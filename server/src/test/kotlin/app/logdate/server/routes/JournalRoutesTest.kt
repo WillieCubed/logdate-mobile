@@ -19,7 +19,7 @@ import kotlin.test.assertEquals
  */
 class JournalRoutesTest {
     @Test
-    fun testJournalRoutesRequireAuthAndEnforceMethods() =
+    fun `journal routes require auth and enforce methods`() =
         testApplication {
             application { module() }
 

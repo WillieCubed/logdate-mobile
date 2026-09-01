@@ -26,7 +26,7 @@ class JvmBatteryInfoProviderTest {
     }
 
     @Test
-    fun testInitialBatteryState() =
+    fun `initial battery state`() =
         runTest {
             val state = batteryInfoProvider.getCurrentBatteryState()
             assertNotNull(state)
@@ -38,7 +38,7 @@ class JvmBatteryInfoProviderTest {
         }
 
     @Test
-    fun testBatteryFlow() =
+    fun `battery flow`() =
         runTest {
             val state = batteryInfoProvider.currentBatteryState.first()
             assertNotNull(state)
@@ -49,14 +49,14 @@ class JvmBatteryInfoProviderTest {
         }
 
     @Test
-    fun testPowerSaveMode() =
+    fun `power save mode`() =
         runTest {
             val isPowerSaveMode = batteryInfoProvider.isPowerSaveMode()
             assertFalse(isPowerSaveMode)
         }
 
     @Test
-    fun testCleanup() {
+    fun `cleanup`() {
         // Just verify that cleanup doesn't throw any exceptions
         batteryInfoProvider.cleanup()
     }

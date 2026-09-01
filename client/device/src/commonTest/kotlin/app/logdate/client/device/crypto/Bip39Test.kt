@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  */
 class Bip39Test {
     @Test
-    fun testGenerateMnemonic() {
+    fun `generate mnemonic`() {
         val entropy = ByteArray(16) { it.toByte() }
         val mnemonic = Bip39.generateMnemonic(entropy)
 
@@ -24,7 +24,7 @@ class Bip39Test {
     }
 
     @Test
-    fun testMnemonicRoundtrip() {
+    fun `mnemonic roundtrip`() {
         val originalEntropy = ByteArray(16) { it.toByte() }
         val mnemonic = Bip39.generateMnemonic(originalEntropy)
         val recoveredEntropy = Bip39.mnemonicToEntropy(mnemonic)
@@ -33,7 +33,7 @@ class Bip39Test {
     }
 
     @Test
-    fun testValidateMnemonic() {
+    fun `validate mnemonic`() {
         val entropy = ByteArray(16) { it.toByte() }
         val mnemonic = Bip39.generateMnemonic(entropy)
 
@@ -41,7 +41,7 @@ class Bip39Test {
     }
 
     @Test
-    fun testValidateInvalidMnemonic() {
+    fun `validate invalid mnemonic`() {
         val invalidMnemonic =
             listOf("invalid", "word", "list", "that", "is", "not", "real", "bip39", "mnemonic", "phrase", "example", "test")
 
@@ -49,7 +49,7 @@ class Bip39Test {
     }
 
     @Test
-    fun testKnownMnemonic() {
+    fun `known mnemonic`() {
         // Known test vector from BIP-39 spec
         val knownMnemonic =
             listOf(

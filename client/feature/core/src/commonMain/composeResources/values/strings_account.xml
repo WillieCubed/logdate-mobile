@@ -82,6 +82,8 @@
     <string name="your_passkeys">Your passkeys</string>
     <string name="passkey_stored_on_device">Stored on %1$s • Last used %2$s</string>
     <string name="passkey_last_used">Last used %1$s</string>
+    <string name="passkey_generic_name">Passkey</string>
+    <string name="passkey_ends_in">Ends in %1$s</string>
     <string name="collapse_passkey_options">Collapse passkey options</string>
     <string name="expand_passkey_options">Expand passkey options</string>
     <string name="account_passkey_create_success_toast">Passkey created successfully!</string>
@@ -218,4 +220,8 @@
     <string name="account_passkey_point_multi_device">Syncs to your other devices through your password manager</string>
     <string name="account_create_cta">Create account</string>
     <string name="account_will_sign_in_to">You'll be signed in to %1$s</string>
+    <!-- Second-device sign-in: adopting entries already on this device -->
+    <string name="account_adopt_local_data_title">Keep what's already here?</string>
+    <string name="account_adopt_local_data_body">This device has entries that aren't in any account yet. Signing in adds them to your account and syncs them to your other devices.</string>
+    <string name="account_adopt_local_data_confirm">Sign in and keep them</string>
 </resources>

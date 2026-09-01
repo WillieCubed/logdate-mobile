@@ -29,7 +29,7 @@ class ExportModelSerializationTest {
     // ── ExportNote ───────────────────────────────────────────────────────
 
     @Test
-    fun exportNote_textType_allFieldsPreserved() {
+    fun `export note text type all fields preserved`() {
         val original =
             ExportNote(
                 id = "note-text-001",
@@ -54,7 +54,7 @@ class ExportModelSerializationTest {
     }
 
     @Test
-    fun exportNote_imageType_mediaRefAndCaptionPreserved() {
+    fun `export note image type media ref and caption preserved`() {
         val original =
             ExportNote(
                 id = "note-img-001",
@@ -73,7 +73,7 @@ class ExportModelSerializationTest {
     }
 
     @Test
-    fun exportNote_audioType_durationPreserved() {
+    fun `export note audio type duration preserved`() {
         val original =
             ExportNote(
                 id = "note-audio-001",
@@ -90,7 +90,7 @@ class ExportModelSerializationTest {
     }
 
     @Test
-    fun exportNote_videoType_captionPreserved() {
+    fun `export note video type caption preserved`() {
         val original =
             ExportNote(
                 id = "note-video-001",
@@ -107,7 +107,7 @@ class ExportModelSerializationTest {
     }
 
     @Test
-    fun exportNote_withLocation_allLocationFieldsPreserved() {
+    fun `export note with location all location fields preserved`() {
         val location =
             ExportLocation(
                 latitude = 51.5074,
@@ -136,7 +136,7 @@ class ExportModelSerializationTest {
     }
 
     @Test
-    fun exportNote_syncVersionZeroDefault_preserved() {
+    fun `export note sync version zero default preserved`() {
         val original =
             ExportNote(
                 id = "note-001",
@@ -150,7 +150,7 @@ class ExportModelSerializationTest {
     }
 
     @Test
-    fun exportNote_unicodeContent_preservedExactly() {
+    fun `export note unicode content preserved exactly`() {
         val original =
             ExportNote(
                 id = "note-unicode",
@@ -165,7 +165,7 @@ class ExportModelSerializationTest {
     // ── ExportMetadata ───────────────────────────────────────────────────
 
     @Test
-    fun exportMetadata_allFieldsPreserved() {
+    fun `export metadata all fields preserved`() {
         val original =
             ExportMetadata(
                 version = ExportSchemaVersion.CURRENT,
@@ -203,7 +203,7 @@ class ExportModelSerializationTest {
     // ── ExportJournalNoteRelation ─────────────────────────────────────────
 
     @Test
-    fun exportJournalNoteRelation_allFieldsPreserved() {
+    fun `export journal note relation all fields preserved`() {
         val original =
             ExportJournalNoteRelation(
                 journalId = "journal-001",
@@ -222,7 +222,7 @@ class ExportModelSerializationTest {
     // ── ExportLocation ────────────────────────────────────────────────────
 
     @Test
-    fun exportLocation_withNullOptionals_preserved() {
+    fun `export location with null optionals preserved`() {
         val original = ExportLocation(latitude = 37.7749, longitude = -122.4194)
         val restored = roundTrip(original)
 
@@ -234,7 +234,7 @@ class ExportModelSerializationTest {
     }
 
     @Test
-    fun exportLocation_withAllOptionals_preserved() {
+    fun `export location with all optionals preserved`() {
         val original =
             ExportLocation(
                 latitude = -33.8688,
@@ -253,7 +253,7 @@ class ExportModelSerializationTest {
     // ── ExportPlace ───────────────────────────────────────────────────────
 
     @Test
-    fun exportPlace_allFieldsPreserved() {
+    fun `export place all fields preserved`() {
         val original =
             ExportPlace(
                 id = "place-001",
@@ -276,7 +276,7 @@ class ExportModelSerializationTest {
     // ── ExportLocationHistoryItem ─────────────────────────────────────────
 
     @Test
-    fun exportLocationHistoryItem_allFieldsPreserved() {
+    fun `export location history item all fields preserved`() {
         val original =
             ExportLocationHistoryItem(
                 sampleId = "sample-001",
@@ -319,7 +319,7 @@ class ExportModelSerializationTest {
     // ── ExportMediaFile ───────────────────────────────────────────────────
 
     @Test
-    fun exportMediaFile_pathsPreserved() {
+    fun `export media file paths preserved`() {
         val original =
             ExportMediaFile(
                 exportPath = "media/note-img-001.jpg",
@@ -334,7 +334,7 @@ class ExportModelSerializationTest {
     // ── ExportSchemaVersion ───────────────────────────────────────────────
 
     @Test
-    fun exportSchemaVersion_serializesAsString() {
+    fun `export schema version serializes as string`() {
         val version = ExportSchemaVersion(1, 2)
         val json = Json.encodeToString(version)
         assertEquals("\"1.2\"", json)
@@ -342,7 +342,7 @@ class ExportModelSerializationTest {
     }
 
     @Test
-    fun exportSchemaVersion_current_survivesRoundTrip() {
+    fun `export schema version current survives round trip`() {
         val restored = roundTrip(ExportSchemaVersion.CURRENT)
         assertEquals(ExportSchemaVersion.CURRENT, restored)
     }
@@ -350,7 +350,7 @@ class ExportModelSerializationTest {
     // ── Timestamp precision ───────────────────────────────────────────────
 
     @Test
-    fun instant_millisecondPrecisionPreservedInJson() {
+    fun `instant millisecond precision preserved in json`() {
         val t = Instant.fromEpochMilliseconds(1_700_000_000_123L)
         val note =
             ExportNote(

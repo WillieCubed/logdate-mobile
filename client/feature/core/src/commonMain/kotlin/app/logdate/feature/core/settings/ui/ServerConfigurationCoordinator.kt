@@ -29,9 +29,20 @@ class ServerConfigurationCoordinator(
         )
     }
 
+    /**
+     * Points the app at LogDate Cloud, failing if the server cannot be reached.
+     *
+     * Discovery failure used to be swallowed, so an unreachable server still reported success and
+     * the flow carried on with no descriptor — leaving someone to fill in a name and a handle
+     * before anything told them the server was down. Surfacing it here means they find out while
+     * they can still choose a different server.
+     */
     suspend fun saveLogDateCloudSelection(): Result<SaveResult> {
         val serverOrigin = DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL
-        val descriptor = serverDiscoveryClient.discoverServer(serverOrigin).getOrNull()
+        val descriptor =
+            serverDiscoveryClient.discoverServer(serverOrigin).getOrElse { error ->
+                return Result.failure(error)
+            }
         saveServerConfiguration(serverOrigin, descriptor)
         return Result.success(
             SaveResult(

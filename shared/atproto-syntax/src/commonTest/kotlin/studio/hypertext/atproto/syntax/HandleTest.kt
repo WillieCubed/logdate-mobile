@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  */
 class HandleTest {
     @Test
-    fun normalizesHandlesToLowercase() {
+    fun `normalizes handles to lowercase`() {
         val handle = Handle.require("XX.LCS.MIT.EDU")
 
         assertEquals("xx.lcs.mit.edu", box(handle).value)
@@ -24,33 +24,33 @@ class HandleTest {
     }
 
     @Test
-    fun allowsReservedTldsAtSyntaxLevel() {
+    fun `allows reserved tlds at syntax level`() {
         val handle = Handle.require("xn--ls8h.test")
 
         assertEquals("xn--ls8h.test", handle.value)
     }
 
     @Test
-    fun serializesAsJsonString() {
+    fun `serializes as json string`() {
         val json = Json.encodeToString(Handle.require("jay.bsky.social"))
 
         assertEquals("\"jay.bsky.social\"", json)
     }
 
     @Test
-    fun rejectsInvalidSyntax() {
+    fun `rejects invalid syntax`() {
         assertFailsWith<InvalidHandleException> {
             Handle.require("org")
         }
     }
 
     @Test
-    fun parseReturnsFailureForInvalidHandle() {
+    fun `parse returns failure for invalid handle`() {
         assertTrue(Handle.parse("john..test").isFailure)
     }
 
     @Test
-    fun reportsValidityAndRejectsOverlongHandles() {
+    fun `reports validity and rejects overlong handles`() {
         assertTrue(Handle.isValid("example.com"))
 
         val overlong = "${"a".repeat(64)}.${"b".repeat(64)}.${"c".repeat(64)}.${"d".repeat(64)}"

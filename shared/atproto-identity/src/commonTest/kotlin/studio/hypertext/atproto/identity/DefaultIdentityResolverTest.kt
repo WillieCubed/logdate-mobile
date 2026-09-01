@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
  */
 class DefaultIdentityResolverTest {
     @Test
-    fun resolvesHandleThenDocument(): Unit =
+    fun `resolves handle then document`(): Unit =
         runTest {
             val did = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
             val document = DidDocument(id = did)
@@ -39,7 +39,7 @@ class DefaultIdentityResolverTest {
         }
 
     @Test
-    fun resolvesDidDirectly(): Unit =
+    fun `resolves did directly`(): Unit =
         runTest {
             val did = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
             val document = DidDocument(id = did)
@@ -62,7 +62,7 @@ class DefaultIdentityResolverTest {
         }
 
     @Test
-    fun resolvesDidFromHandle(): Unit =
+    fun `resolves did from handle`(): Unit =
         runTest {
             val did = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
             val identityResolver =
@@ -84,7 +84,7 @@ class DefaultIdentityResolverTest {
         }
 
     @Test
-    fun propagatesHandleResolutionFailure(): Unit =
+    fun `propagates handle resolution failure`(): Unit =
         runTest {
             val exception = HandleResolutionException("example.com", "HTTP 404")
             val identityResolver =

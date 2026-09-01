@@ -80,6 +80,7 @@ import app.logdate.feature.events.ui.calendarsync.CalendarSyncSettingsContent
 import app.logdate.feature.events.ui.calendarsync.PermissionState
 import app.logdate.feature.events.ui.settings.EventsSettingsContent
 import app.logdate.feature.events.ui.settings.EventsSettingsUiState
+import app.logdate.feature.onboarding.ui.CloudAccountSetupContent
 import app.logdate.feature.onboarding.ui.MemoriesImportInfoScreen
 import app.logdate.feature.onboarding.ui.MemorySelectionScreen
 import app.logdate.feature.onboarding.ui.MemorySelectionUiState
@@ -339,15 +340,13 @@ object SharedScreenshotCatalog {
                 )
             },
             sharedScene(SharedScreenshotSceneId.CloudAccountSetupCompact, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
-                CloudAccountWelcomeContent(
+                CloudAccountSetupContent(
+                    useCompactLayout = true,
+                    onBack = {},
                     onContinue = {},
                     onSignIn = {},
                     onSkip = {},
-                    serverSelectionState = ServerSelectionState(),
-                    onSelectServerPreset = {},
-                    onCustomServerUrlChange = {},
-                    onShowCustomServerInfo = {},
-                    isPasskeySupported = true,
+                    onPlanSelected = {},
                 )
             },
             sharedScene(SharedScreenshotSceneId.OnboardingBirthday, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
@@ -619,7 +618,6 @@ object SharedScreenshotCatalog {
                         listOf(
                             PasskeyInfo(
                                 id = "passkey-ios",
-                                name = "Primary Passkey",
                                 device = "iPhone 16 Pro",
                                 lastUsed = baseInstant,
                             ),
@@ -657,7 +655,6 @@ object SharedScreenshotCatalog {
                         listOf(
                             PasskeyInfo(
                                 id = "passkey-mac",
-                                name = "MacBook Passkey",
                                 device = "MacBook Pro",
                                 lastUsed = baseInstant,
                             ),

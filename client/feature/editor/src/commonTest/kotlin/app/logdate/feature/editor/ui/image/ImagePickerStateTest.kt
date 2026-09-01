@@ -13,7 +13,7 @@ import kotlin.time.Instant
  */
 class ImagePickerStateTest {
     @Test
-    fun testRecentImagePreviewsOnlyReturnsImagesSortedNewestFirst() {
+    fun `recent image previews only returns images sorted newest first`() {
         val oldest = Instant.parse("2024-01-01T00:00:00Z")
         val middle = Instant.parse("2024-02-01T00:00:00Z")
         val newest = Instant.parse("2024-03-01T00:00:00Z")
@@ -56,7 +56,7 @@ class ImagePickerStateTest {
     }
 
     @Test
-    fun testRecentImagePreviewsAppliesLimit() {
+    fun `recent image previews applies limit`() {
         val previews =
             recentImagePreviews(
                 media =

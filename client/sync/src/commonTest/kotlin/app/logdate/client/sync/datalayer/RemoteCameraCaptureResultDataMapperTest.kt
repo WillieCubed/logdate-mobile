@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 class RemoteCameraCaptureResultDataMapperTest {
     @Test
-    fun savedResultRoundTripsThroughStringDataMap() {
+    fun `saved result round trips through string data map`() {
         val result =
             RemoteCameraCaptureResult(
                 isSaved = true,
@@ -26,7 +26,7 @@ class RemoteCameraCaptureResultDataMapperTest {
     }
 
     @Test
-    fun failedResultRoundTripsThroughStringDataMap() {
+    fun `failed result round trips through string data map`() {
         val result =
             RemoteCameraCaptureResult(
                 isSaved = false,

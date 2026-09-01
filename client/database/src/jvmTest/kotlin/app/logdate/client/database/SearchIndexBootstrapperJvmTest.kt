@@ -39,7 +39,7 @@ class SearchIndexBootstrapperJvmTest {
     }
 
     @Test
-    fun freshDatabaseIndexesInsertedTextNotes() =
+    fun `fresh database indexes inserted text notes`() =
         runTest {
             val database = openDatabase()
             val note =
@@ -60,7 +60,7 @@ class SearchIndexBootstrapperJvmTest {
         }
 
     @Test
-    fun transcriptionSearchUsesSourceAudioNoteDateAndDeletesWithSourceNote() =
+    fun `transcription search uses source audio note date and deletes with source note`() =
         runTest {
             val database = openDatabase()
             val audioNote =
@@ -95,7 +95,7 @@ class SearchIndexBootstrapperJvmTest {
         }
 
     @Test
-    fun ambientSoundTagsAreSearchableAndCascadeWithTheParentAudioNote() =
+    fun `ambient sound tags are searchable and cascade with the parent audio note`() =
         runTest {
             val database = openDatabase()
             val audioNote =

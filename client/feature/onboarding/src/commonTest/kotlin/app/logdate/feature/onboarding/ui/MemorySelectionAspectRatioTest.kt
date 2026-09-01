@@ -8,7 +8,7 @@ import kotlin.time.Instant
 
 class MemorySelectionAspectRatioTest {
     @Test
-    fun aspectRatioIsStableForTheSameMediaUri() {
+    fun `aspect ratio is stable for the same media uri`() {
         val image =
             MediaObject.Image(
                 uri = "content://media/photo-1",

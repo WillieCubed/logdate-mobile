@@ -13,7 +13,7 @@ import kotlin.uuid.Uuid
  */
 class EditorStateTest {
     @Test
-    fun testEmptyState() {
+    fun `empty state`() {
         val state = EditorState()
 
         // Initial state should be empty
@@ -26,7 +26,7 @@ class EditorStateTest {
     }
 
     @Test
-    fun testCopyWithNewBlocks() {
+    fun `copy with new blocks`() {
         val initialState = EditorState()
         val block = TextBlockUiState(content = "Test content")
 
@@ -49,7 +49,7 @@ class EditorStateTest {
     }
 
     @Test
-    fun testReadOnlyBlocks() {
+    fun `read only blocks`() {
         val block = TextBlockUiState(content = "Read-only content")
         val readOnlyMap = mapOf(block.id to true)
 
@@ -69,7 +69,7 @@ class EditorStateTest {
     }
 
     @Test
-    fun testExpandedBlockState() {
+    fun `expanded block state`() {
         val block = TextBlockUiState(content = "Test content")
 
         // Create state with an expanded block
@@ -85,7 +85,7 @@ class EditorStateTest {
     }
 
     @Test
-    fun testIsModifiedFlag() {
+    fun `is modified flag`() {
         val block = TextBlockUiState(content = "Test content")
 
         // Create initial state with content but not marked as modified
@@ -109,7 +109,7 @@ class EditorStateTest {
     }
 
     @Test
-    fun testEquality() {
+    fun `equality`() {
         val block = TextBlockUiState(content = "Test content")
         val state1 = EditorState(blocks = listOf(block))
         val state2 = EditorState(blocks = listOf(block))
@@ -123,7 +123,7 @@ class EditorStateTest {
     }
 
     @Test
-    fun testHasContentWithEmptyBlocks() {
+    fun `has content with empty blocks`() {
         // Block with no content
         val emptyBlock = TextBlockUiState(content = "")
 
@@ -136,7 +136,7 @@ class EditorStateTest {
     }
 
     @Test
-    fun modifiedEmptyActiveDraftCannotExitBeforeClearingPersistence() {
+    fun `modified empty active draft cannot exit before clearing persistence`() {
         val state =
             EditorState(
                 blocks = emptyList(),
@@ -149,7 +149,7 @@ class EditorStateTest {
     }
 
     @Test
-    fun modifiedJournalSelectionIsDirtyWithoutBlocks() {
+    fun `modified journal selection is dirty without blocks`() {
         val state =
             EditorState(
                 selectedJournalIds = listOf(Uuid.random()),
@@ -162,7 +162,7 @@ class EditorStateTest {
     }
 
     @Test
-    fun testSingleEmptyBlockReturnsToPickerOnBack() {
+    fun `single empty block returns to picker on back`() {
         val emptyBlock = TextBlockUiState(content = "")
         val state = EditorState(blocks = listOf(emptyBlock))
 
@@ -170,7 +170,7 @@ class EditorStateTest {
     }
 
     @Test
-    fun testSingleBlockWithContentDoesNotReturnToPickerOnBack() {
+    fun `single block with content does not return to picker on back`() {
         val contentBlock = TextBlockUiState(content = "Has content")
         val state = EditorState(blocks = listOf(contentBlock))
 
@@ -178,7 +178,7 @@ class EditorStateTest {
     }
 
     @Test
-    fun testSingleEmptyVideoBlockDoesNotReturnToPickerOnBack() {
+    fun `single empty video block does not return to picker on back`() {
         val emptyBlock = VideoBlockUiState()
         val state = EditorState(blocks = listOf(emptyBlock))
 
@@ -186,7 +186,7 @@ class EditorStateTest {
     }
 
     @Test
-    fun testExpandedImageBlockDoesNotActivateImmersiveLayout() {
+    fun `expanded image block does not activate immersive layout`() {
         val block = ImageBlockUiState(uri = "content://images/1")
         val state =
             EditorState(
@@ -198,7 +198,7 @@ class EditorStateTest {
     }
 
     @Test
-    fun testUnexpandedCameraBlockDoesNotActivateImmersiveLayout() {
+    fun `unexpanded camera block does not activate immersive layout`() {
         val block = CameraBlockUiState()
         val state = EditorState(blocks = listOf(block))
 
@@ -206,7 +206,7 @@ class EditorStateTest {
     }
 
     @Test
-    fun testExpandedCameraBlockActivatesImmersiveLayout() {
+    fun `expanded camera block activates immersive layout`() {
         val block = CameraBlockUiState()
         val state =
             EditorState(
@@ -218,7 +218,7 @@ class EditorStateTest {
     }
 
     @Test
-    fun testMixOfEmptyAndContentBlocks() {
+    fun `mix of empty and content blocks`() {
         // Create blocks with and without content
         val emptyBlock = TextBlockUiState(content = "")
         val contentBlock = TextBlockUiState(content = "Has content")

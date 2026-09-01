@@ -15,7 +15,7 @@ import kotlin.time.Duration.Companion.seconds
  */
 class AICacheEntryCodecTest {
     @Test
-    fun decode_withInvalidPayload_returnsNull() {
+    fun `decode with invalid payload returns null`() {
         val codec = JsonAICacheEntryCodec()
 
         val decoded = codec.decode("not-json")
@@ -24,7 +24,7 @@ class AICacheEntryCodecTest {
     }
 
     @Test
-    fun encodeAndDecode_roundTripsEntry() {
+    fun `encode and decode round trips entry`() {
         val codec = JsonAICacheEntryCodec()
         val now = Clock.System.now()
         val entry =

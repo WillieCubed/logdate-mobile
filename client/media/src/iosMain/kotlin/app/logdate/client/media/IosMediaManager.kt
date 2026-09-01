@@ -82,6 +82,27 @@ class IosMediaManager(
             return@withContext media ?: error("Unsupported or missing media at $uri")
         }
 
+    /**
+     * Deletes a file LogDate itself copied into app storage, and reports whether it was there.
+     *
+     * A `ph://` URI is an asset in the user's photo library and is refused outright -- removing an
+     * entry must never remove a photo from their library. A file path is deleted only when it
+     * resolves inside this app's own media directory, so a file referenced from anywhere else is
+     * left alone.
+     */
+    override suspend fun deleteOwnedMedia(uri: String): Boolean =
+        withContext(Dispatchers.Default) {
+            if (uri.isPhotoLibraryUri()) return@withContext false
+
+            val path = resolvePath(uri) ?: return@withContext false
+            val root = mediaRootPath.trimEnd('/')
+            if (!path.startsWith("$root/")) return@withContext false
+            if (path.contains("/../")) return@withContext false
+            if (!fileManager.fileExistsAtPath(path)) return@withContext false
+
+            fileManager.removeItemAtPath(path, error = null)
+        }
+
     override suspend fun exists(mediaId: String): Boolean =
         withContext(Dispatchers.Default) {
             if (mediaId.isPhotoLibraryUri()) {

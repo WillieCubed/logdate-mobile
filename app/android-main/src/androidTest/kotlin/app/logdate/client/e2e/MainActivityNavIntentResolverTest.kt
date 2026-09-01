@@ -44,7 +44,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class MainActivityNavIntentResolverTest {
     @Test
-    fun customSchemeJournalIntent_resolvesJournalDetailsRoute() {
+    fun `custom scheme journal intent resolves journal details route`() {
         val journalId = Uuid.random()
 
         assertEquals(
@@ -56,7 +56,7 @@ class MainActivityNavIntentResolverTest {
     }
 
     @Test
-    fun customSchemeSearchIntent_resolvesSearchRoute() {
+    fun `custom scheme search intent resolves search route`() {
         assertEquals(
             SearchRoute(
                 query = "lanterns",
@@ -70,7 +70,7 @@ class MainActivityNavIntentResolverTest {
     }
 
     @Test
-    fun webDayIntent_resolvesTimelineDetailRoute() {
+    fun `web day intent resolves timeline detail route`() {
         val date = "2026-06-15"
 
         assertEquals(
@@ -82,7 +82,7 @@ class MainActivityNavIntentResolverTest {
     }
 
     @Test
-    fun customSchemeLocationIntent_resolvesLocationTimelineRoute() {
+    fun `custom scheme location intent resolves location timeline route`() {
         assertEquals(
             LocationTimelineRoute,
             resolveMainActivityNavKey(
@@ -92,7 +92,7 @@ class MainActivityNavIntentResolverTest {
     }
 
     @Test
-    fun ambientPromptNewEntryIntent_resolvesEntryEditorRoute() {
+    fun `ambient prompt new entry intent resolves entry editor route`() {
         assertEquals(
             app.logdate.feature.editor.navigation.EntryEditorRoute(),
             resolveMainActivityNavKey(
@@ -104,7 +104,7 @@ class MainActivityNavIntentResolverTest {
     }
 
     @Test
-    fun ambientPromptDraftIntent_resolvesEntryEditorRouteWithDraftId() {
+    fun `ambient prompt draft intent resolves entry editor route with draft id`() {
         val draftId = Uuid.random().toString()
 
         assertEquals(
@@ -119,7 +119,7 @@ class MainActivityNavIntentResolverTest {
     }
 
     @Test
-    fun ambientPromptMemoryRecallIntent_resolvesTimelineDetailRoute() {
+    fun `ambient prompt memory recall intent resolves timeline detail route`() {
         val date = "2026-06-15"
 
         assertEquals(
@@ -134,7 +134,7 @@ class MainActivityNavIntentResolverTest {
     }
 
     @Test
-    fun ambientPromptEventIntent_resolvesEventDetailRoute() {
+    fun `ambient prompt event intent resolves event detail route`() {
         val eventId = "event-123"
 
         assertEquals(
@@ -149,7 +149,7 @@ class MainActivityNavIntentResolverTest {
     }
 
     @Test
-    fun audioPlaybackNotificationIntent_resolvesNoteDetailRoute() {
+    fun `audio playback notification intent resolves note detail route`() {
         val noteId = Uuid.random().toString()
 
         assertEquals(
@@ -164,7 +164,7 @@ class MainActivityNavIntentResolverTest {
     }
 
     @Test
-    fun locationHistoryNotificationIntent_resolvesLocationTimelineRoute() {
+    fun `location history notification intent resolves location timeline route`() {
         assertEquals(
             LocationTimelineRoute,
             resolveMainActivityNavKey(
@@ -176,7 +176,7 @@ class MainActivityNavIntentResolverTest {
     }
 
     @Test
-    fun rewindNotificationIntent_resolvesRewindDetailRoute() {
+    fun `rewind notification intent resolves rewind detail route`() {
         val rewindId = Uuid.random()
 
         assertEquals(
@@ -191,7 +191,7 @@ class MainActivityNavIntentResolverTest {
     }
 
     @Test
-    fun dataTransferNotificationIntent_resolvesExportSettingsRoute() {
+    fun `data transfer notification intent resolves export settings route`() {
         assertEquals(
             ExportSettingsRoute,
             resolveMainActivityNavKey(
@@ -203,7 +203,7 @@ class MainActivityNavIntentResolverTest {
     }
 
     @Test
-    fun dataTransferNotificationHelpers_includeLaunchIntents() {
+    fun `data transfer notification helpers include launch intents`() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
         assertNotNull(
@@ -221,7 +221,7 @@ class MainActivityNavIntentResolverTest {
     }
 
     @Test
-    fun unrelatedIntent_returnsNull() {
+    fun `unrelated intent returns null`() {
         assertNull(resolveMainActivityNavKey(Intent()))
         assertNull(resolveMainActivityNavKey(Intent(Intent.ACTION_MAIN)))
         assertNull(resolveMainActivityNavKey(Intent().apply { putExtra("something", "else") }))

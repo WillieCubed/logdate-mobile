@@ -134,7 +134,7 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun updateBirthday_delegatesToRepository() =
+    fun `update birthday delegates to repository`() =
         runTest {
             val birthday = Instant.fromEpochMilliseconds(946684800000) // 2000-01-01
 
@@ -145,7 +145,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun setRecommendationsEnabled_true_delegatesToRepository() =
+    fun `set recommendations enabled true delegates to repository`() =
         runTest {
             viewModel.setRecommendationsEnabled(true)
             advanceUntilIdle()
@@ -154,7 +154,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun setRecommendationsEnabled_false_delegatesToRepository() =
+    fun `set recommendations enabled false delegates to repository`() =
         runTest {
             viewModel.setRecommendationsEnabled(false)
             advanceUntilIdle()
@@ -163,7 +163,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun enableLocationTracking_delegatesToRepository() =
+    fun `enable location tracking delegates to repository`() =
         runTest {
             viewModel.enableLocationTracking()
             advanceUntilIdle()
@@ -172,7 +172,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun enableSleepBasedDayBoundaries_delegatesToRepository() =
+    fun `enable sleep based day boundaries delegates to repository`() =
         runTest {
             fakeDayBoundarySettingsRepository.setSleepBasedBoundariesEnabled(false)
 
@@ -183,7 +183,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun disableSleepBasedDayBoundaries_delegatesToRepository() =
+    fun `disable sleep based day boundaries delegates to repository`() =
         runTest {
             viewModel.disableSleepBasedDayBoundaries()
             advanceUntilIdle()
@@ -192,7 +192,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun refreshHealthStatus_whenUnavailable_preservesSleepBasedDayBoundariesPreference() =
+    fun `refresh health status when unavailable preserves sleep based day boundaries preference`() =
         runTest {
             fakeHealthRepository.isAvailable = false
             fakeDayBoundarySettingsRepository.setSleepBasedBoundariesEnabled(true)
@@ -205,7 +205,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun completeOnboarding_delegatesToRepository() =
+    fun `complete onboarding delegates to repository`() =
         runTest {
             fakeProfileRepository.setProfile(
                 LogDateProfile(
@@ -227,7 +227,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun completeOnboardingIfEligible_fails_when_birthday_missing() =
+    fun `complete onboarding if eligible fails when birthday missing`() =
         runTest {
             fakeProfileRepository.setProfile(
                 LogDateProfile(
@@ -247,7 +247,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun completeOnboardingIfEligible_fails_when_location_step_not_handled() =
+    fun `complete onboarding if eligible fails when location step not handled`() =
         runTest {
             fakeProfileRepository.setProfile(
                 LogDateProfile(
@@ -269,7 +269,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun completeOnboardingIfEligible_fails_when_identity_key_missing() =
+    fun `complete onboarding if eligible fails when identity key missing`() =
         runTest {
             identityKeyManager.clearIdentityKey()
             viewModel.refreshIdentityKeyState()
@@ -294,7 +294,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun markNotificationsHandled_updatesProgressSnapshot() =
+    fun `mark notifications handled updates progress snapshot`() =
         runTest {
             viewModel.markNotificationsHandled()
             advanceUntilIdle()
@@ -303,7 +303,7 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun handledMarkers_updateProgressSnapshot() =
+    fun `handled markers update progress snapshot`() =
         runTest {
             viewModel.markRecommendationsHandled()
             viewModel.markDayBoundariesHandled()
@@ -337,7 +337,7 @@ class OnboardingViewModelTest {
     }
 
     @Test
-    fun setActiveEntryMode_updatesState() =
+    fun `set active entry mode updates state`() =
         runTest {
             viewModel.setActiveEntryMode(OnboardingEntryMode.CONTINUE_SETUP)
             advanceUntilIdle()

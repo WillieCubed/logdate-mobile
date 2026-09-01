@@ -49,7 +49,7 @@ class ExportFlowE2ETest {
     // region DataSettingsContent — Export State Rendering
 
     @Test
-    fun idleState_showsExportButton() {
+    fun `idle state shows export button`() {
         composeRule.setContent {
             DataSettingsContent(
                 onBack = {},
@@ -87,7 +87,7 @@ class ExportFlowE2ETest {
     }
 
     @Test
-    fun idleState_exportButtonTriggersShowExportOptions() {
+    fun `idle state export button triggers show export options`() {
         var showOptionsCalled = false
 
         composeRule.setContent {
@@ -126,7 +126,7 @@ class ExportFlowE2ETest {
     }
 
     @Test
-    fun selectingState_showsExportButtonDisabled() {
+    fun `selecting state shows export button disabled`() {
         composeRule.setContent {
             DataSettingsContent(
                 onBack = {},
@@ -162,7 +162,7 @@ class ExportFlowE2ETest {
     }
 
     @Test
-    fun exportingState_showsProgressCard() {
+    fun `exporting state shows progress card`() {
         composeRule.setContent {
             DataSettingsContent(
                 onBack = {},
@@ -200,7 +200,7 @@ class ExportFlowE2ETest {
     }
 
     @Test
-    fun exportingState_cancelButtonTriggersCancelExport() {
+    fun `exporting state cancel button triggers cancel export`() {
         var cancelCalled = false
 
         composeRule.setContent {
@@ -239,7 +239,7 @@ class ExportFlowE2ETest {
     }
 
     @Test
-    fun completedState_showsSuccessCard() {
+    fun `completed state shows success card`() {
         composeRule.setContent {
             DataSettingsContent(
                 onBack = {},
@@ -288,7 +288,7 @@ class ExportFlowE2ETest {
     }
 
     @Test
-    fun completedState_openButtonTriggersBrowseExport() {
+    fun `completed state open button triggers browse export`() {
         var sharedPath: String? = null
 
         composeRule.setContent {
@@ -332,7 +332,7 @@ class ExportFlowE2ETest {
     }
 
     @Test
-    fun completedState_doneButtonTriggersDissmiss() {
+    fun `completed state done button triggers dissmiss`() {
         var dismissCalled = false
 
         composeRule.setContent {
@@ -374,7 +374,7 @@ class ExportFlowE2ETest {
     }
 
     @Test
-    fun completedState_withoutStats_showsSuccessCardWithoutStatsLine() {
+    fun `completed state without stats shows success card without stats line`() {
         composeRule.setContent {
             DataSettingsContent(
                 onBack = {},
@@ -418,7 +418,7 @@ class ExportFlowE2ETest {
     }
 
     @Test
-    fun failedState_showsFailureCard() {
+    fun `failed state shows failure card`() {
         composeRule.setContent {
             DataSettingsContent(
                 onBack = {},
@@ -460,7 +460,7 @@ class ExportFlowE2ETest {
     }
 
     @Test
-    fun failedState_retryButtonTriggersRetryExport() {
+    fun `failed state retry button triggers retry export`() {
         var retryCalled = false
 
         composeRule.setContent {
@@ -499,7 +499,7 @@ class ExportFlowE2ETest {
     }
 
     @Test
-    fun failedState_dismissButtonTriggersDismiss() {
+    fun `failed state dismiss button triggers dismiss`() {
         var dismissCalled = false
 
         composeRule.setContent {
@@ -538,7 +538,7 @@ class ExportFlowE2ETest {
     }
 
     @Test
-    fun exportingState_zeroPercent_showsIndeterminateProgress() {
+    fun `exporting state zero percent shows indeterminate progress`() {
         composeRule.setContent {
             DataSettingsContent(
                 onBack = {},
@@ -575,7 +575,7 @@ class ExportFlowE2ETest {
     }
 
     @Test
-    fun exportingState_hundredPercent_shows100() {
+    fun `exporting state hundred percent shows100`() {
         composeRule.setContent {
             DataSettingsContent(
                 onBack = {},
@@ -616,7 +616,7 @@ class ExportFlowE2ETest {
     // region State Transitions — Dynamic state changes
 
     @Test
-    fun stateTransition_idleToExporting_swapsExportButtonForProgressCard() {
+    fun `state transition idle to exporting swaps export button for progress card`() {
         composeRule.setContent {
             var state by remember { mutableStateOf<ExportState>(ExportState.Idle) }
             DataSettingsContent(
@@ -662,7 +662,7 @@ class ExportFlowE2ETest {
     }
 
     @Test
-    fun stateTransition_exportingToCompleted() {
+    fun `state transition exporting to completed`() {
         composeRule.setContent {
             var state by remember {
                 mutableStateOf<ExportState>(ExportState.Exporting(90, "Finalizing..."))
@@ -712,7 +712,7 @@ class ExportFlowE2ETest {
     }
 
     @Test
-    fun stateTransition_exportingToFailed() {
+    fun `state transition exporting to failed`() {
         composeRule.setContent {
             var state by remember {
                 mutableStateOf<ExportState>(ExportState.Exporting(30, "Working..."))
@@ -757,7 +757,7 @@ class ExportFlowE2ETest {
     }
 
     @Test
-    fun stateTransition_failedToIdleViaDismiss() {
+    fun `state transition failed to idle via dismiss`() {
         composeRule.setContent {
             var state by remember {
                 mutableStateOf<ExportState>(ExportState.Failed(reason = "Disk full"))
@@ -800,7 +800,7 @@ class ExportFlowE2ETest {
     }
 
     @Test
-    fun stateTransition_completedToIdleViaDone() {
+    fun `state transition completed to idle via done`() {
         composeRule.setContent {
             var state by remember {
                 mutableStateOf<ExportState>(

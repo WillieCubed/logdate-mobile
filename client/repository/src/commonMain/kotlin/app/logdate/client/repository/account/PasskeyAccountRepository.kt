@@ -1,6 +1,7 @@
 package app.logdate.client.repository.account
 
 import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.PasskeyInfo
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -83,6 +84,14 @@ interface PasskeyAccountRepository {
      * @return Result indicating success or failure of the deletion operation
      */
     suspend fun deletePasskey(credentialId: String): Result<Unit>
+
+    /**
+     * Lists this account's passkeys with the detail the account payload does not carry.
+     *
+     * The account knows only credential IDs, which cannot tell someone which of their devices a
+     * credential belongs to -- and that is the decision the settings screen asks them to make.
+     */
+    suspend fun listPasskeys(): Result<List<PasskeyInfo>>
 
     /**
      * Create a restore key backed up to the device's encrypted cloud backup.

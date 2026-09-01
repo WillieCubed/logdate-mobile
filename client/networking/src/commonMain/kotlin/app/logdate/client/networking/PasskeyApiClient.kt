@@ -15,6 +15,7 @@ import app.logdate.shared.model.CompleteAuthenticationRequest
 import app.logdate.shared.model.EntitlementResponse
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyAllowCredential
+import app.logdate.shared.model.PasskeyInfo
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.RefreshTokenRequest
 import app.logdate.shared.model.UpdateAccountProfileRequest
@@ -75,6 +76,15 @@ interface PasskeyApiClientContract {
         accessToken: String,
         credentialId: String,
     ): Result<Unit>
+
+    /**
+     * Lists the account's passkeys with the detail the account payload does not carry -- a
+     * nickname, a device type, and when each was created and last used.
+     *
+     * The account itself only knows credential IDs, which cannot tell a person which of their
+     * devices a credential belongs to.
+     */
+    suspend fun listPasskeys(accessToken: String): Result<List<PasskeyInfo>>
 
     /**
      * Begin restore key registration. Returns WebAuthn registration options for creating a restore key.
@@ -399,6 +409,25 @@ class PasskeyApiClient(
         } catch (e: Exception) {
             Napier.w("Failed to revoke refresh token during logout", e)
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to revoke refresh token", e))
+        }
+
+    override suspend fun listPasskeys(accessToken: String): Result<List<PasskeyInfo>> =
+        try {
+            val baseUrl = getBaseUrl()
+            val response =
+                httpClient.get("$baseUrl$AUTH_PATH/me/passkeys") {
+                    header("Authorization", "Bearer $accessToken")
+                }
+
+            if (response.status.value in 200..299) {
+                Result.success(json.decodeFromString<PasskeyListApiResponse>(response.bodyAsText()).data)
+            } else {
+                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+            }
+        } catch (e: Exception) {
+            Napier.w("Failed to list passkeys", e)
+            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to list passkeys", e))
         }
 
     override suspend fun deletePasskey(
@@ -762,3 +791,10 @@ private fun AuthAccountDto.toLogDateAccount(): LogDateAccount =
         emailVerified = emailVerified,
         emailVerifiedAt = emailVerifiedAt?.let { Instant.parse(it) },
     )
+
+/** The wrapped shape `GET /auth/me/passkeys` replies with. */
+@Serializable
+internal data class PasskeyListApiResponse(
+    val success: Boolean,
+    val data: List<PasskeyInfo>,
+)

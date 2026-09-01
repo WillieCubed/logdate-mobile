@@ -66,7 +66,7 @@ class WatchPairingSettingsE2ETest {
     }
 
     @Test
-    fun watchSettings_pairWatchActionUsesConnectionManager() {
+    fun `watch settings pair watch action uses connection manager`() {
         fakeConnectionManager.updateState(WatchConnectionState.NeedsAssociation("Pixel Watch"))
 
         composeRule.onNodeWithText("Pair LogDate with your watch").assertIsDisplayed()
@@ -76,7 +76,7 @@ class WatchPairingSettingsE2ETest {
     }
 
     @Test
-    fun watchSettings_pendingAssociationStateIsRendered() {
+    fun `watch settings pending association state is rendered`() {
         fakeConnectionManager.updateState(WatchConnectionState.AssociationPending)
 
         composeRule.onNodeWithText("Finish pairing on this phone").assertIsDisplayed()
@@ -86,7 +86,7 @@ class WatchPairingSettingsE2ETest {
     }
 
     @Test
-    fun troubleshooting_installAndOpenActionsUseConnectionManager() {
+    fun `troubleshooting install and open actions use connection manager`() {
         fakeConnectionManager.updateState(
             WatchConnectionState.Connected(
                 watchName = "Pixel Watch",

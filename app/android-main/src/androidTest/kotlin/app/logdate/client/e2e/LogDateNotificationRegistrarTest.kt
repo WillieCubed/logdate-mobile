@@ -28,7 +28,7 @@ class LogDateNotificationRegistrarTest {
         context.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as NotificationManager
 
     @Test
-    fun registerAllPhoneChannelsCreatesExpectedGroupsAndChannels() {
+    fun `register all phone channels creates expected groups and channels`() {
         LogDateNotificationRegistrar(context).registerAllPhoneChannels()
 
         val groupsById = notificationManager.notificationChannelGroups.associateBy { it.id }
@@ -46,7 +46,7 @@ class LogDateNotificationRegistrarTest {
     }
 
     @Test
-    fun registerAllPhoneChannelsDeletesLegacyLocationChannel() {
+    fun `register all phone channels deletes legacy location channel`() {
         notificationManager.createNotificationChannel(
             NotificationChannel(
                 "logdate_location_detail_tracking",

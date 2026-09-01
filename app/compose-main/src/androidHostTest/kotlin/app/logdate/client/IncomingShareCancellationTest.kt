@@ -9,7 +9,7 @@ import kotlin.test.assertFalse
 
 class IncomingShareCancellationTest {
     @Test
-    fun cancellationIsRethrownInsteadOfBecomingAnAttachmentFailure() {
+    fun `cancellation is rethrown instead of becoming an attachment failure`() {
         runBlocking {
             assertFailsWith<CancellationException> {
                 importSharedAttachment("content://provider/first") {
@@ -20,7 +20,7 @@ class IncomingShareCancellationTest {
     }
 
     @Test
-    fun cancellationOnLaterAttachmentRollsBackEveryEarlierOwnedImport() {
+    fun `cancellation on later attachment rolls back every earlier owned import`() {
         runBlocking {
             val attemptedSources = mutableListOf<String>()
             val rolledBackImports = mutableListOf<String>()
@@ -53,7 +53,7 @@ class IncomingShareCancellationTest {
     }
 
     @Test
-    fun failedEditorLaunchRollsBackEveryAttachmentStillOwnedByIncomingShare() {
+    fun `failed editor launch rolls back every attachment still owned by incoming share`() {
         runBlocking {
             val ownedAttachments = listOf("owned:first", "owned:second")
             val acceptedAttachments = mutableListOf<String>()

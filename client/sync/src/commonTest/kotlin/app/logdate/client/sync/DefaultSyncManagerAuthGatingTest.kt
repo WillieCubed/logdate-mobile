@@ -29,7 +29,7 @@ import kotlin.uuid.Uuid
  */
 class DefaultSyncManagerAuthGatingTest {
     @Test
-    fun status_reports_disabled_with_no_session() =
+    fun `status reports disabled with no session`() =
         runTest {
             val session = fakeSessionStorage(authenticated = false)
             val manager =
@@ -44,7 +44,7 @@ class DefaultSyncManagerAuthGatingTest {
         }
 
     @Test
-    fun status_reports_enabled_after_session_appears() =
+    fun `status reports enabled after session appears`() =
         runTest {
             val session = fakeSessionStorage(authenticated = false)
             val manager =
@@ -63,7 +63,7 @@ class DefaultSyncManagerAuthGatingTest {
         }
 
     @Test
-    fun status_flips_back_to_disabled_after_sign_out() =
+    fun `status flips back to disabled after sign out`() =
         runTest {
             val session = fakeSessionStorage(authenticated = true)
             val manager =
@@ -81,7 +81,7 @@ class DefaultSyncManagerAuthGatingTest {
         }
 
     @Test
-    fun startup_never_clears_pending_queue_when_auth_is_loaded_but_cache_is_still_empty() =
+    fun `startup never clears pending queue when auth is loaded but cache is still empty`() =
         runTest {
             val session =
                 object : SessionStorage {

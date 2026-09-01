@@ -56,7 +56,7 @@ import kotlin.uuid.Uuid
  */
 class AutomaticDownloadIntegrationTest {
     @Test
-    fun testDownloadRemoteMediaContentSavesLocalMediaForAllSupportedTypes() =
+    fun `download remote media content saves local media for all supported types`() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val notesRepository = FakeJournalNotesRepository()
@@ -151,7 +151,7 @@ class AutomaticDownloadIntegrationTest {
         }
 
     @Test
-    fun testDownloadNewRemoteContent() =
+    fun `download new remote content`() =
         runTest {
             // Given: A sync manager with authenticated account and API client that returns remote changes
             val mockApiClient = fakeCloudApiClient()
@@ -228,7 +228,7 @@ class AutomaticDownloadIntegrationTest {
         }
 
     @Test
-    fun testDownloadRemoteContentUpdates() =
+    fun `download remote content updates`() =
         runTest {
             // Given: A sync manager with existing local content
             val mockApiClient = fakeCloudApiClient()
@@ -295,7 +295,7 @@ class AutomaticDownloadIntegrationTest {
         }
 
     @Test
-    fun testDownloadRemoteContentDeletions() =
+    fun `download remote content deletions`() =
         runTest {
             // Given: A sync manager with API client that returns content deletions
             val mockApiClient = fakeCloudApiClient()
@@ -356,7 +356,7 @@ class AutomaticDownloadIntegrationTest {
         }
 
     @Test
-    fun testDownloadSkipsPendingContentDeletion() =
+    fun `download skips pending content deletion`() =
         runTest {
             val mockApiClient = fakeCloudApiClient()
             val mockNotesRepository = FakeJournalNotesRepository()
@@ -414,7 +414,7 @@ class AutomaticDownloadIntegrationTest {
         }
 
     @Test
-    fun testDownloadSkipsDeletionWhenLocalNoteUpdatedAfterLastSync() =
+    fun `download skips deletion when local note updated after last sync`() =
         runTest {
             val mockApiClient = fakeCloudApiClient()
             val mockNotesRepository = FakeJournalNotesRepository()
@@ -493,7 +493,7 @@ class AutomaticDownloadIntegrationTest {
         }
 
     @Test
-    fun testDownloadDoesNotAdvanceCursorWhenApplyFails() =
+    fun `download does not advance cursor when apply fails`() =
         runTest {
             val mockApiClient = fakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -566,7 +566,7 @@ class AutomaticDownloadIntegrationTest {
         }
 
     @Test
-    fun testDownloadSkipsPendingAssociationDeletion() =
+    fun `download skips pending association deletion`() =
         runTest {
             val mockApiClient = fakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -634,7 +634,7 @@ class AutomaticDownloadIntegrationTest {
         }
 
     @Test
-    fun testDownloadRemoteJournalChanges() =
+    fun `download remote journal changes`() =
         runTest {
             // Given: A sync manager with API client that returns journal changes
             val mockApiClient = fakeCloudApiClient()
@@ -706,7 +706,7 @@ class AutomaticDownloadIntegrationTest {
         }
 
     @Test
-    fun testDownloadSkipsPendingJournalDeletion() =
+    fun `download skips pending journal deletion`() =
         runTest {
             val mockApiClient = fakeCloudApiClient()
             val mockNotesRepository = FakeJournalNotesRepository()
@@ -773,7 +773,7 @@ class AutomaticDownloadIntegrationTest {
         }
 
     @Test
-    fun testDownloadSkipsDeletionWhenLocalJournalUpdatedAfterLastSync() =
+    fun `download skips deletion when local journal updated after last sync`() =
         runTest {
             val mockApiClient = fakeCloudApiClient()
             val mockNotesRepository = FakeJournalNotesRepository()
@@ -853,7 +853,7 @@ class AutomaticDownloadIntegrationTest {
         }
 
     @Test
-    fun testDownloadRemoteAssociationChanges() =
+    fun `download remote association changes`() =
         runTest {
             // Given: A sync manager with API client that returns association changes
             val mockApiClient = fakeCloudApiClient()
@@ -918,7 +918,7 @@ class AutomaticDownloadIntegrationTest {
         }
 
     @Test
-    fun testDownloadFailsWithUnauthenticatedUser() =
+    fun `download fails with unauthenticated user`() =
         runTest {
             // Given: A sync manager with unauthenticated user
             val mockApiClient = fakeCloudApiClient()
@@ -967,7 +967,7 @@ class AutomaticDownloadIntegrationTest {
         }
 
     @Test
-    fun testDownloadHandlesApiErrors() =
+    fun `download handles api errors`() =
         runTest {
             // Given: A sync manager with failing API client
             val mockApiClient = failingCloudApiClient()

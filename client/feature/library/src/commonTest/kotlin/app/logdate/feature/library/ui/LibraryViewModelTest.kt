@@ -43,7 +43,7 @@ class LibraryViewModelTest {
     }
 
     @Test
-    fun initialStateIsLoading() =
+    fun `initial state is loading`() =
         runTest(testDispatcher) {
             val notesRepository = FakeJournalNotesRepository()
             val repository = FakeIndexedMediaRepository()
@@ -52,7 +52,7 @@ class LibraryViewModelTest {
         }
 
     @Test
-    fun emptyRepositoryProducesEmptyState() =
+    fun `empty repository produces empty state`() =
         runTest(testDispatcher) {
             val notesRepository = FakeJournalNotesRepository(emptyList())
             val repository = FakeIndexedMediaRepository(emptyList())
@@ -66,7 +66,7 @@ class LibraryViewModelTest {
         }
 
     @Test
-    fun indexedMediaProducesContentState() =
+    fun `indexed media produces content state`() =
         runTest(testDispatcher) {
             val media =
                 listOf(
@@ -97,7 +97,7 @@ class LibraryViewModelTest {
         }
 
     @Test
-    fun noteOnlyMediaStillAppearsWhenIndexedStoreIsEmpty() =
+    fun `note only media still appears when indexed store is empty`() =
         runTest(testDispatcher) {
             val notes =
                 listOf(
@@ -130,7 +130,7 @@ class LibraryViewModelTest {
         }
 
     @Test
-    fun indexedMediaPreferredOverDuplicateNoteUri() =
+    fun `indexed media preferred over duplicate note uri`() =
         runTest(testDispatcher) {
             val sharedUri = "content://media/external/images/shared"
             val indexedId = Uuid.random()
@@ -173,7 +173,7 @@ class LibraryViewModelTest {
         }
 
     @Test
-    fun mediaGroupedByMonth() =
+    fun `media grouped by month`() =
         runTest(testDispatcher) {
             val media =
                 listOf(
@@ -201,7 +201,7 @@ class LibraryViewModelTest {
         }
 
     @Test
-    fun videoItemsMarkedAsVideo() =
+    fun `video items marked as video`() =
         runTest(testDispatcher) {
             val media =
                 listOf(
@@ -225,7 +225,7 @@ class LibraryViewModelTest {
         }
 
     @Test
-    fun audioNotesAppearAsPlayableAudioItems() =
+    fun `audio notes appear as playable audio items`() =
         runTest(testDispatcher) {
             val noteId = Uuid.random()
             val notes =

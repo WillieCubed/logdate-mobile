@@ -28,7 +28,7 @@ class HealthSnapshotDataMapperTest {
     // =======================================================================
 
     @Test
-    fun fullSnapshotRoundTrip() {
+    fun `full snapshot round trip`() {
         val snapshot =
             HealthSnapshotSyncData(
                 id = fixedUuid,
@@ -49,7 +49,7 @@ class HealthSnapshotDataMapperTest {
     }
 
     @Test
-    fun snapshotWithNullFieldsRoundTrips() {
+    fun `snapshot with null fields round trips`() {
         val snapshot =
             HealthSnapshotSyncData(
                 id = fixedUuid,
@@ -73,7 +73,7 @@ class HealthSnapshotDataMapperTest {
     }
 
     @Test
-    fun snapshotWithOnlyHeartRateRoundTrips() {
+    fun `snapshot with only heart rate round trips`() {
         val snapshot =
             HealthSnapshotSyncData(
                 id = fixedUuid,
@@ -96,7 +96,7 @@ class HealthSnapshotDataMapperTest {
     // =======================================================================
 
     @Test
-    fun dataMapContainsRequiredKeys() {
+    fun `data map contains required keys`() {
         val snapshot =
             HealthSnapshotSyncData(
                 id = fixedUuid,
@@ -117,7 +117,7 @@ class HealthSnapshotDataMapperTest {
     // =======================================================================
 
     @Test
-    fun fromDataMapThrowsOnMissingPayload() {
+    fun `from data map throws on missing payload`() {
         val map = mapOf(HealthSnapshotDataMapper.KEY_UID to fixedUuid.toString())
 
         assertFailsWith<IllegalArgumentException> {
@@ -126,14 +126,14 @@ class HealthSnapshotDataMapperTest {
     }
 
     @Test
-    fun fromDataMapThrowsOnEmptyMap() {
+    fun `from data map throws on empty map`() {
         assertFailsWith<IllegalArgumentException> {
             mapper.fromDataMap(emptyMap())
         }
     }
 
     @Test
-    fun fromDataMapThrowsOnInvalidJson() {
+    fun `from data map throws on invalid json`() {
         val map =
             mapOf(
                 HealthSnapshotDataMapper.KEY_UID to fixedUuid.toString(),
@@ -150,24 +150,24 @@ class HealthSnapshotDataMapperTest {
     // =======================================================================
 
     @Test
-    fun healthPathUsesId() {
+    fun `health path uses id`() {
         val path = HealthSnapshotDataMapper.healthPath(fixedUuid)
         assertEquals("/logdate/health/550e8400-e29b-41d4-a716-446655440000", path)
     }
 
     @Test
-    fun isHealthPathReturnsTrueForHealthDataPaths() {
+    fun `is health path returns true for health data paths`() {
         assertTrue(HealthSnapshotDataMapper.isHealthPath("/logdate/health/550e8400-e29b-41d4-a716-446655440000"))
     }
 
     @Test
-    fun isHealthPathReturnsFalseForUnrelatedPaths() {
+    fun `is health path returns false for unrelated paths`() {
         assertFalse(HealthSnapshotDataMapper.isHealthPath("/logdate/notes/some-id"))
         assertFalse(HealthSnapshotDataMapper.isHealthPath("/logdate/journals/some-id"))
     }
 
     @Test
-    fun healthIdFromPathExtractsCorrectUuid() {
+    fun `health id from path extracts correct uuid`() {
         val path = "/logdate/health/550e8400-e29b-41d4-a716-446655440000"
         val extracted = HealthSnapshotDataMapper.healthIdFromPath(path)
         assertEquals(fixedUuid, extracted)
@@ -178,7 +178,7 @@ class HealthSnapshotDataMapperTest {
     // =======================================================================
 
     @Test
-    fun multipleSnapshotsSerializeIndependently() {
+    fun `multiple snapshots serialize independently`() {
         val snapshots =
             listOf(
                 HealthSnapshotSyncData(

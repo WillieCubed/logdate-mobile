@@ -13,7 +13,7 @@ import kotlin.test.assertNotNull
  */
 class TimedTranscriptBuilderTest {
     @Test
-    fun buildUtteranceGroupsSentencePieceTokensIntoWords() {
+    fun `build utterance groups sentence piece tokens into words`() {
         val utterance =
             assertNotNull(
                 TimedTranscriptBuilder.buildUtterance(
@@ -34,7 +34,7 @@ class TimedTranscriptBuilderTest {
     }
 
     @Test
-    fun buildUtteranceSkipsPunctuationTokensInSearchableWordList() {
+    fun `build utterance skips punctuation tokens in searchable word list`() {
         val utterance =
             assertNotNull(
                 TimedTranscriptBuilder.buildUtterance(

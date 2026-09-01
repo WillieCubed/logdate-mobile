@@ -87,6 +87,7 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.nav3.runtime)
+            implementation(libs.jetbrains.navigation3.ui)
             // External dependencies
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))
@@ -102,6 +103,9 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
+            // Location logging resolves its owner and device through these providers, so the
+            // editor tests that exercise entry saving need to stand them in.
+            implementation(projects.client.device)
         }
 
         androidMain.dependencies {

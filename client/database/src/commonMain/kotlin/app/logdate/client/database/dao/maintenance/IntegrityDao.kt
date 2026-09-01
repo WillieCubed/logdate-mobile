@@ -118,4 +118,39 @@ interface IntegrityDao {
         ownerId: String,
         serverOrigin: String,
     ): Int
+
+    /**
+     * Counts location rows still stamped with the placeholder identity.
+     *
+     * Location logging used to write the literals `user_1` and `device_1` for every row, so a
+     * user's whole location history was owned by an account that does not exist. Rows written
+     * before that was fixed still carry them.
+     */
+    @Query(
+        """
+        SELECT COUNT(*)
+        FROM location_logs
+        WHERE user_id = 'user_1' OR device_id = 'device_1'
+        """,
+    )
+    suspend fun countPlaceholderOwnedLocations(): Int
+
+    /**
+     * Reassigns placeholder-owned location rows to the identity that actually recorded them.
+     *
+     * These rows were written by this person on this device -- the placeholder recorded nothing
+     * about whose they were, so there is no other candidate and nothing is being guessed. Rows
+     * already carrying a real identity are untouched.
+     */
+    @Query(
+        """
+        UPDATE location_logs
+        SET user_id = :ownerId, device_id = :deviceId
+        WHERE user_id = 'user_1' OR device_id = 'device_1'
+        """,
+    )
+    suspend fun reassignPlaceholderOwnedLocations(
+        ownerId: String,
+        deviceId: String,
+    ): Int
 }

@@ -25,7 +25,7 @@ class JvmNetworkSaverModeProviderTest {
     }
 
     @Test
-    fun testInitialNetworkState() =
+    fun `initial network state`() =
         runTest {
             val state = networkSaverModeProvider.getCurrentDataSaverState()
             assertNotNull(state)
@@ -42,7 +42,7 @@ class JvmNetworkSaverModeProviderTest {
         }
 
     @Test
-    fun testNetworkStateFlow() =
+    fun `network state flow`() =
         runTest {
             val state = networkSaverModeProvider.dataSaverModeState.first()
             assertNotNull(state)
@@ -50,14 +50,14 @@ class JvmNetworkSaverModeProviderTest {
         }
 
     @Test
-    fun testDataSaverMode() =
+    fun `data saver mode`() =
         runTest {
             val isDataSaverMode = networkSaverModeProvider.isDataSaverModeActive()
             assertFalse(isDataSaverMode)
         }
 
     @Test
-    fun testCleanup() {
+    fun `cleanup`() {
         // Just verify that cleanup doesn't throw any exceptions
         networkSaverModeProvider.cleanup()
     }

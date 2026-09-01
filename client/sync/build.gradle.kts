@@ -86,10 +86,6 @@ kotlin {
             implementation(libs.androidx.work.runtime)
             // Room for transaction support
             implementation(libs.room.runtime)
-            // Firebase
-            implementation(libs.kotlinx.coroutines.play.services)
-            implementation(project.dependencies.platform(libs.firebase.bom))
-            implementation(libs.firebase.firestore)
         }
         desktopMain.dependencies {
             implementation(projects.client.database)

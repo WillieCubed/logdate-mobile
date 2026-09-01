@@ -25,7 +25,7 @@ class SettingsOverviewNotificationsRowTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun notificationsRowIsHiddenWhenCallbackIsMissing() {
+    fun `notifications row is hidden when callback is missing`() {
         composeRule.setContent {
             SettingsOverviewContent(
                 onBack = {},
@@ -47,7 +47,7 @@ class SettingsOverviewNotificationsRowTest {
     }
 
     @Test
-    fun notificationsRowIsShownWhenCallbackIsProvided() {
+    fun `notifications row is shown when callback is provided`() {
         composeRule.setContent {
             SettingsOverviewContent(
                 onBack = {},

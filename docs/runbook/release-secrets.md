@@ -25,7 +25,9 @@ run one command.
 |---|---|---|
 | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64` | `app/android-main/google-services.json` (debug Firebase project) | When Firebase debug project config changes. |
 | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_RELEASE_BASE64` | `app/android-main/src/release/google-services.json` (release Firebase project) | When Firebase release project config changes. |
-| `LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64` | `iosApp/iosApp/GoogleService-Info.plist` (single iOS Firebase project) | When Firebase iOS project config changes. |
+| `LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64` | `iosApp/iosApp/Firebase/GoogleService-Info-Release.plist` (single iOS Firebase project) | When Firebase iOS project config changes. |
+| `LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG` | Dedicated `logdate-dev` Android key restricted to `studio.hypertext.logdate`, the debug SHA-1, Places API, and Maps SDK for Android. | When the debug signing key or API restriction changes. |
+| `LOGDATE_GOOGLE_MAPS_API_KEY_RELEASE` | Dedicated `logdate` Android key restricted to `studio.hypertext.logdate`, the upload SHA-1, Places API, and Maps SDK for Android. | When the upload or Play signing key changes. |
 
 **Upload from local disk** (one-shot, idempotent — re-running rotates):
 
@@ -36,8 +38,8 @@ run one command.
 ./scripts/sync-firebase-configs.sh all              # everything
 ```
 
-Each upload is validated before transmission (`jq` for JSON, `plutil`
-for plist) so garbage never reaches GitHub. Requires `gh` authenticated
+Each upload is checked against LogDate's exact Firebase project, package or
+bundle ID, and Firebase app ID before transmission. Requires `gh` authenticated
 against the repo.
 
 > **Note on the previous secret name:** an earlier iteration referenced

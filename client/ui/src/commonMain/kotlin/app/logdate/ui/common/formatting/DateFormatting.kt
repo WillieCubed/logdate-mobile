@@ -20,9 +20,17 @@ import kotlin.time.Clock
  * - If the date is after the last week but otherwise within the current year, return the month and day (e.g. "May 12")
  * - If the date is in a different year, return the full date (e.g. "May 12, 2021")
  */
-fun LocalDate.asRelativeDate(): String {
+fun LocalDate.asRelativeDate(): String = asRelativeDate(Clock.System.todayIn(TimeZone.currentSystemDefault()))
+
+/**
+ * Returns a relative date string for this [LocalDate], measured against [today].
+ *
+ * Taking today as an argument is what makes this testable and what makes a screenshot of a recent
+ * date reproducible. Reading the clock inside means "Yesterday" becomes "May 4" the following day,
+ * and any recorded image of it is wrong from then on.
+ */
+fun LocalDate.asRelativeDate(today: LocalDate): String {
     // TODO: Localize date strings
-    val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
 
     when {
         this == today -> return "Today"

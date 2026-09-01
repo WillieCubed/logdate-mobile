@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackMetadata
+import app.logdate.client.media.audio.AudioPlaybackStatusProvider
 import app.logdate.client.media.audio.download.ModelDownloadStatus
 import app.logdate.client.media.audio.tagging.AudioTaggingService
 import app.logdate.client.media.audio.transcription.TranscriptionResult
@@ -38,6 +39,8 @@ class AudioViewModel(
     private val audioTaggingService: AudioTaggingService,
 ) : ViewModel(),
     PendingAudioResolver {
+    private val playbackStatusProvider = audioPlaybackManager as? AudioPlaybackStatusProvider
+
     // StateFlow to expose immutable UI state
     private val _uiState = MutableStateFlow(AudioUiState())
     val uiState: StateFlow<AudioUiState> = _uiState.asStateFlow()
@@ -310,7 +313,14 @@ class AudioViewModel(
                         _uiState.update { it.copy(playbackProgress = progress) }
                     },
                     onPlaybackCompleted = {
-                        _uiState.update { it.copy(isPlaying = false, playbackProgress = 0f) }
+                        val failure = playbackStatusProvider?.playbackStatus?.value?.errorMessage
+                        _uiState.update {
+                            it.copy(
+                                isPlaying = false,
+                                playbackProgress = 0f,
+                                error = if (failure != null) "Failed to play back recording" else null,
+                            )
+                        }
                     },
                 )
             } catch (e: Exception) {

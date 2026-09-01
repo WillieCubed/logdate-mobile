@@ -25,7 +25,7 @@ class ScreenshotOrganizationTest {
         repoRoot.resolve("app/android-main/src/screenshotTest/kotlin/app/logdate/screenshots")
 
     @Test
-    fun screenshotTreeUsesApprovedTopLevelBuckets() {
+    fun `screenshot tree uses approved top level buckets`() {
         assertTrue(screenshotsDir.exists(), "Missing screenshot source directory: $screenshotsDir")
 
         val topLevelDirectories =
@@ -46,7 +46,7 @@ class ScreenshotOrganizationTest {
     }
 
     @Test
-    fun flowScreenshotFilesUseOrderedNamesAndPreviewPrefixes() {
+    fun `flow screenshot files use ordered names and preview prefixes`() {
         val flowDirectories =
             Files
                 .walk(screenshotsDir.resolve("flows"), 1)
@@ -92,7 +92,7 @@ class ScreenshotOrganizationTest {
     }
 
     @Test
-    fun auditScreenshotsUseAdaptiveBucketAndOrderedPreviewPrefixes() {
+    fun `audit screenshots use adaptive bucket and ordered preview prefixes`() {
         val auditDirectory = screenshotsDir.resolve("audit/adaptive")
         assertTrue(auditDirectory.exists(), "Missing adaptive audit directory: $auditDirectory")
 

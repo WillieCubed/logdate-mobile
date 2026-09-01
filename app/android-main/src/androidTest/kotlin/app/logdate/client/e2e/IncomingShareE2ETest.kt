@@ -67,7 +67,7 @@ class IncomingShareE2ETest {
     }
 
     @Test
-    fun actionSend_textLaunchesEditorWithPrefilledText() {
+    fun `action send text launches editor with prefilled text`() {
         val sharedText = "Shared from Android text intent"
         val editorIntent =
             launchShareIntentAndCaptureEditorIntent(
@@ -85,7 +85,7 @@ class IncomingShareE2ETest {
     }
 
     @Test
-    fun actionSend_singleImageImportsAttachmentAndLaunchesEditor() {
+    fun `action send single image imports attachment and launches editor`() {
         val imageUri = createShareableUri(fileName = "single-share.jpg", contents = byteArrayOf(1, 2, 3))
 
         val editorIntent =
@@ -111,7 +111,7 @@ class IncomingShareE2ETest {
     }
 
     @Test
-    fun actionSend_singleVideoImportsAttachmentAndLaunchesEditor() {
+    fun `action send single video imports attachment and launches editor`() {
         val videoUri = createShareableUri(fileName = "single-share.mp4", contents = byteArrayOf(1, 2, 3, 4))
 
         val editorIntent =
@@ -137,7 +137,7 @@ class IncomingShareE2ETest {
     }
 
     @Test
-    fun actionSend_textAndImagePreservesBothInEditorLaunch() {
+    fun `action send text and image preserves both in editor launch`() {
         val imageUri = createShareableUri(fileName = "combo-share.png", contents = byteArrayOf(4, 5, 6))
         val sharedText = "Photo plus note from Android share"
 
@@ -163,7 +163,7 @@ class IncomingShareE2ETest {
     }
 
     @Test
-    fun actionSendMultiple_importsEveryImageIntoSingleDraft() {
+    fun `action send multiple imports every image into single draft`() {
         val firstImage = createShareableUri(fileName = "multi-one.jpg", contents = byteArrayOf(7, 8, 9))
         val secondImage = createShareableUri(fileName = "multi-two.jpg", contents = byteArrayOf(10, 11, 12))
 
@@ -187,7 +187,7 @@ class IncomingShareE2ETest {
     }
 
     @Test
-    fun unsupportedShare_doesNotLaunchEditor() {
+    fun `unsupported share does not launch editor`() {
         val pdfUri = createShareableUri(fileName = "ignored.pdf", contents = byteArrayOf(13, 14, 15))
 
         val editorIntent =
@@ -284,6 +284,9 @@ private class RecordingMediaManager : MediaManager {
     }
 
     override suspend fun getMedia(uri: String): MediaObject = error("Not needed for IncomingShareE2ETest")
+
+    override suspend fun deleteOwnedMedia(uri: String): Boolean = false
+
 
     override suspend fun exists(mediaId: String): Boolean = false
 

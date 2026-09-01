@@ -13,7 +13,7 @@ import kotlin.uuid.Uuid
  */
 class TranscriptionManagerTest {
     @Test
-    fun testTranscriptionManagerContract() {
+    fun `transcription manager contract`() {
         // This is a simple contract test to ensure the interface behaves correctly.
         // Ideally, we would have platform-specific tests for each implementation.
 

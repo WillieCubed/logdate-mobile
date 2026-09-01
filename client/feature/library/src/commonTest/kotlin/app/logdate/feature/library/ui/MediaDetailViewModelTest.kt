@@ -94,7 +94,7 @@ class MediaDetailViewModelTest {
     }
 
     @Test
-    fun missingMediaProducesError() =
+    fun `missing media produces error`() =
         runTest(testDispatcher) {
             val repository = FakeJournalNotesRepository(emptyList())
             val mediaId = Uuid.random()
@@ -116,7 +116,7 @@ class MediaDetailViewModelTest {
         }
 
     @Test
-    fun indexedImageProducesImageContentWithoutMatchingNote() =
+    fun `indexed image produces image content without matching note`() =
         runTest(testDispatcher) {
             val mediaId = Uuid.random()
             indexedMediaRepository.setMedia(
@@ -150,7 +150,7 @@ class MediaDetailViewModelTest {
         }
 
     @Test
-    fun noteOnlyImageStillProducesImageContent() =
+    fun `note only image still produces image content`() =
         runTest(testDispatcher) {
             val noteId = Uuid.random()
             val notes =
@@ -184,7 +184,7 @@ class MediaDetailViewModelTest {
         }
 
     @Test
-    fun noteOnlyAudioProducesAudioContentWithDuration() =
+    fun `note only audio produces audio content with duration`() =
         runTest(testDispatcher) {
             val noteId = Uuid.random()
             val notes =
@@ -218,7 +218,7 @@ class MediaDetailViewModelTest {
         }
 
     @Test
-    fun indexedImageUsesIndexedExifMetadata() =
+    fun `indexed image uses indexed exif metadata`() =
         runTest(testDispatcher) {
             val mediaId = Uuid.random()
             indexedMediaRepository.setMedia(
@@ -262,7 +262,7 @@ class MediaDetailViewModelTest {
         }
 
     @Test
-    fun indexedVideoProducesVideoContentWithoutMatchingNote() =
+    fun `indexed video produces video content without matching note`() =
         runTest(testDispatcher) {
             val mediaId = Uuid.random()
             indexedMediaRepository.setMedia(
@@ -296,7 +296,7 @@ class MediaDetailViewModelTest {
         }
 
     @Test
-    fun locationDataIncludedWhenPresent() =
+    fun `location data included when present`() =
         runTest(testDispatcher) {
             val mediaId = Uuid.random()
             val noteId = Uuid.random()
@@ -344,7 +344,7 @@ class MediaDetailViewModelTest {
         }
 
     @Test
-    fun textOnlyNotesDoNotBlockIndexedMedia() =
+    fun `text only notes do not block indexed media`() =
         runTest(testDispatcher) {
             val mediaId = Uuid.random()
             indexedMediaRepository.setMedia(
@@ -384,7 +384,7 @@ class MediaDetailViewModelTest {
         }
 
     @Test
-    fun crossReferencesPopulatedFromJournals() =
+    fun `cross references populated from journals`() =
         runTest(testDispatcher) {
             val mediaId = Uuid.random()
             val noteId = Uuid.random()
@@ -445,7 +445,7 @@ class MediaDetailViewModelTest {
         }
 
     @Test
-    fun matchingNotesUseNewestLocationAndDeduplicateJournals() =
+    fun `matching notes use newest location and deduplicate journals`() =
         runTest(testDispatcher) {
             val mediaId = Uuid.random()
             val olderNoteId = Uuid.random()
@@ -539,7 +539,7 @@ class MediaDetailViewModelTest {
         }
 
     @Test
-    fun presenterStateUsesVisibleLibraryMediaList() =
+    fun `presenter state uses visible library media list`() =
         runTest(testDispatcher) {
             val olderMediaId = Uuid.random()
             val currentMediaId = Uuid.random()
@@ -602,7 +602,7 @@ class MediaDetailViewModelTest {
         }
 
     @Test
-    fun viewerStateUsesVisibleLibraryMediaList() =
+    fun `viewer state uses visible library media list`() =
         runTest(testDispatcher) {
             val currentMediaId = Uuid.random()
             val newestMediaId = Uuid.random()
@@ -656,7 +656,7 @@ class MediaDetailViewModelTest {
         }
 
     @Test
-    fun selectMediaUpdatesCurrentContentAndIndexes() =
+    fun `select media updates current content and indexes`() =
         runTest(testDispatcher) {
             val firstMediaId = Uuid.random()
             val secondMediaId = Uuid.random()

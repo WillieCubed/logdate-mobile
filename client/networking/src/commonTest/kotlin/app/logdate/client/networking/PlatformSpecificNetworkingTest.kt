@@ -60,7 +60,7 @@ class PlatformSpecificNetworkingTest {
      * **Real App Usage**: Unified networking code across Android, iOS, Desktop, Web
      */
     @Test
-    fun httpClient_expectActualPattern_isConsistent() =
+    fun `http client expect actual pattern is consistent`() =
         runTest {
             // Test that the expect/actual pattern provides a consistent interface
             assertNotNull(httpClient, "HTTP client should be available on all platforms")
@@ -98,7 +98,7 @@ class PlatformSpecificNetworkingTest {
      * **Real App Usage**: Platform-agnostic networking behavior in shared code
      */
     @Test
-    fun httpClient_configurationConsistency() =
+    fun `http client configuration consistency`() =
         runTest {
             // Test that all platform implementations use the same configuration
             val client1 =
@@ -153,7 +153,7 @@ class PlatformSpecificNetworkingTest {
      * **Real App Usage**: API evolution compatibility, robust data handling
      */
     @Test
-    fun httpClient_jsonConfiguration_worksCorrectly() =
+    fun `http client json configuration works correctly`() =
         runTest {
             val client =
                 HttpClient(MockEngine) {
@@ -203,7 +203,7 @@ class PlatformSpecificNetworkingTest {
      * **Real App Usage**: Development debugging, production monitoring
      */
     @Test
-    fun httpClient_loggingConfiguration_isPresent() =
+    fun `http client logging configuration is present`() =
         runTest {
             // Test that logging configuration is applied consistently
             val client =
@@ -238,7 +238,7 @@ class PlatformSpecificNetworkingTest {
      * **Real App Usage**: Shared networking logic, platform-agnostic features
      */
     @Test
-    fun httpClient_interfaceContract_isRespected() =
+    fun `http client interface contract is respected`() =
         runTest {
             // Test that all platform implementations respect the interface contract
             val client =

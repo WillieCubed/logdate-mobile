@@ -52,7 +52,7 @@ class MemorySelectionViewModelTest {
     }
 
     @Test
-    fun refreshMemories_fallsBackToRecentMedia_whenDateRangeIsEmpty() =
+    fun `refresh memories falls back to recent media when date range is empty`() =
         runTest {
             val olderMemories = listOf(sampleImage("older-1"), sampleVideo("older-2"))
             fakeMediaManager.queryMediaByDateFlow = { flowOf(emptyList()) }
@@ -73,7 +73,7 @@ class MemorySelectionViewModelTest {
         }
 
     @Test
-    fun refreshMemories_recoversAfterLoadFailure() =
+    fun `refresh memories recovers after load failure`() =
         runTest {
             fakeMediaManager.queryMediaByDateFlow = {
                 flow {
@@ -132,6 +132,8 @@ private class FakeMediaManager : MediaManager {
     var recentMediaFlow: () -> Flow<List<MediaObject>> = { flowOf(emptyList()) }
 
     override suspend fun getMedia(uri: String): MediaObject = error("Not used in test")
+
+    override suspend fun deleteOwnedMedia(uri: String): Boolean = false
 
     override suspend fun exists(mediaId: String): Boolean = false
 

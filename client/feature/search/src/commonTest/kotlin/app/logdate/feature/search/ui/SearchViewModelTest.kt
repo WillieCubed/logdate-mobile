@@ -49,7 +49,7 @@ class SearchViewModelTest {
     }
 
     @Test
-    fun typingShowsSearchingUntilDebouncedResultsArrive() =
+    fun `typing shows searching until debounced results arrive`() =
         runTest(dispatcher) {
             val repository =
                 FakeSearchRepository(
@@ -85,7 +85,7 @@ class SearchViewModelTest {
         }
 
     @Test
-    fun singleCharacterQueriesStillReturnLiveResults() =
+    fun `single character queries still return live results`() =
         runTest(dispatcher) {
             val repository =
                 FakeSearchRepository(

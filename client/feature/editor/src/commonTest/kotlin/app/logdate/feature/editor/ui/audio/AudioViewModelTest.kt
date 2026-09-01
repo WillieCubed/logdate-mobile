@@ -54,7 +54,7 @@ class AudioViewModelTest {
     }
 
     @Test
-    fun startRecordingUpdatesUiState() =
+    fun `start recording updates ui state`() =
         runTest(dispatcher) {
             val recordingManager =
                 FakeAudioRecordingManager(
@@ -81,7 +81,7 @@ class AudioViewModelTest {
         }
 
     @Test
-    fun stopRecordingStoresRecordedUri() =
+    fun `stop recording stores recorded uri`() =
         runTest(dispatcher) {
             val recordingManager =
                 FakeAudioRecordingManager(
@@ -109,7 +109,7 @@ class AudioViewModelTest {
         }
 
     @Test
-    fun transcriptionFlowUpdatesUiState() =
+    fun `transcription flow updates ui state`() =
         runTest(dispatcher) {
             val recordingManager =
                 FakeAudioRecordingManager(
@@ -149,7 +149,7 @@ class AudioViewModelTest {
         }
 
     @Test
-    fun structuredTranscriptionPreservesTimedTranscript() =
+    fun `structured transcription preserves timed transcript`() =
         runTest(dispatcher) {
             val recordingManager =
                 FakeAudioRecordingManager(
@@ -202,7 +202,7 @@ class AudioViewModelTest {
         }
 
     @Test
-    fun seekToPositionMsUsesAbsoluteSeekAndUpdatesPlaybackProgress() =
+    fun `seek to position ms uses absolute seek and updates playback progress`() =
         runTest(dispatcher) {
             val playbackManager = FakeAudioPlaybackManager()
             val viewModel =

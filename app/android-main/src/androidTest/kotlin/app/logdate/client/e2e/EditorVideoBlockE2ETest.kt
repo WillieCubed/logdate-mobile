@@ -37,7 +37,7 @@ class EditorVideoBlockE2ETest {
     val composeRule = createAndroidComposeRule<VideoPlaybackHostActivity>()
 
     @Test
-    fun compactEditorVideoBlockExposesPlaybackRouteAndPipControls() {
+    fun `compact editor video block exposes playback route and pip controls`() {
         assumeTrue(screenWidthDp() < 600)
         setEditorVideoContent(expandVideoBlock = false)
 
@@ -46,7 +46,7 @@ class EditorVideoBlockE2ETest {
     }
 
     @Test
-    fun expandedEditorVideoBlockExposesPlaybackRouteAndPipControls() {
+    fun `expanded editor video block exposes playback route and pip controls`() {
         assumeTrue(screenWidthDp() >= 600)
         setEditorVideoContent(expandVideoBlock = true)
 

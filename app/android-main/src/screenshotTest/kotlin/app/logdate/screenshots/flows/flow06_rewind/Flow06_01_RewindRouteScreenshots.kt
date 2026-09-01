@@ -67,6 +67,9 @@ fun S03_RewindDetailStory() {
                         ),
                 ),
             onExitRewind = {},
+            // Screenshot rendering advances virtual time eagerly. Freeze the story at its
+            // first readable panel so this route contract does not race auto-advance.
+            externalPause = true,
         )
     }
 }

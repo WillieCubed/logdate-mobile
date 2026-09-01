@@ -18,7 +18,7 @@ class JsonStructuredOutputParserTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
-    fun parse_withValidJson_returnsSuccess() {
+    fun `parse with valid json returns success`() {
         val parser = JsonStructuredOutputParser(json, SamplePayload.serializer())
         val result = parser.parse("""{"name":"Alex","count":2}""")
 
@@ -26,7 +26,7 @@ class JsonStructuredOutputParserTest {
     }
 
     @Test
-    fun parse_withEmptyString_returnsEmpty() {
+    fun `parse with empty string returns empty`() {
         val parser = JsonStructuredOutputParser(json, SamplePayload.serializer())
         val result = parser.parse("   ")
 
@@ -34,7 +34,7 @@ class JsonStructuredOutputParserTest {
     }
 
     @Test
-    fun parse_withInvalidJson_returnsInvalid() {
+    fun `parse with invalid json returns invalid`() {
         val parser = JsonStructuredOutputParser(json, SamplePayload.serializer())
         val result = parser.parse("not-json")
 
@@ -42,7 +42,7 @@ class JsonStructuredOutputParserTest {
     }
 
     @Test
-    fun parse_withEmbeddedJson_andAllowEmbedded_parsesPayload() {
+    fun `parse with embedded json and allow embedded parses payload`() {
         val parser = JsonStructuredOutputParser(json, SamplePayload.serializer(), allowEmbeddedJson = true)
         val result = parser.parse("prefix {\"name\":\"Jordan\",\"count\":3} suffix")
 

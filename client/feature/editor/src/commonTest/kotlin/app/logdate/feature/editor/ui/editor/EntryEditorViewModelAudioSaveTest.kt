@@ -92,6 +92,8 @@ class EntryEditorViewModelAudioSaveTest {
                 locationProvider = locationProvider,
                 locationHistoryRepository = locationHistoryRepository,
                 locationRetryWorker = locationRetryWorker,
+                canonicalOwnerProvider = TestCanonicalOwnerProvider(),
+                deviceIdProvider = TestDeviceIdProvider(),
             )
         val mediaManager = FakeMediaManager()
 
@@ -176,7 +178,7 @@ class EntryEditorViewModelAudioSaveTest {
 
     /** Headline-bug regression. */
     @Test
-    fun saveEntry_withPendingAudio_persistsJournalNoteAudio() =
+    fun `save entry with pending audio persists journal note audio`() =
         testScope.runTest {
             val viewModel = buildViewModel()
             viewModel.editorState.first()
@@ -200,7 +202,7 @@ class EntryEditorViewModelAudioSaveTest {
         }
 
     @Test
-    fun saveEntry_whileActivelyRecording_persistsResolvedAudio() =
+    fun `save entry while actively recording persists resolved audio`() =
         testScope.runTest {
             val viewModel = buildViewModel()
             viewModel.editorState.first()
@@ -223,7 +225,7 @@ class EntryEditorViewModelAudioSaveTest {
         }
 
     @Test
-    fun saveEntry_whenFinalizationFails_setsErrorMessageAndDoesNotExit() =
+    fun `save entry when finalization fails sets error message and does not exit`() =
         testScope.runTest {
             val viewModel = buildViewModel()
             viewModel.editorState.first()
@@ -243,7 +245,7 @@ class EntryEditorViewModelAudioSaveTest {
         }
 
     @Test
-    fun saveEntry_whenFinalizerThrows_clearsSavingAndSurfacesRecoverableError() =
+    fun `save entry when finalizer throws clears saving and surfaces recoverable error`() =
         testScope.runTest {
             val viewModel =
                 buildViewModel(
@@ -264,7 +266,7 @@ class EntryEditorViewModelAudioSaveTest {
         }
 
     @Test
-    fun saveEntry_whenFinalizerCancels_clearsSavingWithoutUiError() =
+    fun `save entry when finalizer cancels clears saving without ui error`() =
         testScope.runTest {
             val viewModel =
                 buildViewModel(
@@ -285,7 +287,7 @@ class EntryEditorViewModelAudioSaveTest {
         }
 
     @Test
-    fun saveEntry_whenFinalizationStalls_surfacesTimeoutAndDoesNotExit() =
+    fun `save entry when finalization stalls surfaces timeout and does not exit`() =
         testScope.runTest {
             val stallingFinalizer = StallingAudioBlockFinalizer()
             val viewModel = buildViewModel(finalizer = stallingFinalizer)
@@ -306,7 +308,7 @@ class EntryEditorViewModelAudioSaveTest {
         }
 
     @Test
-    fun saveEntry_textOnly_doesNotInvokeFinalizer() =
+    fun `save entry text only does not invoke finalizer`() =
         testScope.runTest {
             val viewModel = buildViewModel()
             viewModel.editorState.first()
@@ -323,7 +325,7 @@ class EntryEditorViewModelAudioSaveTest {
         }
 
     @Test
-    fun saveEntry_withReadyAudio_doesNotRefinalize() =
+    fun `save entry with ready audio does not refinalize`() =
         testScope.runTest {
             val viewModel = buildViewModel()
             viewModel.editorState.first()
@@ -342,7 +344,7 @@ class EntryEditorViewModelAudioSaveTest {
         }
 
     @Test
-    fun saveEntry_withMixedTextAndPendingAudio_persistsBoth() =
+    fun `save entry with mixed text and pending audio persists both`() =
         testScope.runTest {
             val viewModel = buildViewModel()
             viewModel.editorState.first()

@@ -30,7 +30,7 @@ class AndroidNetworkSaverModeProviderTest {
     }
 
     @Test
-    fun testNetworkStateNotNull() =
+    fun `network state not null`() =
         runTest {
             val networkState = networkSaverModeProvider.getCurrentDataSaverState()
             assertNotNull(networkState)
@@ -38,14 +38,14 @@ class AndroidNetworkSaverModeProviderTest {
         }
 
     @Test
-    fun testNetworkStateFlow() =
+    fun `network state flow`() =
         runTest {
             val networkState = networkSaverModeProvider.dataSaverModeState.first()
             assertNotNull(networkState)
         }
 
     @Test
-    fun testDataSaverModeIsBoolean() =
+    fun `data saver mode is boolean`() =
         runTest {
             val isDataSaverMode = networkSaverModeProvider.isDataSaverModeActive()
             // Just verify it returns a boolean value without error
@@ -53,7 +53,7 @@ class AndroidNetworkSaverModeProviderTest {
         }
 
     @Test
-    fun testConnectionTypeValid() =
+    fun `connection type valid`() =
         runTest {
             val networkState = networkSaverModeProvider.getCurrentDataSaverState()
             val validTypes = NetworkConnectionType.values().toList()

@@ -12,7 +12,7 @@ class OfflineFirstJournalUserDataRepositoryTest {
     private val repository = OfflineFirstJournalUserDataRepository(journalRepository)
 
     @Test
-    fun changeFavoritedStatus_updatesExistingJournal() =
+    fun `change favorited status updates existing journal`() =
         runTest {
             val journal = Journal(title = "Family")
             journalRepository.addJournal(journal)
@@ -23,7 +23,7 @@ class OfflineFirstJournalUserDataRepositoryTest {
         }
 
     @Test
-    fun changeFavoritedStatus_ignoresMissingJournal() =
+    fun `change favorited status ignores missing journal`() =
         runTest {
             val journal = Journal(title = "Family")
 

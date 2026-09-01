@@ -24,7 +24,7 @@ import kotlin.uuid.Uuid
  */
 class DataModuleTest {
     @Test
-    fun dataModule_resolvesDatabaseNotePlaceResolverAsNotePlaceResolver() {
+    fun `data module resolves database note place resolver as note place resolver`() {
         val koinApplication =
             koinApplication {
                 allowOverride(true)

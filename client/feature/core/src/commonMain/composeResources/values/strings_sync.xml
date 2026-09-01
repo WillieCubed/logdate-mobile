@@ -60,4 +60,29 @@
     <string name="total_usage">Total Usage</string>
     <string name="quota_usage_block">Quota Usage Block</string>
     <string name="separator_pipe"> | </string>
+
+    <!-- Sync issues: what kind of thing failed, and how many -->
+    <plurals name="sync_issue_count_note"><item quantity="one">%1$d entry</item><item quantity="other">%1$d entries</item></plurals>
+    <plurals name="sync_issue_count_journal"><item quantity="one">%1$d journal</item><item quantity="other">%1$d journals</item></plurals>
+    <plurals name="sync_issue_count_media"><item quantity="one">%1$d photo or recording</item><item quantity="other">%1$d photos or recordings</item></plurals>
+    <plurals name="sync_issue_count_draft"><item quantity="one">%1$d draft</item><item quantity="other">%1$d drafts</item></plurals>
+    <plurals name="sync_issue_count_association"><item quantity="one">%1$d entry link</item><item quantity="other">%1$d entry links</item></plurals>
+    <plurals name="sync_issue_count_health"><item quantity="one">%1$d health record</item><item quantity="other">%1$d health records</item></plurals>
+    <plurals name="sync_issue_count_other"><item quantity="one">%1$d item</item><item quantity="other">%1$d items</item></plurals>
+
+    <string name="sync_issue_missing_file_note">This entry's file is missing</string>
+    <string name="sync_issue_missing_file_journal">This journal's file is missing</string>
+    <string name="sync_issue_missing_file_media">This photo or recording's file is missing</string>
+    <string name="sync_issue_missing_file_draft">This draft's file is missing</string>
+    <string name="sync_issue_missing_file_association">This entry link's file is missing</string>
+    <string name="sync_issue_missing_file_health">This health record's file is missing</string>
+    <string name="sync_issue_missing_file_other">This item's file is missing</string>
+
+    <string name="sync_issue_upload_failed_note">This entry didn't upload</string>
+    <string name="sync_issue_upload_failed_journal">This journal didn't upload</string>
+    <string name="sync_issue_upload_failed_media">This photo or recording didn't upload</string>
+    <string name="sync_issue_upload_failed_draft">This draft didn't upload</string>
+    <string name="sync_issue_upload_failed_association">This entry link didn't upload</string>
+    <string name="sync_issue_upload_failed_health">This health record didn't upload</string>
+    <string name="sync_issue_upload_failed_other">This item didn't upload</string>
 </resources>

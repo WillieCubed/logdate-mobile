@@ -50,7 +50,7 @@ class TextProcessingAccuracyTest {
     }
 
     @Test
-    fun dailyJournalEntry_extractsPeopleAndSummarizesCorrectly() =
+    fun `daily journal entry extracts people and summarizes correctly`() =
         runTest(testDispatcher) {
             setup()
             val journalText =
@@ -95,7 +95,7 @@ class TextProcessingAccuracyTest {
         }
 
     @Test
-    fun workMeetingEntry_handlesBusinessContext() =
+    fun `work meeting entry handles business context`() =
         runTest(testDispatcher) {
             setup()
             val journalText =
@@ -134,7 +134,7 @@ class TextProcessingAccuracyTest {
         }
 
     @Test
-    fun familyGatheringEntry_handlesFamilyRelationships() =
+    fun `family gathering entry handles family relationships`() =
         runTest(testDispatcher) {
             setup()
             val journalText =
@@ -179,7 +179,7 @@ class TextProcessingAccuracyTest {
         }
 
     @Test
-    fun travelEntry_handlesGeographicalContext() =
+    fun `travel entry handles geographical context`() =
         runTest(testDispatcher) {
             setup()
             val journalText =
@@ -210,7 +210,7 @@ class TextProcessingAccuracyTest {
         }
 
     @Test
-    fun medicalAppointmentEntry_handlesHealthcareContext() =
+    fun `medical appointment entry handles healthcare context`() =
         runTest(testDispatcher) {
             setup()
             val journalText =
@@ -242,7 +242,7 @@ class TextProcessingAccuracyTest {
         }
 
     @Test
-    fun socialEventEntry_handlesLargeGroups() =
+    fun `social event entry handles large groups`() =
         runTest(testDispatcher) {
             setup()
             val journalText =
@@ -285,7 +285,7 @@ class TextProcessingAccuracyTest {
         }
 
     @Test
-    fun emotionalEntry_maintainsContextInSummary() =
+    fun `emotional entry maintains context in summary`() =
         runTest(testDispatcher) {
             setup()
             val journalText =
@@ -314,7 +314,7 @@ class TextProcessingAccuracyTest {
         }
 
     @Test
-    fun achievementEntry_capturesPositiveContext() =
+    fun `achievement entry captures positive context`() =
         runTest(testDispatcher) {
             setup()
             val journalText =

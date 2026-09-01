@@ -37,7 +37,7 @@ class MiniAudioPlayerE2ETest {
     private val noteId = Uuid.parse("00000000-0000-0000-0000-000000009281")
 
     @Test
-    fun compactMiniPlayerExposesOutputRouteControls() {
+    fun `compact mini player exposes output route controls`() {
         assumeTrue(screenWidthDp() < 600)
         setMiniPlayerContent()
 
@@ -46,7 +46,7 @@ class MiniAudioPlayerE2ETest {
     }
 
     @Test
-    fun expandedMiniPlayerExposesOutputRouteControls() {
+    fun `expanded mini player exposes output route controls`() {
         assumeTrue(screenWidthDp() >= 600)
         setMiniPlayerContent()
 

@@ -15,7 +15,7 @@ import kotlin.test.assertIs
 @RunWith(AndroidJUnit4::class)
 class AndroidManagedMediaDiscarderTest {
     @Test
-    fun preExistingMediaStoreRowIsNotADeletionCapability() =
+    fun `pre existing media store row is not a deletion capability`() =
         runTest {
             val preExistingUri = Uri.parse("content://media/external/images/media/42")
             val contentResolver = mockk<android.content.ContentResolver>()

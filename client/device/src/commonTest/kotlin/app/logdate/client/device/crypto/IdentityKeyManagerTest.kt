@@ -24,13 +24,13 @@ class IdentityKeyManagerTest {
     private val manager = IdentityKeyManager(mockSecureStorage, cryptoManager)
 
     @Test
-    fun testNoIdentityKeyInitially() =
+    fun `no identity key initially`() =
         runTest {
             assertFalse(manager.hasIdentityKey())
         }
 
     @Test
-    fun testSetupNewIdentity() =
+    fun `setup new identity`() =
         runTest {
             val phrase = manager.setupNewIdentity()
 
@@ -40,7 +40,7 @@ class IdentityKeyManagerTest {
         }
 
     @Test
-    fun testGetIdentityKeyAfterSetup() =
+    fun `get identity key after setup`() =
         runTest {
             manager.setupNewIdentity()
             val key = manager.getIdentityKey()
@@ -49,7 +49,7 @@ class IdentityKeyManagerTest {
         }
 
     @Test
-    fun testRecoverIdentity() =
+    fun `recover identity`() =
         runTest {
             val phrase1 = manager.setupNewIdentity()
             val key1 = manager.getIdentityKey()
@@ -66,7 +66,7 @@ class IdentityKeyManagerTest {
         }
 
     @Test
-    fun testDeterministicKeyDerivation() =
+    fun `deterministic key derivation`() =
         runTest {
             val phrase = manager.setupNewIdentity()
             val key1 = manager.getIdentityKey()
@@ -79,7 +79,7 @@ class IdentityKeyManagerTest {
         }
 
     @Test
-    fun testGetIdentityKeyThrowsWhenNotSet() =
+    fun `get identity key throws when not set`() =
         runTest {
             assertFailsWith<IdentityKeyNotFoundException> {
                 manager.getIdentityKey()
@@ -87,7 +87,7 @@ class IdentityKeyManagerTest {
         }
 
     @Test
-    fun testClearIdentityKey() =
+    fun `clear identity key`() =
         runTest {
             manager.setupNewIdentity()
             assertTrue(manager.hasIdentityKey())
@@ -107,7 +107,7 @@ class KeyDerivationTest {
     private val keyDerivation = KeyDerivation(cryptoManager)
 
     @Test
-    fun testDeriveKey() {
+    fun `derive key`() {
         val identityKey = ByteArray(32) { it.toByte() }
         val key = keyDerivation.deriveKey(identityKey, "journal_entry", "uuid-123")
 
@@ -115,7 +115,7 @@ class KeyDerivationTest {
     }
 
     @Test
-    fun testDeterministicDerivation() {
+    fun `deterministic derivation`() {
         val identityKey = ByteArray(32) { it.toByte() }
 
         val key1 = keyDerivation.deriveKey(identityKey, "journal_entry", "uuid-123")
@@ -125,7 +125,7 @@ class KeyDerivationTest {
     }
 
     @Test
-    fun testDifferentContextProducesDifferentKey() {
+    fun `different context produces different key`() {
         val identityKey = ByteArray(32) { it.toByte() }
 
         val key1 = keyDerivation.deriveKey(identityKey, "journal_entry", "uuid-123")
@@ -135,7 +135,7 @@ class KeyDerivationTest {
     }
 
     @Test
-    fun testDifferentContentIdProducesDifferentKey() {
+    fun `different content id produces different key`() {
         val identityKey = ByteArray(32) { it.toByte() }
 
         val key1 = keyDerivation.deriveKey(identityKey, "journal_entry", "uuid-123")

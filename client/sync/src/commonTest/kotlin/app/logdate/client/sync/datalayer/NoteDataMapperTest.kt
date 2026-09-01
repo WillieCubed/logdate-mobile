@@ -33,7 +33,7 @@ class NoteDataMapperTest {
     // =======================================================================
 
     @Test
-    fun textNoteRoundTrip() {
+    fun `text note round trip`() {
         val note =
             JournalNote.Text(
                 uid = fixedUuid,
@@ -50,7 +50,7 @@ class NoteDataMapperTest {
     }
 
     @Test
-    fun textNoteWithLocationRoundTrips() {
+    fun `text note with location round trips`() {
         val note =
             JournalNote.Text(
                 uid = fixedUuid,
@@ -88,7 +88,7 @@ class NoteDataMapperTest {
     }
 
     @Test
-    fun textNoteWithNullLocationRoundTrips() {
+    fun `text note with null location round trips`() {
         val note =
             JournalNote.Text(
                 uid = fixedUuid,
@@ -105,7 +105,7 @@ class NoteDataMapperTest {
     }
 
     @Test
-    fun textNoteWithEmptyContentRoundTrips() {
+    fun `text note with empty content round trips`() {
         val note =
             JournalNote.Text(
                 uid = fixedUuid,
@@ -121,7 +121,7 @@ class NoteDataMapperTest {
     }
 
     @Test
-    fun textNoteWithUnicodeContentRoundTrips() {
+    fun `text note with unicode content round trips`() {
         val note =
             JournalNote.Text(
                 uid = fixedUuid,
@@ -137,7 +137,7 @@ class NoteDataMapperTest {
     }
 
     @Test
-    fun textNoteWithLongContentRoundTrips() {
+    fun `text note with long content round trips`() {
         val longContent = "A".repeat(10_000)
         val note =
             JournalNote.Text(
@@ -158,7 +158,7 @@ class NoteDataMapperTest {
     // =======================================================================
 
     @Test
-    fun audioNoteRoundTrip() {
+    fun `audio note round trip`() {
         val note =
             JournalNote.Audio(
                 uid = fixedUuid,
@@ -181,7 +181,7 @@ class NoteDataMapperTest {
     }
 
     @Test
-    fun audioNoteWithZeroDurationRoundTrips() {
+    fun `audio note with zero duration round trips`() {
         val note =
             JournalNote.Audio(
                 uid = fixedUuid,
@@ -198,7 +198,7 @@ class NoteDataMapperTest {
     }
 
     @Test
-    fun audioNoteWithLongDurationRoundTrips() {
+    fun `audio note with long duration round trips`() {
         val note =
             JournalNote.Audio(
                 uid = fixedUuid,
@@ -215,7 +215,7 @@ class NoteDataMapperTest {
     }
 
     @Test
-    fun audioNoteWithLocationRoundTrips() {
+    fun `audio note with location round trips`() {
         val note =
             JournalNote.Audio(
                 uid = fixedUuid,
@@ -241,7 +241,7 @@ class NoteDataMapperTest {
     }
 
     @Test
-    fun audioNotePreservesAllFields() {
+    fun `audio note preserves all fields`() {
         val note =
             JournalNote.Audio(
                 uid = fixedUuid,
@@ -272,7 +272,7 @@ class NoteDataMapperTest {
     // =======================================================================
 
     @Test
-    fun imageNoteRoundTrip() {
+    fun `image note round trip`() {
         val note =
             JournalNote.Image(
                 uid = fixedUuid,
@@ -290,7 +290,7 @@ class NoteDataMapperTest {
     }
 
     @Test
-    fun imageNoteWithEmptyCaptionRoundTrips() {
+    fun `image note with empty caption round trips`() {
         val note =
             JournalNote.Image(
                 uid = fixedUuid,
@@ -311,7 +311,7 @@ class NoteDataMapperTest {
     // =======================================================================
 
     @Test
-    fun videoNoteRoundTrip() {
+    fun `video note round trip`() {
         val note =
             JournalNote.Video(
                 uid = fixedUuid,
@@ -333,7 +333,7 @@ class NoteDataMapperTest {
     // =======================================================================
 
     @Test
-    fun noteTypeIsPreservedInDataMap() {
+    fun `note type is preserved in data map`() {
         val types =
             mapOf(
                 NoteType.TEXT to
@@ -377,7 +377,7 @@ class NoteDataMapperTest {
     // =======================================================================
 
     @Test
-    fun dataMapContainsRequiredKeys() {
+    fun `data map contains required keys`() {
         val note =
             JournalNote.Text(
                 uid = fixedUuid,
@@ -399,7 +399,7 @@ class NoteDataMapperTest {
     // =======================================================================
 
     @Test
-    fun fromDataMapThrowsOnMissingPayload() {
+    fun `from data map throws on missing payload`() {
         val map =
             mapOf(
                 NoteDataMapper.KEY_UID to fixedUuid.toString(),
@@ -412,14 +412,14 @@ class NoteDataMapperTest {
     }
 
     @Test
-    fun fromDataMapThrowsOnEmptyMap() {
+    fun `from data map throws on empty map`() {
         assertFailsWith<IllegalArgumentException> {
             mapper.fromDataMap(emptyMap())
         }
     }
 
     @Test
-    fun fromDataMapThrowsOnInvalidJson() {
+    fun `from data map throws on invalid json`() {
         val map =
             mapOf(
                 NoteDataMapper.KEY_UID to fixedUuid.toString(),
@@ -437,65 +437,65 @@ class NoteDataMapperTest {
     // =======================================================================
 
     @Test
-    fun notePathUsesUid() {
+    fun `note path uses uid`() {
         val path = NoteDataMapper.notePath(fixedUuid)
         assertEquals("/logdate/notes/550e8400-e29b-41d4-a716-446655440000", path)
     }
 
     @Test
-    fun noteDeletePathUsesUid() {
+    fun `note delete path uses uid`() {
         val path = NoteDataMapper.noteDeletePath(fixedUuid)
         assertEquals("/logdate/notes/550e8400-e29b-41d4-a716-446655440000/delete", path)
     }
 
     @Test
-    fun isNotePathReturnsTrueForNoteDataPaths() {
+    fun `is note path returns true for note data paths`() {
         assertTrue(NoteDataMapper.isNotePath("/logdate/notes/550e8400-e29b-41d4-a716-446655440000"))
     }
 
     @Test
-    fun isNotePathReturnsFalseForDeletePaths() {
+    fun `is note path returns false for delete paths`() {
         assertFalse(NoteDataMapper.isNotePath("/logdate/notes/550e8400-e29b-41d4-a716-446655440000/delete"))
     }
 
     @Test
-    fun isNotePathReturnsFalseForUnrelatedPaths() {
+    fun `is note path returns false for unrelated paths`() {
         assertFalse(NoteDataMapper.isNotePath("/logdate/journals/some-id"))
         assertFalse(NoteDataMapper.isNotePath("/other/path"))
     }
 
     @Test
-    fun isDeletePathReturnsTrueForDeletePaths() {
+    fun `is delete path returns true for delete paths`() {
         assertTrue(NoteDataMapper.isDeletePath("/logdate/notes/550e8400-e29b-41d4-a716-446655440000/delete"))
     }
 
     @Test
-    fun isDeletePathReturnsFalseForNonDeletePaths() {
+    fun `is delete path returns false for non delete paths`() {
         assertFalse(NoteDataMapper.isDeletePath("/logdate/notes/550e8400-e29b-41d4-a716-446655440000"))
     }
 
     @Test
-    fun isDeletePathReturnsFalseForNonNoteDeletePaths() {
+    fun `is delete path returns false for non note delete paths`() {
         assertFalse(NoteDataMapper.isDeletePath("/logdate/journals/550e8400-e29b-41d4-a716-446655440000/delete"))
         assertFalse(NoteDataMapper.isDeletePath("/logdate/associations/one::two/delete"))
     }
 
     @Test
-    fun noteIdFromPathExtractsCorrectUuid() {
+    fun `note id from path extracts correct uuid`() {
         val path = "/logdate/notes/550e8400-e29b-41d4-a716-446655440000"
         val extracted = NoteDataMapper.noteIdFromPath(path)
         assertEquals(fixedUuid, extracted)
     }
 
     @Test
-    fun noteIdFromDeletePathExtractsCorrectUuid() {
+    fun `note id from delete path extracts correct uuid`() {
         val path = "/logdate/notes/550e8400-e29b-41d4-a716-446655440000/delete"
         val extracted = NoteDataMapper.noteIdFromPath(path)
         assertEquals(fixedUuid, extracted)
     }
 
     @Test
-    fun noteIdFromPathThrowsOnInvalidUuid() {
+    fun `note id from path throws on invalid uuid`() {
         assertFailsWith<Exception> {
             NoteDataMapper.noteIdFromPath("/logdate/notes/not-a-uuid")
         }
@@ -506,7 +506,7 @@ class NoteDataMapperTest {
     // =======================================================================
 
     @Test
-    fun multipleNotesSerializeAndDeserializeIndependently() {
+    fun `multiple notes serialize and deserialize independently`() {
         val notes =
             listOf(
                 JournalNote.Text(uid = Uuid.random(), creationTimestamp = fixedTime, lastUpdated = fixedTime, content = "Note 1"),
@@ -541,7 +541,7 @@ class NoteDataMapperTest {
     // =======================================================================
 
     @Test
-    fun syncVersionPreservedForAllNoteTypes() {
+    fun `sync version preserved for all note types`() {
         val textNote =
             JournalNote.Text(
                 uid = fixedUuid,

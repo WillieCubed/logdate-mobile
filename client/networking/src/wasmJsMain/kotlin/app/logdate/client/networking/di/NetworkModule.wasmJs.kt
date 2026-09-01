@@ -4,8 +4,10 @@ import app.logdate.client.networking.CloudTranscriptionApiClient
 import app.logdate.client.networking.CloudTranscriptionApiClientContract
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.DefaultDataUsagePolicy
+import app.logdate.client.networking.DefaultPlanCatalogClient
 import app.logdate.client.networking.DefaultServerDiscoveryClient
 import app.logdate.client.networking.DefaultServerHealthChecker
+import app.logdate.client.networking.PlanCatalogClient
 import app.logdate.client.networking.ServerDiscoveryClient
 import app.logdate.client.networking.ServerHealthChecker
 import app.logdate.client.networking.httpClient
@@ -18,5 +20,6 @@ actual val networkingModule: Module =
         single<DataUsagePolicy> { DefaultDataUsagePolicy(get()) }
         single<ServerHealthChecker> { DefaultServerHealthChecker(get()) }
         single<ServerDiscoveryClient> { DefaultServerDiscoveryClient(get()) }
+        single<PlanCatalogClient> { DefaultPlanCatalogClient(get(), get()) }
         single<CloudTranscriptionApiClientContract> { CloudTranscriptionApiClient(get(), get()) }
     }

@@ -30,7 +30,7 @@ class TextToolTest {
         )
 
     @Test
-    fun newTextElementHasCorrectProperties() {
+    fun `new text element has correct properties`() {
         val element =
             CanvasElement.Text(
                 id = Uuid.random(),
@@ -51,7 +51,7 @@ class TextToolTest {
     }
 
     @Test
-    fun updateTextElementPreservesId() {
+    fun `update text element preserves id`() {
         val originalId = Uuid.random()
         val original =
             CanvasElement.Text(
@@ -84,7 +84,7 @@ class TextToolTest {
     }
 
     @Test
-    fun updateTextElementInDocumentOnlyAffectsTarget() {
+    fun `update text element in document only affects target`() {
         val targetId = Uuid.random()
         val otherId = Uuid.random()
         val elements =
@@ -126,14 +126,14 @@ class TextToolTest {
     }
 
     @Test
-    fun textEditorStateStartsHidden() {
+    fun `text editor state starts hidden`() {
         val state = createState()
         assertFalse(state.isTextEditorVisible)
         assertNull(state.editingTextElementId)
     }
 
     @Test
-    fun startTextEditingNewShowsEditor() {
+    fun `start text editing new shows editor`() {
         val state =
             createState().copy(
                 isTextEditorVisible = true,
@@ -144,7 +144,7 @@ class TextToolTest {
     }
 
     @Test
-    fun startTextEditingExistingPreservesElementId() {
+    fun `start text editing existing preserves element id`() {
         val elementId = Uuid.random()
         val state =
             createState().copy(
@@ -156,7 +156,7 @@ class TextToolTest {
     }
 
     @Test
-    fun cancelTextEditingHidesEditor() {
+    fun `cancel text editing hides editor`() {
         val state =
             createState()
                 .copy(
@@ -171,7 +171,7 @@ class TextToolTest {
     }
 
     @Test
-    fun fontChoiceEnumHasAllPersonalityFonts() {
+    fun `font choice enum has all personality fonts`() {
         val fontIds = FontChoice.entries.map { it.id }
         assertTrue("caveat" in fontIds)
         assertTrue("dancing-script" in fontIds)
@@ -180,7 +180,7 @@ class TextToolTest {
     }
 
     @Test
-    fun fontChoiceDisplayNamesAreHumanReadable() {
+    fun `font choice display names are human readable`() {
         assertEquals("Caveat", FontChoice.CAVEAT.displayName)
         assertEquals("Dancing Script", FontChoice.DANCING_SCRIPT.displayName)
         assertEquals("Patrick Hand", FontChoice.PATRICK_HAND.displayName)

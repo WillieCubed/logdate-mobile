@@ -23,19 +23,19 @@ class LogdatePreferencesDataSourceTest {
     private val dataSource = LogdatePreferencesDataSource(TestPreferencesDataStore())
 
     @Test
-    fun systemSearchVisibility_defaultsToEnabled() =
+    fun `system search visibility defaults to enabled`() =
         runTest {
             assertTrue(dataSource.getSystemSearchVisibilityEnabled())
         }
 
     @Test
-    fun peopleFeature_defaultsToEnabled() =
+    fun `people feature defaults to enabled`() =
         runTest {
             assertEquals(true, dataSource.observePeopleEnabled().first())
         }
 
     @Test
-    fun systemSearchVisibility_canBePersisted() =
+    fun `system search visibility can be persisted`() =
         runTest {
             dataSource.setSystemSearchVisibilityEnabled(true)
 
@@ -43,7 +43,7 @@ class LogdatePreferencesDataSourceTest {
         }
 
     @Test
-    fun androidPlatformSearchIndexState_canBePersisted() =
+    fun `android platform search index state can be persisted`() =
         runTest {
             dataSource.setAndroidPlatformSearchIndexState(
                 generation = 42L,
@@ -55,7 +55,7 @@ class LogdatePreferencesDataSourceTest {
         }
 
     @Test
-    fun favoriteNotes_arePersistedAndDeduplicated() =
+    fun `favorite notes are persisted and deduplicated`() =
         runTest {
             dataSource.addFavoriteNotes(setOf("note-1", "note-2"))
             dataSource.addFavoriteNotes(setOf("note-2", "note-3"))
@@ -71,13 +71,13 @@ class LogdatePreferencesDataSourceTest {
         }
 
     @Test
-    fun hasSeenRewindOnboarding_defaultsToFalse() =
+    fun `has seen rewind onboarding defaults to false`() =
         runTest {
             assertEquals(false, dataSource.hasSeenRewindOnboarding())
         }
 
     @Test
-    fun hasSeenRewindOnboarding_canBePersisted() =
+    fun `has seen rewind onboarding can be persisted`() =
         runTest {
             dataSource.setHasSeenRewindOnboarding(true)
 
@@ -86,13 +86,13 @@ class LogdatePreferencesDataSourceTest {
         }
 
     @Test
-    fun rewindCurationStrictness_defaultsToStandard() =
+    fun `rewind curation strictness defaults to standard`() =
         runTest {
             assertEquals("STANDARD", dataSource.getRewindCurationStrictness())
         }
 
     @Test
-    fun rewindCurationStrictness_canBePersisted() =
+    fun `rewind curation strictness can be persisted`() =
         runTest {
             dataSource.setRewindCurationStrictness("STRICT")
 
@@ -101,13 +101,13 @@ class LogdatePreferencesDataSourceTest {
         }
 
     @Test
-    fun rewindIncludeScreenshots_defaultsToFalse() =
+    fun `rewind include screenshots defaults to false`() =
         runTest {
             assertEquals(false, dataSource.isRewindIncludeScreenshots())
         }
 
     @Test
-    fun rewindIncludeScreenshots_canBePersisted() =
+    fun `rewind include screenshots can be persisted`() =
         runTest {
             dataSource.setRewindIncludeScreenshots(true)
 

@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  */
 class AtprotoDidTest {
     @Test
-    fun acceptsDidPlc() {
+    fun `accepts did plc`() {
         val did = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
 
         assertEquals("did:plc:ewvi7nxzyoun6zhxrhs64oiz", box(did).value.value)
@@ -24,28 +24,28 @@ class AtprotoDidTest {
     }
 
     @Test
-    fun acceptsHostnameLevelDidWeb() {
+    fun `accepts hostname level did web`() {
         val did = AtprotoDid.require("did:web:example.com%3A8443")
 
         assertEquals("web", did.method)
     }
 
     @Test
-    fun rejectsPathBasedDidWeb() {
+    fun `rejects path based did web`() {
         assertFailsWith<InvalidAtprotoDidException> {
             AtprotoDid.require("did:web:example.com:users:alice")
         }
     }
 
     @Test
-    fun rejectsUnsupportedDidMethod() {
+    fun `rejects unsupported did method`() {
         assertFailsWith<InvalidAtprotoDidException> {
             AtprotoDid.require("did:key:z6Mk")
         }
     }
 
     @Test
-    fun parseAndHelperUrlsCoverSupportedAndUnsupportedCases() {
+    fun `parse and helper urls cover supported and unsupported cases`() {
         val plcDid = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
         val webDid = AtprotoDid.require("did:web:example.com%3A8443")
 

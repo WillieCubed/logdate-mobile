@@ -35,6 +35,8 @@ jobs:
         uses: ./.github/actions/setup-firebase-configs
         with:
           android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64 }}
+          android-maps-api-key: ${{ secrets.LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG }}
+          google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -106,6 +108,8 @@ jobs:
         uses: ./.github/actions/setup-firebase-configs
         with:
           android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64 }}
+          android-maps-api-key: ${{ secrets.LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG }}
+          google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG }}
           ios-google-service-info-plist-base64: ${{ secrets.LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
 
       - name: Set up JDK 17

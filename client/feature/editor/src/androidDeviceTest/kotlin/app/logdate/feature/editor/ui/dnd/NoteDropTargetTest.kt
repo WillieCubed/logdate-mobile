@@ -29,7 +29,7 @@ class NoteDropTargetTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun noteDropTarget_composesWithoutError() {
+    fun `note drop target composes without error`() {
         composeTestRule.setContent {
             Box(modifier = Modifier.size(200.dp).noteDropTarget { })
         }
@@ -37,7 +37,7 @@ class NoteDropTargetTest {
     }
 
     @Test
-    fun noteDropTarget_callbackLambdaIsInvocable() {
+    fun `note drop target callback lambda is invocable`() {
         val receivedTexts = mutableListOf<String>()
 
         composeTestRule.setContent {
@@ -56,7 +56,7 @@ class NoteDropTargetTest {
     }
 
     @Test
-    fun noteDragSource_composesWithoutError() {
+    fun `note drag source composes without error`() {
         composeTestRule.setContent {
             Box(modifier = Modifier.size(200.dp).noteDragSource("drag content"))
         }
@@ -64,7 +64,7 @@ class NoteDropTargetTest {
     }
 
     @Test
-    fun noteDragSource_longPressDoesNotCrash() {
+    fun `note drag source long press does not crash`() {
         composeTestRule.setContent {
             Box(modifier = Modifier.size(200.dp).noteDragSource("drag content"))
         }
@@ -74,7 +74,7 @@ class NoteDropTargetTest {
     }
 
     @Test
-    fun noteDragSourceAndDropTarget_canCoexistOnSameLayout() {
+    fun `note drag source and drop target can coexist on same layout`() {
         val drops = mutableListOf<String>()
 
         composeTestRule.setContent {

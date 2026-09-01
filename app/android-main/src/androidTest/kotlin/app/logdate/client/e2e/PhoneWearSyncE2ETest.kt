@@ -36,7 +36,7 @@ class PhoneWearSyncE2ETest {
     // =======================================================================
 
     @Test
-    fun phoneCanDeserializeWatchAudioNote() {
+    fun `phone can deserialize watch audio note`() {
         val noteId = Uuid.random()
         val watchNote = JournalNote.Audio(
             uid = noteId,
@@ -61,7 +61,7 @@ class PhoneWearSyncE2ETest {
     }
 
     @Test
-    fun phoneCanDeserializeWatchAudioNoteWithLocation() {
+    fun `phone can deserialize watch audio note with location`() {
         val watchNote = JournalNote.Audio(
             uid = Uuid.random(),
             creationTimestamp = fixedTime,
@@ -93,7 +93,7 @@ class PhoneWearSyncE2ETest {
     // =======================================================================
 
     @Test
-    fun phoneCanDeserializeWatchTextNote() {
+    fun `phone can deserialize watch text note`() {
         val watchNote = JournalNote.Text(
             uid = Uuid.random(),
             creationTimestamp = fixedTime,
@@ -109,7 +109,7 @@ class PhoneWearSyncE2ETest {
     }
 
     @Test
-    fun phoneCanDeserializeMoodNoteFromWatch() {
+    fun `phone can deserialize mood note from watch`() {
         val watchNote = JournalNote.Text(
             uid = Uuid.random(),
             creationTimestamp = fixedTime,
@@ -128,7 +128,7 @@ class PhoneWearSyncE2ETest {
     // =======================================================================
 
     @Test
-    fun phoneCanDeserializeBatchOfMixedNotes() {
+    fun `phone can deserialize batch of mixed notes`() {
         val notes = listOf(
             JournalNote.Audio(
                 uid = Uuid.random(), creationTimestamp = fixedTime, lastUpdated = fixedTime,
@@ -160,7 +160,7 @@ class PhoneWearSyncE2ETest {
     // =======================================================================
 
     @Test
-    fun phoneIdentifiesDeletePath() {
+    fun `phone identifies delete path`() {
         val noteId = Uuid.parse("550e8400-e29b-41d4-a716-446655440000")
         val deletePath = NoteDataMapper.noteDeletePath(noteId)
 
@@ -169,7 +169,7 @@ class PhoneWearSyncE2ETest {
     }
 
     @Test
-    fun phoneDistinguishesNotePathFromDeletePath() {
+    fun `phone distinguishes note path from delete path`() {
         val noteId = Uuid.random()
         val notePath = NoteDataMapper.notePath(noteId)
         val deletePath = NoteDataMapper.noteDeletePath(noteId)
@@ -186,7 +186,7 @@ class PhoneWearSyncE2ETest {
     // =======================================================================
 
     @Test
-    fun syncVersionPreservedThroughSync() {
+    fun `sync version preserved through sync`() {
         val watchNote = JournalNote.Audio(
             uid = Uuid.random(),
             creationTimestamp = fixedTime,
@@ -207,7 +207,7 @@ class PhoneWearSyncE2ETest {
     // =======================================================================
 
     @Test
-    fun timestampsPreservedWithMillisecondPrecision() {
+    fun `timestamps preserved with millisecond precision`() {
         val preciseTime = Instant.fromEpochMilliseconds(1_710_000_123_456)
         val preciseUpdate = Instant.fromEpochMilliseconds(1_710_000_123_789)
 
@@ -231,7 +231,7 @@ class PhoneWearSyncE2ETest {
     // =======================================================================
 
     @Test
-    fun noteUidsArePreservedAndUnique() {
+    fun `note uids are preserved and unique`() {
         val uid1 = Uuid.random()
         val uid2 = Uuid.random()
 
@@ -257,7 +257,7 @@ class PhoneWearSyncE2ETest {
     // =======================================================================
 
     @Test
-    fun fullPipelineDataIntegrity_audioRecordingToPhoneNote() {
+    fun `full pipeline data integrity audio recording to phone note`() {
         // Step 1: Watch records audio and creates note
         val recordingNoteId = Uuid.random()
         val recordingTimestamp = Instant.fromEpochMilliseconds(System.currentTimeMillis())

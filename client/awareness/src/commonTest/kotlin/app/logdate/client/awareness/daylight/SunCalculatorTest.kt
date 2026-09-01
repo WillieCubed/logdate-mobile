@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
  */
 class SunCalculatorTest {
     @Test
-    fun calculatesReasonableSunriseForNycSummer() {
+    fun `calculates reasonable sunrise for nyc summer`() {
         val lat = 40.7128 // NYC
         val lng = -74.0060
         val date = LocalDate(2024, 6, 21) // Summer solstice
@@ -26,7 +26,7 @@ class SunCalculatorTest {
     }
 
     @Test
-    fun sunsetIsAfterSunrise() {
+    fun `sunset is after sunrise`() {
         val lat = 37.7749 // San Francisco
         val lng = -122.4194
         val date = LocalDate(2024, 3, 15)
@@ -40,7 +40,7 @@ class SunCalculatorTest {
     }
 
     @Test
-    fun solarNoonIsBetweenSunriseAndSunset() {
+    fun `solar noon is between sunrise and sunset`() {
         val lat = 51.5074 // London
         val lng = -0.1278
         val date = LocalDate(2024, 12, 21) // Winter solstice
@@ -58,7 +58,7 @@ class SunCalculatorTest {
     }
 
     @Test
-    fun worksForSouthernHemisphere() {
+    fun `works for southern hemisphere`() {
         val lat = -33.8688 // Sydney
         val lng = 151.2093
         val date = LocalDate(2024, 12, 21) // Summer in southern hemisphere
@@ -70,7 +70,7 @@ class SunCalculatorTest {
     }
 
     @Test
-    fun solarNoonNearMidDay() {
+    fun `solar noon near mid day`() {
         val lat = 0.0 // Equator
         val lng = 0.0 // Prime meridian
         val date = LocalDate(2024, 3, 20) // Equinox

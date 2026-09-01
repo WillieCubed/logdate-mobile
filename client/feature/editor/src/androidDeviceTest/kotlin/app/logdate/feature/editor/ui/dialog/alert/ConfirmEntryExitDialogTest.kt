@@ -11,7 +11,7 @@ class ConfirmEntryExitDialogTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun persistenceInProgressDisablesEveryExitAction() {
+    fun `persistence in progress disables every exit action`() {
         composeTestRule.setContent {
             ConfirmEntryExitDialog(
                 onCancel = {},

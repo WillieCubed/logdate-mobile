@@ -37,18 +37,21 @@ domains               = ["cloud.logdate.app"]
 # Both values below are derived from the keystore that
 # scripts/create-signing-keystore.sh manages; re-run it to reprint them.
 #
-# The Play app-signing certificate is deliberately absent. Play issues it when
-# the application is first created, so requiring it here would make the first
-# production deploy impossible. Add it once the app exists in Play Console --
-# installs from Play are signed with that key rather than the upload key, so
-# passkey enrolment from a Play install needs it:
-#
-#   ./scripts/create-signing-keystore.sh --environment production \
-#       --play-fingerprint <fingerprint from Setup -> App integrity>
+# The Play app-signing certificate is recorded below, read from Play Console
+# (Setup -> App integrity) once the LogDate application existed there. Installs
+# from Play are signed with that key rather than the upload key, so passkey
+# enrolment from a Play install needs both published at
+# https://logdate.app/.well-known/assetlinks.json. Re-read it from Play Console
+# rather than deriving it; ./scripts/create-signing-keystore.sh --environment
+# production --play-fingerprint <fingerprint> reprints the pair.
 android_signing_certificates = {
   upload = {
     fingerprint         = "FC:42:9A:EC:1E:80:3A:AA:25:3C:26:B8:1A:25:FC:41:17:12:BB:55:E7:09:D5:5A:B7:61:2F:5D:F2:82:C7:DD"
     apk_key_hash_origin = "android:apk-key-hash:_EKa7B6AOqolPCa4GiX8QRcSu1XnCdVat2EvXfKCx90"
+  }
+  play_app_signing = {
+    fingerprint         = "ED:EA:68:23:18:BB:DE:47:83:4B:81:7D:F2:23:8E:4B:A5:0C:14:6D:0F:4A:A6:08:D6:FD:EF:F8:DE:6C:89:B2"
+    apk_key_hash_origin = "android:apk-key-hash:7epoIxi73keDS4F98iOOS6UMFG0PSqYI1v3v-N5sibI"
   }
 }
 
@@ -81,22 +84,22 @@ cloud_run_secret_env = {
   # Version 2 carries no credentials in the query string. Version 1 embedded the Neon user and
   # password there, which the migration runner refuses outright - credentials belong in
   # DATABASE_USER and DATABASE_PASSWORD, which the server and the runner both read.
-  DATABASE_URL             = { secret_id = "logdate-db-url", version = "2" }
-  DATABASE_USER            = { secret_id = "logdate-db-user", version = "1" }
-  DATABASE_PASSWORD        = { secret_id = "logdate-db-password", version = "1" }
-  JWT_SECRET               = { secret_id = "logdate-jwt-secret", version = "1" }
+  DATABASE_URL      = { secret_id = "logdate-db-url", version = "2" }
+  DATABASE_USER     = { secret_id = "logdate-db-user", version = "1" }
+  DATABASE_PASSWORD = { secret_id = "logdate-db-password", version = "1" }
+  JWT_SECRET        = { secret_id = "logdate-jwt-secret", version = "1" }
   # Required by the first-party contract. Create a version for each of these in the production
   # project's Secret Manager before deploying; Cloud Run rejects an empty mounted secret.
   SERVER_ENCRYPTION_KEY    = { secret_id = "logdate-server-encryption-key", version = "1" }
   SERVER_ENCRYPTION_KEY_ID = { secret_id = "logdate-server-encryption-key-id", version = "1" }
   HEALTH_INTERNAL_TOKEN    = { secret_id = "logdate-health-internal-token", version = "1" }
+  GOOGLE_OIDC_CLIENT_IDS   = { secret_id = "logdate-google-oidc-client-ids", version = "1" }
   # Mount these only AFTER the matching secret has at least one version.
   # Cloud Run fails the revision if it tries to mount an empty container.
   # Provisioning steps: docs/observability/sentry.md.
   #   SENTRY_DSN             = { secret_id = "logdate-sentry-dsn", version = "1" }
   # Opt-in only — add entries below and drop a matching key into
-  # infra/terraform/production.env to configure Google OIDC or Redis:
-  #   GOOGLE_OIDC_CLIENT_IDS = { secret_id = "logdate-google-oidc-client-ids" }
+  # infra/terraform/production.env to configure Redis:
   #   REDIS_URL              = { secret_id = "logdate-redis-url" }
 }
 

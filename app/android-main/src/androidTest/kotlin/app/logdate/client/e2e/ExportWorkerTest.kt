@@ -58,7 +58,7 @@ class ExportWorkerTest {
     }
 
     @Test
-    fun workerSucceeds_andEmitsCompletedFilePath_whenExportCompletes() =
+    fun `worker succeeds and emits completed file path when export completes`() =
         runTest {
             val mockResult =
                 mockk<ExportResult> {
@@ -109,7 +109,7 @@ class ExportWorkerTest {
         }
 
     @Test
-    fun workerFails_whenExportProgressEmitsFailed() =
+    fun `worker fails when export progress emits failed`() =
         runTest {
             val mockUseCase =
                 mockk<ExportUserDataUseCase> {
@@ -126,7 +126,7 @@ class ExportWorkerTest {
         }
 
     @Test
-    fun workerFails_whenUseCaseFlowThrows() =
+    fun `worker fails when use case flow throws`() =
         runTest {
             val mockUseCase =
                 mockk<ExportUserDataUseCase> {

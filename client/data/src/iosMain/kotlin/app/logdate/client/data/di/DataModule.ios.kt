@@ -262,5 +262,5 @@ actual val dataModule: Module =
         single<StreakSettingsRepository> { DefaultStreakSettingsRepository(get()) }
 
         // Integrity
-        single { DataIntegrityService(get(), get(), get(), get(), get()) }
+        single { DataIntegrityService(get(), get(), get(), get(), get(), get()) }
     }

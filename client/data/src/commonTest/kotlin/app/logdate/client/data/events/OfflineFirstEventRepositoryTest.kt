@@ -73,7 +73,7 @@ class OfflineFirstEventRepositoryTest {
      * the flag when fetched again. Guards the mapper wiring that the all-day display fix relies on.
      */
     @Test
-    fun isAllDay_round_trips_through_repository() =
+    fun `is all day round trips through repository`() =
         runTest {
             val (repo, dao, _) = newRepo()
             val seededId = seed(dao, isAllDay = true)
@@ -95,7 +95,7 @@ class OfflineFirstEventRepositoryTest {
      * the repository round-trips through the DAO instead of caching stale state.
      */
     @Test
-    fun updateEvent_persists_changes() =
+    fun `update event persists changes`() =
         runTest {
             val (repo, dao, _) = newRepo()
             val id = seed(dao, title = "Old")
@@ -116,7 +116,7 @@ class OfflineFirstEventRepositoryTest {
      * the soft-delete filter excludes it.
      */
     @Test
-    fun deleteEvent_hides_event_from_subsequent_reads() =
+    fun `delete event hides event from subsequent reads`() =
         runTest {
             val (repo, dao, _) = newRepo()
             val id = seed(dao)
@@ -137,7 +137,7 @@ class OfflineFirstEventRepositoryTest {
      * Only the overlapping event should be returned.
      */
     @Test
-    fun observeEventsForDateRange_includes_overlapping_excludes_outside() =
+    fun `observe events for date range includes overlapping excludes outside`() =
         runTest {
             val (repo, dao, _) = newRepo()
             val outsideBefore =
@@ -181,7 +181,7 @@ class OfflineFirstEventRepositoryTest {
      * branch of the SQL `COALESCE(end_time, start_time) >= :start` clause.
      */
     @Test
-    fun observeEventsForDateRange_includes_point_in_time_at_lower_bound() =
+    fun `observe events for date range includes point in time at lower bound`() =
         runTest {
             val (repo, dao, _) = newRepo()
             val pointInTime =
@@ -208,7 +208,7 @@ class OfflineFirstEventRepositoryTest {
      * note id. Covers the basic write-then-read flow on the junction table.
      */
     @Test
-    fun linkNoteToEvent_then_observeNotesForEvent_emits_link() =
+    fun `link note to event then observe notes for event emits link`() =
         runTest {
             val (repo, dao, _) = newRepo()
             val eventId = seed(dao)
@@ -225,7 +225,7 @@ class OfflineFirstEventRepositoryTest {
      * observed list. The event itself is unaffected.
      */
     @Test
-    fun unlinkNoteFromEvent_removes_link() =
+    fun `unlink note from event removes link`() =
         runTest {
             val (repo, dao, _) = newRepo()
             val eventId = seed(dao)
@@ -243,7 +243,7 @@ class OfflineFirstEventRepositoryTest {
      * that joins junction rows to event rows.
      */
     @Test
-    fun observeEventsForNote_resolves_to_event_models() =
+    fun `observe events for note resolves to event models`() =
         runTest {
             val (repo, dao, _) = newRepo()
             val eventId = seed(dao, title = "Concert")

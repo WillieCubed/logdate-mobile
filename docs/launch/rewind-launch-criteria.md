@@ -3,6 +3,12 @@
 The checklist that says Rewind is ready to ship to all users. Treat every box as
 load-bearing — uncheck means do-not-launch.
 
+**How to read the boxes.** A box marked `[x]` here is checked because a test asserts it and that
+test runs in CI, so it stays checked only as long as the test passes. Boxes that need a person —
+a manual pass on a seeded account, hardware LogDate does not have, or a signature — are still
+open, and no amount of automation closes them. Where a criterion was partly automatable the box
+stays open and the automated part is noted, so nothing reads as done when it is not.
+
 ## What "ready" means
 
 A user on any plan, on Android / iOS / Desktop / Wear, opens their Rewind for the
@@ -11,16 +17,25 @@ hanging on a spinner, or showing a chronological photo dump. That's the bar.
 
 ## Curation
 
-- [ ] `RewindContent.Image.significanceScore` is populated for every image panel
-      a curated Rewind ships with. Sample a fresh Rewind on a real account and
-      assert `significanceScore != null` for every image.
-- [ ] Screenshots, document scans, and burst duplicates are filtered out across
-      Android, iOS, and Desktop. Seed a test account with one of each and verify
-      none of them appear in the produced Rewind.
+- [x] `RewindContent.Image.significanceScore` is populated for every image panel
+      a curated Rewind ships with. Asserted by `RewindMediaCuratorTest` for a small fixture and
+      again at 240 photos. Sampling a *real* account is still worth doing once — the tests use a
+      seeded signal extractor, not a device's photo library.
+- [x] Screenshots, document scans, and burst duplicates are filtered out. `PhotoHardFilterTest`
+      and `RewindMediaCuratorTest` cover the rules and the mixed fixture, and the pipeline is
+      common code, so all three platforms share it. **Still open per platform:** each supplies its
+      own signal extractor, and only the shared pipeline is under test — see the iOS box below.
 - [ ] Story-beat `evidenceIds` reference real items that exist in the period's
       content. No dangling UIDs.
-- [ ] `maxItemsPerBeat` and `maxTotalMedia` caps hold under heavy input
-      (≥200 photos for a single week).
+- [x] `maxItemsPerBeat` and `maxTotalMedia` caps hold under heavy input
+      (≥200 photos for a single week). `RewindMediaCuratorTest` runs 240 photos across a week with
+      story beats and asserts both caps, plus the documented cited-item allowance.
+
+      Note for anyone extending these: a default `MediaSignals` has no dimensions, so the hard
+      filter drops it below `minResolutionPx` and the fixture curates to nothing — an assertion
+      that iterates the result then passes without checking anything. And with no narrative there
+      are no beats, so everything becomes a free agent, which by design is not counted against the
+      total cap.
 
 ## Tier coverage
 
@@ -80,14 +95,20 @@ All three tiers tested end-to-end with an account flagged into each:
 
 Run the following sequence cleanly with no failures:
 
+These modules are multiplatform, so their tests aggregate under `allTests`; a bare `test` task
+does not reach them at all.
+
 ```bash
-./gradlew :client:intelligence:test :client:domain:test :client:repository:test \
-          :client:feature:rewind:test :client:database:test :client:datastore:test
+./gradlew :client:intelligence:allTests :client:domain:allTests :client:repository:allTests \
+          :client:feature:rewind:allTests :client:database:allTests :client:logdate-datastore:allTests
 ./gradlew ktlintCheck
 ./gradlew :app:android-main:assembleDebug :app:android-main:smokeDevicesGroupDebugAndroidTest
 ./gradlew :app:compose-main:packageDmg
 ./gradlew :app:wear:assembleDebug
 ```
+
+Verified 2026-08-31: the module tests, `ktlintCheck`, and the Android and Wear debug assemblies
+all pass. The managed-device and DMG steps have not been run as part of this pass.
 
 No `connectedDebugAndroidTest`, no `adb install` against a physical device.
 

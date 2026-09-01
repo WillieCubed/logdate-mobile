@@ -32,7 +32,7 @@ class WearHomeScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun homeScreen_displaysGreeting() {
+    fun `home screen displays greeting`() {
         composeRule.setContent {
             MaterialTheme {
                 WearHomeContent(
@@ -48,7 +48,7 @@ class WearHomeScreenTest {
     }
 
     @Test
-    fun homeScreen_displaysAllCaptureChips() {
+    fun `home screen displays all capture chips`() {
         composeRule.setContent {
             MaterialTheme {
                 WearHomeContent(
@@ -68,7 +68,7 @@ class WearHomeScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun homeScreen_moodCheckInChipTriggersNavigation() {
+    fun `home screen mood check in chip triggers navigation`() {
         var navigated = false
         composeRule.setContent {
             MaterialTheme {
@@ -84,7 +84,7 @@ class WearHomeScreenTest {
     }
 
     @Test
-    fun homeScreen_quickTextChipTriggersNavigation() {
+    fun `home screen quick text chip triggers navigation`() {
         var navigated = false
         composeRule.setContent {
             MaterialTheme {
@@ -100,7 +100,7 @@ class WearHomeScreenTest {
     }
 
     @Test
-    fun homeScreen_timelineChipTriggersNavigation() {
+    fun `home screen timeline chip triggers navigation`() {
         var navigated = false
         composeRule.setContent {
             MaterialTheme {
@@ -116,7 +116,7 @@ class WearHomeScreenTest {
     }
 
     @Test
-    fun homeScreen_settingsChipTriggersNavigation() {
+    fun `home screen settings chip triggers navigation`() {
         var navigated = false
         composeRule.setContent {
             MaterialTheme {

@@ -28,7 +28,7 @@ import kotlin.uuid.Uuid
  */
 class SyncTriggerIntegrationTest {
     @Test
-    fun testJournalNotesRepositoryTriggersContentSync() =
+    fun `journal notes repository triggers content sync`() =
         runTest {
             // Given: A mock sync manager that tracks sync calls
             val mockSyncManager = MockSyncManager()
@@ -49,7 +49,7 @@ class SyncTriggerIntegrationTest {
         }
 
     @Test
-    fun testJournalNotesRepositoryTriggersContentSyncOnDeletion() =
+    fun `journal notes repository triggers content sync on deletion`() =
         runTest {
             // Given: A mock sync manager and repository
             val mockSyncManager = MockSyncManager()
@@ -70,7 +70,7 @@ class SyncTriggerIntegrationTest {
         }
 
     @Test
-    fun testJournalNotesRepositoryTriggersAssociationSync() =
+    fun `journal notes repository triggers association sync`() =
         runTest {
             // Given: A mock sync manager and repository
             val mockSyncManager = MockSyncManager()
@@ -93,7 +93,7 @@ class SyncTriggerIntegrationTest {
         }
 
     @Test
-    fun testJournalRepositoryTriggersSyncOnCrud() =
+    fun `journal repository triggers sync on crud`() =
         runTest {
             // Given: A mock sync manager and repository
             val mockSyncManager = MockSyncManager()
@@ -118,7 +118,7 @@ class SyncTriggerIntegrationTest {
         }
 
     @Test
-    fun testMultipleOperationsAccumulateSyncCalls() =
+    fun `multiple operations accumulate sync calls`() =
         runTest {
             // Given: A mock sync manager and repositories
             val mockSyncManager = MockSyncManager()

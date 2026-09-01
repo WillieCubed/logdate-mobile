@@ -53,7 +53,7 @@ class DatabaseMigrationIntegrationTest {
         )
 
     @Test
-    fun testMigrationFrom5To6() {
+    fun `migration from5 to6`() {
         var db =
             helper.createDatabase(testDatabaseName, 5).apply {
                 // Insert test data in version 5 schema
@@ -72,7 +72,7 @@ class DatabaseMigrationIntegrationTest {
     }
 
     @Test
-    fun testMigrationFrom6To7() {
+    fun `migration from6 to7`() {
         var db =
             helper.createDatabase(testDatabaseName, 6).apply {
                 // Insert test data in version 6 schema
@@ -90,7 +90,7 @@ class DatabaseMigrationIntegrationTest {
     }
 
     @Test
-    fun testMigrationFrom7To8() {
+    fun `migration from7 to8`() {
         var db =
             helper.createDatabase(testDatabaseName, 7).apply {
                 // Insert test data in version 7 schema
@@ -108,7 +108,7 @@ class DatabaseMigrationIntegrationTest {
     }
 
     @Test
-    fun testMigrationFrom8To9() {
+    fun `migration from8 to9`() {
         var db =
             helper.createDatabase(testDatabaseName, 8).apply {
                 // Insert test data in version 8 schema
@@ -132,7 +132,7 @@ class DatabaseMigrationIntegrationTest {
     }
 
     @Test
-    fun testMigrationFrom9To10() {
+    fun `migration from9 to10`() {
         var db =
             helper.createDatabase(testDatabaseName, 9).apply {
                 // Insert test data in version 9 schema
@@ -156,7 +156,7 @@ class DatabaseMigrationIntegrationTest {
     }
 
     @Test
-    fun testCompleteChainMigration5To10() {
+    fun `complete chain migration5 to10`() {
         var db =
             helper.createDatabase(testDatabaseName, 5).apply {
                 // Insert comprehensive test data in version 5 schema
@@ -207,7 +207,7 @@ class DatabaseMigrationIntegrationTest {
     }
 
     @Test
-    fun testMigrationFrom39To40CreatesPeopleTable() {
+    fun `migration from39 to40 creates people table`() {
         val databaseName = "$testDatabaseName-39-40"
 
         helper.createDatabase(databaseName, 39).use { db ->
@@ -270,7 +270,7 @@ class DatabaseMigrationIntegrationTest {
     }
 
     @Test
-    fun testMigrationFrom40To41CreatesPeopleGraphTables() {
+    fun `migration from40 to41 creates people graph tables`() {
         val databaseName = "$testDatabaseName-40-41"
 
         helper.createDatabase(databaseName, 40).use { db ->
@@ -484,7 +484,7 @@ class DatabaseMigrationIntegrationTest {
     }
 
     @Test
-    fun testDataIntegrityWithFullDatabaseOperations() =
+    fun `data integrity with full database operations`() =
         runTest {
             // Create database with latest schema and perform full CRUD operations
             val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -568,7 +568,7 @@ class DatabaseMigrationIntegrationTest {
         }
 
     @Test
-    fun testMigrationFrom25To26BackfillsLocationSampleMetadata() {
+    fun `migration from25 to26 backfills location sample metadata`() {
         var db =
             helper.createDatabase(testDatabaseName, 25).apply {
                 execSQL(
@@ -630,7 +630,7 @@ class DatabaseMigrationIntegrationTest {
     }
 
     @Test
-    fun testMigrationFrom26To27RemovesUnexpectedLocationTimestampIndex() {
+    fun `migration from26 to27 removes unexpected location timestamp index`() {
         var db =
             helper.createDatabase(testDatabaseName, 26).apply {
                 execSQL("CREATE INDEX IF NOT EXISTS index_location_logs_timestamp ON location_logs(timestamp)")
@@ -653,7 +653,7 @@ class DatabaseMigrationIntegrationTest {
     }
 
     @Test
-    fun testMigrationFrom45To46PreservesSyncMetadataAsUnowned() {
+    fun `migration from45 to46 preserves sync metadata as unowned`() {
         val databaseName = "$testDatabaseName-45-46"
         helper.createDatabase(databaseName, 45).use { db ->
             db.execSQL(

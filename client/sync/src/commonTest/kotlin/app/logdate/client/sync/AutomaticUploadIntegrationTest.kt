@@ -47,7 +47,7 @@ import kotlin.uuid.Uuid
  */
 class AutomaticUploadIntegrationTest {
     @Test
-    fun testMediaNotesUploadMediaBeforePublishingContent() =
+    fun `media notes upload media before publishing content`() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val notesRepository = fakeJournalNotesRepository()
@@ -124,7 +124,7 @@ class AutomaticUploadIntegrationTest {
         }
 
     @Test
-    fun testMediaNoteStaysPendingWhenDataPolicyDefersMediaUpload() =
+    fun `media note stays pending when data policy defers media upload`() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val notesRepository = fakeJournalNotesRepository()
@@ -181,7 +181,7 @@ class AutomaticUploadIntegrationTest {
         }
 
     @Test
-    fun testAutomaticContentUpload() =
+    fun `automatic content upload`() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val notesRepository = fakeJournalNotesRepository()
@@ -234,7 +234,7 @@ class AutomaticUploadIntegrationTest {
         }
 
     @Test
-    fun testAutomaticJournalUpload() =
+    fun `automatic journal upload`() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val journalRepository = fakeJournalRepository()
@@ -289,7 +289,7 @@ class AutomaticUploadIntegrationTest {
         }
 
     @Test
-    fun testAutomaticAssociationUpload() =
+    fun `automatic association upload`() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -335,7 +335,7 @@ class AutomaticUploadIntegrationTest {
         }
 
     @Test
-    fun testUploadFailuresAreHandledGracefully() =
+    fun `upload failures are handled gracefully`() =
         runTest {
             val apiClient = failingCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -386,7 +386,7 @@ class AutomaticUploadIntegrationTest {
         }
 
     @Test
-    fun testSuccessfulContentSyncRefreshesObservedServerQuota() =
+    fun `successful content sync refreshes observed server quota`() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -433,7 +433,7 @@ class AutomaticUploadIntegrationTest {
         }
 
     @Test
-    fun testQuotaRefreshFailureDoesNotFailSuccessfulContentSync() =
+    fun `quota refresh failure does not fail successful content sync`() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -480,7 +480,7 @@ class AutomaticUploadIntegrationTest {
         }
 
     @Test
-    fun testUnauthenticatedUploadFails() =
+    fun `unauthenticated upload fails`() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()

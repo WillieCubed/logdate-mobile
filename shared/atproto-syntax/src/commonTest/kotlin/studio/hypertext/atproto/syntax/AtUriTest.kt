@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
  */
 class AtUriTest {
     @Test
-    fun normalizesHandleAuthorityAndCollection() {
+    fun `normalizes handle authority and collection`() {
         val uri = AtUri.require("at://BNEWBOLD.BSKY.TEAM/App.Bsky.feed.post/3jwdwj2ctlk26")
 
         assertEquals("at://bnewbold.bsky.team/app.bsky.feed.post/3jwdwj2ctlk26", box(uri).value)
@@ -28,7 +28,7 @@ class AtUriTest {
     }
 
     @Test
-    fun supportsRepositoryOnlyUris() {
+    fun `supports repository only uris`() {
         val uri = AtUri.require("at://did:plc:44ybard66vv44zksje25o7dz")
 
         assertEquals("did:plc:44ybard66vv44zksje25o7dz", uri.authority)
@@ -37,26 +37,26 @@ class AtUriTest {
     }
 
     @Test
-    fun serializesAsJsonString() {
+    fun `serializes as json string`() {
         val json = Json.encodeToString(AtUri.require("at://foo.com/com.example.foo/123"))
 
         assertEquals("\"at://foo.com/com.example.foo/123\"", json)
     }
 
     @Test
-    fun rejectsTrailingSlash() {
+    fun `rejects trailing slash`() {
         assertFailsWith<InvalidAtUriException> {
             AtUri.require("at://foo.com/")
         }
     }
 
     @Test
-    fun parseReturnsFailureForInvalidCollectionShape() {
+    fun `parse returns failure for invalid collection shape`() {
         assertTrue(AtUri.parse("at://foo.com/example/123").isFailure)
     }
 
     @Test
-    fun reportsValidityAndRejectsAdditionalInvalidShapes() {
+    fun `reports validity and rejects additional invalid shapes`() {
         assertTrue(AtUri.isValid("at://foo.com/com.example.foo/123"))
 
         assertFailsWith<InvalidAtUriException> {

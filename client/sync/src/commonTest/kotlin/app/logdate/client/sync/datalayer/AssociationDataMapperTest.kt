@@ -25,7 +25,7 @@ class AssociationDataMapperTest {
     // =======================================================================
 
     @Test
-    fun associationRoundTrip() {
+    fun `association round trip`() {
         val map = mapper.toDataMap(journalId, contentId)
         val (restoredJournal, restoredContent) = mapper.fromDataMap(map)
 
@@ -34,7 +34,7 @@ class AssociationDataMapperTest {
     }
 
     @Test
-    fun dataMapContainsRequiredKeys() {
+    fun `data map contains required keys`() {
         val map = mapper.toDataMap(journalId, contentId)
 
         assertEquals(journalId.toString(), map[AssociationDataMapper.KEY_JOURNAL_ID])
@@ -46,7 +46,7 @@ class AssociationDataMapperTest {
     // =======================================================================
 
     @Test
-    fun fromDataMapThrowsOnMissingJournalId() {
+    fun `from data map throws on missing journal id`() {
         val map = mapOf(AssociationDataMapper.KEY_CONTENT_ID to contentId.toString())
 
         assertFailsWith<IllegalArgumentException> {
@@ -55,7 +55,7 @@ class AssociationDataMapperTest {
     }
 
     @Test
-    fun fromDataMapThrowsOnMissingContentId() {
+    fun `from data map throws on missing content id`() {
         val map = mapOf(AssociationDataMapper.KEY_JOURNAL_ID to journalId.toString())
 
         assertFailsWith<IllegalArgumentException> {
@@ -64,7 +64,7 @@ class AssociationDataMapperTest {
     }
 
     @Test
-    fun fromDataMapThrowsOnEmptyMap() {
+    fun `from data map throws on empty map`() {
         assertFailsWith<IllegalArgumentException> {
             mapper.fromDataMap(emptyMap())
         }
@@ -75,7 +75,7 @@ class AssociationDataMapperTest {
     // =======================================================================
 
     @Test
-    fun associationPathUsesCompositKey() {
+    fun `association path uses composit key`() {
         val path = AssociationDataMapper.associationPath(journalId, contentId)
         assertEquals(
             "/logdate/associations/550e8400-e29b-41d4-a716-446655440000::660e8400-e29b-41d4-a716-446655440000",
@@ -84,7 +84,7 @@ class AssociationDataMapperTest {
     }
 
     @Test
-    fun associationDeletePathUsesCompositeKey() {
+    fun `association delete path uses composite key`() {
         val path = AssociationDataMapper.associationDeletePath(journalId, contentId)
         assertEquals(
             "/logdate/associations/550e8400-e29b-41d4-a716-446655440000::660e8400-e29b-41d4-a716-446655440000/delete",
@@ -93,7 +93,7 @@ class AssociationDataMapperTest {
     }
 
     @Test
-    fun isAssociationPathReturnsTrueForDataPaths() {
+    fun `is association path returns true for data paths`() {
         assertTrue(
             AssociationDataMapper.isAssociationPath(
                 "/logdate/associations/550e8400-e29b-41d4-a716-446655440000::660e8400-e29b-41d4-a716-446655440000",
@@ -102,7 +102,7 @@ class AssociationDataMapperTest {
     }
 
     @Test
-    fun isAssociationPathReturnsFalseForDeletePaths() {
+    fun `is association path returns false for delete paths`() {
         assertFalse(
             AssociationDataMapper.isAssociationPath(
                 "/logdate/associations/550e8400-e29b-41d4-a716-446655440000::660e8400-e29b-41d4-a716-446655440000/delete",
@@ -111,13 +111,13 @@ class AssociationDataMapperTest {
     }
 
     @Test
-    fun isAssociationPathReturnsFalseForUnrelatedPaths() {
+    fun `is association path returns false for unrelated paths`() {
         assertFalse(AssociationDataMapper.isAssociationPath("/logdate/notes/some-id"))
         assertFalse(AssociationDataMapper.isAssociationPath("/logdate/journals/some-id"))
     }
 
     @Test
-    fun isDeletePathReturnsTrueForDeletePaths() {
+    fun `is delete path returns true for delete paths`() {
         assertTrue(
             AssociationDataMapper.isDeletePath(
                 "/logdate/associations/550e8400-e29b-41d4-a716-446655440000::660e8400-e29b-41d4-a716-446655440000/delete",
@@ -126,7 +126,7 @@ class AssociationDataMapperTest {
     }
 
     @Test
-    fun idsFromPathExtractsCorrectUuids() {
+    fun `ids from path extracts correct uuids`() {
         val path =
             "/logdate/associations/550e8400-e29b-41d4-a716-446655440000::660e8400-e29b-41d4-a716-446655440000"
         val (extractedJournal, extractedContent) = AssociationDataMapper.idsFromPath(path)
@@ -136,7 +136,7 @@ class AssociationDataMapperTest {
     }
 
     @Test
-    fun idsFromDeletePathExtractsCorrectUuids() {
+    fun `ids from delete path extracts correct uuids`() {
         val path =
             "/logdate/associations/550e8400-e29b-41d4-a716-446655440000::660e8400-e29b-41d4-a716-446655440000/delete"
         val (extractedJournal, extractedContent) = AssociationDataMapper.idsFromPath(path)
@@ -150,7 +150,7 @@ class AssociationDataMapperTest {
     // =======================================================================
 
     @Test
-    fun multipleAssociationsSerializeIndependently() {
+    fun `multiple associations serialize independently`() {
         val pairs =
             listOf(
                 Uuid.random() to Uuid.random(),

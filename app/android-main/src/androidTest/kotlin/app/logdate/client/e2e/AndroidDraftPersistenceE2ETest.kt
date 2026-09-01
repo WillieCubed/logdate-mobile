@@ -24,7 +24,7 @@ import kotlin.uuid.Uuid
 @RunWith(AndroidJUnit4::class)
 class AndroidDraftPersistenceE2ETest {
     @Test
-    fun completeSnapshotSurvivesStoreAndRepositoryRecreation() =
+    fun `complete snapshot survives store and repository recreation`() =
         runTest {
             val context = ApplicationProvider.getApplicationContext<Context>()
             val firstStore = AndroidLocalEntryDraftStore(context)

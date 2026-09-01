@@ -29,7 +29,7 @@ class AndroidBatteryInfoProviderTest {
     }
 
     @Test
-    fun testBatteryStateNotNull() =
+    fun `battery state not null`() =
         runTest {
             val batteryState = batteryInfoProvider.getCurrentBatteryState()
             assertNotNull(batteryState)
@@ -39,14 +39,14 @@ class AndroidBatteryInfoProviderTest {
         }
 
     @Test
-    fun testBatteryStateFlow() =
+    fun `battery state flow`() =
         runTest {
             val batteryState = batteryInfoProvider.currentBatteryState.first()
             assertNotNull(batteryState)
         }
 
     @Test
-    fun testPowerSaveModeIsBoolean() =
+    fun `power save mode is boolean`() =
         runTest {
             val isPowerSaveMode = batteryInfoProvider.isPowerSaveMode()
             // Just verify it returns a boolean value without error

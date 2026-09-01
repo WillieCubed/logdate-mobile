@@ -17,7 +17,7 @@ import kotlin.uuid.Uuid
  */
 class StickerIntegrationTest {
     @Test
-    fun addStickerElementProducesCorrectRef() {
+    fun `add sticker element produces correct ref`() {
         val stickerRef = Uuid.random()
         val element =
             CanvasElement.Sticker(
@@ -33,7 +33,7 @@ class StickerIntegrationTest {
     }
 
     @Test
-    fun stickerUriMapResolvesKnownRef() {
+    fun `sticker uri map resolves known ref`() {
         val ref = Uuid.random()
         val uriMap = mapOf(ref to "file:///stickers/cat.png")
 
@@ -41,7 +41,7 @@ class StickerIntegrationTest {
     }
 
     @Test
-    fun stickerUriMapReturnsNullForUnknownRef() {
+    fun `sticker uri map returns null for unknown ref`() {
         val uriMap = mapOf(Uuid.random() to "file:///stickers/cat.png")
         val unknownRef = Uuid.random()
 
@@ -49,7 +49,7 @@ class StickerIntegrationTest {
     }
 
     @Test
-    fun shelfStickersPopulateFromEntities() {
+    fun `shelf stickers populate from entities`() {
         val stickers =
             listOf(
                 StickerShelfItem(Uuid.random(), "file:///sticker1.png", "Cat"),
@@ -74,7 +74,7 @@ class StickerIntegrationTest {
     }
 
     @Test
-    fun stickerUriMapBuiltFromShelfStickers() {
+    fun `sticker uri map built from shelf stickers`() {
         val id1 = Uuid.random()
         val id2 = Uuid.random()
         val stickers =
@@ -90,7 +90,7 @@ class StickerIntegrationTest {
     }
 
     @Test
-    fun documentWithStickerElementsExtractsRefs() {
+    fun `document with sticker elements extracts refs`() {
         val ref1 = Uuid.random()
         val ref2 = Uuid.random()
         val doc =

@@ -40,7 +40,7 @@ class MainActivityRecreationE2ETest {
     val ruleChain: RuleChain = RuleChain.outerRule(koinRule).around(composeRule)
 
     @Test
-    fun entryEditor_remainsOpenAcrossActivityRecreation() {
+    fun `entry editor remains open across activity recreation`() {
         composeRule.onNodeWithContentDescription("Start text entry").performClick()
         waitForTag("editor_text_input")
 

@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  */
 class NsidTest {
     @Test
-    fun normalizesAuthorityToLowercase() {
+    fun `normalizes authority to lowercase`() {
         val nsid = Nsid.require("Com.Example.fooBar")
 
         assertEquals("com.example.fooBar", box(nsid).value)
@@ -26,26 +26,26 @@ class NsidTest {
     }
 
     @Test
-    fun serializesAsJsonString() {
+    fun `serializes as json string`() {
         val json = Json.encodeToString(Nsid.require("com.atproto.sync.getRecord"))
 
         assertEquals("\"com.atproto.sync.getRecord\"", json)
     }
 
     @Test
-    fun rejectsHyphenatedNames() {
+    fun `rejects hyphenated names`() {
         assertFailsWith<InvalidNsidException> {
             Nsid.require("com.example.foo-bar")
         }
     }
 
     @Test
-    fun parseReturnsFailureForTooFewSegments() {
+    fun `parse returns failure for too few segments`() {
         assertTrue(Nsid.parse("example.foo").isFailure)
     }
 
     @Test
-    fun reportsValidityAndRejectsAdditionalInvalidShapes() {
+    fun `reports validity and rejects additional invalid shapes`() {
         assertTrue(Nsid.isValid("com.example.fooBar"))
 
         val overlongAuthority = "${"a".repeat(64)}.${"b".repeat(64)}.${"c".repeat(64)}.${"d".repeat(61)}.foo"

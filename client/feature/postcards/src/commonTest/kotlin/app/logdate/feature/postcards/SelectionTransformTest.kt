@@ -20,7 +20,7 @@ import kotlin.uuid.Uuid
  */
 class SelectionTransformTest {
     @Test
-    fun selectElementSetsSelectedId() {
+    fun `select element sets selected id`() {
         val elementId = Uuid.random()
         var selectedId: Uuid? = null
 
@@ -30,14 +30,14 @@ class SelectionTransformTest {
     }
 
     @Test
-    fun deselectClearsSelectedId() {
+    fun `deselect clears selected id`() {
         var selectedId: Uuid? = Uuid.random()
         selectedId = null
         assertNull(selectedId)
     }
 
     @Test
-    fun moveElementAppliesDelta() {
+    fun `move element applies delta`() {
         val original = ElementTransform(x = 100f, y = 200f)
         val dx = 25f
         val dy = -15f
@@ -51,7 +51,7 @@ class SelectionTransformTest {
     }
 
     @Test
-    fun transformElementAppliesScaleAndRotation() {
+    fun `transform element applies scale and rotation`() {
         val original = ElementTransform(scaleX = 1f, scaleY = 1f, rotation = 0f)
         val scaleDelta = 1.5f
         val rotationDelta = 30f
@@ -69,7 +69,7 @@ class SelectionTransformTest {
     }
 
     @Test
-    fun transformElementClampsScaleMin() {
+    fun `transform element clamps scale min`() {
         val original = ElementTransform(scaleX = 0.15f, scaleY = 0.15f)
         val scaleDelta = 0.5f // Would result in 0.075, below minimum
 
@@ -78,7 +78,7 @@ class SelectionTransformTest {
     }
 
     @Test
-    fun transformElementClampsScaleMax() {
+    fun `transform element clamps scale max`() {
         val original = ElementTransform(scaleX = 8f, scaleY = 8f)
         val scaleDelta = 2f // Would result in 16, above maximum
 
@@ -87,7 +87,7 @@ class SelectionTransformTest {
     }
 
     @Test
-    fun undoBatchingDragProducesSingleUndoEntry() {
+    fun `undo batching drag produces single undo entry`() {
         // Simulate a drag operation that should produce exactly one undo entry
         val undoStack = ArrayDeque<PostcardDocument>()
         val doc =
@@ -112,7 +112,7 @@ class SelectionTransformTest {
     }
 
     @Test
-    fun elementSizeDpReturnsCorrectSizeForPhoto() {
+    fun `element size dp returns correct size for photo`() {
         val photo =
             CanvasElement.Photo(
                 id = Uuid.random(),
@@ -125,7 +125,7 @@ class SelectionTransformTest {
     }
 
     @Test
-    fun elementSizeDpReturnsCorrectSizeForShape() {
+    fun `element size dp returns correct size for shape`() {
         val shape =
             CanvasElement.Shape(
                 id = Uuid.random(),
@@ -141,7 +141,7 @@ class SelectionTransformTest {
     }
 
     @Test
-    fun elementSizeDpReturnsCorrectSizeForSticker() {
+    fun `element size dp returns correct size for sticker`() {
         val sticker =
             CanvasElement.Sticker(
                 id = Uuid.random(),
@@ -153,7 +153,7 @@ class SelectionTransformTest {
     }
 
     @Test
-    fun elementSizeDpComputesBoundsForInk() {
+    fun `element size dp computes bounds for ink`() {
         val ink =
             CanvasElement.Ink(
                 id = Uuid.random(),
@@ -174,7 +174,7 @@ class SelectionTransformTest {
     }
 
     @Test
-    fun elementSizeDpEnforcesMinimumForSmallInk() {
+    fun `element size dp enforces minimum for small ink`() {
         val ink =
             CanvasElement.Ink(
                 id = Uuid.random(),
@@ -194,7 +194,7 @@ class SelectionTransformTest {
     }
 
     @Test
-    fun cumulativeMovePreservesAccuracy() {
+    fun `cumulative move preserves accuracy`() {
         var transform = ElementTransform(x = 0f, y = 0f)
 
         // Simulate many small drag increments

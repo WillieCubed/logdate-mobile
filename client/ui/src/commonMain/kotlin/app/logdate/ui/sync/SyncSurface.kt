@@ -15,12 +15,8 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -36,7 +32,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -46,6 +41,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.BannerContent
+import app.logdate.ui.common.MessageBanner
 import app.logdate.ui.theme.Spacing
 
 /**
@@ -125,65 +122,21 @@ fun SyncErrorBanner(
     onDismiss: () -> Unit = {},
 ) {
     val visual = presentation.toBannerVisual()
-    AnimatedVisibility(
-        visible = visual != null,
-        // Slight bounce on enter — MD3 Expressive's voice. Snappy on exit so it doesn't linger.
-        enter =
-            slideInVertically(
-                initialOffsetY = { -it },
-                animationSpec =
-                    spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMediumLow,
-                    ),
-            ) + fadeIn(),
-        exit = slideOutVertically(targetOffsetY = { -it / 2 }) + fadeOut(),
-        modifier = modifier,
-    ) {
-        if (visual == null) return@AnimatedVisibility
-        Surface(
-            color = visual.containerColor,
-            contentColor = visual.contentColor,
-            // MD3 extra-large container radius (28dp). Uniform rounding reads cleaner here
-            // than the asymmetric variant — the banner already has plenty of presence from
-            // its tonal color and width; bending the corners adds noise without meaning.
-            shape = MaterialTheme.shapes.extraLarge,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                Icon(
-                    imageVector = visual.icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp),
+    MessageBanner(
+        content =
+            visual?.let {
+                BannerContent(
+                    message = it.message,
+                    icon = it.icon,
+                    containerColor = it.containerColor,
+                    contentColor = it.contentColor,
+                    action = it.action?.let { (label, syncAction) -> label to { onAction(syncAction) } },
+                    dismissible = it.dismissible,
                 )
-                Box(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = visual.message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                visual.action?.let { (label, syncAction) ->
-                    TextButton(onClick = { onAction(syncAction) }) {
-                        Text(label)
-                    }
-                }
-                if (visual.dismissible) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Dismiss")
-                    }
-                }
-            }
-        }
-    }
+            },
+        modifier = modifier,
+        onDismiss = onDismiss,
+    )
 }
 
 private data class ChipVisual(

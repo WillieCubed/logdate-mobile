@@ -65,6 +65,16 @@ interface VideoNoteDao {
     suspend fun addNote(note: VideoNoteEntity)
 
     /**
+     * Counts how many notes still point at [contentUri].
+     *
+     * Media is stored content-addressed, so two notes holding the same bytes share one file on
+     * disk. Deleting a note may therefore not mean deleting its media: the file may only be
+     * removed once nothing references it.
+     */
+    @Query("SELECT COUNT(*) FROM video_notes WHERE contentUri = :contentUri")
+    suspend fun countByContentUri(contentUri: String): Int
+
+    /**
      * Removes the given note from the DB.
      */
     @Query("DELETE FROM video_notes WHERE uid = :noteId")

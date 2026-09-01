@@ -48,7 +48,7 @@ class OnThisDayWidgetStateDefinitionTest {
     }
 
     @Test
-    fun defaultState_isLoading() = runTest {
+    fun `default state is loading`() = runTest {
         val key = uniqueKey()
         val store = stateDefinition.getDataStore(context, key)
         val state = store.data.first()
@@ -57,7 +57,7 @@ class OnThisDayWidgetStateDefinitionTest {
     }
 
     @Test
-    fun writeAndReadHasMemory() = runTest {
+    fun `write and read has memory`() = runTest {
         val key = uniqueKey()
         val store = stateDefinition.getDataStore(context, key)
         val expected = OnThisDayWidgetState.HasMemory(
@@ -78,7 +78,7 @@ class OnThisDayWidgetStateDefinitionTest {
     }
 
     @Test
-    fun writeNoMemoryToday_overwritesPreviousMemory() = runTest {
+    fun `write no memory today overwrites previous memory`() = runTest {
         val key = uniqueKey()
         val store = stateDefinition.getDataStore(context, key)
 
@@ -97,7 +97,7 @@ class OnThisDayWidgetStateDefinitionTest {
     }
 
     @Test
-    fun hasMemoryWithNullThumbnail_roundTrips() = runTest {
+    fun `has memory with null thumbnail round trips`() = runTest {
         val key = uniqueKey()
         val store = stateDefinition.getDataStore(context, key)
         val expected = OnThisDayWidgetState.HasMemory(
@@ -116,7 +116,7 @@ class OnThisDayWidgetStateDefinitionTest {
     }
 
     @Test
-    fun cachedDataStore_returnsSameInstance() = runTest {
+    fun `cached data store returns same instance`() = runTest {
         val key = uniqueKey()
         val store1 = stateDefinition.getDataStore(context, key)
         val store2 = stateDefinition.getDataStore(context, key)

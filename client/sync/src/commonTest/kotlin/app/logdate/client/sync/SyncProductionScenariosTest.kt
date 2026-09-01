@@ -41,7 +41,7 @@ import kotlin.test.assertTrue
  */
 class SyncProductionScenariosTest {
     @Test
-    fun testLargeScaleSyncWith100Items() =
+    fun `large scale sync with100 items`() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -95,7 +95,7 @@ class SyncProductionScenariosTest {
         }
 
     @Test
-    fun testPartialBatchFailureRollback() =
+    fun `partial batch failure rollback`() =
         runTest {
             val apiClient = FakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -156,7 +156,7 @@ class SyncProductionScenariosTest {
         }
 
     @Test
-    fun testNetworkTimeoutDuringUpload() =
+    fun `network timeout during upload`() =
         runTest {
             val apiClient = FakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -210,7 +210,7 @@ class SyncProductionScenariosTest {
         }
 
     @Test
-    fun testOfflineQueueFlushesAfterReconnect() =
+    fun `offline queue flushes after reconnect`() =
         runTest {
             val offlineClient =
                 FakeCloudApiClient().apply {
@@ -290,7 +290,7 @@ class SyncProductionScenariosTest {
         }
 
     @Test
-    fun testConcurrentUploadAndDownloadSync() =
+    fun `concurrent upload and download sync`() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -339,7 +339,7 @@ class SyncProductionScenariosTest {
         }
 
     @Test
-    fun testMultipleFailureTypesInSingleSync() =
+    fun `multiple failure types in single sync`() =
         runTest {
             val apiClient = FakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -391,7 +391,7 @@ class SyncProductionScenariosTest {
         }
 
     @Test
-    fun testSyncWithMixedSuccessAndFailure() =
+    fun `sync with mixed success and failure`() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -431,7 +431,7 @@ class SyncProductionScenariosTest {
         }
 
     @Test
-    fun testRepeatedFailuresTrackCumulativeErrors() =
+    fun `repeated failures track cumulative errors`() =
         runTest {
             val apiClient = FakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -478,7 +478,7 @@ class SyncProductionScenariosTest {
         }
 
     @Test
-    fun testSyncRecoveryAfterMultipleFailures() =
+    fun `sync recovery after multiple failures`() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -518,7 +518,7 @@ class SyncProductionScenariosTest {
         }
 
     @Test
-    fun testAuthenticationRequiredMidwayThroughSync() =
+    fun `authentication required midway through sync`() =
         runTest {
             val apiClient = FakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -558,7 +558,7 @@ class SyncProductionScenariosTest {
         }
 
     @Test
-    fun testPartialDownloadWithMixedResults() =
+    fun `partial download with mixed results`() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -595,7 +595,7 @@ class SyncProductionScenariosTest {
         }
 
     @Test
-    fun testUploadPendingChangesWithEmptyQueue() =
+    fun `upload pending changes with empty queue`() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()

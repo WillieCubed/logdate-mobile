@@ -7,7 +7,7 @@ import kotlin.test.assertIs
 
 class FoldableLayoutInfoTest {
     @Test
-    fun splitLayoutReturnsNoneWhenDeviceHasNoHinge() {
+    fun `split layout returns none when device has no hinge`() {
         val split =
             calculateFoldableSplitLayout(
                 containerWidth = 840.dp,
@@ -19,7 +19,7 @@ class FoldableLayoutInfoTest {
     }
 
     @Test
-    fun verticalSeparatingHingeProducesLeftAndRightPaneBounds() {
+    fun `vertical separating hinge produces left and right pane bounds`() {
         val split =
             calculateFoldableSplitLayout(
                 containerWidth = 820.dp,
@@ -46,7 +46,7 @@ class FoldableLayoutInfoTest {
     }
 
     @Test
-    fun horizontalSeparatingHingeProducesTopAndBottomPaneBounds() {
+    fun `horizontal separating hinge produces top and bottom pane bounds`() {
         val split =
             calculateFoldableSplitLayout(
                 containerWidth = 820.dp,
@@ -73,7 +73,7 @@ class FoldableLayoutInfoTest {
     }
 
     @Test
-    fun splitLayoutReturnsNoneWhenSafePaneIsTooSmall() {
+    fun `split layout returns none when safe pane is too small`() {
         val split =
             calculateFoldableSplitLayout(
                 containerWidth = 700.dp,
@@ -97,7 +97,7 @@ class FoldableLayoutInfoTest {
     }
 
     @Test
-    fun splitLayoutReturnsNoneWhenHingeDoesNotSeparateWindow() {
+    fun `split layout returns none when hinge does not separate window`() {
         val split =
             calculateFoldableSplitLayout(
                 containerWidth = 820.dp,
@@ -109,7 +109,7 @@ class FoldableLayoutInfoTest {
     }
 
     @Test
-    fun pixelsToDpUsesDensityScale() {
+    fun `pixels to dp uses density scale`() {
         assertEquals(120f, pixelsToDp(px = 360, density = 3f))
     }
 

@@ -9,12 +9,12 @@ import kotlin.time.Clock
  */
 class QuickNetworkingTest {
     @Test
-    fun httpClient_exists() {
+    fun `http client exists`() {
         assertNotNull(httpClient)
     }
 
     @Test
-    fun networkState_connected_canBeCreated() {
+    fun `network state connected can be created`() {
         val timestamp = Clock.System.now()
         val state = NetworkState.Connected(timestamp)
         assertNotNull(state)

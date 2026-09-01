@@ -55,7 +55,7 @@ class MultiWindowEditorE2ETest {
      * to the NoteEditorScreen composable.
      */
     @Test
-    fun testOpenEntryInNewWindow() {
+    fun `open entry in new window`() {
         val entryId = Uuid.random()
         val journalId = Uuid.random()
 
@@ -83,7 +83,7 @@ class MultiWindowEditorE2ETest {
      * Should launch a blank editor with no initial content.
      */
     @Test
-    fun testCreateNewBlankEditorWindow() {
+    fun `create new blank editor window`() {
         val intent = EditorActivity.createIntent(context)
 
         // Verify multi-window flags are set even for new entries
@@ -103,7 +103,7 @@ class MultiWindowEditorE2ETest {
      * The initial text should be passed to the editor for new entry creation.
      */
     @Test
-    fun testCreateEditorWindowWithInitialContent() {
+    fun `create editor window with initial content`() {
         val initialText = "Test journal entry content"
         val attachmentUri = "content://media/external/images/media/1"
 
@@ -133,7 +133,7 @@ class MultiWindowEditorE2ETest {
      * in separate editor windows independently.
      */
     @Test
-    fun testOpenDifferentEntryTypesInSeparateWindows() {
+    fun `open different entry types in separate windows`() {
         val textEntryId = Uuid.random()
         val imageEntryId = Uuid.random()
         val audioEntryId = Uuid.random()
@@ -173,7 +173,7 @@ class MultiWindowEditorE2ETest {
      * ```
      */
     @Test
-    fun testEditorActivityIsInSeparateTask() {
+    fun `editor activity is in separate task`() {
         // Launch an editor window
         val intent = EditorActivity.createIntent(context, entryId = Uuid.random())
 
@@ -203,7 +203,7 @@ class MultiWindowEditorE2ETest {
      * ```
      */
     @Test
-    fun testEditorActivitySupportsSplitScreen() {
+    fun `editor activity supports split screen`() {
         val intent = EditorActivity.createIntent(context)
 
         // Verify activity can be launched (manifest allows it)
@@ -224,7 +224,7 @@ class MultiWindowEditorE2ETest {
      * The EditorActivity.updateWindowMetrics() method should be called on RESUMED state.
      */
     @Test
-    fun testEditorWindowHandlesConfigurationChanges() {
+    fun `editor window handles configuration changes`() {
         val intent = EditorActivity.createIntent(context, entryId = Uuid.random())
 
         val scenario = ActivityScenario.launch<EditorActivity>(intent)

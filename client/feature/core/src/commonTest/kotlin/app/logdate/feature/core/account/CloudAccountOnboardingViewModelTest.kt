@@ -50,6 +50,7 @@ import app.logdate.shared.model.Journal
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyAuthenticationOptions
 import app.logdate.shared.model.PasskeyCapabilities
+import app.logdate.shared.model.PasskeyInfo
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.ServerDescriptor
 import app.logdate.shared.model.UsernameAvailabilityData
@@ -331,6 +332,8 @@ class CloudAccountOnboardingViewModelTest {
 
         override suspend fun refreshAuthentication(): Result<Unit> = Result.success(Unit)
 
+        override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = Result.success(emptyList())
+
         override suspend fun deletePasskey(credentialId: String): Result<Unit> = Result.success(Unit)
 
         override suspend fun createRestoreKey(): Result<Unit> = Result.success(Unit)
@@ -552,6 +555,8 @@ class CloudAccountOnboardingViewModelTest {
         ): Result<LogDateAccount> = Result.failure(NotImplementedError())
 
         override suspend fun refreshToken(refreshToken: String): Result<String> = Result.failure(NotImplementedError())
+
+        override suspend fun listPasskeys(accessToken: String): Result<List<PasskeyInfo>> = Result.success(emptyList())
 
         override suspend fun deletePasskey(
             accessToken: String,

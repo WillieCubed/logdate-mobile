@@ -268,7 +268,7 @@ class ArchiveRoundTripTest {
     // ── Tests ────────────────────────────────────────────────────────────
 
     @Test
-    fun archive_allContentTypes_surviveRoundTrip() =
+    fun `archive all content types survive round trip`() =
         runTest {
             val now = now()
 
@@ -360,7 +360,7 @@ class ArchiveRoundTripTest {
         }
 
     @Test
-    fun archive_unicodeAndSpecialCharacters_preservedExactly() =
+    fun `archive unicode and special characters preserved exactly`() =
         runTest {
             val now = now()
             val journal = Journal(
@@ -391,7 +391,7 @@ class ArchiveRoundTripTest {
         }
 
     @Test
-    fun archive_timestamps_preservedWithMillisecondPrecision() =
+    fun `archive timestamps preserved with millisecond precision`() =
         runTest {
             val created = Instant.fromEpochMilliseconds(1_700_000_000_123L)
             val updated = Instant.fromEpochMilliseconds(1_700_000_060_456L)
@@ -419,7 +419,7 @@ class ArchiveRoundTripTest {
         }
 
     @Test
-    fun archive_manyItems_noneDropped() =
+    fun `archive many items none dropped`() =
         runTest {
             val now = now()
             val journal = Journal(id = Uuid.random(), title = "Bulk", created = now, lastUpdated = now)
@@ -447,7 +447,7 @@ class ArchiveRoundTripTest {
         }
 
     @Test
-    fun archive_drafts_survivedWhenIncluded() =
+    fun `archive drafts survived when included`() =
         runTest {
             val now = now()
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
@@ -476,7 +476,7 @@ class ArchiveRoundTripTest {
         }
 
     @Test
-    fun archive_drafts_absentWhenExcluded() =
+    fun `archive drafts absent when excluded`() =
         runTest {
             val now = now()
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
@@ -498,7 +498,7 @@ class ArchiveRoundTripTest {
         }
 
     @Test
-    fun archive_emptyDatabase_producesValidArchiveAndRestoresCleanly() =
+    fun `archive empty database produces valid archive and restores cleanly`() =
         runTest {
             // No data seeded — archive must still be well-formed and restore must succeed.
             archiveRoundTrip()

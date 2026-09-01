@@ -13,18 +13,18 @@ import kotlin.test.assertTrue
  */
 class SharedScreenshotCatalogTest {
     @Test
-    fun sceneIds_are_unique() {
+    fun `scene ids are unique`() {
         val sceneIds = SharedScreenshotCatalog.allScenes.map { it.id }
         assertEquals(sceneIds.size, sceneIds.distinct().size)
     }
 
     @Test
-    fun every_scene_has_at_least_one_variant() {
+    fun `every scene has at least one variant`() {
         assertTrue(SharedScreenshotCatalog.allScenes.all { it.variants.isNotEmpty() })
     }
 
     @Test
-    fun baseline_names_are_unique() {
+    fun `baseline names are unique`() {
         val baselineNames =
             SharedScreenshotCatalog.allScenes.flatMap { scene ->
                 scene.variants.map { variant -> screenshotBaselineName(scene, variant) }

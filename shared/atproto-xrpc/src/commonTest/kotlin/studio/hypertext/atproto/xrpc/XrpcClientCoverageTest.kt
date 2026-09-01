@@ -23,7 +23,7 @@ import kotlin.test.assertIs
 class XrpcClientCoverageTest {
     @OptIn(ExperimentalSerializationApi::class)
     @Test
-    fun interfaceHelpersAndBuilderStateAreCovered(): Unit =
+    fun `interface helpers and builder state are covered`(): Unit =
         runTest {
             val client: XrpcClient = FakeXrpcClient()
             val nsid = Nsid.require("com.example.rpc.echo")
@@ -90,7 +90,7 @@ class XrpcClientCoverageTest {
         }
 
     @Test
-    fun exceptionMessagesAreStable() {
+    fun `exception messages are stable`() {
         val transportWithoutCause = XrpcTransportException("transport only")
         val transport = XrpcTransportException("transport broke", IllegalStateException("boom"))
         val protocol = XrpcProtocolException(statusCode = 401, error = "AuthRequired", errorMessage = "token missing")

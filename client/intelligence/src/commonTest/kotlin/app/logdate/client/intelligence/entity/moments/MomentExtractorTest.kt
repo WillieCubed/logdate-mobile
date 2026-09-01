@@ -50,7 +50,7 @@ class MomentExtractorTest {
     }
 
     @Test
-    fun extractMoments_withValidResponse_parsesCorrectly() =
+    fun `extract moments with valid response parses correctly`() =
         runTest(testDispatcher) {
             setup()
             val entriesText = "Entry [abc-123] at 2025-03-15T08:00:00Z: Morning coffee"
@@ -88,7 +88,7 @@ class MomentExtractorTest {
         }
 
     @Test
-    fun extractMoments_withMultipleMoments_parsesAll() =
+    fun `extract moments with multiple moments parses all`() =
         runTest(testDispatcher) {
             setup()
             val entriesText = "Full day journal dump"
@@ -134,7 +134,7 @@ class MomentExtractorTest {
         }
 
     @Test
-    fun extractMoments_withCachedResponse_returnsCached() =
+    fun `extract moments with cached response returns cached`() =
         runTest(testDispatcher) {
             setup()
             val entriesText = "Cached journal entry"
@@ -156,7 +156,7 @@ class MomentExtractorTest {
         }
 
     @Test
-    fun extractMoments_networkUnavailable_returnsUnavailable() =
+    fun `extract moments network unavailable returns unavailable`() =
         runTest(testDispatcher) {
             setup()
             fakeNetworkMonitor.setAvailable(false)
@@ -166,7 +166,7 @@ class MomentExtractorTest {
         }
 
     @Test
-    fun extractMoments_aiError_returnsError() =
+    fun `extract moments ai error returns error`() =
         runTest(testDispatcher) {
             setup()
             fakeAIClient.shouldThrowError = true
@@ -176,7 +176,7 @@ class MomentExtractorTest {
         }
 
     @Test
-    fun extractMoments_invalidJson_returnsError() =
+    fun `extract moments invalid json returns error`() =
         runTest(testDispatcher) {
             setup()
             fakeAIClient.defaultResponse = "not valid json at all"
@@ -186,7 +186,7 @@ class MomentExtractorTest {
         }
 
     @Test
-    fun extractMoments_emptyMoments_returnsEmptyList() =
+    fun `extract moments empty moments returns empty list`() =
         runTest(testDispatcher) {
             setup()
             fakeAIClient.defaultResponse = """{"moments": []}"""
@@ -197,7 +197,7 @@ class MomentExtractorTest {
         }
 
     @Test
-    fun extractMoments_cachesSuccessfulResponse() =
+    fun `extract moments caches successful response`() =
         runTest(testDispatcher) {
             setup()
             val entriesText = "Journal entry to cache"
@@ -211,7 +211,7 @@ class MomentExtractorTest {
         }
 
     @Test
-    fun extractMoments_sendsSystemPromptWithMomentInstructions() =
+    fun `extract moments sends system prompt with moment instructions`() =
         runTest(testDispatcher) {
             setup()
             fakeAIClient.defaultResponse = """{"moments": []}"""

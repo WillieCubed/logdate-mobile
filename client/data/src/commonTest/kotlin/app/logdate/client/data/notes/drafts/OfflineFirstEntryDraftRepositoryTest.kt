@@ -73,7 +73,7 @@ class OfflineFirstEntryDraftRepositoryTest {
      * Expected behavior: The flow should emit an empty list when first collected.
      */
     @Test
-    fun getDrafts_emitsEmptyListInitially() =
+    fun `get drafts emits empty list initially`() =
         runTest(testDispatcher) {
             val drafts = repository.getDrafts().first()
             assertTrue(drafts.isEmpty())
@@ -86,7 +86,7 @@ class OfflineFirstEntryDraftRepositoryTest {
      * a list containing the created draft with the same notes that were provided.
      */
     @Test
-    fun getDrafts_emitsDraftsAfterCreation() =
+    fun `get drafts emits drafts after creation`() =
         runTest(testDispatcher) {
             val notes = listOf(createTestTextNote())
 
@@ -104,7 +104,7 @@ class OfflineFirstEntryDraftRepositoryTest {
      * return a success Result containing the correct draft with matching ID and notes.
      */
     @Test
-    fun getDraft_returnsSuccessForExistingDraft() =
+    fun `get draft returns success for existing draft`() =
         runTest(testDispatcher) {
             val notes = listOf(createTestTextNote())
             val draftId = repository.createDraft(notes)
@@ -121,7 +121,7 @@ class OfflineFirstEntryDraftRepositoryTest {
      * return a failure Result containing a NoSuchElementException.
      */
     @Test
-    fun getDraft_returnsFailureForNonExistentDraft() =
+    fun `get draft returns failure for non existent draft`() =
         runTest(testDispatcher) {
             val nonExistentId = Uuid.random()
 
@@ -139,7 +139,7 @@ class OfflineFirstEntryDraftRepositoryTest {
      * 3. The draft should contain all the notes that were provided
      */
     @Test
-    fun createDraft_returnsValidUuid() =
+    fun `create draft returns valid uuid`() =
         runTest(testDispatcher) {
             val notes = listOf(createTestTextNote(), createTestImageNote())
 
@@ -159,7 +159,7 @@ class OfflineFirstEntryDraftRepositoryTest {
      * and be directly retrievable with matching notes and ID.
      */
     @Test
-    fun createDraft_persistsToStore() =
+    fun `create draft persists to store`() =
         runTest(testDispatcher) {
             val notes = listOf(createTestTextNote())
 
@@ -171,7 +171,7 @@ class OfflineFirstEntryDraftRepositoryTest {
         }
 
     @Test
-    fun createDraft_persistsCompleteSnapshotAtStableIdentity() =
+    fun `create draft persists complete snapshot at stable identity`() =
         runTest(testDispatcher) {
             val draftId = Uuid.random()
             val journalId = Uuid.random()
@@ -208,7 +208,7 @@ class OfflineFirstEntryDraftRepositoryTest {
      * 3. The updated draft's updatedAt timestamp should be newer than its createdAt timestamp
      */
     @Test
-    fun updateDraft_modifiesExistingDraft() =
+    fun `update draft modifies existing draft`() =
         runTest(testDispatcher) {
             val initialNotes = listOf(createTestTextNote())
             val draftId = repository.createDraft(initialNotes)
@@ -232,7 +232,7 @@ class OfflineFirstEntryDraftRepositoryTest {
      * the repository should throw an IllegalArgumentException.
      */
     @Test
-    fun updateDraft_throwsForNonExistentDraft() =
+    fun `update draft throws for non existent draft`() =
         runTest(testDispatcher) {
             val nonExistentId = Uuid.random()
             val notes = listOf(createTestTextNote())
@@ -249,7 +249,7 @@ class OfflineFirstEntryDraftRepositoryTest {
      * and be directly retrievable with the updated notes.
      */
     @Test
-    fun updateDraft_persistsChangesToStore() =
+    fun `update draft persists changes to store`() =
         runTest(testDispatcher) {
             val initialNotes = listOf(createTestTextNote())
             val draftId = repository.createDraft(initialNotes)
@@ -264,7 +264,7 @@ class OfflineFirstEntryDraftRepositoryTest {
         }
 
     @Test
-    fun updateDraft_replacesCompleteSnapshot() =
+    fun `update draft replaces complete snapshot`() =
         runTest(testDispatcher) {
             val draftId = repository.createDraft(listOf(createTestTextNote()))
             val journalId = Uuid.random()
@@ -290,7 +290,7 @@ class OfflineFirstEntryDraftRepositoryTest {
         }
 
     @Test
-    fun deleteDraft_removesFromRepository() =
+    fun `delete draft removes from repository`() =
         runTest(testDispatcher) {
             val notes = listOf(createTestTextNote())
             val draftId = repository.createDraft(notes)
@@ -305,7 +305,7 @@ class OfflineFirstEntryDraftRepositoryTest {
         }
 
     @Test
-    fun deleteDraft_removesFromStore() =
+    fun `delete draft removes from store`() =
         runTest(testDispatcher) {
             val notes = listOf(createTestTextNote())
             val draftId = repository.createDraft(notes)
@@ -317,7 +317,7 @@ class OfflineFirstEntryDraftRepositoryTest {
         }
 
     @Test
-    fun deleteDraft_handlesNonExistentDraft() =
+    fun `delete draft handles non existent draft`() =
         runTest(testDispatcher) {
             val nonExistentId = Uuid.random()
 
@@ -329,7 +329,7 @@ class OfflineFirstEntryDraftRepositoryTest {
         }
 
     @Test
-    fun initialization_loadsExistingDrafts() =
+    fun `initialization loads existing drafts`() =
         runTest(testDispatcher) {
             // Pre-populate the store
             val existingDraft =
@@ -354,7 +354,7 @@ class OfflineFirstEntryDraftRepositoryTest {
         }
 
     @Test
-    fun initializationInAlreadyCancelledScopeFailsInsteadOfLeavingCollectorsSuspended() =
+    fun `initialization in already cancelled scope fails instead of leaving collectors suspended`() =
         runTest {
             val owner = Job()
             owner.cancel(CancellationException("repository owner already cancelled"))
@@ -379,7 +379,7 @@ class OfflineFirstEntryDraftRepositoryTest {
         }
 
     @Test
-    fun initializationCannotOverwriteDraftCreatedWhileStorageLoadIsPending() =
+    fun `initialization cannot overwrite draft created while storage load is pending`() =
         runTest {
             val delayedStore = DelayedInitialLoadStore()
             val dispatcher = StandardTestDispatcher(testScheduler)
@@ -410,7 +410,7 @@ class OfflineFirstEntryDraftRepositoryTest {
         }
 
     @Test
-    fun getDraftWaitsForStorageInitializationBeforeReportingMissing() =
+    fun `get draft waits for storage initialization before reporting missing`() =
         runTest {
             val existingDraft =
                 EntryDraft(
@@ -439,7 +439,7 @@ class OfflineFirstEntryDraftRepositoryTest {
         }
 
     @Test
-    fun fieldMutationsBeforeInitializationUseStoredDraft() =
+    fun `field mutations before initialization use stored draft`() =
         runTest {
             val existingDraft =
                 EntryDraft(
@@ -478,7 +478,7 @@ class OfflineFirstEntryDraftRepositoryTest {
         }
 
     @Test
-    fun expiredCleanupBeforeInitializationUsesStoredDrafts() =
+    fun `expired cleanup before initialization uses stored drafts`() =
         runTest {
             val storedDraft =
                 EntryDraft(
@@ -505,7 +505,7 @@ class OfflineFirstEntryDraftRepositoryTest {
         }
 
     @Test
-    fun createDraft_withEmptyNotes_works() =
+    fun `create draft with empty notes works`() =
         runTest(testDispatcher) {
             val emptyNotes = emptyList<JournalNote>()
 
@@ -518,7 +518,7 @@ class OfflineFirstEntryDraftRepositoryTest {
         }
 
     @Test
-    fun multipleOperations_maintainConsistency() =
+    fun `multiple operations maintain consistency`() =
         runTest(testDispatcher) {
             // Create multiple drafts
             val draft1Id = repository.createDraft(listOf(createTestTextNote()))

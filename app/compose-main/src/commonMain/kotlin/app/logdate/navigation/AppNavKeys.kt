@@ -58,18 +58,17 @@ import app.logdate.feature.library.navigation.MediaDetailRoute
 import app.logdate.feature.onboarding.navigation.AccountCreation
 import app.logdate.feature.onboarding.navigation.AppOverview
 import app.logdate.feature.onboarding.navigation.BirthdayIntro
-import app.logdate.feature.onboarding.navigation.CloudSync
 import app.logdate.feature.onboarding.navigation.FeatureDayBoundaries
 import app.logdate.feature.onboarding.navigation.FeatureLocationTimeline
 import app.logdate.feature.onboarding.navigation.FeatureNotifications
 import app.logdate.feature.onboarding.navigation.FeatureRecommendations
-import app.logdate.feature.onboarding.navigation.FirstEntry
 import app.logdate.feature.onboarding.navigation.MemoryImport
 import app.logdate.feature.onboarding.navigation.MemorySelection
 import app.logdate.feature.onboarding.navigation.OnboardingComplete
 import app.logdate.feature.onboarding.navigation.OnboardingRoute
 import app.logdate.feature.onboarding.navigation.OnboardingStart
 import app.logdate.feature.onboarding.navigation.PersonalIntro
+import app.logdate.feature.onboarding.navigation.RecoveryPhrase
 import app.logdate.feature.onboarding.navigation.SignIn
 import app.logdate.feature.onboarding.navigation.WelcomeBack
 import app.logdate.feature.postcards.navigation.PostcardEditorRoute
@@ -106,12 +105,11 @@ val appNavSavedStateConfiguration: SavedStateConfiguration =
                     subclass(OnboardingStart::class, OnboardingStart.serializer())
                     subclass(PersonalIntro::class, PersonalIntro.serializer())
                     subclass(AppOverview::class, AppOverview.serializer())
-                    subclass(FirstEntry::class, FirstEntry.serializer())
-                    subclass(CloudSync::class, CloudSync.serializer())
                     subclass(MemoryImport::class, MemoryImport.serializer())
                     subclass(MemorySelection::class, MemorySelection.serializer())
                     subclass(AccountCreation::class, AccountCreation.serializer())
                     subclass(SignIn::class, SignIn.serializer())
+                    subclass(RecoveryPhrase::class, RecoveryPhrase.serializer())
                     subclass(BirthdayIntro::class, BirthdayIntro.serializer())
                     subclass(FeatureRecommendations::class, FeatureRecommendations.serializer())
                     subclass(FeatureDayBoundaries::class, FeatureDayBoundaries.serializer())

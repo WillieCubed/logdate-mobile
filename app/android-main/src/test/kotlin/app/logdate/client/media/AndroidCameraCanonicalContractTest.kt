@@ -11,7 +11,7 @@ class AndroidCameraCanonicalContractTest {
     private val repoRoot = locateRepoRoot(Paths.get(System.getProperty("user.dir") ?: ".").toAbsolutePath())
 
     @Test
-    fun cameraCaptureCannotPublishDirectlyToMediaStore() {
+    fun `camera capture cannot publish directly to media store`() {
         val source =
             repoRoot
                 .resolve(

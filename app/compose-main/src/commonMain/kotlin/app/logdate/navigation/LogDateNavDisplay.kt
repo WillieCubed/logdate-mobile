@@ -273,6 +273,7 @@ fun LogDateNavDisplay(
                                             backStack.clear()
                                             backStack.add(HomeRoute)
                                         },
+                                        metadata = editorRouteTransitionMetadata,
                                     )
                                     eventDetailEntry(onGoBack = { backStack.removeLastOrNull() })
                                     profileEntry(

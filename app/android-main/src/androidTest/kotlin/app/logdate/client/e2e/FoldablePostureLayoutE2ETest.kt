@@ -81,7 +81,7 @@ class FoldablePostureLayoutE2ETest {
             .around(composeRule)
 
     @Test
-    fun bookPosture_rendersBothListAndDetailPanes() {
+    fun `book posture renders both list and detail panes`() {
         // Two-pane needs both panes ≥ 320dp, so the window must be ≥ ~640dp wide (tablet only).
         assumeTrue(windowWidthDp() >= TWO_PANE_MIN_WIDTH_DP)
 
@@ -99,7 +99,7 @@ class FoldablePostureLayoutE2ETest {
     }
 
     @Test
-    fun flatPosture_collapsesToSinglePane() {
+    fun `flat posture collapses to single pane`() {
         // A flat posture only collapses to single-pane below the 840dp expanded breakpoint;
         // gating to < 600dp keeps this on the narrow phone where width never forces two-pane.
         assumeTrue(windowWidthDp() < SINGLE_PANE_MAX_WIDTH_DP)
@@ -117,7 +117,7 @@ class FoldablePostureLayoutE2ETest {
     }
 
     @Test
-    fun tabletopPosture_keepsHomeSinglePane() {
+    fun `tabletop posture keeps home single pane`() {
         // The Home two-pane scene is vertical-hinge only. Gating to the narrow phone (< 600dp)
         // removes the width-based two-pane path so the horizontal hinge is the only signal, and
         // it must keep Home single-pane (no two-pane tag).
@@ -136,7 +136,7 @@ class FoldablePostureLayoutE2ETest {
     }
 
     @Test
-    fun togglingFromBookToFlat_returnsToSinglePane() {
+    fun `toggling from book to flat returns to single pane`() {
         // Book must split into two ≥ 320dp panes (≥ 640dp wide) while flat must still collapse
         // (< 840dp wide). Only the medium width band satisfies both, so this skips on the phone
         // and the tablet but stays valid for a medium foldable / split-screen window.

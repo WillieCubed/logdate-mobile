@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 
 class HomeAdaptiveLayoutTest {
     @Test
-    fun noHingeUsesExistingExpandedWidthBreakpoint() {
+    fun `no hinge uses existing expanded width breakpoint`() {
         assertTrue(
             supportsDualPaneHomeScene(
                 width = 840.dp,
@@ -25,7 +25,7 @@ class HomeAdaptiveLayoutTest {
     }
 
     @Test
-    fun noHingeKeepsCompactWidthSinglePane() {
+    fun `no hinge keeps compact width single pane`() {
         assertFalse(
             supportsDualPaneHomeScene(
                 width = 420.dp,
@@ -36,7 +36,7 @@ class HomeAdaptiveLayoutTest {
     }
 
     @Test
-    fun verticalSeparatingHingeEnablesDualPaneWhenBothPanesAreSafe() {
+    fun `vertical separating hinge enables dual pane when both panes are safe`() {
         assertTrue(
             supportsDualPaneHomeScene(
                 width = 820.dp,
@@ -59,7 +59,7 @@ class HomeAdaptiveLayoutTest {
     }
 
     @Test
-    fun verticalSeparatingHingeDisablesDualPaneWhenPaneIsTooSmall() {
+    fun `vertical separating hinge disables dual pane when pane is too small`() {
         assertFalse(
             supportsDualPaneHomeScene(
                 width = 700.dp,
@@ -82,7 +82,7 @@ class HomeAdaptiveLayoutTest {
     }
 
     @Test
-    fun horizontalSeparatingHingeDoesNotUseSideBySideHomeScene() {
+    fun `horizontal separating hinge does not use side by side home scene`() {
         assertFalse(
             supportsDualPaneHomeScene(
                 width = 900.dp,

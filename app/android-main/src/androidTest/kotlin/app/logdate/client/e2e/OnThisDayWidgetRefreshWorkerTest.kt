@@ -57,7 +57,7 @@ class OnThisDayWidgetRefreshWorkerTest {
     }
 
     @Test
-    fun workerSucceeds_withNoEntries() = runTest {
+    fun `worker succeeds with no entries`() = runTest {
         setupKoin(
             notesForDay = emptyList(),
             contextualRecommendationsEnabled = true,
@@ -70,7 +70,7 @@ class OnThisDayWidgetRefreshWorkerTest {
     }
 
     @Test
-    fun workerSucceeds_whenRecommendationsDisabled() = runTest {
+    fun `worker succeeds when recommendations disabled`() = runTest {
         setupKoin(
             notesForDay = emptyList(),
             contextualRecommendationsEnabled = false,
@@ -83,7 +83,7 @@ class OnThisDayWidgetRefreshWorkerTest {
     }
 
     @Test
-    fun workerSucceeds_withEntryOneYearAgo() = runTest {
+    fun `worker succeeds with entry one year ago`() = runTest {
         val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
         val oneYearAgo = today.minus(1, DateTimeUnit.YEAR)
         val timestamp = oneYearAgo.atStartOfDayIn(TimeZone.currentSystemDefault())
@@ -108,7 +108,7 @@ class OnThisDayWidgetRefreshWorkerTest {
     }
 
     @Test
-    fun workerSucceeds_withArchiveMode() = runTest {
+    fun `worker succeeds with archive mode`() = runTest {
         val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
         val archiveDay = today.minus(45, DateTimeUnit.DAY)
         val timestamp = archiveDay.atStartOfDayIn(TimeZone.currentSystemDefault())
@@ -134,7 +134,7 @@ class OnThisDayWidgetRefreshWorkerTest {
     }
 
     @Test
-    fun workerSucceeds_withPhotosOnlyContentFilter() = runTest {
+    fun `worker succeeds with photos only content filter`() = runTest {
         val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
         val oneYearAgo = today.minus(1, DateTimeUnit.YEAR)
         val timestamp = oneYearAgo.atStartOfDayIn(TimeZone.currentSystemDefault())

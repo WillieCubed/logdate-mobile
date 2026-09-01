@@ -35,6 +35,32 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.platform.PlatformIcons
+import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.sync_issue_count_association
+import logdate.client.feature.core.generated.resources.sync_issue_count_draft
+import logdate.client.feature.core.generated.resources.sync_issue_count_health
+import logdate.client.feature.core.generated.resources.sync_issue_count_journal
+import logdate.client.feature.core.generated.resources.sync_issue_count_media
+import logdate.client.feature.core.generated.resources.sync_issue_count_note
+import logdate.client.feature.core.generated.resources.sync_issue_count_other
+import logdate.client.feature.core.generated.resources.sync_issue_missing_file_association
+import logdate.client.feature.core.generated.resources.sync_issue_missing_file_draft
+import logdate.client.feature.core.generated.resources.sync_issue_missing_file_health
+import logdate.client.feature.core.generated.resources.sync_issue_missing_file_journal
+import logdate.client.feature.core.generated.resources.sync_issue_missing_file_media
+import logdate.client.feature.core.generated.resources.sync_issue_missing_file_note
+import logdate.client.feature.core.generated.resources.sync_issue_missing_file_other
+import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_association
+import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_draft
+import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_health
+import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_journal
+import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_media
+import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_note
+import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_other
+import org.jetbrains.compose.resources.PluralStringResource
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -161,7 +187,7 @@ private fun SyncIssuesSummaryPane(
             .eachCount()
             .forEach { (entityType, count) ->
                 Text(
-                    text = "$count ${describeThing(entityType, count)}",
+                    text = pluralStringResource(countPluralFor(entityType), count, count),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -204,7 +230,7 @@ private fun SyncIssueCard(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = describeIssue(record),
+                text = stringResource(issueMessageFor(record)),
                 style = MaterialTheme.typography.titleSmall,
             )
             Text(
@@ -234,31 +260,39 @@ private fun SyncIssueCard(
  * count, and a raw exception message that includes on-disk paths. None of that belongs on screen,
  * so the card is written from the record rather than printing it.
  */
-private fun describeThing(
-    entityType: String,
-    count: Int,
-): String {
-    val singular =
-        when (entityType.uppercase()) {
-            "NOTE" -> "entry"
-            "JOURNAL" -> "journal"
-            "MEDIA" -> "photo or recording"
-            "DRAFT" -> "draft"
-            "ASSOCIATION" -> "entry link"
-            "HEALTH" -> "health record"
-            else -> "item"
-        }
-    return if (count == 1) singular else "${singular}s"
-}
-
-private fun describeIssue(record: SyncDeadLetterRecord): String {
-    val thing = describeThing(record.entityType, count = 1)
-    return if (record.isMissingFile()) {
-        "This $thing's file is missing"
-    } else {
-        "This $thing didn't upload"
+private fun countPluralFor(entityType: String): PluralStringResource =
+    when (entityType.uppercase()) {
+        "NOTE" -> Res.plurals.sync_issue_count_note
+        "JOURNAL" -> Res.plurals.sync_issue_count_journal
+        "MEDIA" -> Res.plurals.sync_issue_count_media
+        "DRAFT" -> Res.plurals.sync_issue_count_draft
+        "ASSOCIATION" -> Res.plurals.sync_issue_count_association
+        "HEALTH" -> Res.plurals.sync_issue_count_health
+        else -> Res.plurals.sync_issue_count_other
     }
-}
+
+private fun issueMessageFor(record: SyncDeadLetterRecord): StringResource =
+    if (record.isMissingFile()) {
+        when (record.entityType.uppercase()) {
+            "NOTE" -> Res.string.sync_issue_missing_file_note
+            "JOURNAL" -> Res.string.sync_issue_missing_file_journal
+            "MEDIA" -> Res.string.sync_issue_missing_file_media
+            "DRAFT" -> Res.string.sync_issue_missing_file_draft
+            "ASSOCIATION" -> Res.string.sync_issue_missing_file_association
+            "HEALTH" -> Res.string.sync_issue_missing_file_health
+            else -> Res.string.sync_issue_missing_file_other
+        }
+    } else {
+        when (record.entityType.uppercase()) {
+            "NOTE" -> Res.string.sync_issue_upload_failed_note
+            "JOURNAL" -> Res.string.sync_issue_upload_failed_journal
+            "MEDIA" -> Res.string.sync_issue_upload_failed_media
+            "DRAFT" -> Res.string.sync_issue_upload_failed_draft
+            "ASSOCIATION" -> Res.string.sync_issue_upload_failed_association
+            "HEALTH" -> Res.string.sync_issue_upload_failed_health
+            else -> Res.string.sync_issue_upload_failed_other
+        }
+    }
 
 private fun explainIssue(record: SyncDeadLetterRecord): String =
     if (record.isMissingFile()) {

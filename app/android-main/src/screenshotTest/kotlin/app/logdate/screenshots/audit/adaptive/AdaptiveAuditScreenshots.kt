@@ -449,7 +449,7 @@ fun A01_OnboardingStartLanding() {
         OnboardingStartScreenContent(
             showLanding = true,
             onGetStarted = {},
-            onStartFromBackup = {},
+            onSignIn = {},
         )
     }
 }
@@ -1025,7 +1025,7 @@ fun A68_OnboardingStartBookPosture() {
             OnboardingStartScreenContent(
                 showLanding = true,
                 onGetStarted = {},
-                onStartFromBackup = {},
+                onSignIn = {},
                 modifier = Modifier.fillMaxSize(),
                 animateContent = false,
             )
@@ -1042,7 +1042,7 @@ fun A69_OnboardingStartTabletopPosture() {
             OnboardingStartScreenContent(
                 showLanding = true,
                 onGetStarted = {},
-                onStartFromBackup = {},
+                onSignIn = {},
                 modifier = Modifier.fillMaxSize(),
                 animateContent = false,
             )
@@ -1568,8 +1568,8 @@ fun A102_CloudAccountCreationBookPosture() {
             PasskeyAccountCreationFinalContent(
                 displayName = "Alex Johnson",
                 username = "alex_j",
-                bio = "Explorer and photographer",
-                onBioChange = {},
+                stepNumber = 2,
+                stepCount = 2,
                 onCreateAccount = {},
                 onBack = {},
                 isCreatingAccount = false,
@@ -1592,8 +1592,8 @@ fun A103_CloudAccountCreationTabletopPosture() {
             PasskeyAccountCreationFinalContent(
                 displayName = "Alex Johnson",
                 username = "alex_j",
-                bio = "Explorer and photographer",
-                onBioChange = {},
+                stepNumber = 2,
+                stepCount = 2,
                 onCreateAccount = {},
                 onBack = {},
                 isCreatingAccount = true,

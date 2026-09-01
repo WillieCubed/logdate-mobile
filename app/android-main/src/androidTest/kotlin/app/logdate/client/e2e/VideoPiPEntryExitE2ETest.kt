@@ -3,10 +3,10 @@ package app.logdate.client.e2e
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.SystemClock
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -16,94 +16,152 @@ import androidx.test.uiautomator.UiDevice
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
 import app.logdate.feature.editor.ui.video.VideoPlayerTags
 import app.logdate.ui.theme.LogDateTheme
-import org.junit.Ignore
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
  * Instrumented E2E coverage for entering and leaving Picture-in-Picture from the video player.
  *
- * Tapping the PiP affordance should move the host activity into PiP while the playback surface
- * stays alive, and pressing Home followed by bringing the same host back to the foreground should
- * keep the player content available rather than tearing it down. Emulator PiP transitions can be
- * slow, so the assertions poll with generous timeouts.
+ * Tapping the PiP affordance should move the host activity into PiP while playback survives, and
+ * bringing the host back to the foreground should restore the player rather than a torn-down shell.
  *
- * Note: the test host [VideoPlaybackHostActivity] (and the production activities) do not override
- * `onPictureInPictureModeChanged`, so this suite asserts the observable PiP state and surface
- * survival rather than any mode-change callback behavior (see reported risks).
+ * **Nothing here asks Compose anything once the activity has entered PiP.** Entering PiP detaches
+ * the Compose hierarchy from instrumentation, and the binding does not come back when PiP is left
+ * — measured on a Pixel 9 Pro API 36 managed device, where a semantics query after the round trip
+ * still fails with "no compose hierarchies found" even though the activity has demonstrably
+ * returned to full screen. That is what previously made this whole suite unrunnable rather than
+ * merely failing.
  *
- * Disabled on emulators: entering Picture-in-Picture detaches the activity's Compose hierarchy from
- * the instrumentation, so subsequent Compose assertions fail with "No compose hierarchies found".
- * PiP entry/exit therefore cannot be asserted via Compose here; the shared video player's PiP
- * implementation is verified by code and screenshot evidence, with fold/unfold-during-PiP behavior
- * recorded on physical hardware in the Manual Foldable Evidence Log.
+ * So the Compose assertions all happen before the PiP tap, and everything after it is asserted
+ * against the activity, which stays perfectly observable throughout: that it entered PiP, that it
+ * was neither finished nor destroyed while there, and that it left PiP again. Whether the player
+ * *renders* correctly afterwards is left to the screenshot suite, which can see it.
+ *
+ * The host (like the production activities) does not override `onPictureInPictureModeChanged`, so
+ * this asserts observable PiP state and surface survival rather than callback behaviour.
  */
-@Ignore(
-    "Entering PiP detaches the Compose hierarchy from instrumentation on emulators; PiP is verified " +
-        "via the in-app implementation and physical-hardware checks in the Manual Foldable Evidence Log.",
-)
 @RunWith(AndroidJUnit4::class)
 class VideoPiPEntryExitE2ETest {
     @get:Rule
     val composeRule = createAndroidComposeRule<VideoPlaybackHostActivity>()
 
+    /**
+     * Leaves the device focusable for whatever runs next.
+     *
+     * These tests deliberately put the host into Picture-in-Picture and send the device to Home,
+     * and a PiP window does not take focus. Left that way, the next test in the run waits for a
+     * focused window that never arrives and fails with RootViewWithoutFocusException having done
+     * nothing wrong. So the host is brought back out of PiP and finished before handing over.
+     */
+    @After
+    fun restoreDeviceFocus() {
+        runCatching {
+            if (isHostInPictureInPictureMode()) {
+                returnHostToForeground()
+                pollUntil { !isHostInPictureInPictureMode() }
+            }
+            runOnMain { composeRule.activity.finish() }
+            UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).waitForIdle()
+        }
+    }
+
     @Test
-    fun tappingPipMovesActivityIntoPictureInPictureWithSurfaceAlive() {
+    fun `tapping the pip affordance moves the activity into picture in picture`() {
         showVideoPlayer()
 
         composeRule.onNodeWithTag(VideoPlayerTags.ROOT).assertIsDisplayed()
         composeRule.onNodeWithTag(VideoPlayerTags.PLAYER_VIEW).assertIsDisplayed()
         composeRule.onNodeWithTag(VideoPlayerTags.PIP_BUTTON).assertIsDisplayed().performClick()
 
-        composeRule.waitUntil(timeoutMillis = PIP_TIMEOUT_MILLIS) { isHostInPictureInPictureMode() }
-
-        // The player surface must still be attached while in PiP — playback is not torn down.
-        composeRule.waitUntil(timeoutMillis = PIP_TIMEOUT_MILLIS) {
-            composeRule.onAllNodesWithTag(VideoPlayerTags.PLAYER_VIEW).fetchSemanticsNodes().isNotEmpty()
-        }
-        assertTrue(isHostInPictureInPictureMode(), "Activity should remain in PiP mode")
-    }
-
-    @Test
-    fun pressingHomeFromPipKeepsPlayerAvailable() {
-        showVideoPlayer()
-
-        composeRule.onNodeWithTag(VideoPlayerTags.PIP_BUTTON).assertIsDisplayed().performClick()
-        composeRule.waitUntil(timeoutMillis = PIP_TIMEOUT_MILLIS) { isHostInPictureInPictureMode() }
-
-        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        device.pressHome()
-
-        // Bring the SAME host activity back to the foreground rather than launching a fresh
-        // process. Reordering the existing task to front keeps this instance (and its compose
-        // content) alive, so a surviving player surface proves playback was not torn down.
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val refocus =
-            Intent(context, VideoPlaybackHostActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        context.startActivity(refocus)
-
-        composeRule.waitUntil(timeoutMillis = PIP_TIMEOUT_MILLIS) {
-            composeRule.onAllNodesWithTag(VideoPlayerTags.ROOT).fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onNodeWithTag(VideoPlayerTags.ROOT).assertIsDisplayed()
+        assertTrue(
+            pollUntil { isHostInPictureInPictureMode() },
+            "Tapping the PiP affordance should move the host into Picture-in-Picture",
+        )
     }
 
     /**
-     * Reads the host activity's PiP state on the main thread, since [android.app.Activity]
-     * window/PiP state must not be queried off the UI thread.
+     * Playback must not be torn down by the transition: the host stays alive in PiP and comes back
+     * out of it, rather than being finished and rebuilt.
      */
-    private fun isHostInPictureInPictureMode(): Boolean {
-        var inPip = false
-        composeRule.runOnUiThread {
-            inPip = composeRule.activity.isInPictureInPictureMode
+    @Test
+    fun `the activity survives picture in picture and leaves it again`() {
+        showVideoPlayer()
+
+        composeRule.onNodeWithTag(VideoPlayerTags.PIP_BUTTON).assertIsDisplayed().performClick()
+        assertTrue(pollUntil { isHostInPictureInPictureMode() }, "Host should have entered PiP")
+
+        assertFalse(isHostGone(), "The host must stay alive in PiP rather than being torn down")
+
+        returnHostToForeground()
+
+        assertTrue(pollUntil { !isHostInPictureInPictureMode() }, "Host should have left PiP")
+        assertFalse(isHostGone(), "The host must survive the round trip out of PiP")
+    }
+
+    @Test
+    fun `the host survives picture in picture followed by home`() {
+        showVideoPlayer()
+
+        composeRule.onNodeWithTag(VideoPlayerTags.PIP_BUTTON).assertIsDisplayed().performClick()
+        assertTrue(pollUntil { isHostInPictureInPictureMode() }, "Host should have entered PiP")
+
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressHome()
+
+        returnHostToForeground()
+
+        assertTrue(pollUntil { !isHostInPictureInPictureMode() }, "Host should have left PiP")
+        assertFalse(isHostGone(), "The host must survive PiP and a trip through Home")
+    }
+
+    /** Whether the host has been finished or destroyed, read off the main thread. */
+    private fun isHostGone(): Boolean = runOnMain { composeRule.activity.isFinishing || composeRule.activity.isDestroyed }
+
+    /**
+     * Brings the *same* host back to the front rather than starting a fresh one.
+     *
+     * Reordering the existing task keeps this instance and its composition alive, so a player that
+     * is still there afterwards proves the content survived rather than being rebuilt.
+     */
+    private fun returnHostToForeground() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.startActivity(
+            Intent(context, VideoPlaybackHostActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+        )
+    }
+
+    /**
+     * Polls [condition] on a plain clock rather than through Compose.
+     *
+     * `ComposeTestRule.waitUntil` drives the Compose clock and needs a hierarchy to attach to, so
+     * it cannot be used across a PiP transition — the very thing these tests wait for.
+     */
+    private fun pollUntil(condition: () -> Boolean): Boolean {
+        val deadline = SystemClock.uptimeMillis() + PIP_TIMEOUT_MILLIS
+        while (SystemClock.uptimeMillis() < deadline) {
+            if (condition()) return true
+            SystemClock.sleep(POLL_INTERVAL_MILLIS)
         }
-        return inPip
+        return condition()
+    }
+
+    /**
+     * Reads the host's PiP state on the main thread, since window and PiP state must not be queried
+     * off the UI thread.
+     */
+    private fun isHostInPictureInPictureMode(): Boolean = runOnMain { composeRule.activity.isInPictureInPictureMode }
+
+    private fun <T> runOnMain(block: () -> T): T {
+        var result: Result<T>? = null
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { result = runCatching(block) }
+        return checkNotNull(result) { "runOnMainSync did not run the block" }.getOrThrow()
     }
 
     private fun showVideoPlayer() {
@@ -129,5 +187,6 @@ class VideoPiPEntryExitE2ETest {
 
     private companion object {
         const val PIP_TIMEOUT_MILLIS = 15_000L
+        const val POLL_INTERVAL_MILLIS = 250L
     }
 }

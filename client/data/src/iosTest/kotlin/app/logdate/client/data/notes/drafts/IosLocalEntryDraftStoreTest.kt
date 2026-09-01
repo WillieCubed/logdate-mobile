@@ -20,7 +20,7 @@ import kotlin.uuid.Uuid
 
 class IosLocalEntryDraftStoreTest {
     @Test
-    fun saveWithCorruptIndexPreservesIndexAndDoesNotCreateDraft() =
+    fun `save with corrupt index preserves index and does not create draft`() =
         runTest {
             val store = IosLocalEntryDraftStore()
             val defaults = NSUserDefaults.standardUserDefaults
@@ -44,7 +44,7 @@ class IosLocalEntryDraftStoreTest {
         }
 
     @Test
-    fun deleteWithCorruptIndexPreservesIndexAndDraft() =
+    fun `delete with corrupt index preserves index and draft`() =
         runTest {
             val store = IosLocalEntryDraftStore()
             val defaults = NSUserDefaults.standardUserDefaults
@@ -70,7 +70,7 @@ class IosLocalEntryDraftStoreTest {
         }
 
     @Test
-    fun saveOverCorruptTargetPreservesTargetAndIndex() =
+    fun `save over corrupt target preserves target and index`() =
         runTest {
             val store = IosLocalEntryDraftStore()
             val defaults = NSUserDefaults.standardUserDefaults
@@ -96,7 +96,7 @@ class IosLocalEntryDraftStoreTest {
         }
 
     @Test
-    fun malformedDraftFailsClosedAndPreservesStoredBytes() =
+    fun `malformed draft fails closed and preserves stored bytes`() =
         runTest {
             val store = IosLocalEntryDraftStore()
             val defaults = NSUserDefaults.standardUserDefaults
@@ -117,7 +117,7 @@ class IosLocalEntryDraftStoreTest {
         }
 
     @Test
-    fun malformedDraftIndexFailsClosedAndPreservesStoredBytes() =
+    fun `malformed draft index fails closed and preserves stored bytes`() =
         runTest {
             val store = IosLocalEntryDraftStore()
             val defaults = NSUserDefaults.standardUserDefaults
@@ -137,7 +137,7 @@ class IosLocalEntryDraftStoreTest {
         }
 
     @Test
-    fun invalidDraftIdentityFailsClosedAndPreservesStoredBytes() =
+    fun `invalid draft identity fails closed and preserves stored bytes`() =
         runTest {
             val store = IosLocalEntryDraftStore()
             val defaults = NSUserDefaults.standardUserDefaults
@@ -159,7 +159,7 @@ class IosLocalEntryDraftStoreTest {
         }
 
     @Test
-    fun invalidDraftIndexIdentityFailsClosedAndPreservesStoredBytes() =
+    fun `invalid draft index identity fails closed and preserves stored bytes`() =
         runTest {
             val store = IosLocalEntryDraftStore()
             val defaults = NSUserDefaults.standardUserDefaults
@@ -179,7 +179,7 @@ class IosLocalEntryDraftStoreTest {
         }
 
     @Test
-    fun saveDraftRoundTripsPendingMediaJournalSelectionAndCaption() =
+    fun `save draft round trips pending media journal selection and caption`() =
         runTest {
             val store = IosLocalEntryDraftStore()
             val now = Clock.System.now()
@@ -223,7 +223,7 @@ class IosLocalEntryDraftStoreTest {
         }
 
     @Test
-    fun legacyDraftWithoutNewFieldsLoadsWithEmptyDefaults() =
+    fun `legacy draft without new fields loads with empty defaults`() =
         runTest {
             val store = IosLocalEntryDraftStore()
             val defaults = NSUserDefaults.standardUserDefaults
@@ -245,7 +245,7 @@ class IosLocalEntryDraftStoreTest {
         }
 
     @Test
-    fun everyJournalNoteTypeRoundTripsUpdateVersionAndLocationFields() =
+    fun `every journal note type round trips update version and location fields`() =
         runTest {
             val store = IosLocalEntryDraftStore()
             val createdAt = Instant.fromEpochMilliseconds(1_725_000_000_000)

@@ -13,7 +13,7 @@ fun rememberGoogleMapsEnabled(): Boolean {
     val context = LocalContext.current
 
     return override ?: remember(context) {
-        val resourceId = context.resources.getIdentifier("google_api_key", "string", context.packageName)
+        val resourceId = context.resources.getIdentifier("google_maps_api_key", "string", context.packageName)
         resourceId != 0 && runCatching { context.getString(resourceId) }.getOrDefault("").isNotBlank()
     }
 }

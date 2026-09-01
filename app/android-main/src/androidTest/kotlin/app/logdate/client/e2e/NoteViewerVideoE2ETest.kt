@@ -34,7 +34,7 @@ class NoteViewerVideoE2ETest {
     val composeRule = createAndroidComposeRule<VideoPlaybackHostActivity>()
 
     @Test
-    fun compactVideoNoteViewerExposesPlaybackRouteAndPipControls() {
+    fun `compact video note viewer exposes playback route and pip controls`() {
         assumeTrue(screenWidthDp() < 600)
         setVideoNoteViewerContent()
 
@@ -43,7 +43,7 @@ class NoteViewerVideoE2ETest {
     }
 
     @Test
-    fun expandedVideoNoteViewerExposesPlaybackRouteAndPipControls() {
+    fun `expanded video note viewer exposes playback route and pip controls`() {
         assumeTrue(screenWidthDp() >= 600)
         setVideoNoteViewerContent()
 

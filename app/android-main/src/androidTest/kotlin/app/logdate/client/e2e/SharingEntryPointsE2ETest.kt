@@ -38,7 +38,7 @@ class SharingEntryPointsE2ETest {
     val composeRule = createAndroidComposeRule<ShareEntryPointHostActivity>()
 
     @Test
-    fun timelineMemoryShareAction_emitsCurrentMemoryRecallState() {
+    fun `timeline memory share action emits current memory recall state`() {
         val memoryState =
             TimelineSuggestionBlockUiState(
                 type = TimelineSuggestionBlockType.MEMORY_RECALL,
@@ -71,7 +71,7 @@ class SharingEntryPointsE2ETest {
     }
 
     @Test
-    fun mediaDetailShareAction_emitsCurrentMediaReference() {
+    fun `media detail share action emits current media reference`() {
         val mediaRef = "content://media/external/images/media/42"
         var sharedMediaRef: String? = null
 
@@ -101,7 +101,7 @@ class SharingEntryPointsE2ETest {
     }
 
     @Test
-    fun journalShareActions_emitCurrentJournalState() {
+    fun `journal share actions emit current journal state`() {
         val journal = Journal(title = "Road Trip")
         var qrJournal: Journal? = null
         var sharedJournal: Journal? = null

@@ -17,10 +17,32 @@ import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-class DesktopMediaManager : MediaManager {
+class DesktopMediaManager(
+    /** Where LogDate keeps its own copies. Injectable so a test never touches a real home directory. */
+    private val mediaRoot: Path = defaultMediaRoot,
+) : MediaManager {
     override suspend fun getMedia(uri: String): MediaObject {
         val path = resolvePath(uri)
         return toMediaObject(path) ?: error("Unsupported or missing media at $uri")
+    }
+
+    /**
+     * Deletes a file LogDate itself wrote, and reports whether it was there to delete.
+     *
+     * Refuses anything that does not resolve inside the directory `saveMedia` and
+     * `saveMediaFromFile` write to. Media referenced by an entry may be a file the user picked from
+     * anywhere on their disk, and removing an entry must never remove that. Symlinks are refused
+     * for the same reason: one could resolve to somewhere outside the store.
+     */
+    override suspend fun deleteOwnedMedia(uri: String): Boolean {
+        val target = runCatching { resolvePath(uri) }.getOrNull() ?: return false
+        if (!Files.isRegularFile(target) || Files.isSymbolicLink(target)) return false
+
+        val root = runCatching { mediaRoot.toRealPath() }.getOrNull() ?: return false
+        val resolved = runCatching { target.toRealPath() }.getOrNull() ?: return false
+        if (!resolved.startsWith(root)) return false
+
+        return Files.deleteIfExists(resolved)
     }
 
     override suspend fun exists(mediaId: String): Boolean = Files.exists(resolvePath(mediaId))
@@ -201,10 +223,11 @@ class DesktopMediaManager : MediaManager {
 
     private companion object {
         private const val LIBRARY_SCAN_DEPTH = 4
-        private val mediaRoot: Path = Path.of(System.getProperty("user.home"), ".logdate", "media")
         private val picturesRoot: Path = Path.of(System.getProperty("user.home"), "Pictures")
     }
 }
+
+private val defaultMediaRoot: Path = Path.of(System.getProperty("user.home"), ".logdate", "media")
 
 private fun Path.hasIgnoredLibrarySegment(root: Path): Boolean {
     val relativePath = root.relativize(this)

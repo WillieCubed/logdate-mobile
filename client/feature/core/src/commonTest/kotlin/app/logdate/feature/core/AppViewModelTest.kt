@@ -10,6 +10,7 @@ import app.logdate.client.repository.account.AccountCreationRequest
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.PasskeyInfo
 import app.logdate.shared.model.user.AppSecurityLevel
 import app.logdate.shared.model.user.UserData
 import kotlinx.coroutines.Dispatchers
@@ -306,6 +307,8 @@ class AppViewModelTest {
         ): Result<LogDateAccount> = Result.failure(NotImplementedError())
 
         override suspend fun checkUsernameAvailability(username: String): Result<Boolean> = Result.success(true)
+
+        override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = Result.success(emptyList())
 
         override suspend fun signOut(): Result<Unit> = Result.success(Unit)
 

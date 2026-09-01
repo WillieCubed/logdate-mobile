@@ -55,7 +55,7 @@ class JournalSearchToolbarE2ETest {
     // region Collapsed State
 
     @Test
-    fun collapsedSearchBar_displaysPlaceholder() {
+    fun `collapsed search bar displays placeholder`() {
         composeRule.setContent {
             JournalSearchToolbar(
                 searchQuery = "",
@@ -71,7 +71,7 @@ class JournalSearchToolbarE2ETest {
     }
 
     @Test
-    fun collapsedSearchBar_tappingExpands() {
+    fun `collapsed search bar tapping expands`() {
         composeRule.setContent {
             JournalSearchToolbar(
                 searchQuery = "",
@@ -95,7 +95,7 @@ class JournalSearchToolbarE2ETest {
     // region Expanded — Results Display
 
     @Test
-    fun expandedSearch_withMatchingJournals_showsJournalsSection() {
+    fun `expanded search with matching journals shows journals section`() {
         composeRule.setContent {
             JournalSearchToolbar(
                 searchQuery = "trip",
@@ -118,7 +118,7 @@ class JournalSearchToolbarE2ETest {
     }
 
     @Test
-    fun expandedSearch_withMatchingEntries_showsEntriesSection() {
+    fun `expanded search with matching entries shows entries section`() {
         composeRule.setContent {
             JournalSearchToolbar(
                 searchQuery = "hiking",
@@ -138,7 +138,7 @@ class JournalSearchToolbarE2ETest {
     }
 
     @Test
-    fun expandedSearch_noResults_showsEmptyState() {
+    fun `expanded search no results shows empty state`() {
         composeRule.setContent {
             JournalSearchToolbar(
                 searchQuery = "zzz_no_match",
@@ -161,7 +161,7 @@ class JournalSearchToolbarE2ETest {
     // region Interaction Callbacks
 
     @Test
-    fun tappingJournalResult_invokesOnOpenJournal() {
+    fun `tapping journal result invokes on open journal`() {
         var openedJournalId: Uuid? = null
 
         composeRule.setContent {
@@ -190,7 +190,7 @@ class JournalSearchToolbarE2ETest {
     }
 
     @Test
-    fun clearButton_visibleWhenQueryNonEmpty_clearsOnTap() {
+    fun `clear button visible when query non empty clears on tap`() {
         var lastQuery = ""
 
         composeRule.setContent {

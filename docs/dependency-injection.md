@@ -18,7 +18,7 @@ expect val dataModule: Module
 
 // androidMain - Android implementation with real services
 actual val dataModule: Module = module {
-    factory<RemoteJournalDataSource> { FirebaseRemoteJournalDataSource() }
+    factory<RemoteJournalDataSource> { NoOpJournalDataSource }
     single<LocationHistoryRepository> { OfflineFirstLocationHistoryRepository(get()) }
 }
 
@@ -198,7 +198,7 @@ actual val dataModule: Module = module {
     includes(databaseModule, deviceInstanceModule, datastoreModule, syncModule)
     
     // ✅ Bind concrete implementations to interfaces
-    factory<RemoteJournalDataSource> { FirebaseRemoteJournalDataSource() }
+    factory<RemoteJournalDataSource> { NoOpJournalDataSource }
     single<JournalRepository> { OfflineFirstJournalRepository(get(), get(), get()) }
     single<LocationHistoryRepository> { OfflineFirstLocationHistoryRepository(get()) }
     single<EntryDraftRepository> { OfflineFirstEntryDraftRepository(get(), get()) }
@@ -376,7 +376,7 @@ single<LocationRetryWorker> { LocationRetryWorker(get()) }
 **`factory`** - For stateless objects and use cases
 ```kotlin
 factory { AddNoteUseCase(get(), get(), get(), get()) }
-factory<RemoteJournalDataSource> { FirebaseRemoteJournalDataSource() }
+factory<RemoteJournalDataSource> { NoOpJournalDataSource }
 ```
 
 **`viewModel`** - Platform-specific ViewModel scoping

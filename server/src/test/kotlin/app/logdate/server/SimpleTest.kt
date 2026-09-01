@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
  */
 class SimpleTest {
     @Test
-    fun testBasicServerSetup() =
+    fun `basic server setup`() =
         testApplication {
             application {
                 module()

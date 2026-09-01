@@ -12,7 +12,7 @@ import kotlin.test.assertEquals
  */
 class AICacheKeyStrategyTest {
     @Test
-    fun createKey_withSameInput_producesStableKey() {
+    fun `create key with same input produces stable key`() {
         val policy = AICachePolicy(ttlSeconds = 60)
         val input =
             AICacheKeyInput(
@@ -34,7 +34,7 @@ class AICacheKeyStrategyTest {
     }
 
     @Test
-    fun createKey_withNormalizedWhitespace_producesSameKey() {
+    fun `create key with normalized whitespace produces same key`() {
         val policy = AICachePolicy(ttlSeconds = 60)
         val strategy = DefaultAICacheKeyStrategy()
 

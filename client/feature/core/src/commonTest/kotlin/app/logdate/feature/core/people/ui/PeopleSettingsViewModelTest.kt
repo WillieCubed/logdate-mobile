@@ -66,7 +66,7 @@ class PeopleSettingsViewModelTest {
     }
 
     @Test
-    fun emits_default_enabled_state_on_fresh_install() =
+    fun `emits default enabled state on fresh install`() =
         runTest(testDispatcher) {
             val peopleStore = FakePeopleStore()
             val viewModel = newViewModel(peopleStore, FakeDeviceContactsReader())
@@ -80,7 +80,7 @@ class PeopleSettingsViewModelTest {
         }
 
     @Test
-    fun importAllContacts_is_blocked_while_people_is_disabled() =
+    fun `import all contacts is blocked while people is disabled`() =
         runTest(testDispatcher) {
             val peopleStore = FakePeopleStore()
             val viewModel =
@@ -105,7 +105,7 @@ class PeopleSettingsViewModelTest {
         }
 
     @Test
-    fun enabling_people_allows_full_contact_import_and_persists_access_mode() =
+    fun `enabling people allows full contact import and persists access mode`() =
         runTest(testDispatcher) {
             val peopleStore = FakePeopleStore()
             val viewModel =
@@ -137,7 +137,7 @@ class PeopleSettingsViewModelTest {
         }
 
     @Test
-    fun selected_contact_import_updates_selected_access_mode() =
+    fun `selected contact import updates selected access mode`() =
         runTest(testDispatcher) {
             val peopleStore = FakePeopleStore()
             val viewModel =

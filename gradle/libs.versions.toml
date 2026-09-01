@@ -354,7 +354,6 @@ androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profi
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebase-bom" }
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
 firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }
-firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
 firebase-installations = { group = "com.google.firebase", name = "firebase-installations" }
 firebase-perf = { group = "com.google.firebase", name = "firebase-perf" }
 firebase-messaging-ktx = { group = "com.google.firebase", name = "firebase-messaging-ktx" }

@@ -5,6 +5,7 @@ import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.user.UserData
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
+import app.logdate.shared.model.PasskeyInfo as SharedPasskeyInfo
 
 fun UserData?.orDefault(): UserData = this ?: UserData()
 
@@ -37,19 +38,28 @@ fun LogDateAccount.toUserProfile(): UserProfile =
         emailVerifiedAt = emailVerifiedAt,
     )
 
-fun LogDateAccount.toPasskeyInfoList(): List<PasskeyInfo> =
-    if (username.isNotEmpty()) {
-        // TODO: fetch real passkey metadata (nicknames, device info) from API
-        passkeyCredentialIds
-            .mapIndexed { index, credentialId ->
-                PasskeyInfo(
-                    id = credentialId,
-                    name = "Passkey #${index + 1}",
-                    device = "This Device",
-                    createdAt = createdAt.toString(),
-                    lastUsed = updatedAt,
-                )
-            }
-    } else {
-        emptyList()
+/**
+ * Lists the account's passkeys.
+ *
+ * Only the credential ID is populated. The account payload carries nothing else about a passkey,
+ * and the fields this used to fill -- a device of "This Device", the account's own created and
+ * updated timestamps presented as the passkey's -- were not describing the credential at all. The
+ * server does record a nickname, device type, and real timestamps; exposing them needs an endpoint
+ * that does not exist yet.
+ */
+fun LogDateAccount.toPasskeyInfoList(details: List<SharedPasskeyInfo> = emptyList()): List<PasskeyInfo> {
+    if (username.isEmpty()) return emptyList()
+
+    val byCredentialId = details.associateBy { it.credentialId }
+    return passkeyCredentialIds.map { credentialId ->
+        val detail = byCredentialId[credentialId]
+        PasskeyInfo(
+            id = credentialId,
+            // Only what the server actually said. A credential the details call did not cover
+            // still renders, just without the extras -- better a sparse row than an invented one.
+            device = detail?.deviceType,
+            createdAt = detail?.createdAt?.toString(),
+            lastUsed = detail?.lastUsedAt,
+        )
     }
+}

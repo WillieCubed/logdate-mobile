@@ -6,9 +6,9 @@ import app.logdate.client.data.account.DefaultAccountRepository
 import app.logdate.client.data.account.DefaultPasskeyAccountRepository
 import app.logdate.client.data.audio.OfflineFirstAudioTagRepository
 import app.logdate.client.data.events.OfflineFirstEventRepository
-import app.logdate.client.data.journals.FirebaseRemoteJournalDataSource
 import app.logdate.client.data.journals.JournalUserDataRepository
 import app.logdate.client.data.journals.LocalFirstDraftRepository
+import app.logdate.client.data.journals.NoOpJournalDataSource
 import app.logdate.client.data.journals.OfflineFirstJournalContentRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
 import app.logdate.client.data.journals.OfflineFirstJournalUserDataRepository
@@ -111,8 +111,9 @@ actual val dataModule: Module =
             }
         }
 
-        // Journals
-        factory<RemoteJournalDataSource> { FirebaseRemoteJournalDataSource() }
+        // Journals — RemoteJournalDataSource is a vestigial pre-AT-Protocol abstraction.
+        // Real journal sync runs through SyncManager and the Cloud Run sync API.
+        factory<RemoteJournalDataSource> { NoOpJournalDataSource }
         single<JournalUserDataRepository> { OfflineFirstJournalUserDataRepository(get()) }
         single<DraftRepository> { LocalFirstDraftRepository(get(), get()) }
         single<JournalRepository> {
@@ -284,5 +285,5 @@ actual val dataModule: Module =
         single<StreakSettingsRepository> { DefaultStreakSettingsRepository(get()) }
 
         // Integrity
-        single { DataIntegrityService(get(), get(), get(), get(), get()) }
+        single { DataIntegrityService(get(), get(), get(), get(), get(), get()) }
     }

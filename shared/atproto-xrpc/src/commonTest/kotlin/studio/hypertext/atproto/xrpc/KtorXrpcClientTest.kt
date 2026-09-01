@@ -27,7 +27,7 @@ import kotlin.test.assertFailsWith
  */
 class KtorXrpcClientTest {
     @Test
-    fun queryBuildsGetRequestAndDecodesJson(): Unit =
+    fun `query builds get request and decodes json`(): Unit =
         runTest {
             val client =
                 KtorXrpcClient(
@@ -56,7 +56,7 @@ class KtorXrpcClientTest {
         }
 
     @Test
-    fun procedureAddsBearerAuthorization(): Unit =
+    fun `procedure adds bearer authorization`(): Unit =
         runTest {
             val client =
                 KtorXrpcClient(
@@ -89,7 +89,7 @@ class KtorXrpcClientTest {
         }
 
     @Test
-    fun mapsProtocolErrors(): Unit =
+    fun `maps protocol errors`(): Unit =
         runTest {
             val client =
                 KtorXrpcClient(
@@ -117,7 +117,7 @@ class KtorXrpcClientTest {
         }
 
     @Test
-    fun mapsTransportSerializationAndPlainTextProtocolFailures(): Unit =
+    fun `maps transport serialization and plain text protocol failures`(): Unit =
         runTest {
             val transportClient =
                 KtorXrpcClient(

@@ -43,6 +43,7 @@ jobs:
         uses: ./.github/actions/setup-firebase-configs
         with:
           ios-google-service-info-plist-base64: ${{ secrets.LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+          google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_RELEASE }}
 
       - name: Resolve iOS version
         id: version
@@ -138,6 +139,7 @@ jobs:
         uses: ./.github/actions/setup-firebase-configs
         with:
           ios-google-service-info-plist-base64: ${{ secrets.LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+          google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_RELEASE }}
 
       - name: Resolve iOS version
         id: version

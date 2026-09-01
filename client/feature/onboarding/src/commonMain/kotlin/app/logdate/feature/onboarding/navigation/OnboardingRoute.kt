@@ -64,12 +64,6 @@ data object PersonalIntro : OnboardingBaseRoute
 data object AppOverview : OnboardingBaseRoute
 
 @Serializable
-data object FirstEntry : OnboardingBaseRoute
-
-@Serializable
-data object CloudSync : OnboardingBaseRoute
-
-@Serializable
 data object MemoryImport : OnboardingBaseRoute
 
 @Serializable
@@ -195,37 +189,6 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
                     routeForStep(
                         nextOnboardingStepAfter(
                             currentStep = OnboardingStep.APP_OVERVIEW,
-                            entryMode = entryMode,
-                            snapshot = progressSnapshot,
-                        ) ?: terminalStepFor(entryMode),
-                    ),
-                )
-            },
-        )
-    }
-    taggedEntry<CloudSync> {
-        val flowViewModel = koinViewModel<OnboardingViewModel>()
-        val progressSnapshot by flowViewModel.progressSnapshot.collectAsState()
-        val entryMode by flowViewModel.activeEntryMode.collectAsState()
-
-        CloudAccountSetupScreen(
-            onBack = onNavigateBack,
-            onContinue = {
-                onGoToItem(
-                    routeForStep(
-                        nextOnboardingStepAfter(
-                            currentStep = OnboardingStep.ACCOUNT,
-                            entryMode = entryMode,
-                            snapshot = progressSnapshot.copy(hasCloudAccount = true),
-                        ) ?: terminalStepFor(entryMode),
-                    ),
-                )
-            },
-            onSkip = {
-                onGoToItem(
-                    routeForStep(
-                        nextOnboardingStepAfter(
-                            currentStep = OnboardingStep.ACCOUNT,
                             entryMode = entryMode,
                             snapshot = progressSnapshot,
                         ) ?: terminalStepFor(entryMode),

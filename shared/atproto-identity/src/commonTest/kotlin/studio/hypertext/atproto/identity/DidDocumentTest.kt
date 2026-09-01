@@ -16,7 +16,7 @@ class DidDocumentTest {
     private val json: Json = Json { encodeDefaults = true }
 
     @Test
-    fun serializesAndDeserializesDidDocument() {
+    fun `serializes and deserializes did document`() {
         val did = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
         val verificationMethod =
             VerificationMethod(

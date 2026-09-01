@@ -1,6 +1,7 @@
 @file:Suppress("UnstableApiUsage")
 
 import com.android.build.api.dsl.ApplicationExtension
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -29,6 +30,19 @@ val androidTestOrchestratorEnabled =
         .gradleProperty("logdate.androidTestOrchestrator")
         .map(String::toBoolean)
         .getOrElse(true)
+val localProperties =
+    Properties().apply {
+        rootProject
+            .file("local.properties")
+            .takeIf { it.isFile }
+            ?.inputStream()
+            ?.use(::load)
+    }
+val resolvedGoogleMapsApiKey =
+    System.getenv("LOGDATE_GOOGLE_MAPS_API_KEY")
+        ?: providers.gradleProperty("logdate.googleMapsApiKey").orNull
+        ?: localProperties.getProperty("logdate.googleMapsApiKey")
+        ?: ""
 
 /**
  * Production release versionCode comes from CI. Priority order:
@@ -141,6 +155,9 @@ extensions.configure<ApplicationExtension> {
         // The account type res/xml/authenticator.xml declares. AndroidAccountManager derives the
         // same value from the installed package name, so the two cannot drift apart.
         resValue("string", "logdate_account_type", "$applicationId.account")
+        // Maps and Places use a dedicated Android-restricted credential. Never fall back to the
+        // general Firebase API key generated from google-services.json.
+        resValue("string", "google_maps_api_key", resolvedGoogleMapsApiKey)
         minSdk =
             libs.versions.android.minSdk
                 .get()

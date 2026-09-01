@@ -24,7 +24,7 @@ import kotlin.time.Clock
  */
 class SyncTestFakesTest {
     @Test
-    fun testFakeCloudApiClientTracksCalls() =
+    fun `fake cloud api client tracks calls`() =
         runTest {
             // Given: A fake API client
             val apiClient = FakeCloudApiClient()
@@ -50,7 +50,7 @@ class SyncTestFakesTest {
         }
 
     @Test
-    fun testFakeCloudApiClientConfigurableFailures() =
+    fun `fake cloud api client configurable failures`() =
         runTest {
             // Given: A fake API client configured for content sync failure
             val apiClient = FakeCloudApiClient()
@@ -77,7 +77,7 @@ class SyncTestFakesTest {
         }
 
     @Test
-    fun testFakeCloudAccountRepositoryAuthenticationStates() =
+    fun `fake cloud account repository authentication states`() =
         runTest {
             // Given: A fake cloud account repository
             val repository = FakeCloudAccountRepository()
@@ -98,7 +98,7 @@ class SyncTestFakesTest {
         }
 
     @Test
-    fun testTrackingSyncManagerTracksAllCalls() =
+    fun `tracking sync manager tracks all calls`() =
         runTest {
             // Given: A tracking sync manager
             val syncManager = TrackingSyncManager()
@@ -119,7 +119,7 @@ class SyncTestFakesTest {
         }
 
     @Test
-    fun testTrackingSyncManagerConfigurableResults() =
+    fun `tracking sync manager configurable results`() =
         runTest {
             // Given: A tracking sync manager configured for failure
             val syncManager = TrackingSyncManager()
@@ -144,7 +144,7 @@ class SyncTestFakesTest {
         }
 
     @Test
-    fun testFakeRepositoryBasicOperations() =
+    fun `fake repository basic operations`() =
         runTest {
             // Given: A fake notes repository
             val repository = FakeJournalNotesRepository()
@@ -169,7 +169,7 @@ class SyncTestFakesTest {
         }
 
     @Test
-    fun testEndToEndSyncWithFakes() =
+    fun `end to end sync with fakes`() =
         runTest {
             // Given: A complete sync setup with fakes
             val apiClient = fakeCloudApiClient()
@@ -214,7 +214,7 @@ class SyncTestFakesTest {
         }
 
     @Test
-    fun testSyncFailureWithUnauthenticatedUser() =
+    fun `sync failure with unauthenticated user`() =
         runTest {
             // Given: An unauthenticated user setup
             val apiClient = fakeCloudApiClient()
@@ -256,7 +256,7 @@ class SyncTestFakesTest {
         }
 
     @Test
-    fun testSyncFailureWithNetworkErrors() =
+    fun `sync failure with network errors`() =
         runTest {
             // Given: Network errors from API
             val apiClient = failingCloudApiClient()

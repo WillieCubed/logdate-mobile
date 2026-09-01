@@ -60,6 +60,7 @@ const val CLOUD_ACCOUNT_SETUP_ROOT_TAG = "onboarding_account_root"
 const val CLOUD_ACCOUNT_SETUP_PRIMARY_ACTION_TAG = "onboarding_account_primary_action"
 const val CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG = "onboarding_account_skip_action"
 const val CLOUD_ACCOUNT_SETUP_SKIP_OPTION_TAG = "onboarding_account_skip_option"
+const val CLOUD_ACCOUNT_SETUP_SIGN_IN_ACTION_TAG = "onboarding_account_sign_in_action"
 
 @Composable
 fun CloudAccountSetupScreen(
@@ -72,24 +73,27 @@ fun CloudAccountSetupScreen(
 ) {
     BoxWithConstraints(modifier = modifier) {
         val resolvedUseCompactLayout = useCompactLayout ?: (maxWidth < 700.dp)
-        var showAccountFlow by remember { mutableStateOf(false) }
+        // Null until the person chooses; otherwise the step the account flow opens on. Creating an
+        // account and signing in are separate entry points into the same flow, so someone
+        // reinstalling the app can get back to their journals without creating a second account.
+        var entryStep by remember { mutableStateOf<CloudAccountOnboardingStep?>(null) }
         val cloudAccountViewModel = koinViewModel<CloudAccountOnboardingViewModel>()
 
-        LaunchedEffect(showAccountFlow) {
-            if (showAccountFlow) {
+        LaunchedEffect(entryStep) {
+            entryStep?.let { step ->
                 cloudAccountViewModel.resetFlow()
-                cloudAccountViewModel.setInitialStep(CloudAccountOnboardingStep.DisplayName)
+                cloudAccountViewModel.setInitialStep(step)
             }
         }
 
-        if (showAccountFlow) {
+        if (entryStep != null) {
             CloudAccountOnboardingScreen(
                 viewModel = cloudAccountViewModel,
                 onAccountCreated = onContinue,
                 onSkipOnboarding = onSkip,
                 onBack = {
                     cloudAccountViewModel.resetFlow()
-                    showAccountFlow = false
+                    entryStep = null
                 },
                 modifier = Modifier.fillMaxSize(),
             )
@@ -99,7 +103,8 @@ fun CloudAccountSetupScreen(
         CloudAccountSetupContent(
             useCompactLayout = resolvedUseCompactLayout,
             onBack = onBack,
-            onContinue = { showAccountFlow = true },
+            onContinue = { entryStep = CloudAccountOnboardingStep.DisplayName },
+            onSignIn = { entryStep = CloudAccountOnboardingStep.SignIn },
             onSkip = onSkip,
             onPlanSelected = onboardingViewModel::selectPlan,
             modifier = Modifier.fillMaxSize(),
@@ -115,6 +120,7 @@ fun CloudAccountSetupContent(
     onSkip: () -> Unit,
     onPlanSelected: (LogDateBackupPlanOption) -> Unit,
     modifier: Modifier = Modifier,
+    onSignIn: () -> Unit = {},
     selectedOption: LogDateBackupPlanOption? = null,
     onOptionSelected: (LogDateBackupPlanOption) -> Unit = {},
 ) {
@@ -122,6 +128,7 @@ fun CloudAccountSetupContent(
         BackupSyncCompactContent(
             onBack = onBack,
             onContinue = onContinue,
+            onSignIn = onSignIn,
             onSkip = onSkip,
             onPlanSelected = onPlanSelected,
             modifier = modifier,
@@ -164,7 +171,11 @@ fun CloudAccountSetupContent(
                             modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
                             contentAlignment = Alignment.Center,
                         ) {
-                            ActionButtons(onContinue = onContinue, onSkip = onSkip)
+                            ActionButtons(
+                                onContinue = onContinue,
+                                onSignIn = onSignIn,
+                                onSkip = onSkip,
+                            )
                         }
                     },
                 ) { contentPadding ->
@@ -189,6 +200,7 @@ fun CloudAccountSetupContent(
 private fun BackupSyncCompactContent(
     onBack: () -> Unit,
     onContinue: () -> Unit,
+    onSignIn: () -> Unit,
     onSkip: () -> Unit,
     onPlanSelected: (LogDateBackupPlanOption) -> Unit,
     modifier: Modifier = Modifier,
@@ -202,6 +214,7 @@ private fun BackupSyncCompactContent(
             ) {
                 ActionButtons(
                     onContinue = onContinue,
+                    onSignIn = onSignIn,
                     onSkip = onSkip,
                     modifier = Modifier.widthIn(max = 444.dp),
                 )
@@ -258,6 +271,7 @@ private fun BackupSyncCompactContent(
 @Composable
 private fun ActionButtons(
     onContinue: () -> Unit,
+    onSignIn: () -> Unit,
     onSkip: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -271,6 +285,12 @@ private fun ActionButtons(
             modifier = Modifier.fillMaxWidth().testTag(CLOUD_ACCOUNT_SETUP_PRIMARY_ACTION_TAG),
         ) {
             Text(stringResource(UiRes.string.common_continue))
+        }
+        TextButton(
+            onClick = onSignIn,
+            modifier = Modifier.testTag(CLOUD_ACCOUNT_SETUP_SIGN_IN_ACTION_TAG),
+        ) {
+            Text(stringResource(Res.string.onboarding_account_existing_action))
         }
         TextButton(
             onClick = onSkip,

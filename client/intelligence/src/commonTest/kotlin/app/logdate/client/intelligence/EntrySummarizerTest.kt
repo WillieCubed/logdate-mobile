@@ -59,7 +59,7 @@ class EntrySummarizerTest {
         )
 
     @Test
-    fun summarize_withValidText_generatesNewSummary() =
+    fun `summarize with valid text generates new summary`() =
         runTest(testDispatcher) {
             setup()
             val summaryId = "test-entry-1"
@@ -93,7 +93,7 @@ class EntrySummarizerTest {
         }
 
     @Test
-    fun summarize_withCachedResponse_returnsCachedSummary() =
+    fun `summarize with cached response returns cached summary`() =
         runTest(testDispatcher) {
             setup()
             val summaryId = "cached-entry"
@@ -114,7 +114,7 @@ class EntrySummarizerTest {
         }
 
     @Test
-    fun summarize_withCachedDisabled_skipsCache() =
+    fun `summarize with cached disabled skips cache`() =
         runTest(testDispatcher) {
             setup()
             val summaryId = "skip-cache-entry"
@@ -137,7 +137,7 @@ class EntrySummarizerTest {
         }
 
     @Test
-    fun summarize_withNoCachedResponse_generatesNewSummary() =
+    fun `summarize with no cached response generates new summary`() =
         runTest(testDispatcher) {
             setup()
             val summaryId = "no-cache-entry"
@@ -158,7 +158,7 @@ class EntrySummarizerTest {
         }
 
     @Test
-    fun summarize_withAIClientReturningNull_returnsFallbackMessage() =
+    fun `summarize with ai client returning null returns fallback message`() =
         runTest(testDispatcher) {
             setup()
             val summaryId = "null-response-entry"
@@ -173,7 +173,7 @@ class EntrySummarizerTest {
         }
 
     @Test
-    fun summarize_withAIClientError_returnsNull() =
+    fun `summarize with ai client error returns null`() =
         runTest(testDispatcher) {
             setup()
             val summaryId = "error-entry"
@@ -192,7 +192,7 @@ class EntrySummarizerTest {
         }
 
     @Test
-    fun summarize_withEmptyText_handlesGracefully() =
+    fun `summarize with empty text handles gracefully`() =
         runTest(testDispatcher) {
             setup()
             val summaryId = "empty-text-entry"
@@ -210,7 +210,7 @@ class EntrySummarizerTest {
         }
 
     @Test
-    fun summarize_withLongText_processesCorrectly() =
+    fun `summarize with long text processes correctly`() =
         runTest(testDispatcher) {
             setup()
             val summaryId = "long-text-entry"
@@ -238,7 +238,7 @@ class EntrySummarizerTest {
         }
 
     @Test
-    fun summarize_whenOffline_returnsUnavailable() =
+    fun `summarize when offline returns unavailable`() =
         runTest(testDispatcher) {
             setup()
             fakeNetworkMonitor.setAvailable(false)
@@ -252,7 +252,7 @@ class EntrySummarizerTest {
         }
 
     @Test
-    fun summarize_systemPromptIsCorrect() =
+    fun `summarize system prompt is correct`() =
         runTest(testDispatcher) {
             setup()
             val summaryId = "prompt-test"
@@ -273,7 +273,7 @@ class EntrySummarizerTest {
         }
 
     @Test
-    fun summarize_multipleEntries_cachesIndependently() =
+    fun `summarize multiple entries caches independently`() =
         runTest(testDispatcher) {
             setup()
             val entry1Id = "entry-1"

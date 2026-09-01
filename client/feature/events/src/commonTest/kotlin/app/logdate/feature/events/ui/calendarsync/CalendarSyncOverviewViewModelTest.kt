@@ -52,7 +52,7 @@ class CalendarSyncOverviewViewModelTest {
     }
 
     @Test
-    fun emits_default_state_when_no_preferences_set() =
+    fun `emits default state when no preferences set`() =
         runTest(testDispatcher) {
             val viewModel = newViewModel()
             val collectJob = startCollecting(viewModel.uiState)
@@ -67,7 +67,7 @@ class CalendarSyncOverviewViewModelTest {
         }
 
     @Test
-    fun setSyncEnabled_persists_to_preferences() =
+    fun `set sync enabled persists to preferences`() =
         runTest(testDispatcher) {
             val viewModel = newViewModel()
             val collectJob = startCollecting(viewModel.uiState)
@@ -80,7 +80,7 @@ class CalendarSyncOverviewViewModelTest {
         }
 
     @Test
-    fun setPermissionState_granted_refreshes_total_calendar_count() =
+    fun `set permission state granted refreshes total calendar count`() =
         runTest(testDispatcher) {
             reader.calendars =
                 listOf(
@@ -99,7 +99,7 @@ class CalendarSyncOverviewViewModelTest {
         }
 
     @Test
-    fun selected_calendar_count_reflects_persisted_selection() =
+    fun `selected calendar count reflects persisted selection`() =
         runTest(testDispatcher) {
             preferences.setDeviceCalendarEnabledIds(setOf("cal-1", "cal-3"))
             val viewModel = newViewModel()

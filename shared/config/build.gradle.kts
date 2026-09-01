@@ -25,7 +25,11 @@ buildConfig {
     // OAuth client exists. Blank disables the Google sign-in option in the client.
     buildConfigField(
         "GOOGLE_SERVER_CLIENT_ID",
-        providers.gradleProperty("logdate.googleServerClientId").orElse("").get(),
+        providers
+            .gradleProperty("logdate.googleServerClientId")
+            .orElse(providers.environmentVariable("LOGDATE_GOOGLE_SERVER_CLIENT_ID"))
+            .orElse("")
+            .get(),
     )
 }
 

@@ -103,7 +103,7 @@ class WearDayDetailPlaybackTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun idleAudioNote_displaysPlayIcon() {
+    fun `idle audio note displays play icon`() {
         composeRule.setContent {
             MaterialTheme {
                 WearDayDetailContent(
@@ -120,7 +120,7 @@ class WearDayDetailPlaybackTest {
     }
 
     @Test
-    fun idleAudioNote_displaysDuration() {
+    fun `idle audio note displays duration`() {
         composeRule.setContent {
             MaterialTheme {
                 WearDayDetailContent(
@@ -137,7 +137,7 @@ class WearDayDetailPlaybackTest {
     }
 
     @Test
-    fun idleAudioNote_tapTriggersToggle() {
+    fun `idle audio note tap triggers toggle`() {
         var toggled = false
         composeRule.setContent {
             MaterialTheme {
@@ -160,7 +160,7 @@ class WearDayDetailPlaybackTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun playingAudioNote_displaysStopButton() {
+    fun `playing audio note displays stop button`() {
         composeRule.setContent {
             MaterialTheme {
                 WearDayDetailContent(
@@ -182,7 +182,7 @@ class WearDayDetailPlaybackTest {
     }
 
     @Test
-    fun playingAudioNote_displaysElapsedTime() {
+    fun `playing audio note displays elapsed time`() {
         composeRule.setContent {
             MaterialTheme {
                 WearDayDetailContent(
@@ -205,7 +205,7 @@ class WearDayDetailPlaybackTest {
     }
 
     @Test
-    fun playingAudioNote_stopTriggersToggle() {
+    fun `playing audio note stop triggers toggle`() {
         var toggled = false
         composeRule.setContent {
             MaterialTheme {
@@ -233,7 +233,7 @@ class WearDayDetailPlaybackTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun noOutput_displaysConnectHeadphonesMessage() {
+    fun `no output displays connect headphones message`() {
         composeRule.setContent {
             MaterialTheme {
                 WearDayDetailContent(
@@ -253,7 +253,7 @@ class WearDayDetailPlaybackTest {
     }
 
     @Test
-    fun noOutput_tapOpensBluetoothSettings() {
+    fun `no output tap opens bluetooth settings`() {
         var opened = false
         composeRule.setContent {
             MaterialTheme {
@@ -272,7 +272,7 @@ class WearDayDetailPlaybackTest {
     }
 
     @Test
-    fun outputSummary_tapShowsOutputPicker() {
+    fun `output summary tap shows output picker`() {
         var toggledPicker = false
         composeRule.setContent {
             MaterialTheme {
@@ -294,7 +294,7 @@ class WearDayDetailPlaybackTest {
     }
 
     @Test
-    fun outputPicker_displaysBluetoothOutputRoute() {
+    fun `output picker displays bluetooth output route`() {
         composeRule.setContent {
             MaterialTheme {
                 WearDayDetailContent(
@@ -314,7 +314,7 @@ class WearDayDetailPlaybackTest {
     }
 
     @Test
-    fun outputPicker_controllableRouteSelectsBluetoothOutput() {
+    fun `output picker controllable route selects bluetooth output`() {
         var selectedDeviceId: String? = null
         composeRule.setContent {
             MaterialTheme {
@@ -344,7 +344,7 @@ class WearDayDetailPlaybackTest {
     }
 
     @Test
-    fun outputPicker_systemControlledRouteOpensBluetoothSettings() {
+    fun `output picker system controlled route opens bluetooth settings`() {
         var opened = false
         composeRule.setContent {
             MaterialTheme {
@@ -377,7 +377,7 @@ class WearDayDetailPlaybackTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun mixedEntries_textNoteShowsContent() {
+    fun `mixed entries text note shows content`() {
         composeRule.setContent {
             MaterialTheme {
                 WearDayDetailContent(
@@ -395,7 +395,7 @@ class WearDayDetailPlaybackTest {
     }
 
     @Test
-    fun differentNoteActive_showsPlayNotStop() {
+    fun `different note active shows play not stop`() {
         val otherNoteId = Uuid.random()
         composeRule.setContent {
             MaterialTheme {

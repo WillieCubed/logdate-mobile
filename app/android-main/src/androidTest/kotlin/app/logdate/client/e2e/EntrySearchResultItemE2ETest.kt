@@ -46,7 +46,7 @@ class EntrySearchResultItemE2ETest {
     // region Rendering
 
     @Test
-    fun textNote_displaysContent() {
+    fun `text note displays content`() {
         composeRule.setContent {
             EntrySearchResultItem(
                 state = textNoteState,
@@ -58,7 +58,7 @@ class EntrySearchResultItemE2ETest {
     }
 
     @Test
-    fun textNote_displaysDateAndTypeLabel() {
+    fun `text note displays date and type label`() {
         composeRule.setContent {
             EntrySearchResultItem(
                 state = textNoteState,
@@ -70,7 +70,7 @@ class EntrySearchResultItemE2ETest {
     }
 
     @Test
-    fun voiceNote_displaysContent() {
+    fun `voice note displays content`() {
         composeRule.setContent {
             EntrySearchResultItem(
                 state = voiceNoteState,
@@ -82,7 +82,7 @@ class EntrySearchResultItemE2ETest {
     }
 
     @Test
-    fun voiceNote_displaysDateAndTypeLabel() {
+    fun `voice note displays date and type label`() {
         composeRule.setContent {
             EntrySearchResultItem(
                 state = voiceNoteState,
@@ -98,7 +98,7 @@ class EntrySearchResultItemE2ETest {
     // region Interaction
 
     @Test
-    fun click_invokesCallback() {
+    fun `click invokes callback`() {
         var clicked = false
 
         composeRule.setContent {

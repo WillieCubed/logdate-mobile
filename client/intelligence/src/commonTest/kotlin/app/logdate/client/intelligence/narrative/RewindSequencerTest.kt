@@ -30,7 +30,7 @@ class RewindSequencerTest {
     private val emptyStats = WeekStatsSnapshot(photoCount = 0, textNoteCount = 0, distinctLocations = 0, distinctPeople = 0)
 
     @Test
-    fun sequence_createsOpeningContext() {
+    fun `sequence creates opening context`() {
         val narrative = narrativeOf(overallNarrative = "You explored the coast. It was wonderful.")
 
         val result =
@@ -51,7 +51,7 @@ class RewindSequencerTest {
     }
 
     @Test
-    fun sequence_createsResolution() {
+    fun `sequence creates resolution`() {
         val narrative = narrativeOf(overallNarrative = "You explored the coast. It was wonderful.")
 
         val result =
@@ -72,7 +72,7 @@ class RewindSequencerTest {
     }
 
     @Test
-    fun sequence_includesStoryBeatsWithEvidence() {
+    fun `sequence includes story beats with evidence`() {
         val textEntry =
             JournalNote.Text(
                 uid = Uuid.random(),
@@ -116,7 +116,7 @@ class RewindSequencerTest {
     }
 
     @Test
-    fun sequence_includesMediaEvidence() {
+    fun `sequence includes media evidence`() {
         val imageMedia =
             IndexedMedia.Image(
                 uid = Uuid.random(),
@@ -168,7 +168,7 @@ class RewindSequencerTest {
     }
 
     @Test
-    fun sequence_createsTransitionsBetweenBeats() {
+    fun `sequence creates transitions between beats`() {
         val textEntry1 =
             JournalNote.Text(
                 uid = Uuid.random(),
@@ -222,7 +222,7 @@ class RewindSequencerTest {
     }
 
     @Test
-    fun sequence_handlesMultipleStoryBeats() {
+    fun `sequence handles multiple story beats`() {
         val entries =
             listOf(
                 JournalNote.Text(
@@ -279,7 +279,7 @@ class RewindSequencerTest {
     }
 
     @Test
-    fun sequence_handlesBeatWithNoEvidence() {
+    fun `sequence handles beat with no evidence`() {
         val narrative =
             narrativeOf(
                 storyBeats =
@@ -311,7 +311,7 @@ class RewindSequencerTest {
     }
 
     @Test
-    fun sequence_sortsEvidenceChronologically() {
+    fun `sequence sorts evidence chronologically`() {
         val laterEntry =
             JournalNote.Text(
                 uid = Uuid.random(),
@@ -362,7 +362,7 @@ class RewindSequencerTest {
     }
 
     @Test
-    fun sequence_withEmptyNarrative_createsMinimalStructure() {
+    fun `sequence with empty narrative creates minimal structure`() {
         val narrative = narrativeOf(overallNarrative = "Not much happened.")
 
         val result =

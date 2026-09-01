@@ -18,7 +18,7 @@ class PreferencesCurationConfigProviderTest {
     private val provider = PreferencesCurationConfigProvider(dataSource)
 
     @Test
-    fun defaultsToStandardStrictnessExcludingScreenshots() =
+    fun `defaults to standard strictness excluding screenshots`() =
         runTest {
             val config = provider.get()
             assertEquals(CurationConfig.Strictness.STANDARD, config.strictness)
@@ -26,7 +26,7 @@ class PreferencesCurationConfigProviderTest {
         }
 
     @Test
-    fun strictStrictnessIsResolved() =
+    fun `strict strictness is resolved`() =
         runTest {
             dataSource.setRewindCurationStrictness("STRICT")
             val config = provider.get()
@@ -36,7 +36,7 @@ class PreferencesCurationConfigProviderTest {
         }
 
     @Test
-    fun lenientStrictnessIsResolved() =
+    fun `lenient strictness is resolved`() =
         runTest {
             dataSource.setRewindCurationStrictness("LENIENT")
             val config = provider.get()
@@ -44,7 +44,7 @@ class PreferencesCurationConfigProviderTest {
         }
 
     @Test
-    fun unknownStrictnessFallsBackToStandard() =
+    fun `unknown strictness falls back to standard`() =
         runTest {
             // Older releases may have written an enum name we no longer ship.
             dataSource.setRewindCurationStrictness("RUTHLESS")
@@ -53,7 +53,7 @@ class PreferencesCurationConfigProviderTest {
         }
 
     @Test
-    fun includeScreenshotsOverridesStrictnessDefault() =
+    fun `include screenshots overrides strictness default`() =
         runTest {
             dataSource.setRewindIncludeScreenshots(true)
             val config = provider.get()
@@ -61,7 +61,7 @@ class PreferencesCurationConfigProviderTest {
         }
 
     @Test
-    fun includeScreenshotsLayersOnStrictStrictness() =
+    fun `include screenshots layers on strict strictness`() =
         runTest {
             dataSource.setRewindCurationStrictness("STRICT")
             dataSource.setRewindIncludeScreenshots(true)

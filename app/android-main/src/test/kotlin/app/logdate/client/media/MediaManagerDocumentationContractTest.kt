@@ -11,7 +11,7 @@ class MediaManagerDocumentationContractTest {
     private val repoRoot = locateRepoRoot(Paths.get(System.getProperty("user.dir") ?: ".").toAbsolutePath())
 
     @Test
-    fun saveMediaFromFileCancellationGuaranteeIsNotGlobal() {
+    fun `save media from file cancellation guarantee is not global`() {
         val commonContract =
             repoRoot
                 .resolve("client/media/src/commonMain/kotlin/app/logdate/client/media/MediaManager.kt")

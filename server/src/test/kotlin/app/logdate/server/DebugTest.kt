@@ -16,7 +16,7 @@ class DebugTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
-    fun debugApiV1BaseRoute() =
+    fun `debug api v 1 base route`() =
         testApplication {
             application { module() }
 
@@ -40,7 +40,7 @@ class DebugTest {
         }
 
     @Test
-    fun debugJsonStructure() =
+    fun `debug json structure`() =
         testApplication {
             application { module() }
 

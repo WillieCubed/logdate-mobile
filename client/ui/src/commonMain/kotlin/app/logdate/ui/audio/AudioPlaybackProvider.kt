@@ -137,8 +137,12 @@ fun AudioPlaybackProvider(content: @Composable () -> Unit) {
                 progress = newProgress
             },
             onPlaybackCompleted = {
+                // A playback error also invokes this callback (not just natural end-of-track), so
+                // only force progress to 100% on a real completion — otherwise leave the actual
+                // (partial or zero) progress in place instead of implying the track fully played.
+                val failed = statusProvider?.playbackStatus?.value?.errorMessage != null
                 isPlaying = false
-                progress = 1f
+                if (!failed) progress = 1f
             },
         )
     }

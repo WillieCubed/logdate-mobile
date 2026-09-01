@@ -48,7 +48,7 @@ class NetworkStateTest {
      * **Real App Usage**: Recording when sync became available, cache decisions
      */
     @Test
-    fun networkStateConnected_createsWithTimestamp() {
+    fun `network state connected creates with timestamp`() {
         val timestamp = Clock.System.now()
         val state = NetworkState.Connected(timestamp)
 
@@ -67,7 +67,7 @@ class NetworkStateTest {
      * **Real App Usage**: Tracking offline duration, user experience decisions
      */
     @Test
-    fun networkStateNotConnected_createsWithTimestamp() {
+    fun `network state not connected creates with timestamp`() {
         val timestamp = Clock.System.now()
         val state = NetworkState.NotConnected(timestamp)
 
@@ -75,7 +75,7 @@ class NetworkStateTest {
     }
 
     @Test
-    fun networkStateConnected_equalityWorks() {
+    fun `network state connected equality works`() {
         val timestamp = Clock.System.now()
         val state1 = NetworkState.Connected(timestamp)
         val state2 = NetworkState.Connected(timestamp)
@@ -85,7 +85,7 @@ class NetworkStateTest {
     }
 
     @Test
-    fun networkStateNotConnected_equalityWorks() {
+    fun `network state not connected equality works`() {
         val timestamp = Clock.System.now()
         val state1 = NetworkState.NotConnected(timestamp)
         val state2 = NetworkState.NotConnected(timestamp)
@@ -95,7 +95,7 @@ class NetworkStateTest {
     }
 
     @Test
-    fun networkStates_withDifferentTimestamps_areNotEqual() {
+    fun `network states with different timestamps are not equal`() {
         val timestamp1 = Clock.System.now()
         val timestamp2 = timestamp1 + 1.seconds
 
@@ -111,7 +111,7 @@ class NetworkStateTest {
     }
 
     @Test
-    fun networkStates_differentTypes_areNotEqual() {
+    fun `network states different types are not equal`() {
         val timestamp = Clock.System.now()
         val connected = NetworkState.Connected(timestamp)
         val notConnected = NetworkState.NotConnected(timestamp)
@@ -120,7 +120,7 @@ class NetworkStateTest {
     }
 
     @Test
-    fun networkStateConnected_toStringContainsUsefulInfo() {
+    fun `network state connected to string contains useful info`() {
         val timestamp = Clock.System.now()
         val state = NetworkState.Connected(timestamp)
 
@@ -131,7 +131,7 @@ class NetworkStateTest {
     }
 
     @Test
-    fun networkStateNotConnected_toStringContainsUsefulInfo() {
+    fun `network state not connected to string contains useful info`() {
         val timestamp = Clock.System.now()
         val state = NetworkState.NotConnected(timestamp)
 
@@ -142,7 +142,7 @@ class NetworkStateTest {
     }
 
     @Test
-    fun networkState_timestampAccuracy() {
+    fun `network state timestamp accuracy`() {
         val beforeCreation = Clock.System.now()
         val state = NetworkState.Connected(Clock.System.now())
         val afterCreation = Clock.System.now()
@@ -152,7 +152,7 @@ class NetworkStateTest {
     }
 
     @Test
-    fun networkState_sealedInterfacePolymorphism() {
+    fun `network state sealed interface polymorphism`() {
         val timestamp = Clock.System.now()
         val states: List<NetworkState> =
             listOf(
@@ -176,7 +176,7 @@ class NetworkStateTest {
     }
 
     @Test
-    fun networkState_copyFunctionality() {
+    fun `network state copy functionality`() {
         val originalTimestamp = Clock.System.now()
         val newTimestamp = originalTimestamp + 5.minutes
 
@@ -188,7 +188,7 @@ class NetworkStateTest {
     }
 
     @Test
-    fun networkState_destructuringDeclaration() {
+    fun `network state destructuring declaration`() {
         val timestamp = Clock.System.now()
         val connected = NetworkState.Connected(timestamp)
         val (lastConnected) = connected
@@ -202,7 +202,7 @@ class NetworkStateTest {
     }
 
     @Test
-    fun networkState_immutability() {
+    fun `network state immutability`() {
         val timestamp = Clock.System.now()
         val state = NetworkState.Connected(timestamp)
 
@@ -216,7 +216,7 @@ class NetworkStateTest {
     }
 
     @Test
-    fun networkState_withEdgeCaseTimestamps() {
+    fun `network state with edge case timestamps`() {
         // Test with very old timestamp
         val veryOldTimestamp = Instant.fromEpochMilliseconds(0)
         val oldState = NetworkState.Connected(veryOldTimestamp)
@@ -229,7 +229,7 @@ class NetworkStateTest {
     }
 
     @Test
-    fun networkState_multipleInstancesWithSameTimestamp() {
+    fun `network state multiple instances with same timestamp`() {
         val timestamp = Clock.System.now()
 
         val states =

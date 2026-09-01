@@ -37,7 +37,7 @@ class EditorAudioBlockE2ETest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun compactEditorAudioBlockExposesPlaybackRouteControls() {
+    fun `compact editor audio block exposes playback route controls`() {
         assumeTrue(screenWidthDp() < 600)
         setEditorAudioContent()
 
@@ -46,7 +46,7 @@ class EditorAudioBlockE2ETest {
     }
 
     @Test
-    fun expandedEditorAudioBlockExposesPlaybackRouteControls() {
+    fun `expanded editor audio block exposes playback route controls`() {
         assumeTrue(screenWidthDp() >= 600)
         setEditorAudioContent()
 

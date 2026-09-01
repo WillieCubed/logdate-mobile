@@ -98,6 +98,8 @@ class DraftManagementTest {
                 locationProvider = locationProvider,
                 locationHistoryRepository = locationHistoryRepository,
                 locationRetryWorker = locationRetryWorker,
+                canonicalOwnerProvider = TestCanonicalOwnerProvider(),
+                deviceIdProvider = TestDeviceIdProvider(),
             )
         val mediaManager = FakeMediaManager()
 
@@ -167,7 +169,7 @@ class DraftManagementTest {
     }
 
     @Test
-    fun testDraftIdSurvivesCombineReemission() =
+    fun `draft id survives combine reemission`() =
         testScope.runTest {
             // Create a text block with content
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
@@ -189,7 +191,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testAutoSaveWaitsForDurableDraftPersistence() =
+    fun `auto save waits for durable draft persistence`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Durable content"))
@@ -213,7 +215,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testConcurrentAutoSavesPreserveSingleDraftIdentity() =
+    fun `concurrent auto saves preserve single draft identity`() =
         testScope.runTest {
             val firstBlock = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(firstBlock.copy(content = "First version"))
@@ -244,7 +246,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testClearingActiveDraftPersistsEmptyContent() =
+    fun `clearing active draft persists empty content`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Content that will be cleared"))
@@ -265,7 +267,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testClearingActiveDraftSoleBlockCannotResetToPickerBeforeEmptySnapshotPersists() =
+    fun `clearing active draft sole block cannot reset to picker before empty snapshot persists`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Content that must be cleared durably"))
@@ -288,7 +290,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testSaveAsDraftWaitsForDurableDraftPersistence() =
+    fun `save as draft waits for durable draft persistence`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Exit draft"))
@@ -309,7 +311,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testSaveAsDraftPersistsLatestChangesBeforeReturningSuccess() =
+    fun `save as draft persists latest changes before returning success`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Click-time content"))
@@ -338,7 +340,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testSaveAsDraftFailureKeepsEditorOpenAndReportsError() =
+    fun `save as draft failure keeps editor open and reports error`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Unsaved exit draft"))
@@ -358,7 +360,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testManualSaveWaitsForInFlightDurableAutoSave() =
+    fun `manual save waits for in flight durable auto save`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Publish after durable autosave"))
@@ -391,7 +393,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testPublishAdmissionRejectsLateTextJournalAndBlockMutations() =
+    fun `publish admission rejects late text journal and block mutations`() =
         testScope.runTest {
             val initialJournalId = Uuid.random()
             val rejectedJournalId = Uuid.random()
@@ -426,7 +428,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testPublishDoesNotClearEditorWhenDurableFingerprintChangesDuringSave() =
+    fun `publish does not clear editor when durable fingerprint changes during save`() =
         testScope.runTest {
             val originalBlock = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(originalBlock.copy(content = "Publish with invariant"))
@@ -454,7 +456,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testRapidDoubleSubmitPublishesEntryOnlyOnce() =
+    fun `rapid double submit publishes entry only once`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Publish once"))
@@ -471,7 +473,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testPublishCancellationDoesNotBecomeUiError() =
+    fun `publish cancellation does not become ui error`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Cancelled publish"))
@@ -487,7 +489,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testPublishCancellationWhileWaitingForDraftMutexClearsExclusiveSaveState() =
+    fun `publish cancellation while waiting for draft mutex clears exclusive save state`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Waiting for draft mutex"))
@@ -519,7 +521,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testEmptyDraftDeleteCancellationClearsExclusiveSaveState() =
+    fun `empty draft delete cancellation clears exclusive save state`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Durable content before clear"))
@@ -543,7 +545,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testJournalSelectionOnlyDraftPersistsAndLoadsSelection() =
+    fun `journal selection only draft persists and loads selection`() =
         testScope.runTest {
             val selectedJournalId = Uuid.random()
 
@@ -564,7 +566,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testNavigationJournalContextOverridesInitializedDefaultWithoutDirtyingEditor() =
+    fun `navigation journal context overrides initialized default without dirtying editor`() =
         testScope.runTest {
             val defaultJournalId = Uuid.random()
             val navigationJournalId = Uuid.random()
@@ -578,7 +580,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testClearingTransientEmptyBlockPreservesJournalSelectionDirtyState() =
+    fun `clearing transient empty block preserves journal selection dirty state`() =
         testScope.runTest {
             val selectedJournalId = Uuid.random()
             viewModel.setSelectedJournals(listOf(selectedJournalId))
@@ -597,7 +599,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testDeselectingEveryJournalRemainsDirtyAndCreatesEmptySelectionDraft() =
+    fun `deselecting every journal remains dirty and creates empty selection draft`() =
         testScope.runTest {
             viewModel.initializeSelectedJournals(listOf(Uuid.random()))
             viewModel.setSelectedJournals(emptyList())
@@ -610,7 +612,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testExplicitEmptyJournalSelectionOverridesDerivedDefaultAfterPersistence() =
+    fun `explicit empty journal selection overrides derived default after persistence`() =
         testScope.runTest {
             val defaultJournalId = Uuid.random()
             journalRepository.create(Journal(id = defaultJournalId, title = "Default"))
@@ -640,7 +642,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testImmediateSaveAsDraftKeepsExplicitEmptyJournalSelectionAuthoritative() =
+    fun `immediate save as draft keeps explicit empty journal selection authoritative`() =
         testScope.runTest {
             val defaultJournalId = Uuid.random()
             journalRepository.create(Journal(id = defaultJournalId, title = "Default"))
@@ -656,7 +658,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testPublishAfterExplicitEmptySaveDraftDoesNotRestoreCombinedDefault() =
+    fun `publish after explicit empty save draft does not restore combined default`() =
         testScope.runTest {
             val defaultJournalId = Uuid.random()
             journalRepository.create(Journal(id = defaultJournalId, title = "Default"))
@@ -681,7 +683,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testDraftManagerRethrowsLoadCancellation() =
+    fun `draft manager rethrows load cancellation`() =
         testScope.runTest {
             entryDraftRepository.getDraftFailure = CancellationException("load cancelled")
 
@@ -691,7 +693,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testDraftManagerRethrowsDeleteCancellation() =
+    fun `draft manager rethrows delete cancellation`() =
         testScope.runTest {
             val draftId = Uuid.random()
             entryDraftRepository.setDeletionFailure(
@@ -705,7 +707,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testDraftManagerRethrowsDeleteAllCancellation() =
+    fun `draft manager rethrows delete all cancellation`() =
         testScope.runTest {
             entryDraftRepository.deleteAllDraftsFailure = CancellationException("delete all cancelled")
 
@@ -715,7 +717,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testRetryAfterPartialDraftCreatePreservesSingleIdentity() =
+    fun `retry after partial draft create preserves single identity`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Retry stable identity"))
@@ -736,7 +738,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testPublishAfterPartialDraftCreateDeletesRetainedCandidate() =
+    fun `publish after partial draft create deletes retained candidate`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Publish after partial draft create"))
@@ -760,7 +762,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testDiscardDeletesActiveDraftBeforeExit() =
+    fun `discard deletes active draft before exit`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Discard durable draft"))
@@ -777,7 +779,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testDiscardDeletionFailureFailsClosed() =
+    fun `discard deletion failure fails closed`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Keep when deletion fails"))
@@ -797,7 +799,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testDiscardDeletesRetainedPartialCreateBeforeExit() =
+    fun `discard deletes retained partial create before exit`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Discard retained candidate"))
@@ -817,7 +819,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testDiscardCancellationFailsClosedAndReleasesEditorLock() =
+    fun `discard cancellation fails closed and releases editor lock`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Retain cancelled discard"))
@@ -842,7 +844,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testDeleteAllWaitsForInFlightDraftPersistence() =
+    fun `delete all waits for in flight draft persistence`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Delete after write"))
@@ -864,7 +866,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testDeletingActiveDraftInvalidatesQueuedAutosaveSnapshot() =
+    fun `deleting active draft invalidates queued autosave snapshot`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Delete without resurrection"))
@@ -885,7 +887,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testDeletingAllDraftsInvalidatesQueuedAutosaveSnapshot() =
+    fun `deleting all drafts invalidates queued autosave snapshot`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Delete all without resurrection"))
@@ -906,7 +908,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testDeleteDraftCompletionPreservesEditMadeWhileDeletionIsSuspended() =
+    fun `delete draft completion preserves edit made while deletion is suspended`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Persisted before delete"))
@@ -932,7 +934,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testDeleteAllCompletionPreservesEditMadeWhileDeletionIsSuspended() =
+    fun `delete all completion preserves edit made while deletion is suspended`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Persisted before delete all"))
@@ -958,7 +960,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testLoadDraftWinsAfterOlderAutosaveCompletes() =
+    fun `load draft wins after older autosave completes`() =
         testScope.runTest {
             val targetDraftId = entryDraftRepository.createDraft(listOf(textNote("Loaded target")))
             val oldBlock = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
@@ -984,7 +986,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testQueuedOldAutosaveCannotRetargetContentToNewlyLoadedDraft() =
+    fun `queued old autosave cannot retarget content to newly loaded draft`() =
         testScope.runTest {
             val targetDraftId = entryDraftRepository.createDraft(listOf(textNote("Loaded target")))
             val oldBlock = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
@@ -1012,7 +1014,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testSlowLoadCompletionDoesNotOverwriteNewerEditorMutation() =
+    fun `slow load completion does not overwrite newer editor mutation`() =
         testScope.runTest {
             val targetDraftId = entryDraftRepository.createDraft(listOf(textNote("Loaded target")))
             val currentBlock = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
@@ -1038,7 +1040,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testSaveEntryDeletesDraftAfterAutoSave() =
+    fun `save entry deletes draft after auto save`() =
         testScope.runTest {
             // Create content and auto-save to create a draft
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
@@ -1070,7 +1072,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testSaveEntryAfterClearingActiveDraftDeletesOldDurableContentBeforeExit() =
+    fun `save entry after clearing active draft deletes old durable content before exit`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(block.copy(content = "Old durable content"))
@@ -1091,7 +1093,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testSaveEntryDeletesDraftWhenCallerStateMissesLatestAutosave() =
+    fun `save entry deletes draft when caller state misses latest autosave`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             advanceUntilIdle()
@@ -1120,7 +1122,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testDelayedAutoSaveAfterSuccessfulSaveDoesNotRecreateDraft() =
+    fun `delayed auto save after successful save does not recreate draft`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             advanceUntilIdle()
@@ -1147,7 +1149,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testLoadDraftSetsIsModified() =
+    fun `load draft sets is modified`() =
         testScope.runTest {
             // Pre-populate a draft in the repository
             val draftId =
@@ -1177,7 +1179,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testAutoSaveSkippedDuringManualSave() =
+    fun `auto save skipped during manual save`() =
         testScope.runTest {
             // Create content
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
@@ -1211,7 +1213,7 @@ class DraftManagementTest {
         }
 
     @Test
-    fun testDeleteAllDraftsClearsAllAtOnce() =
+    fun `delete all drafts clears all at once`() =
         testScope.runTest {
             // Create multiple drafts
             entryDraftRepository.createDraft(

@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.client.awareness.daylight.stringRes
+import app.logdate.ui.common.formatting.LocalToday
 import app.logdate.ui.common.formatting.asRelativeDate
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
@@ -63,7 +64,7 @@ internal fun SemanticTimelineDayHeader(
         modifier = modifier,
     ) {
         Text(
-            text = item.date.asRelativeDate(),
+            text = item.date.asRelativeDate(LocalToday.current),
             style = MaterialTheme.typography.labelLarge,
             color = style.accentColor,
             fontWeight = FontWeight.SemiBold,

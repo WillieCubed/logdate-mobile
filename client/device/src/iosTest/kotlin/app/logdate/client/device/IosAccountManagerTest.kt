@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class IosAccountManagerTest {
     @Test
-    fun pendingAuthorizationRejectsAccountCreationBeforeReadingOrWritingKeychain() =
+    fun `pending authorization rejects account creation before reading or writing keychain`() =
         runTest {
             val keychain = RecordingKeychainWrapper()
             val originalBytes =
@@ -36,7 +36,7 @@ class IosAccountManagerTest {
         }
 
     @Test
-    fun pendingAuthorizationRejectsAccountEnumerationBeforeReadingKeychain() =
+    fun `pending authorization rejects account enumeration before reading keychain`() =
         runTest {
             val keychain = RecordingKeychainWrapper()
             val originalBytes = mapOf("accounts" to "opaque-legacy-account-index")

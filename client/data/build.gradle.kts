@@ -67,10 +67,6 @@ kotlin {
             implementation(libs.androidx.appsearch.platform.storage)
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.koin.android)
-            // Firebase
-            implementation(libs.kotlinx.coroutines.play.services)
-            implementation(project.dependencies.platform(libs.firebase.bom))
-            implementation(libs.firebase.firestore)
         }
         desktopMain.dependencies {
             implementation(libs.kotlinx.coroutines.swing)

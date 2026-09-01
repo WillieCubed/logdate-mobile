@@ -1,5 +1,7 @@
 package app.logdate.client.domain.location
 
+import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.repository.location.LocationCapturePipeline
 import app.logdate.client.repository.location.LocationCaptureSource
@@ -18,9 +20,8 @@ class LogCurrentLocationUseCase(
     private val locationProvider: ClientLocationProvider,
     private val locationHistoryRepository: LocationHistoryRepository,
     private val locationRetryWorker: LocationRetryWorker,
-    // TODO: Get actual user and device IDs from user session/device repository
-    private val defaultUserId: String = "user_1",
-    private val defaultDeviceId: String = "device_1",
+    private val canonicalOwnerProvider: CanonicalOwnerProvider,
+    private val deviceIdProvider: DeviceIdProvider,
 ) {
     /**
      * Handles location logging operations based on the request type
@@ -33,8 +34,8 @@ class LogCurrentLocationUseCase(
                     val now = Clock.System.now()
                     val record =
                         LocationLogRecord(
-                            userId = request.userId,
-                            deviceId = request.deviceId,
+                            userId = canonicalOwnerProvider.getCanonicalOwnerId(),
+                            deviceId = deviceIdProvider.getDeviceId().value.toString(),
                             timestamp = now,
                             loggedAt = now,
                             location = location,
@@ -75,8 +76,6 @@ class LogCurrentLocationUseCase(
 
     sealed class LocationLogRequest {
         data class LogLocation(
-            val userId: String = "user_1",
-            val deviceId: String = "device_1",
             val capturePipeline: LocationCapturePipeline = LocationCapturePipeline.LEGACY,
             val captureSource: LocationCaptureSource = LocationCaptureSource.MANUAL,
         ) : LocationLogRequest()

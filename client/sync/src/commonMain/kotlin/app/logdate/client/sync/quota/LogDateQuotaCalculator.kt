@@ -83,13 +83,15 @@ class LogDateQuotaCalculator(
                 "Invalid negative total size for $categoryName: $totalSizeBytes bytes",
             )
             totalSizeBytes > MAX_REASONABLE_TOTAL_SIZE -> throw IllegalStateException(
-                "Unreasonably large total size for $categoryName: $totalSizeBytes bytes (>${MAX_REASONABLE_TOTAL_SIZE / (1024 * 1024 * 1024 * 1024)}TB)",
+                "Unreasonably large total size for $categoryName: $totalSizeBytes bytes " +
+                    "(>${MAX_REASONABLE_TOTAL_SIZE / BYTES_PER_TERABYTE}TB)",
             )
         }
     }
 
     companion object {
         // Validation limits to catch data corruption or unrealistic sizes
-        private const val MAX_REASONABLE_TOTAL_SIZE = 100L * 1024L * 1024L * 1024L * 1024L // 100TB total per category
+        private const val BYTES_PER_TERABYTE = 1024L * 1024L * 1024L * 1024L
+        private const val MAX_REASONABLE_TOTAL_SIZE = 100L * BYTES_PER_TERABYTE // 100TB per category
     }
 }

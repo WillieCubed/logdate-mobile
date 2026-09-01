@@ -81,7 +81,7 @@ class OfflineFirstJournalRepositoryTest {
      * Expected behavior: The flow should emit an empty list when first collected.
      */
     @Test
-    fun allJournalsObserved_emitsEmptyListInitially() =
+    fun `all journals observed emits empty list initially`() =
         runTest(testDispatcher) {
             val journals = repository.allJournalsObserved.first()
             assertTrue(journals.isEmpty())
@@ -94,7 +94,7 @@ class OfflineFirstJournalRepositoryTest {
      * a list containing the created journal with all properties correctly mapped to the model.
      */
     @Test
-    fun allJournalsObserved_emitsJournalsAfterCreation() =
+    fun `all journals observed emits journals after creation`() =
         runTest(testDispatcher) {
             val journal = createTestJournal()
             journalDao.create(journal.toEntity())
@@ -111,7 +111,7 @@ class OfflineFirstJournalRepositoryTest {
      * with all properties matching the original journal in the database.
      */
     @Test
-    fun observeJournalById_emitsCorrectJournal() =
+    fun `observe journal by id emits correct journal`() =
         runTest(testDispatcher) {
             val journal = createTestJournal()
             journalDao.create(journal.toEntity())
@@ -128,7 +128,7 @@ class OfflineFirstJournalRepositoryTest {
      * observe a journal with an ID that doesn't exist in the database.
      */
     @Test
-    fun observeJournalById_throwsWhenJournalNotFound() =
+    fun `observe journal by id throws when journal not found`() =
         runTest(testDispatcher) {
             val nonExistentId = Uuid.random()
 
@@ -146,7 +146,7 @@ class OfflineFirstJournalRepositoryTest {
      * 3. The journals observable flow should be updated with the new journal
      */
     @Test
-    fun create_successfullyCreatesJournal() =
+    fun `create successfully creates journal`() =
         runTest(testDispatcher) {
             val journal = createTestJournal()
 
@@ -166,7 +166,7 @@ class OfflineFirstJournalRepositoryTest {
      * 2. The journals observable flow should be updated to no longer include the deleted journal
      */
     @Test
-    fun delete_successfullyDeletesJournal() =
+    fun `delete successfully deletes journal`() =
         runTest(testDispatcher) {
             val journal = createTestJournal()
             journalDao.create(journal.toEntity())
@@ -185,7 +185,7 @@ class OfflineFirstJournalRepositoryTest {
      * draftRepository, which should store it correctly and make it retrievable by ID.
      */
     @Test
-    fun saveDraft_delegatesToDraftRepository() =
+    fun `save draft delegates to draft repository`() =
         runTest(testDispatcher) {
             val draft = createTestDraft()
 
@@ -197,7 +197,7 @@ class OfflineFirstJournalRepositoryTest {
         }
 
     @Test
-    fun saveDraft_enqueuesDraftUpload() =
+    fun `save draft enqueues draft upload`() =
         runTest(testDispatcher) {
             val draft = createTestDraft()
 
@@ -216,7 +216,7 @@ class OfflineFirstJournalRepositoryTest {
      * the most recent lastModifiedAt timestamp.
      */
     @Test
-    fun getLatestDraft_returnsCorrectDraft() =
+    fun `get latest draft returns correct draft`() =
         runTest(testDispatcher) {
             val olderTimestamp = Clock.System.now()
             val newerTimestamp = olderTimestamp.plus(kotlin.time.Duration.parse("1s"))
@@ -244,7 +244,7 @@ class OfflineFirstJournalRepositoryTest {
      * Expected behavior: When no drafts have been saved, getLatestDraft should return null.
      */
     @Test
-    fun getLatestDraft_returnsNullWhenNoDrafts() =
+    fun `get latest draft returns null when no drafts`() =
         runTest(testDispatcher) {
             val latestDraft = repository.getLatestDraft()
             assertNull(latestDraft)
@@ -257,7 +257,7 @@ class OfflineFirstJournalRepositoryTest {
      * matching the count and content of drafts in the draft repository.
      */
     @Test
-    fun getAllDrafts_returnsAllDrafts() =
+    fun `get all drafts returns all drafts`() =
         runTest(testDispatcher) {
             val draft1 = createTestDraft()
             val draft2 = createTestDraft()
@@ -276,7 +276,7 @@ class OfflineFirstJournalRepositoryTest {
      * that draft with all properties matching the original draft.
      */
     @Test
-    fun getDraft_returnsCorrectDraft() =
+    fun `get draft returns correct draft`() =
         runTest(testDispatcher) {
             val draft = createTestDraft()
             draftRepository.saveDraft(draft)
@@ -293,7 +293,7 @@ class OfflineFirstJournalRepositoryTest {
      * return null rather than throwing an exception.
      */
     @Test
-    fun getDraft_returnsNullWhenNotFound() =
+    fun `get draft returns null when not found`() =
         runTest(testDispatcher) {
             val nonExistentId = Uuid.random()
 
@@ -308,7 +308,7 @@ class OfflineFirstJournalRepositoryTest {
      * from the draft repository.
      */
     @Test
-    fun deleteDraft_successfullyDeletesDraft() =
+    fun `delete draft successfully deletes draft`() =
         runTest(testDispatcher) {
             val draft = createTestDraft()
             draftRepository.saveDraft(draft)
@@ -320,7 +320,7 @@ class OfflineFirstJournalRepositoryTest {
         }
 
     @Test
-    fun deleteDraft_enqueuesDraftDeletion() =
+    fun `delete draft enqueues draft deletion`() =
         runTest(testDispatcher) {
             val draft = createTestDraft()
             draftRepository.saveDraft(draft)
@@ -334,7 +334,7 @@ class OfflineFirstJournalRepositoryTest {
         }
 
     @Test
-    fun saveDraftFromSync_doesNotEnqueueDraftUpload() =
+    fun `save draft from sync does not enqueue draft upload`() =
         runTest(testDispatcher) {
             val draft = createTestDraft()
 
@@ -345,7 +345,7 @@ class OfflineFirstJournalRepositoryTest {
         }
 
     @Test
-    fun deleteDraftFromSync_doesNotEnqueueDraftDeletion() =
+    fun `delete draft from sync does not enqueue draft deletion`() =
         runTest(testDispatcher) {
             val draft = createTestDraft()
             draftRepository.saveDraft(draft)

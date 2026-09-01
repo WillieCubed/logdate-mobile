@@ -9,6 +9,11 @@ import kotlin.time.Instant
  * Deterministic in-memory [MediaManager] used by cross-module tests.
  */
 open class InMemoryMediaManager : MediaManager {
+    private val deletedOwnedMedia = mutableSetOf<String>()
+
+    /** The URIs [deleteOwnedMedia] was asked to remove, in call order. */
+    val deletedOwnedMediaUris: Set<String> get() = deletedOwnedMedia
+
     override suspend fun getMedia(uri: String): MediaObject =
         MediaObject.Video(
             name = "In-memory video",
@@ -17,6 +22,8 @@ open class InMemoryMediaManager : MediaManager {
             timestamp = Instant.parse("2023-01-01T12:00:00Z"),
             duration = 30.seconds,
         )
+
+    override suspend fun deleteOwnedMedia(uri: String): Boolean = deletedOwnedMedia.add(uri)
 
     override suspend fun exists(mediaId: String): Boolean = false
 

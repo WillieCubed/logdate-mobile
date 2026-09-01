@@ -20,7 +20,7 @@ import kotlin.time.Clock
  */
 class AudioContextProcessorTest {
     @Test
-    fun processProgressivelyEmitsEmptyThenSnapshotsThenFinal() =
+    fun `process progressively emits empty then snapshots then final`() =
         runTest {
             val extractor =
                 FakeProgressiveExtractor(
@@ -62,7 +62,7 @@ class AudioContextProcessorTest {
         }
 
     @Test
-    fun processProgressivelyShortCircuitsOnCacheHit() =
+    fun `process progressively short circuits on cache hit`() =
         runTest {
             val cached = listOf(0.1f, 0.2f, 0.3f)
             val storage = InMemoryWaveformStorage().apply { save("fake://audio", cached) }

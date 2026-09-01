@@ -16,14 +16,14 @@ import kotlin.test.assertTrue
  */
 class DidWebResolverTest {
     @Test
-    fun buildsWellKnownUrl() {
+    fun `builds well known url`() {
         val resolver = DidWebResolver(mockHttpClient { _ -> HttpStatusCode.OK to """{"id":"did:web:example.com"}""" })
 
         assertEquals("https://example.com/.well-known/did.json", resolver.urlFor(AtprotoDid.require("did:web:example.com")))
     }
 
     @Test
-    fun decodesPortFromDidWebIdentifier() {
+    fun `decodes port from did web identifier`() {
         val resolver = DidWebResolver(mockHttpClient { _ -> HttpStatusCode.OK to """{"id":"did:web:example.com%3A8443"}""" })
 
         assertEquals(
@@ -33,7 +33,7 @@ class DidWebResolverTest {
     }
 
     @Test
-    fun resolvesDocument(): Unit =
+    fun `resolves document`(): Unit =
         runTest {
             val resolver =
                 DidWebResolver(
@@ -50,7 +50,7 @@ class DidWebResolverTest {
         }
 
     @Test
-    fun failsOnDidMismatch(): Unit =
+    fun `fails on did mismatch`(): Unit =
         runTest {
             val resolver =
                 DidWebResolver(
@@ -66,7 +66,7 @@ class DidWebResolverTest {
         }
 
     @Test
-    fun failsOnNonSuccessStatus(): Unit =
+    fun `fails on non success status`(): Unit =
         runTest {
             val resolver =
                 DidWebResolver(
@@ -82,7 +82,7 @@ class DidWebResolverTest {
         }
 
     @Test
-    fun failsOnInvalidJson(): Unit =
+    fun `fails on invalid json`(): Unit =
         runTest {
             val resolver =
                 DidWebResolver(

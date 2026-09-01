@@ -5,6 +5,7 @@ import app.logdate.client.networking.PasskeyApiException
 import app.logdate.client.repository.account.AccountCreationRequest
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.PasskeyInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -35,6 +36,8 @@ class SignInWithGoogleUseCaseTest {
     ) : PasskeyAccountRepository {
         override val currentAccount = MutableStateFlow<LogDateAccount?>(null)
         override val isAuthenticated = MutableStateFlow(false)
+
+        override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = Result.success(emptyList())
 
         override suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> =
             Result.failure(NotImplementedError())

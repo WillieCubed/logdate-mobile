@@ -61,6 +61,8 @@ class FakeAudioNoteDao : AudioNoteDao {
         updateFlow()
     }
 
+    override suspend fun countByContentUri(contentUri: String): Int = notes.values.count { it.contentUri == contentUri }
+
     override suspend fun removeNote(noteId: Uuid) {
         notes.remove(noteId)
         updateFlow()

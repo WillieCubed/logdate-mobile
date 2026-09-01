@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class InlineMarkdownTest {
     @Test
-    fun headingsAreRecognizedOnlyAtTheStartOfLines() {
+    fun `headings are recognized only at the start of lines`() {
         val source = "# First\n## Second\n### Third\n#### Fourth\n##### Fifth\n###### Sixth\nNot # a heading"
 
         val spans = parseInlineMarkdown(source)
@@ -25,7 +25,7 @@ class InlineMarkdownTest {
     }
 
     @Test
-    fun inlineFormattingKeepsRangesAlignedWithTheRawMarkdown() {
+    fun `inline formatting keeps ranges aligned with the raw markdown`() {
         val source = "A **bright** day with *friends*, ~~rain~~, and `coffee`."
 
         val spans = parseInlineMarkdown(source)
@@ -42,7 +42,7 @@ class InlineMarkdownTest {
     }
 
     @Test
-    fun linksQuotesAndListMarkersAreRecognized() {
+    fun `links quotes and list markers are recognized`() {
         val source = "> Remember this\n- Gallery\n1. Call Sam\nRead the [map](https://logdate.app)."
 
         val spans = parseInlineMarkdown(source)
@@ -54,7 +54,7 @@ class InlineMarkdownTest {
     }
 
     @Test
-    fun fencedAndInlineCodeProtectMarkdownCharactersInsideCode() {
+    fun `fenced and inline code protect markdown characters inside code`() {
         val source = "`**literal**`\n```kotlin\n# also literal\n```"
 
         val spans = parseInlineMarkdown(source)
@@ -66,7 +66,7 @@ class InlineMarkdownTest {
     }
 
     @Test
-    fun inlineCodeDoesNotSuppressBlockFormattingOnTheSameLine() {
+    fun `inline code does not suppress block formatting on the same line`() {
         val source = "# Heading with `code`\n> Quote with `code`\n- Pack the `rain shell`"
 
         val spans = parseInlineMarkdown(source)
@@ -78,7 +78,7 @@ class InlineMarkdownTest {
     }
 
     @Test
-    fun unmatchedAndEscapedMarkersStayPlain() {
+    fun `unmatched and escaped markers stay plain`() {
         val source = "An *unfinished thought and \\*escaped\\* markers"
 
         val spans = parseInlineMarkdown(source)
@@ -87,7 +87,7 @@ class InlineMarkdownTest {
     }
 
     @Test
-    fun unfinishedDelimiterDoesNotSuppressValidFormattingOnLaterLines() {
+    fun `unfinished delimiter does not suppress valid formatting on later lines`() {
         val source = "*unfinished\nlater *valid* and `code`"
 
         val spans = parseInlineMarkdown(source)
@@ -97,7 +97,7 @@ class InlineMarkdownTest {
     }
 
     @Test
-    fun unfinishedInlineCodeDoesNotSuppressValidCodeOnLaterLines() {
+    fun `unfinished inline code does not suppress valid code on later lines`() {
         val source = "`unfinished\nlater `valid`"
 
         val spans = parseInlineMarkdown(source)
@@ -106,7 +106,7 @@ class InlineMarkdownTest {
     }
 
     @Test
-    fun unclosedCodeFenceProtectsTheRemainingDocument() {
+    fun `unclosed code fence protects the remaining document`() {
         val source = "Before\n```kotlin\n# literal\n**also literal**"
 
         val spans = parseInlineMarkdown(source)
@@ -122,7 +122,7 @@ class InlineMarkdownTest {
     }
 
     @Test
-    fun underscoresInsideWordsAndIdentifiersStayPlain() {
+    fun `underscores inside words and identifiers stay plain`() {
         val source = "trip_to_paris, user_profile_name, and user__profile__name"
 
         val spans = parseInlineMarkdown(source)
@@ -132,7 +132,7 @@ class InlineMarkdownTest {
     }
 
     @Test
-    fun tripleAsterisksApplyStrongAndEmphasisToTheSameContent() {
+    fun `triple asterisks apply strong and emphasis to the same content`() {
         val source = "A ***really bright*** morning"
 
         val spans = parseInlineMarkdown(source)
@@ -142,7 +142,7 @@ class InlineMarkdownTest {
     }
 
     @Test
-    fun cjkRtlAndEmojiContentKeepsExactSourceRanges() {
+    fun `cjk rtl and emoji content keeps exact source ranges`() {
         val source = "**旅行 🌏** و *ذكريات*"
 
         val spans = parseInlineMarkdown(source)
@@ -152,7 +152,7 @@ class InlineMarkdownTest {
     }
 
     @Test
-    fun unicodeContentUsesIdentityOffsets() {
+    fun `unicode content uses identity offsets`() {
         val source = "# Café 👩🏽‍🚀"
 
         val heading = parseInlineMarkdown(source).single()
@@ -162,7 +162,7 @@ class InlineMarkdownTest {
     }
 
     @Test
-    fun visualFormattingPreservesRawTextAndIdentityOffsets() {
+    fun `visual formatting preserves raw text and identity offsets`() {
         val source = "# Trip notes\nA **bright** day with `coffee`."
         val transformation =
             InlineMarkdownVisualTransformation {

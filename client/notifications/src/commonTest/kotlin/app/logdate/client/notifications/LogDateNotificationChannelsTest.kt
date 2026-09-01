@@ -11,14 +11,14 @@ import kotlin.test.assertEquals
  */
 class LogDateNotificationChannelsTest {
     @Test
-    fun phoneChannelIdsRemainUnique() {
+    fun `phone channel ids remain unique`() {
         val channelIds = LogDateNotificationChannels.phoneChannels.map { it.id }
 
         assertEquals(channelIds.size, channelIds.distinct().size)
     }
 
     @Test
-    fun notificationIdsRemainUniqueWhenPresent() {
+    fun `notification ids remain unique when present`() {
         val notificationIds =
             LogDateNotificationChannels.phoneChannels
                 .mapNotNull { it.notificationId }
@@ -27,7 +27,7 @@ class LogDateNotificationChannelsTest {
     }
 
     @Test
-    fun legacyChannelIdsDoNotOverlapActiveIds() {
+    fun `legacy channel ids do not overlap active ids`() {
         val activeIds = LogDateNotificationChannels.phoneChannels.map { it.id }.toSet()
 
         assertEquals(

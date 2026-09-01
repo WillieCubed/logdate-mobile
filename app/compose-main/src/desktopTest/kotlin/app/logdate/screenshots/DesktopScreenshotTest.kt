@@ -19,6 +19,7 @@ import app.logdate.screenshots.shared.SharedScreenshotSceneSpec
 import app.logdate.screenshots.shared.screenshotBaselineName
 import app.logdate.ui.theme.LogDateTheme
 import java.awt.Dimension
+import java.awt.GraphicsEnvironment
 import java.awt.image.BufferedImage
 import java.io.File
 import java.io.IOException
@@ -45,7 +46,8 @@ import kotlin.test.assertTrue
  */
 class DesktopScreenshotTest {
     @Test
-    fun shared_catalog_matches_baselines() {
+    fun `shared catalog matches baselines`() {
+        if (skipWithoutDisplay()) return
         val sceneFilter = desktopScreenshotSceneFilter
         SharedScreenshotCatalog.allScenes
             .filter { scene -> sceneFilter == null || scene.id.value.contains(sceneFilter) }
@@ -64,13 +66,33 @@ class DesktopScreenshotTest {
      *  twice at slightly offset positions). Replacing the staggered grid with a non-lazy
      *  FlowRow + verticalScroll would fix it but is invasive product code; quarantining the
      *  family until that lands. */
+
     private val nonDeterministicScenePrefixes: List<String> =
         listOf(
             "memory-selection-",
         )
 
+    /**
+     * Whether to skip because there is no display to render into.
+     *
+     * These render through a real Swing window, so they need a desktop session and throw
+     * [java.awt.HeadlessException] without one. Skipping keeps a headless run -- CI, or a terminal
+     * over SSH -- reporting on everything it *can* check instead of failing on something it was
+     * never able to do. Set `LOGDATE_REQUIRE_DESKTOP_SCREENSHOTS=true` to make the absence of a
+     * display a failure instead, so a machine that is supposed to have one cannot skip silently.
+     */
+    private fun skipWithoutDisplay(): Boolean {
+        if (!GraphicsEnvironment.isHeadless()) return false
+        check(System.getenv("LOGDATE_REQUIRE_DESKTOP_SCREENSHOTS") != "true") {
+            "Desktop screenshots were required but this machine has no display."
+        }
+        println("Skipping desktop screenshots: no display available.")
+        return true
+    }
+
     @Test
-    fun lock_screen_matches_baseline() {
+    fun `lock screen matches baseline`() {
+        if (skipWithoutDisplay()) return
         assertMatchesBaseline(
             baselineName = "lock-screen",
             width = 1280,

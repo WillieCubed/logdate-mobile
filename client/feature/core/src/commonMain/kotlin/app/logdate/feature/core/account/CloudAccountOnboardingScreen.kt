@@ -29,6 +29,9 @@ import app.logdate.feature.core.settings.ui.CustomServerInfoBottomSheet
 import app.logdate.feature.core.settings.ui.ServerPreset
 import app.logdate.shared.model.ServerDescriptor
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.account_adopt_local_data_body
+import logdate.client.feature.core.generated.resources.account_adopt_local_data_confirm
+import logdate.client.feature.core.generated.resources.account_adopt_local_data_title
 import logdate.client.feature.core.generated.resources.atproto_recovery_guidance_body
 import logdate.client.feature.core.generated.resources.atproto_recovery_guidance_title
 import logdate.client.feature.core.generated.resources.google_sign_in_account_conflict
@@ -127,16 +130,11 @@ fun CloudAccountOnboardingScreen(
     uiState.pendingLocalDataAdoption?.let { pendingUsername ->
         AlertDialog(
             onDismissRequest = viewModel::dismissLocalDataAdoption,
-            title = { Text("Keep what's already here?") },
-            text = {
-                Text(
-                    "This device has entries that aren't in any account yet. Signing in adds them " +
-                        "to your account and syncs them to your other devices.",
-                )
-            },
+            title = { Text(stringResource(Res.string.account_adopt_local_data_title)) },
+            text = { Text(stringResource(Res.string.account_adopt_local_data_body)) },
             confirmButton = {
                 TextButton(onClick = { viewModel.signInAdoptingLocalData(pendingUsername) }) {
-                    Text("Sign in and keep them")
+                    Text(stringResource(Res.string.account_adopt_local_data_confirm))
                 }
             },
             dismissButton = {
