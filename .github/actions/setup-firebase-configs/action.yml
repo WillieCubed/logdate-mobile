@@ -22,6 +22,9 @@ inputs:
       release → app/android-main/src/release/google-services.json.
     required: false
     default: debug
+  android-maps-api-key:
+    description: Dedicated Android-restricted key for Maps SDK and Places API.
+    required: false
   ios-google-service-info-plist-base64:
     description: |
       Base64 of iosApp/iosApp/Firebase/GoogleService-Info-Release.plist.
@@ -60,12 +63,19 @@ runs:
         if ! printf '%s' "$GOOGLE_SERVICES_JSON_B64" | base64 --decode > "$target" 2>/dev/null; then
           printf '%s' "$GOOGLE_SERVICES_JSON_B64" | base64 -D > "$target"
         fi
-        if ! jq -e '.project_info.project_id' "$target" >/dev/null; then
-          echo "::error::$target is not valid Firebase JSON. Re-upload the matching"
+        if ! ./scripts/validate-firebase-config.sh "android-$FLAVOR" "$target"; then
+          echo "::error::$target is not the registered LogDate Firebase configuration. Re-upload the matching"
           echo "::error::secret with: ./scripts/sync-firebase-configs.sh android-$FLAVOR"
           exit 1
         fi
         echo "Materialized $target ($FLAVOR flavor)"
+
+    - name: Export Android Maps and Places key
+      if: ${{ inputs.android-maps-api-key != '' }}
+      shell: bash
+      env:
+        MAPS_API_KEY: ${{ inputs.android-maps-api-key }}
+      run: echo "LOGDATE_GOOGLE_MAPS_API_KEY=$MAPS_API_KEY" >> "$GITHUB_ENV"
 
     - name: Materialize iOS GoogleService-Info.plist
       if: ${{ inputs.ios-google-service-info-plist-base64 != '' && runner.os == 'macOS' }}
@@ -79,5 +89,5 @@ runs:
         if ! printf '%s' "$PLIST_B64" | base64 --decode > "$target" 2>/dev/null; then
           printf '%s' "$PLIST_B64" | base64 -D > "$target"
         fi
-        plutil -lint "$target"
+        ./scripts/validate-firebase-config.sh ios "$target"
         echo "Materialized $target"

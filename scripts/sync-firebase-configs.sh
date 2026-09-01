@@ -43,18 +43,16 @@ require_gh() {
 
 # upload_json <local-path> <secret-name>
 upload_json() {
-    local path="$1" secret="$2"
+    local path="$1" secret="$2" config_kind="$3"
     [[ -f "$path" ]] || die "$path does not exist locally."
-    jq -e '.project_info.project_id' "$path" >/dev/null \
-        || die "$path is not a valid Firebase config (missing .project_info.project_id)."
+    ./scripts/validate-firebase-config.sh "$config_kind" "$path"
     base64 -i "$path" | gh secret set "$secret"
     printf '[ok] Uploaded %s → %s\n' "$path" "$secret"
 }
 
 upload_ios() {
     [[ -f "$IOS_PATH" ]] || die "$IOS_PATH does not exist locally."
-    plutil -lint "$IOS_PATH" >/dev/null \
-        || die "$IOS_PATH did not lint as a valid plist."
+    ./scripts/validate-firebase-config.sh ios "$IOS_PATH"
     base64 -i "$IOS_PATH" | gh secret set "$IOS_SECRET"
     printf '[ok] Uploaded %s → %s\n' "$IOS_PATH" "$IOS_SECRET"
 }
@@ -75,16 +73,16 @@ EOF
 main() {
     require_gh
     case "${1:-}" in
-        android-debug)   upload_json "$ANDROID_DEBUG_PATH" "$ANDROID_DEBUG_SECRET" ;;
-        android-release) upload_json "$ANDROID_RELEASE_PATH" "$ANDROID_RELEASE_SECRET" ;;
+        android-debug)   upload_json "$ANDROID_DEBUG_PATH" "$ANDROID_DEBUG_SECRET" android-debug ;;
+        android-release) upload_json "$ANDROID_RELEASE_PATH" "$ANDROID_RELEASE_SECRET" android-release ;;
         android-all)
-            upload_json "$ANDROID_DEBUG_PATH" "$ANDROID_DEBUG_SECRET"
-            upload_json "$ANDROID_RELEASE_PATH" "$ANDROID_RELEASE_SECRET"
+            upload_json "$ANDROID_DEBUG_PATH" "$ANDROID_DEBUG_SECRET" android-debug
+            upload_json "$ANDROID_RELEASE_PATH" "$ANDROID_RELEASE_SECRET" android-release
             ;;
         ios) upload_ios ;;
         all)
-            upload_json "$ANDROID_DEBUG_PATH" "$ANDROID_DEBUG_SECRET"
-            upload_json "$ANDROID_RELEASE_PATH" "$ANDROID_RELEASE_SECRET"
+            upload_json "$ANDROID_DEBUG_PATH" "$ANDROID_DEBUG_SECRET" android-debug
+            upload_json "$ANDROID_RELEASE_PATH" "$ANDROID_RELEASE_SECRET" android-release
             upload_ios
             ;;
         *) usage ;;

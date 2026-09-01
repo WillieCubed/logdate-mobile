@@ -43,6 +43,7 @@ jobs:
         with:
           android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_RELEASE_BASE64 }}
           android-flavor: release
+          android-maps-api-key: ${{ secrets.LOGDATE_GOOGLE_MAPS_API_KEY_RELEASE }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
