@@ -97,7 +97,7 @@ private fun Route.contentRoutes(
                         error("VALIDATION_ERROR", "Request body id must match path contentId"),
                     )
                 }
-                val wasCreated = collectionsRepository.getEntry(userId, contentId) == null
+                val wasCreated = !collectionsRepository.entryExists(userId, contentId)
                 Napier.d("Content upsert for user $userId: $contentId")
                 val stored =
                     collectionsRepository.upsertEntry(
@@ -292,7 +292,7 @@ private fun Route.journalRoutes(
                         error("VALIDATION_ERROR", "Request body id must match path journalId"),
                     )
                 }
-                val wasCreated = collectionsRepository.getJournal(userId, journalId) == null
+                val wasCreated = !collectionsRepository.journalExists(userId, journalId)
                 Napier.d("Journal upsert for user $userId: $journalId")
                 val stored =
                     collectionsRepository.upsertJournal(

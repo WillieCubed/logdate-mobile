@@ -121,6 +121,18 @@ interface LogDateCollectionsRepository {
         id: String,
     ): LogDateEntry?
 
+    /**
+     * Whether an entry exists, without reading it.
+     *
+     * Upsert needs this only to answer 200 versus 201. Fetching the record to find out opens the
+     * repo, which costs a pass over every block in it, and the value is then thrown away. The
+     * default is the honest fallback for implementations that have no cheaper answer.
+     */
+    suspend fun entryExists(
+        userId: UUID,
+        id: String,
+    ): Boolean = getEntry(userId, id) != null
+
     suspend fun deleteEntry(
         userId: UUID,
         id: String,
@@ -144,6 +156,12 @@ interface LogDateCollectionsRepository {
         userId: UUID,
         id: String,
     ): LogDateJournal?
+
+    /** Whether a journal exists, without reading it. See [entryExists]. */
+    suspend fun journalExists(
+        userId: UUID,
+        id: String,
+    ): Boolean = getJournal(userId, id) != null
 
     suspend fun deleteJournal(
         userId: UUID,

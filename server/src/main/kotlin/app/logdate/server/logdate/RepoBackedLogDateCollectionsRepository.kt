@@ -59,6 +59,16 @@ internal class RepoBackedLogDateCollectionsRepository(
         return entry.copy(version = metadata.version, lastUpdated = System.currentTimeMillis())
     }
 
+    override suspend fun entryExists(
+        userId: UUID,
+        id: String,
+    ): Boolean = metadataStore.metadata(userId, LogDateCollectionKind.ENTRY, id) != null
+
+    override suspend fun journalExists(
+        userId: UUID,
+        id: String,
+    ): Boolean = metadataStore.metadata(userId, LogDateCollectionKind.JOURNAL, id) != null
+
     override suspend fun getEntry(
         userId: UUID,
         id: String,
