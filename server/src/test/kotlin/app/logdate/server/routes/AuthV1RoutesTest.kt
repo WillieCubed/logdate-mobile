@@ -454,6 +454,80 @@ class AuthV1RoutesTest {
             assertTrue(prometheusBody.contains("logdate_auth_rate_limit_total"))
         }
 
+    /**
+     * The settings screen reads this to tell one credential from another before revoking one, so
+     * what matters is that the list belongs to the caller and carries the detail the account
+     * payload does not: a nickname, a device type, and real timestamps.
+     */
+    @Test
+    fun `listing passkeys returns the caller's own credentials with their metadata`() =
+        testApplication {
+            configureAuthV1TestApp()
+            val credentialId = "test-credential-id-list"
+
+            val beginResponse =
+                client.post("/api/v1/auth/signup/passkey/begin") {
+                    contentType(ContentType.Application.Json)
+                    setBody(signupPasskeyBeginBody(username = "list_user", displayName = "List User"))
+                }
+            assertEquals(HttpStatusCode.OK, beginResponse.status)
+            val sessionToken =
+                json
+                    .parseToJsonElement(beginResponse.bodyAsText())
+                    .jsonObject["data"]
+                    ?.jsonObject
+                    ?.get("sessionToken")
+                    ?.jsonPrimitive
+                    ?.content
+            assertNotNull(sessionToken)
+            val completeResponse =
+                client.post("/api/v1/auth/signup/passkey/complete") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        signupPasskeyCompleteBody(
+                            sessionToken = sessionToken,
+                            credentialId = credentialId,
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.Created, completeResponse.status)
+            val accessToken =
+                json
+                    .parseToJsonElement(completeResponse.bodyAsText())
+                    .jsonObject["data"]
+                    ?.jsonObject
+                    ?.get("tokens")
+                    ?.jsonObject
+                    ?.get("accessToken")
+                    ?.jsonPrimitive
+                    ?.content
+            assertNotNull(accessToken)
+
+            val listed = client.get("/api/v1/auth/me/passkeys") { header("Authorization", "Bearer $accessToken") }
+            assertEquals(HttpStatusCode.OK, listed.status)
+
+            val entries = json.parseToJsonElement(listed.bodyAsText()).jsonObject["data"]!!.jsonArray
+            assertEquals(1, entries.size, "only the caller's own passkey should be listed")
+
+            val entry = entries.single().jsonObject
+            // Not compared to the id sent above: credential IDs are stored base64url-normalised, so
+            // a fixture id that is not valid base64 comes back re-encoded. What matters here is that
+            // an id is returned at all, alongside the detail the account payload does not carry.
+            assertTrue(entry["credentialId"]!!.jsonPrimitive.content.isNotBlank())
+            assertTrue(entry.containsKey("nickname"), "the client cannot label a credential without this")
+            assertTrue(entry.containsKey("deviceType"), "the client cannot tell credentials apart without this")
+            assertTrue(entry.containsKey("createdAt"))
+            assertTrue(entry.containsKey("lastUsedAt"))
+        }
+
+    @Test
+    fun `listing passkeys without a token is refused`() =
+        testApplication {
+            configureAuthV1TestApp()
+
+            assertEquals(HttpStatusCode.Unauthorized, client.get("/api/v1/auth/me/passkeys").status)
+        }
+
     @Test
     fun `passkey delete is idempotent and unknown credential returns not found`() =
         testApplication {
