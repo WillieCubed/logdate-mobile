@@ -108,6 +108,10 @@ class DefaultSyncManager(
      */
     private var mediaDeferredForNetwork = false
 
+    /** What the current upload run set out to do, and how far through it is. See [SyncStatus]. */
+    private var runTotal: Int? = null
+    private var runCompleted = 0
+
     private val _syncStatusFlow =
         MutableStateFlow(
             SyncStatus(
@@ -155,6 +159,8 @@ class DefaultSyncManager(
                 hasErrors = lastErrorFlow.value != null,
                 lastError = lastErrorFlow.value,
                 pausedReason = currentPausedReason(authenticated),
+                totalForRun = runTotal,
+                completedInRun = runCompleted,
             )
     }
 
@@ -237,6 +243,11 @@ class DefaultSyncManager(
             }
 
             syncStateFlow.value = SyncState.Syncing
+            // Captured here because this is the only moment the denominator exists: once the run
+            // starts draining the queue, the count that is left is all anyone can see.
+            runTotal = runCatching { syncMetadataService.getPendingCount() }.getOrNull()?.takeIf { it > 0 }
+            runCompleted = 0
+            publishStatus()
 
             try {
                 val accessToken =
@@ -258,6 +269,7 @@ class DefaultSyncManager(
                         contentResult.uploadedItems +
                         associationResult.uploadedItems +
                         draftResult.uploadedItems
+                runCompleted = totalUploaded
                 val errors =
                     journalResult.errors +
                         contentResult.errors +
@@ -644,6 +656,8 @@ class DefaultSyncManager(
             hasErrors = lastErrorFlow.value != null,
             lastError = lastErrorFlow.value,
             pausedReason = currentPausedReason(authenticated),
+            totalForRun = runTotal,
+            completedInRun = runCompleted,
         )
     }
 

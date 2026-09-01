@@ -124,6 +124,16 @@ data class SyncStatus(
     val hasErrors: Boolean,
     val lastError: SyncError? = null,
     val pausedReason: SyncPausedReason? = null,
+    /**
+     * How many items this run set out to upload, or null when no run has started one.
+     *
+     * [pendingUploads] is a live count of what is left, which only shrinks and never says how far
+     * along the run is. Progress needs a denominator: on a first sync of several hundred entries,
+     * "45 of 630" is the difference between waiting a moment and waiting an hour.
+     */
+    val totalForRun: Int? = null,
+    /** How many of [totalForRun] this run has finished. */
+    val completedInRun: Int = 0,
 )
 
 /**

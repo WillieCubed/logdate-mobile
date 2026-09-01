@@ -47,6 +47,7 @@ import app.logdate.util.toReadableDateTimeShort
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.automatically_sync_your_data_in_the_background
 import logdate.client.feature.core.generated.resources.background_sync
+import logdate.client.feature.core.generated.resources.backing_up_progress
 import logdate.client.feature.core.generated.resources.cloud_sync
 import logdate.client.feature.core.generated.resources.create_account
 import logdate.client.feature.core.generated.resources.last_sync_failed
@@ -423,15 +424,17 @@ private fun SyncStatusText(syncStatus: app.logdate.client.sync.SyncStatus?) {
     syncStatus?.let { status ->
         val pausedReason = status.pausedReason
         if (status.isSyncing) {
-            // A bare "Syncing..." says nothing about whether 6 or 600 entries are left, which on a
-            // first sync is the difference between a moment and an hour.
+            // A bare "Syncing..." says nothing about whether 6 or 600 entries are left, which on
+            // a first sync is the difference between a moment and an hour. Prefer a real
+            // fraction; fall back to the count left, and only then to the bare word.
+            val total = status.totalForRun
             val remaining = status.pendingUploads
             Text(
                 text =
-                    if (remaining > 0) {
-                        stringResource(Res.string.syncing_remaining, remaining)
-                    } else {
-                        stringResource(Res.string.syncing)
+                    when {
+                        total != null -> stringResource(Res.string.backing_up_progress, status.completedInRun, total)
+                        remaining > 0 -> stringResource(Res.string.syncing_remaining, remaining)
+                        else -> stringResource(Res.string.syncing)
                     },
                 color = MaterialTheme.colorScheme.primary,
             )
