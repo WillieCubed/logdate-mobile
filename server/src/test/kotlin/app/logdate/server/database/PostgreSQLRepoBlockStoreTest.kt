@@ -11,6 +11,7 @@ import studio.hypertext.atproto.repo.SignedRepoCommit
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -27,6 +28,38 @@ import kotlin.test.assertTrue
  * confirming that clearing one repository does not affect others.
  */
 class PostgreSQLRepoBlockStoreTest {
+    @Test
+    fun `compare and swap head only advances the expected revision`() {
+        withH2Database(AtprotoRepoHeadsTable) {
+            val store = PostgreSQLRepoBlockStore()
+            val repo = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
+            val firstHead =
+                RepoHead(
+                    repo = repo,
+                    root = Cid.sha256(DAG_CBOR_CODEC_VALUE, "root-1".encodeToByteArray()),
+                    commitCid = Cid.sha256(DAG_CBOR_CODEC_VALUE, "commit-1".encodeToByteArray()),
+                    revision = 1L,
+                )
+            val secondHead =
+                RepoHead(
+                    repo = repo,
+                    root = Cid.sha256(DAG_CBOR_CODEC_VALUE, "root-2".encodeToByteArray()),
+                    commitCid = Cid.sha256(DAG_CBOR_CODEC_VALUE, "commit-2".encodeToByteArray()),
+                    revision = 2L,
+                )
+
+            runBlocking {
+                assertTrue(store.compareAndSwapHead(firstHead, expectedRevision = null).getOrThrow())
+                assertFalse(store.compareAndSwapHead(secondHead, expectedRevision = null).getOrThrow())
+                assertFalse(store.compareAndSwapHead(secondHead, expectedRevision = 0L).getOrThrow())
+                assertEquals(firstHead, store.readHead(repo).getOrThrow())
+
+                assertTrue(store.compareAndSwapHead(secondHead, expectedRevision = 1L).getOrThrow())
+                assertEquals(secondHead, store.readHead(repo).getOrThrow())
+            }
+        }
+    }
+
     @Test
     fun `repo block store persists heads blocks and commits by repo`() {
         withH2Database(
