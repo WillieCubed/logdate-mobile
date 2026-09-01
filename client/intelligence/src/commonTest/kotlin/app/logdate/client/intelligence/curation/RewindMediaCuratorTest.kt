@@ -1,6 +1,8 @@
 package app.logdate.client.intelligence.curation
 
 import app.logdate.client.repository.media.IndexedMedia
+import app.logdate.shared.model.StoryBeat
+import app.logdate.shared.model.WeekNarrative
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -113,6 +115,119 @@ class RewindMediaCuratorTest {
             }
         }
 
+    /**
+     * The launch criteria name a specific scale: the caps must hold for a week with at least 200
+     * photos in it. A cap that only holds for a handful of items is not a cap, and the failure it
+     * would let through -- a Rewind that is a chronological photo dump -- is exactly what curation
+     * exists to prevent.
+     */
+    @Test
+    fun `caps hold for a week containing more than two hundred photos`() =
+        runTest {
+            val weekMillis = 7L * 24L * 60L * 60L * 1000L
+            val photoCount = 240
+            // Spread across the week so they land in many beats rather than collapsing as a burst.
+            val photos =
+                (0 until photoCount).map { idx ->
+                    indexedImage(
+                        atMs = baseTs.toEpochMilliseconds() + idx * (weekMillis / photoCount),
+                        signals = cameraPhotoSignals(),
+                    )
+                }
+            // The significance threshold is a separate rule with its own tests; admitting every
+            // photo here is what puts the caps under the pressure this case exists to check.
+            val config = CurationConfig()
+
+            val result =
+                curator.curate(
+                    allMedia = photos,
+                    // A real week has story beats -- local Rewinds detect them even with no AI.
+                    // Without any, every photo is a free agent, and free agents deliberately do
+                    // not count against the total cap, so the cap would not be under test at all.
+                    narrative = narrativeCiting(photos.map { it.uid.toString() }),
+                    textEntries = emptyList(),
+                    people = emptyList(),
+                    locationHistory = emptyList(),
+                    periodStart = baseTs,
+                    periodEnd = Instant.fromEpochMilliseconds(baseTs.toEpochMilliseconds() + weekMillis),
+                    config = config,
+                )
+
+            val kept = result.perBeat.values.flatten()
+            assertTrue(
+                kept.size <= config.maxTotalMedia,
+                "kept ${kept.size} of $photoCount, over the ${config.maxTotalMedia} total cap",
+            )
+            result.perBeat.forEach { (beat, items) ->
+                assertTrue(
+                    items.size <= config.maxItemsPerBeat + CITED_OVERFLOW_ALLOWANCE,
+                    "beat $beat kept ${items.size}, over the ${config.maxItemsPerBeat} per-beat cap",
+                )
+            }
+            assertTrue(kept.isNotEmpty(), "a week of 240 photos should still produce a Rewind")
+        }
+
+    /** Every kept item must be scored, at scale and not just for a handful. */
+    @Test
+    fun `every kept candidate is scored even at scale`() =
+        runTest {
+            val weekMillis = 7L * 24L * 60L * 60L * 1000L
+            val photos =
+                (0 until 240).map { idx ->
+                    indexedImage(
+                        atMs = baseTs.toEpochMilliseconds() + idx * (weekMillis / 240),
+                        signals = cameraPhotoSignals(),
+                    )
+                }
+
+            val result =
+                curator.curate(
+                    allMedia = photos,
+                    narrative = narrativeCiting(photos.map { it.uid.toString() }),
+                    textEntries = emptyList(),
+                    people = emptyList(),
+                    locationHistory = emptyList(),
+                    periodStart = baseTs,
+                    periodEnd = Instant.fromEpochMilliseconds(baseTs.toEpochMilliseconds() + weekMillis),
+                    config = CurationConfig(),
+                )
+
+            val kept = result.perBeat.values.flatten() + result.freeAgents
+            assertTrue(kept.isNotEmpty(), "nothing was kept, so this would assert nothing")
+            kept.forEach { candidate ->
+                assertTrue(
+                    result.sigByMediaUid[candidate.media.uid] != null,
+                    "no significance score for ${candidate.media.uid}",
+                )
+            }
+        }
+
+    /**
+     * Signals for an ordinary camera photo.
+     *
+     * A default [MediaSignals] carries no dimensions, so the hard filter rejects it as below
+     * [CurationConfig.minResolutionPx] before anything is scored -- a fixture built from defaults
+     * curates to nothing and asserts nothing.
+     */
+    private fun cameraPhotoSignals() = MediaSignals(widthPx = 4032, heightPx = 3024)
+
+    /** A narrative whose beats spread the given evidence across a week, so photos land in beats. */
+    private fun narrativeCiting(evidenceIds: List<String>): WeekNarrative =
+        WeekNarrative(
+            themes = emptyList(),
+            emotionalTone = "",
+            storyBeats =
+                evidenceIds.chunked((evidenceIds.size / BEATS_IN_FIXTURE).coerceAtLeast(1)).map { chunk ->
+                    StoryBeat(
+                        moment = "moment",
+                        context = "context",
+                        emotionalWeight = "neutral",
+                        evidenceIds = chunk,
+                    )
+                },
+            overallNarrative = "",
+        )
+
     private fun indexedImage(
         atMs: Long = baseTs.toEpochMilliseconds(),
         signals: MediaSignals = MediaSignals(),
@@ -134,5 +249,13 @@ class RewindMediaCuratorTest {
                 it.uid to
                     (signalLookup[it.uid] ?: MediaSignals())
             }
+    }
+
+    private companion object {
+        /** DiversitySelector lets cited items exceed the per-beat cap by up to two. */
+        const val CITED_OVERFLOW_ALLOWANCE = 2
+
+        /** How many beats the heavy-input fixture spreads its photos across. */
+        const val BEATS_IN_FIXTURE = 7
     }
 }
