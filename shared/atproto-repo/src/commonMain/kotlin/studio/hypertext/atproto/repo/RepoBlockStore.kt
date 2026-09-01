@@ -17,6 +17,20 @@ public interface RepoBlockStore {
     public suspend fun writeHead(head: RepoHead): Result<Unit>
 
     /**
+     * Moves the head to [head] only while the stored head is still at [expectedRevision], where
+     * null means the repo has no head yet. Returns false when somebody else moved it first.
+     *
+     * A repo write reads the whole tree, rebuilds it and writes the head back. Two writes in
+     * flight for one repo each build a tree that is missing the other's record, so an
+     * unconditional write silently drops whichever landed first -- its blocks survive but nothing
+     * points at them. Callers use the false return to reload and try again.
+     */
+    public suspend fun compareAndSwapHead(
+        head: RepoHead,
+        expectedRevision: Long?,
+    ): Result<Boolean>
+
+    /**
      * Reads a single block by [cid].
      */
     public suspend fun readBlock(cid: Cid): Result<RepoBlock?>
@@ -69,6 +83,19 @@ public class InMemoryRepoBlockStore : RepoBlockStore {
             run {
                 heads[head.repo] = head
                 Unit
+            },
+        )
+
+    override suspend fun compareAndSwapHead(
+        head: RepoHead,
+        expectedRevision: Long?,
+    ): Result<Boolean> =
+        Result.success(
+            if (heads[head.repo]?.revision != expectedRevision) {
+                false
+            } else {
+                heads[head.repo] = head
+                true
             },
         )
 

@@ -190,6 +190,17 @@ public class DefaultRepoEngine(
         swapRecord: String?,
     ): Result<RepoWriteResult> =
         runCatching {
+            retryingOnHeadConflict {
+                putRecordOnce(recordId, value, swapRecord)
+            }
+        }
+
+    private suspend fun putRecordOnce(
+        recordId: RepoRecordId,
+        value: JsonObject,
+        swapRecord: String?,
+    ): RepoWriteResult =
+        run {
             val snapshot = loadSnapshot(recordId.repo)
             val previousCid = snapshot.tree.get(recordId.collection, recordId.recordKey)?.toString()
             if (swapRecord != null && previousCid != swapRecord) {
@@ -214,8 +225,18 @@ public class DefaultRepoEngine(
         swapRecord: String?,
     ): Result<Boolean> =
         runCatching {
+            retryingOnHeadConflict {
+                deleteRecordOnce(recordId, swapRecord)
+            }
+        }
+
+    private suspend fun deleteRecordOnce(
+        recordId: RepoRecordId,
+        swapRecord: String?,
+    ): Boolean =
+        run {
             val snapshot = loadSnapshot(recordId.repo)
-            val previousCid = snapshot.tree.get(recordId.collection, recordId.recordKey)?.toString() ?: return@runCatching false
+            val previousCid = snapshot.tree.get(recordId.collection, recordId.recordKey)?.toString() ?: return false
             if (swapRecord != null && previousCid != swapRecord) {
                 throw InvalidSwapException(expectedCid = previousCid, providedCid = swapRecord)
             }
@@ -223,6 +244,26 @@ public class DefaultRepoEngine(
             persistSnapshot(recordId.repo, updatedTree, snapshot.head)
             true
         }
+
+    /**
+     * Reruns [write] from a fresh snapshot when another writer moved the head underneath it.
+     *
+     * The whole read-modify-write has to be repeated, not just the head swap: the tree this
+     * attempt built no longer contains what the winner wrote.
+     */
+    private suspend fun <T> retryingOnHeadConflict(write: suspend () -> T): T {
+        var attempt = 0
+        while (true) {
+            try {
+                return write()
+            } catch (conflict: RepoHeadConflictException) {
+                attempt++
+                if (attempt >= MAX_HEAD_CONFLICT_RETRIES) {
+                    throw conflict
+                }
+            }
+        }
+    }
 
     override suspend fun loadHead(repo: AtprotoDid): Result<RepoHead?> = blockStore.readHead(repo)
 
@@ -326,7 +367,10 @@ public class DefaultRepoEngine(
                 commitCid = commitCid,
                 revision = commit.revision,
             )
-        blockStore.writeHead(head).getOrThrow()
+        val swapped = blockStore.compareAndSwapHead(head, previousHead?.revision).getOrThrow()
+        if (!swapped) {
+            throw RepoHeadConflictException(repo = repo, expectedRevision = previousHead?.revision)
+        }
         return head
     }
 
@@ -358,6 +402,12 @@ public class DefaultRepoEngine(
 
     private companion object {
         private const val MAX_PAGE_SIZE: Int = 100
+
+        /**
+         * Enough to ride out contention between the handful of writers one account can have in
+         * flight, while still failing loudly rather than spinning if something is badly wrong.
+         */
+        private const val MAX_HEAD_CONFLICT_RETRIES: Int = 5
     }
 }
 
@@ -633,6 +683,14 @@ private fun decodeVarintLong(
     }
     error("Unexpected end of varint input")
 }
+
+/**
+ * Raised when the repo head moved while this write was building its new tree.
+ */
+public class RepoHeadConflictException(
+    public val repo: AtprotoDid,
+    public val expectedRevision: Long?,
+) : RepoException("Repo $repo moved past revision $expectedRevision while this write was in flight")
 
 /**
  * Raised when compare-and-swap metadata does not match the current record state.

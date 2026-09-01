@@ -65,6 +65,48 @@ class PostgreSQLRepoBlockStore : RepoBlockStore {
             }
         }
 
+    override suspend fun compareAndSwapHead(
+        head: RepoHead,
+        expectedRevision: Long?,
+    ): Result<Boolean> =
+        runCatching {
+            transaction {
+                val repoDid = head.repo.toString()
+                if (expectedRevision == null) {
+                    // No head yet. The insert itself is the guard: a unique repoDid means a
+                    // racing writer that also thought the repo was empty loses here.
+                    val alreadyPresent =
+                        AtprotoRepoHeadsTable
+                            .selectAll()
+                            .where { AtprotoRepoHeadsTable.repoDid eq repoDid }
+                            .any()
+                    if (alreadyPresent) {
+                        return@transaction false
+                    }
+                    AtprotoRepoHeadsTable.insert {
+                        it[AtprotoRepoHeadsTable.repoDid] = repoDid
+                        it[rootCid] = head.root.toString()
+                        it[commitCid] = head.commitCid.toString()
+                        it[revision] = head.revision
+                        it[updatedAt] = Clock.System.now()
+                    }
+                    true
+                } else {
+                    val updated =
+                        AtprotoRepoHeadsTable.update({
+                            (AtprotoRepoHeadsTable.repoDid eq repoDid) and
+                                (AtprotoRepoHeadsTable.revision eq expectedRevision)
+                        }) {
+                            it[rootCid] = head.root.toString()
+                            it[commitCid] = head.commitCid.toString()
+                            it[revision] = head.revision
+                            it[updatedAt] = Clock.System.now()
+                        }
+                    updated > 0
+                }
+            }
+        }
+
     override suspend fun readBlock(cid: Cid): Result<RepoBlock?> =
         runCatching {
             transaction {
