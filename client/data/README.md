@@ -26,7 +26,7 @@ Data Layer
 - `LocalEntryDraftStore.kt` - **Platform-agnostic draft storage interface**
 
 ### Data Sources
-- `FirebaseRemoteJournalDataSource.kt` - Remote data sync
+- Journal cloud sync is handled by `client/sync` through the Cloud Run API.
 - Local database integration via DAOs
 - Cache management implementations
 
@@ -79,7 +79,7 @@ Data Layer
 - **Kotlinx Coroutines**: Asynchronous operations
 - **Kotlinx Serialization**: Data serialization
 - **Koin**: Dependency injection
-- **Firebase Firestore**: Remote data storage
+- **Cloud Run sync API**: Remote journal synchronization
 
 ## Data Flow
 

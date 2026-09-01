@@ -68,7 +68,6 @@ kotlin {
             implementation(libs.androidx.security.crypto)
             implementation(libs.bouncycastle.bcprov)
             implementation(project.dependencies.platform(libs.firebase.bom))
-            implementation(libs.firebase.firestore)
             implementation(libs.firebase.installations)
             implementation(libs.koin.android)
         }
