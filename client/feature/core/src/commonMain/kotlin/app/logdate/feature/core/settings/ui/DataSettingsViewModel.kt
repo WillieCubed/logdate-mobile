@@ -10,14 +10,11 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.domain.quota.ObserveCloudQuotaUseCase
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncManager
-import app.logdate.client.sync.conflict.SyncConflictRecord
-import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.CloudStorageQuota
 import app.logdate.shared.model.ServerCapability
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -28,17 +25,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlin.time.Clock
-import kotlin.time.Instant
 
 data class DataSettingsState(
     val quotaState: CloudStorageQuota?,
     val hasAuthoritativeQuota: Boolean,
     val isQuotaAvailable: Boolean,
     val integrityState: IntegrityState,
-    val conflictsState: ConflictsState,
     val syncStatus: app.logdate.client.sync.SyncStatus?,
     val isAuthenticated: Boolean,
     val isBackgroundSyncEnabled: Boolean,
@@ -75,13 +68,6 @@ sealed interface SyncFeedback {
     ) : SyncFeedback
 }
 
-data class ConflictsState(
-    val conflicts: List<SyncConflictRecord> = emptyList(),
-    val isLoading: Boolean = false,
-    val lastUpdated: Instant? = null,
-    val errorMessage: String? = null,
-)
-
 class DataSettingsViewModel(
     observeCloudQuotaUseCase: ObserveCloudQuotaUseCase,
     private val syncManager: SyncManager,
@@ -89,13 +75,9 @@ class DataSettingsViewModel(
     private val preferencesDataSource: LogdatePreferencesDataSource,
     private val configRepository: LogDateConfigRepository,
     private val dataIntegrityService: DataIntegrityService,
-    private val conflictStore: SyncConflictStore,
 ) : ViewModel() {
     private val _integrityState = MutableStateFlow(IntegrityState())
     val integrityState: StateFlow<IntegrityState> = _integrityState.asStateFlow()
-
-    private val _conflictsState = MutableStateFlow(ConflictsState())
-    val conflictsState: StateFlow<ConflictsState> = _conflictsState.asStateFlow()
 
     private val _syncFeedback = MutableStateFlow<SyncFeedback?>(null)
     val syncFeedback: StateFlow<SyncFeedback?> = _syncFeedback.asStateFlow()
@@ -130,14 +112,12 @@ class DataSettingsViewModel(
             quotaFlow,
             quotaAvailabilityFlow,
             _integrityState,
-            _conflictsState,
-        ) { quotaState, isQuotaAvailable, integrityState, conflictsState ->
+        ) { quotaState, isQuotaAvailable, integrityState ->
             DataSettingsState(
                 quotaState = quotaState,
                 hasAuthoritativeQuota = true,
                 isQuotaAvailable = isQuotaAvailable,
                 integrityState = integrityState,
-                conflictsState = conflictsState,
                 syncStatus = null,
                 isAuthenticated = false,
                 isBackgroundSyncEnabled = true,
@@ -164,7 +144,6 @@ class DataSettingsViewModel(
                 hasAuthoritativeQuota = false,
                 isQuotaAvailable = true,
                 integrityState = IntegrityState(),
-                conflictsState = ConflictsState(),
                 syncStatus = null,
                 isAuthenticated = false,
                 isBackgroundSyncEnabled = true,
@@ -172,7 +151,6 @@ class DataSettingsViewModel(
         )
 
     init {
-        startConflictPolling()
     }
 
     fun runIntegrityCheck() {
@@ -212,53 +190,6 @@ class DataSettingsViewModel(
                         it.copy(isRepairing = false, errorMessage = error.message ?: "Integrity repair failed")
                     }
                 }
-        }
-    }
-
-    fun refreshConflicts(force: Boolean = false) {
-        viewModelScope.launch {
-            val shouldShowLoading = force || _conflictsState.value.conflicts.isEmpty()
-            if (shouldShowLoading) {
-                _conflictsState.update { it.copy(isLoading = true, errorMessage = null) }
-            } else {
-                _conflictsState.update { it.copy(errorMessage = null) }
-            }
-            runCatching { conflictStore.list() }
-                .onSuccess { conflicts ->
-                    _conflictsState.update {
-                        it.copy(
-                            conflicts = conflicts.sortedByDescending { record -> record.detectedAt },
-                            isLoading = false,
-                            lastUpdated = Clock.System.now(),
-                            errorMessage = null,
-                        )
-                    }
-                }.onFailure { error ->
-                    Napier.e("Failed to load sync conflicts", error)
-                    _conflictsState.update {
-                        it.copy(
-                            isLoading = false,
-                            errorMessage = error.message ?: "Failed to load conflicts",
-                        )
-                    }
-                }
-        }
-    }
-
-    fun clearConflicts() {
-        viewModelScope.launch {
-            runCatching { conflictStore.clear() }
-                .onFailure { error -> Napier.e("Failed to clear sync conflicts", error) }
-            refreshConflicts()
-        }
-    }
-
-    private fun startConflictPolling() {
-        viewModelScope.launch {
-            while (isActive) {
-                refreshConflicts()
-                delay(10_000)
-            }
         }
     }
 

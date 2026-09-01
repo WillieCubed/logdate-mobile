@@ -29,7 +29,6 @@ import app.logdate.client.media.audio.download.ModelDownloadStatus
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.sync.SyncStatus
-import app.logdate.client.sync.conflict.SyncConflictRecord
 import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.feature.core.account.CloudAccountSignInContent
 import app.logdate.feature.core.account.CloudAccountWelcomeContent
@@ -40,7 +39,6 @@ import app.logdate.feature.core.settings.ui.AccountIdentityState
 import app.logdate.feature.core.settings.ui.AccountSettingsContent
 import app.logdate.feature.core.settings.ui.AdvancedSettingsContent
 import app.logdate.feature.core.settings.ui.BirthdaySettingsContent
-import app.logdate.feature.core.settings.ui.ConflictsState
 import app.logdate.feature.core.settings.ui.DataSettingsContent
 import app.logdate.feature.core.settings.ui.DayBoundarySettingsContent
 import app.logdate.feature.core.settings.ui.IntegrityState
@@ -712,9 +710,6 @@ object SharedScreenshotCatalog {
                     integrityState = IntegrityState(),
                     onRunIntegrityCheck = {},
                     onRepairIntegrity = {},
-                    conflictsState = ConflictsState(),
-                    onClearConflicts = {},
-                    onRefreshConflicts = {},
                     snackbarHostState = remember { SnackbarHostState() },
                     isAuthenticated = true,
                     onSyncNow = {},
@@ -777,36 +772,6 @@ object SharedScreenshotCatalog {
                     onBackgroundSyncEnabledChange = {},
                     onNavigateToCloudAccountCreation = {},
                     onNavigateToSignIn = {},
-                    conflictsState =
-                        ConflictsState(
-                            conflicts =
-                                listOf(
-                                    SyncConflictRecord(
-                                        id = "conflict-1",
-                                        entityType = "NOTE",
-                                        entityId = "note-2026-06-14",
-                                        localVersion = 4,
-                                        remoteVersion = 5,
-                                        localUpdatedAt = baseInstant.toEpochMilliseconds(),
-                                        remoteUpdatedAt = baseInstant.toEpochMilliseconds(),
-                                        reason = "Remote note changed while local edits were pending.",
-                                        detectedAt = baseInstant.toEpochMilliseconds(),
-                                    ),
-                                    SyncConflictRecord(
-                                        id = "conflict-2",
-                                        entityType = "JOURNAL",
-                                        entityId = "journal-family",
-                                        localVersion = 2,
-                                        remoteVersion = 3,
-                                        localUpdatedAt = baseInstant.toEpochMilliseconds(),
-                                        remoteUpdatedAt = baseInstant.toEpochMilliseconds(),
-                                        reason = "Journal metadata needs review before upload can continue.",
-                                        detectedAt = baseInstant.toEpochMilliseconds(),
-                                    ),
-                                ),
-                        ),
-                    onClearConflicts = {},
-                    onRefreshConflicts = {},
                     quotaUsage =
                         StorageQuotaUi(
                             totalBytes = 5_000_000_000,

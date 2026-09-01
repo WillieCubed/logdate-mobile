@@ -27,7 +27,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -48,22 +47,13 @@ import app.logdate.util.toReadableDateTimeShort
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.automatically_sync_your_data_in_the_background
 import logdate.client.feature.core.generated.resources.background_sync
-import logdate.client.feature.core.generated.resources.clear
 import logdate.client.feature.core.generated.resources.cloud_sync
-import logdate.client.feature.core.generated.resources.conflict_entity_with_id
-import logdate.client.feature.core.generated.resources.conflicts_need_review
 import logdate.client.feature.core.generated.resources.create_account
-import logdate.client.feature.core.generated.resources.detected_timestamp
 import logdate.client.feature.core.generated.resources.last_sync_failed
 import logdate.client.feature.core.generated.resources.last_synced_time
-import logdate.client.feature.core.generated.resources.loading_conflicts
 import logdate.client.feature.core.generated.resources.never_synced
-import logdate.client.feature.core.generated.resources.no_conflicts_waiting
-import logdate.client.feature.core.generated.resources.queued_conflicts
-import logdate.client.feature.core.generated.resources.showing_three_of_conflicts
 import logdate.client.feature.core.generated.resources.sign_in
 import logdate.client.feature.core.generated.resources.sync_and_backup
-import logdate.client.feature.core.generated.resources.sync_conflicts
 import logdate.client.feature.core.generated.resources.sync_devices_subtitle
 import logdate.client.feature.core.generated.resources.sync_feature_access
 import logdate.client.feature.core.generated.resources.sync_feature_backup
@@ -84,11 +74,9 @@ import logdate.client.feature.core.generated.resources.sync_status
 import logdate.client.feature.core.generated.resources.syncing
 import logdate.client.feature.core.generated.resources.syncing_remaining
 import logdate.client.ui.generated.resources.common_loading
-import logdate.client.ui.generated.resources.common_refresh
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
-import kotlin.time.Instant
 import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
@@ -158,9 +146,6 @@ fun SyncSettingsScreen(
         onBackgroundSyncEnabledChange = viewModel::setBackgroundSyncEnabled,
         onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
         onNavigateToSignIn = onNavigateToSignIn,
-        conflictsState = uiState.conflictsState,
-        onClearConflicts = viewModel::clearConflicts,
-        onRefreshConflicts = { viewModel.refreshConflicts(force = true) },
         quotaUsage = uiState.quotaState.orDefault().toStorageQuotaUi(),
         isQuotaAvailable = uiState.isQuotaAvailable && uiState.hasAuthoritativeQuota,
         snackbarHostState = snackbarHostState,
@@ -177,9 +162,6 @@ fun SyncSettingsContent(
     onBackgroundSyncEnabledChange: (Boolean) -> Unit,
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit,
-    conflictsState: ConflictsState,
-    onClearConflicts: () -> Unit,
-    onRefreshConflicts: () -> Unit,
     quotaUsage: StorageQuotaUi,
     isQuotaAvailable: Boolean,
     snackbarHostState: SnackbarHostState,
@@ -204,13 +186,6 @@ fun SyncSettingsContent(
                             .padding(vertical = Spacing.lg),
                     verticalArrangement = Arrangement.spacedBy(Spacing.lg),
                 ) {
-                    if (isQuotaAvailable) {
-                        QuotaUsageBlock(
-                            quotaUsage = quotaUsage,
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
-                        )
-                    }
-
                     CloudSyncSection(
                         syncStatus = syncStatus,
                         onSyncNow = onSyncNow,
@@ -238,12 +213,12 @@ fun SyncSettingsContent(
                             .verticalScroll(rememberScrollState())
                             .padding(vertical = Spacing.lg),
                 ) {
-                    SyncConflictsSection(
-                        conflictsState = conflictsState,
-                        onClearConflicts = onClearConflicts,
-                        onRefreshConflicts = onRefreshConflicts,
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    )
+                    if (isQuotaAvailable) {
+                        QuotaUsageBlock(
+                            quotaUsage = quotaUsage,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
                 }
             }
         },
@@ -278,15 +253,6 @@ fun SyncSettingsContent(
                             onSyncNow = onSyncNow,
                             isBackgroundSyncEnabled = isBackgroundSyncEnabled,
                             onBackgroundSyncEnabledChange = onBackgroundSyncEnabledChange,
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
-                        )
-                    }
-
-                    item {
-                        SyncConflictsSection(
-                            conflictsState = conflictsState,
-                            onClearConflicts = onClearConflicts,
-                            onRefreshConflicts = onRefreshConflicts,
                             modifier = Modifier.padding(horizontal = Spacing.lg),
                         )
                     }
@@ -514,128 +480,4 @@ private fun SyncStatusText(syncStatus: app.logdate.client.sync.SyncStatus?) {
             )
         }
     } ?: Text(stringResource(UiRes.string.common_loading), color = MaterialTheme.colorScheme.onSurfaceVariant)
-}
-
-@Composable
-private fun SyncConflictsSection(
-    conflictsState: ConflictsState,
-    onClearConflicts: () -> Unit,
-    onRefreshConflicts: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val conflictCount = conflictsState.conflicts.size
-    SettingsSection(
-        title = stringResource(Res.string.sync_conflicts),
-        modifier = modifier,
-    ) {
-        Column {
-            ConflictsSummaryItem(
-                conflictsState = conflictsState,
-                conflictCount = conflictCount,
-                onClearConflicts = onClearConflicts,
-                onRefreshConflicts = onRefreshConflicts,
-            )
-            conflictsState.conflicts.take(3).forEach { conflict ->
-                ConflictDetailItem(conflict)
-            }
-            if (conflictCount > 3) {
-                Text(
-                    text =
-                        stringResource(
-                            Res.string.showing_three_of_conflicts,
-                            conflictCount,
-                        ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(Spacing.md),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ConflictsSummaryItem(
-    conflictsState: ConflictsState,
-    conflictCount: Int,
-    onClearConflicts: () -> Unit,
-    onRefreshConflicts: () -> Unit,
-) {
-    ListItem(
-        headlineContent = { Text(stringResource(Res.string.queued_conflicts)) },
-        supportingContent = {
-            Column {
-                Text(
-                    text =
-                        if (conflictsState.isLoading) {
-                            stringResource(Res.string.loading_conflicts)
-                        } else if (conflictCount == 0) {
-                            stringResource(Res.string.no_conflicts_waiting)
-                        } else {
-                            stringResource(
-                                Res.string.conflicts_need_review,
-                                conflictCount,
-                                if (conflictCount == 1) "" else "s",
-                            )
-                        },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                conflictsState.errorMessage?.let { message ->
-                    Spacer(modifier = Modifier.height(Spacing.xs))
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
-        },
-        trailingContent = {
-            Row {
-                TextButton(onClick = onRefreshConflicts) {
-                    Text(stringResource(UiRes.string.common_refresh))
-                }
-                TextButton(
-                    onClick = onClearConflicts,
-                    enabled = conflictCount > 0,
-                ) {
-                    Text(stringResource(Res.string.clear))
-                }
-            }
-        },
-    )
-}
-
-@Composable
-private fun ConflictDetailItem(conflict: app.logdate.client.sync.conflict.SyncConflictRecord) {
-    ListItem(
-        headlineContent = {
-            Text(
-                stringResource(
-                    Res.string.conflict_entity_with_id,
-                    conflict.entityType,
-                    conflict.entityId,
-                ),
-            )
-        },
-        supportingContent = {
-            Column {
-                Text(
-                    text = conflict.reason,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                val timestamp = Instant.fromEpochMilliseconds(conflict.detectedAt)
-                Text(
-                    text =
-                        stringResource(
-                            Res.string.detected_timestamp,
-                            timestamp.toReadableDateTimeShort(),
-                        ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-    )
 }
