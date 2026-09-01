@@ -1766,8 +1766,6 @@ fun A110_DataSettingsExportBookPosture() {
                 syncStatus = null,
                 isAuthenticated = false,
                 onSyncNow = {},
-                isBackgroundSyncEnabled = true,
-                onBackgroundSyncEnabledChange = {},
                 onNavigateToCloudAccountCreation = {},
                 onNavigateToSignIn = {},
             )
@@ -1814,8 +1812,6 @@ fun A111_DataSettingsExportProgressBookPosture() {
                 syncStatus = null,
                 isAuthenticated = false,
                 onSyncNow = {},
-                isBackgroundSyncEnabled = true,
-                onBackgroundSyncEnabledChange = {},
                 onNavigateToCloudAccountCreation = {},
                 onNavigateToSignIn = {},
             )
@@ -1867,8 +1863,6 @@ fun A112_DataSettingsRestorePreviewBookPosture() {
                 syncStatus = null,
                 isAuthenticated = false,
                 onSyncNow = {},
-                isBackgroundSyncEnabled = true,
-                onBackgroundSyncEnabledChange = {},
                 onNavigateToCloudAccountCreation = {},
                 onNavigateToSignIn = {},
             )

@@ -41,7 +41,6 @@ data class DataSettingsState(
      * WhileSubscribed brings the seed back every time the screen is left for five seconds.
      */
     val isAuthenticated: Boolean?,
-    val isBackgroundSyncEnabled: Boolean,
 )
 
 data class IntegrityState(
@@ -98,7 +97,6 @@ class DataSettingsViewModel(
             .map<CloudStorageQuota, CloudStorageQuota?> { it }
             .onStart { emit(null) }
     private val sessionFlow = sessionStorage.getSessionFlow()
-    private val backgroundSyncEnabledFlow = preferencesDataSource.backgroundSyncEnabled
     private val quotaAvailabilityFlow =
         configRepository.serverDescriptor
             .combine(configRepository.backendUrl) { descriptor, backendUrl ->
@@ -127,7 +125,6 @@ class DataSettingsViewModel(
                 integrityState = integrityState,
                 syncStatus = null,
                 isAuthenticated = null,
-                isBackgroundSyncEnabled = true,
             )
         }
 
@@ -136,12 +133,10 @@ class DataSettingsViewModel(
             sourceStateFlow,
             syncStatusFlow,
             sessionFlow,
-            backgroundSyncEnabledFlow,
-        ) { sourceState, syncStatus, session, backgroundSyncEnabled ->
+        ) { sourceState, syncStatus, session ->
             sourceState.copy(
                 syncStatus = syncStatus,
                 isAuthenticated = session != null,
-                isBackgroundSyncEnabled = backgroundSyncEnabled,
             )
         }.stateIn(
             viewModelScope,
@@ -153,7 +148,6 @@ class DataSettingsViewModel(
                 integrityState = IntegrityState(),
                 syncStatus = null,
                 isAuthenticated = null,
-                isBackgroundSyncEnabled = true,
             ),
         )
 
@@ -228,12 +222,6 @@ class DataSettingsViewModel(
     /** Clears the last sync outcome once the UI has shown it. */
     fun consumeSyncFeedback() {
         _syncFeedback.value = null
-    }
-
-    fun setBackgroundSyncEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            preferencesDataSource.setBackgroundSyncEnabled(enabled)
-        }
     }
 }
 

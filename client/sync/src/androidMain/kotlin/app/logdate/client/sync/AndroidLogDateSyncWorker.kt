@@ -25,7 +25,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -158,12 +157,12 @@ class AndroidSyncManager(
     init {
         // Observe authentication state and automatically enable/disable background sync
         scope.launch {
-            combine(
-                sessionStorage.getSessionFlow().map { it != null },
-                preferencesDataSource.backgroundSyncEnabled,
-            ) { isAuthenticated, isEnabled ->
-                isAuthenticated && isEnabled
-            }.distinctUntilChanged()
+            // Being signed in is the whole condition; see ForegroundSyncManager for why the
+            // stored preference that used to be ANDed in here had to go.
+            sessionStorage
+                .getSessionFlow()
+                .map { it != null }
+                .distinctUntilChanged()
                 .collect { shouldEnable ->
                     if (shouldEnable) {
                         Napier.i("Background sync enabled")

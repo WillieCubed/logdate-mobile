@@ -302,7 +302,6 @@ class AccountSettingsViewModel(
                     onError(message)
                     return@launch
                 }
-                preferencesDataSource.setBackgroundSyncEnabled(false)
                 Napier.i("Session cleared; local backup queue is retained until sign-in resumes")
             } catch (e: Exception) {
                 Napier.e("Failed to sign out", e)

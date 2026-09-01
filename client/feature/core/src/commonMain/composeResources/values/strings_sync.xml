@@ -1,30 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Cloud sync -->
-    <string name="cloud_sync">Cloud Sync</string>
-    <string name="background_sync">Background Sync</string>
-    <string name="automatically_sync_your_data_in_the_background">Automatically sync your data in the background</string>
-    <string name="sync_and_backup">Sync</string>
-    <string name="sync_and_backup_description">Sync status, background sync, and conflict resolution</string>
-    <string name="sync_now">Sync Now</string>
-    <string name="sync_status">Sync Status</string>
-    <string name="syncing">Syncing...</string>
-    <string name="syncing_remaining">Syncing… %1$d left</string>
-    <string name="last_synced_time">Last synced: %1$s</string>
-    <string name="last_sync_failed">Last sync failed</string>
-    <string name="never_synced">Never synced</string>
+    <string name="cloud_sync">Your journal</string>
+    <string name="sync_and_backup">Backup</string>
+    <string name="sync_and_backup_description">Keep every entry safe and on all your devices</string>
+    <string name="sync_now">Back up now</string>
+    <string name="syncing">Backing up…</string>
+    <string name="syncing_remaining">Backing up · %1$d to go</string>
+    <string name="last_synced_time">All backed up · %1$s</string>
+    <string name="last_sync_failed">Couldn't finish backing up</string>
+    <string name="never_synced">Nothing backed up yet</string>
 
     <!-- Manual sync outcome -->
-    <string name="sync_feedback_needs_account">Sign in to sync your journals</string>
+    <string name="sync_feedback_needs_account">Sign in to start backing up</string>
     <string name="sync_feedback_sign_in_action">Sign in</string>
-    <string name="sync_feedback_up_to_date">Everything is up to date</string>
-    <string name="sync_feedback_succeeded">Synced %1$d up, %2$d down</string>
-    <string name="sync_feedback_failed">Sync failed: %1$s</string>
+    <string name="sync_feedback_up_to_date">Everything is backed up</string>
+    <string name="sync_feedback_succeeded">Backed up %1$d · received %2$d</string>
+    <string name="sync_feedback_failed">Couldn't back up: %1$s</string>
     <string name="sync_feedback_started">Backing up in the background</string>
 
     <!-- Sync promotion -->
-    <string name="sync_promotion_title">Sync your journals across devices</string>
-    <string name="sync_promotion_description">Sign in to keep your data synced across devices and access it from anywhere</string>
+    <string name="sync_promotion_title">Keep your journal safe</string>
+    <string name="sync_promotion_description">Sign in and every entry is backed up and waiting on your other devices</string>
     <string name="sync_feature_backup">Your signed-in devices stay in sync</string>
     <string name="sync_feature_access">Access your journals from any device</string>
     <string name="sync_feature_sync">Changes sync seamlessly in the background</string>

@@ -41,12 +41,9 @@ import app.logdate.client.sync.SyncPausedReason
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
-import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.automatically_sync_your_data_in_the_background
-import logdate.client.feature.core.generated.resources.background_sync
 import logdate.client.feature.core.generated.resources.backing_up_progress
 import logdate.client.feature.core.generated.resources.cloud_sync
 import logdate.client.feature.core.generated.resources.create_account
@@ -71,7 +68,6 @@ import logdate.client.feature.core.generated.resources.sync_paused_background_da
 import logdate.client.feature.core.generated.resources.sync_paused_media_waiting_for_wifi
 import logdate.client.feature.core.generated.resources.sync_paused_offline
 import logdate.client.feature.core.generated.resources.sync_paused_signed_out
-import logdate.client.feature.core.generated.resources.sync_status
 import logdate.client.feature.core.generated.resources.syncing
 import logdate.client.feature.core.generated.resources.syncing_remaining
 import logdate.client.ui.generated.resources.common_loading
@@ -156,8 +152,6 @@ fun SyncSettingsScreen(
         syncStatus = uiState.syncStatus,
         isAuthenticated = isAuthenticated,
         onSyncNow = viewModel::syncNow,
-        isBackgroundSyncEnabled = uiState.isBackgroundSyncEnabled,
-        onBackgroundSyncEnabledChange = viewModel::setBackgroundSyncEnabled,
         onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
         onNavigateToSignIn = onNavigateToSignIn,
         quotaUsage = uiState.quotaState.orDefault().toStorageQuotaUi(),
@@ -172,8 +166,6 @@ fun SyncSettingsContent(
     syncStatus: app.logdate.client.sync.SyncStatus?,
     isAuthenticated: Boolean,
     onSyncNow: () -> Unit,
-    isBackgroundSyncEnabled: Boolean,
-    onBackgroundSyncEnabledChange: (Boolean) -> Unit,
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit,
     quotaUsage: StorageQuotaUi,
@@ -203,8 +195,6 @@ fun SyncSettingsContent(
                     CloudSyncSection(
                         syncStatus = syncStatus,
                         onSyncNow = onSyncNow,
-                        isBackgroundSyncEnabled = isBackgroundSyncEnabled,
-                        onBackgroundSyncEnabledChange = onBackgroundSyncEnabledChange,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
@@ -265,8 +255,6 @@ fun SyncSettingsContent(
                         CloudSyncSection(
                             syncStatus = syncStatus,
                             onSyncNow = onSyncNow,
-                            isBackgroundSyncEnabled = isBackgroundSyncEnabled,
-                            onBackgroundSyncEnabledChange = onBackgroundSyncEnabledChange,
                             modifier = Modifier.padding(horizontal = Spacing.lg),
                         )
                     }
@@ -380,8 +368,6 @@ private fun SyncFeatureRow(
 private fun CloudSyncSection(
     syncStatus: app.logdate.client.sync.SyncStatus?,
     onSyncNow: () -> Unit,
-    isBackgroundSyncEnabled: Boolean,
-    onBackgroundSyncEnabledChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     SettingsSection(
@@ -390,12 +376,6 @@ private fun CloudSyncSection(
     ) {
         Column {
             SyncStatusItem(syncStatus = syncStatus, onSyncNow = onSyncNow)
-            ToggleSettingsItem(
-                title = stringResource(Res.string.background_sync),
-                description = stringResource(Res.string.automatically_sync_your_data_in_the_background),
-                checked = isBackgroundSyncEnabled,
-                onCheckedChange = onBackgroundSyncEnabledChange,
-            )
         }
     }
 }
@@ -406,8 +386,10 @@ private fun SyncStatusItem(
     onSyncNow: () -> Unit,
 ) {
     ListItem(
-        headlineContent = { Text(stringResource(Res.string.sync_status)) },
-        supportingContent = { SyncStatusText(syncStatus) },
+        // The state itself is the headline. There used to be a "Sync Status" label above it,
+        // which named the row rather than telling anyone anything, and pushed the one line that
+        // matters into the small print.
+        headlineContent = { SyncStatusText(syncStatus) },
         trailingContent = {
             Button(
                 onClick = onSyncNow,

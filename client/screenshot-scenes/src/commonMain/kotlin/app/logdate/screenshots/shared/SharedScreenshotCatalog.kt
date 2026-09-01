@@ -713,8 +713,6 @@ object SharedScreenshotCatalog {
                     snackbarHostState = remember { SnackbarHostState() },
                     isAuthenticated = true,
                     onSyncNow = {},
-                    isBackgroundSyncEnabled = true,
-                    onBackgroundSyncEnabledChange = {},
                     onNavigateToCloudAccountCreation = {},
                     onNavigateToSignIn = {},
                 )
@@ -768,8 +766,6 @@ object SharedScreenshotCatalog {
                         ),
                     isAuthenticated = true,
                     onSyncNow = {},
-                    isBackgroundSyncEnabled = true,
-                    onBackgroundSyncEnabledChange = {},
                     onNavigateToCloudAccountCreation = {},
                     onNavigateToSignIn = {},
                     quotaUsage =

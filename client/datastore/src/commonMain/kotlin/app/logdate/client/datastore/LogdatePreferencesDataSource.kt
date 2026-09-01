@@ -33,7 +33,6 @@ class LogdatePreferencesDataSource(
         val SECURITY_LEVEL = stringPreferencesKey("security_level")
         val DAY_START_HOUR = intPreferencesKey("day_start_hour")
         val DAY_END_HOUR = intPreferencesKey("day_end_hour")
-        val BACKGROUND_SYNC_ENABLED = booleanPreferencesKey("background_sync_enabled")
         val SYSTEM_SEARCH_VISIBILITY_ENABLED = booleanPreferencesKey("system_search_visibility_enabled")
         val FAVORITE_NOTE_IDS = stringSetPreferencesKey("favorite_note_ids")
 
@@ -260,11 +259,6 @@ class LogdatePreferencesDataSource(
         }
     }
 
-    val backgroundSyncEnabled: Flow<Boolean> =
-        userPreferences.data.map { prefs ->
-            prefs[BACKGROUND_SYNC_ENABLED] ?: true
-        }
-
     suspend fun setShouldHideOnboarding(value: Boolean) {
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
@@ -316,14 +310,6 @@ class LogdatePreferencesDataSource(
             }
         }
         Napier.d("Birthday update complete")
-    }
-
-    suspend fun setBackgroundSyncEnabled(enabled: Boolean) {
-        userPreferences.updateData { preferences ->
-            preferences.toMutablePreferences().apply {
-                this[BACKGROUND_SYNC_ENABLED] = enabled
-            }
-        }
     }
 
     /**

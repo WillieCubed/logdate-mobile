@@ -16,7 +16,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -39,12 +38,14 @@ class ForegroundSyncManager(
 
     init {
         syncScope.launch {
-            combine(
-                sessionStorage.getSessionFlow().map { it != null },
-                preferencesDataSource.backgroundSyncEnabled,
-            ) { isAuthenticated, isEnabled ->
-                isAuthenticated && isEnabled
-            }.distinctUntilChanged()
+            // Being signed in is the whole condition. There used to be a stored preference
+            // ANDed in here, which signing out set to false and nothing ever set back - so
+            // signing in again left backups off for good, with the queue growing and the app
+            // reporting itself healthy. Signing out already stops sync by clearing the session.
+            sessionStorage
+                .getSessionFlow()
+                .map { it != null }
+                .distinctUntilChanged()
                 .collect { shouldEnable ->
                     if (shouldEnable) {
                         startPeriodicSync()
