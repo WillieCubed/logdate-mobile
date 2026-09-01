@@ -34,7 +34,6 @@ assert_file_not_contains 'HEALTH_INTERNAL_TOKEN: ${{ secrets.HEALTH_INTERNAL_TOK
 assert_file_contains '--service-url "$REVISION_URL"' .github/workflows/deploy-server-cloud-run.yml
 assert_file_contains '--contract-file "$CONTRACT_FILE"' .github/workflows/deploy-server-cloud-run.yml
 assert_file_contains '--expected-release "$(jq -r '\''.env_vars.RELEASE_VERSION'\'' "$CONTRACT_FILE")"' .github/workflows/deploy-server-cloud-run.yml
-assert_file_contains 'version: '\''>= 582.0.0'\''' .github/workflows/deploy-server-cloud-run.yml
 assert_file_contains '--update-secrets "$SECRET_ENV_BINDINGS"' .github/workflows/deploy-server-cloud-run.yml
 assert_file_contains '--phase prepare' .github/workflows/deploy-server-cloud-run.yml
 assert_file_contains '--service-url "$(jq -r '\''.canonical_origin'\'' "$CONTRACT_FILE")"' .github/workflows/deploy-server-cloud-run.yml

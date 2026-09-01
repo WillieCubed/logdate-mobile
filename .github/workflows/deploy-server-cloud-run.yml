@@ -148,8 +148,6 @@ jobs:
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v3
-        with:
-          version: '>= 582.0.0'
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
