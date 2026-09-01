@@ -768,6 +768,12 @@ class DefaultSyncManager(
             return initialResult
         }
 
+        // Keep the refreshed token. The account repository persists it under its own storage key,
+        // which the session storage never reads, so without this the session keeps handing out the
+        // token the server just rejected and every single request pays a 401 and a refresh before
+        // it does any work.
+        sessionStorage.saveSession(currentSession.copy(accessToken = newToken))
+
         Napier.d("Token refreshed successfully, retrying $operationName")
         return operation(newToken)
     }
