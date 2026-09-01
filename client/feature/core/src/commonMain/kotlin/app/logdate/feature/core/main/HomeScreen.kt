@@ -60,7 +60,6 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.transcription.TranscriptionData
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.transcription.TranscriptionStatus
-import app.logdate.feature.core.sync.SyncIssuesBanner
 import app.logdate.feature.core.sync.SyncPresentationViewModel
 import app.logdate.feature.journals.ui.JournalClickCallback
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
@@ -292,7 +291,6 @@ fun HomeScreen(
                                             .applyScreenStyles()
                                             .safeDrawingPadding(),
                                 ) {
-                                    SyncIssuesBanner(onOpenSyncIssues = onOpenSyncIssues)
                                     val transcriptionState by viewModel.transcriptionState.collectAsStateWithLifecycle()
                                     TranscriptionProvider(transcriptionState) {
                                         TimelinePane(
