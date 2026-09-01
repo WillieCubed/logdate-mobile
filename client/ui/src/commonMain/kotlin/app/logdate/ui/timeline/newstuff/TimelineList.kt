@@ -65,6 +65,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.applyPaddingIfLast
+import app.logdate.ui.common.formatting.LocalToday
 import app.logdate.ui.common.formatting.asRelativeDate
 import app.logdate.ui.restore.LocalAcknowledgeCloudRestore
 import app.logdate.ui.restore.LocalIsPostCloudRestore
@@ -394,7 +395,7 @@ internal fun EndOfTimelineItem(
         when (state) {
             is EndOfTimelineUiState.BirthdayCelebration -> {
                 Text(
-                    text = state.birthDate.asRelativeDate(),
+                    text = state.birthDate.asRelativeDate(LocalToday.current),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -530,7 +531,7 @@ private fun InlineDateHeader(
         modifier = modifier,
     ) {
         Text(
-            text = item.date.asRelativeDate(),
+            text = item.date.asRelativeDate(LocalToday.current),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
         )
@@ -634,7 +635,7 @@ private fun TimelineDayHeader(
         modifier = modifier,
     ) {
         Text(
-            text = item.date.asRelativeDate(),
+            text = item.date.asRelativeDate(LocalToday.current),
             style = MaterialTheme.typography.labelLarge,
             color = style.accentColor,
             fontWeight = FontWeight.SemiBold,
