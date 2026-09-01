@@ -158,6 +158,19 @@ fun DataSettingsScreen(
         viewModel.consumeSyncFeedback()
     }
 
+    // The session flow starts at null meaning "not read yet", and stateIn's seed used to call
+    // that signed out - so the screen opened on Create Account for someone already signed in and
+    // syncing, then corrected itself a frame later. Hold the screen until the answer is known.
+    val isAuthenticated = uiState.isAuthenticated
+    if (isAuthenticated == null) {
+        SettingsScaffold(
+            title = stringResource(Res.string.data_management),
+            onBack = onBack,
+            snackbarHostState = snackbarHostState,
+        ) {}
+        return
+    }
+
     DataSettingsContent(
         onBack = onBack,
         quotaUsage = uiState.quotaState.orDefault().toStorageQuotaUi(),
@@ -185,7 +198,7 @@ fun DataSettingsScreen(
         onRepairIntegrity = viewModel::repairIntegrity,
         snackbarHostState = snackbarHostState,
         syncStatus = uiState.syncStatus,
-        isAuthenticated = uiState.isAuthenticated,
+        isAuthenticated = isAuthenticated,
         onSyncNow = viewModel::syncNow,
         isBackgroundSyncEnabled = uiState.isBackgroundSyncEnabled,
         onBackgroundSyncEnabledChange = viewModel::setBackgroundSyncEnabled,

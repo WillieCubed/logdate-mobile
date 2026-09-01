@@ -33,7 +33,14 @@ data class DataSettingsState(
     val isQuotaAvailable: Boolean,
     val integrityState: IntegrityState,
     val syncStatus: app.logdate.client.sync.SyncStatus?,
-    val isAuthenticated: Boolean,
+    /**
+     * Null until the stored session has been read.
+     *
+     * The session flow starts at null, which means "not loaded yet" but reads as "signed out".
+     * Seeding this false showed Create Account to someone already signed in and syncing, and
+     * WhileSubscribed brings the seed back every time the screen is left for five seconds.
+     */
+    val isAuthenticated: Boolean?,
     val isBackgroundSyncEnabled: Boolean,
 )
 
@@ -119,7 +126,7 @@ class DataSettingsViewModel(
                 isQuotaAvailable = isQuotaAvailable,
                 integrityState = integrityState,
                 syncStatus = null,
-                isAuthenticated = false,
+                isAuthenticated = null,
                 isBackgroundSyncEnabled = true,
             )
         }
@@ -145,7 +152,7 @@ class DataSettingsViewModel(
                 isQuotaAvailable = true,
                 integrityState = IntegrityState(),
                 syncStatus = null,
-                isAuthenticated = false,
+                isAuthenticated = null,
                 isBackgroundSyncEnabled = true,
             ),
         )
