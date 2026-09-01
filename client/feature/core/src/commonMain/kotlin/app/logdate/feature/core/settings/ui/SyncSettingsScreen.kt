@@ -20,8 +20,10 @@ import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHostState
@@ -380,6 +382,7 @@ private fun CloudSyncSection(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SyncStatusItem(
     syncStatus: app.logdate.client.sync.SyncStatus?,
@@ -390,6 +393,20 @@ private fun SyncStatusItem(
         // which named the row rather than telling anyone anything, and pushed the one line that
         // matters into the small print.
         headlineContent = { SyncStatusText(syncStatus) },
+        leadingContent = {
+            // Shown only while something is actually happening, so the row is quiet at rest.
+            if (syncStatus?.isSyncing == true) {
+                val total = syncStatus.totalForRun
+                if (total != null && total > 0) {
+                    LoadingIndicator(
+                        progress = { syncStatus.completedInRun.toFloat() / total.toFloat() },
+                        modifier = Modifier.size(28.dp),
+                    )
+                } else {
+                    LoadingIndicator(modifier = Modifier.size(28.dp))
+                }
+            }
+        },
         trailingContent = {
             Button(
                 onClick = onSyncNow,

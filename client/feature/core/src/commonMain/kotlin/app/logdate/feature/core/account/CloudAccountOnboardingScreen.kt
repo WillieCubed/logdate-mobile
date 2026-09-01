@@ -10,7 +10,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -278,6 +279,7 @@ fun CloudAccountOnboardingScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun InitialSyncProgressScreen(
     status: InitialSyncStatus,
@@ -294,13 +296,15 @@ private fun InitialSyncProgressScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
+        // Material 3 Expressive's loading indicator, which morphs through a shape sequence rather
+        // than spinning a ring - determinate when there is a real fraction to show.
         if (status == InitialSyncStatus.Running && total != null && total > 0) {
-            CircularProgressIndicator(
+            LoadingIndicator(
                 progress = { completed.toFloat() / total.toFloat() },
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(64.dp),
             )
         } else {
-            CircularProgressIndicator(modifier = Modifier.size(48.dp))
+            LoadingIndicator(modifier = Modifier.size(64.dp))
         }
         Text(
             text =
