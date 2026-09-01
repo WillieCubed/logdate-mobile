@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.client.domain.account.GoogleAuthError
+import app.logdate.client.sync.SyncStatus
 import app.logdate.feature.core.settings.ui.CustomServerInfoBottomSheet
 import app.logdate.feature.core.settings.ui.ServerPreset
 import app.logdate.shared.model.ServerDescriptor
@@ -34,6 +35,12 @@ import logdate.client.feature.core.generated.resources.account_adopt_local_data_
 import logdate.client.feature.core.generated.resources.account_adopt_local_data_title
 import logdate.client.feature.core.generated.resources.atproto_recovery_guidance_body
 import logdate.client.feature.core.generated.resources.atproto_recovery_guidance_title
+import logdate.client.feature.core.generated.resources.first_sync_failed
+import logdate.client.feature.core.generated.resources.first_sync_partial
+import logdate.client.feature.core.generated.resources.first_sync_progress
+import logdate.client.feature.core.generated.resources.first_sync_running
+import logdate.client.feature.core.generated.resources.first_sync_success
+import logdate.client.feature.core.generated.resources.first_sync_timed_out
 import logdate.client.feature.core.generated.resources.google_sign_in_account_conflict
 import logdate.client.feature.core.generated.resources.google_sign_in_cancelled
 import logdate.client.feature.core.generated.resources.google_sign_in_failed
@@ -93,6 +100,7 @@ fun CloudAccountOnboardingScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val syncStatus by viewModel.syncStatus.collectAsStateWithLifecycle()
     val uriHandler = LocalUriHandler.current
     val showCustomServerInfo = remember { mutableStateOf(false) }
     val showRecoveryInfo = remember { mutableStateOf(false) }
@@ -262,6 +270,7 @@ fun CloudAccountOnboardingScreen(
                 // sets after sync settles.
                 InitialSyncProgressScreen(
                     status = uiState.initialSyncStatus,
+                    syncStatus = syncStatus,
                     modifier = modifier,
                 )
             }
@@ -272,22 +281,41 @@ fun CloudAccountOnboardingScreen(
 @Composable
 private fun InitialSyncProgressScreen(
     status: InitialSyncStatus,
+    syncStatus: SyncStatus?,
     modifier: Modifier = Modifier,
 ) {
+    // The one screen where a real count matters most: it is shown while several hundred entries
+    // upload, and a bare spinner leaves the difference between a moment and an hour unsaid.
+    val total = syncStatus?.totalForRun
+    val completed = syncStatus?.completedInRun ?: 0
+
     Column(
         modifier = modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        CircularProgressIndicator(modifier = Modifier.size(48.dp))
+        if (status == InitialSyncStatus.Running && total != null && total > 0) {
+            CircularProgressIndicator(
+                progress = { completed.toFloat() / total.toFloat() },
+                modifier = Modifier.size(48.dp),
+            )
+        } else {
+            CircularProgressIndicator(modifier = Modifier.size(48.dp))
+        }
         Text(
             text =
                 when (status) {
-                    InitialSyncStatus.Running -> "Syncing your library\u2026"
-                    InitialSyncStatus.Success -> "All caught up"
-                    InitialSyncStatus.Partial -> "Signed in. Some items are still uploading."
-                    InitialSyncStatus.TimedOut -> "Signed in. Continuing to sync in the background."
-                    InitialSyncStatus.Failed -> "Signed in. We'll retry sync shortly."
+                    InitialSyncStatus.Running ->
+                        if (total != null && total > 0) {
+                            stringResource(Res.string.first_sync_progress, completed, total)
+                        } else {
+                            stringResource(Res.string.first_sync_running)
+                        }
+
+                    InitialSyncStatus.Success -> stringResource(Res.string.first_sync_success)
+                    InitialSyncStatus.Partial -> stringResource(Res.string.first_sync_partial)
+                    InitialSyncStatus.TimedOut -> stringResource(Res.string.first_sync_timed_out)
+                    InitialSyncStatus.Failed -> stringResource(Res.string.first_sync_failed)
                     InitialSyncStatus.NotStarted -> ""
                 },
             style = MaterialTheme.typography.titleMedium,

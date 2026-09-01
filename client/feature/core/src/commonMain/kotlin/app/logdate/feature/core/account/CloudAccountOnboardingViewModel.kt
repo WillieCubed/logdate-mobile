@@ -14,6 +14,8 @@ import app.logdate.client.domain.account.VerifyEmailUseCase
 import app.logdate.client.permissions.EmailVerificationOutcome
 import app.logdate.client.permissions.PasskeyManager
 import app.logdate.client.repository.profile.ProfileRepository
+import app.logdate.client.sync.SyncManager
+import app.logdate.client.sync.SyncStatus
 import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
 import app.logdate.feature.core.settings.ui.ServerPreset
 import app.logdate.feature.core.settings.ui.ServerSelectionState
@@ -42,7 +44,17 @@ class CloudAccountOnboardingViewModel(
     private val emailVerificationAvailability: EmailVerificationAvailability,
     private val profileRepository: ProfileRepository,
     private val serverConfigurationCoordinator: ServerConfigurationCoordinator,
+    syncManager: SyncManager,
 ) : ViewModel() {
+    /**
+     * Live backup progress, so the first sync can say how far along it is.
+     *
+     * This screen is the one place a real count matters most - it is shown while several hundred
+     * entries upload, and an indeterminate spinner there is the difference between "a moment" and
+     * "an hour" left entirely unsaid.
+     */
+    val syncStatus: StateFlow<SyncStatus> = syncManager.syncStatusFlow
+
     private val _uiState =
         MutableStateFlow(
             CloudAccountOnboardingUiState(

@@ -143,7 +143,7 @@ actual val coreFeatureModule: Module =
                 preferencesDataSource = get(),
             )
         }
-        viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+        viewModel { CloudAccountOnboardingViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
         viewModel { LocationSettingsViewModel(get()) }
         viewModel { MemoriesSettingsViewModel(get(), get()) }
         viewModel { VoiceNotesSettingsViewModel(get(), get()) }

@@ -249,6 +249,7 @@ class CloudAccountOnboardingViewModelTest {
             verifyEmailUseCase = verifyEmailUseCase,
             emailVerificationAvailability = emailAvailability,
             profileRepository = FakeProfileRepository(),
+            syncManager = FakeSyncManager(),
             serverConfigurationCoordinator =
                 ServerConfigurationCoordinator(
                     serverHealthChecker = FakeServerHealthChecker(),
