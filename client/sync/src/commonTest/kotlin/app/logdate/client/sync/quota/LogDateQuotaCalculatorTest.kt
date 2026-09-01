@@ -23,7 +23,7 @@ import kotlin.uuid.Uuid
  */
 class LogDateQuotaCalculatorTest {
     @Test
-    fun categoryUsage_readsSizeAndCountForThatCategoryOnly() =
+    fun `category usage reads the size and count for that category only`() =
         runTest {
             val dao =
                 FakeStorageMetadataDao(
@@ -39,7 +39,7 @@ class LogDateQuotaCalculatorTest {
         }
 
     @Test
-    fun categoryUsage_isZeroForACategoryWithNothingStored() =
+    fun `category usage is zero for a category with nothing stored`() =
         runTest {
             val usage =
                 LogDateQuotaCalculator(FakeStorageMetadataDao())
@@ -50,7 +50,7 @@ class LogDateQuotaCalculatorTest {
         }
 
     @Test
-    fun everyCloudObjectTypeIsAccountedFor() =
+    fun `every cloud object type is accounted for`() =
         runTest {
             val quota = LogDateQuotaCalculator(FakeStorageMetadataDao()).calculateTotalUsage()
 
@@ -61,7 +61,7 @@ class LogDateQuotaCalculatorTest {
         }
 
     @Test
-    fun totalUsed_isTheSumOfItsCategories() =
+    fun `the total used is the sum of its categories`() =
         runTest {
             val dao =
                 FakeStorageMetadataDao(
@@ -84,7 +84,7 @@ class LogDateQuotaCalculatorTest {
      * present nonsense as fact, and can make the remaining allowance look larger than it is.
      */
     @Test
-    fun negativeStoredSize_failsRatherThanBeingReported() =
+    fun `a negative stored size fails rather than being reported`() =
         runTest {
             val dao = FakeStorageMetadataDao(sizes = mapOf(StorageContentType.TEXT_NOTE to -1L))
 
@@ -94,7 +94,7 @@ class LogDateQuotaCalculatorTest {
         }
 
     @Test
-    fun implausiblyLargeStoredSize_failsRatherThanBeingReported() =
+    fun `an implausibly large stored size fails rather than being reported`() =
         runTest {
             val hundredTerabytes = 100L * 1024L * 1024L * 1024L * 1024L
             val dao =

@@ -20,7 +20,7 @@ class FeatureFlagStoreTest {
     private val store = DataStoreFeatureFlagStore(preferences)
 
     @Test
-    fun unsetFlag_usesItsDeclaredDefault() =
+    fun `an unset flag uses its declared default`() =
         runTest {
             assertFalse(store.isEnabled(FeatureFlag.LIBRARY))
             assertTrue(store.isEnabled(FeatureFlag.EVENTS))
@@ -28,7 +28,7 @@ class FeatureFlagStoreTest {
         }
 
     @Test
-    fun setEnabled_persistsAndOverridesTheDefault() =
+    fun `setting a flag persists it and overrides the default`() =
         runTest {
             store.setEnabled(FeatureFlag.LIBRARY, enabled = true)
             store.setEnabled(FeatureFlag.EVENTS, enabled = false)
@@ -38,7 +38,7 @@ class FeatureFlagStoreTest {
         }
 
     @Test
-    fun observe_emitsTheCurrentValue() =
+    fun `observing a flag emits its current value`() =
         runTest {
             assertFalse(store.observe(FeatureFlag.LIBRARY).first())
 
@@ -48,7 +48,7 @@ class FeatureFlagStoreTest {
         }
 
     @Test
-    fun flagsAreStoredUnderTheirDeclaredKey() =
+    fun `a flag is stored under its declared key`() =
         runTest {
             store.setEnabled(FeatureFlag.LIBRARY, enabled = true)
 
@@ -63,7 +63,7 @@ class FeatureFlagStoreTest {
      * one caller and off according to another.
      */
     @Test
-    fun sharesStorageWithTheExistingFeatureAccessors() =
+    fun `shares storage with the existing feature accessors`() =
         runTest {
             val dataSource = LogdatePreferencesDataSource(preferences)
 
@@ -79,7 +79,7 @@ class FeatureFlagStoreTest {
      * otherwise introducing the registry silently changes what a feature does on a fresh install.
      */
     @Test
-    fun defaultsMatchTheExistingAccessors() =
+    fun `declared defaults match the existing accessors`() =
         runTest {
             val dataSource = LogdatePreferencesDataSource(preferences)
 
@@ -89,13 +89,13 @@ class FeatureFlagStoreTest {
         }
 
     @Test
-    fun forKey_findsAFlagAndRejectsAnUnknownKey() {
+    fun `a flag can be found by key and an unknown key finds nothing`() {
         assertEquals(FeatureFlag.LIBRARY, FeatureFlag.forKey("library_enabled"))
         assertNull(FeatureFlag.forKey("not_a_flag"))
     }
 
     @Test
-    fun everyFlagOwnsADistinctKey() {
+    fun `every flag owns a distinct key`() {
         val keys = FeatureFlag.entries.map { it.key }
 
         assertEquals(keys.size, keys.toSet().size)

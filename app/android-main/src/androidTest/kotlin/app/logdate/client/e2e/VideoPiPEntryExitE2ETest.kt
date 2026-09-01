@@ -50,7 +50,7 @@ class VideoPiPEntryExitE2ETest {
     val composeRule = createAndroidComposeRule<VideoPlaybackHostActivity>()
 
     @Test
-    fun tappingPipMovesTheActivityIntoPictureInPicture() {
+    fun `tapping the pip affordance moves the activity into picture in picture`() {
         showVideoPlayer()
 
         composeRule.onNodeWithTag(VideoPlayerTags.ROOT).assertIsDisplayed()
@@ -68,7 +68,7 @@ class VideoPiPEntryExitE2ETest {
      * out of it, rather than being finished and rebuilt.
      */
     @Test
-    fun theActivitySurvivesPictureInPictureAndLeavesItAgain() {
+    fun `the activity survives picture in picture and leaves it again`() {
         showVideoPlayer()
 
         composeRule.onNodeWithTag(VideoPlayerTags.PIP_BUTTON).assertIsDisplayed().performClick()
@@ -83,7 +83,7 @@ class VideoPiPEntryExitE2ETest {
     }
 
     @Test
-    fun theHostSurvivesPipFollowedByHome() {
+    fun `the host survives picture in picture followed by home`() {
         showVideoPlayer()
 
         composeRule.onNodeWithTag(VideoPlayerTags.PIP_BUTTON).assertIsDisplayed().performClick()
