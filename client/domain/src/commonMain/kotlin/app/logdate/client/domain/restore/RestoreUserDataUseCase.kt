@@ -20,7 +20,6 @@ import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
-import app.logdate.client.repository.journals.SyncableJournalContentRepository
 import app.logdate.client.repository.location.LocationCapturePipeline
 import app.logdate.client.repository.location.LocationCaptureSource
 import app.logdate.client.repository.location.LocationHistoryRepository
@@ -96,8 +95,6 @@ class RestoreUserDataUseCase(
                     ),
             )
 
-        val syncableContent = journalContentRepository as? SyncableJournalContentRepository
-
         var journalsImported = 0
         var notesImported = 0
         var draftsImported = 0
@@ -118,8 +115,8 @@ class RestoreUserDataUseCase(
                 hasProfile = profilePayload != null,
             )
 
-        // Restored entries are written through the ordinary create/update path, not the
-        // *FromSync variants. Those exist so data arriving from the server is not echoed straight
+        // Restored entries *and their journal links* are written through the ordinary
+        // create/update path, not the *FromSync variants. Those exist so data arriving from the server is not echoed straight
         // back, and they leave nothing queued -- an archive restored that way was invisible to
         // sync for ever, however many times Sync Now was pressed. An archive is local data the
         // server has never seen, so it has to be queued like anything else written on the device.
@@ -192,11 +189,7 @@ class RestoreUserDataUseCase(
                 val journalId = parseUuid(relation.journalId, warnings) ?: continue
                 val noteId = parseUuid(relation.noteId, warnings) ?: continue
 
-                if (syncableContent != null) {
-                    syncableContent.addContentToJournalFromSync(noteId, journalId)
-                } else {
-                    journalContentRepository.addContentToJournal(noteId, journalId)
-                }
+                journalContentRepository.addContentToJournal(noteId, journalId)
                 createdLinks.add(noteId to journalId)
                 linksImported++
             }

@@ -18,6 +18,7 @@ import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.SyncableJournalContentRepository
 import app.logdate.client.repository.location.LocationCapturePipeline
 import app.logdate.client.repository.location.LocationHistoryItem
 import app.logdate.client.repository.location.LocationHistoryRepository
@@ -193,6 +194,43 @@ class RestoreUserDataUseCaseTest {
             assertEquals(2, contentRepo.links.size)
             assertTrue(contentRepo.links.any { it.first == noteId && it.second == j1 })
             assertTrue(contentRepo.links.any { it.first == noteId && it.second == j2 })
+        }
+
+    @Test
+    fun `links from a restored archive are queued for upload rather than left on the device`() =
+        runTest {
+            // Restore wrote links through the from-sync path, which records the row and queues
+            // nothing, because that path is for data arriving *from* the server. An imported
+            // archive is the opposite case: the server has never seen it. The links stayed on the
+            // device, so entries reached other devices attached to no journal at all. The other
+            // tests here cannot catch it - their content repository is not syncable, so they take
+            // the branch that does queue.
+            val journalId = Uuid.random()
+            val noteId = Uuid.random()
+            val syncableContent = FakeSyncableJournalContentRepository()
+            val syncingUseCase =
+                RestoreUserDataUseCase(
+                    journalRepo,
+                    notesRepo,
+                    syncableContent,
+                    profileRepo,
+                    placesRepo,
+                    locationHistoryRepo,
+                )
+
+            syncingUseCase.restore(
+                buildBundle(
+                    journals = listOf(testJournal(journalId)),
+                    notes = listOf(testTextNote(noteId)),
+                    relations = listOf(ExportJournalNoteRelation(journalId.toString(), noteId.toString(), now)),
+                ),
+            )
+
+            assertTrue(
+                syncableContent.unqueuedLinks.isEmpty(),
+                "restore must not use the from-sync path for data the server has never seen",
+            )
+            assertEquals(listOf(noteId to journalId), syncableContent.queuedLinks)
         }
 
     @Test
@@ -1382,6 +1420,51 @@ class RestoreUserDataUseCaseTest {
         ) {}
 
         override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
+    }
+
+    /** Distinguishes the queueing write from the from-sync one, which the plain fake cannot. */
+    private class FakeSyncableJournalContentRepository : SyncableJournalContentRepository {
+        val queuedLinks = mutableListOf<Pair<Uuid, Uuid>>()
+        val unqueuedLinks = mutableListOf<Pair<Uuid, Uuid>>()
+
+        override fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>> = flowOf(emptyList())
+
+        override fun observeJournalsForContent(contentId: Uuid): Flow<List<Journal>> = flowOf(emptyList())
+
+        override suspend fun addContentToJournal(
+            contentId: Uuid,
+            journalId: Uuid,
+        ) {
+            queuedLinks.add(contentId to journalId)
+        }
+
+        override suspend fun removeContentFromJournal(
+            contentId: Uuid,
+            journalId: Uuid,
+        ) = Unit
+
+        override suspend fun addContentToJournals(
+            contentId: Uuid,
+            journalIds: List<Uuid>,
+        ) {
+            journalIds.forEach { queuedLinks.add(contentId to it) }
+        }
+
+        override suspend fun removeContentFromAllJournals(contentId: Uuid) = Unit
+
+        override fun observeJournalsForContents(contentIds: Set<Uuid>): Flow<Map<Uuid, List<Journal>>> = flowOf(emptyMap())
+
+        override suspend fun addContentToJournalFromSync(
+            contentId: Uuid,
+            journalId: Uuid,
+        ) {
+            unqueuedLinks.add(contentId to journalId)
+        }
+
+        override suspend fun removeContentFromJournalFromSync(
+            contentId: Uuid,
+            journalId: Uuid,
+        ) = Unit
     }
 
     private class FakeJournalContentRepository : JournalContentRepository {
