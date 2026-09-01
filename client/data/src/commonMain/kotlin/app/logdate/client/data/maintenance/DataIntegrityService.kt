@@ -4,6 +4,7 @@ import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.dao.maintenance.IntegrityDao
 import app.logdate.client.database.dao.sync.SyncMetadataDao
 import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.shared.config.LogDateConfigRepository
@@ -19,7 +20,11 @@ class DataIntegrityService(
     private val journalContentDao: JournalContentDao,
     private val configRepository: LogDateConfigRepository,
     private val canonicalOwnerProvider: CanonicalOwnerProvider,
+    deviceIdProvider: DeviceIdProvider,
 ) {
+    private val locationOwnershipRepair =
+        LocationOwnershipRepair(integrityDao, canonicalOwnerProvider, deviceIdProvider)
+
     suspend fun audit(): IntegrityReport {
         val ownerId = canonicalOwnerProvider.getCanonicalOwnerId()
         val serverOrigin = currentOrigin()
@@ -28,6 +33,7 @@ class DataIntegrityService(
         val pendingMissingJournals = integrityDao.countPendingMissingJournals(ownerId, serverOrigin)
         val pendingMissingNotes = integrityDao.countPendingMissingNotes(ownerId, serverOrigin)
         val associationAudit = auditPendingAssociations()
+        val placeholderOwnedLocations = locationOwnershipRepair.count()
 
         return IntegrityReport(
             checkedAt = Clock.System.now(),
@@ -37,6 +43,7 @@ class DataIntegrityService(
             pendingMissingNotes = pendingMissingNotes,
             pendingAssociationMissingLinks = associationAudit.missingLinks,
             pendingAssociationMalformed = associationAudit.malformed,
+            placeholderOwnedLocations = placeholderOwnedLocations,
         )
     }
 
@@ -48,6 +55,7 @@ class DataIntegrityService(
         val pendingMissingJournalsRemoved = integrityDao.deletePendingMissingJournals(ownerId, serverOrigin)
         val pendingMissingNotesRemoved = integrityDao.deletePendingMissingNotes(ownerId, serverOrigin)
         val pendingAssociationsRemoved = repairPendingAssociations()
+        val placeholderOwnedLocationsReassigned = locationOwnershipRepair.repair()
 
         return IntegrityRepairResult(
             repairedAt = Clock.System.now(),
@@ -56,6 +64,7 @@ class DataIntegrityService(
             pendingMissingJournalsRemoved = pendingMissingJournalsRemoved,
             pendingMissingNotesRemoved = pendingMissingNotesRemoved,
             pendingAssociationsRemoved = pendingAssociationsRemoved,
+            placeholderOwnedLocationsReassigned = placeholderOwnedLocationsReassigned,
         )
     }
 
@@ -118,6 +127,8 @@ data class IntegrityReport(
     val pendingMissingNotes: Int,
     val pendingAssociationMissingLinks: Int,
     val pendingAssociationMalformed: Int,
+    /** Location rows still owned by the `user_1`/`device_1` placeholders. */
+    val placeholderOwnedLocations: Int,
 )
 
 data class IntegrityRepairResult(
@@ -127,6 +138,8 @@ data class IntegrityRepairResult(
     val pendingMissingJournalsRemoved: Int,
     val pendingMissingNotesRemoved: Int,
     val pendingAssociationsRemoved: Int,
+    /** Location rows handed back to the identity that recorded them. */
+    val placeholderOwnedLocationsReassigned: Int,
 )
 
 private data class PendingAssociationAudit(
