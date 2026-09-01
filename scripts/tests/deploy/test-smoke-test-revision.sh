@@ -258,6 +258,15 @@ case "$path" in
             body='{"planId":"free","tier":"FREE","status":"ACTIVE","storageBytesLimit":1073741824,"backupCountLimit":3,"features":{}}'
         fi
         ;;
+    /api/v1/auth/signin/google)
+        if [[ "$scenario" == "google_auth_not_configured" ]]; then
+            status="503"
+            body='{"error":{"code":"GOOGLE_AUTH_NOT_CONFIGURED","message":"Google sign-in is not configured on this server"}}'
+        else
+            status="401"
+            body='{"error":{"code":"GOOGLE_TOKEN_INVALID","message":"Google identity token is invalid"}}'
+        fi
+        ;;
     /api/v1/quota)
         if [[ "$scenario" == "quota_unlimited" ]]; then
             body='{"totalBytes":9223372036854775807,"usedBytes":0,"categories":[]}'
@@ -866,6 +875,7 @@ declare -a negative_cases=(
     "assetlinks_missing_cert|asset links certificate set does not match"
     "assetlinks_extra_cert|asset links certificate set does not match"
     "protected_not_401|unauthenticated entitlement route did not return 401"
+    "google_auth_not_configured|Google sign-in configuration probe did not reject an invalid token"
 )
 for case_spec in "${negative_cases[@]}"; do
     scenario="${case_spec%%|*}"

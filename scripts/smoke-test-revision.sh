@@ -620,12 +620,26 @@ probe_protected_route() {
     fi
 }
 
+probe_google_auth_configuration() {
+    local body="$WORK_DIR/google-auth-invalid-token.json"
+    local status
+    status="$(http_request POST "$SERVICE_URL/api/v1/auth/signin/google" "$body" "" \
+        --header 'Content-Type: application/json' \
+        --data '{"idToken":"invalid-deployment-smoke-token"}')"
+    if [[ "$status" != "401" ]] ||
+        ! jq -e '.error.code == "GOOGLE_TOKEN_INVALID"' "$body" >/dev/null 2>&1; then
+        fail "Google sign-in configuration probe did not reject an invalid token"
+        return 1
+    fi
+}
+
 run_identity_probes() {
     probe_public_health
     probe_internal_health
     probe_descriptor
     probe_asset_links
     probe_protected_route
+    probe_google_auth_configuration
 }
 
 make_auth_header() {

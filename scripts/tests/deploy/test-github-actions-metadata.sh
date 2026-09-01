@@ -26,13 +26,16 @@ assert_file_contains "Verify staging before production" .github/workflows/deploy
 assert_file_contains "actions: read" .github/workflows/deploy-server-production.yml
 assert_file_contains "workflow_call:" .github/workflows/deploy-server-cloud-run.yml
 assert_file_contains "Install passkey verifier dependencies" .github/workflows/deploy-server-cloud-run.yml
-assert_file_contains 'gcloud auth print-identity-token --audiences "$REVISION_URL" >"$INVOKER_TOKEN_FILE"' .github/workflows/deploy-server-cloud-run.yml
+assert_file_contains 'steps.smoke_auth.outputs.id_token' .github/workflows/deploy-server-cloud-run.yml
+assert_file_contains '>"$INVOKER_TOKEN_FILE"' .github/workflows/deploy-server-cloud-run.yml
 assert_file_contains "gcloud secrets versions access" .github/workflows/deploy-server-cloud-run.yml
 assert_file_contains "'.secret_env.HEALTH_INTERNAL_TOKEN.version'" .github/workflows/deploy-server-cloud-run.yml
 assert_file_not_contains 'HEALTH_INTERNAL_TOKEN: ${{ secrets.HEALTH_INTERNAL_TOKEN }}' .github/workflows/deploy-server-cloud-run.yml
 assert_file_contains '--service-url "$REVISION_URL"' .github/workflows/deploy-server-cloud-run.yml
 assert_file_contains '--contract-file "$CONTRACT_FILE"' .github/workflows/deploy-server-cloud-run.yml
 assert_file_contains '--expected-release "$(jq -r '\''.env_vars.RELEASE_VERSION'\'' "$CONTRACT_FILE")"' .github/workflows/deploy-server-cloud-run.yml
+assert_file_contains 'version: '\''>= 582.0.0'\''' .github/workflows/deploy-server-cloud-run.yml
+assert_file_contains '--update-secrets "$SECRET_ENV_BINDINGS"' .github/workflows/deploy-server-cloud-run.yml
 assert_file_contains '--phase prepare' .github/workflows/deploy-server-cloud-run.yml
 assert_file_contains '--service-url "$(jq -r '\''.canonical_origin'\'' "$CONTRACT_FILE")"' .github/workflows/deploy-server-cloud-run.yml
 assert_file_contains '--phase verify-and-cleanup' .github/workflows/deploy-server-cloud-run.yml
