@@ -29,6 +29,31 @@ run one command.
 | `LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG` | Dedicated `logdate-dev` Android key restricted to `studio.hypertext.logdate`, the debug SHA-1, Places API, and Maps SDK for Android. | When the debug signing key or API restriction changes. |
 | `LOGDATE_GOOGLE_MAPS_API_KEY_RELEASE` | Dedicated `logdate` Android key restricted to `studio.hypertext.logdate`, the upload SHA-1, Places API, and Maps SDK for Android. | When the upload or Play signing key changes. |
 
+### Google ID-token audiences and Android OAuth clients
+
+The build workflows pass the web/server OAuth client ID separately from
+`google-services.json`. These are GitHub repository variables, not secrets:
+
+| Variable | Firebase project | OAuth client ID |
+|---|---|---|
+| `LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG` | `logdate-dev` | `<debug-web-server-oauth-client-id>` |
+| `LOGDATE_GOOGLE_SERVER_CLIENT_ID_RELEASE` | `logdate` | `<release-web-server-oauth-client-id>` |
+
+The production Android upload-certificate client is named
+`LogDate Android upload client (production)`. It is restricted to package
+`studio.hypertext.logdate` and SHA-1
+`<upload-signing-sha1>`; its client ID is
+`<release-upload-android-oauth-client-id>`.
+
+Creating or changing an Android OAuth client changes the generated Firebase config. Download the
+new `google-services.json`, validate it, and rerun
+`./scripts/sync-firebase-configs.sh android-release` so CI receives the same client set.
+
+The upload-certificate client does not authorize a Play-installed build. After Play App Signing
+exists, obtain Google's app-signing SHA-1 from Play Console and create a second Android OAuth
+client for the same package with that certificate. The corresponding SHA-256 belongs in the
+Digital Asset Links file maintained by `logdate-web`.
+
 **Upload from local disk** (one-shot, idempotent — re-running rotates):
 
 ```bash
