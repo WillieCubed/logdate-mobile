@@ -22,7 +22,7 @@ class PostcardDocumentSerializationTest {
         }
 
     @Test
-    fun roundTripFullDocument() {
+    fun `round trip full document`() {
         val document =
             PostcardDocument(
                 id = Uuid.parse("550e8400-e29b-41d4-a716-446655440000"),
@@ -89,7 +89,7 @@ class PostcardDocumentSerializationTest {
     }
 
     @Test
-    fun roundTripEmptyDocument() {
+    fun `round trip empty document`() {
         val document =
             PostcardDocument(
                 id = Uuid.parse("550e8400-e29b-41d4-a716-446655440000"),
@@ -105,7 +105,7 @@ class PostcardDocumentSerializationTest {
     }
 
     @Test
-    fun roundTripGradientBackground() {
+    fun `round trip gradient background`() {
         val document =
             PostcardDocument(
                 id = Uuid.parse("550e8400-e29b-41d4-a716-446655440000"),
@@ -130,7 +130,7 @@ class PostcardDocumentSerializationTest {
     }
 
     @Test
-    fun roundTripAllInkTools() {
+    fun `round trip all ink tools`() {
         for (tool in InkTool.entries) {
             val element =
                 CanvasElement.Ink(
@@ -147,7 +147,7 @@ class PostcardDocumentSerializationTest {
     }
 
     @Test
-    fun roundTripAllShapeKinds() {
+    fun `round trip all shape kinds`() {
         for (kind in ShapeKind.entries) {
             val element =
                 CanvasElement.Shape(
@@ -165,7 +165,7 @@ class PostcardDocumentSerializationTest {
     }
 
     @Test
-    fun polymorphicElementDeserialization() {
+    fun `polymorphic element deserialization`() {
         val elements: List<CanvasElement> =
             listOf(
                 CanvasElement.Photo(

@@ -42,7 +42,7 @@ class EventsSettingsViewModelTest {
     }
 
     @Test
-    fun emits_default_state_on_a_fresh_install() =
+    fun `emits default state on a fresh install`() =
         runTest(testDispatcher) {
             val viewModel = newViewModel()
             val collectJob = startCollecting(viewModel.uiState)
@@ -55,7 +55,7 @@ class EventsSettingsViewModelTest {
         }
 
     @Test
-    fun setAutoEventsEnabled_persists_to_preferences() =
+    fun `set auto events enabled persists to preferences`() =
         runTest(testDispatcher) {
             val viewModel = newViewModel()
             val collectJob = startCollecting(viewModel.uiState)
@@ -68,7 +68,7 @@ class EventsSettingsViewModelTest {
         }
 
     @Test
-    fun setSmartNamingEnabled_round_trips() =
+    fun `set smart naming enabled round trips`() =
         runTest(testDispatcher) {
             val viewModel = newViewModel()
             val collectJob = startCollecting(viewModel.uiState)
@@ -81,7 +81,7 @@ class EventsSettingsViewModelTest {
         }
 
     @Test
-    fun reflects_persisted_disabled_state() =
+    fun `reflects persisted disabled state`() =
         runTest(testDispatcher) {
             preferences.setEventsEnabled(false)
             val viewModel = newViewModel()

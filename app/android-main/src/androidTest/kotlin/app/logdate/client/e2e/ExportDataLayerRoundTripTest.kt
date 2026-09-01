@@ -120,7 +120,7 @@ class ExportDataLayerRoundTripTest {
     // ── Journal fields ───────────────────────────────────────────────────
 
     @Test
-    fun room_journal_allFieldsRoundTrip() =
+    fun `room journal all fields round trip`() =
         runTest {
             val now = now()
             val journal = Journal(
@@ -142,7 +142,7 @@ class ExportDataLayerRoundTripTest {
         }
 
     @Test
-    fun room_allJournalsObserved_includesEveryCreatedJournal() =
+    fun `room all journals observed includes every created journal`() =
         runTest {
             val now = now()
             val ids = (1..5).map { i ->
@@ -160,7 +160,7 @@ class ExportDataLayerRoundTripTest {
     // ── Text note fields ─────────────────────────────────────────────────
 
     @Test
-    fun room_textNote_allFieldsRoundTrip() =
+    fun `room text note all fields round trip`() =
         runTest {
             val now = now()
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
@@ -192,7 +192,7 @@ class ExportDataLayerRoundTripTest {
         }
 
     @Test
-    fun room_textNote_withoutLocation_locationRemainsNull() =
+    fun `room text note without location location remains null`() =
         runTest {
             val now = now()
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
@@ -213,7 +213,7 @@ class ExportDataLayerRoundTripTest {
     // ── Image note fields ─────────────────────────────────────────────────
 
     @Test
-    fun room_imageNote_allFieldsRoundTrip() =
+    fun `room image note all fields round trip`() =
         runTest {
             val now = now()
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
@@ -240,7 +240,7 @@ class ExportDataLayerRoundTripTest {
         }
 
     @Test
-    fun room_imageNote_emptyCaptionRoundTrips() =
+    fun `room image note empty caption round trips`() =
         runTest {
             val now = now()
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
@@ -262,7 +262,7 @@ class ExportDataLayerRoundTripTest {
     // ── Audio note fields ─────────────────────────────────────────────────
 
     @Test
-    fun room_audioNote_allFieldsRoundTrip() =
+    fun `room audio note all fields round trip`() =
         runTest {
             val now = now()
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
@@ -291,7 +291,7 @@ class ExportDataLayerRoundTripTest {
     // ── Video note fields ─────────────────────────────────────────────────
 
     @Test
-    fun room_videoNote_allFieldsRoundTrip() =
+    fun `room video note all fields round trip`() =
         runTest {
             val now = now()
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
@@ -320,7 +320,7 @@ class ExportDataLayerRoundTripTest {
     // ── Journal-note links ───────────────────────────────────────────────
 
     @Test
-    fun room_journalNoteLinks_allLinksReturnedByGetAllJournalNoteLinks() =
+    fun `room journal note links all links returned by get all journal note links`() =
         runTest {
             val now = now()
             val j1 = Journal(id = Uuid.random(), title = "J1", created = now, lastUpdated = now)
@@ -342,7 +342,7 @@ class ExportDataLayerRoundTripTest {
         }
 
     @Test
-    fun room_journalContentRepo_observesCorrectNotesPerJournal() =
+    fun `room journal content repo observes correct notes per journal`() =
         runTest {
             val now = now()
             val j1 = Journal(id = Uuid.random(), title = "J1", created = now, lastUpdated = now)
@@ -370,7 +370,7 @@ class ExportDataLayerRoundTripTest {
     // ── allNotesObserved ─────────────────────────────────────────────────
 
     @Test
-    fun room_allNotesObserved_includesAllNoteTypes() =
+    fun `room all notes observed includes all note types`() =
         runTest {
             val now = now()
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
@@ -396,7 +396,7 @@ class ExportDataLayerRoundTripTest {
     // ── Draft fields ─────────────────────────────────────────────────────
 
     @Test
-    fun room_draft_allFieldsRoundTrip() =
+    fun `room draft all fields round trip`() =
         runTest {
             val now = now()
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
@@ -425,7 +425,7 @@ class ExportDataLayerRoundTripTest {
         }
 
     @Test
-    fun room_draft_withMediaBlocks_mediaRefsPreserved() =
+    fun `room draft with media blocks media refs preserved`() =
         runTest {
             val now = now()
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
@@ -456,7 +456,7 @@ class ExportDataLayerRoundTripTest {
         }
 
     @Test
-    fun room_getAllDrafts_returnsAllSavedDrafts() =
+    fun `room get all drafts returns all saved drafts`() =
         runTest {
             val now = now()
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)

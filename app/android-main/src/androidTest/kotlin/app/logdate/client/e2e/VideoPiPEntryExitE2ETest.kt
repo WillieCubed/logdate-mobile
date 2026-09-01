@@ -16,6 +16,7 @@ import androidx.test.uiautomator.UiDevice
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
 import app.logdate.feature.editor.ui.video.VideoPlayerTags
 import app.logdate.ui.theme.LogDateTheme
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,6 +49,26 @@ import kotlin.test.assertTrue
 class VideoPiPEntryExitE2ETest {
     @get:Rule
     val composeRule = createAndroidComposeRule<VideoPlaybackHostActivity>()
+
+    /**
+     * Leaves the device focusable for whatever runs next.
+     *
+     * These tests deliberately put the host into Picture-in-Picture and send the device to Home,
+     * and a PiP window does not take focus. Left that way, the next test in the run waits for a
+     * focused window that never arrives and fails with RootViewWithoutFocusException having done
+     * nothing wrong. So the host is brought back out of PiP and finished before handing over.
+     */
+    @After
+    fun restoreDeviceFocus() {
+        runCatching {
+            if (isHostInPictureInPictureMode()) {
+                returnHostToForeground()
+                pollUntil { !isHostInPictureInPictureMode() }
+            }
+            runOnMain { composeRule.activity.finish() }
+            UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).waitForIdle()
+        }
+    }
 
     @Test
     fun `tapping the pip affordance moves the activity into picture in picture`() {

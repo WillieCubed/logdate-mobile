@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  */
 class TidTest {
     @Test
-    fun acceptsValidTid() {
+    fun `accepts valid tid`() {
         val tid = Tid.require("3jzfcijpj2z2a")
 
         assertEquals("3jzfcijpj2z2a", box(tid).value)
@@ -24,31 +24,31 @@ class TidTest {
     }
 
     @Test
-    fun serializesAsJsonString() {
+    fun `serializes as json string`() {
         val json = Json.encodeToString(Tid.require("2222222222222"))
 
         assertEquals("\"2222222222222\"", json)
     }
 
     @Test
-    fun rejectsLegacyDashSyntax() {
+    fun `rejects legacy dash syntax`() {
         assertFailsWith<InvalidTidException> {
             Tid.require("3jzf-cij-pj2z-2a")
         }
     }
 
     @Test
-    fun parseReturnsFailureForUppercase() {
+    fun `parse returns failure for uppercase`() {
         assertTrue(Tid.parse("3JZFCIJPJ2Z2A").isFailure)
     }
 
     @Test
-    fun reportsValidityForValidTid() {
+    fun `reports validity for valid tid`() {
         assertTrue(Tid.isValid("3jzfcijpj2z2a"))
     }
 
     @Test
-    fun encodesAndDecodesLongValues() {
+    fun `encodes and decodes long values`() {
         val tid = Tid.fromLong(42L)
 
         assertEquals("222222222223e", tid.value)

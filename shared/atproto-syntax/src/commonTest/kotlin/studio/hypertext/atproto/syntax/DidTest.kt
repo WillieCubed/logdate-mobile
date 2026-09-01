@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  */
 class DidTest {
     @Test
-    fun parsesMethodAndIdentifier() {
+    fun `parses method and identifier`() {
         val did = Did.require("did:web:logdate.app")
 
         assertEquals("did:web:logdate.app", box(did).value)
@@ -25,7 +25,7 @@ class DidTest {
     }
 
     @Test
-    fun supportsUnknownMethods() {
+    fun `supports unknown methods`() {
         val did = Did.require("did:example:custom-id")
 
         assertEquals("example", did.method)
@@ -33,34 +33,34 @@ class DidTest {
     }
 
     @Test
-    fun serializesAsJsonString() {
+    fun `serializes as json string`() {
         val json = Json.encodeToString(Did.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz"))
 
         assertEquals("\"did:plc:ewvi7nxzyoun6zhxrhs64oiz\"", json)
     }
 
     @Test
-    fun rejectsMalformedDid() {
+    fun `rejects malformed did`() {
         assertFailsWith<InvalidDidException> {
             Did.require("invalid")
         }
     }
 
     @Test
-    fun parseReturnsFailureForInvalidDid() {
+    fun `parse returns failure for invalid did`() {
         assertTrue(Did.parse("did::missing").isFailure)
         assertTrue(Did.parse("did:plc").isFailure)
     }
 
     @Test
-    fun reportsValidityForSuccessfulAndFailedParses() {
+    fun `reports validity for successful and failed parses`() {
         assertTrue(Did.isValid("did:plc:ewvi7nxzyoun6zhxrhs64oiz"))
         assertTrue(Did.parse("did:web:example.com").isSuccess)
         assertTrue(Did.parse("did:UPPER:example").isFailure)
     }
 
     @Test
-    fun rejectsInvalidMethodAndIdentifierSegments() {
+    fun `rejects invalid method and identifier segments`() {
         assertFailsWith<InvalidDidException> {
             Did.require("did:Upper:example")
         }

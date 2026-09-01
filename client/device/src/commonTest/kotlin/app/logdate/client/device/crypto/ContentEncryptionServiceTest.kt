@@ -21,7 +21,7 @@ class ContentEncryptionServiceTest {
     private val service = ContentEncryptionService(identityKeyManager, keyDerivation, cryptoManager)
 
     @Test
-    fun testEncryptDecryptRoundtrip() =
+    fun `encrypt decrypt roundtrip`() =
         runTest {
             identityKeyManager.setupNewIdentity()
 
@@ -35,7 +35,7 @@ class ContentEncryptionServiceTest {
         }
 
     @Test
-    fun testEncryptedContentIsNotPlaintext() =
+    fun `encrypted content is not plaintext`() =
         runTest {
             identityKeyManager.setupNewIdentity()
 
@@ -48,7 +48,7 @@ class ContentEncryptionServiceTest {
         }
 
     @Test
-    fun testWrongContentIdFails() =
+    fun `wrong content id fails`() =
         runTest {
             identityKeyManager.setupNewIdentity()
 
@@ -61,7 +61,7 @@ class ContentEncryptionServiceTest {
         }
 
     @Test
-    fun testTamperedCiphertextFails() =
+    fun `tampered ciphertext fails`() =
         runTest {
             identityKeyManager.setupNewIdentity()
 
@@ -82,7 +82,7 @@ class ContentEncryptionServiceTest {
         }
 
     @Test
-    fun testMultipleEntriesDifferentKeys() =
+    fun `multiple entries different keys`() =
         runTest {
             identityKeyManager.setupNewIdentity()
 
@@ -94,7 +94,7 @@ class ContentEncryptionServiceTest {
         }
 
     @Test
-    fun testIdentityNotSetUpThrows() =
+    fun `identity not set up throws`() =
         runTest {
             assertFailsWith<IdentityKeyNotFoundException> {
                 service.encryptContent("entry", "data")

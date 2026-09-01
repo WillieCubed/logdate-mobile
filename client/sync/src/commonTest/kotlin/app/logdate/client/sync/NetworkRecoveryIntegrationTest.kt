@@ -35,7 +35,7 @@ import kotlin.test.assertTrue
  */
 class NetworkRecoveryIntegrationTest {
     @Test
-    fun testLastErrorTrackedOnNetworkFailure() =
+    fun `last error tracked on network failure`() =
         runTest {
             val apiClient = FakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -78,7 +78,7 @@ class NetworkRecoveryIntegrationTest {
         }
 
     @Test
-    fun testLastErrorIsClearedOnSuccess() =
+    fun `last error is cleared on success`() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -117,7 +117,7 @@ class NetworkRecoveryIntegrationTest {
         }
 
     @Test
-    fun testTransientErrorCanBeDifferentiatedFromAuthError() =
+    fun `transient error can be differentiated from auth error`() =
         runTest {
             val failingApiClient = failingCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()

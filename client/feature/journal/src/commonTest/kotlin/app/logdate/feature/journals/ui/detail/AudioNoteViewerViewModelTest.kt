@@ -44,7 +44,7 @@ class AudioNoteViewerViewModelTest {
     }
 
     @Test
-    fun audioNoteLoadsContext() =
+    fun `audio note loads context`() =
         runTest(dispatcher) {
             val noteId = Uuid.random()
             val now = Instant.parse("2025-01-01T00:00:00Z")
@@ -85,7 +85,7 @@ class AudioNoteViewerViewModelTest {
         }
 
     @Test
-    fun togglePlaybackStartsPlayback() =
+    fun `toggle playback starts playback`() =
         runTest(dispatcher) {
             val noteId = Uuid.random()
             val now = Instant.parse("2025-01-01T00:00:00Z")
@@ -127,7 +127,7 @@ class AudioNoteViewerViewModelTest {
         }
 
     @Test
-    fun seekClampsProgress() =
+    fun `seek clamps progress`() =
         runTest(dispatcher) {
             val noteId = Uuid.random()
             val now = Instant.parse("2025-01-01T00:00:00Z")
@@ -167,7 +167,7 @@ class AudioNoteViewerViewModelTest {
         }
 
     @Test
-    fun playbackStatusUpdatesState() =
+    fun `playback status updates state`() =
         runTest(dispatcher) {
             val noteId = Uuid.random()
             val now = Instant.parse("2025-01-01T00:00:00Z")
@@ -215,7 +215,7 @@ class AudioNoteViewerViewModelTest {
         }
 
     @Test
-    fun playbackFailureSurfacesAsAnErrorInsteadOfHanging() =
+    fun `playback failure surfaces as an error instead of hanging`() =
         runTest(dispatcher) {
             val noteId = Uuid.random()
             val now = Instant.parse("2025-01-01T00:00:00Z")

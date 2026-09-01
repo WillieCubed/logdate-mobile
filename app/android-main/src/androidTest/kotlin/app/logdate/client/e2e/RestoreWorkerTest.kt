@@ -72,7 +72,7 @@ class RestoreWorkerTest {
     }
 
     @Test
-    fun workerFails_whenSourceUriMissing() =
+    fun `worker fails when source uri missing`() =
         runTest {
             val recordingLauncher = RecordingRestoreLauncher()
             setupKoin(mockk(relaxed = true), mockk(relaxed = true), recordingLauncher)
@@ -85,7 +85,7 @@ class RestoreWorkerTest {
         }
 
     @Test
-    fun workerSucceeds_andCompletesWithSuccess_whenArchiveIsValid() =
+    fun `worker succeeds and completes with success when archive is valid`() =
         runTest {
             val archiveFile = createMinimalArchive(context)
 
@@ -144,7 +144,7 @@ class RestoreWorkerTest {
         }
 
     @Test
-    fun workerFails_andCompletesWithFailure_whenArchiveIsInvalid() =
+    fun `worker fails and completes with failure when archive is invalid`() =
         runTest {
             val invalidFile = File.createTempFile("not_a_zip", ".zip", context.cacheDir)
             invalidFile.writeText("this is not a valid ZIP archive")

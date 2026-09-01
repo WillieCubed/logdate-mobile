@@ -41,7 +41,7 @@ class JournalInlineAudioE2ETest {
     private val audioEntryId = Uuid.parse("00000000-0000-0000-0000-000000009271")
 
     @Test
-    fun compactJournalAudioCardExposesOutputRouteControls() {
+    fun `compact journal audio card exposes output route controls`() {
         assumeTrue(screenWidthDp() < 600)
         setJournalDetailContent()
 
@@ -50,7 +50,7 @@ class JournalInlineAudioE2ETest {
     }
 
     @Test
-    fun expandedJournalAudioCardExposesOutputRouteControls() {
+    fun `expanded journal audio card exposes output route controls`() {
         assumeTrue(screenWidthDp() >= 600)
         setJournalDetailContent()
 

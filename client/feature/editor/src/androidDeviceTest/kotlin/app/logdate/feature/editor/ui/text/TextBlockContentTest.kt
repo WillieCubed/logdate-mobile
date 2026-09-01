@@ -25,7 +25,7 @@ class TextBlockContentTest {
     private val textChangeTracker = TextChangeTracker()
 
     @Test
-    fun testTextBlockDisplaysContent() {
+    fun `text block displays content`() {
         // Prepare a block with content
         val block = TextBlockUiState(content = "Test content")
 
@@ -45,7 +45,7 @@ class TextBlockContentTest {
     }
 
     @Test
-    fun testTextInputTriggersCallback() {
+    fun `text input triggers callback`() {
         // Prepare an empty block
         val block = TextBlockUiState(content = "")
 
@@ -69,7 +69,7 @@ class TextBlockContentTest {
     }
 
     @Test
-    fun testReadOnlyBlockRejectsInput() {
+    fun `read only block rejects input`() {
         // Prepare a block with content
         val block = TextBlockUiState(content = "Read-only content")
 
@@ -95,7 +95,7 @@ class TextBlockContentTest {
     }
 
     @Test
-    fun testEmptyBlockShowsPlaceholder() {
+    fun `empty block shows placeholder`() {
         // Prepare an empty block
         val block = TextBlockUiState(content = "")
 

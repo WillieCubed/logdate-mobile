@@ -83,7 +83,7 @@ class NotificationAttachmentEntryRestorationE2ETest : KoinComponent {
             .around(postureSupport.publisherRule)
 
     @Test
-    fun audioPlaybackNoteRoute_survivesPostureAndRecreation() {
+    fun `audio playback note route survives posture and recreation`() {
         val noteId = Uuid.random().toString()
         assertRouteSurvivesRestoration(
             Intent().apply {
@@ -94,14 +94,14 @@ class NotificationAttachmentEntryRestorationE2ETest : KoinComponent {
     }
 
     @Test
-    fun dayTimelineDeepLinkRoute_survivesPostureAndRecreation() {
+    fun `day timeline deep link route survives posture and recreation`() {
         assertRouteSurvivesRestoration(
             Intent(Intent.ACTION_VIEW, Uri.parse("https://logdate.app/day/2026-06-15")),
         )
     }
 
     @Test
-    fun locationTimelineRoute_survivesPostureAndRecreation() {
+    fun `location timeline route survives posture and recreation`() {
         assertRouteSurvivesRestoration(
             Intent().apply {
                 putExtra(EXTRA_LOCATION_NAV_SOURCE, NAV_SOURCE_LOCATION_HISTORY)
@@ -110,7 +110,7 @@ class NotificationAttachmentEntryRestorationE2ETest : KoinComponent {
     }
 
     @Test
-    fun newEntryDraftRoute_survivesPostureAndRecreation() {
+    fun `new entry draft route survives posture and recreation`() {
         assertRouteSurvivesRestoration(
             Intent().apply {
                 putExtra(EXTRA_AMBIENT_PROMPT_TARGET, AMBIENT_PROMPT_TARGET_NEW_ENTRY)
@@ -127,7 +127,7 @@ class NotificationAttachmentEntryRestorationE2ETest : KoinComponent {
     }
 
     @Test
-    fun memoryRecallDayRoute_survivesPostureAndRecreation() {
+    fun `memory recall day route survives posture and recreation`() {
         assertRouteSurvivesRestoration(
             Intent().apply {
                 putExtra(EXTRA_AMBIENT_PROMPT_TARGET, AMBIENT_PROMPT_TARGET_MEMORY_RECALL)
@@ -137,7 +137,7 @@ class NotificationAttachmentEntryRestorationE2ETest : KoinComponent {
     }
 
     @Test
-    fun eventDetailRoute_survivesPostureAndRecreation() {
+    fun `event detail route survives posture and recreation`() {
         val eventId = seedEvent()
         assertRouteSurvivesRestoration(
             Intent().apply {
@@ -148,7 +148,7 @@ class NotificationAttachmentEntryRestorationE2ETest : KoinComponent {
     }
 
     @Test
-    fun rewindDetailRoute_survivesPostureAndRecreation() {
+    fun `rewind detail route survives posture and recreation`() {
         val rewindId = seedRewind()
         assertRouteSurvivesRestoration(
             Intent().apply {
@@ -159,7 +159,7 @@ class NotificationAttachmentEntryRestorationE2ETest : KoinComponent {
     }
 
     @Test
-    fun exportRestoreDataTransferRoute_survivesPostureAndRecreation() {
+    fun `export restore data transfer route survives posture and recreation`() {
         assertRouteSurvivesRestoration(
             Intent().apply {
                 putExtra(EXTRA_DATA_TRANSFER_NAV_SOURCE, NAV_SOURCE_DATA_TRANSFER)
@@ -168,7 +168,7 @@ class NotificationAttachmentEntryRestorationE2ETest : KoinComponent {
     }
 
     @Test
-    fun incomingShareTextLaunch_survivesPostureAndRecreation() {
+    fun `incoming share text launch survives posture and recreation`() {
         val editorIntent =
             launchIncomingShareAndCaptureEditorIntent(
                 Intent(ApplicationProvider.getApplicationContext<Context>(), MainActivity::class.java).apply {

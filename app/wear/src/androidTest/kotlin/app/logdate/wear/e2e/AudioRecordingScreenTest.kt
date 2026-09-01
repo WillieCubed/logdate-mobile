@@ -60,7 +60,7 @@ class AudioRecordingScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun idleState_displaysRecordButton() {
+    fun `idle state displays record button`() {
         composeRule.setContent {
             MaterialTheme {
                 AudioRecordingTestContent(
@@ -77,7 +77,7 @@ class AudioRecordingScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun recordingState_displaysWaveformAndTimer() {
+    fun `recording state displays waveform and timer`() {
         composeRule.setContent {
             MaterialTheme {
                 AudioRecordingTestContent(
@@ -96,7 +96,7 @@ class AudioRecordingScreenTest {
     }
 
     @Test
-    fun recordingState_displaysPauseButton() {
+    fun `recording state displays pause button`() {
         composeRule.setContent {
             MaterialTheme {
                 AudioRecordingTestContent(
@@ -109,7 +109,7 @@ class AudioRecordingScreenTest {
     }
 
     @Test
-    fun recordingState_displaysCancelButton() {
+    fun `recording state displays cancel button`() {
         composeRule.setContent {
             MaterialTheme {
                 AudioRecordingTestContent(
@@ -122,7 +122,7 @@ class AudioRecordingScreenTest {
     }
 
     @Test
-    fun recordingState_pauseButtonTriggersCallback() {
+    fun `recording state pause button triggers callback`() {
         var paused = false
         composeRule.setContent {
             MaterialTheme {
@@ -142,7 +142,7 @@ class AudioRecordingScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun pausedState_displaysResumeButton() {
+    fun `paused state displays resume button`() {
         composeRule.setContent {
             MaterialTheme {
                 AudioRecordingTestContent(
@@ -163,7 +163,7 @@ class AudioRecordingScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun errorState_displaysErrorMessage() {
+    fun `error state displays error message`() {
         composeRule.setContent {
             MaterialTheme {
                 AudioRecordingTestContent(
@@ -185,7 +185,7 @@ class AudioRecordingScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun recordButton_triggersStartWhenNotRecording() {
+    fun `record button triggers start when not recording`() {
         var started = false
         composeRule.setContent {
             MaterialTheme {
@@ -201,7 +201,7 @@ class AudioRecordingScreenTest {
     }
 
     @Test
-    fun recordButton_triggersStopWhenRecording() {
+    fun `record button triggers stop when recording`() {
         var stopped = false
         composeRule.setContent {
             MaterialTheme {

@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
  */
 class IdentityExceptionTest {
     @Test
-    fun constructsExceptionMessagesAndCauses() {
+    fun `constructs exception messages and causes`() {
         val cause = IllegalStateException("boom")
         val didException = DidResolutionException("did:plc:ewvi7nxzyoun6zhxrhs64oiz", "HTTP 500", cause)
         val handleException = HandleResolutionException("alice.test", "HTTP 404", cause)

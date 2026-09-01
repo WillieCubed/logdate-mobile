@@ -89,7 +89,7 @@ class HttpClientTest {
      * **Expected Behavior**: Client creates successfully and can be closed without errors
      */
     @Test
-    fun httpClient_canBeCreated() =
+    fun `http client can be created`() =
         runTest {
             val client = createMockClient()
             assertNotNull(client)
@@ -108,7 +108,7 @@ class HttpClientTest {
      * **Critical for**: All API communication in LogDate app
      */
     @Test
-    fun httpClient_hasContentNegotiationInstalled() =
+    fun `http client has content negotiation installed`() =
         runTest {
             val client = createMockClient()
             // Test that JSON content negotiation works by making a request
@@ -129,7 +129,7 @@ class HttpClientTest {
      * **Real App Usage**: Loading user journal list, fetching journal details
      */
     @Test
-    fun httpClient_makesGetRequest() =
+    fun `http client makes get request`() =
         runTest {
             val client = createMockClient("""{"data": "test_value", "id": 123}""")
 
@@ -154,7 +154,7 @@ class HttpClientTest {
      * **Real App Usage**: Creating new journals, adding journal entries
      */
     @Test
-    fun httpClient_makesPostRequest() =
+    fun `http client makes post request`() =
         runTest {
             val client = createMockClient("""{"id": "new_journal_123", "created": true}""")
 
@@ -182,7 +182,7 @@ class HttpClientTest {
      * **Real App Usage**: Editing journal titles, updating journal content
      */
     @Test
-    fun httpClient_makesPutRequest() =
+    fun `http client makes put request`() =
         runTest {
             val client = createMockClient("""{"id": "journal_123", "updated": true}""")
 
@@ -209,7 +209,7 @@ class HttpClientTest {
      * **Real App Usage**: Deleting unwanted journals, cleaning up old entries
      */
     @Test
-    fun httpClient_makesDeleteRequest() =
+    fun `http client makes delete request`() =
         runTest {
             val client = createMockClient("""{"deleted": true, "id": "journal_123"}""")
 
@@ -234,7 +234,7 @@ class HttpClientTest {
      * **Real App Usage**: Journal list with entries, paginated responses, metadata
      */
     @Test
-    fun httpClient_handlesJsonResponseWithComplexData() =
+    fun `http client handles json response with complex data`() =
         runTest {
             val jsonResponse =
                 """
@@ -274,7 +274,7 @@ class HttpClientTest {
      * **Real App Usage**: Accessing deleted journals, invalid journal IDs
      */
     @Test
-    fun httpClient_handles404Error() =
+    fun `http client handles404 error`() =
         runTest {
             val client =
                 createMockClient(
@@ -303,7 +303,7 @@ class HttpClientTest {
      * **Real App Usage**: Expired login sessions, invalid API tokens
      */
     @Test
-    fun httpClient_handles401UnauthorizedError() =
+    fun `http client handles401 unauthorized error`() =
         runTest {
             val client =
                 createMockClient(
@@ -333,7 +333,7 @@ class HttpClientTest {
      * **Real App Usage**: Database failures, backend service outages
      */
     @Test
-    fun httpClient_handles500InternalServerError() =
+    fun `http client handles500 internal server error`() =
         runTest {
             val client =
                 createMockClient(
@@ -359,7 +359,7 @@ class HttpClientTest {
      * **Real App Usage**: User authentication, API versioning, request tracing
      */
     @Test
-    fun httpClient_handlesCustomHeaders() =
+    fun `http client handles custom headers`() =
         runTest {
             val customHeaders =
                 mapOf(
@@ -388,7 +388,7 @@ class HttpClientTest {
      * **Real App Usage**: Health checks, connectivity tests, ping operations
      */
     @Test
-    fun httpClient_handlesEmptyResponse() =
+    fun `http client handles empty response`() =
         runTest {
             val client = createMockClient(responseBody = "")
 
@@ -412,7 +412,7 @@ class HttpClientTest {
      * **Real App Usage**: Loading complete journal history, bulk operations
      */
     @Test
-    fun httpClient_handlesLargeJsonResponse() =
+    fun `http client handles large json response`() =
         runTest {
             // Simulate a large response that might be returned by the LogDate API
             val entries =
@@ -446,7 +446,7 @@ class HttpClientTest {
      * **Real App Usage**: API version upgrades, gradual feature rollouts
      */
     @Test
-    fun httpClient_configurationIgnoresUnknownJsonKeys() =
+    fun `http client configuration ignores unknown json keys`() =
         runTest {
             // Test that the JSON configuration properly ignores unknown keys (important for API evolution)
             val responseWithUnknownFields =

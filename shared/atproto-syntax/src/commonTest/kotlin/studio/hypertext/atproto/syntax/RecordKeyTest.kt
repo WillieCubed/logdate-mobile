@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
  */
 class RecordKeyTest {
     @Test
-    fun acceptsSpecExamples() {
+    fun `accepts spec examples`() {
         val recordKey = RecordKey.require("self")
 
         assertEquals("self", box(recordKey).value)
@@ -25,26 +25,26 @@ class RecordKeyTest {
     }
 
     @Test
-    fun serializesAsJsonString() {
+    fun `serializes as json string`() {
         val json = Json.encodeToString(RecordKey.require("~1.2-3_"))
 
         assertEquals("\"~1.2-3_\"", json)
     }
 
     @Test
-    fun rejectsDotSegments() {
+    fun `rejects dot segments`() {
         assertFailsWith<InvalidRecordKeyException> {
             RecordKey.require("..")
         }
     }
 
     @Test
-    fun parseReturnsFailureForInvalidCharacter() {
+    fun `parse returns failure for invalid character`() {
         assertTrue(RecordKey.parse("alpha/beta").isFailure)
     }
 
     @Test
-    fun reportsValidityForAllowedCharacters() {
+    fun `reports validity for allowed characters`() {
         assertTrue(RecordKey.isValid("~1.2-3_"))
     }
 }

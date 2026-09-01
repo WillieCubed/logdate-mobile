@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class RemoteCameraDeviceDataMapperTest {
     @Test
-    fun cameraSelectionRoundTripsThroughStringDataMap() {
+    fun `camera selection round trips through string data map`() {
         val selection =
             MediaDeviceSelectionUiState(
                 kind = MediaDeviceKind.CAMERA,

@@ -16,7 +16,7 @@ import kotlin.test.assertNotNull
 @OptIn(ExperimentalCoroutinesApi::class)
 class DaoInterfaceTest : BaseDatabaseTest() {
     @Test
-    fun journalDao_classExists() =
+    fun `journal dao class exists`() =
         runTest {
             val daoClass = JournalDao::class
             assertNotNull(daoClass)
@@ -24,7 +24,7 @@ class DaoInterfaceTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun textNoteDao_classExists() =
+    fun `text note dao class exists`() =
         runTest {
             val daoClass = TextNoteDao::class
             assertNotNull(daoClass)
@@ -32,7 +32,7 @@ class DaoInterfaceTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun imageNoteDao_classExists() =
+    fun `image note dao class exists`() =
         runTest {
             val daoClass = ImageNoteDao::class
             assertNotNull(daoClass)
@@ -40,7 +40,7 @@ class DaoInterfaceTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun journalNotesDao_classExists() =
+    fun `journal notes dao class exists`() =
         runTest {
             val daoClass = JournalNotesDao::class
             assertNotNull(daoClass)
@@ -48,7 +48,7 @@ class DaoInterfaceTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun locationHistoryDao_classExists() =
+    fun `location history dao class exists`() =
         runTest {
             val daoClass = LocationHistoryDao::class
             assertNotNull(daoClass)
@@ -56,7 +56,7 @@ class DaoInterfaceTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun userDevicesDao_classExists() =
+    fun `user devices dao class exists`() =
         runTest {
             val daoClass = UserDevicesDao::class
             assertNotNull(daoClass)
@@ -64,7 +64,7 @@ class DaoInterfaceTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun userMediaDao_classExists() =
+    fun `user media dao class exists`() =
         runTest {
             val daoClass = UserMediaDao::class
             assertNotNull(daoClass)
@@ -72,7 +72,7 @@ class DaoInterfaceTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun journalContentDao_classExists() =
+    fun `journal content dao class exists`() =
         runTest {
             val daoClass = app.logdate.client.database.dao.journals.JournalContentDao::class
             assertNotNull(daoClass)
@@ -80,7 +80,7 @@ class DaoInterfaceTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun cachedRewindDao_classExists() =
+    fun `cached rewind dao class exists`() =
         runTest {
             val daoClass = app.logdate.client.database.dao.rewind.CachedRewindDao::class
             assertNotNull(daoClass)
@@ -88,7 +88,7 @@ class DaoInterfaceTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun allDaoClasses_exist() =
+    fun `all dao classes exist`() =
         runTest {
             val daoClasses =
                 listOf(

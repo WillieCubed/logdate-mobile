@@ -126,7 +126,7 @@ class WeekNarrativeSynthesizerTest {
     }
 
     @Test
-    fun synthesize_withVacationWeek_generatesCorrectNarrative() =
+    fun `synthesize with vacation week generates correct narrative`() =
         runTest(testDispatcher) {
             setup()
             val weekId = "2024-W30"
@@ -203,7 +203,7 @@ class WeekNarrativeSynthesizerTest {
         }
 
     @Test
-    fun synthesize_withToughWeek_generatesCorrectNarrative() =
+    fun `synthesize with tough week generates correct narrative`() =
         runTest(testDispatcher) {
             setup()
             val weekId = "2024-W31"
@@ -282,7 +282,7 @@ class WeekNarrativeSynthesizerTest {
         }
 
     @Test
-    fun synthesize_withCachedResponse_usesCachedNarrative() =
+    fun `synthesize with cached response uses cached narrative`() =
         runTest(testDispatcher) {
             setup()
             val weekId = "2024-W32"
@@ -325,7 +325,7 @@ class WeekNarrativeSynthesizerTest {
         }
 
     @Test
-    fun synthesize_withNoContent_handlesGracefully() =
+    fun `synthesize with no content handles gracefully`() =
         runTest(testDispatcher) {
             setup()
             val weekId = "2024-W33"
@@ -357,7 +357,7 @@ class WeekNarrativeSynthesizerTest {
         }
 
     @Test
-    fun synthesize_whenOffline_returnsUnavailable() =
+    fun `synthesize when offline returns unavailable`() =
         runTest(testDispatcher) {
             setup()
             fakeNetworkMonitor.setAvailable(false)
@@ -377,7 +377,7 @@ class WeekNarrativeSynthesizerTest {
         }
 
     @Test
-    fun synthesize_withNullAIResponse_returnsNull() =
+    fun `synthesize with null ai response returns null`() =
         runTest(testDispatcher) {
             setup()
             val weekId = "2024-W34"
@@ -405,7 +405,7 @@ class WeekNarrativeSynthesizerTest {
         }
 
     @Test
-    fun synthesize_withInvalidJSON_returnsNull() =
+    fun `synthesize with invalid json returns null`() =
         runTest(testDispatcher) {
             setup()
             val weekId = "2024-W35"
@@ -433,7 +433,7 @@ class WeekNarrativeSynthesizerTest {
         }
 
     @Test
-    fun synthesize_includesPeopleInContentSummary() =
+    fun `synthesize includes people in content summary`() =
         runTest(testDispatcher) {
             setup()
             val weekId = "2024-W36"
@@ -477,7 +477,7 @@ class WeekNarrativeSynthesizerTest {
         }
 
     @Test
-    fun synthesize_includesMediaInContentSummary() =
+    fun `synthesize includes media in content summary`() =
         runTest(testDispatcher) {
             setup()
             val weekId = "2024-W37"
@@ -531,7 +531,7 @@ class WeekNarrativeSynthesizerTest {
         }
 
     @Test
-    fun synthesize_includesAudioTranscriptsInContentSummary() =
+    fun `synthesize includes audio transcripts in content summary`() =
         runTest(testDispatcher) {
             setup()
             val weekId = "2024-W38"

@@ -17,7 +17,7 @@ import kotlin.test.assertIs
  */
 class AudioRecordingResumptionTest {
     @Test
-    fun recover_withParseableFile_returnsReady() =
+    fun `recover with parseable file returns ready`() =
         runTest {
             val recoverer =
                 DefaultPendingAudioRecoverer(
@@ -35,7 +35,7 @@ class AudioRecordingResumptionTest {
         }
 
     @Test
-    fun recover_withUnparseableFile_returnsFailed() =
+    fun `recover with unparseable file returns failed`() =
         runTest {
             val recoverer =
                 DefaultPendingAudioRecoverer(
@@ -51,7 +51,7 @@ class AudioRecordingResumptionTest {
         }
 
     @Test
-    fun recover_withNullFilePath_returnsFailed() =
+    fun `recover with null file path returns failed`() =
         runTest {
             val recoverer =
                 DefaultPendingAudioRecoverer(
@@ -65,7 +65,7 @@ class AudioRecordingResumptionTest {
         }
 
     @Test
-    fun recover_whenResolverThrows_returnsFailed() =
+    fun `recover when resolver throws returns failed`() =
         runTest {
             val recoverer =
                 DefaultPendingAudioRecoverer(

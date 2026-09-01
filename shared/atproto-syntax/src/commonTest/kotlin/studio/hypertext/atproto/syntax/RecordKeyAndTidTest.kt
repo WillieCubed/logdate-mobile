@@ -13,28 +13,28 @@ import kotlin.test.assertFailsWith
  */
 class RecordKeyAndTidTest {
     @Test
-    fun acceptsValidRecordKeys() {
+    fun `accepts valid record keys`() {
         val recordKey = RecordKey.require("self")
 
         assertEquals("self", recordKey.value)
     }
 
     @Test
-    fun rejectsRecordKeysWithSlashes() {
+    fun `rejects record keys with slashes`() {
         assertFailsWith<InvalidRecordKeyException> {
             RecordKey.require("a/b")
         }
     }
 
     @Test
-    fun acceptsValidTid() {
+    fun `accepts valid tid`() {
         val tid = Tid.require("3jqfcqzm3fo2j")
 
         assertEquals("3jqfcqzm3fo2j", tid.value)
     }
 
     @Test
-    fun rejectsInvalidTid() {
+    fun `rejects invalid tid`() {
         assertFailsWith<InvalidTidException> {
             Tid.require("not-a-tid")
         }

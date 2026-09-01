@@ -41,7 +41,7 @@ class WearRecordingScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun readyState_displaysHoldToRecord() {
+    fun `ready state displays hold to record`() {
         composeRule.setContent {
             MaterialTheme {
                 Box(
@@ -61,7 +61,7 @@ class WearRecordingScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun recordingState_displaysTimer() {
+    fun `recording state displays timer`() {
         composeRule.setContent {
             MaterialTheme {
                 Box(
@@ -83,7 +83,7 @@ class WearRecordingScreenTest {
     }
 
     @Test
-    fun recordingState_displaysWaveformWithLevels() {
+    fun `recording state displays waveform with levels`() {
         composeRule.setContent {
             MaterialTheme {
                 Box(
@@ -102,7 +102,7 @@ class WearRecordingScreenTest {
     }
 
     @Test
-    fun recordingState_displaysEmptyWaveform() {
+    fun `recording state displays empty waveform`() {
         composeRule.setContent {
             MaterialTheme {
                 Box(
@@ -125,7 +125,7 @@ class WearRecordingScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun savingState_displaysSavingText() {
+    fun `saving state displays saving text`() {
         composeRule.setContent {
             MaterialTheme {
                 Box(
@@ -145,7 +145,7 @@ class WearRecordingScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun savedState_displaysCheckmarkAndDuration() {
+    fun `saved state displays checkmark and duration`() {
         composeRule.setContent {
             MaterialTheme {
                 Box(
@@ -165,7 +165,7 @@ class WearRecordingScreenTest {
     }
 
     @Test
-    fun savedState_displaysLongDuration() {
+    fun `saved state displays long duration`() {
         composeRule.setContent {
             MaterialTheme {
                 Box(
@@ -185,7 +185,7 @@ class WearRecordingScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun tooShortState_displaysBothMessages() {
+    fun `too short state displays both messages`() {
         composeRule.setContent {
             MaterialTheme {
                 Box(
@@ -206,7 +206,7 @@ class WearRecordingScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun errorState_displaysErrorMessage() {
+    fun `error state displays error message`() {
         composeRule.setContent {
             MaterialTheme {
                 Box(
@@ -222,7 +222,7 @@ class WearRecordingScreenTest {
     }
 
     @Test
-    fun errorState_displaysDefaultWhenNull() {
+    fun `error state displays default when null`() {
         composeRule.setContent {
             MaterialTheme {
                 Box(
@@ -242,22 +242,22 @@ class WearRecordingScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun formatDuration_zeroMs() {
+    fun `format duration zero ms`() {
         assertEquals("0:00", formatDuration(0))
     }
 
     @Test
-    fun formatDuration_subMinute() {
+    fun `format duration sub minute`() {
         assertEquals("0:04", formatDuration(4_200))
     }
 
     @Test
-    fun formatDuration_exactMinute() {
+    fun `format duration exact minute`() {
         assertEquals("1:00", formatDuration(60_000))
     }
 
     @Test
-    fun formatDuration_multiMinute() {
+    fun `format duration multi minute`() {
         assertEquals("2:30", formatDuration(150_000))
     }
 }

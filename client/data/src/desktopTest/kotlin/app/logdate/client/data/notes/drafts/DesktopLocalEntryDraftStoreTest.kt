@@ -33,7 +33,7 @@ class DesktopLocalEntryDraftStoreTest {
     }
 
     @Test
-    fun completeDraftSnapshotRoundTrips() =
+    fun `complete draft snapshot round trips`() =
         runTest {
             val timestamp = Instant.fromEpochMilliseconds(1_725_000_000_000)
             val pendingMedia =
@@ -69,7 +69,7 @@ class DesktopLocalEntryDraftStoreTest {
         }
 
     @Test
-    fun legacyDraftWithoutSnapshotFieldsUsesEmptyDefaults() =
+    fun `legacy draft without snapshot fields uses empty defaults`() =
         runTest {
             val draftId = Uuid.random()
             val draftsDirectory = File(temporaryAppDataDirectory, "drafts")
@@ -92,7 +92,7 @@ class DesktopLocalEntryDraftStoreTest {
         }
 
     @Test
-    fun malformedDraftSnapshotSurfacesRecoverableErrorAndPreservesFile() =
+    fun `malformed draft snapshot surfaces recoverable error and preserves file`() =
         runTest {
             val draftId = Uuid.random()
             val malformed = "{ definitely-not-a-draft"
@@ -106,7 +106,7 @@ class DesktopLocalEntryDraftStoreTest {
         }
 
     @Test
-    fun malformedIndexedSnapshotFailsWholeLoadAndPreservesFiles() =
+    fun `malformed indexed snapshot fails whole load and preserves files`() =
         runTest {
             val draftId = Uuid.random()
             val draftsDirectory = File(temporaryAppDataDirectory, "drafts")
@@ -123,7 +123,7 @@ class DesktopLocalEntryDraftStoreTest {
         }
 
     @Test
-    fun malformedDraftIndexSurfacesRecoverableErrorAndPreservesIndex() =
+    fun `malformed draft index surfaces recoverable error and preserves index`() =
         runTest {
             val index = File(temporaryAppDataDirectory, "drafts/index.json")
             index.writeText("not-json")

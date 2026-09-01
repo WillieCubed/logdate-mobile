@@ -26,7 +26,7 @@ import kotlin.uuid.Uuid
  */
 class ImportDeviceCalendarEventsUseCaseTest {
     @Test
-    fun imports_new_events() =
+    fun `imports new events`() =
         runTest {
             val reader = FakeCalendarReader(events = listOf(deviceEvent("evt-1", title = "Recital")))
             val repo = RecordingEventRepository()
@@ -46,7 +46,7 @@ class ImportDeviceCalendarEventsUseCaseTest {
         }
 
     @Test
-    fun imports_all_day_events_with_the_all_day_flag_set() =
+    fun `imports all day events with the all day flag set`() =
         runTest {
             val reader =
                 FakeCalendarReader(
@@ -63,7 +63,7 @@ class ImportDeviceCalendarEventsUseCaseTest {
         }
 
     @Test
-    fun updates_event_when_only_the_all_day_flag_changed() =
+    fun `updates event when only the all day flag changed`() =
         runTest {
             val existing =
                 Event(
@@ -98,7 +98,7 @@ class ImportDeviceCalendarEventsUseCaseTest {
         }
 
     @Test
-    fun updates_events_whose_title_or_time_changed() =
+    fun `updates events whose title or time changed`() =
         runTest {
             val existing =
                 Event(
@@ -135,7 +135,7 @@ class ImportDeviceCalendarEventsUseCaseTest {
         }
 
     @Test
-    fun skips_events_that_havent_changed() =
+    fun `skips events that havent changed`() =
         runTest {
             val existing =
                 Event(
@@ -173,7 +173,7 @@ class ImportDeviceCalendarEventsUseCaseTest {
         }
 
     @Test
-    fun returns_permission_denied_when_reader_has_no_permission() =
+    fun `returns permission denied when reader has no permission`() =
         runTest {
             val reader = FakeCalendarReader(hasPermission = false, events = listOf(deviceEvent("evt-1")))
             val repo = RecordingEventRepository()
@@ -186,7 +186,7 @@ class ImportDeviceCalendarEventsUseCaseTest {
         }
 
     @Test
-    fun returns_empty_summary_when_no_calendars_are_selected() =
+    fun `returns empty summary when no calendars are selected`() =
         runTest {
             val reader = FakeCalendarReader(events = listOf(deviceEvent("evt-1")))
             val repo = RecordingEventRepository()
@@ -202,7 +202,7 @@ class ImportDeviceCalendarEventsUseCaseTest {
         }
 
     @Test
-    fun respects_lookback_and_lookahead_window_passed_to_reader() =
+    fun `respects lookback and lookahead window passed to reader`() =
         runTest {
             val reader = FakeCalendarReader(events = emptyList())
             val repo = RecordingEventRepository()

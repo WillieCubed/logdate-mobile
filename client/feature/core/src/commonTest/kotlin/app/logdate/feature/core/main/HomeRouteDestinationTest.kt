@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 class HomeRouteDestinationTest {
     @Test
-    fun visibleEntries_hidesLibrary_whenDisabled() {
+    fun `visible entries hides library when disabled`() {
         val visible = HomeRouteDestination.visibleEntries(isLibraryEnabled = false)
 
         assertFalse(
@@ -17,7 +17,7 @@ class HomeRouteDestinationTest {
     }
 
     @Test
-    fun visibleEntries_showsLibrary_whenEnabled() {
+    fun `visible entries shows library when enabled`() {
         val visible = HomeRouteDestination.visibleEntries(isLibraryEnabled = true)
 
         assertTrue(
@@ -27,14 +27,14 @@ class HomeRouteDestinationTest {
     }
 
     @Test
-    fun visibleEntries_preservesDeclaredOrder_whenLibraryEnabled() {
+    fun `visible entries preserves declared order when library enabled`() {
         val visible = HomeRouteDestination.visibleEntries(isLibraryEnabled = true)
 
         assertEquals(HomeRouteDestination.entries, visible)
     }
 
     @Test
-    fun visibleEntries_keepsEveryNonLibraryTab_whenDisabled() {
+    fun `visible entries keeps every non library tab when disabled`() {
         val visible = HomeRouteDestination.visibleEntries(isLibraryEnabled = false)
 
         assertEquals(

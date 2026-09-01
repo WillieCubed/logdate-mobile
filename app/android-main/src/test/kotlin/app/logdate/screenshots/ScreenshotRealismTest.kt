@@ -27,7 +27,7 @@ class ScreenshotRealismTest {
         repoRoot.resolve("app/android-main/src/screenshotTest/kotlin/app/logdate/screenshots")
 
     @Test
-    fun flowScreenshotsAvoidSyntheticScaffoldingAndDebtStates() {
+    fun `flow screenshots avoid synthetic scaffolding and debt states`() {
         val violations =
             collectViolations(screenshotsDir.resolve("flows")) { file, contents ->
                 buildList {
@@ -65,7 +65,7 @@ class ScreenshotRealismTest {
     }
 
     @Test
-    fun componentScreenshotsAvoidFakeShellCopy() {
+    fun `component screenshots avoid fake shell copy`() {
         val violations =
             collectViolations(screenshotsDir.resolve("components")) { file, contents ->
                 buildList {
@@ -97,7 +97,7 @@ class ScreenshotRealismTest {
     }
 
     @Test
-    fun editorMediaFixtureIsPackagedAndCheckoutIndependent() {
+    fun `editor media fixture is packaged and checkout independent`() {
         val editorScreenshotSource =
             screenshotsDir.resolve("components/editor/EditorModeComponentScreenshots.kt")
         val source = editorScreenshotSource.readText()
@@ -116,7 +116,7 @@ class ScreenshotRealismTest {
     }
 
     @Test
-    fun editorMediaImportFailureCopyDoesNotAssumeTheOriginalIsInThePhotoLibrary() {
+    fun `editor media import failure copy does not assume the original is in the photo library`() {
         val editorStrings =
             repoRoot
                 .resolve("client/feature/editor/src/commonMain/composeResources/values/strings.xml")

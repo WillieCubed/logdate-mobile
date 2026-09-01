@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
  */
 class AesGcmMediaPayloadCryptoTest {
     @Test
-    fun encryptAddsPrefixAndDecrypts() =
+    fun `encrypt adds prefix and decrypts`() =
         runTest {
             val key = ByteArray(32) { index -> (index + 1).toByte() }
             val crypto = AesGcmMediaPayloadCrypto(key)
@@ -33,7 +33,7 @@ class AesGcmMediaPayloadCryptoTest {
         }
 
     @Test
-    fun encryptSkipsAlreadyPrefixedPayloads() =
+    fun `encrypt skips already prefixed payloads`() =
         runTest {
             val key = ByteArray(32) { index -> (index + 2).toByte() }
             val crypto = AesGcmMediaPayloadCrypto(key)
@@ -45,7 +45,7 @@ class AesGcmMediaPayloadCryptoTest {
         }
 
     @Test
-    fun decryptPassesThroughPlaintext() =
+    fun `decrypt passes through plaintext`() =
         runTest {
             val key = ByteArray(32) { index -> (index + 3).toByte() }
             val crypto = AesGcmMediaPayloadCrypto(key)
@@ -58,7 +58,7 @@ class AesGcmMediaPayloadCryptoTest {
         }
 
     @Test
-    fun decryptFailsOnTamperedCiphertext() =
+    fun `decrypt fails on tampered ciphertext`() =
         runTest {
             val key = ByteArray(32) { index -> (index + 5).toByte() }
             val crypto = AesGcmMediaPayloadCrypto(key)

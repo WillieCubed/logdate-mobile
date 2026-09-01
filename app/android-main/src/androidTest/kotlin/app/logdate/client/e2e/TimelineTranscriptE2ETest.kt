@@ -41,7 +41,7 @@ class TimelineTranscriptE2ETest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun legacyAudioCard_showsSentenceExcerpt_andExpandsInlineTranscript() {
+    fun `legacy audio card shows sentence excerpt and expands inline transcript`() {
         val noteId = Uuid.random()
         val firstSentence = "This is a deliberately long opening sentence for the transcript."
         val secondSentence = "The hidden follow-up sentence appears after expansion."
@@ -72,7 +72,7 @@ class TimelineTranscriptE2ETest {
     }
 
     @Test
-    fun momentAudioCard_usesSentenceBoundaries_forCollapsedPreview() {
+    fun `moment audio card uses sentence boundaries for collapsed preview`() {
         val secondSentence = "Here is the useful detail that should still show."
         val thirdSentence = "This sentence should stay hidden while collapsed."
         val transcript = "Yep. $secondSentence $thirdSentence"
@@ -91,7 +91,7 @@ class TimelineTranscriptE2ETest {
     }
 
     @Test
-    fun momentAudioCard_expandsInlineTranscript_whenPreviewRequested() {
+    fun `moment audio card expands inline transcript when preview requested`() {
         val firstSentence = "This is another long first sentence for a semantic moment."
         val secondSentence = "The rest of the transcript should appear after tapping preview."
         val transcript = "$firstSentence $secondSentence"

@@ -44,7 +44,7 @@ import kotlin.uuid.Uuid
  */
 class InferEventsUseCaseTest {
     @Test
-    fun creates_event_when_long_stop_has_photo_and_note_signals() =
+    fun `creates event when long stop has photo and note signals`() =
         runTest {
             val stop = stopAt(STOP_START)
             val media = listOf(image(at = STOP_START + 30.minutes))
@@ -74,7 +74,7 @@ class InferEventsUseCaseTest {
         }
 
     @Test
-    fun skips_clusters_at_familiar_places() =
+    fun `skips clusters at familiar places`() =
         runTest {
             val stop = stopAt(STOP_START)
             val eventRepo = RecordingEventRepository()
@@ -97,7 +97,7 @@ class InferEventsUseCaseTest {
         }
 
     @Test
-    fun skips_clusters_with_fewer_signals_than_sensitivity_requires() =
+    fun `skips clusters with fewer signals than sensitivity requires`() =
         runTest {
             val stop = stopAt(STOP_START)
             val eventRepo = RecordingEventRepository()
@@ -121,7 +121,7 @@ class InferEventsUseCaseTest {
         }
 
     @Test
-    fun deduplicates_against_existing_events_in_range() =
+    fun `deduplicates against existing events in range`() =
         runTest {
             val stop = stopAt(STOP_START)
             val pre =
@@ -150,7 +150,7 @@ class InferEventsUseCaseTest {
         }
 
     @Test
-    fun falls_back_to_heuristic_name_when_extractor_fails() =
+    fun `falls back to heuristic name when extractor fails`() =
         runTest {
             val stop = stopAt(STOP_START)
             val eventRepo = RecordingEventRepository()
@@ -184,7 +184,7 @@ class InferEventsUseCaseTest {
         }
 
     @Test
-    fun returns_zero_when_no_qualifying_stops_exist() =
+    fun `returns zero when no qualifying stops exist`() =
         runTest {
             val eventRepo = RecordingEventRepository()
             val useCase =
@@ -206,7 +206,7 @@ class InferEventsUseCaseTest {
         }
 
     @Test
-    fun skips_stops_resolved_to_unknown_locations() =
+    fun `skips stops resolved to unknown locations`() =
         runTest {
             val stop = stopAt(STOP_START)
             val eventRepo = RecordingEventRepository()
@@ -229,7 +229,7 @@ class InferEventsUseCaseTest {
         }
 
     @Test
-    fun does_not_call_extractor_when_ai_naming_disabled() =
+    fun `does not call extractor when ai naming disabled`() =
         runTest {
             var extractorCalls = 0
             val stop = stopAt(STOP_START)

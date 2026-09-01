@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
  */
 class WellKnownHandleResolverTest {
     @Test
-    fun resolvesHandleViaWellKnownEndpoint(): Unit =
+    fun `resolves handle via well known endpoint`(): Unit =
         runTest {
             val resolver =
                 WellKnownHandleResolver(
@@ -48,7 +48,7 @@ class WellKnownHandleResolverTest {
         }
 
     @Test
-    fun returnsFailureForNotFound(): Unit =
+    fun `returns failure for not found`(): Unit =
         runTest {
             val resolver =
                 WellKnownHandleResolver(
@@ -69,7 +69,7 @@ class WellKnownHandleResolverTest {
         }
 
     @Test
-    fun returnsFailureForInvalidDidBody(): Unit =
+    fun `returns failure for invalid did body`(): Unit =
         runTest {
             val resolver =
                 WellKnownHandleResolver(

@@ -45,7 +45,7 @@ class NoteViewerViewModelTest {
     }
 
     @Test
-    fun mapsTextNoteToContentState() =
+    fun `maps text note to content state`() =
         runTest(dispatcher) {
             val noteId = Uuid.random()
             val now = Instant.parse("2025-01-01T00:00:00Z")
@@ -77,7 +77,7 @@ class NoteViewerViewModelTest {
         }
 
     @Test
-    fun mapsImageNoteToContentState() =
+    fun `maps image note to content state`() =
         runTest(dispatcher) {
             val noteId = Uuid.random()
             val now = Instant.parse("2025-01-01T00:00:00Z")
@@ -108,7 +108,7 @@ class NoteViewerViewModelTest {
         }
 
     @Test
-    fun mapsVideoNoteToContentState() =
+    fun `maps video note to content state`() =
         runTest(dispatcher) {
             val noteId = Uuid.random()
             val now = Instant.parse("2025-01-01T00:00:00Z")
@@ -139,7 +139,7 @@ class NoteViewerViewModelTest {
         }
 
     @Test
-    fun mapsAudioNoteToContentState() =
+    fun `maps audio note to content state`() =
         runTest(dispatcher) {
             val noteId = Uuid.random()
             val now = Instant.parse("2025-01-01T00:00:00Z")
@@ -172,7 +172,7 @@ class NoteViewerViewModelTest {
         }
 
     @Test
-    fun deleteNoteInvokesUseCase() =
+    fun `delete note invokes use case`() =
         runTest(dispatcher) {
             val noteId = Uuid.random()
             val now = Instant.parse("2025-01-01T00:00:00Z")
@@ -204,7 +204,7 @@ class NoteViewerViewModelTest {
         }
 
     @Test
-    fun shareCurrentNote_sharesTextContentAsPlainText() =
+    fun `share current note shares text content as plain text`() =
         runTest(dispatcher) {
             val noteId = Uuid.random()
             val now = Instant.parse("2025-01-01T00:00:00Z")
@@ -235,7 +235,7 @@ class NoteViewerViewModelTest {
         }
 
     @Test
-    fun shareCurrentNote_sharesImageContentAsMedia() =
+    fun `share current note shares image content as media`() =
         runTest(dispatcher) {
             val noteId = Uuid.random()
             val now = Instant.parse("2025-01-01T00:00:00Z")

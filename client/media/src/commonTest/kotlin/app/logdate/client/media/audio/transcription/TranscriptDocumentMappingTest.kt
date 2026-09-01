@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 
 class TranscriptDocumentMappingTest {
     @Test
-    fun toTranscriptDocument_preserves_timed_utterances_and_words() {
+    fun `to transcript document preserves timed utterances and words`() {
         val timedTranscript =
             TimedTranscript(
                 utterances =

@@ -17,7 +17,7 @@ import kotlin.test.assertNull
  */
 class EmptyEditorTransitionStateTest {
     @Test
-    fun testMatchingPickerTileIdsReuseSupportedBlockIds() {
+    fun `matching picker tile ids reuse supported block ids`() {
         val textBlock = TextBlockUiState()
         val audioBlock = AudioBlockUiState()
         val imageBlock = ImageBlockUiState()
@@ -30,7 +30,7 @@ class EmptyEditorTransitionStateTest {
     }
 
     @Test
-    fun testUnsupportedBlockTypesDoNotMapToPickerTiles() {
+    fun `unsupported block types do not map to picker tiles`() {
         val videoBlock = VideoBlockUiState()
         val tileIds = matchingPickerTileIdsFor(videoBlock)
 

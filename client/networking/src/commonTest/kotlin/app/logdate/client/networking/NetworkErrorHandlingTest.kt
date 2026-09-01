@@ -92,7 +92,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_withTimeout_throwsTimeoutException() =
+    fun `http client with timeout throws timeout exception`() =
         runTest {
             val client = createMockClientWithDelay(delayMs = 2000) // 2 second delay
 
@@ -103,7 +103,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_withConnectTimeout_throwsConnectTimeoutException() =
+    fun `http client with connect timeout throws connect timeout exception`() =
         runTest {
             val client = createMockClientWithException(ConnectTimeoutException("Connection timeout"))
 
@@ -114,7 +114,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_withSocketTimeout_throwsSocketTimeoutException() =
+    fun `http client with socket timeout throws socket timeout exception`() =
         runTest {
             val client = createMockClientWithException(SocketTimeoutException("Socket timeout"))
 
@@ -125,7 +125,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_withIOException_throwsIOException() =
+    fun `http client with io exception throws io exception`() =
         runTest {
             val client = createMockClientWithException(IOException("Network IO error"))
 
@@ -136,7 +136,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_with400BadRequest_throwsClientRequestException() =
+    fun `http client with400 bad request throws client request exception`() =
         runTest {
             val client =
                 createMockClientWithDelay(
@@ -150,7 +150,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_with401Unauthorized_throwsClientRequestException() =
+    fun `http client with401 unauthorized throws client request exception`() =
         runTest {
             val client =
                 createMockClientWithDelay(
@@ -164,7 +164,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_with403Forbidden_throwsClientRequestException() =
+    fun `http client with403 forbidden throws client request exception`() =
         runTest {
             val client =
                 createMockClientWithDelay(
@@ -178,7 +178,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_with404NotFound_throwsClientRequestException() =
+    fun `http client with404 not found throws client request exception`() =
         runTest {
             val client =
                 createMockClientWithDelay(
@@ -192,7 +192,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_with500InternalServerError_throwsServerResponseException() =
+    fun `http client with500 internal server error throws server response exception`() =
         runTest {
             val client =
                 createMockClientWithDelay(
@@ -206,7 +206,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_with502BadGateway_throwsServerResponseException() =
+    fun `http client with502 bad gateway throws server response exception`() =
         runTest {
             val client =
                 createMockClientWithDelay(
@@ -220,7 +220,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_with503ServiceUnavailable_throwsServerResponseException() =
+    fun `http client with503 service unavailable throws server response exception`() =
         runTest {
             val client =
                 createMockClientWithDelay(
@@ -234,7 +234,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_withCustomTimeout_respectsTimeout() =
+    fun `http client with custom timeout respects timeout`() =
         runTest {
             val client =
                 HttpClient(MockEngine) {
@@ -261,7 +261,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_withPostRequestError_handlesCorrectly() =
+    fun `http client with post request error handles correctly`() =
         runTest {
             val client =
                 createMockClientWithDelay(
@@ -278,7 +278,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_withNetworkFluctuation_handlesMultipleErrors() =
+    fun `http client with network fluctuation handles multiple errors`() =
         runTest {
             val errors =
                 listOf(
@@ -300,7 +300,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_withMalformedResponse_handlesGracefully() =
+    fun `http client with malformed response handles gracefully`() =
         runTest {
             val client =
                 HttpClient(MockEngine) {
@@ -322,7 +322,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_withSlowResponse_completesWithinReasonableTime() =
+    fun `http client with slow response completes within reasonable time`() =
         runTest {
             val client =
                 createMockClientWithDelay(
@@ -336,7 +336,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_withEmptyErrorResponse_handlesCorrectly() =
+    fun `http client with empty error response handles correctly`() =
         runTest {
             val client =
                 createMockClientWithDelay(
@@ -350,7 +350,7 @@ class NetworkErrorHandlingTest {
         }
 
     @Test
-    fun httpClient_withRateLimitError_throwsCorrectException() =
+    fun `http client with rate limit error throws correct exception`() =
         runTest {
             val client =
                 createMockClientWithDelay(

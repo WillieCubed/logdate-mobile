@@ -15,7 +15,7 @@ import kotlin.uuid.Uuid
 
 class AndroidLocalEntryDraftStoreTest {
     @Test
-    fun malformedSnapshotSurfacesRecoverableErrorAndPreservesDataStoreValue() =
+    fun `malformed snapshot surfaces recoverable error and preserves data store value`() =
         runTest {
             val draftId = Uuid.random()
             val key = stringPreferencesKey(draftId.toString())

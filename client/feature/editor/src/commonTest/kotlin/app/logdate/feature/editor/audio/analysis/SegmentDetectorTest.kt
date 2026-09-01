@@ -18,20 +18,20 @@ class SegmentDetectorTest {
     private val detector = SegmentDetector()
 
     @Test
-    fun emptyAmplitudesReturnsEmptySegments() {
+    fun `empty amplitudes returns empty segments`() {
         val result = detector.detectSegments(emptyList(), 1000L)
         assertTrue(result.isEmpty())
     }
 
     @Test
-    fun zeroDurationReturnsEmptySegments() {
+    fun `zero duration returns empty segments`() {
         val amplitudes = listOf(0.5f, 0.6f, 0.4f)
         val result = detector.detectSegments(amplitudes, 0L)
         assertTrue(result.isEmpty())
     }
 
     @Test
-    fun detectsSpeechOnsetAfterSilence() {
+    fun `detects speech onset after silence`() {
         // Silence followed by speech
         val amplitudes = listOf(0.05f, 0.05f, 0.05f, 0.5f, 0.6f, 0.5f)
         val result = detector.detectSegments(amplitudes, 6000L)
@@ -43,7 +43,7 @@ class SegmentDetectorTest {
     }
 
     @Test
-    fun detectsVolumePeaks() {
+    fun `detects volume peaks`() {
         // Clear peak in the middle
         val amplitudes = listOf(0.3f, 0.5f, 0.9f, 0.5f, 0.3f)
         val result = detector.detectSegments(amplitudes, 5000L)
@@ -55,7 +55,7 @@ class SegmentDetectorTest {
     }
 
     @Test
-    fun segmentsAreSortedByTimestamp() {
+    fun `segments are sorted by timestamp`() {
         // Multiple potential segments
         val amplitudes = List(100) { if (it % 20 == 10) 0.9f else 0.3f }
         val result = detector.detectSegments(amplitudes, 10000L)
@@ -65,7 +65,7 @@ class SegmentDetectorTest {
     }
 
     @Test
-    fun detectsSignificantPause() {
+    fun `detects significant pause`() {
         // Speech, long silence, speech
         val amplitudes =
             buildList {
@@ -80,7 +80,7 @@ class SegmentDetectorTest {
     }
 
     @Test
-    fun ignoresShortPauses() {
+    fun `ignores short pauses`() {
         // Speech, short silence, speech
         val amplitudes =
             buildList {

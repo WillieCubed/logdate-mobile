@@ -20,7 +20,7 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalCoroutinesApi::class)
 class AutoSaveCoordinatorTest {
     @Test
-    fun saveWaitsForPersistenceBeforeReportingSaved() =
+    fun `save waits for persistence before reporting saved`() =
         runTest {
             val persistenceGate = CompletableDeferred<Unit>()
             val states = mutableListOf<AutoSaveState>()
@@ -51,7 +51,7 @@ class AutoSaveCoordinatorTest {
         }
 
     @Test
-    fun saveRetriesFailuresWithBackoffUntilSuccess() =
+    fun `save retries failures with backoff until success`() =
         runTest {
             var calls = 0
             val callTimes = mutableListOf<Long>()
@@ -84,7 +84,7 @@ class AutoSaveCoordinatorTest {
         }
 
     @Test
-    fun saveStopsAtConfiguredAttemptBound() =
+    fun `save stops at configured attempt bound`() =
         runTest {
             var calls = 0
             val states = mutableListOf<AutoSaveState>()
@@ -107,7 +107,7 @@ class AutoSaveCoordinatorTest {
         }
 
     @Test
-    fun skippedSaveDoesNotReportSavedOrRetry() =
+    fun `skipped save does not report saved or retry`() =
         runTest {
             var calls = 0
             val states = mutableListOf<AutoSaveState>()
@@ -131,7 +131,7 @@ class AutoSaveCoordinatorTest {
         }
 
     @Test
-    fun periodicBackupUsesLatestContentAndCallback() =
+    fun `periodic backup uses latest content and callback`() =
         runTest {
             var content = "old content"
             var callbackName = "old callback"
@@ -160,7 +160,7 @@ class AutoSaveCoordinatorTest {
         }
 
     @Test
-    fun saveOperationsAreSerialized() =
+    fun `save operations are serialized`() =
         runTest {
             val firstSaveGate = CompletableDeferred<Unit>()
             var latestContent = "first"
@@ -196,7 +196,7 @@ class AutoSaveCoordinatorTest {
         }
 
     @Test
-    fun staleCompletionDoesNotMarkNewerContentSaved() =
+    fun `stale completion does not mark newer content saved`() =
         runTest {
             val persistenceGate = CompletableDeferred<Unit>()
             var latestContent = "first"
@@ -225,7 +225,7 @@ class AutoSaveCoordinatorTest {
         }
 
     @Test
-    fun cancellationDoesNotBecomeErrorOrRetry() =
+    fun `cancellation does not become error or retry`() =
         runTest {
             var calls = 0
             val states = mutableListOf<AutoSaveState>()
@@ -253,7 +253,7 @@ class AutoSaveCoordinatorTest {
         }
 
     @Test
-    fun cancellationDuringRetryBackoffReturnsToNeutralIdleState() =
+    fun `cancellation during retry backoff returns to neutral idle state`() =
         runTest {
             val states = mutableListOf<AutoSaveState>()
             val coordinator = coordinator(states = states)
@@ -280,7 +280,7 @@ class AutoSaveCoordinatorTest {
         }
 
     @Test
-    fun staleFailureReturnsToIdleWithoutSurfacingError() =
+    fun `stale failure returns to idle without surfacing error`() =
         runTest {
             val persistenceGate = CompletableDeferred<Unit>()
             var latestContent = "first"
@@ -310,7 +310,7 @@ class AutoSaveCoordinatorTest {
         }
 
     @Test
-    fun editorDraftFingerprintIncludesCaptionsPendingAudioAndJournalSelection() {
+    fun `editor draft fingerprint includes captions pending audio and journal selection`() {
         val blockId = Uuid.random()
         val image = ImageBlockUiState(id = blockId, uri = "image://one", caption = "first caption")
         val imageCaptionChanged = image.copy(caption = "second caption")

@@ -40,7 +40,7 @@ class JournalFilterBarE2ETest {
     // region Layout Mode Toggle
 
     @Test
-    fun layoutToggle_inCarouselMode_showsSwitchToGridDescription() {
+    fun `layout toggle in carousel mode shows switch to grid description`() {
         composeRule.setContent {
             JournalFilterBar(
                 layoutMode = JournalLayoutMode.CAROUSEL,
@@ -56,7 +56,7 @@ class JournalFilterBarE2ETest {
     }
 
     @Test
-    fun layoutToggle_click_invokesCallback() {
+    fun `layout toggle click invokes callback`() {
         var toggled = false
 
         composeRule.setContent {
@@ -75,7 +75,7 @@ class JournalFilterBarE2ETest {
     }
 
     @Test
-    fun layoutToggle_switchesToGrid_updatesState() {
+    fun `layout toggle switches to grid updates state`() {
         composeRule.setContent {
             var mode by remember { mutableStateOf(JournalLayoutMode.CAROUSEL) }
 
@@ -111,7 +111,7 @@ class JournalFilterBarE2ETest {
     // region Sort Dropdown
 
     @Test
-    fun sortChip_displaysCurrentSortOption() {
+    fun `sort chip displays current sort option`() {
         composeRule.setContent {
             JournalFilterBar(
                 layoutMode = JournalLayoutMode.CAROUSEL,
@@ -127,7 +127,7 @@ class JournalFilterBarE2ETest {
     }
 
     @Test
-    fun sortChip_click_opensDropdown() {
+    fun `sort chip click opens dropdown`() {
         composeRule.setContent {
             JournalFilterBar(
                 layoutMode = JournalLayoutMode.CAROUSEL,
@@ -149,7 +149,7 @@ class JournalFilterBarE2ETest {
     }
 
     @Test
-    fun sortDropdown_selectOption_invokesCallbackAndCloses() {
+    fun `sort dropdown select option invokes callback and closes`() {
         var selectedOption: JournalSortOption? = null
 
         composeRule.setContent {
@@ -175,7 +175,7 @@ class JournalFilterBarE2ETest {
     }
 
     @Test
-    fun sortDropdown_selectOption_updatesChipLabel() {
+    fun `sort dropdown select option updates chip label`() {
         var selectedSort = JournalSortOption.LAST_UPDATED
 
         composeRule.setContent {
@@ -211,7 +211,7 @@ class JournalFilterBarE2ETest {
     // region Filter Chips
 
     @Test
-    fun filterChips_displayedWithCorrectLabels() {
+    fun `filter chips displayed with correct labels`() {
         composeRule.setContent {
             JournalFilterBar(
                 layoutMode = JournalLayoutMode.CAROUSEL,
@@ -228,7 +228,7 @@ class JournalFilterBarE2ETest {
     }
 
     @Test
-    fun filterChip_ownedByMe_click_invokesCallback() {
+    fun `filter chip owned by me click invokes callback`() {
         var toggledFilter: JournalFilter? = null
 
         composeRule.setContent {
@@ -250,7 +250,7 @@ class JournalFilterBarE2ETest {
     }
 
     @Test
-    fun filterChip_shared_click_invokesCallback() {
+    fun `filter chip shared click invokes callback`() {
         var toggledFilter: JournalFilter? = null
 
         composeRule.setContent {
@@ -272,7 +272,7 @@ class JournalFilterBarE2ETest {
     }
 
     @Test
-    fun filterChip_toggleOnAndOff() {
+    fun `filter chip toggle on and off`() {
         var selectedFilters by mutableStateOf<Set<JournalFilter>>(emptySet())
 
         composeRule.setContent {
@@ -310,7 +310,7 @@ class JournalFilterBarE2ETest {
     }
 
     @Test
-    fun filterChips_multipleCanBeActive() {
+    fun `filter chips multiple can be active`() {
         var selectedFilters by mutableStateOf<Set<JournalFilter>>(emptySet())
 
         composeRule.setContent {
@@ -348,7 +348,7 @@ class JournalFilterBarE2ETest {
     // region All Controls Together
 
     @Test
-    fun allControls_renderedInDefaultState() {
+    fun `all controls rendered in default state`() {
         composeRule.setContent {
             JournalFilterBar(
                 layoutMode = JournalLayoutMode.CAROUSEL,

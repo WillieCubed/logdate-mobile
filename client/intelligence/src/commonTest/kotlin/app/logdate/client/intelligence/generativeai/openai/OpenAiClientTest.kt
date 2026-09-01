@@ -13,7 +13,7 @@ import kotlin.test.assertEquals
  */
 class OpenAiClientTest {
     @Test
-    fun toOpenAiChatMessage_convertsCorrectly() {
+    fun `to open ai chat message converts correctly`() {
         val message = GenerativeAIChatMessage("user", "Hello world")
         val openAiMessage = message.toOpenAiChatMessage()
 
@@ -22,7 +22,7 @@ class OpenAiClientTest {
     }
 
     @Test
-    fun toOpenAiChatMessage_withSystemRole_convertsCorrectly() {
+    fun `to open ai chat message with system role converts correctly`() {
         val message = GenerativeAIChatMessage("system", "You are a helpful assistant")
         val openAiMessage = message.toOpenAiChatMessage()
 
@@ -31,7 +31,7 @@ class OpenAiClientTest {
     }
 
     @Test
-    fun toOpenAiChatMessage_withAssistantRole_convertsCorrectly() {
+    fun `to open ai chat message with assistant role converts correctly`() {
         val message = GenerativeAIChatMessage("assistant", "I'm here to help you.")
         val openAiMessage = message.toOpenAiChatMessage()
 
@@ -40,7 +40,7 @@ class OpenAiClientTest {
     }
 
     @Test
-    fun openAiRequest_serializesCorrectly() {
+    fun `open ai request serializes correctly`() {
         val messages =
             listOf(
                 OpenAiChatMessage("system", "You are helpful"),
@@ -63,7 +63,7 @@ class OpenAiClientTest {
     }
 
     @Test
-    fun openAiResponse_dataClassesHaveCorrectStructure() {
+    fun `open ai response data classes have correct structure`() {
         val choice =
             Choice(
                 message = OpenAiChatMessage("assistant", "Test response"),
@@ -90,7 +90,7 @@ class OpenAiClientTest {
     }
 
     @Test
-    fun openAiChatMessage_dataClassWorksCorrectly() {
+    fun `open ai chat message data class works correctly`() {
         val message = OpenAiChatMessage("user", "What is the weather like?")
 
         assertEquals("user", message.role)
@@ -98,7 +98,7 @@ class OpenAiClientTest {
     }
 
     @Test
-    fun generativeAIChatMessage_convertsToOpenAiFormat() {
+    fun `generative ai chat message converts to open ai format`() {
         val originalMessage = GenerativeAIChatMessage("system", "Be concise")
         val convertedMessage = originalMessage.toOpenAiChatMessage()
 
@@ -108,7 +108,7 @@ class OpenAiClientTest {
     }
 
     @Test
-    fun multipleMessages_convertCorrectly() {
+    fun `multiple messages convert correctly`() {
         val messages =
             listOf(
                 GenerativeAIChatMessage("system", "You are a helpful assistant."),
@@ -128,7 +128,7 @@ class OpenAiClientTest {
     }
 
     @Test
-    fun openAiRequest_withDefaultTemperature_hasCorrectValue() {
+    fun `open ai request with default temperature has correct value`() {
         val request =
             OpenAiRequest(
                 model = "gpt-4",
@@ -139,7 +139,7 @@ class OpenAiClientTest {
     }
 
     @Test
-    fun openAiRequest_withCustomTemperature_usesCustomValue() {
+    fun `open ai request with custom temperature uses custom value`() {
         val request =
             OpenAiRequest(
                 model = "gpt-4",

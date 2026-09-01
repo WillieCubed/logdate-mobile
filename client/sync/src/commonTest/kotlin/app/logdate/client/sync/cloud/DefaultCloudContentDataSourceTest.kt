@@ -20,7 +20,7 @@ class DefaultCloudContentDataSourceTest {
     private val dataSource = DefaultCloudContentDataSource(mockApiClient)
 
     @Test
-    fun testUploadTextNote() =
+    fun `upload text note`() =
         runTest {
             // Given
             val accessToken = "test-token"
@@ -62,7 +62,7 @@ class DefaultCloudContentDataSourceTest {
         }
 
     @Test
-    fun testUploadImageNote() =
+    fun `upload image note`() =
         runTest {
             // Given
             val accessToken = "test-token"
@@ -149,7 +149,7 @@ class DefaultCloudContentDataSourceTest {
         }
 
     @Test
-    fun testUploadAudioNoteIncludesDuration() =
+    fun `upload audio note includes duration`() =
         runTest {
             // Given
             val accessToken = "test-token"
@@ -183,7 +183,7 @@ class DefaultCloudContentDataSourceTest {
         }
 
     @Test
-    fun testUpdateNote() =
+    fun `update note`() =
         runTest {
             // Given
             val accessToken = "test-token"
@@ -228,7 +228,7 @@ class DefaultCloudContentDataSourceTest {
         }
 
     @Test
-    fun testDeleteNote() =
+    fun `delete note`() =
         runTest {
             // Given
             val accessToken = "test-token"
@@ -249,7 +249,7 @@ class DefaultCloudContentDataSourceTest {
         }
 
     @Test
-    fun testGetContentChanges() =
+    fun `get content changes`() =
         runTest {
             // Given
             val accessToken = "test-token"
@@ -306,7 +306,7 @@ class DefaultCloudContentDataSourceTest {
         }
 
     @Test
-    fun testGetContentChangesAudioIncludesDuration() =
+    fun `get content changes audio includes duration`() =
         runTest {
             // Given
             val accessToken = "test-token"
@@ -347,7 +347,7 @@ class DefaultCloudContentDataSourceTest {
         }
 
     @Test
-    fun testUploadFailure() =
+    fun `upload failure`() =
         runTest {
             // Given
             val accessToken = "test-token"
@@ -371,7 +371,7 @@ class DefaultCloudContentDataSourceTest {
         }
 
     @Test
-    fun testGetContentChangesFailure() =
+    fun `get content changes failure`() =
         runTest {
             // Given
             val accessToken = "test-token"

@@ -32,7 +32,7 @@ class WearSyncE2ETest {
     // =======================================================================
 
     @Test
-    fun audioNoteSurvivesSerializationOnDevice() {
+    fun `audio note survives serialization on device`() {
         val noteId = Uuid.random()
         val note =
             JournalNote.Audio(
@@ -55,7 +55,7 @@ class WearSyncE2ETest {
     }
 
     @Test
-    fun audioNoteWithLocationSurvivesSerializationOnDevice() {
+    fun `audio note with location survives serialization on device`() {
         val note =
             JournalNote.Audio(
                 uid = Uuid.random(),
@@ -88,7 +88,7 @@ class WearSyncE2ETest {
     // =======================================================================
 
     @Test
-    fun batchOfNotesSerializeAndDeserializeOnDevice() {
+    fun `batch of notes serialize and deserialize on device`() {
         val notes =
             listOf(
                 JournalNote.Audio(
@@ -125,7 +125,7 @@ class WearSyncE2ETest {
     // =======================================================================
 
     @Test
-    fun audioNotePathIsCorrect() {
+    fun `audio note path is correct`() {
         val noteId = Uuid.parse("550e8400-e29b-41d4-a716-446655440000")
         val path = NoteDataMapper.notePath(noteId)
         assertEquals("/logdate/notes/550e8400-e29b-41d4-a716-446655440000", path)
@@ -133,14 +133,14 @@ class WearSyncE2ETest {
     }
 
     @Test
-    fun audioChannelPathDerivedFromNotePath() {
+    fun `audio channel path derived from note path`() {
         val noteId = Uuid.parse("550e8400-e29b-41d4-a716-446655440000")
         val channelPath = "${NoteDataMapper.notePath(noteId)}/audio"
         assertEquals("/logdate/notes/550e8400-e29b-41d4-a716-446655440000/audio", channelPath)
     }
 
     @Test
-    fun deletePathIsDistinctFromNotePath() {
+    fun `delete path is distinct from note path`() {
         val noteId = Uuid.parse("550e8400-e29b-41d4-a716-446655440000")
         val notePath = NoteDataMapper.notePath(noteId)
         val deletePath = NoteDataMapper.noteDeletePath(noteId)
@@ -156,7 +156,7 @@ class WearSyncE2ETest {
     // =======================================================================
 
     @Test
-    fun uuidSurvivesPathRoundTrip() {
+    fun `uuid survives path round trip`() {
         val originalId = Uuid.random()
         val path = NoteDataMapper.notePath(originalId)
         val extracted = NoteDataMapper.noteIdFromPath(path)
@@ -164,7 +164,7 @@ class WearSyncE2ETest {
     }
 
     @Test
-    fun uuidSurvivesDeletePathRoundTrip() {
+    fun `uuid survives delete path round trip`() {
         val originalId = Uuid.random()
         val path = NoteDataMapper.noteDeletePath(originalId)
         val extracted = NoteDataMapper.noteIdFromPath(path)
@@ -176,7 +176,7 @@ class WearSyncE2ETest {
     // =======================================================================
 
     @Test
-    fun dataMapContainsAllRequiredKeys() {
+    fun `data map contains all required keys`() {
         val note =
             JournalNote.Audio(
                 uid = Uuid.random(),
@@ -199,7 +199,7 @@ class WearSyncE2ETest {
     // =======================================================================
 
     @Test
-    fun phoneListenerCanDeserializeWatchAudioNote() {
+    fun `phone listener can deserialize watch audio note`() {
         // Watch side: create and serialize
         val watchNote =
             JournalNote.Audio(
@@ -231,7 +231,7 @@ class WearSyncE2ETest {
     // =======================================================================
 
     @Test
-    fun longMediaRefPathSurvivesRoundTrip() {
+    fun `long media ref path survives round trip`() {
         val longPath = "/data/data/app.logdate.wear/files/recordings/" + "a".repeat(200) + ".aac"
         val note =
             JournalNote.Audio(

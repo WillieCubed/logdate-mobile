@@ -24,7 +24,7 @@ class DefaultDataUsagePolicyTest {
     private val policy = DefaultDataUsagePolicy(networkSaverProvider)
 
     @Test
-    fun noConnection_returnsRestricted() =
+    fun `no connection returns restricted`() =
         runTest {
             networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = false, connectionType = NetworkConnectionType.NONE),
@@ -33,7 +33,7 @@ class DefaultDataUsagePolicyTest {
         }
 
     @Test
-    fun cellularWithDataSaverOn_returnsRestricted() =
+    fun `cellular with data saver on returns restricted`() =
         runTest {
             networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = true, connectionType = NetworkConnectionType.CELLULAR),
@@ -42,7 +42,7 @@ class DefaultDataUsagePolicyTest {
         }
 
     @Test
-    fun cellularWithDataSaverOff_returnsConservative() =
+    fun `cellular with data saver off returns conservative`() =
         runTest {
             networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = false, connectionType = NetworkConnectionType.CELLULAR),
@@ -51,7 +51,7 @@ class DefaultDataUsagePolicyTest {
         }
 
     @Test
-    fun wifiWithDataSaverOff_returnsUnrestricted() =
+    fun `wifi with data saver off returns unrestricted`() =
         runTest {
             networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = false, connectionType = NetworkConnectionType.WIFI),
@@ -60,7 +60,7 @@ class DefaultDataUsagePolicyTest {
         }
 
     @Test
-    fun wifiWithDataSaverOn_returnsRestricted() =
+    fun `wifi with data saver on returns restricted`() =
         runTest {
             networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = true, connectionType = NetworkConnectionType.WIFI),
@@ -69,7 +69,7 @@ class DefaultDataUsagePolicyTest {
         }
 
     @Test
-    fun ethernetWithDataSaverOff_returnsUnrestricted() =
+    fun `ethernet with data saver off returns unrestricted`() =
         runTest {
             networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = false, connectionType = NetworkConnectionType.ETHERNET),
@@ -78,7 +78,7 @@ class DefaultDataUsagePolicyTest {
         }
 
     @Test
-    fun ethernetWithDataSaverOn_returnsRestricted() =
+    fun `ethernet with data saver on returns restricted`() =
         runTest {
             networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = true, connectionType = NetworkConnectionType.ETHERNET),
@@ -87,7 +87,7 @@ class DefaultDataUsagePolicyTest {
         }
 
     @Test
-    fun otherConnectionWithDataSaverOff_returnsUnrestricted() =
+    fun `other connection with data saver off returns unrestricted`() =
         runTest {
             networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = false, connectionType = NetworkConnectionType.OTHER),
@@ -96,7 +96,7 @@ class DefaultDataUsagePolicyTest {
         }
 
     @Test
-    fun policyFlowEmitsOnStateChange() =
+    fun `policy flow emits on state change`() =
         runTest {
             networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = false, connectionType = NetworkConnectionType.WIFI),
@@ -117,42 +117,42 @@ class DefaultDataUsagePolicyTest {
     // Extension function tests
 
     @Test
-    fun shouldSyncMedia_onlyUnrestricted() {
+    fun `should sync media only unrestricted`() {
         assertTrue(DataUsageMode.Unrestricted.shouldSyncMedia())
         assertFalse(DataUsageMode.Conservative.shouldSyncMedia())
         assertFalse(DataUsageMode.Restricted.shouldSyncMedia())
     }
 
     @Test
-    fun shouldSyncMetadata_unrestrictedAndConservative() {
+    fun `should sync metadata unrestricted and conservative`() {
         assertTrue(DataUsageMode.Unrestricted.shouldSyncMetadata())
         assertTrue(DataUsageMode.Conservative.shouldSyncMetadata())
         assertFalse(DataUsageMode.Restricted.shouldSyncMetadata())
     }
 
     @Test
-    fun shouldLoadFullResImages_onlyUnrestricted() {
+    fun `should load full res images only unrestricted`() {
         assertTrue(DataUsageMode.Unrestricted.shouldLoadFullResImages())
         assertFalse(DataUsageMode.Conservative.shouldLoadFullResImages())
         assertFalse(DataUsageMode.Restricted.shouldLoadFullResImages())
     }
 
     @Test
-    fun shouldLoadReducedImages_onlyConservative() {
+    fun `should load reduced images only conservative`() {
         assertFalse(DataUsageMode.Unrestricted.shouldLoadReducedImages())
         assertTrue(DataUsageMode.Conservative.shouldLoadReducedImages())
         assertFalse(DataUsageMode.Restricted.shouldLoadReducedImages())
     }
 
     @Test
-    fun shouldPrefetchImages_onlyUnrestricted() {
+    fun `should prefetch images only unrestricted`() {
         assertTrue(DataUsageMode.Unrestricted.shouldPrefetchImages())
         assertFalse(DataUsageMode.Conservative.shouldPrefetchImages())
         assertFalse(DataUsageMode.Restricted.shouldPrefetchImages())
     }
 
     @Test
-    fun shouldAllowAICalls_unrestrictedAndConservative() {
+    fun `should allow ai calls unrestricted and conservative`() {
         assertTrue(DataUsageMode.Unrestricted.shouldAllowAICalls())
         assertTrue(DataUsageMode.Conservative.shouldAllowAICalls())
         assertFalse(DataUsageMode.Restricted.shouldAllowAICalls())

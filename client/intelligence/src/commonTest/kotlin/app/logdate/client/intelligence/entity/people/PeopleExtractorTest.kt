@@ -61,7 +61,7 @@ class PeopleExtractorTest {
         )
 
     @Test
-    fun extractPeople_withSinglePerson_extractsCorrectly() =
+    fun `extract people with single person extracts correctly`() =
         runTest(testDispatcher) {
             setup()
             val documentId = "doc-single-person"
@@ -92,7 +92,7 @@ class PeopleExtractorTest {
         }
 
     @Test
-    fun extractPeople_withMultiplePeople_extractsAll() =
+    fun `extract people with multiple people extracts all`() =
         runTest(testDispatcher) {
             setup()
             val documentId = "doc-multiple-people"
@@ -113,7 +113,7 @@ class PeopleExtractorTest {
         }
 
     @Test
-    fun extractPeople_withCachedResponse_returnsCachedPeople() =
+    fun `extract people with cached response returns cached people`() =
         runTest(testDispatcher) {
             setup()
             val documentId = "doc-cached"
@@ -136,7 +136,7 @@ class PeopleExtractorTest {
         }
 
     @Test
-    fun extractPeople_withCachedDisabled_skipsCache() =
+    fun `extract people with cached disabled skips cache`() =
         runTest(testDispatcher) {
             setup()
             val documentId = "doc-skip-cache"
@@ -161,7 +161,7 @@ class PeopleExtractorTest {
         }
 
     @Test
-    fun extractPeople_withNoNames_returnsEmptyList() =
+    fun `extract people with no names returns empty list`() =
         runTest(testDispatcher) {
             setup()
             val documentId = "doc-no-names"
@@ -176,7 +176,7 @@ class PeopleExtractorTest {
         }
 
     @Test
-    fun extractPeople_withNullAIResponse_returnsEmptyList() =
+    fun `extract people with null ai response returns empty list`() =
         runTest(testDispatcher) {
             setup()
             val documentId = "doc-null-response"
@@ -190,7 +190,7 @@ class PeopleExtractorTest {
         }
 
     @Test
-    fun extractPeople_withWhitespaceInNames_trimsCorrectly() =
+    fun `extract people with whitespace in names trims correctly`() =
         runTest(testDispatcher) {
             setup()
             val documentId = "doc-whitespace"
@@ -208,7 +208,7 @@ class PeopleExtractorTest {
         }
 
     @Test
-    fun extractPeople_whenOffline_returnsUnavailable() =
+    fun `extract people when offline returns unavailable`() =
         runTest(testDispatcher) {
             setup()
             fakeNetworkMonitor.setAvailable(false)
@@ -222,7 +222,7 @@ class PeopleExtractorTest {
         }
 
     @Test
-    fun extractPeople_withComplexNames_extractsCorrectly() =
+    fun `extract people with complex names extracts correctly`() =
         runTest(testDispatcher) {
             setup()
             val documentId = "doc-complex-names"
@@ -241,7 +241,7 @@ class PeopleExtractorTest {
         }
 
     @Test
-    fun extractPeople_withFirstPersonReferences_handlesCorrectly() =
+    fun `extract people with first person references handles correctly`() =
         runTest(testDispatcher) {
             setup()
             val documentId = "doc-first-person"
@@ -259,7 +259,7 @@ class PeopleExtractorTest {
         }
 
     @Test
-    fun extractPeople_withEmptyInput_handlesGracefully() =
+    fun `extract people with empty input handles gracefully`() =
         runTest(testDispatcher) {
             setup()
             val documentId = "doc-empty"
@@ -277,7 +277,7 @@ class PeopleExtractorTest {
         }
 
     @Test
-    fun extractPeople_cachesResultsCorrectly() =
+    fun `extract people caches results correctly`() =
         runTest(testDispatcher) {
             setup()
             val documentId = "doc-caching"
@@ -301,7 +301,7 @@ class PeopleExtractorTest {
         }
 
     @Test
-    fun extractPeople_withMixedCaseAndPunctuation_extractsCorrectly() =
+    fun `extract people with mixed case and punctuation extracts correctly`() =
         runTest(testDispatcher) {
             setup()
             val documentId = "doc-mixed"
@@ -321,7 +321,7 @@ class PeopleExtractorTest {
         }
 
     @Test
-    fun extractPeople_withLongText_processesCorrectly() =
+    fun `extract people with long text processes correctly`() =
         runTest(testDispatcher) {
             setup()
             val documentId = "doc-long"
@@ -364,7 +364,7 @@ class PeopleExtractorTest {
         }
 
     @Test
-    fun extractPeople_systemPromptIsCorrect() =
+    fun `extract people system prompt is correct`() =
         runTest(testDispatcher) {
             setup()
             val documentId = "doc-prompt-test"

@@ -48,7 +48,7 @@ class DatabaseIntegrationTest {
     }
 
     @Test
-    fun journalDao_insertAndRetrieve_worksCorrectly() =
+    fun `journal dao insert and retrieve works correctly`() =
         runTest {
             val journalDao = database.journalDao()
             val journal =
@@ -71,7 +71,7 @@ class DatabaseIntegrationTest {
         }
 
     @Test
-    fun journalDao_observeJournal_emitsUpdates() =
+    fun `journal dao observe journal emits updates`() =
         runTest {
             val journalDao = database.journalDao()
             val journal =
@@ -93,7 +93,7 @@ class DatabaseIntegrationTest {
         }
 
     @Test
-    fun textNoteDao_insertAndRetrieve_worksCorrectly() =
+    fun `text note dao insert and retrieve works correctly`() =
         runTest {
             val textNoteDao = database.textNoteDao()
             val note =
@@ -115,7 +115,7 @@ class DatabaseIntegrationTest {
         }
 
     @Test
-    fun imageNoteDao_insertAndRetrieve_worksCorrectly() =
+    fun `image note dao insert and retrieve works correctly`() =
         runTest {
             val imageNoteDao = database.imageNoteDao()
             val note =
@@ -137,7 +137,7 @@ class DatabaseIntegrationTest {
         }
 
     @Test
-    fun journalNotesDao_associationsFunctionCorrectly() =
+    fun `journal notes dao associations function correctly`() =
         runTest {
             val journalDao = database.journalDao()
             val textNoteDao = database.textNoteDao()
@@ -180,7 +180,7 @@ class DatabaseIntegrationTest {
         }
 
     @Test
-    fun database_transactionRollback_worksCorrectly() =
+    fun `database transaction rollback works correctly`() =
         runTest {
             val journalDao = database.journalDao()
 
@@ -210,7 +210,7 @@ class DatabaseIntegrationTest {
         }
 
     @Test
-    fun database_multipleOperations_maintainConsistency() =
+    fun `database multiple operations maintain consistency`() =
         runTest {
             val journalDao = database.journalDao()
             val textNoteDao = database.textNoteDao()
@@ -268,7 +268,7 @@ class DatabaseIntegrationTest {
         }
 
     @Test
-    fun database_allDaosAccessible() =
+    fun `database all daos accessible`() =
         runTest {
             // Verify all DAOs can be accessed and are functional
             assertNotNull(database.journalDao())

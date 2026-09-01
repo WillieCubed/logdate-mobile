@@ -17,7 +17,7 @@ class AndroidCryptoManagerTest {
     private val cryptoManager = AndroidCryptoManager()
 
     @Test
-    fun testGenerateRecoveryPhrase() =
+    fun `generate recovery phrase`() =
         runTest {
             val phrase = cryptoManager.generateRecoveryPhrase()
 
@@ -26,7 +26,7 @@ class AndroidCryptoManagerTest {
         }
 
     @Test
-    fun testDeriveMasterKey() =
+    fun `derive master key`() =
         runTest {
             val phrase = cryptoManager.generateRecoveryPhrase()
             val masterKey = cryptoManager.deriveMasterKey(phrase)
@@ -35,7 +35,7 @@ class AndroidCryptoManagerTest {
         }
 
     @Test
-    fun testDeterministicKeyDerivation() =
+    fun `deterministic key derivation`() =
         runTest {
             val phrase = cryptoManager.generateRecoveryPhrase()
 
@@ -46,7 +46,7 @@ class AndroidCryptoManagerTest {
         }
 
     @Test
-    fun testValidateRecoveryPhrase() =
+    fun `validate recovery phrase`() =
         runTest {
             val phrase = cryptoManager.generateRecoveryPhrase()
 
@@ -54,7 +54,7 @@ class AndroidCryptoManagerTest {
         }
 
     @Test
-    fun testGenerateRandomBytes() {
+    fun `generate random bytes`() {
         val bytes = cryptoManager.generateRandomBytes(32)
 
         assertEquals(32, bytes.size)

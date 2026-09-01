@@ -33,7 +33,7 @@ class DateTimeFormattingTest {
      * we can't test for exact output format.
      */
     @Test
-    fun testFormatDateLocalized() {
+    fun `format date localized`() {
         val testDate = LocalDate(2025, 6, 5)
         val formattedDate = formatDateLocalized(testDate)
 
@@ -62,7 +62,7 @@ class DateTimeFormattingTest {
      * The exact formatting depends on platform locale settings.
      */
     @Test
-    fun testInstantAsTime() {
+    fun `instant as time`() {
         val now = Clock.System.now()
         val timeString = now.asTime
 
@@ -80,7 +80,7 @@ class DateTimeFormattingTest {
      * the current system date in terms of year, month, and day.
      */
     @Test
-    fun testLocalDateNow() {
+    fun `local date now`() {
         val today = LocalDate.now()
         val systemNow =
             Clock.System
@@ -106,7 +106,7 @@ class DateTimeFormattingTest {
      * year or the first week of the next year.
      */
     @Test
-    fun testWeekOfYear() {
+    fun `week of year`() {
         // Test first week of the year (ISO week date standard)
         val firstWeek = LocalDateTime(2025, 1, 2, 0, 0)
         assertEquals(1, firstWeek.weekOfYear, "January 2, 2025 should be week 1")
@@ -135,7 +135,7 @@ class DateTimeFormattingTest {
      * - The current timestamp returns 0 days
      */
     @Test
-    fun testDaysUntilNow() {
+    fun `days until now`() {
         // Test with a date from yesterday
         val yesterday = Clock.System.now().minus(1.days)
         assertEquals(1, yesterday.daysUntilNow, "Yesterday should be 1 day until now")
@@ -155,7 +155,7 @@ class DateTimeFormattingTest {
      * This confirms the function rounds down to the nearest week.
      */
     @Test
-    fun testWeeksAgo() {
+    fun `weeks ago`() {
         // Test with a date from 3 weeks ago
         val threeWeeksAgo = Clock.System.now().minus(21.days)
         assertEquals(3, threeWeeksAgo.weeksAgo(), "Three weeks ago should return 3")
@@ -176,7 +176,7 @@ class DateTimeFormattingTest {
      * This ensures consistent human-readable date formatting.
      */
     @Test
-    fun testToReadableDateShort() {
+    fun `to readable date short`() {
         val date = LocalDate(2025, 3, 15)
         val result = date.toReadableDateShort()
 
@@ -206,7 +206,7 @@ class DateTimeFormattingTest {
      * date stable and drops the meaningless time.
      */
     @Test
-    fun testToReadableDateAllDay_rendersUtcDateWithoutTime() {
+    fun `to readable date all day renders utc date without time`() {
         val allDayInstant = LocalDate(2026, 6, 17).atStartOfDayIn(TimeZone.UTC)
 
         val result = allDayInstant.toReadableDateAllDay()
@@ -226,7 +226,7 @@ class DateTimeFormattingTest {
      * still renders a time.
      */
     @Test
-    fun testToReadableDateTimeRangeShort_allDayCollapsesToDate() {
+    fun `to readable date time range short all day collapses to date`() {
         val start = LocalDate(2026, 6, 17).atStartOfDayIn(TimeZone.UTC)
         val end = LocalDate(2026, 6, 19).atStartOfDayIn(TimeZone.UTC)
 

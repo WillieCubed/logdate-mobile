@@ -79,7 +79,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun getRecentMedia_backfillsLegacyEntryMediaIntoMediaStore() = runTest {
+    fun `get recent media backfills legacy entry media into media store`() = runTest {
         val legacyFile = createLegacyImageFile()
         var publishedUri: String? = null
 
@@ -101,7 +101,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun getMedia_readsFileUrisAndUsesDateAddedFallbackWhenNeeded() = runTest {
+    fun `get media reads file uris and uses date added fallback when needed`() = runTest {
         val imageFile = createImageFile(context.cacheDir, "file-image")
         val videoFile = File(context.cacheDir, "file-video-${Uuid.random()}.mp4")
         videoFile.writeBytes(byteArrayOf(0, 1, 2, 3))
@@ -193,7 +193,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun readMedia_readsRawAndFileUriAudioRecordings() = runTest {
+    fun `read media reads raw and file uri audio recordings`() = runTest {
         val audioBytes = byteArrayOf(0, 0, 0, 24, 102, 116, 121, 112, 77, 52, 65, 32)
         val audioFile = File(context.cacheDir, "recording-${Uuid.random()}.m4a")
         audioFile.writeBytes(audioBytes)
@@ -213,7 +213,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun readMedia_readsContentUriAudioRecording() = runTest {
+    fun `read media reads content uri audio recording`() = runTest {
         val environment = createMockEnvironment()
         val audioUri = Uri.parse("content://example.media/audio/42")
         val audioBytes = byteArrayOf(1, 3, 3, 7)
@@ -244,7 +244,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMediaFromFile_persistsImageInPrivateCanonicalStore() = runTest {
+    fun `save media from file persists image in private canonical store`() = runTest {
         val sourceFile = createImageFile(context.cacheDir, "source")
         var savedUri: String? = null
 
@@ -266,7 +266,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMediaFromFile_neverPublishesPrivateMediaToMediaStore() =
+    fun `save media from file never publishes private media to media store`() =
         runTest {
             val environment = createMockEnvironment()
             val sourceFile = createImageFile(environment.filesDir, "private-copy")
@@ -289,7 +289,7 @@ class AndroidMediaManagerTest {
         }
 
     @Test
-    fun saveMediaFromFile_rejectsUnsupportedMimeType() = runTest {
+    fun `save media from file rejects unsupported mime type`() = runTest {
         val sourceFile = createImageFile(context.cacheDir, "fallback-file")
 
         try {
@@ -307,7 +307,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMedia_persistsImageInPrivateCanonicalStore() = runTest {
+    fun `save media persists image in private canonical store`() = runTest {
         val sourceFile = createImageFile(context.cacheDir, "payload")
         val payloadBytes = sourceFile.readBytes()
         var savedUri: String? = null
@@ -333,7 +333,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMedia_persistsDownloadedAudioInPrivateCanonicalStorage() = runTest {
+    fun `save media persists downloaded audio in private canonical storage`() = runTest {
         val environment = createMockEnvironment()
         val audioBytes = byteArrayOf(9, 8, 7, 6, 5)
 
@@ -361,7 +361,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMediaFromFile_persistsDownloadedAudioInPrivateCanonicalStorage() = runTest {
+    fun `save media from file persists downloaded audio in private canonical storage`() = runTest {
         val environment = createMockEnvironment()
         val audioBytes = byteArrayOf(4, 3, 2, 1)
         val sourceFile = File(environment.filesDir, "source-${Uuid.random()}.m4a").apply { writeBytes(audioBytes) }
@@ -386,7 +386,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMedia_normalizesAudioMimeAndMismatchedFileExtension() = runTest {
+    fun `save media normalizes audio mime and mismatched file extension`() = runTest {
         val environment = createMockEnvironment()
         val audioBytes = byteArrayOf(7, 7, 7)
 
@@ -413,7 +413,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMedia_addsAudioExtensionWhenFileNameHasNone() = runTest {
+    fun `save media adds audio extension when file name has none`() = runTest {
         val environment = createMockEnvironment()
         val audioBytes = byteArrayOf(6, 5, 4)
 
@@ -438,7 +438,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMedia_canonicalizesAudioWithoutLeakingFileNames() = runTest {
+    fun `save media canonicalizes audio without leaking file names`() = runTest {
         val environment = createMockEnvironment()
         val audioBytes = byteArrayOf(1, 2, 1, 2)
         val oversizedNames =
@@ -470,7 +470,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMedia_removesStaleCanonicalStagingFilesButPreservesFreshWriters() = runTest {
+    fun `save media removes stale canonical staging files but preserves fresh writers`() = runTest {
         val environment = createMockEnvironment()
         val stagingDirectory = environment.filesDir.resolve("media/staging").apply { mkdirs() }
         val staleTemp = stagingDirectory.resolve("${Uuid.random()}.tmp").apply { writeBytes(ByteArray(8)) }
@@ -496,7 +496,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMedia_doesNotRequireMediaStorePublishing() = runTest {
+    fun `save media does not require media store publishing`() = runTest {
         val environment = createMockEnvironment()
         val payloadBytes = byteArrayOf(1, 2, 3, 4)
         val payload =
@@ -519,7 +519,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMedia_rejectsUnsupportedMimeType() = runTest {
+    fun `save media rejects unsupported mime type`() = runTest {
         val sourceFile = createImageFile(context.cacheDir, "fallback")
         val payloadBytes = sourceFile.readBytes()
 
@@ -541,7 +541,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMediaFromFile_doesNotRequireMediaStorePublishing() = runTest {
+    fun `save media from file does not require media store publishing`() = runTest {
         val environment = createMockEnvironment()
         val sourceFile = createImageFile(environment.filesDir, "publish-fallback")
 
@@ -562,7 +562,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun saveMediaFromFile_persistsVideoInPrivateCanonicalStore() = runTest {
+    fun `save media from file persists video in private canonical store`() = runTest {
         val sourceFile = File(context.cacheDir, "video-${Uuid.random()}.mp4")
         sourceFile.writeBytes(byteArrayOf(0, 1, 2, 3, 4))
         sourceFile.setLastModified(1_234_567_890_000L)
@@ -586,7 +586,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun addToDefaultCollection_publishesContentUriIntoMediaStore() = runTest {
+    fun `add to default collection publishes content uri into media store`() = runTest {
         val environment = createMockEnvironment()
         val sourceUri = Uri.parse("content://example.media/items/1")
         val payloadBytes = byteArrayOf(10, 11, 12)
@@ -640,7 +640,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun addToDefaultCollection_throwsWhenTimestampMetadataIsMissing() = runTest {
+    fun `add to default collection throws when timestamp metadata is missing`() = runTest {
         val environment = createMockEnvironment()
         val sourceUri = Uri.parse("content://example.media/items/no-timestamp.png")
 
@@ -681,7 +681,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun addToDefaultCollection_failsWhenPublishAndFallbackCopyFail() = runTest {
+    fun `add to default collection fails when publish and fallback copy fail`() = runTest {
         val environment = createMockEnvironment()
         val sourceUri = Uri.parse("content://example.media/items/fail.png")
 
@@ -731,7 +731,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun addToDefaultCollection_exportsNewFileUriFromPrivateStorage() = runTest {
+    fun `add to default collection exports new file uri from private storage`() = runTest {
         val freshFile = createImageFile(context.cacheDir, "fresh")
         val duplicateFile = createImageFile(context.cacheDir, "duplicate")
         duplicateFile.setLastModified(2_222_222_222_000L)
@@ -770,7 +770,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun addToDefaultCollection_rejectsUnsupportedContentUri() = runTest {
+    fun `add to default collection rejects unsupported content uri`() = runTest {
         val environment = createMockEnvironment()
         val sourceUri = Uri.parse("content://example.media/items/1")
 
@@ -799,7 +799,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun getMedia_rejectsUnsupportedFileType() = runTest {
+    fun `get media rejects unsupported file type`() = runTest {
         val file = File(context.cacheDir, "unsupported-${Uuid.random()}.txt")
         file.writeText("not media")
 
@@ -813,7 +813,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun getMedia_readsImageAndVideoMetadataFromCursor() = runTest {
+    fun `get media reads image and video metadata from cursor`() = runTest {
         val environment = createMockEnvironment()
         val imageUri = Uri.parse("content://example.media/images/1")
         val videoUri = Uri.parse("content://example.media/videos/2")
@@ -871,7 +871,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun getMedia_throwsWhenCursorHasNoRows() = runTest {
+    fun `get media throws when cursor has no rows`() = runTest {
         // Empty cursor means the URI itself doesn't resolve to any MediaStore row,
         // which is genuinely unrecoverable: there's nothing to materialize. Throwing
         // here is correct — distinct from the "row exists but metadata is incomplete"
@@ -928,7 +928,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun queryMediaByDate_returnsSortedImageAndVideoResults() = runTest {
+    fun `query media by date returns sorted image and video results`() = runTest {
         val environment = createMockEnvironment()
         val start = Instant.fromEpochMilliseconds(0)
         val end = Instant.fromEpochMilliseconds(20_000L)
@@ -982,7 +982,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun queryMediaByDate_throwsWhenQueriesFailAndNoMediaFound() = runTest {
+    fun `query media by date throws when queries fail and no media found`() = runTest {
         val environment = createMockEnvironment()
         val start = Instant.fromEpochMilliseconds(0)
         val end = Instant.fromEpochMilliseconds(20_000L)
@@ -1020,7 +1020,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun getRecentMedia_throwsWhenQueriesFail() = runTest {
+    fun `get recent media throws when queries fail`() = runTest {
         val environment = createMockEnvironment()
         val imageCollection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
         val videoCollection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
@@ -1054,7 +1054,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun queryMediaByDate_recoversRowsWithMissingTimestampMetadata() = runTest {
+    fun `query media by date recovers rows with missing timestamp metadata`() = runTest {
         // The user must never see media disappear from the gallery just because
         // MediaStore left a row's metadata blank. A row with both DATE_TAKEN and
         // DATE_ADDED set to zero must still surface, with the timestamp falling
@@ -1113,7 +1113,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun getRecentMedia_recoversRowsWithMissingTimestampMetadata() = runTest {
+    fun `get recent media recovers rows with missing timestamp metadata`() = runTest {
         // Same contract as the date-range query: the user must never see a row
         // disappear from the recent media gallery just because MediaStore left
         // its DATE_TAKEN and DATE_ADDED columns blank.
@@ -1167,7 +1167,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun getRecentMedia_recoversVideosWithNullDurationMetadata() = runTest {
+    fun `get recent media recovers videos with null duration metadata`() = runTest {
         // The originally reported bug: a video row whose DURATION column is null
         // (e.g. MediaStore failed to index it properly) used to throw and abort the
         // entire query, hiding every other video in the gallery. The user would
@@ -1225,7 +1225,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun getMedia_recoversMediaWithMissingTimestampMetadata() = runTest {
+    fun `get media recovers media with missing timestamp metadata`() = runTest {
         // Direct lookups by URI must follow the same "never lose user data"
         // contract as the bulk queries: a row with both DATE_TAKEN and DATE_ADDED
         // set to zero must still materialize, with the timestamp falling back to
@@ -1285,7 +1285,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun exists_recognizesPersistedMediaUris() = runTest {
+    fun `exists recognizes persisted media uris`() = runTest {
         val environment = createMockEnvironment()
         val sourceFile = createImageFile(environment.filesDir, "exists")
         val contentUri = Uri.parse("content://example.media/items/1")
@@ -1323,7 +1323,7 @@ class AndroidMediaManagerTest {
     }
 
     @Test
-    fun getMedia_withMalformedFileUri_throwsIllegalArgumentException() = runTest {
+    fun `get media with malformed file uri throws illegal argument exception`() = runTest {
         assertFailsWith<IllegalArgumentException> {
             mediaManager.getMedia("file://")
         }

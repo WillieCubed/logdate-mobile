@@ -81,7 +81,7 @@ class AndroidManagedMediaImporterTest {
     }
 
     @Test
-    fun recentMediaStoreImageIsCopiedBeforeOriginalRowDisappears() =
+    fun `recent media store image is copied before original row disappears`() =
         runTest {
             val imageBytes = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 13, 10, 26, 10)
             val sourceFile = createSourceFile("recent", "png", imageBytes)
@@ -110,7 +110,7 @@ class AndroidManagedMediaImporterTest {
         }
 
     @Test
-    fun providerVideoIsCopiedAndClosedBeforeSourceAccessDisappears() =
+    fun `provider video is copied and closed before source access disappears`() =
         runTest {
             val videoBytes = byteArrayOf(0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 0x6D, 0x70, 0x34, 0x32)
             val sourceFile = createSourceFile("picker-video", "mp4", videoBytes)
@@ -138,7 +138,7 @@ class AndroidManagedMediaImporterTest {
         }
 
     @Test
-    fun cancellationDuringMediaStoreCopyDeletesDestinationAndStagingFile() =
+    fun `cancellation during media store copy deletes destination and staging file`() =
         runTest {
             val selectedUri = Uri.parse("content://picker.provider/images/cancelled")
             val insertedUri = Uri.parse("content://media/external/images/media/911")
@@ -203,7 +203,7 @@ class AndroidManagedMediaImporterTest {
         }
 
     @Test
-    fun unknownImageSubtypeIsRejectedBeforeUntrustedExtensionCanBePublished() =
+    fun `unknown image subtype is rejected before untrusted extension can be published`() =
         runTest {
             val selectedUri = Uri.parse("content://untrusted.provider/items/1")
             val fakeResolver = mockk<android.content.ContentResolver>()

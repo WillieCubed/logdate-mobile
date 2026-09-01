@@ -10,7 +10,7 @@ import kotlin.uuid.Uuid
 
 class MediaThumbnailGridTest {
     @Test
-    fun splitMediaGroupsForBookPostureSplitsSingleLargeGroupAcrossPanes() {
+    fun `split media groups for book posture splits single large group across panes`() {
         val group = mediaGroup("March 2026", itemCount = 7)
 
         val (leftGroups, rightGroups) = splitMediaGroupsForBookPosture(listOf(group))
@@ -22,7 +22,7 @@ class MediaThumbnailGridTest {
     }
 
     @Test
-    fun splitMediaGroupsForBookPostureBalancesMultipleGroupsByItemCount() {
+    fun `split media groups for book posture balances multiple groups by item count`() {
         val groups =
             listOf(
                 mediaGroup("March 2026", itemCount = 3),
@@ -39,7 +39,7 @@ class MediaThumbnailGridTest {
     }
 
     @Test
-    fun mediaGridColumnCountForBookPaneUsesPhysicalPaneWidth() {
+    fun `media grid column count for book pane uses physical pane width`() {
         val columnCount =
             mediaGridColumnCountForBookPane(
                 paneWidth = 708.dp,

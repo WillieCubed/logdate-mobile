@@ -77,7 +77,7 @@ class DraftsE2ETest {
      * never deleted after publishing because the combine block overwrote draftId.
      */
     @Test
-    fun writeContentAndSave_draftIsDeletedAfterPublish() {
+    fun `write content and save draft is deleted after publish`() {
         startTextEntry()
 
         // Type some content
@@ -108,7 +108,7 @@ class DraftsE2ETest {
      * Test: Write content → auto-save → back → tap Save Draft → navigate → exact draft persists.
      */
     @Test
-    fun writeContentAndSaveAsDraft_draftPersistsAfterExit() {
+    fun `write content and save as draft draft persists after exit`() {
         val activity = composeRule.activity
         startTextEntry()
 
@@ -138,7 +138,7 @@ class DraftsE2ETest {
 
     /** Test: Write content → back before debounce → Save Draft → local draft persists. */
     @Test
-    fun writeContentAndSaveAsDraftBeforeDebounce_draftPersistsAfterExit() {
+    fun `write content and save as draft before debounce draft persists after exit`() {
         val activity = composeRule.activity
         val draftsBeforeTest = fakeDraftRepository.currentDrafts.size
 
@@ -179,7 +179,7 @@ class DraftsE2ETest {
 
     /** Test: activity recreation keeps the active editor and its durable draft visible. */
     @Test
-    fun writeContentAndRecreateActivity_editorRestoresExactDraft() {
+    fun `write content and recreate activity editor restores exact draft`() {
         val content = "Text that must survive rotation"
         startTextEntry()
 
@@ -204,7 +204,7 @@ class DraftsE2ETest {
 
     /** Test: Write content → auto-save → back → Discard → navigate only after durable deletion. */
     @Test
-    fun writeContentAndDiscard_draftIsDeletedBeforeExit() {
+    fun `write content and discard draft is deleted before exit`() {
         val activity = composeRule.activity
         startTextEntry()
         composeRule.onNodeWithTag("editor_text_input").performTextInput("Discard this exact draft")
@@ -235,7 +235,7 @@ class DraftsE2ETest {
      * Tests the full draft lifecycle from loading through publishing.
      */
     @Test
-    fun loadDraftAndPublish_draftIsDeletedAfterSave() {
+    fun `load draft and publish draft is deleted after save`() {
         // Pre-seed a draft
         val draftContent = "Previously saved draft content"
         val draftId = fakeDraftRepository.seedDraft(draftContent)
@@ -275,7 +275,7 @@ class DraftsE2ETest {
      * Test: Open drafts dialog when no drafts exist → empty state shown.
      */
     @Test
-    fun openDraftsDialog_emptyStateShown() {
+    fun `open drafts dialog empty state shown`() {
         // Ensure no drafts exist
         assertTrue("The empty-state test must start without drafts", fakeDraftRepository.currentDrafts.isEmpty())
 

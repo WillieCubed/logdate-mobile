@@ -77,7 +77,7 @@ class AudioPlaybackBackgroundE2ETest {
     }
 
     @Test
-    fun playbackNotificationAndSessionStaySynchronizedAfterBackgroundAndLock() {
+    fun `playback notification and session stay synchronized after background and lock`() {
         // The clip must outlast the entire test timeline: a 65s background sleep plus the
         // notification-shade fallback search, which is slower on tablet emulators. A 90s clip
         // finishes mid-test on slower devices, so the media notification flips to a "Play" action
@@ -180,7 +180,7 @@ class AudioPlaybackBackgroundE2ETest {
     }
 
     @Test
-    fun playbackContinuesWhenAppIsVisibleButNotFocusedInMultiWindow() {
+    fun `playback continues when app is visible but not focused in multi window`() {
         ActivityScenario.launch(VideoPlaybackHostActivity::class.java).use { scenario ->
             val audioFile = silentWavFile(durationSeconds = 30)
 
@@ -236,7 +236,7 @@ class AudioPlaybackBackgroundE2ETest {
     }
 
     @Test
-    fun downloadedAudioRoundTripsThroughPrivateStorageAndPlays() {
+    fun `downloaded audio round trips through private storage and plays`() {
         ActivityScenario.launch(VideoPlaybackHostActivity::class.java).use {
             val sourceFile = silentWavFile(durationSeconds = 5)
             val sourceBytes = sourceFile.readBytes()

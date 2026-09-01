@@ -18,7 +18,7 @@ import kotlin.test.assertNull
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionStorageBackendChangeTest {
     @Test
-    fun changingBackendDoesNotReviveThePreviousSession() =
+    fun `changing backend does not revive the previous session`() =
         runTest {
             val dataStore = SessionTestPreferencesDataStore()
             val config = DefaultLogDateConfigRepository(initialBackendUrl = "https://first.logdate.app")

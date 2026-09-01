@@ -86,7 +86,7 @@ class AudioRecordingE2ETest {
     val ruleChain: RuleChain = RuleChain.outerRule(koinRule).around(composeRule)
 
     @Test
-    fun recordAudioShowsDurationInBlock() {
+    fun `record audio shows duration in block`() {
         composeRule.onNodeWithTag("editor_start_audio_block").performClick()
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithTag("audio_record_start_button").fetchSemanticsNodes().isNotEmpty() ||

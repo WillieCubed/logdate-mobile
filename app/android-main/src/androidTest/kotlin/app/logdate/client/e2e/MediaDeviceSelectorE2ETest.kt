@@ -30,7 +30,7 @@ class MediaDeviceSelectorE2ETest {
     val composeRule = createComposeRule()
 
     @Test
-    fun controllableCameraRowsSelectDeviceFromTheRow() {
+    fun `controllable camera rows select device from the row`() {
         var selectedDeviceId: String? = null
         val selection =
             MediaDeviceSelectionUiState(
@@ -85,7 +85,7 @@ class MediaDeviceSelectorE2ETest {
     }
 
     @Test
-    fun systemControlledOutputShowsSettingsAffordance() {
+    fun `system controlled output shows settings affordance`() {
         var openedSettings = false
         val selection =
             MediaDeviceSelectionUiState(
@@ -138,7 +138,7 @@ class MediaDeviceSelectorE2ETest {
     }
 
     @Test
-    fun systemControlledOutputDefaultsToPlatformOutputSwitcherAction() {
+    fun `system controlled output defaults to platform output switcher action`() {
         val selection =
             MediaDeviceSelectionUiState(
                 kind = MediaDeviceKind.AUDIO_OUTPUT,

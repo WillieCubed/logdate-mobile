@@ -35,7 +35,7 @@ class MoodCheckInScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun selectMood_displaysTitle() {
+    fun `select mood displays title`() {
         composeRule.setContent {
             MaterialTheme {
                 SelectMoodContent(onMoodSelected = {})
@@ -46,7 +46,7 @@ class MoodCheckInScreenTest {
     }
 
     @Test
-    fun selectMood_displaysAllOptions() {
+    fun `select mood displays all options`() {
         composeRule.setContent {
             MaterialTheme {
                 SelectMoodContent(onMoodSelected = {})
@@ -59,7 +59,7 @@ class MoodCheckInScreenTest {
     }
 
     @Test
-    fun selectMood_tappingGreatTriggersCallback() {
+    fun `select mood tapping great triggers callback`() {
         var selectedMood: MoodOption? = null
         composeRule.setContent {
             MaterialTheme {
@@ -75,7 +75,7 @@ class MoodCheckInScreenTest {
     }
 
     @Test
-    fun selectMood_tappingSadTriggersCallback() {
+    fun `select mood tapping sad triggers callback`() {
         var selectedMood: MoodOption? = null
         composeRule.setContent {
             MaterialTheme {
@@ -91,7 +91,7 @@ class MoodCheckInScreenTest {
     }
 
     @Test
-    fun selectMood_tappingRoughTriggersCallback() {
+    fun `select mood tapping rough triggers callback`() {
         var selectedMood: MoodOption? = null
         composeRule.setContent {
             MaterialTheme {
@@ -111,7 +111,7 @@ class MoodCheckInScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun voicePrompt_displaysMoodEmoji() {
+    fun `voice prompt displays mood emoji`() {
         composeRule.setContent {
             MaterialTheme {
                 VoicePromptContent(
@@ -127,7 +127,7 @@ class MoodCheckInScreenTest {
     }
 
     @Test
-    fun voicePrompt_displaysButtons() {
+    fun `voice prompt displays buttons`() {
         composeRule.setContent {
             MaterialTheme {
                 VoicePromptContent(
@@ -143,7 +143,7 @@ class MoodCheckInScreenTest {
     }
 
     @Test
-    fun voicePrompt_addVoiceTriggersCallback() {
+    fun `voice prompt add voice triggers callback`() {
         var voiceAttached = false
         composeRule.setContent {
             MaterialTheme {
@@ -160,7 +160,7 @@ class MoodCheckInScreenTest {
     }
 
     @Test
-    fun voicePrompt_skipTriggersCallback() {
+    fun `voice prompt skip triggers callback`() {
         var skipped = false
         composeRule.setContent {
             MaterialTheme {
@@ -177,7 +177,7 @@ class MoodCheckInScreenTest {
     }
 
     @Test
-    fun voicePrompt_hidesEmojiWhenNull() {
+    fun `voice prompt hides emoji when null`() {
         composeRule.setContent {
             MaterialTheme {
                 VoicePromptContent(
@@ -197,7 +197,7 @@ class MoodCheckInScreenTest {
     // -----------------------------------------------------------------------
 
     @Test
-    fun savedState_displaysSavedText() {
+    fun `saved state displays saved text`() {
         composeRule.setContent {
             MaterialTheme {
                 MoodSavedContent()

@@ -44,13 +44,13 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class DatabaseConfigurationTest : BaseDatabaseTest() {
     @Test
-    fun databaseConstants_haveCorrectValues() =
+    fun `database constants have correct values`() =
         runTest {
             assertEquals("logdate", DATABASE_NAME)
         }
 
     @Test
-    fun migrationEndpoints_haveCorrectVersionNumbers() =
+    fun `migration endpoints have correct version numbers`() =
         runTest {
             val migrations =
                 listOf(
@@ -105,7 +105,7 @@ class DatabaseConfigurationTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun databaseAbstractClass_exists() =
+    fun `database abstract class exists`() =
         runTest {
             // Test that the LogDateDatabase abstract class exists
             val databaseClass = LogDateDatabase::class
@@ -114,7 +114,7 @@ class DatabaseConfigurationTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun daosModule_hasAllExpectedProviders() =
+    fun `daos module has all expected providers`() =
         runTest {
             // Test that the daosModule has providers for all expected DAOs
             val module = daosModule
@@ -127,13 +127,13 @@ class DatabaseConfigurationTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun databaseVersion_isCorrect() =
+    fun `database version is correct`() =
         runTest {
             assertEquals(41, MIGRATION_40_41.endVersion)
         }
 
     @Test
-    fun typeConverters_areConfigured() =
+    fun `type converters are configured`() =
         runTest {
             assertNotNull(TimestampConverter::class)
             assertNotNull(UuidConverter::class)
@@ -141,7 +141,7 @@ class DatabaseConfigurationTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun entities_areProperlyConfigured() =
+    fun `entities are properly configured`() =
         runTest {
             val entityClasses =
                 listOf(

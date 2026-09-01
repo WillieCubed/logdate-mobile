@@ -6,7 +6,7 @@ import kotlin.test.assertTrue
 
 class VideoPauseVisibilityPolicyTest {
     @Test
-    fun keepsPlayingWhenAlreadyVisibleInPictureInPicture() {
+    fun `keeps playing when already visible in picture in picture`() {
         assertTrue(
             shouldKeepVideoVisibleOnPause(
                 isInPictureInPictureMode = true,
@@ -16,7 +16,7 @@ class VideoPauseVisibilityPolicyTest {
     }
 
     @Test
-    fun keepsPlayingWhenVisibleInMultiWindow() {
+    fun `keeps playing when visible in multi window`() {
         assertTrue(
             shouldKeepVideoVisibleOnPause(
                 isInPictureInPictureMode = false,
@@ -26,7 +26,7 @@ class VideoPauseVisibilityPolicyTest {
     }
 
     @Test
-    fun doesNotKeepPlayingWhenNoVisibleVideoSurfaceRemains() {
+    fun `does not keep playing when no visible video surface remains`() {
         assertFalse(
             shouldKeepVideoVisibleOnPause(
                 isInPictureInPictureMode = false,

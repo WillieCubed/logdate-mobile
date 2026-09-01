@@ -128,7 +128,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * and sets the authenticated state to true.
      */
     @Test
-    fun initialization_with_existing_session_sets_authenticated_state() =
+    fun `initialization with existing session sets authenticated state`() =
         runTest {
             val sessionStorage =
                 FakeSessionStorage().apply {
@@ -156,7 +156,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests that the repository starts in an unauthenticated state when no session exists.
      */
     @Test
-    fun initialization_without_session_sets_unauthenticated_state() =
+    fun `initialization without session sets unauthenticated state`() =
         runTest {
             val repository = createRepository()
 
@@ -165,7 +165,7 @@ class DefaultPasskeyAccountRepositoryTest {
         }
 
     @Test
-    fun initialization_quarantines_a_session_for_a_different_local_owner() =
+    fun `initialization quarantines a session for a different local owner`() =
         runTest {
             val sessionStorage = FakeSessionStorage().apply { saveSession(testSession) }
 
@@ -186,7 +186,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests that username availability check returns available when the username is free.
      */
     @Test
-    fun checkUsernameAvailability_returns_available_when_username_is_free() =
+    fun `check username availability returns available when username is free`() =
         runTest {
             val apiClient =
                 FakePasskeyApiClient().apply {
@@ -210,7 +210,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests that username availability check returns unavailable when the username is taken.
      */
     @Test
-    fun checkUsernameAvailability_returns_unavailable_when_username_is_taken() =
+    fun `check username availability returns unavailable when username is taken`() =
         runTest {
             val apiClient =
                 FakePasskeyApiClient().apply {
@@ -234,7 +234,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests that username availability check properly handles API errors.
      */
     @Test
-    fun checkUsernameAvailability_handles_API_error() =
+    fun `check username availability handles api error`() =
         runTest {
             val apiClient =
                 FakePasskeyApiClient().apply {
@@ -251,7 +251,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests the full account creation flow with passkeys.
      */
     @Test
-    fun createAccountWithPasskey_succeeds_with_valid_flow() =
+    fun `create account with passkey succeeds with valid flow`() =
         runTest {
             val sessionStorage = FakeSessionStorage()
             val platformAccountManager = FakePlatformAccountManager()
@@ -288,7 +288,7 @@ class DefaultPasskeyAccountRepositoryTest {
         }
 
     @Test
-    fun createAccountWithPasskey_does_not_persist_a_different_cloud_owner() =
+    fun `create account with passkey does not persist a different cloud owner`() =
         runTest {
             val sessionStorage = FakeSessionStorage()
             val repository =
@@ -308,7 +308,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests that account creation fails when the API cannot begin account creation.
      */
     @Test
-    fun createAccountWithPasskey_handles_begin_account_creation_failure() =
+    fun `create account with passkey handles begin account creation failure`() =
         runTest {
             val apiClient =
                 FakePasskeyApiClient().apply {
@@ -335,7 +335,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests that account creation fails when passkey registration fails.
      */
     @Test
-    fun createAccountWithPasskey_handles_passkey_registration_failure() =
+    fun `create account with passkey handles passkey registration failure`() =
         runTest {
             val passkeyManager =
                 FakePasskeyManager().apply {
@@ -361,7 +361,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests that account creation fails when the API cannot complete account creation.
      */
     @Test
-    fun createAccountWithPasskey_handles_complete_account_creation_failure() =
+    fun `create account with passkey handles complete account creation failure`() =
         runTest {
             val apiClient =
                 FakePasskeyApiClient().apply {
@@ -387,7 +387,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests the full authentication flow with passkeys.
      */
     @Test
-    fun authenticateWithPasskey_succeeds_with_valid_flow() =
+    fun `authenticate with passkey succeeds with valid flow`() =
         runTest {
             val sessionStorage = FakeSessionStorage()
             val platformAccountManager = FakePlatformAccountManager()
@@ -414,7 +414,7 @@ class DefaultPasskeyAccountRepositoryTest {
         }
 
     @Test
-    fun authenticateWithPasskey_does_not_replace_the_installation_owner() =
+    fun `authenticate with passkey does not replace the installation owner`() =
         runTest {
             val sessionStorage = FakeSessionStorage()
             val repository =
@@ -431,7 +431,7 @@ class DefaultPasskeyAccountRepositoryTest {
         }
 
     @Test
-    fun authenticateWithPasskey_binds_an_unused_installation_to_the_authenticated_owner() =
+    fun `authenticate with passkey binds an unused installation to the authenticated owner`() =
         runTest {
             val sessionStorage = FakeSessionStorage()
             val repository =
@@ -527,7 +527,7 @@ class DefaultPasskeyAccountRepositoryTest {
         }
 
     @Test
-    fun signInWithRestoreKey_does_not_replace_the_installation_owner() =
+    fun `sign in with restore key does not replace the installation owner`() =
         runTest {
             val sessionStorage = FakeSessionStorage()
             val repository =
@@ -546,7 +546,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests that authentication fails when the API cannot begin authentication.
      */
     @Test
-    fun authenticateWithPasskey_handles_begin_authentication_failure() =
+    fun `authenticate with passkey handles begin authentication failure`() =
         runTest {
             val apiClient =
                 FakePasskeyApiClient().apply {
@@ -564,7 +564,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests that authentication fails when passkey authentication fails.
      */
     @Test
-    fun authenticateWithPasskey_handles_passkey_authentication_failure() =
+    fun `authenticate with passkey handles passkey authentication failure`() =
         runTest {
             val passkeyManager =
                 FakePasskeyManager().apply {
@@ -582,7 +582,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests that signing out clears the session and resets the authentication state.
      */
     @Test
-    fun signOut_clears_session_and_resets_state() =
+    fun `sign out clears session and resets state`() =
         runTest {
             val sessionStorage =
                 FakeSessionStorage().apply {
@@ -611,7 +611,7 @@ class DefaultPasskeyAccountRepositoryTest {
         }
 
     @Test
-    fun signOut_revokes_the_remote_refresh_token_before_clearing_local_credentials() =
+    fun `sign out revokes the remote refresh token before clearing local credentials`() =
         runTest {
             val sessionStorage = FakeSessionStorage().apply { saveSession(testSession) }
             val apiClient = FakePasskeyApiClient()
@@ -630,7 +630,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests that token refresh successfully updates the session with a new access token.
      */
     @Test
-    fun refreshAuthentication_succeeds_with_valid_refresh_token() =
+    fun `refresh authentication succeeds with valid refresh token`() =
         runTest {
             val sessionStorage =
                 FakeSessionStorage().apply {
@@ -662,7 +662,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests that token refresh failure clears the session and resets the authentication state.
      */
     @Test
-    fun refreshAuthentication_clears_session_on_failure() =
+    fun `refresh authentication clears session on failure`() =
         runTest {
             val sessionStorage =
                 FakeSessionStorage().apply {
@@ -690,7 +690,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests that getAccountInfo returns account info when the API call succeeds.
      */
     @Test
-    fun getAccountInfo_succeeds_with_valid_session() =
+    fun `get account info succeeds with valid session`() =
         runTest {
             val sessionStorage =
                 FakeSessionStorage().apply {
@@ -718,7 +718,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests that getAccountInfo retries after token refresh when the initial call fails.
      */
     @Test
-    fun getAccountInfo_retries_after_token_refresh_on_authentication_failure() =
+    fun `get account info retries after token refresh on authentication failure`() =
         runTest {
             val sessionStorage =
                 FakeSessionStorage().apply {
@@ -753,7 +753,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests that deleting a passkey succeeds when the API call succeeds.
      */
     @Test
-    fun deletePasskey_succeeds_with_valid_session() =
+    fun `delete passkey succeeds with valid session`() =
         runTest {
             val sessionStorage =
                 FakeSessionStorage().apply {
@@ -779,7 +779,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests that deletePasskey retries after token refresh when the initial call fails.
      */
     @Test
-    fun deletePasskey_retries_after_token_refresh_on_authentication_failure() =
+    fun `delete passkey retries after token refresh on authentication failure`() =
         runTest {
             val sessionStorage =
                 FakeSessionStorage().apply {
@@ -810,7 +810,7 @@ class DefaultPasskeyAccountRepositoryTest {
      * Tests that getCurrentAccount returns the current account state.
      */
     @Test
-    fun getCurrentAccount_returns_current_account_state() =
+    fun `get current account returns current account state`() =
         runTest {
             val repository = createRepository()
 

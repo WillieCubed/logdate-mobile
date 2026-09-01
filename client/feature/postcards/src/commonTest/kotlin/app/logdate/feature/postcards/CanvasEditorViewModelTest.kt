@@ -21,7 +21,7 @@ import kotlin.uuid.Uuid
  */
 class CanvasEditorViewModelTest {
     @Test
-    fun elementWithTransformReturnsCorrectType() {
+    fun `element with transform returns correct type`() {
         val photo =
             CanvasElement.Photo(
                 id = Uuid.random(),
@@ -40,7 +40,7 @@ class CanvasEditorViewModelTest {
     }
 
     @Test
-    fun addingElementIncrementsZIndex() {
+    fun `adding element increments z index`() {
         val elements =
             listOf(
                 CanvasElement.Text(
@@ -67,7 +67,7 @@ class CanvasEditorViewModelTest {
     }
 
     @Test
-    fun deleteElementRemovesFromList() {
+    fun `delete element removes from list`() {
         val keepId = Uuid.random()
         val deleteId = Uuid.random()
         val elements =
@@ -96,7 +96,7 @@ class CanvasEditorViewModelTest {
     }
 
     @Test
-    fun moveElementUpdateTransform() {
+    fun `move element update transform`() {
         val elementId = Uuid.random()
         val element =
             CanvasElement.Photo(
@@ -122,7 +122,7 @@ class CanvasEditorViewModelTest {
     }
 
     @Test
-    fun scaleElementClampsToRange() {
+    fun `scale element clamps to range`() {
         val scale = 0.5f
         val delta = 0.05f
         val newScale = (scale * delta).coerceIn(0.1f, 10f)
@@ -131,7 +131,7 @@ class CanvasEditorViewModelTest {
     }
 
     @Test
-    fun defaultEditorStateValues() {
+    fun `default editor state values`() {
         val state =
             CanvasEditorState(
                 document =

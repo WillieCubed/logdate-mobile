@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class TextFieldValueSyncTest {
     @Test
-    fun selectionAndCompositionOnlyChangesDoNotPropagateText() {
+    fun `selection and composition only changes do not propagate text`() {
         val previous = TextFieldValue(text = "draft", selection = TextRange(5))
         val next =
             TextFieldValue(
@@ -22,7 +22,7 @@ class TextFieldValueSyncTest {
     }
 
     @Test
-    fun localTextChangesPropagateBeforeParentRecomposition() {
+    fun `local text changes propagate before parent recomposition`() {
         val previous = TextFieldValue(text = "draft", selection = TextRange(5))
         val next = TextFieldValue(text = "drafts", selection = TextRange(6))
 
@@ -30,7 +30,7 @@ class TextFieldValueSyncTest {
     }
 
     @Test
-    fun matchingExternalTextPreservesSelectionAndComposition() {
+    fun `matching external text preserves selection and composition`() {
         val current =
             TextFieldValue(
                 text = "draft",
@@ -44,7 +44,7 @@ class TextFieldValueSyncTest {
     }
 
     @Test
-    fun externalAppendPreservesAMidStringSelection() {
+    fun `external append preserves a mid string selection`() {
         val current = TextFieldValue(text = "draft", selection = TextRange(2, 4))
 
         val merged = mergeExternalText(current, "draft restored")
@@ -55,7 +55,7 @@ class TextFieldValueSyncTest {
     }
 
     @Test
-    fun shorterExternalTextClampsSelectionToTheNewText() {
+    fun `shorter external text clamps selection to the new text`() {
         val current = TextFieldValue(text = "long draft", selection = TextRange(4, 10))
 
         val merged = mergeExternalText(current, "short")

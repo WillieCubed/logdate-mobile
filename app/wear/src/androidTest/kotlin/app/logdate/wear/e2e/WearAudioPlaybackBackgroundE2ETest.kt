@@ -69,7 +69,7 @@ class WearAudioPlaybackBackgroundE2ETest {
     }
 
     @Test
-    fun playbackNotificationAndSessionStaySynchronizedAfterWearHome() {
+    fun `playback notification and session stay synchronized after wear home`() {
         val audioFile = silentWavFile(durationSeconds = 60)
 
         runOnMainSync {
@@ -144,7 +144,7 @@ class WearAudioPlaybackBackgroundE2ETest {
     }
 
     @Test
-    fun wearApplicationRegistersPlaybackNotificationChannel() {
+    fun `wear application registers playback notification channel`() {
         val channel = notificationManager.getNotificationChannel(AudioPlaybackService.CHANNEL_ID)
 
         assertNotNull("Wear app must register the audio playback notification channel", channel)

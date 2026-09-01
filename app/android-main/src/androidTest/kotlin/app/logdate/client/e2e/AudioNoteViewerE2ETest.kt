@@ -45,7 +45,7 @@ class AudioNoteViewerE2ETest {
     private val noteId = Uuid.parse("00000000-0000-0000-0000-000000009291")
 
     @Test
-    fun compactAudioNoteViewerExposesOutputRouteControls() {
+    fun `compact audio note viewer exposes output route controls`() {
         assumeTrue(screenWidthDp() < 600)
         setAudioViewerContent()
 
@@ -54,7 +54,7 @@ class AudioNoteViewerE2ETest {
     }
 
     @Test
-    fun expandedAudioNoteViewerExposesOutputRouteControls() {
+    fun `expanded audio note viewer exposes output route controls`() {
         assumeTrue(screenWidthDp() >= 600)
         setAudioViewerContent()
 

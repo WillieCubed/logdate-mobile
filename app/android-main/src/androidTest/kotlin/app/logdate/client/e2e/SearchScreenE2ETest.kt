@@ -138,7 +138,7 @@ class SearchScreenE2ETest {
     }
 
     @Test
-    fun idleState_showsPromptText() {
+    fun `idle state shows prompt text`() {
         composeRule.setContent {
             SearchScreenContent(
                 searchState = SearchScreenState.Idle(recentSearches = emptyList()),
@@ -155,7 +155,7 @@ class SearchScreenE2ETest {
     }
 
     @Test
-    fun withResults_showsTextNoteContent() {
+    fun `with results shows text note content`() {
         composeRule.setContent {
             SearchScreenContent(
                 searchState = SearchScreenState.Results(results = allResults),
@@ -172,7 +172,7 @@ class SearchScreenE2ETest {
     }
 
     @Test
-    fun withResults_showsTranscriptionContent() {
+    fun `with results shows transcription content`() {
         composeRule.setContent {
             SearchScreenContent(
                 searchState = SearchScreenState.Results(results = allResults),
@@ -191,7 +191,7 @@ class SearchScreenE2ETest {
     }
 
     @Test
-    fun emptyState_showsNoResultsMessage() {
+    fun `empty state shows no results message`() {
         composeRule.setContent {
             SearchScreenContent(
                 searchState = SearchScreenState.Empty(query = "nonexistent"),
@@ -208,7 +208,7 @@ class SearchScreenE2ETest {
     }
 
     @Test
-    fun realSearch_typingQuery_returnsIndexedDatabaseResults() {
+    fun `real search typing query returns indexed database results`() {
         composeRule.setContent {
             MaterialTheme {
                 SearchScreen(
@@ -241,7 +241,7 @@ class SearchScreenE2ETest {
     }
 
     @Test
-    fun realSearch_unmatchedQuery_showsEmptyState() {
+    fun `real search unmatched query shows empty state`() {
         composeRule.setContent {
             MaterialTheme {
                 SearchScreen(

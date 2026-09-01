@@ -46,7 +46,7 @@ import kotlin.test.assertTrue
  */
 class DesktopScreenshotTest {
     @Test
-    fun shared_catalog_matches_baselines() {
+    fun `shared catalog matches baselines`() {
         if (skipWithoutDisplay()) return
         val sceneFilter = desktopScreenshotSceneFilter
         SharedScreenshotCatalog.allScenes
@@ -91,7 +91,7 @@ class DesktopScreenshotTest {
     }
 
     @Test
-    fun lock_screen_matches_baseline() {
+    fun `lock screen matches baseline`() {
         if (skipWithoutDisplay()) return
         assertMatchesBaseline(
             baselineName = "lock-screen",

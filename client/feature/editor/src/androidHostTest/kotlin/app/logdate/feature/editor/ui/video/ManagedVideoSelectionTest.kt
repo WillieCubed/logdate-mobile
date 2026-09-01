@@ -8,7 +8,7 @@ import kotlin.test.assertEquals
 
 class ManagedVideoSelectionTest {
     @Test
-    fun durationAndEditorCallbackReceiveOnlyTheManagedUri() =
+    fun `duration and editor callback receive only the managed uri`() =
         runTest {
             val transientUri = "content://picker/video/transient"
             val managedUri = "content://media/external/video/media/42"
@@ -36,7 +36,7 @@ class ManagedVideoSelectionTest {
         }
 
     @Test
-    fun editorCallbackRunsInsideTheImportTransaction() =
+    fun `editor callback runs inside the import transaction`() =
         runTest {
             val statesObservedByCallback = mutableListOf<ManagedMediaSelectionState>()
             val controller = ManagedMediaSelectionController { "content://media/video/managed" }
@@ -57,7 +57,7 @@ class ManagedVideoSelectionTest {
         }
 
     @Test
-    fun callbackFailureBeforeAcceptanceDiscardsTheManagedCopy() =
+    fun `callback failure before acceptance discards the managed copy`() =
         runTest {
             val discardedManagedUris = mutableListOf<String>()
             val controller =

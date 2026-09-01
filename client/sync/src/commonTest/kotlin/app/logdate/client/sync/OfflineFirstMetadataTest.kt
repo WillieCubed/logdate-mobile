@@ -17,7 +17,7 @@ import kotlin.uuid.Uuid
  */
 class OfflineFirstMetadataTest {
     @Test
-    fun enqueue_is_retained_while_signed_out() =
+    fun `enqueue is retained while signed out`() =
         runTest {
             val session = fakeSessionStorage(authenticated = false)
             val metadata = fakeSyncMetadataService(session)
@@ -36,7 +36,7 @@ class OfflineFirstMetadataTest {
         }
 
     @Test
-    fun pending_count_survives_sign_out() =
+    fun `pending count survives sign out`() =
         runTest {
             val session = fakeSessionStorage(authenticated = true)
             val metadata = fakeSyncMetadataService(session)
@@ -55,7 +55,7 @@ class OfflineFirstMetadataTest {
         }
 
     @Test
-    fun queued_offline_work_is_available_after_sign_in() =
+    fun `queued offline work is available after sign in`() =
         runTest {
             val session = fakeSessionStorage(authenticated = false)
             val metadata = fakeSyncMetadataService(session)
@@ -83,7 +83,7 @@ class OfflineFirstMetadataTest {
         }
 
     @Test
-    fun clearPending_empties_queue_unconditionally() =
+    fun `clear pending empties queue unconditionally`() =
         runTest {
             val session = fakeSessionStorage(authenticated = true)
             val metadata = fakeSyncMetadataService(session)

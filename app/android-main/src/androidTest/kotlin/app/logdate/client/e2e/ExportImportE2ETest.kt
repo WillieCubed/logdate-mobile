@@ -225,7 +225,7 @@ class ExportImportE2ETest {
     // ── Tests ───────────────────────────────────────────────────────────
 
     @Test
-    fun roundTrip_journals_preservesAllFields() = runTest {
+    fun `round trip journals preserves all fields`() = runTest {
         val now = now()
         val journal = Journal(
             id = Uuid.random(),
@@ -248,7 +248,7 @@ class ExportImportE2ETest {
     }
 
     @Test
-    fun roundTrip_textNote_preservesContent() = runTest {
+    fun `round trip text note preserves content`() = runTest {
         val now = now()
         val journal = Journal(id = Uuid.random(), title = "J1", created = now, lastUpdated = now)
         sourceJournalRepo.create(journal)
@@ -271,7 +271,7 @@ class ExportImportE2ETest {
     }
 
     @Test
-    fun roundTrip_imageNote_preservesMediaRefAndCaption() = runTest {
+    fun `round trip image note preserves media ref and caption`() = runTest {
         val now = now()
         val journal = Journal(id = Uuid.random(), title = "Photos", created = now, lastUpdated = now)
         sourceJournalRepo.create(journal)
@@ -294,7 +294,7 @@ class ExportImportE2ETest {
     }
 
     @Test
-    fun roundTrip_videoNote_preservesMediaRefAndCaption() = runTest {
+    fun `round trip video note preserves media ref and caption`() = runTest {
         val now = now()
         val journal = Journal(id = Uuid.random(), title = "Videos", created = now, lastUpdated = now)
         sourceJournalRepo.create(journal)
@@ -317,7 +317,7 @@ class ExportImportE2ETest {
     }
 
     @Test
-    fun roundTrip_audioNote_preservesMediaRef() = runTest {
+    fun `round trip audio note preserves media ref`() = runTest {
         val now = now()
         val journal = Journal(id = Uuid.random(), title = "Voice Memos", created = now, lastUpdated = now)
         sourceJournalRepo.create(journal)
@@ -340,7 +340,7 @@ class ExportImportE2ETest {
     }
 
     @Test
-    fun roundTrip_noteLocation_preservesCoordinates() = runTest {
+    fun `round trip note location preserves coordinates`() = runTest {
         val now = now()
         val journal = Journal(id = Uuid.random(), title = "Geo", created = now, lastUpdated = now)
         sourceJournalRepo.create(journal)
@@ -369,7 +369,7 @@ class ExportImportE2ETest {
     }
 
     @Test
-    fun roundTrip_journalNoteRelations_preserved() = runTest {
+    fun `round trip journal note relations preserved`() = runTest {
         val now = now()
         val journal = Journal(id = Uuid.random(), title = "Daily", created = now, lastUpdated = now)
         sourceJournalRepo.create(journal)
@@ -398,7 +398,7 @@ class ExportImportE2ETest {
     }
 
     @Test
-    fun roundTrip_multipleJournals_allPreserved() = runTest {
+    fun `round trip multiple journals all preserved`() = runTest {
         val now = now()
         val journals = (1..3).map { i ->
             Journal(id = Uuid.random(), title = "Journal $i", created = now, lastUpdated = now)
@@ -415,7 +415,7 @@ class ExportImportE2ETest {
     }
 
     @Test
-    fun roundTrip_drafts_preservedWhenIncluded() = runTest {
+    fun `round trip drafts preserved when included`() = runTest {
         val now = now()
         val journal = Journal(id = Uuid.random(), title = "J1", created = now, lastUpdated = now)
         sourceJournalRepo.create(journal)
@@ -442,7 +442,7 @@ class ExportImportE2ETest {
     }
 
     @Test
-    fun roundTrip_drafts_skippedWhenExcluded() = runTest {
+    fun `round trip drafts skipped when excluded`() = runTest {
         val now = now()
         val journal = Journal(id = Uuid.random(), title = "J1", created = now, lastUpdated = now)
         sourceJournalRepo.create(journal)
@@ -469,7 +469,7 @@ class ExportImportE2ETest {
     }
 
     @Test
-    fun roundTrip_timestamps_preservedExactly() = runTest {
+    fun `round trip timestamps preserved exactly`() = runTest {
         val created = Instant.fromEpochMilliseconds(1700000000000L)
         val updated = Instant.fromEpochMilliseconds(1700000060000L)
 
@@ -496,7 +496,7 @@ class ExportImportE2ETest {
     }
 
     @Test
-    fun roundTrip_metadata_containsDeviceAndAppInfo() = runTest {
+    fun `round trip metadata contains device and app info`() = runTest {
         val now = now()
         val journal = Journal(id = Uuid.random(), title = "Meta", created = now, lastUpdated = now)
         sourceJournalRepo.create(journal)

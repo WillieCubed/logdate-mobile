@@ -98,7 +98,7 @@ class OfflineFirstJournalNotesRepositoryTest {
      * Expected behavior: The flow should emit an empty list when first collected.
      */
     @Test
-    fun allNotesObserved_emitsEmptyListInitially() =
+    fun `all notes observed emits empty list initially`() =
         runTest {
             val notes = repository.allNotesObserved.first()
             assertTrue(notes.isEmpty())
@@ -111,7 +111,7 @@ class OfflineFirstJournalNotesRepositoryTest {
      * when notes of both types exist in their respective DAOs.
      */
     @Test
-    fun allNotesObserved_combinesTextAndImageNotes() =
+    fun `all notes observed combines text and image notes`() =
         runTest {
             val textNote = createTestTextNote()
             val imageNote = createTestImageNote()
@@ -124,7 +124,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
-    fun observeNotesInJournal_filtersNotesByJournal() =
+    fun `observe notes in journal filters notes by journal`() =
         runTest {
             val journal = createTestJournal()
             val textNote = createTestTextNote()
@@ -147,7 +147,7 @@ class OfflineFirstJournalNotesRepositoryTest {
      * creation timestamps within that range should be returned, excluding notes outside the range.
      */
     @Test
-    fun observeNotesInRange_filtersNotesByTimeRange() =
+    fun `observe notes in range filters notes by time range`() =
         runTest {
             val now = Clock.System.now()
             val hourAgo = now - 1.hours
@@ -177,7 +177,7 @@ class OfflineFirstJournalNotesRepositoryTest {
      * 3. The total number of notes across all pages should equal the total number of notes in the database
      */
     @Test
-    fun observeNotesPage_returnsPaginatedResults() =
+    fun `observe notes page returns paginated results`() =
         runTest {
             // Add multiple notes
             repeat(5) { index ->
@@ -197,7 +197,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
-    fun observeNotesStream_returnsAllNotes() =
+    fun `observe notes stream returns all notes`() =
         runTest {
             val textNote = createTestTextNote()
             val imageNote = createTestImageNote()
@@ -210,7 +210,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
-    fun create_videoNote_addsToDatabase() =
+    fun `create video note adds to database`() =
         runTest {
             val videoNote =
                 JournalNote.Video(
@@ -236,7 +236,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
-    fun create_videoNote_indexesMediaAutomatically() =
+    fun `create video note indexes media automatically`() =
         runTest {
             val videoNote =
                 JournalNote.Video(
@@ -268,7 +268,7 @@ class OfflineFirstJournalNotesRepositoryTest {
      * 3. The note's content should match the original note's content
      */
     @Test
-    fun create_textNote_addsToDatabase() =
+    fun `create text note adds to database`() =
         runTest {
             val textNote = createTestTextNote()
 
@@ -281,7 +281,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
-    fun create_imageNote_addsToDatabase() =
+    fun `create image note adds to database`() =
         runTest {
             val imageNote = createTestImageNote()
             mediaManager.mediaByUri[imageNote.mediaRef] =
@@ -301,7 +301,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
-    fun create_imageNote_indexesMediaAutomatically() =
+    fun `create image note indexes media automatically`() =
         runTest {
             val imageNote = createTestImageNote()
             mediaManager.mediaByUri[imageNote.mediaRef] =
@@ -318,7 +318,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
-    fun create_imageNote_doesNotDuplicateAlreadyIndexedMedia() =
+    fun `create image note does not duplicate already indexed media`() =
         runTest {
             val imageNote = createTestImageNote()
             mediaManager.mediaByUri[imageNote.mediaRef] =
@@ -339,7 +339,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
-    fun create_imageNote_rollsBackIndexedMediaWhenNotePersistenceFails() =
+    fun `create image note rolls back indexed media when note persistence fails`() =
         runTest {
             val imageNote = createTestImageNote()
             mediaManager.mediaByUri[imageNote.mediaRef] =
@@ -367,7 +367,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
-    fun create_audioNote_addsToDatabase() =
+    fun `create audio note adds to database`() =
         runTest {
             val audioNote =
                 JournalNote.Audio(
@@ -385,7 +385,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
-    fun remove_textNote_removesFromDatabase() =
+    fun `remove text note removes from database`() =
         runTest {
             val textNote = createTestTextNote()
             textNoteDao.addNote(textNote.toEntity())
@@ -397,7 +397,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
-    fun remove_imageNote_removesFromDatabase() =
+    fun `remove image note removes from database`() =
         runTest {
             val imageNote = createTestImageNote()
             imageNoteDao.addNote(imageNote.toEntity())
@@ -409,7 +409,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
-    fun removeById_removesTextNote() =
+    fun `remove by id removes text note`() =
         runTest {
             val textNote = createTestTextNote()
             textNoteDao.addNote(textNote.toEntity())
@@ -421,7 +421,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
-    fun createWithJournal_addsNoteAndLinksToJournal() =
+    fun `create with journal adds note and links to journal`() =
         runTest {
             val journal = createTestJournal()
             val textNote = createTestTextNote()
@@ -440,7 +440,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
-    fun allNotesObserved_hydratesSemanticPlaceFromResolver() =
+    fun `all notes observed hydrates semantic place from resolver`() =
         runTest {
             val place =
                 NotePlace(
@@ -468,7 +468,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
-    fun removeFromJournal_removesNoteJournalLink() =
+    fun `remove from journal removes note journal link`() =
         runTest {
             val journal = createTestJournal()
             val textNote = createTestTextNote()
@@ -523,7 +523,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         )
 
     @Test
-    fun removingANoteRemovesTheMediaItWasTheLastToReference() =
+    fun `removing a note removes the media it was the last to reference`() =
         runTest {
             val repository = createRepository()
             val note = createTestImageNote()
@@ -539,7 +539,7 @@ class OfflineFirstJournalNotesRepositoryTest {
      * Deleting one must not take the other's photo with it.
      */
     @Test
-    fun removingANoteLeavesMediaAnotherNoteStillReferences() =
+    fun `removing a note leaves media another note still references`() =
         runTest {
             val repository = createRepository()
             val shared = "shared-image.jpg"
@@ -561,7 +561,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
-    fun removingATextNoteDeletesNoMedia() =
+    fun `removing a text note deletes no media`() =
         runTest {
             val repository = createRepository()
             val note = createTestTextNote()
@@ -573,7 +573,7 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
-    fun removingByIdAlsoRemovesTheMedia() =
+    fun `removing by id also removes the media`() =
         runTest {
             val repository = createRepository()
             val note = createTestImageNote()

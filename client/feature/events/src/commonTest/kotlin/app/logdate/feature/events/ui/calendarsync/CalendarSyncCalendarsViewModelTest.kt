@@ -45,7 +45,7 @@ class CalendarSyncCalendarsViewModelTest {
     }
 
     @Test
-    fun init_loads_calendars_and_initial_selection_from_preferences() =
+    fun `init loads calendars and initial selection from preferences`() =
         runTest(testDispatcher) {
             reader.calendars =
                 listOf(
@@ -63,7 +63,7 @@ class CalendarSyncCalendarsViewModelTest {
         }
 
     @Test
-    fun toggleCalendar_adds_then_removes_from_selection() =
+    fun `toggle calendar adds then removes from selection`() =
         runTest(testDispatcher) {
             reader.calendars = listOf(deviceCalendar("cal-1", "Personal"))
             val viewModel = CalendarSyncCalendarsViewModel(reader, preferences)
@@ -79,7 +79,7 @@ class CalendarSyncCalendarsViewModelTest {
         }
 
     @Test
-    fun toggleCalendar_persists_selection_immediately() =
+    fun `toggle calendar persists selection immediately`() =
         runTest(testDispatcher) {
             reader.calendars = listOf(deviceCalendar("cal-1", "Personal"))
             val viewModel = CalendarSyncCalendarsViewModel(reader, preferences)
@@ -90,7 +90,7 @@ class CalendarSyncCalendarsViewModelTest {
         }
 
     @Test
-    fun toggleCalendar_off_removes_from_persisted_selection() =
+    fun `toggle calendar off removes from persisted selection`() =
         runTest(testDispatcher) {
             reader.calendars = listOf(deviceCalendar("cal-1", "Personal"))
             preferences.setDeviceCalendarEnabledIds(setOf("cal-1"))
@@ -102,7 +102,7 @@ class CalendarSyncCalendarsViewModelTest {
         }
 
     @Test
-    fun init_with_no_calendars_emits_empty_loaded_state() =
+    fun `init with no calendars emits empty loaded state`() =
         runTest(testDispatcher) {
             val viewModel = CalendarSyncCalendarsViewModel(reader, preferences)
 

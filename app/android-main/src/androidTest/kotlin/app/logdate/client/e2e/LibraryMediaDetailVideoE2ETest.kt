@@ -42,7 +42,7 @@ class LibraryMediaDetailVideoE2ETest {
     val composeRule = createAndroidComposeRule<VideoPlaybackHostActivity>()
 
     @Test
-    fun compactVideoDetailShowsPresenterOutputRouteControls() {
+    fun `compact video detail shows presenter output route controls`() {
         assumeTrue(isCompactManagedDevice())
         var stopPresentingCount = 0
         setVideoDetailContent(
@@ -71,7 +71,7 @@ class LibraryMediaDetailVideoE2ETest {
     }
 
     @Test
-    fun expandedVideoDetailShowsPresenterOutputRouteControlsBesideMetadata() {
+    fun `expanded video detail shows presenter output route controls beside metadata`() {
         assumeTrue(isLargeScreenManagedDevice())
         var stopPresentingCount = 0
         setVideoDetailContent(

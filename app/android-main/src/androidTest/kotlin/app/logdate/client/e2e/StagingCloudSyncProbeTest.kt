@@ -30,7 +30,7 @@ import kotlin.uuid.Uuid
 @RunWith(AndroidJUnit4::class)
 class StagingCloudSyncProbeTest {
     @Test
-    fun syncsARealEntryAcrossFreshManagedDevices() = runBlocking {
+    fun `syncs a real entry across fresh managed devices`() = runBlocking {
         val args = InstrumentationRegistry.getArguments().getString(ARGUMENTS).orEmpty()
         val values = parseArguments(args)
         val mode = values["mode"]

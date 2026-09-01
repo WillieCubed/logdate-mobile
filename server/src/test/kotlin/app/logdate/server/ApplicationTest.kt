@@ -33,7 +33,7 @@ class ApplicationTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
-    fun testRootJsonForNonBrowsers() =
+    fun `root json for non browsers`() =
         testApplication {
             application {
                 module()
@@ -48,7 +48,7 @@ class ApplicationTest {
         }
 
     @Test
-    fun testRootHtmlForBrowsers() =
+    fun `root html for browsers`() =
         testApplication {
             application {
                 module()
@@ -66,7 +66,7 @@ class ApplicationTest {
         }
 
     @Test
-    fun testHealthOmitsInternalDetailsWithoutToken() =
+    fun `health omits internal details without token`() =
         testApplication {
             application {
                 module(
@@ -89,7 +89,7 @@ class ApplicationTest {
         }
 
     @Test
-    fun testHealthOmitsInternalDetailsWithWrongToken() =
+    fun `health omits internal details with wrong token`() =
         testApplication {
             application {
                 module(
@@ -110,7 +110,7 @@ class ApplicationTest {
         }
 
     @Test
-    fun testHealthOmitsInternalDetailsWhenTokenUnconfigured() =
+    fun `health omits internal details when token unconfigured`() =
         testApplication {
             application {
                 module(
@@ -132,7 +132,7 @@ class ApplicationTest {
         }
 
     @Test
-    fun testHealthIncludesDbConnectedWithCorrectToken() =
+    fun `health includes db connected with correct token`() =
         testApplication {
             application {
                 module(
@@ -155,7 +155,7 @@ class ApplicationTest {
         }
 
     @Test
-    fun testOAuthDiscoveryRoutes() =
+    fun `o auth discovery routes`() =
         testApplication {
             application {
                 module()
@@ -175,7 +175,7 @@ class ApplicationTest {
         }
 
     @Test
-    fun testApiV1BaseRoute() =
+    fun `api v 1 base route`() =
         testApplication {
             application {
                 module()
@@ -199,7 +199,7 @@ class ApplicationTest {
         }
 
     @Test
-    fun testOpenApiJson() =
+    fun `open api json`() =
         testApplication {
             application {
                 module()
@@ -216,7 +216,7 @@ class ApplicationTest {
         }
 
     @Test
-    fun testOpenApiYaml() =
+    fun `open api yaml`() =
         testApplication {
             application {
                 module()
@@ -231,7 +231,7 @@ class ApplicationTest {
         }
 
     @Test
-    fun testScalarApiReference() =
+    fun `scalar api reference`() =
         testApplication {
             application {
                 module()
@@ -254,7 +254,7 @@ class ApplicationTest {
         }
 
     @Test
-    fun testPublishedOpenApiOperationsAreComplete() =
+    fun `published open api operations are complete`() =
         testApplication {
             application { module() }
             client.get("/openapi.json").apply {

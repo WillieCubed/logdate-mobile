@@ -8,7 +8,7 @@ import kotlin.test.assertEquals
 
 class PostcardsCollectionLayoutTest {
     @Test
-    fun splitPostcardsForBookPostureBalancesCardsAcrossPanes() {
+    fun `split postcards for book posture balances cards across panes`() {
         val (startPaneItems, endPaneItems) = splitPostcardsForBookPosture((1..7).toList())
 
         assertEquals(listOf(1, 2, 3, 4), startPaneItems)
@@ -16,7 +16,7 @@ class PostcardsCollectionLayoutTest {
     }
 
     @Test
-    fun splitPostcardsForBookPostureKeepsSingleCardInStartPane() {
+    fun `split postcards for book posture keeps single card in start pane`() {
         val (startPaneItems, endPaneItems) = splitPostcardsForBookPosture(listOf("only"))
 
         assertEquals(listOf("only"), startPaneItems)
@@ -24,7 +24,7 @@ class PostcardsCollectionLayoutTest {
     }
 
     @Test
-    fun postcardGridColumnCountForBookPaneUsesPhysicalPaneWidth() {
+    fun `postcard grid column count for book pane uses physical pane width`() {
         val columnCount =
             postcardGridColumnCountForBookPane(
                 paneWidth = 708.dp,

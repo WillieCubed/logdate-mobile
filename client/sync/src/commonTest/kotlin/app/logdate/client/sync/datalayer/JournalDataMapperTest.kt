@@ -27,7 +27,7 @@ class JournalDataMapperTest {
     // =======================================================================
 
     @Test
-    fun journalRoundTrip() {
+    fun `journal round trip`() {
         val journal =
             Journal(
                 id = fixedUuid,
@@ -46,7 +46,7 @@ class JournalDataMapperTest {
     }
 
     @Test
-    fun journalWithFavoritedFlagRoundTrips() {
+    fun `journal with favorited flag round trips`() {
         val journal =
             Journal(
                 id = fixedUuid,
@@ -66,7 +66,7 @@ class JournalDataMapperTest {
     }
 
     @Test
-    fun journalWithEmptyFieldsRoundTrips() {
+    fun `journal with empty fields round trips`() {
         val journal =
             Journal(
                 id = fixedUuid,
@@ -84,7 +84,7 @@ class JournalDataMapperTest {
     }
 
     @Test
-    fun journalWithUnicodeContentRoundTrips() {
+    fun `journal with unicode content round trips`() {
         val journal =
             Journal(
                 id = fixedUuid,
@@ -102,7 +102,7 @@ class JournalDataMapperTest {
     }
 
     @Test
-    fun syncVersionPreservedThroughRoundTrip() {
+    fun `sync version preserved through round trip`() {
         val journal =
             Journal(
                 id = fixedUuid,
@@ -122,7 +122,7 @@ class JournalDataMapperTest {
     // =======================================================================
 
     @Test
-    fun dataMapContainsRequiredKeys() {
+    fun `data map contains required keys`() {
         val journal =
             Journal(
                 id = fixedUuid,
@@ -143,7 +143,7 @@ class JournalDataMapperTest {
     // =======================================================================
 
     @Test
-    fun fromDataMapThrowsOnMissingPayload() {
+    fun `from data map throws on missing payload`() {
         val map = mapOf(JournalDataMapper.KEY_UID to fixedUuid.toString())
 
         assertFailsWith<IllegalArgumentException> {
@@ -152,14 +152,14 @@ class JournalDataMapperTest {
     }
 
     @Test
-    fun fromDataMapThrowsOnEmptyMap() {
+    fun `from data map throws on empty map`() {
         assertFailsWith<IllegalArgumentException> {
             mapper.fromDataMap(emptyMap())
         }
     }
 
     @Test
-    fun fromDataMapThrowsOnInvalidJson() {
+    fun `from data map throws on invalid json`() {
         val map =
             mapOf(
                 JournalDataMapper.KEY_UID to fixedUuid.toString(),
@@ -176,52 +176,52 @@ class JournalDataMapperTest {
     // =======================================================================
 
     @Test
-    fun journalPathUsesId() {
+    fun `journal path uses id`() {
         val path = JournalDataMapper.journalPath(fixedUuid)
         assertEquals("/logdate/journals/550e8400-e29b-41d4-a716-446655440000", path)
     }
 
     @Test
-    fun journalDeletePathUsesId() {
+    fun `journal delete path uses id`() {
         val path = JournalDataMapper.journalDeletePath(fixedUuid)
         assertEquals("/logdate/journals/550e8400-e29b-41d4-a716-446655440000/delete", path)
     }
 
     @Test
-    fun isJournalPathReturnsTrueForJournalDataPaths() {
+    fun `is journal path returns true for journal data paths`() {
         assertTrue(JournalDataMapper.isJournalPath("/logdate/journals/550e8400-e29b-41d4-a716-446655440000"))
     }
 
     @Test
-    fun isJournalPathReturnsFalseForDeletePaths() {
+    fun `is journal path returns false for delete paths`() {
         assertFalse(JournalDataMapper.isJournalPath("/logdate/journals/550e8400-e29b-41d4-a716-446655440000/delete"))
     }
 
     @Test
-    fun isJournalPathReturnsFalseForUnrelatedPaths() {
+    fun `is journal path returns false for unrelated paths`() {
         assertFalse(JournalDataMapper.isJournalPath("/logdate/notes/some-id"))
         assertFalse(JournalDataMapper.isJournalPath("/other/path"))
     }
 
     @Test
-    fun isDeletePathReturnsTrueForDeletePaths() {
+    fun `is delete path returns true for delete paths`() {
         assertTrue(JournalDataMapper.isDeletePath("/logdate/journals/550e8400-e29b-41d4-a716-446655440000/delete"))
     }
 
     @Test
-    fun isDeletePathReturnsFalseForNonDeletePaths() {
+    fun `is delete path returns false for non delete paths`() {
         assertFalse(JournalDataMapper.isDeletePath("/logdate/journals/550e8400-e29b-41d4-a716-446655440000"))
     }
 
     @Test
-    fun journalIdFromPathExtractsCorrectUuid() {
+    fun `journal id from path extracts correct uuid`() {
         val path = "/logdate/journals/550e8400-e29b-41d4-a716-446655440000"
         val extracted = JournalDataMapper.journalIdFromPath(path)
         assertEquals(fixedUuid, extracted)
     }
 
     @Test
-    fun journalIdFromDeletePathExtractsCorrectUuid() {
+    fun `journal id from delete path extracts correct uuid`() {
         val path = "/logdate/journals/550e8400-e29b-41d4-a716-446655440000/delete"
         val extracted = JournalDataMapper.journalIdFromPath(path)
         assertEquals(fixedUuid, extracted)
@@ -232,7 +232,7 @@ class JournalDataMapperTest {
     // =======================================================================
 
     @Test
-    fun multipleJournalsSerializeIndependently() {
+    fun `multiple journals serialize independently`() {
         val journals =
             listOf(
                 Journal(id = Uuid.random(), title = "Journal 1", created = fixedTime, lastUpdated = fixedTime),

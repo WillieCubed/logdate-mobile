@@ -29,7 +29,7 @@ class EventUseCasesTest {
      * arguments survive the call.
      */
     @Test
-    fun observeEventsForDateRange_passes_through_to_repository() =
+    fun `observe events for date range passes through to repository`() =
         runTest {
             val event = sampleEvent(title = "Recital")
             val repo =
@@ -50,7 +50,7 @@ class EventUseCasesTest {
      * Both branches are exercised in one test for compactness.
      */
     @Test
-    fun getEventById_emits_event_or_null() =
+    fun `get event by id emits event or null`() =
         runTest {
             val event = sampleEvent()
             val repo = FakeEventRepository(events = listOf(event))
@@ -65,7 +65,7 @@ class EventUseCasesTest {
      * the exact event instance passed in, so callers can rely on it not being mutated.
      */
     @Test
-    fun updateEvent_returns_repository_result() =
+    fun `update event returns repository result`() =
         runTest {
             val repo = FakeEventRepository()
             val useCase = UpdateEventUseCase(repo)
@@ -82,7 +82,7 @@ class EventUseCasesTest {
      * [Result] unchanged.
      */
     @Test
-    fun deleteEvent_calls_repository() =
+    fun `delete event calls repository`() =
         runTest {
             val repo = FakeEventRepository()
             val useCase = DeleteEventUseCase(repo)
@@ -99,7 +99,7 @@ class EventUseCasesTest {
      * unknown notes. Both the populated and empty branches are checked.
      */
     @Test
-    fun observeEventsForNote_returns_events_for_note() =
+    fun `observe events for note returns events for note`() =
         runTest {
             val event = sampleEvent()
             val noteId = Uuid.random()
@@ -118,7 +118,7 @@ class EventUseCasesTest {
      * count) forwards the event id and returns the configured note ids.
      */
     @Test
-    fun observeNotesForEvent_returns_note_ids_for_event() =
+    fun `observe notes for event returns note ids for event`() =
         runTest {
             val eventId = Uuid.random()
             val noteId = Uuid.random()

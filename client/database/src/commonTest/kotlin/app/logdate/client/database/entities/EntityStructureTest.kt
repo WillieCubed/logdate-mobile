@@ -20,7 +20,7 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalCoroutinesApi::class)
 class EntityStructureTest : BaseDatabaseTest() {
     @Test
-    fun journalEntity_creation_hasCorrectProperties() =
+    fun `journal entity creation has correct properties`() =
         runTest {
             val now = Clock.System.now()
             val journal =
@@ -40,7 +40,7 @@ class EntityStructureTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun textNoteEntity_creation_hasCorrectProperties() =
+    fun `text note entity creation has correct properties`() =
         runTest {
             val now = Clock.System.now()
             val uid = Uuid.random()
@@ -59,7 +59,7 @@ class EntityStructureTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun imageNoteEntity_creation_hasCorrectProperties() =
+    fun `image note entity creation has correct properties`() =
         runTest {
             val now = Clock.System.now()
             val uid = Uuid.random()
@@ -78,7 +78,7 @@ class EntityStructureTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun journalNoteCrossRef_creation_hasCorrectProperties() =
+    fun `journal note cross ref creation has correct properties`() =
         runTest {
             val journalId = Uuid.random()
             val noteId = Uuid.random()
@@ -93,7 +93,7 @@ class EntityStructureTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun entitiesWithSameData_areEqual() =
+    fun `entities with same data are equal`() =
         runTest {
             val now = Clock.System.now()
             val uid = Uuid.random()
@@ -121,7 +121,7 @@ class EntityStructureTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun entitiesWithDifferentData_areNotEqual() =
+    fun `entities with different data are not equal`() =
         runTest {
             val now = Clock.System.now()
 
@@ -147,7 +147,7 @@ class EntityStructureTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun entityCopy_modifiesOnlySpecifiedFields() =
+    fun `entity copy modifies only specified fields`() =
         runTest {
             val now = Clock.System.now()
             val original =
@@ -169,7 +169,7 @@ class EntityStructureTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun noteEntity_implementsGenericNoteData() =
+    fun `note entity implements generic note data`() =
         runTest {
             val now = Clock.System.now()
             val uid = Uuid.random()
@@ -201,7 +201,7 @@ class EntityStructureTest : BaseDatabaseTest() {
         }
 
     @Test
-    fun uuidGeneration_createsUniqueIds() =
+    fun `uuid generation creates unique ids`() =
         runTest {
             val entity1 =
                 JournalEntity(

@@ -62,7 +62,7 @@ class AudioPlaybackE2ETest {
     val ruleChain: RuleChain = RuleChain.outerRule(koinRule).around(composeRule)
 
     @Test
-    fun miniPlayerShowsStopButtonThatDismisses() {
+    fun `mini player shows stop button that dismisses`() {
         // Wait for app to load
         composeRule.waitForIdle()
 
@@ -71,7 +71,7 @@ class AudioPlaybackE2ETest {
     }
 
     @Test
-    fun audioPlaybackMetadataFallbackShowsAudioRecording() {
+    fun `audio playback metadata fallback shows audio recording`() {
         // Verify that the default metadata title is "Audio Recording"
         // when no title is explicitly set
         val metadata = AudioPlaybackMetadata()
@@ -81,7 +81,7 @@ class AudioPlaybackE2ETest {
     }
 
     @Test
-    fun audioPlaybackMetadataPreservesJournalNames() {
+    fun `audio playback metadata preserves journal names`() {
         val metadata =
             AudioPlaybackMetadata(
                 title = "Morning Recording",
@@ -92,7 +92,7 @@ class AudioPlaybackE2ETest {
     }
 
     @Test
-    fun audioPlaybackMetadataPreservesPaletteColors() {
+    fun `audio playback metadata preserves palette colors`() {
         val metadata =
             AudioPlaybackMetadata(
                 title = "Evening Recording",

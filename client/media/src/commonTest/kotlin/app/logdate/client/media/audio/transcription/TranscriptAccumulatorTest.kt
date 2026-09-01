@@ -12,20 +12,20 @@ import kotlin.test.assertEquals
  */
 class TranscriptAccumulatorTest {
     @Test
-    fun buildReturnsEmptyWhenNoSegmentsOrPartial() {
+    fun `build returns empty when no segments or partial`() {
         val accumulator = TranscriptAccumulator()
         assertEquals("", accumulator.build())
     }
 
     @Test
-    fun buildReturnsSingleSegment() {
+    fun `build returns single segment`() {
         val accumulator = TranscriptAccumulator()
         accumulator.addSegment("Hello world.")
         assertEquals("Hello world.", accumulator.build())
     }
 
     @Test
-    fun buildJoinsMultipleSegments() {
+    fun `build joins multiple segments`() {
         val accumulator = TranscriptAccumulator()
         accumulator.addSegment("Hello world.")
         accumulator.addSegment("How are you?")
@@ -33,14 +33,14 @@ class TranscriptAccumulatorTest {
     }
 
     @Test
-    fun buildReturnsPartialWhenNoSegments() {
+    fun `build returns partial when no segments`() {
         val accumulator = TranscriptAccumulator()
         accumulator.setPartial("hello")
         assertEquals("hello", accumulator.build())
     }
 
     @Test
-    fun buildAppendsPartialToSegments() {
+    fun `build appends partial to segments`() {
         val accumulator = TranscriptAccumulator()
         accumulator.addSegment("Hello world.")
         accumulator.setPartial("how are")
@@ -48,7 +48,7 @@ class TranscriptAccumulatorTest {
     }
 
     @Test
-    fun addSegmentClearsPartial() {
+    fun `add segment clears partial`() {
         val accumulator = TranscriptAccumulator()
         accumulator.setPartial("hello world")
         accumulator.addSegment("Hello world.")
@@ -56,7 +56,7 @@ class TranscriptAccumulatorTest {
     }
 
     @Test
-    fun buildTimedTranscriptReturnsAccumulatedUtterances() {
+    fun `build timed transcript returns accumulated utterances`() {
         val accumulator = TranscriptAccumulator()
         val utterance =
             TimedUtterance(
@@ -76,7 +76,7 @@ class TranscriptAccumulatorTest {
     }
 
     @Test
-    fun resetClearsEverything() {
+    fun `reset clears everything`() {
         val accumulator = TranscriptAccumulator()
         accumulator.addSegment("Hello world.")
         accumulator.setPartial("how")

@@ -32,7 +32,7 @@ class CloudBackupWorkerTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     @Test
-    fun uploadsCompletedExportAndDeletesPrivateArchiveOnlyAfterSuccess() = runTest {
+    fun `uploads completed export and deletes private archive only after success`() = runTest {
         val export = mockk<ExportResult>(relaxed = true)
         every { export.serializeMetadata() } returns "{\"deviceId\":\"device\"}"
         every { export.hasProfile } returns false
@@ -55,7 +55,7 @@ class CloudBackupWorkerTest {
     }
 
     @Test
-    fun retainsPrivateArchiveWhenUploadFails() = runTest {
+    fun `retains private archive when upload fails`() = runTest {
         val export = mockk<ExportResult>(relaxed = true)
         every { export.serializeMetadata() } returns "manifest"
         every { export.hasProfile } returns false
@@ -84,7 +84,7 @@ class CloudBackupWorkerTest {
     }
 
     @Test
-    fun skipsWithoutAuthenticatedSession() = runTest {
+    fun `skips without authenticated session`() = runTest {
         val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L)))
         val params = mockk<WorkerParameters>(relaxed = true)
         every { params.id } returns UUID.randomUUID()
@@ -102,7 +102,7 @@ class CloudBackupWorkerTest {
     }
 
     @Test
-    fun cloudRestoreDownloadsNewestBackupAndEnqueuesNormalRestore() = runTest {
+    fun `cloud restore downloads newest backup and enqueues normal restore`() = runTest {
         val newest =
             BackupMetadata(
                 id = "newest",

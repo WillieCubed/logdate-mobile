@@ -23,7 +23,7 @@ class WearSyncNotificationTest {
     private val fixedTime = Instant.fromEpochMilliseconds(1_710_000_000_000)
 
     @Test
-    fun audioNoteProducesVoiceNoteTitle() {
+    fun `audio note produces voice note title`() {
         val note = JournalNote.Audio(
             uid = Uuid.random(),
             creationTimestamp = fixedTime,
@@ -39,7 +39,7 @@ class WearSyncNotificationTest {
     }
 
     @Test
-    fun textNoteShowsContentPreview() {
+    fun `text note shows content preview`() {
         val content = "Had an amazing lunch at the park today with the family"
         val note = JournalNote.Text(
             uid = Uuid.random(),
@@ -55,7 +55,7 @@ class WearSyncNotificationTest {
     }
 
     @Test
-    fun longTextNoteTruncatesTo80Chars() {
+    fun `long text note truncates to80 chars`() {
         val longContent = "A".repeat(200)
         val note = JournalNote.Text(
             uid = Uuid.random(),
@@ -70,7 +70,7 @@ class WearSyncNotificationTest {
     }
 
     @Test
-    fun imageNoteProducesPhotoTitle() {
+    fun `image note produces photo title`() {
         val note = JournalNote.Image(
             uid = Uuid.random(),
             creationTimestamp = fixedTime,
@@ -85,7 +85,7 @@ class WearSyncNotificationTest {
     }
 
     @Test
-    fun videoNoteProducesVideoTitle() {
+    fun `video note produces video title`() {
         val note = JournalNote.Video(
             uid = Uuid.random(),
             creationTimestamp = fixedTime,
@@ -100,7 +100,7 @@ class WearSyncNotificationTest {
     }
 
     @Test
-    fun moodTextNoteShowsMoodContent() {
+    fun `mood text note shows mood content`() {
         val note = JournalNote.Text(
             uid = Uuid.random(),
             creationTimestamp = fixedTime,
@@ -115,7 +115,7 @@ class WearSyncNotificationTest {
     }
 
     @Test
-    fun eachNoteTypeMapsToCorrectType() {
+    fun `each note type maps to correct type`() {
         val types = mapOf(
             NoteType.AUDIO to JournalNote.Audio(
                 uid = Uuid.random(), creationTimestamp = fixedTime, lastUpdated = fixedTime,

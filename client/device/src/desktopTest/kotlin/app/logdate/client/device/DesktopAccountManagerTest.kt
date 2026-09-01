@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 class DesktopAccountManagerTest {
     @Test
-    fun pendingAuthorizationRejectsOriginScopedAccountCreation() =
+    fun `pending authorization rejects origin scoped account creation`() =
         runTest {
             val manager = DesktopAccountManager()
 
@@ -23,7 +23,7 @@ class DesktopAccountManagerTest {
         }
 
     @Test
-    fun pendingAuthorizationDoesNotReportAnAuthoritativelyEmptyAccountList() =
+    fun `pending authorization does not report an authoritatively empty account list`() =
         runTest {
             val manager = DesktopAccountManager()
 

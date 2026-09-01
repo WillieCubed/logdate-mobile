@@ -62,7 +62,7 @@ class ShareReceiverE2ETest {
     }
 
     @Test
-    fun copyLinkAction_writesSharedLinkToClipboard() {
+    fun `copy link action writes shared link to clipboard`() {
         val sharedLink = "https://logdate.app/j/example"
 
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -82,7 +82,7 @@ class ShareReceiverE2ETest {
     }
 
     @Test
-    fun shareQrCodeAction_launchesChooserWithQrImagePayload() {
+    fun `share qr code action launches chooser with qr image payload`() {
         val sharedLink = "https://logdate.app/j/example"
         val qrCodeUri = Uri.parse("content://app.logdate.test/qr/example.png")
 

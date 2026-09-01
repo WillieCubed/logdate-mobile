@@ -47,7 +47,7 @@ class FoldableStateContinuityE2ETest {
             .around(composeRule)
 
     @Test
-    fun editorText_survivesBookPosturePublish() {
+    fun `editor text survives book posture publish`() {
         openEditorAndType(DRAFT_TEXT)
 
         composeRule.activityRule.scenario.onActivity { activity ->
@@ -61,7 +61,7 @@ class FoldableStateContinuityE2ETest {
     }
 
     @Test
-    fun editorText_survivesPosturePublishThenRecreation() {
+    fun `editor text survives posture publish then recreation`() {
         openEditorAndType(DRAFT_TEXT)
 
         composeRule.activityRule.scenario.onActivity { activity ->
@@ -78,7 +78,7 @@ class FoldableStateContinuityE2ETest {
     }
 
     @Test
-    fun editorText_survivesUnfoldThenRefold() {
+    fun `editor text survives unfold then refold`() {
         openEditorAndType(DRAFT_TEXT)
 
         composeRule.activityRule.scenario.onActivity { activity ->

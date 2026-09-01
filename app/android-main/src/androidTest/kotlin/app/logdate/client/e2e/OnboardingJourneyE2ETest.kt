@@ -73,7 +73,7 @@ class OnboardingJourneyE2ETest {
     val ruleChain: RuleChain = RuleChain.outerRule(koinRule).around(launchOverrideRule).around(composeRule)
 
     @Test
-    fun freshOnboardingJourney_reachesCompletionScreen_andCapturesScreens() {
+    fun `fresh onboarding journey reaches completion screen and captures screens`() {
         advanceToStartActions()
         capture(ONBOARDING_START_ROOT_TAG, "fresh", "01_start.png")
         composeRule.onNodeWithTag(ONBOARDING_START_GET_STARTED_TAG).performClick()
@@ -142,7 +142,7 @@ class OnboardingJourneyE2ETest {
     }
 
     @Test
-    fun personalIntroState_andCurrentStep_surviveActivityRecreation() {
+    fun `personal intro state and current step survive activity recreation`() {
         advanceToStartActions()
         composeRule.onNodeWithTag(ONBOARDING_START_GET_STARTED_TAG).performClick()
         waitForTag(PERSONAL_INTRO_ROOT_TAG)
@@ -167,7 +167,7 @@ class OnboardingJourneyE2ETest {
     }
 
     @Test
-    fun birthdayStep_survivesActivityRecreation_andContinuesForward() {
+    fun `birthday step survives activity recreation and continues forward`() {
         advanceToStartActions()
         composeRule.onNodeWithTag(ONBOARDING_START_GET_STARTED_TAG).performClick()
         waitForTag(PERSONAL_INTRO_NAME_FIELD_TAG)
@@ -205,7 +205,7 @@ class OnboardingJourneyE2ETest {
     }
 
     @Test
-    fun continueSetupFlow_usesCanonicalSetupOrder_and_reachesWelcomeBack() {
+    fun `continue setup flow uses canonical setup order and reaches welcome back`() {
         logStep("continue-setup: waiting for onboarding start")
         advanceToStartActions()
         logStep("continue-setup: tapping start-from-backup")
@@ -252,7 +252,7 @@ class OnboardingJourneyE2ETest {
     }
 
     @Test
-    fun freshFlow_showsDayBoundariesWhenHealthConnectIsAvailable() {
+    fun `fresh flow shows day boundaries when health connect is available`() {
         environment.healthRepository.available = true
         environment.healthRepository.sleepPermissionsGranted = false
 

@@ -16,25 +16,25 @@ import kotlin.uuid.Uuid
  */
 class ExportPresetTest {
     @Test
-    fun storyPresetHas9to16Ratio() {
+    fun `story preset has9to16 ratio`() {
         assertEquals(9, ExportPreset.STORY.widthRatio)
         assertEquals(16, ExportPreset.STORY.heightRatio)
     }
 
     @Test
-    fun squarePresetHas1to1Ratio() {
+    fun `square preset has1to1 ratio`() {
         assertEquals(1, ExportPreset.SQUARE.widthRatio)
         assertEquals(1, ExportPreset.SQUARE.heightRatio)
     }
 
     @Test
-    fun portraitPresetHas4to5Ratio() {
+    fun `portrait preset has4to5 ratio`() {
         assertEquals(4, ExportPreset.PORTRAIT.widthRatio)
         assertEquals(5, ExportPreset.PORTRAIT.heightRatio)
     }
 
     @Test
-    fun captureRegionForEmptyDocumentUsesDefaultSize() {
+    fun `capture region for empty document uses default size`() {
         val doc =
             PostcardDocument(
                 id = Uuid.random(),
@@ -49,7 +49,7 @@ class ExportPresetTest {
     }
 
     @Test
-    fun captureRegionSquareProducesEqualDimensions() {
+    fun `capture region square produces equal dimensions`() {
         val doc =
             PostcardDocument(
                 id = Uuid.random(),
@@ -64,7 +64,7 @@ class ExportPresetTest {
     }
 
     @Test
-    fun captureRegionStoryIsTallerThanWide() {
+    fun `capture region story is taller than wide`() {
         val doc =
             PostcardDocument(
                 id = Uuid.random(),
@@ -88,7 +88,7 @@ class ExportPresetTest {
     }
 
     @Test
-    fun captureRegionBoundsAllElements() {
+    fun `capture region bounds all elements`() {
         val doc =
             PostcardDocument(
                 id = Uuid.random(),

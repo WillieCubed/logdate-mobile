@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
  */
 class DidPlcResolverTest {
     @Test
-    fun buildsPlcDirectoryUrl() {
+    fun `builds plc directory url`() {
         val resolver = DidPlcResolver(mockHttpClient { _ -> HttpStatusCode.OK to """{"id":"did:plc:ewvi7nxzyoun6zhxrhs64oiz"}""" })
 
         assertEquals(
@@ -28,7 +28,7 @@ class DidPlcResolverTest {
     }
 
     @Test
-    fun resolvesPlcDocument(): Unit =
+    fun `resolves plc document`(): Unit =
         runTest {
             val did = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
             val resolver =
@@ -46,7 +46,7 @@ class DidPlcResolverTest {
         }
 
     @Test
-    fun failsOnNonSuccessStatus(): Unit =
+    fun `fails on non success status`(): Unit =
         runTest {
             val did = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
             val resolver =
@@ -63,7 +63,7 @@ class DidPlcResolverTest {
         }
 
     @Test
-    fun failsOnInvalidJson(): Unit =
+    fun `fails on invalid json`(): Unit =
         runTest {
             val did = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
             val resolver =
@@ -80,7 +80,7 @@ class DidPlcResolverTest {
         }
 
     @Test
-    fun failsOnDidMismatch(): Unit =
+    fun `fails on did mismatch`(): Unit =
         runTest {
             val did = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
             val resolver =

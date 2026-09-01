@@ -39,7 +39,7 @@ class UuidSerializerTest {
      * - The format matches the standard UUID string representation (with hyphens)
      */
     @Test
-    fun testUuidSerialization() {
+    fun `uuid serialization`() {
         // Create a test UUID
         val testUuid = Uuid.parse("550e8400-e29b-41d4-a716-446655440000")
         val testData = TestData(testUuid, "Test Name")
@@ -61,7 +61,7 @@ class UuidSerializerTest {
      * - The other fields in the JSON are also properly deserialized
      */
     @Test
-    fun testUuidDeserialization() {
+    fun `uuid deserialization`() {
         // JSON with UUID in string format
         val jsonString = """{"id":"550e8400-e29b-41d4-a716-446655440000","name":"Test Name"}"""
 
@@ -90,7 +90,7 @@ class UuidSerializerTest {
      * a hardcoded one, ensuring robust serialization for any valid UUID.
      */
     @Test
-    fun testRoundTrip() {
+    fun `round trip`() {
         // Create a random UUID
         val randomUuid = Uuid.random()
         val original = TestData(randomUuid, "Random Data")

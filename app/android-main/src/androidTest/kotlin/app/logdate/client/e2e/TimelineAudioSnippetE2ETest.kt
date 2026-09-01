@@ -39,7 +39,7 @@ class TimelineAudioSnippetE2ETest {
     private val noteId = Uuid.parse("00000000-0000-0000-0000-000000009251")
 
     @Test
-    fun compactTimelineAudioSnippetExposesOutputRouteControls() {
+    fun `compact timeline audio snippet exposes output route controls`() {
         assumeTrue(screenWidthDp() < 600)
         setTimelineAudioSnippetContent()
 
@@ -48,7 +48,7 @@ class TimelineAudioSnippetE2ETest {
     }
 
     @Test
-    fun expandedTimelineAudioSnippetExposesOutputRouteControls() {
+    fun `expanded timeline audio snippet exposes output route controls`() {
         assumeTrue(screenWidthDp() >= 600)
         setTimelineAudioSnippetContent()
 

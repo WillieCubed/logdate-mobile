@@ -51,7 +51,7 @@ class CalendarSyncActivityViewModelTest {
     }
 
     @Test
-    fun emits_empty_list_initially() =
+    fun `emits empty list initially`() =
         runTest(testDispatcher) {
             val repo = FakeEventRepository(events = emptyList())
             val useCase = ObserveImportedEventsUseCase(repo)
@@ -63,7 +63,7 @@ class CalendarSyncActivityViewModelTest {
         }
 
     @Test
-    fun emits_imported_events_sorted_newest_first() =
+    fun `emits imported events sorted newest first`() =
         runTest(testDispatcher) {
             val older =
                 importedEvent(
@@ -86,7 +86,7 @@ class CalendarSyncActivityViewModelTest {
         }
 
     @Test
-    fun filters_out_non_imported_events() =
+    fun `filters out non imported events`() =
         runTest(testDispatcher) {
             val imported =
                 importedEvent(

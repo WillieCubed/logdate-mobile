@@ -40,7 +40,7 @@ import kotlin.uuid.Uuid
  */
 class AccountlessToCloudJourneyTest {
     @Test
-    fun backlog_created_accountless_drains_after_first_sign_in_via_backfill() =
+    fun `backlog created accountless drains after first sign in via backfill`() =
         runTest {
             val apiClient = fakeCloudApiClient()
             val sessionStorage = fakeSessionStorage(authenticated = false)

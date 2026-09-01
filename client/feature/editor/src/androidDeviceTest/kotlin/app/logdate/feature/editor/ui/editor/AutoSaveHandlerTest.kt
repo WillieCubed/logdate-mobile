@@ -18,7 +18,7 @@ class AutoSaveHandlerTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun testAutoSaveStateHasCorrectInitialValues() {
+    fun `auto save state has correct initial values`() {
         composeTestRule.setContent {
             val autoSaveState =
                 rememberAutoSaveHandler(
@@ -38,7 +38,7 @@ class AutoSaveHandlerTest {
     }
 
     @Test
-    fun testEditorAutoSaveDetectsChanges() {
+    fun `editor auto save detects changes`() {
         var saveCount = 0
         var lastSavedState: EditorState? = null
 
@@ -90,7 +90,7 @@ class AutoSaveHandlerTest {
     }
 
     @Test
-    fun testContentChangeDetection() {
+    fun `content change detection`() {
         var saveCount = 0
 
         composeTestRule.setContent {
@@ -142,7 +142,7 @@ class AutoSaveHandlerTest {
     }
 
     @Test
-    fun testDisablingPreventsAutoSave() {
+    fun `disabling prevents auto save`() {
         var saveCount = 0
 
         composeTestRule.setContent {
@@ -176,7 +176,7 @@ class AutoSaveHandlerTest {
     }
 
     @Test
-    fun testSameContentIsNotReportedAsChangedAfterSave() {
+    fun `same content is not reported as changed after save`() {
         var saveCount = 0
 
         composeTestRule.setContent {

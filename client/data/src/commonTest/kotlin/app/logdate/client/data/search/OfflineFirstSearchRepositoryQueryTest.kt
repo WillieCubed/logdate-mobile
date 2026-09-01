@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
  */
 class OfflineFirstSearchRepositoryQueryTest {
     @Test
-    fun prepareFtsQuery_usesPrefixMatchingForPlainTyping() {
+    fun `prepare fts query uses prefix matching for plain typing`() {
         val prepared = assertNotNull(prepareFtsQuery("Hiking trail"))
 
         assertEquals("hiking* trail*", prepared.query)
@@ -26,7 +26,7 @@ class OfflineFirstSearchRepositoryQueryTest {
     }
 
     @Test
-    fun prepareFtsQuery_marksSingleCharacterPlainQueries() {
+    fun `prepare fts query marks single character plain queries`() {
         val prepared = assertNotNull(prepareFtsQuery("a"))
 
         assertEquals("a*", prepared.query)
@@ -35,7 +35,7 @@ class OfflineFirstSearchRepositoryQueryTest {
     }
 
     @Test
-    fun prepareFtsQuery_preservesExplicitSyntax() {
+    fun `prepare fts query preserves explicit syntax`() {
         val prepared = assertNotNull(prepareFtsQuery("\"golden hour\" OR sunset"))
 
         assertEquals("\"golden hour\" OR sunset", prepared.query)
@@ -43,7 +43,7 @@ class OfflineFirstSearchRepositoryQueryTest {
     }
 
     @Test
-    fun prepareFtsQuery_sanitizesBrokenExplicitSyntax() {
+    fun `prepare fts query sanitizes broken explicit syntax`() {
         val prepared = assertNotNull(prepareFtsQuery("\"golden hour"))
 
         assertEquals("golden hour", prepared.query)
@@ -51,7 +51,7 @@ class OfflineFirstSearchRepositoryQueryTest {
     }
 
     @Test
-    fun prepareFtsQuery_returnsNullForBlankOrOperatorOnlyQueries() {
+    fun `prepare fts query returns null for blank or operator only queries`() {
         assertNull(prepareFtsQuery("   "))
         assertNull(prepareFtsQuery("NOT"))
     }

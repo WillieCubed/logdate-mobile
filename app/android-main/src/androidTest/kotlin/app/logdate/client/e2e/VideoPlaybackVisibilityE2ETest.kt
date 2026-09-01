@@ -25,7 +25,7 @@ class VideoPlaybackVisibilityE2ETest {
     val composeRule = createAndroidComposeRule<VideoPlaybackHostActivity>()
 
     @Test
-    fun videoPlayerPipAffordanceKeepsVideoVisibleWhenLeavingTheAppSurface() {
+    fun `video player pip affordance keeps video visible when leaving the app surface`() {
         val videoUri = emptyVideoFileUri()
 
         composeRule.runOnUiThread {
@@ -47,7 +47,7 @@ class VideoPlaybackVisibilityE2ETest {
     }
 
     @Test
-    fun videoPlayerRemainsVisibleWhenAppIsResizedIntoMultiWindow() {
+    fun `video player remains visible when app is resized into multi window`() {
         val videoUri = emptyVideoFileUri()
 
         composeRule.runOnUiThread {

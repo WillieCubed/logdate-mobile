@@ -146,7 +146,7 @@ class TextEditingTest {
     }
 
     @Test
-    fun testCreateNewTextBlock() =
+    fun `create new text block`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             advanceUntilIdle()
@@ -159,7 +159,7 @@ class TextEditingTest {
         }
 
     @Test
-    fun testUpdateTextBlockContent() =
+    fun `update text block content`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             advanceUntilIdle()
@@ -176,7 +176,7 @@ class TextEditingTest {
         }
 
     @Test
-    fun testMultipleBlockEditing() =
+    fun `multiple block editing`() =
         testScope.runTest {
             val block1 = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             val block2 = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
@@ -198,7 +198,7 @@ class TextEditingTest {
         }
 
     @Test
-    fun testEmptyBlockCreation() =
+    fun `empty block creation`() =
         testScope.runTest {
             assertTrue(
                 viewModel.editorState.value.blocks
@@ -214,7 +214,7 @@ class TextEditingTest {
         }
 
     @Test
-    fun initialAttachments_areNotDuplicatedWhenEditorIsRecreated() =
+    fun `initial attachments are not duplicated when editor is recreated`() =
         testScope.runTest {
             val attachments = listOf("content://image/one", "content://video/two")
 
@@ -234,7 +234,7 @@ class TextEditingTest {
         }
 
     @Test
-    fun existingEntry_editsAreNotOverwrittenWhenLoadEffectReplays() =
+    fun `existing entry edits are not overwritten when load effect replays`() =
         testScope.runTest {
             val noteId = Uuid.random()
             val timestamp = Instant.parse("2020-01-01T00:00:00Z")
@@ -270,7 +270,7 @@ class TextEditingTest {
         }
 
     @Test
-    fun testClearSingleEmptyBlockReturnsEditorToPicker() =
+    fun `clear single empty block returns editor to picker`() =
         testScope.runTest {
             val emptyTypes =
                 listOf(
@@ -298,7 +298,7 @@ class TextEditingTest {
         }
 
     @Test
-    fun testDismissExpandedBlockOrClearSingleEmptyPreservesContent() =
+    fun `dismiss expanded block or clear single empty preserves content`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             advanceUntilIdle()
@@ -324,7 +324,7 @@ class TextEditingTest {
         }
 
     @Test
-    fun testSingleEmptyVideoBlockDoesNotClearToPicker() =
+    fun `single empty video block does not clear to picker`() =
         testScope.runTest {
             viewModel.createNewBlock(BlockType.VIDEO)
             advanceUntilIdle()
@@ -337,7 +337,7 @@ class TextEditingTest {
         }
 
     @Test
-    fun testAppendTextBlockAddsNewBlock() =
+    fun `append text block adds new block`() =
         testScope.runTest {
             viewModel.appendTextBlock("Hello from drag-and-drop")
             advanceUntilIdle()
@@ -349,7 +349,7 @@ class TextEditingTest {
         }
 
     @Test
-    fun testAppendTextBlockWithBlankTextIsIgnored() =
+    fun `append text block with blank text is ignored`() =
         testScope.runTest {
             viewModel.appendTextBlock("   ")
             advanceUntilIdle()
@@ -361,7 +361,7 @@ class TextEditingTest {
         }
 
     @Test
-    fun testAppendTextBlockWithEmptyStringIsIgnored() =
+    fun `append text block with empty string is ignored`() =
         testScope.runTest {
             viewModel.appendTextBlock("")
             advanceUntilIdle()
@@ -373,7 +373,7 @@ class TextEditingTest {
         }
 
     @Test
-    fun testAppendTextBlockSetsIsModified() =
+    fun `append text block sets is modified`() =
         testScope.runTest {
             viewModel.appendTextBlock("Some dropped text")
             advanceUntilIdle()
@@ -382,7 +382,7 @@ class TextEditingTest {
         }
 
     @Test
-    fun testAppendTextBlockOnPopulatedEditorAppendsToEnd() =
+    fun `append text block on populated editor appends to end`() =
         testScope.runTest {
             val existing = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
             viewModel.updateBlock(existing.copy(content = "First block"))
@@ -398,7 +398,7 @@ class TextEditingTest {
         }
 
     @Test
-    fun testAppendTextBlockMultipleDropsAppendInOrder() =
+    fun `append text block multiple drops append in order`() =
         testScope.runTest {
             viewModel.appendTextBlock("First drop")
             viewModel.appendTextBlock("Second drop")

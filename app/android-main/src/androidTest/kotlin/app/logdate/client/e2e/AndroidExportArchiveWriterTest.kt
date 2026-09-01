@@ -20,7 +20,7 @@ class AndroidExportArchiveWriterTest {
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
     @Test
-    fun writesExportResultToAnAppPrivateZipWithMedia() {
+    fun `writes export result to an app private zip with media`() {
         val mediaSource = File.createTempFile("logdate_archive_media", ".txt", context.cacheDir)
         mediaSource.writeText("private media bytes")
         val outputName = "archive-writer-test-${System.nanoTime()}.zip"

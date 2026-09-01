@@ -19,7 +19,7 @@ import kotlin.time.Instant
  */
 class OfflineGenerativeAICacheTest {
     @Test
-    fun getEntry_expiresAfterTtl() =
+    fun `get entry expires after ttl`() =
         runTest {
             val clock = TestClock(Instant.parse("2024-01-01T00:00:00Z"))
             val dataSource = TestLocalDataSource()
@@ -41,7 +41,7 @@ class OfflineGenerativeAICacheTest {
         }
 
     @Test
-    fun putEntry_enforcesPersistentMaxEntries() =
+    fun `put entry enforces persistent max entries`() =
         runTest {
             val clock = TestClock(Instant.parse("2024-01-01T00:00:00Z"))
             val dataSource = TestLocalDataSource()

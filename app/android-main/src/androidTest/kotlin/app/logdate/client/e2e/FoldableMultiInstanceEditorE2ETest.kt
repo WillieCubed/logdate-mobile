@@ -53,7 +53,7 @@ class FoldableMultiInstanceEditorE2ETest {
             .around(composeRule)
 
     @Test
-    fun primaryEditorKeepsTextWhenPublishingBookPosture() {
+    fun `primary editor keeps text when publishing book posture`() {
         appendToPrimaryEditor(PRIMARY_APPENDED_TEXT)
 
         composeRule.activityRule.scenario.onActivity { activity ->
@@ -69,7 +69,7 @@ class FoldableMultiInstanceEditorE2ETest {
     }
 
     @Test
-    fun secondaryEditorInstanceIsIndependentOfPrimary() {
+    fun `secondary editor instance is independent of primary`() {
         appendToPrimaryEditor(PRIMARY_APPENDED_TEXT)
 
         composeRule.activityRule.scenario.onActivity { activity ->

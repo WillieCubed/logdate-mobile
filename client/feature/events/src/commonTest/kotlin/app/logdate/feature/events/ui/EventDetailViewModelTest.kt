@@ -64,7 +64,7 @@ class EventDetailViewModelTest {
      * the initial `Loading` to `Loaded` carrying that exact event.
      */
     @Test
-    fun loadEvent_existing_id_transitions_to_loaded() =
+    fun `load event existing id transitions to loaded`() =
         runTest {
             val event = sampleEvent(title = "Recital")
             val viewModel = newViewModel(events = listOf(event))
@@ -82,7 +82,7 @@ class EventDetailViewModelTest {
      * can render its empty-state copy instead of the editor.
      */
     @Test
-    fun loadEvent_missing_id_transitions_to_not_found() =
+    fun `load event missing id transitions to not found`() =
         runTest {
             val viewModel = newViewModel()
 
@@ -97,7 +97,7 @@ class EventDetailViewModelTest {
      * not called until the user explicitly saves.
      */
     @Test
-    fun updateTitle_mutates_loaded_draft_without_persisting() =
+    fun `update title mutates loaded draft without persisting`() =
         runTest {
             val event = sampleEvent(title = "Old")
             val eventRepo = FakeEventRepository(events = listOf(event))
@@ -118,7 +118,7 @@ class EventDetailViewModelTest {
      * common edit when the user realizes the event started sooner than they remembered.
      */
     @Test
-    fun updateStartTime_keeps_end_when_still_after_start() =
+    fun `update start time keeps end when still after start`() =
         runTest {
             val event = sampleEvent()
             val viewModel = newViewModel(events = listOf(event))
@@ -139,7 +139,7 @@ class EventDetailViewModelTest {
      * up in an inverted-range state. The next end-time pick re-establishes a range.
      */
     @Test
-    fun updateStartTime_drops_end_when_pulled_past_it() =
+    fun `update start time drops end when pulled past it`() =
         runTest {
             val event = sampleEvent()
             val viewModel = newViewModel(events = listOf(event))
@@ -160,7 +160,7 @@ class EventDetailViewModelTest {
      * one-hour range.
      */
     @Test
-    fun togglePointInTime_clears_end_when_on_and_restores_when_off() =
+    fun `toggle point in time clears end when on and restores when off`() =
         runTest {
             val event = sampleEvent()
             val viewModel = newViewModel(events = listOf(event))
@@ -183,7 +183,7 @@ class EventDetailViewModelTest {
      * change goes to the repository only when the user taps Save.
      */
     @Test
-    fun updatePlace_stages_place_id_in_draft() =
+    fun `update place stages place id in draft`() =
         runTest {
             val event = sampleEvent()
             val placeId = Uuid.random()
@@ -204,7 +204,7 @@ class EventDetailViewModelTest {
      * dismiss the picker mid-edit.
      */
     @Test
-    fun openPlacePicker_then_dismiss_toggles_visibility_flag() =
+    fun `open place picker then dismiss toggles visibility flag`() =
         runTest {
             val event = sampleEvent()
             val viewModel = newViewModel(events = listOf(event))
@@ -227,7 +227,7 @@ class EventDetailViewModelTest {
      * picker to render.
      */
     @Test
-    fun openAttachSheet_loads_attachable_notes_for_current_draft() =
+    fun `open attach sheet loads attachable notes for current draft`() =
         runTest {
             val event = sampleEvent()
             val nearbyNote = textNote(creationTime = event.startTime + 1.hours, content = "Nearby")
@@ -252,7 +252,7 @@ class EventDetailViewModelTest {
      * against whatever the user's draft looks like by then.
      */
     @Test
-    fun dismissAttachSheet_clears_loaded_candidates() =
+    fun `dismiss attach sheet clears loaded candidates`() =
         runTest {
             val event = sampleEvent()
             val nearbyNote = textNote(creationTime = event.startTime + 1.hours)
@@ -276,7 +276,7 @@ class EventDetailViewModelTest {
      * user expects an Attach tap to stick the moment they tap it.
      */
     @Test
-    fun linkNote_persists_immediately_through_repository() =
+    fun `link note persists immediately through repository`() =
         runTest {
             val event = sampleEvent()
             val noteId = Uuid.random()
@@ -296,7 +296,7 @@ class EventDetailViewModelTest {
      * sides of the same operation behave consistently.
      */
     @Test
-    fun unlinkNote_persists_immediately_through_repository() =
+    fun `unlink note persists immediately through repository`() =
         runTest {
             val event = sampleEvent()
             val noteId = Uuid.random()
@@ -317,7 +317,7 @@ class EventDetailViewModelTest {
      * keeps the screen in `Loaded`, and the repository captured the event.
      */
     @Test
-    fun save_success_clears_isSaving_and_keeps_loaded_state() =
+    fun `save success clears is saving and keeps loaded state`() =
         runTest {
             val event = sampleEvent()
             val eventRepo = FakeEventRepository(events = listOf(event))
@@ -339,7 +339,7 @@ class EventDetailViewModelTest {
      * loaded state and clears `isSaving` so the user can try again.
      */
     @Test
-    fun save_failure_surfaces_error_message() =
+    fun `save failure surfaces error message`() =
         runTest {
             val event = sampleEvent()
             val viewModel = newViewModel(eventRepo = FakeEventRepository(events = listOf(event), failUpdates = true))
@@ -359,7 +359,7 @@ class EventDetailViewModelTest {
      * can dismiss itself) and the repository sees the deletion request.
      */
     @Test
-    fun delete_success_invokes_callback() =
+    fun `delete success invokes callback`() =
         runTest {
             val event = sampleEvent()
             val eventRepo = FakeEventRepository(events = listOf(event))
@@ -380,7 +380,7 @@ class EventDetailViewModelTest {
      * message so the user is informed and can retry.
      */
     @Test
-    fun delete_failure_surfaces_error_message() =
+    fun `delete failure surfaces error message`() =
         runTest {
             val event = sampleEvent()
             val viewModel = newViewModel(eventRepo = FakeEventRepository(events = listOf(event), failDeletes = true))
@@ -399,7 +399,7 @@ class EventDetailViewModelTest {
      * flow updates `linkedNotes` on the loaded state without re-issuing `loadEvent`.
      */
     @Test
-    fun linked_notes_update_when_repository_emits() =
+    fun `linked notes update when repository emits`() =
         runTest {
             val event = sampleEvent()
             val firstNote = textNote(content = "first")

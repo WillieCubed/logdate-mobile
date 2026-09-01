@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 class TranscriptDocumentTest {
     @Test
-    fun plainText_joins_final_segments_in_timeline_order() {
+    fun `plain text joins final segments in timeline order`() {
         val document =
             TranscriptDocument(
                 segments =
@@ -21,7 +21,7 @@ class TranscriptDocumentTest {
     }
 
     @Test
-    fun upsertSegment_replaces_matching_segment_without_changing_its_identity() {
+    fun `upsert segment replaces matching segment without changing its identity`() {
         val original =
             TranscriptDocument(
                 revision = 4,
@@ -43,7 +43,7 @@ class TranscriptDocumentTest {
     }
 
     @Test
-    fun upsertSegment_ignores_lower_priority_revision_for_same_segment() {
+    fun `upsert segment ignores lower priority revision for same segment`() {
         val original =
             TranscriptDocument(
                 segments =
@@ -73,7 +73,7 @@ class TranscriptDocumentTest {
     }
 
     @Test
-    fun isFinal_is_true_only_when_document_and_segments_are_final() {
+    fun `is final is true only when document and segments are final`() {
         val finalDocument =
             TranscriptDocument(
                 status = TranscriptDocumentStatus.FINAL,
@@ -95,7 +95,7 @@ class TranscriptDocumentTest {
     }
 
     @Test
-    fun coordinator_keeps_local_draft_until_cloud_live_replaces_it() {
+    fun `coordinator keeps local draft until cloud live replaces it`() {
         val coordinator = TranscriptSessionCoordinator(language = "en-US")
 
         val local =
@@ -117,7 +117,7 @@ class TranscriptDocumentTest {
     }
 
     @Test
-    fun coordinator_marks_refining_and_final_states_without_losing_segments() {
+    fun `coordinator marks refining and final states without losing segments`() {
         val coordinator = TranscriptSessionCoordinator()
         coordinator.apply(
             TranscriptSessionUpdate.UpsertSegment(

@@ -43,7 +43,7 @@ class AudioLabelResolverTest {
             .toInstant(TimeZone.UTC)
 
     @Test
-    fun captionTakesPriority() {
+    fun `caption takes priority`() {
         val result =
             resolver.resolve(
                 createdAt = morningInstant,
@@ -55,7 +55,7 @@ class AudioLabelResolverTest {
     }
 
     @Test
-    fun blankCaptionFallsThrough() {
+    fun `blank caption falls through`() {
         val result =
             resolver.resolve(
                 createdAt = morningInstant,
@@ -66,7 +66,7 @@ class AudioLabelResolverTest {
     }
 
     @Test
-    fun nullCaptionFallsThrough() {
+    fun `null caption falls through`() {
         val result =
             resolver.resolve(
                 createdAt = morningInstant,
@@ -76,7 +76,7 @@ class AudioLabelResolverTest {
     }
 
     @Test
-    fun contextualResultIncludesLocationName() {
+    fun `contextual result includes location name`() {
         val result =
             resolver.resolve(
                 createdAt = morningInstant,
@@ -87,7 +87,7 @@ class AudioLabelResolverTest {
     }
 
     @Test
-    fun blankLocationNameBecomesNull() {
+    fun `blank location name becomes null`() {
         val result =
             resolver.resolve(
                 createdAt = morningInstant,
@@ -98,7 +98,7 @@ class AudioLabelResolverTest {
     }
 
     @Test
-    fun contextualResultIncludesDaylightPeriod() {
+    fun `contextual result includes daylight period`() {
         val result = resolver.resolve(createdAt = morningInstant)
         assertIs<AudioLabelResult.Contextual>(result)
         // Should produce a valid DaylightPeriod regardless of system timezone
@@ -106,7 +106,7 @@ class AudioLabelResolverTest {
     }
 
     @Test
-    fun classifyPeriodWithLocationReturnsPeriod() {
+    fun `classify period with location returns period`() {
         // NYC coordinates — the classifier should return a valid period
         val period =
             resolver.classifyPeriod(
@@ -118,7 +118,7 @@ class AudioLabelResolverTest {
     }
 
     @Test
-    fun classifyPeriodWithoutLocationReturnsPeriod() {
+    fun `classify period without location returns period`() {
         val period =
             resolver.classifyPeriod(
                 createdAt = morningInstant,
