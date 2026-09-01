@@ -18,6 +18,16 @@ public interface RepoRecordStore {
     public suspend fun getRecord(recordId: RepoRecordId): Result<RepoRecord?>
 
     /**
+     * Returns the records at [recordIds], in the same order, with `null` for any that are absent.
+     *
+     * Callers reading a page of a change feed want many records from one repo at once. Opening a
+     * repo is the expensive part of a read, so implementations should open it once for the whole
+     * batch. The default here is the naive loop, which is correct but costs one open per record.
+     */
+    public suspend fun getRecords(recordIds: List<RepoRecordId>): Result<List<RepoRecord?>> =
+        runCatching { recordIds.map { getRecord(it).getOrThrow() } }
+
+    /**
      * Lists records in [collection] for [repo].
      */
     public suspend fun listRecords(

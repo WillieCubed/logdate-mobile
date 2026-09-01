@@ -106,14 +106,16 @@ internal class RepoBackedLogDateCollectionsRepository(
         val metadata = metadataStore.changes(userId, LogDateCollectionKind.ENTRY, since, limit)
         return LogDateChangeSet(
             changes =
-                metadata.changes.mapNotNull { change ->
-                    repoEngine
-                        .getRecord(entryRecordId(repoDid, change.recordKey))
-                        .getOrThrow()
-                        ?.value
-                        ?.toLogDateEntry(recordKey = RecordKey.require(change.recordKey), version = change.version)
-                        ?: missingRecord(userId, LogDateCollectionKind.ENTRY, change.recordKey)
-                },
+                repoEngine
+                    .getRecords(metadata.changes.map { entryRecordId(repoDid, it.recordKey) })
+                    .getOrThrow()
+                    .zip(metadata.changes)
+                    .mapNotNull { (record, change) ->
+                        record
+                            ?.value
+                            ?.toLogDateEntry(recordKey = RecordKey.require(change.recordKey), version = change.version)
+                            ?: missingRecord(userId, LogDateCollectionKind.ENTRY, change.recordKey)
+                    },
             deletions =
                 metadata.deletions.map { deletion ->
                     LogDateEntryDeletion(
@@ -198,14 +200,16 @@ internal class RepoBackedLogDateCollectionsRepository(
         val metadata = metadataStore.changes(userId, LogDateCollectionKind.JOURNAL, since, limit)
         return LogDateChangeSet(
             changes =
-                metadata.changes.mapNotNull { change ->
-                    repoEngine
-                        .getRecord(journalRecordId(repoDid, change.recordKey))
-                        .getOrThrow()
-                        ?.value
-                        ?.toLogDateJournal(recordKey = RecordKey.require(change.recordKey), version = change.version)
-                        ?: missingRecord(userId, LogDateCollectionKind.JOURNAL, change.recordKey)
-                },
+                repoEngine
+                    .getRecords(metadata.changes.map { journalRecordId(repoDid, it.recordKey) })
+                    .getOrThrow()
+                    .zip(metadata.changes)
+                    .mapNotNull { (record, change) ->
+                        record
+                            ?.value
+                            ?.toLogDateJournal(recordKey = RecordKey.require(change.recordKey), version = change.version)
+                            ?: missingRecord(userId, LogDateCollectionKind.JOURNAL, change.recordKey)
+                    },
             deletions =
                 metadata.deletions.map { deletion ->
                     LogDateJournalDeletion(
@@ -285,14 +289,19 @@ internal class RepoBackedLogDateCollectionsRepository(
         val metadata = metadataStore.changes(userId, LogDateCollectionKind.ASSOCIATION, since, limit)
         return LogDateChangeSet(
             changes =
-                metadata.changes.mapNotNull { change ->
-                    repoEngine
-                        .getRecord(repoRecordIdForAssociation(repoDid = repoDid, recordKey = change.recordKey))
-                        .getOrThrow()
-                        ?.value
-                        ?.toLogDateAssociation(recordKey = RecordKey.require(change.recordKey), version = change.version)
-                        ?: missingRecord(userId, LogDateCollectionKind.ASSOCIATION, change.recordKey)
-                },
+                repoEngine
+                    .getRecords(
+                        metadata.changes.map {
+                            repoRecordIdForAssociation(repoDid = repoDid, recordKey = it.recordKey)
+                        },
+                    ).getOrThrow()
+                    .zip(metadata.changes)
+                    .mapNotNull { (record, change) ->
+                        record
+                            ?.value
+                            ?.toLogDateAssociation(recordKey = RecordKey.require(change.recordKey), version = change.version)
+                            ?: missingRecord(userId, LogDateCollectionKind.ASSOCIATION, change.recordKey)
+                    },
             deletions =
                 metadata.deletions.map { deletion ->
                     LogDateAssociationDeletion(
@@ -364,13 +373,15 @@ internal class RepoBackedLogDateCollectionsRepository(
         val metadata = metadataStore.changes(userId, LogDateCollectionKind.DRAFT, since, limit)
         return LogDateChangeSet(
             changes =
-                metadata.changes.mapNotNull { change ->
-                    repoEngine
-                        .getRecord(draftRecordId(repoDid, change.recordKey))
-                        .getOrThrow()
-                        ?.value
-                        ?.toLogDateDraft(recordKey = RecordKey.require(change.recordKey), version = change.version)
-                },
+                repoEngine
+                    .getRecords(metadata.changes.map { draftRecordId(repoDid, it.recordKey) })
+                    .getOrThrow()
+                    .zip(metadata.changes)
+                    .mapNotNull { (record, change) ->
+                        record
+                            ?.value
+                            ?.toLogDateDraft(recordKey = RecordKey.require(change.recordKey), version = change.version)
+                    },
             deletions =
                 metadata.deletions.map { deletion ->
                     LogDateDraftDeletion(

@@ -115,6 +115,25 @@ public class DefaultRepoEngine(
             )
         }
 
+    override suspend fun getRecords(recordIds: List<RepoRecordId>): Result<List<RepoRecord?>> =
+        runCatching {
+            // One snapshot per repo, not one per record. Reading a 25-record page used to open the
+            // repo 25 times, and opening it costs a pass over every block in it.
+            val snapshots = mutableMapOf<AtprotoDid, RepoSnapshot>()
+            recordIds.map { recordId ->
+                val snapshot = snapshots.getOrPut(recordId.repo) { loadSnapshot(recordId.repo) }
+                val cid =
+                    snapshot.tree.get(recordId.collection, recordId.recordKey)
+                        ?: return@map null
+                val block = blockStore.readBlock(cid).getOrThrow() ?: return@map null
+                RepoRecord(
+                    uri = recordId.uri,
+                    cid = cid.toString(),
+                    value = DagCborCodec.decode(block.bytes).jsonObject,
+                )
+            }
+        }
+
     override suspend fun listRecords(
         repo: AtprotoDid,
         collection: Nsid,
