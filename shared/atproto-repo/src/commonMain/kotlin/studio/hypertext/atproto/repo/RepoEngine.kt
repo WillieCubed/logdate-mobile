@@ -239,11 +239,11 @@ public class DefaultRepoEngine(
             )
         }
 
-    override suspend fun putRecords(records: List<Pair<RepoRecordId, JsonObject>>): Result<List<RepoWriteResult>> =
+    override suspend fun putRecords(records: List<BatchRecordWrite>): Result<List<RepoWriteResult>> =
         runCatching {
             if (records.isEmpty()) return@runCatching emptyList()
-            val repo = records.first().first.repo
-            require(records.all { it.first.repo == repo }) {
+            val repo = records.first().recordId.repo
+            require(records.all { it.recordId.repo == repo }) {
                 "putRecords writes one repo at a time; got records for more than one"
             }
             retryingOnHeadConflict {
@@ -253,22 +253,34 @@ public class DefaultRepoEngine(
 
     private suspend fun putRecordsOnce(
         repo: AtprotoDid,
-        records: List<Pair<RepoRecordId, JsonObject>>,
+        records: List<BatchRecordWrite>,
     ): List<RepoWriteResult> {
         // The tree is read once and persisted once, however many records are in the batch; the
         // per-record work is a block write and a tree put.
         val snapshot = loadSnapshot(repo)
         var tree = snapshot.tree
-        val results = mutableListOf<RepoWriteResult>()
 
-        for ((recordId, value) in records) {
-            val recordBytes = DagCborCodec.encode(value)
+        // Check every swapRecord precondition against the snapshot this batch is building on
+        // before writing anything. A batch is one atomic commit, so a CAS mismatch on record N
+        // must fail the whole batch rather than leave the records before it committed and the
+        // rest missing - there would be no way back from that half-applied state.
+        for (record in records) {
+            val expectedSwap = record.swapRecord ?: continue
+            val previousCid = tree.get(record.recordId.collection, record.recordId.recordKey)?.toString()
+            if (previousCid != expectedSwap) {
+                throw InvalidSwapException(expectedCid = previousCid, providedCid = expectedSwap)
+            }
+        }
+
+        val results = mutableListOf<RepoWriteResult>()
+        for (record in records) {
+            val recordBytes = DagCborCodec.encode(record.value)
             val recordCid = Cid.sha256(DAG_CBOR_CODEC, recordBytes)
             blockStore.writeBlock(repo, RepoBlock(recordCid, recordBytes)).getOrThrow()
-            tree = tree.put(recordId.collection, recordId.recordKey, recordCid)
+            tree = tree.put(record.recordId.collection, record.recordId.recordKey, recordCid)
             results +=
                 RepoWriteResult(
-                    uri = recordId.uri,
+                    uri = record.recordId.uri,
                     cid = recordCid.toString(),
                     validationStatus = RepoValidationStatus.UNKNOWN,
                 )

@@ -54,6 +54,29 @@ internal interface LogDateCollectionsMetadataStore {
         recordKey: String,
     ): LogDateCollectionMetadata
 
+    /**
+     * Upserts every key in [recordKeys] as one atomic unit: either all of them get a fresh
+     * server version, or (on failure partway through) none of them do.
+     *
+     * [RepoBackedLogDateCollectionsRepository.upsertAssociations] commits every association's
+     * repo record in a single atomic batch write *before* this runs. A naive per-record loop
+     * here would let a mid-batch failure leave some records with metadata and the rest without -
+     * "phantom" repo records that are present in commit history but invisible to [listLive] and
+     * [changes], which read from this store rather than the tree. Atomicity here lets the caller
+     * compensate by deleting the whole repo batch on any failure, keeping the repo and this store
+     * in lockstep instead of just bounding how bad the divergence gets.
+     *
+     * The default is the naive loop, which is correct when nothing fails but gives none of that
+     * guarantee - implementations that can offer a real all-or-nothing batch (a DB transaction,
+     * for example) should override it.
+     */
+    suspend fun upsertBatch(
+        userId: UUID,
+        repoDid: AtprotoDid,
+        collection: LogDateCollectionKind,
+        recordKeys: List<String>,
+    ): List<LogDateCollectionMetadata> = recordKeys.map { recordKey -> upsert(userId, repoDid, collection, recordKey) }
+
     suspend fun delete(
         userId: UUID,
         repoDid: AtprotoDid,
@@ -141,6 +164,44 @@ internal class InMemoryLogDateCollectionsMetadataStore : LogDateCollectionsMetad
     }
 
     override suspend fun upsert(
+        userId: UUID,
+        repoDid: AtprotoDid,
+        collection: LogDateCollectionKind,
+        recordKey: String,
+    ): LogDateCollectionMetadata = upsertRow(userId = userId, repoDid = repoDid, collection = collection, recordKey = recordKey)
+
+    override suspend fun upsertBatch(
+        userId: UUID,
+        repoDid: AtprotoDid,
+        collection: LogDateCollectionKind,
+        recordKeys: List<String>,
+    ): List<LogDateCollectionMetadata> {
+        val userMetadata = metadataForUser(userId)
+        val keys = recordKeys.map { LogDateCollectionKey(collection = collection, recordKey = it) }
+        // Snapshot only the rows this batch might touch, and the version state, so a failure
+        // partway through can put back exactly what was there before - no more, no less - rather
+        // than leaving any of this batch's upserts behind as a record with no matching commit
+        // anywhere else.
+        val previousRows = keys.associateWith { userMetadata[it] }
+        val previousState = states[userId]
+
+        return try {
+            recordKeys.map { recordKey -> upsertRow(userId = userId, repoDid = repoDid, collection = collection, recordKey = recordKey) }
+        } catch (failure: Throwable) {
+            keys.forEach { key ->
+                val previousRow = previousRows.getValue(key)
+                if (previousRow == null) {
+                    userMetadata.remove(key)
+                } else {
+                    userMetadata[key] = previousRow
+                }
+            }
+            if (previousState == null) states.remove(userId) else states[userId] = previousState
+            throw failure
+        }
+    }
+
+    private fun upsertRow(
         userId: UUID,
         repoDid: AtprotoDid,
         collection: LogDateCollectionKind,

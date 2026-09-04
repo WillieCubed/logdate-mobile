@@ -6,6 +6,21 @@ import studio.hypertext.atproto.syntax.Nsid
 import studio.hypertext.atproto.syntax.RecordKey
 
 /**
+ * One write in a [RepoRecordStore.putRecords] batch.
+ *
+ * [swapRecord] mirrors [RepoRecordStore.putRecord]'s optional compare-and-swap: when non-null,
+ * the write is only applied if the record's current CID equals [swapRecord]. Unlike the
+ * single-record path, a mismatch here must fail the whole batch rather than commit the records
+ * around it - a batch is one atomic commit, so there is no partially-applied state to leave
+ * behind.
+ */
+public data class BatchRecordWrite(
+    val recordId: RepoRecordId,
+    val value: JsonObject,
+    val swapRecord: String? = null,
+)
+
+/**
  * Standalone abstraction for AT Protocol repository record storage.
  *
  * Implementations are transport-agnostic and may be backed by local storage,
@@ -68,8 +83,8 @@ public interface RepoRecordStore {
      * open the repo once and leave one commit behind. The default is the naive loop, which is
      * correct but has exactly the cost this exists to avoid.
      */
-    public suspend fun putRecords(records: List<Pair<RepoRecordId, JsonObject>>): Result<List<RepoWriteResult>> =
-        runCatching { records.map { (id, value) -> putRecord(id, value).getOrThrow() } }
+    public suspend fun putRecords(records: List<BatchRecordWrite>): Result<List<RepoWriteResult>> =
+        runCatching { records.map { putRecord(it.recordId, it.value, it.swapRecord).getOrThrow() } }
 
     /**
      * Deletes the record at [recordId].

@@ -15,6 +15,7 @@ import studio.hypertext.atproto.repo.InMemoryRepoBlockStore
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -258,6 +259,69 @@ class RepoBackedLogDateCollectionsRepositoryTest {
             }
         }
 
+    @Test
+    fun `a metadata failure partway through a batch leaves no phantom repo records`() =
+        runTest {
+            val accountRepository = InMemoryAccountRepository()
+            val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
+            val identityService = identityService(accountRepository)
+            val account =
+                identityService.ensureIdentity(
+                    accountRepository.save(
+                        Account(
+                            id = Uuid.random(),
+                            username = "dana",
+                            displayName = "Dana",
+                            createdAt = Clock.System.now(),
+                        ),
+                    ),
+                )
+            val blockStore = InMemoryRepoBlockStore()
+            val failingRecordKey = associationRecordKey(journalId = "journal-1", entryId = "entry-3").toString()
+            val metadataStore =
+                FailingBatchMetadataStore(
+                    delegate = InMemoryLogDateCollectionsMetadataStore(),
+                    failingRecordKey = failingRecordKey,
+                )
+            val repository =
+                RepoBackedLogDateCollectionsRepository(
+                    accountRepository = accountRepository,
+                    identityService = identityService,
+                    signingKeyService = signingKeyService,
+                    blockStore = blockStore,
+                    metadataStore = metadataStore,
+                )
+            val userId = account.id.toJavaUUID()
+            val repoDid = AtprotoDid.require(requireNotNull(account.did))
+            val associations =
+                (1..5).map { i ->
+                    LogDateAssociation(
+                        journalId = "journal-1",
+                        entryId = "entry-$i",
+                        createdAt = 10L * i,
+                        version = 0L,
+                        deviceId = DeviceId("device-batch"),
+                    )
+                }
+
+            // The third association's metadata upsert fails; before the fix, the repo batch had
+            // already committed all five records atomically, so entries 3-5 would survive as
+            // "phantom" records - present in commit history but invisible to listAssociations,
+            // which reads from metadataStore rather than the tree.
+            assertFailsWith<IllegalStateException> {
+                repository.upsertAssociations(userId = userId, associations = associations)
+            }
+
+            val engine = DefaultRepoEngine(blockStore)
+            associations.forEach { association ->
+                assertNull(
+                    engine.getRecord(associationRecordId(repoDid, association.journalId, association.entryId)).getOrThrow(),
+                    "no repo record for ${association.entryId} should survive a failed batch upsert",
+                )
+            }
+            assertTrue(repository.listAssociations(userId).isEmpty(), "no association should be visible after a failed batch upsert")
+        }
+
     private fun entry(id: String) =
         LogDateEntry(
             id = id,
@@ -277,4 +341,37 @@ class RepoBackedLogDateCollectionsRepositoryTest {
             signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
             config = AtprotoIdentityConfig(handleDomain = "logdate.app", pdsServiceEndpoint = "https://logdate.app"),
         )
+
+    /**
+     * Metadata store that throws when asked to upsert [failingRecordKey], to exercise
+     * [RepoBackedLogDateCollectionsRepository.upsertAssociations]'s handling of a metadata
+     * failure partway through a batch.
+     *
+     * Deliberately does *not* delegate [upsertBatch] to [delegate]'s own (atomic) implementation:
+     * it loops through this store's own [upsert] instead, so records before the failing one land
+     * for real before the throw - the worst case for a metadata store's own batch write, and the
+     * scenario the repository's own repo-side compensation has to hold up against regardless of
+     * whether the metadata store it's talking to can roll back its half of the work itself.
+     */
+    private class FailingBatchMetadataStore(
+        private val delegate: LogDateCollectionsMetadataStore,
+        private val failingRecordKey: String,
+    ) : LogDateCollectionsMetadataStore by delegate {
+        override suspend fun upsert(
+            userId: UUID,
+            repoDid: AtprotoDid,
+            collection: LogDateCollectionKind,
+            recordKey: String,
+        ): LogDateCollectionMetadata {
+            check(recordKey != failingRecordKey) { "Simulated metadata upsert failure for $recordKey" }
+            return delegate.upsert(userId, repoDid, collection, recordKey)
+        }
+
+        override suspend fun upsertBatch(
+            userId: UUID,
+            repoDid: AtprotoDid,
+            collection: LogDateCollectionKind,
+            recordKeys: List<String>,
+        ): List<LogDateCollectionMetadata> = recordKeys.map { recordKey -> upsert(userId, repoDid, collection, recordKey) }
+    }
 }

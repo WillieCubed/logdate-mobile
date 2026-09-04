@@ -9,6 +9,7 @@ import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.SigningKeyService
 import io.github.aakira.napier.Napier
 import studio.hypertext.atproto.identity.AtprotoDid
+import studio.hypertext.atproto.repo.BatchRecordWrite
 import studio.hypertext.atproto.repo.DefaultRepoEngine
 import studio.hypertext.atproto.repo.RepoBlockStore
 import studio.hypertext.atproto.repo.RepoRecordId
@@ -258,21 +259,45 @@ internal class RepoBackedLogDateCollectionsRepository(
         repoEngine
             .putRecords(
                 associations.map { association ->
-                    associationRecordId(repoDid, association.journalId, association.entryId) to
-                        association.toRepoJson()
+                    BatchRecordWrite(
+                        recordId = associationRecordId(repoDid, association.journalId, association.entryId),
+                        value = association.toRepoJson(),
+                    )
                 },
             ).getOrThrow()
 
-        return associations.map { association ->
-            val metadata =
-                metadataStore.upsert(
+        val metadataResults =
+            try {
+                metadataStore.upsertBatch(
                     userId = userId,
                     repoDid = repoDid,
                     collection = LogDateCollectionKind.ASSOCIATION,
-                    recordKey = associationRecordKey(association.journalId, association.entryId).toString(),
+                    recordKeys = associations.map { associationRecordKey(it.journalId, it.entryId).toString() },
                 )
-            association.copy(version = metadata.version)
-        }
+            } catch (failure: Throwable) {
+                // upsertBatch is all-or-nothing, so on failure NONE of this batch has a metadata
+                // row. The repo commit above already landed every record in one atomic commit
+                // though, so without this the repo would be left holding "phantom" records:
+                // present in commit history but invisible to listAssociations/associationChanges,
+                // which read from metadataStore rather than the tree. Delete the whole batch back
+                // out of the repo so the two stores stay in lockstep and the caller sees a clean
+                // failure rather than a partial one.
+                associations.forEach { association ->
+                    runCatching {
+                        repoEngine.deleteRecord(associationRecordId(repoDid, association.journalId, association.entryId)).getOrThrow()
+                    }.onFailure { compensationFailure ->
+                        Napier.e(
+                            "Failed to compensate association repo record " +
+                                "${association.journalId}/${association.entryId} for user $userId after metadata upsert " +
+                                "failed; repo and metadata store may now be inconsistent",
+                            compensationFailure,
+                        )
+                    }
+                }
+                throw failure
+            }
+
+        return associations.zip(metadataResults) { association, metadata -> association.copy(version = metadata.version) }
     }
 
     override suspend fun deleteAssociations(

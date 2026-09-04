@@ -142,39 +142,61 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
         recordKey: String,
     ): LogDateCollectionMetadata =
         withContext(Dispatchers.IO) {
+            transaction { upsertRow(userId, repoDid, collection, recordKey) }
+        }
+
+    override suspend fun upsertBatch(
+        userId: UUID,
+        repoDid: AtprotoDid,
+        collection: LogDateCollectionKind,
+        recordKeys: List<String>,
+    ): List<LogDateCollectionMetadata> =
+        withContext(Dispatchers.IO) {
             transaction {
-                val state = nextState(userId, repoDid)
-                val existing =
-                    LogDateCollectionRecordsTable
-                        .selectAll()
-                        .where {
-                            (LogDateCollectionRecordsTable.userId eq userId) and
-                                (LogDateCollectionRecordsTable.collection eq collection.storageName) and
-                                (LogDateCollectionRecordsTable.recordKey eq recordKey)
-                        }.singleOrNull()
-                if (existing == null) {
-                    LogDateCollectionRecordsTable.insert {
-                        it[LogDateCollectionRecordsTable.userId] = userId
-                        it[LogDateCollectionRecordsTable.collection] = collection.storageName
-                        it[LogDateCollectionRecordsTable.recordKey] = recordKey
-                        it[serverVersion] = state.lastVersion
-                        it[deleted] = false
-                        it[deletedAt] = null
-                    }
-                } else {
-                    LogDateCollectionRecordsTable.update({
-                        (LogDateCollectionRecordsTable.userId eq userId) and
-                            (LogDateCollectionRecordsTable.collection eq collection.storageName) and
-                            (LogDateCollectionRecordsTable.recordKey eq recordKey)
-                    }) {
-                        it[serverVersion] = state.lastVersion
-                        it[deleted] = false
-                        it[deletedAt] = null
-                    }
-                }
-                LogDateCollectionMetadata(recordKey = recordKey, version = state.lastVersion, deletedAt = null)
+                // One transaction for the whole batch: Exposed rolls the entire block back if any
+                // row upsert throws, instead of leaving the first N rows committed and the rest
+                // missing.
+                recordKeys.map { recordKey -> upsertRow(userId, repoDid, collection, recordKey) }
             }
         }
+
+    private fun upsertRow(
+        userId: UUID,
+        repoDid: AtprotoDid,
+        collection: LogDateCollectionKind,
+        recordKey: String,
+    ): LogDateCollectionMetadata {
+        val state = nextState(userId, repoDid)
+        val existing =
+            LogDateCollectionRecordsTable
+                .selectAll()
+                .where {
+                    (LogDateCollectionRecordsTable.userId eq userId) and
+                        (LogDateCollectionRecordsTable.collection eq collection.storageName) and
+                        (LogDateCollectionRecordsTable.recordKey eq recordKey)
+                }.singleOrNull()
+        if (existing == null) {
+            LogDateCollectionRecordsTable.insert {
+                it[LogDateCollectionRecordsTable.userId] = userId
+                it[LogDateCollectionRecordsTable.collection] = collection.storageName
+                it[LogDateCollectionRecordsTable.recordKey] = recordKey
+                it[serverVersion] = state.lastVersion
+                it[deleted] = false
+                it[deletedAt] = null
+            }
+        } else {
+            LogDateCollectionRecordsTable.update({
+                (LogDateCollectionRecordsTable.userId eq userId) and
+                    (LogDateCollectionRecordsTable.collection eq collection.storageName) and
+                    (LogDateCollectionRecordsTable.recordKey eq recordKey)
+            }) {
+                it[serverVersion] = state.lastVersion
+                it[deleted] = false
+                it[deletedAt] = null
+            }
+        }
+        return LogDateCollectionMetadata(recordKey = recordKey, version = state.lastVersion, deletedAt = null)
+    }
 
     override suspend fun delete(
         userId: UUID,
