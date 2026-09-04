@@ -564,41 +564,6 @@ internal fun TimelineMediaTile(
 }
 
 @Composable
-internal fun AudioWaveBars(
-    accentColor: Color,
-    modifier: Modifier = Modifier,
-) {
-    val waveHeights =
-        listOf(
-            10.dp,
-            18.dp,
-            12.dp,
-            22.dp,
-            14.dp,
-            20.dp,
-            11.dp,
-            17.dp,
-        )
-
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-        verticalAlignment = Alignment.Bottom,
-        modifier = modifier,
-    ) {
-        waveHeights.forEach { barHeight ->
-            Box(
-                modifier =
-                    Modifier
-                        .width(5.dp)
-                        .height(barHeight)
-                        .clip(RoundedCornerShape(100.dp))
-                        .background(accentColor.copy(alpha = 0.78f)),
-            )
-        }
-    }
-}
-
-@Composable
 private fun MediaBadge(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     text: String,
@@ -804,13 +769,6 @@ private fun TimelineDayLayoutMode.contentType(): TimelineListContentType =
         TimelineDayLayoutMode.MEDIUM -> TimelineListContentType.DAY_MEDIUM
         TimelineDayLayoutMode.EXPANDED -> TimelineListContentType.DAY_EXPANDED
     }
-
-internal fun Long.toDurationLabel(): String {
-    val totalSeconds = this / 1000
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return "$minutes:${seconds.toString().padStart(2, '0')}"
-}
 
 private fun LocalDate.shortMonthLabel(): String =
     when (month) {

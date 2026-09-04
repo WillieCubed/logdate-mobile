@@ -36,7 +36,7 @@ class TimelineTranscriptE2ETest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun `audio card resolves transcript from the provider and expands it inline`() {
+    fun `audio card resolves transcript from the provider and expands it on tap`() {
         val noteId = Uuid.random()
         val firstSentence = "This is a deliberately long opening sentence for the transcript."
         val secondSentence = "The hidden follow-up sentence appears after expansion."
@@ -60,9 +60,8 @@ class TimelineTranscriptE2ETest {
         composeRule.onNodeWithText(firstSentence).assertExists()
         composeRule.onNodeWithText(secondSentence, substring = true).assertDoesNotExist()
 
-        composeRule.onNodeWithText("Preview Transcript").performClick()
+        composeRule.onNodeWithText(firstSentence).performClick()
 
-        composeRule.onNodeWithText("Hide Transcript").assertExists()
         composeRule.onNodeWithText(secondSentence, substring = true).assertExists()
     }
 
@@ -86,7 +85,7 @@ class TimelineTranscriptE2ETest {
     }
 
     @Test
-    fun `moment audio card expands inline transcript when preview requested`() {
+    fun `moment audio card expands to the full transcript when tapped`() {
         val firstSentence = "This is another long first sentence for a semantic moment."
         val secondSentence = "The rest of the transcript should appear after tapping preview."
         val transcript = "$firstSentence $secondSentence"
@@ -102,9 +101,8 @@ class TimelineTranscriptE2ETest {
 
         composeRule.onNodeWithText(secondSentence, substring = true).assertDoesNotExist()
 
-        composeRule.onNodeWithText("Preview Transcript").performClick()
+        composeRule.onNodeWithText(firstSentence).performClick()
 
-        composeRule.onNodeWithText("Hide Transcript").assertExists()
         composeRule.onNodeWithText(secondSentence, substring = true).assertExists()
     }
 }

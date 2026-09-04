@@ -1,387 +1,58 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+@file:Suppress("ktlint:standard:function-naming")
 
 package app.logdate.feature.timeline.ui.details
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import app.logdate.client.awareness.daylight.DaylightClassifier
-import app.logdate.client.awareness.daylight.stringRes
-import app.logdate.ui.audio.AudioPlaybackDisplayInfo
 import app.logdate.ui.audio.LocalAudioPlaybackState
-import app.logdate.ui.audio.LocalTranscriptionState
+import app.logdate.ui.audio.MomentAudioCard
 import app.logdate.ui.common.noteDragSource
 import app.logdate.ui.media.MediaDeviceSelector
-import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.AudioNoteUiState
-import app.logdate.util.toReadableDateTimeShort
-import kotlinx.datetime.DatePeriod
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.minus
-import kotlinx.datetime.toLocalDateTime
-import logdate.client.feature.timeline.generated.resources.*
-import logdate.client.feature.timeline.generated.resources.Res
-import logdate.client.ui.generated.resources.common_retry
-import org.jetbrains.compose.resources.stringResource
-import kotlin.time.Clock
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Instant
-import logdate.client.ui.generated.resources.Res as UiRes
+import app.logdate.ui.timeline.MomentAudioUiState
 
 /**
- * Displays an audio note in the timeline with enhanced playback controls and transcription.
- * Uses the app-wide audio playback provider to ensure only one audio can play at a time.
+ * An audio note in a day's detail.
+ *
+ * The recording is rendered by the same component the timeline feed uses, so a note does not
+ * change appearance when the user taps into the day. This wrapper adds only what the detail
+ * view needs on top: output-device routing while this note is the one playing.
  */
 @Composable
 fun AudioNoteSnippet(
     uiState: AudioNoteUiState,
     modifier: Modifier = Modifier,
 ) {
-    // Get the global audio playback state
     val audioPlaybackState = LocalAudioPlaybackState.current
-
-    // Get the transcription state
-    val transcriptionState = LocalTranscriptionState.current
-
-    // Check if this specific note is currently playing
-    val isThisPlaying =
-        remember(audioPlaybackState.currentlyPlayingId, audioPlaybackState.isPlaying) {
-            audioPlaybackState.currentlyPlayingId == uiState.noteId && audioPlaybackState.isPlaying
-        }
-
-    // Check if this note is the current one (even if paused)
-    val isThisCurrent =
-        remember(audioPlaybackState.currentlyPlayingId) {
-            audioPlaybackState.currentlyPlayingId == uiState.noteId
-        }
-
-    // Create a duration from the milliseconds
-    val duration =
-        remember(uiState.duration) {
-            uiState.duration.milliseconds
-        }
-
-    val audioTitle = audioRecordingTitle(uiState.timestamp)
-    val displayInfo =
-        remember(audioTitle, duration) {
-            val subtitle =
-                if (duration.inWholeSeconds > 0) {
-                    "${duration.inWholeMinutes}:${(duration.inWholeSeconds % 60).toString().padStart(2, '0')}"
-                } else {
-                    null
-                }
-            AudioPlaybackDisplayInfo(title = audioTitle, subtitle = subtitle)
-        }
+    val isThisCurrent = audioPlaybackState.currentlyPlayingId == uiState.noteId
 
     Column(
-        modifier = modifier.padding(vertical = Spacing.xs),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        modifier = modifier.padding(vertical = Spacing.xs).noteDragSource(uiState.noteId.toString()),
     ) {
-        // Date/time displayed above the card
-        Text(
-            text = uiState.timestamp.toReadableDateTimeShort(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp),
+        MomentAudioCard(
+            audio =
+                MomentAudioUiState(
+                    uri = uiState.uri,
+                    durationMs = uiState.duration,
+                    noteId = uiState.noteId,
+                    recordedAt = uiState.timestamp,
+                ),
+            timeOfDay = null,
         )
 
-        Surface(
-            shape = MaterialTheme.shapes.small,
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .noteDragSource(uiState.noteId.toString())
-                    .clickable {
-                        if (isThisPlaying) {
-                            audioPlaybackState.pause()
-                        } else {
-                            audioPlaybackState.play(uiState.noteId, uiState.uri, displayInfo)
-                        }
-                    },
-        ) {
-            Column(
-                modifier = Modifier.padding(Spacing.md),
-            ) {
-                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                    val stackRouteControls = maxWidth < 360.dp && isThisCurrent
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            IconButton(
-                                onClick = {
-                                    if (isThisPlaying) {
-                                        audioPlaybackState.pause()
-                                    } else {
-                                        audioPlaybackState.play(uiState.noteId, uiState.uri, displayInfo)
-                                    }
-                                },
-                                modifier = Modifier.size(40.dp),
-                            ) {
-                                Icon(
-                                    painter = if (isThisPlaying) PlatformIcons.pause() else PlatformIcons.play(),
-                                    contentDescription = if (isThisPlaying) "Pause" else "Play",
-                                    modifier = Modifier.size(24.dp),
-                                )
-                            }
-
-                            Column(
-                                modifier = Modifier.weight(1f),
-                            ) {
-                                Text(
-                                    text = stringResource(Res.string.audio_recording),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-
-                                Text(
-                                    text =
-                                        if (isThisPlaying) {
-                                            "Playing • ${duration.inWholeMinutes}:${
-                                                (duration.inWholeSeconds % 60)
-                                                    .toString()
-                                                    .padStart(2, '0')
-                                            }"
-                                        } else {
-                                            "${duration.inWholeMinutes}:${
-                                                (duration.inWholeSeconds % 60)
-                                                    .toString()
-                                                    .padStart(2, '0')
-                                            }"
-                                        },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-
-                            if (isThisCurrent && !stackRouteControls) {
-                                MediaDeviceSelector(
-                                    selection = audioPlaybackState.outputSelection,
-                                    onDeviceSelected = audioPlaybackState.selectOutputDevice,
-                                    label = "Audio output",
-                                    modifier = Modifier.widthIn(max = 160.dp),
-                                )
-                            }
-
-                            if (isThisCurrent) {
-                                IconButton(
-                                    onClick = { audioPlaybackState.stop() },
-                                    modifier = Modifier.size(32.dp),
-                                ) {
-                                    Icon(
-                                        painter = PlatformIcons.stop(),
-                                        contentDescription = stringResource(Res.string.stop),
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                }
-                            }
-                        }
-
-                        if (stackRouteControls) {
-                            MediaDeviceSelector(
-                                selection = audioPlaybackState.outputSelection,
-                                onDeviceSelected = audioPlaybackState.selectOutputDevice,
-                                label = "Audio output",
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                    }
-                }
-
-                // Progress bar and seeking (only show if this audio is current)
-                if (isThisCurrent) {
-                    Column(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(top = Spacing.sm),
-                    ) {
-                        // Seekable progress bar
-                        Slider(
-                            value = audioPlaybackState.progress,
-                            onValueChange = { newProgress ->
-                                audioPlaybackState.seekTo(newProgress)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-
-                        // Time labels
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            val currentTime = (audioPlaybackState.progress * duration.inWholeSeconds).toInt()
-                            Text(
-                                text =
-                                    stringResource(
-                                        Res.string.timestamp_minutes_seconds,
-                                        currentTime / 60,
-                                        (currentTime % 60).toString().padStart(2, '0'),
-                                    ),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text =
-                                    stringResource(
-                                        Res.string.timestamp_minutes_seconds,
-                                        duration.inWholeMinutes,
-                                        (duration.inWholeSeconds % 60).toString().padStart(2, '0'),
-                                    ),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-
-                // Transcription section
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(top = Spacing.md),
-                ) {
-                    // Get the necessary info for this note from the transcription state
-                    val transcriptionText = transcriptionState.getTranscriptionText(uiState.noteId)
-                    val isTranscriptionInProgress = transcriptionState.isTranscriptionInProgress(uiState.noteId)
-                    val transcriptionError = transcriptionState.getTranscriptionError(uiState.noteId)
-
-                    when {
-                        // Transcription is in progress
-                        isTranscriptionInProgress -> {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp,
-                                )
-                                Text(
-                                    text = stringResource(Res.string.converting_to_text),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-
-                        // Transcription completed successfully
-                        transcriptionText != null -> {
-                            Text(
-                                text = stringResource(Res.string.transcript),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(bottom = Spacing.xs),
-                            )
-
-                            OutlinedCard(
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(
-                                    text = transcriptionText,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.padding(Spacing.md),
-                                )
-                            }
-                        }
-
-                        // Transcription failed
-                        transcriptionError != null -> {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                            ) {
-                                Text(
-                                    text = stringResource(Res.string.transcription_failed),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error,
-                                )
-
-                                Button(
-                                    onClick = { transcriptionState.requestTranscription(uiState.noteId) },
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    Text(stringResource(UiRes.string.common_retry))
-                                }
-                            }
-                        }
-
-                        // No transcription exists yet
-                        else -> {
-                            Button(
-                                onClick = { transcriptionState.requestTranscription(uiState.noteId) },
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(stringResource(Res.string.convert_to_text))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Resolves a contextual title for an audio recording based on when it was captured.
- * Uses [DaylightClassifier] for the period name and relative date context.
- */
-@Composable
-private fun audioRecordingTitle(timestamp: Instant): String {
-    val period = DaylightClassifier().classifyWithoutLocation(timestamp)
-    val periodName = stringResource(period.stringRes)
-
-    val tz = TimeZone.currentSystemDefault()
-    val recorded = timestamp.toLocalDateTime(tz)
-    val now = Clock.System.now().toLocalDateTime(tz)
-    val today = now.date
-    val yesterday = today.minus(DatePeriod(days = 1))
-
-    return when (recorded.date) {
-        today -> stringResource(Res.string.audio_recording_today, periodName)
-        yesterday -> stringResource(Res.string.audio_recording_from_yesterday, periodName)
-        else -> {
-            val daysAgo = today.toEpochDays() - recorded.date.toEpochDays()
-            if (daysAgo in 2..6) {
-                val dayName =
-                    recorded.date.dayOfWeek.name
-                        .lowercase()
-                        .replaceFirstChar { it.uppercase() }
-                stringResource(Res.string.audio_recording_from_day, periodName, dayName)
-            } else {
-                val monthName =
-                    recorded.date.month.name
-                        .lowercase()
-                        .replaceFirstChar { it.uppercase() }
-                stringResource(Res.string.audio_recording_from_date, periodName, monthName, recorded.date.day)
-            }
+        if (isThisCurrent) {
+            MediaDeviceSelector(
+                selection = audioPlaybackState.outputSelection,
+                onDeviceSelected = audioPlaybackState.selectOutputDevice,
+                label = "Audio output",
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

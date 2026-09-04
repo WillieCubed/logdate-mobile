@@ -762,7 +762,12 @@ class HomeViewModel(
             media = media.map { MomentMediaUiState(uri = it.uri, isVideo = it.isVideo) },
             audio =
                 audio.firstOrNull()?.let {
-                    MomentAudioUiState(uri = it.uri, durationMs = it.durationMs, noteId = it.sourceNoteId)
+                    MomentAudioUiState(
+                        uri = it.uri,
+                        durationMs = it.durationMs,
+                        noteId = it.sourceNoteId,
+                        recordedAt = estimatedStart,
+                    )
                 },
             places = places.map { PlaceUiState(id = it.id, title = it.name, latitude = it.latitude, longitude = it.longitude) },
             people = resolvedPeople,

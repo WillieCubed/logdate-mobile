@@ -69,6 +69,7 @@ val LocalAudioPlaybackState =
 @Composable
 fun AudioPlaybackProvider(content: @Composable () -> Unit) {
     val audioPlaybackManager: AudioPlaybackManager = koinInject()
+    val audioContextProcessor: AudioContextProcessor = koinInject()
     val audioRouteRepository: AudioRouteRepository = koinInject()
     val statusProvider = audioPlaybackManager as? AudioPlaybackStatusProvider
 
@@ -195,7 +196,10 @@ fun AudioPlaybackProvider(content: @Composable () -> Unit) {
         )
 
     // Provide the state to all descendants
-    CompositionLocalProvider(LocalAudioPlaybackState provides playbackState) {
+    CompositionLocalProvider(
+        LocalAudioPlaybackState provides playbackState,
+        LocalAudioContextProcessor provides audioContextProcessor,
+    ) {
         content()
     }
 }

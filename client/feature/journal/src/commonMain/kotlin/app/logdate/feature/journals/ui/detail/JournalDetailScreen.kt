@@ -83,7 +83,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.audio.AudioLabelResolver
-import app.logdate.ui.audio.color.PaletteGenerator
 import app.logdate.feature.editor.audio.formatAudioLabel
 import app.logdate.feature.editor.ui.audio.AnimatedPlayPauseButton
 import app.logdate.feature.journals.ui.deriveCoverColor
@@ -92,6 +91,7 @@ import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.audio.AudioPlaybackDisplayInfo
 import app.logdate.ui.audio.LocalAudioPlaybackState
+import app.logdate.ui.audio.color.PaletteGenerator
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.common.MarkdownPreviewText
 import app.logdate.ui.common.MarkdownText

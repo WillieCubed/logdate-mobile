@@ -18,13 +18,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,17 +35,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.client.awareness.daylight.stringRes
+import app.logdate.ui.audio.MomentAudioCard
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.DayPresentation
-import app.logdate.ui.timeline.MomentAudioUiState
 import app.logdate.ui.timeline.MomentMediaUiState
 import app.logdate.ui.timeline.MomentUiState
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelineMediaItemUiState
 import coil3.compose.AsyncImage
-import logdate.client.ui.generated.resources.Res
-import logdate.client.ui.generated.resources.audio_recording
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -185,7 +181,7 @@ private fun HeroMomentContainer(
             }
         }
 
-        moment.audio?.let { audio -> AudioMomentCard(audio = audio, style = style) }
+        moment.audio?.let { audio -> MomentAudioCard(audio = audio, timeOfDay = moment.timeOfDay) }
         PersonAvatarRow(people = moment.people)
     }
 }
@@ -237,7 +233,7 @@ private fun SupportingMomentContainer(
             if (moment.media.isNotEmpty()) {
                 MomentMediaGrid(media = moment.media, layoutMode = layoutMode, emphasized = false)
             }
-            moment.audio?.let { audio -> AudioMomentCard(audio = audio, style = style) }
+            moment.audio?.let { audio -> MomentAudioCard(audio = audio, timeOfDay = moment.timeOfDay) }
             moment.textSnippet?.let { snippet -> TextQuoteContainer(text = snippet, maxLines = 6) }
             PersonAvatarRow(people = moment.people)
         }
@@ -272,7 +268,7 @@ private fun StackedMomentCard(
             if (moment.media.isNotEmpty()) {
                 MomentMediaGrid(media = moment.media, layoutMode = layoutMode, emphasized = moment.isHero)
             }
-            moment.audio?.let { audio -> AudioMomentCard(audio = audio, style = style) }
+            moment.audio?.let { audio -> MomentAudioCard(audio = audio, timeOfDay = moment.timeOfDay) }
             moment.textSnippet?.let { snippet ->
                 Text(
                     text = snippet,
@@ -361,65 +357,6 @@ private fun PersonAvatarRow(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-    }
-}
-
-@Composable
-private fun AudioMomentCard(
-    audio: MomentAudioUiState,
-    style: TimelineDayStyle,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(20.dp),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            modifier = Modifier.padding(Spacing.md),
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(style.accentColor.copy(alpha = 0.16f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.GraphicEq,
-                        contentDescription = null,
-                        tint = style.accentColor,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(
-                        text = stringResource(Res.string.audio_recording),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                }
-                Text(
-                    text = audio.durationMs.toDurationLabel(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            TimelineTranscriptPreview(
-                noteId = audio.noteId,
-                fallbackTranscript = audio.transcript,
-            )
-            AudioWaveBars(accentColor = style.accentColor, modifier = Modifier.fillMaxWidth())
         }
     }
 }

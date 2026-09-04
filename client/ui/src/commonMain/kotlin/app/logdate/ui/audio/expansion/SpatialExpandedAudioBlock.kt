@@ -54,6 +54,7 @@ fun SpatialExpandedAudioBlock(
     createdAt: Instant,
     modifier: Modifier = Modifier,
     segments: List<AudioSegment> = emptyList(),
+    transcript: String? = null,
     onPlayPause: () -> Unit = {},
     onSeek: (Float) -> Unit = {},
     onExpand: () -> Unit = {},
@@ -90,6 +91,14 @@ fun SpatialExpandedAudioBlock(
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                // The words come first: expanding a recording is how you read all of it.
+                transcript?.let { text ->
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+
                 // Waveform
                 BezierAudioWaveform(
                     amplitudes = amplitudes,

@@ -143,6 +143,11 @@ data class MomentAudioUiState(
      * The note ID for this audio, used to look up transcription state.
      */
     val noteId: Uuid? = null,
+    /**
+     * When the recording was made, used to render its time and to derive its palette.
+     * Falls back to the moment's classified time of day when absent.
+     */
+    val recordedAt: Instant? = null,
 )
 
 // endregion
