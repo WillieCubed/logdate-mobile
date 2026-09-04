@@ -75,7 +75,9 @@ The four screenshot suites building state through the legacy builder migrate to 
 
 ### Relocating the audio system
 
-`AudioContextProcessor` depends only on `client.awareness` and `app.logdate.ui.audio.WaveformStorage`, both already available to `client/ui`, so the move requires no dependency inversion. Moved from `client/feature/editor` to `client/ui`: `AudioContextProcessor`, `AmplitudeExtractor` with its platform source sets, `SegmentDetector`, `PaletteGenerator`, the `AudioPalette`/`AudioSegment` models, `BezierAudioWaveform`, `WaveformPathGenerator`, the expansion package, and the `MediaDurationFormatter` expect/actual. Koin bindings move with them. `feature/editor` and `feature/journal` update imports; both already depend on `client/ui`.
+`AudioContextProcessor` depends only on `client.awareness` and `app.logdate.ui.audio.WaveformStorage`, both already available to `client/ui`, so the move requires no dependency inversion. Moved from `client/feature/editor` to `client/ui`: `AudioContextProcessor`, `AmplitudeExtractor` with its platform source sets, `SegmentDetector`, `PaletteGenerator`, the `AudioPalette`/`AudioSegment` models, `BezierAudioWaveform`, `WaveformPathGenerator`, the expansion state machine, and `SpatialExpandedAudioBlock`. Koin bindings move with them. `feature/editor` and `feature/journal` update imports; both already depend on `client/ui`.
+
+`ElevatedAudioCard` and `ImmersiveAudioScreen` stay in the editor: they depend on `ImmersiveSystemBarEffect`, whose `jvm` actual has no corresponding source set in `client/ui`. They are the overlay states, which the timeline does not enter, and they compile against the moved types from where they are. `MediaDurationFormatter` likewise stays; it is an expect/actual that exists only to reach `String.format`, so `client/ui` gains a single pure-Kotlin `formatAudioDuration` instead and the seven competing formatters are left for separate cleanup.
 
 This lands as a behavior-preserving move so that the subsequent change is legible in review.
 
@@ -85,7 +87,9 @@ The missing `COLLAPSED` renderer is extracted from `AudioBlockContent`'s collaps
 
 The inline states gain the transcript, which no expansion component currently displays: `COLLAPSED` shows the excerpt from `buildTranscriptExcerpt`, `SPATIAL_EXPANDED` the full text. `AudioMomentCard` is replaced by `CollapsedAudioCard` driven by an `AudioExpansionController` with `expandOnPlayback` enabled.
 
-Amplitudes are sourced through `AudioContextProcessor`, which loads from cache or extracts and caches, rather than through `WaveformStorage` directly. Composables obtain an `AudioContext` via `produceState` with an injected processor, following `AudioPlaybackComponent`. Extraction is bounded to notes the existing `onVisibleAudioNoteIdsChanged` mechanism reports as visible, so scrolling does not decode the back catalogue.
+Amplitudes are sourced through `AudioContextProcessor`, which loads from cache or extracts and caches, rather than through `WaveformStorage` directly. Composables obtain an `AudioContext` via `produceState`.
+
+The processor reaches the card through `LocalAudioContextProcessor`, supplied by the app-wide `AudioPlaybackProvider`, rather than being injected inside the card. Audio cards render in previews and screenshot tests where no Koin graph exists, and injecting there fails hard enough to remove the entire surrounding section — observed as the day detail losing its notes list. With no processor available the card still draws and still plays; it has no waveform until one can be produced.
 
 `AudioNoteSnippet` reduces to the same component plus output-device routing when its note is active. Its icon tile, "Audio recording" title, and "Convert to Text" button are removed. `AudioPalette` supplies per-recording color.
 
