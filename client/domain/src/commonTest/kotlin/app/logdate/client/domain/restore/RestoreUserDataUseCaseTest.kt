@@ -338,6 +338,89 @@ class RestoreUserDataUseCaseTest {
         }
 
     @Test
+    fun `restore drops draft audio block and warns when the manifest exists but excludes this media`() =
+        runTest {
+            // Mirrors "restore drops note and warns when the manifest exists but excludes this
+            // media" for the draft-blocks path: restoreDraftBlock used to always keep the block,
+            // just with uri set to whatever resolveMediaReference returned (including null),
+            // silently persisting a draft that looks normal but can never play.
+            val draftId = Uuid.random()
+            val blockId = Uuid.random()
+            val sourceUri = "/data/user/0/studio.hypertext.logdate/files/audio_notes/recording_abc.m4a"
+            val bundle =
+                buildBundle(
+                    drafts =
+                        listOf(
+                            ExportDraft(
+                                id = draftId.toString(),
+                                content = "",
+                                createdAt = now,
+                                updatedAt = now,
+                                blocks =
+                                    listOf(
+                                        SerializableAudioBlock(
+                                            id = blockId,
+                                            timestamp = now,
+                                            uri = sourceUri,
+                                        ),
+                                    ),
+                            ),
+                        ),
+                    mediaManifest = ExportMediaManifest(files = emptyList()),
+                )
+
+            val result = useCase.restore(bundle, mediaImporter = FakeMediaImporter())
+
+            assertEquals(1, result.draftsImported)
+            val saved = journalRepo.savedDrafts.first()
+            assertTrue(
+                saved.blocks.none { it is SerializableAudioBlock },
+                "Unresolvable audio block must be dropped, not persisted with uri=null",
+            )
+            assertTrue(
+                result.warnings.any { it.contains(blockId.toString()) && it.contains("not found in archive") },
+                "Expected a warning naming the dropped draft block and the missing media, got: ${result.warnings}",
+            )
+        }
+
+    @Test
+    fun `restore keeps a draft block that never had media to begin with`() =
+        runTest {
+            // A block with no uri at all (e.g. an in-progress draft) is not "missing media from
+            // the archive" -- there was never anything to resolve, so it must not be dropped.
+            val draftId = Uuid.random()
+            val blockId = Uuid.random()
+            val bundle =
+                buildBundle(
+                    drafts =
+                        listOf(
+                            ExportDraft(
+                                id = draftId.toString(),
+                                content = "",
+                                createdAt = now,
+                                updatedAt = now,
+                                blocks =
+                                    listOf(
+                                        SerializableAudioBlock(
+                                            id = blockId,
+                                            timestamp = now,
+                                            uri = null,
+                                        ),
+                                    ),
+                            ),
+                        ),
+                    mediaManifest = ExportMediaManifest(files = emptyList()),
+                )
+
+            val result = useCase.restore(bundle, mediaImporter = FakeMediaImporter())
+
+            assertEquals(1, result.draftsImported)
+            val saved = journalRepo.savedDrafts.first()
+            val audioBlock = saved.blocks.filterIsInstance<SerializableAudioBlock>().singleOrNull()
+            assertEquals(blockId, audioBlock?.id, "A block with no media to begin with must be kept, not dropped")
+        }
+
+    @Test
     fun `restore imports profile places and location history from optional payloads`() =
         runTest {
             val placeId = Uuid.random()
