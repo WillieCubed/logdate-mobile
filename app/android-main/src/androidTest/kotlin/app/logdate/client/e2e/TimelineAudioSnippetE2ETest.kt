@@ -9,9 +9,9 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.test.espresso.Espresso.pressBack
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.UiDevice
 import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
@@ -80,7 +80,7 @@ class TimelineAudioSnippetE2ETest {
             .assertIsDisplayed()
             .assertHasClickAction()
 
-        pressBack()
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
     }
 
     private fun setTimelineAudioSnippetContent() {

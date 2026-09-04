@@ -15,9 +15,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.espresso.Espresso.pressBack
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.UiDevice
 import app.logdate.feature.editor.ui.video.VideoPlayerTags
 import app.logdate.feature.journals.ui.detail.VideoNoteViewerContent
 import app.logdate.ui.media.MediaDeviceSelectorTags
@@ -65,7 +65,7 @@ class NoteViewerVideoE2ETest {
             .assertIsDisplayed()
             .assertHasClickAction()
 
-        pressBack()
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
     }
 
     private fun setVideoNoteViewerContent() {
