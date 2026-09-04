@@ -33,9 +33,6 @@ data class TimelineDayUiState(
     val mediaUris: List<MediaObjectUiState> = emptyList(),
     val notes: List<NoteUiState> = emptyList(),
     val layout: TimelineDayCardLayout = TimelineDayCardLayout.STORY_LED,
-    val recap: TimelineDayRecapUiState = TimelineDayRecapUiState(),
-    val heroSection: TimelineDaySectionUiState? = null,
-    val supportingSections: List<TimelineDaySectionUiState> = emptyList(),
     val isLoadingSummary: Boolean = false,
     val isLoadingPeople: Boolean = false,
     // Semantic Timeline fields
@@ -72,44 +69,10 @@ enum class TimelineDayCardLayout {
     STORY_LED,
 }
 
-data class TimelineDayRecapUiState(
-    val captureCount: Int = 0,
-    val mediaCount: Int = 0,
-    val audioCount: Int = 0,
-    val placeCount: Int = 0,
-    val peopleCount: Int = 0,
-    val activeSpanMinutes: Int = 0,
-)
-
-sealed interface TimelineDaySectionUiState {
-    val label: String
-}
-
-data class TimelineTextSnippetSectionUiState(
-    override val label: String,
-    val text: String,
-    val timestamp: Instant,
-) : TimelineDaySectionUiState
-
 data class TimelineMediaItemUiState(
     val uri: String,
     val isVideo: Boolean = false,
 )
-
-data class TimelineMediaSectionUiState(
-    override val label: String,
-    val items: List<TimelineMediaItemUiState>,
-) : TimelineDaySectionUiState
-
-data class TimelineAudioSectionUiState(
-    override val label: String,
-    val note: AudioNoteUiState,
-) : TimelineDaySectionUiState
-
-data class TimelinePlaceSectionUiState(
-    override val label: String,
-    val places: List<PlaceUiState>,
-) : TimelineDaySectionUiState
 
 // region Semantic Timeline (moment-based)
 

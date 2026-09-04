@@ -23,11 +23,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -36,9 +34,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.PeopleAlt
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
@@ -70,19 +65,13 @@ import app.logdate.ui.common.formatting.asRelativeDate
 import app.logdate.ui.restore.LocalAcknowledgeCloudRestore
 import app.logdate.ui.restore.LocalIsPostCloudRestore
 import app.logdate.ui.theme.Spacing
-import app.logdate.ui.timeline.TimelineAudioSectionUiState
 import app.logdate.ui.timeline.TimelineDayCardLayout
-import app.logdate.ui.timeline.TimelineDayRecapUiState
-import app.logdate.ui.timeline.TimelineDaySectionUiState
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelineLoadingState
 import app.logdate.ui.timeline.TimelineMediaItemUiState
-import app.logdate.ui.timeline.TimelineMediaSectionUiState
-import app.logdate.ui.timeline.TimelinePlaceSectionUiState
 import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.TimelineSuggestionBlockType
 import app.logdate.ui.timeline.TimelineSuggestionBlockUiState
-import app.logdate.ui.timeline.TimelineTextSnippetSectionUiState
 import app.logdate.ui.timeline.collectLazyTimelineAudioNoteIds
 import app.logdate.util.now
 import coil3.compose.AsyncImage
@@ -92,7 +81,6 @@ import kotlinx.datetime.LocalDate
 import logdate.client.ui.generated.resources.Res
 import logdate.client.ui.generated.resources.a_long_time_passed
 import logdate.client.ui.generated.resources.add_your_birthday_in_settings_to_see_something_special_here
-import logdate.client.ui.generated.resources.audio_recording
 import logdate.client.ui.generated.resources.cd_timeline_photo
 import logdate.client.ui.generated.resources.cd_timeline_video
 import logdate.client.ui.generated.resources.congrats_curious_explorer
@@ -460,62 +448,38 @@ private fun TimelineDayListItem(
 ) {
     val style = defaultDayStyle()
 
-    if (item.moments.isNotEmpty()) {
-        if (layoutMode == TimelineDayLayoutMode.COMPACT) {
-            // Compact: no rail, inline date
-            Column(
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                modifier =
-                    modifier
-                        .fillMaxWidth()
-                        .clickable { onOpenDay(item.date) }
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-            ) {
-                InlineDateHeader(item = item)
-                SemanticTimelineDayContent(item = item, style = style, layoutMode = layoutMode)
-            }
-        } else {
-            // Medium/Expanded: rail on the left
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xl),
-                modifier =
-                    modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg)
-                        .clip(RoundedCornerShape(32.dp))
-                        .clickable { onOpenDay(item.date) }
-                        .padding(vertical = Spacing.md),
-            ) {
-                TimelineDayRail(item = item, style = style, layoutMode = layoutMode)
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    SemanticTimelineDayHeader(item = item, style = style, layoutMode = layoutMode)
-                    SemanticTimelineDayContent(item = item, style = style, layoutMode = layoutMode)
-                }
-            }
+    if (layoutMode == TimelineDayLayoutMode.COMPACT) {
+        // Compact: no rail, inline date
+        Column(
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            modifier =
+                modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenDay(item.date) }
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+        ) {
+            InlineDateHeader(item = item)
+            SemanticTimelineDayContent(item = item, style = style, layoutMode = layoutMode)
         }
     } else {
-        // Legacy fallback
-        val legacyStyle = item.layout.style()
+        // Medium/Expanded: rail on the left
         Row(
-            horizontalArrangement = Arrangement.spacedBy(if (layoutMode == TimelineDayLayoutMode.COMPACT) Spacing.md else Spacing.xl),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xl),
             modifier =
                 modifier
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.lg)
                     .clip(RoundedCornerShape(32.dp))
                     .clickable { onOpenDay(item.date) }
-                    .padding(vertical = if (layoutMode == TimelineDayLayoutMode.COMPACT) Spacing.sm else Spacing.md),
+                    .padding(vertical = Spacing.md),
         ) {
-            TimelineDayRail(item = item, style = legacyStyle, layoutMode = layoutMode)
+            TimelineDayRail(item = item, style = style, layoutMode = layoutMode)
             Column(
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
                 modifier = Modifier.weight(1f),
             ) {
-                TimelineDayHeader(item = item, style = legacyStyle, layoutMode = layoutMode)
-                TimelineDayContent(item = item, style = legacyStyle, layoutMode = layoutMode)
+                SemanticTimelineDayHeader(item = item, style = style, layoutMode = layoutMode)
+                SemanticTimelineDayContent(item = item, style = style, layoutMode = layoutMode)
             }
         }
     }
@@ -624,382 +588,6 @@ private fun TimelineDayRail(
 }
 
 @Composable
-private fun TimelineDayHeader(
-    item: TimelineDayUiState,
-    style: TimelineDayStyle,
-    layoutMode: TimelineDayLayoutMode,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        modifier = modifier,
-    ) {
-        Text(
-            text = item.date.asRelativeDate(LocalToday.current),
-            style = MaterialTheme.typography.labelLarge,
-            color = style.accentColor,
-            fontWeight = FontWeight.SemiBold,
-        )
-
-        item.supportingSummary?.let { summary ->
-            Text(
-                text = summary,
-                style =
-                    when (layoutMode) {
-                        TimelineDayLayoutMode.COMPACT -> MaterialTheme.typography.titleLarge
-                        TimelineDayLayoutMode.MEDIUM -> MaterialTheme.typography.headlineSmall
-                        TimelineDayLayoutMode.EXPANDED -> MaterialTheme.typography.headlineMedium
-                    },
-                maxLines = if (layoutMode == TimelineDayLayoutMode.COMPACT) 3 else 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            if (item.placesVisited.isNotEmpty()) {
-                DayMetaPill(
-                    icon = Icons.Default.LocationOn,
-                    text = "${item.placesVisited.size} places",
-                    style = style,
-                )
-            }
-            if (item.people.isNotEmpty()) {
-                DayMetaPill(
-                    icon = Icons.Default.PeopleAlt,
-                    text = "${item.people.size} people",
-                    style = style,
-                )
-            }
-            if (item.notes.isNotEmpty()) {
-                DayMetaPill(
-                    icon = Icons.Default.GraphicEq,
-                    text = "${item.notes.size} captures",
-                    style = style,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TimelineDayContent(
-    item: TimelineDayUiState,
-    style: TimelineDayStyle,
-    layoutMode: TimelineDayLayoutMode,
-    modifier: Modifier = Modifier,
-) {
-    when (layoutMode) {
-        TimelineDayLayoutMode.COMPACT ->
-            Column(
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                modifier = modifier.fillMaxWidth(),
-            ) {
-                item.heroSection?.let { section ->
-                    TimelineSection(
-                        section = section,
-                        style = style,
-                        layoutMode = layoutMode,
-                        emphasized = true,
-                    )
-                }
-                if (item.supportingSections.isNotEmpty()) {
-                    TimelineSupportingFlow(
-                        sections = item.supportingSections,
-                        style = style,
-                        layoutMode = layoutMode,
-                    )
-                }
-                TimelineRecapStrip(
-                    recap = item.recap,
-                    style = style,
-                )
-            }
-
-        TimelineDayLayoutMode.MEDIUM,
-        TimelineDayLayoutMode.EXPANDED,
-        ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(if (layoutMode == TimelineDayLayoutMode.EXPANDED) Spacing.xl else Spacing.lg),
-                verticalAlignment = Alignment.Top,
-                modifier = modifier.fillMaxWidth(),
-            ) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                    modifier = Modifier.weight(1.25f),
-                ) {
-                    item.heroSection?.let { section ->
-                        TimelineSection(
-                            section = section,
-                            style = style,
-                            layoutMode = layoutMode,
-                            emphasized = true,
-                        )
-                    }
-                    TimelineRecapStrip(
-                        recap = item.recap,
-                        style = style,
-                    )
-                }
-
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    if (item.supportingSections.isNotEmpty()) {
-                        TimelineSupportingFlow(
-                            sections = item.supportingSections,
-                            style = style,
-                            layoutMode = layoutMode,
-                        )
-                    } else if (item.heroSection == null) {
-                        TimelineRecapStrip(
-                            recap = item.recap,
-                            style = style,
-                        )
-                    }
-                }
-            }
-    }
-}
-
-@Composable
-private fun TimelineSupportingFlow(
-    sections: List<TimelineDaySectionUiState>,
-    style: TimelineDayStyle,
-    layoutMode: TimelineDayLayoutMode,
-    modifier: Modifier = Modifier,
-) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        sections.forEach { section ->
-            val sectionModifier =
-                when {
-                    section is TimelineTextSnippetSectionUiState ->
-                        Modifier.fillMaxWidth()
-                    layoutMode == TimelineDayLayoutMode.COMPACT ->
-                        Modifier
-                            .weight(1f, fill = true)
-                            .widthIn(min = 168.dp)
-                    else ->
-                        Modifier
-                            .weight(1f, fill = true)
-                            .widthIn(min = 220.dp)
-                }
-
-            TimelineSection(
-                section = section,
-                style = style,
-                layoutMode = layoutMode,
-                modifier = sectionModifier,
-            )
-        }
-    }
-}
-
-@Composable
-private fun TimelineSection(
-    section: TimelineDaySectionUiState,
-    style: TimelineDayStyle,
-    layoutMode: TimelineDayLayoutMode,
-    modifier: Modifier = Modifier,
-    emphasized: Boolean = false,
-) {
-    when (section) {
-        is TimelineAudioSectionUiState ->
-            AudioSection(
-                section = section,
-                style = style,
-                modifier = modifier,
-                emphasized = emphasized,
-            )
-        is TimelineMediaSectionUiState ->
-            MediaSection(
-                section = section,
-                style = style,
-                modifier = modifier,
-                layoutMode = layoutMode,
-                emphasized = emphasized,
-            )
-        is TimelinePlaceSectionUiState ->
-            PlaceSection(
-                section = section,
-                style = style,
-                modifier = modifier,
-                emphasized = emphasized,
-            )
-        is TimelineTextSnippetSectionUiState ->
-            TextSnippetSection(
-                section = section,
-                style = style,
-                modifier = modifier,
-                emphasized = emphasized,
-            )
-    }
-}
-
-@Composable
-private fun TimelineRecapStrip(
-    recap: TimelineDayRecapUiState,
-    style: TimelineDayStyle,
-    modifier: Modifier = Modifier,
-) {
-    val recapItems =
-        buildList {
-            if (recap.captureCount > 0) {
-                add("${recap.captureCount} captured")
-            }
-            if (recap.placeCount > 0) {
-                add("${recap.placeCount} visited")
-            }
-            if (recap.peopleCount > 0) {
-                add("${recap.peopleCount} connected")
-            }
-            if (recap.activeSpanMinutes > 0) {
-                add(recap.activeSpanMinutes.toSpanLabel())
-            }
-        }
-
-    if (recapItems.isEmpty()) {
-        return
-    }
-
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        recapItems.forEach { item ->
-            Surface(
-                color = style.chipColor,
-                shape = RoundedCornerShape(18.dp),
-            ) {
-                Text(
-                    text = item,
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TextSnippetSection(
-    section: TimelineTextSnippetSectionUiState,
-    style: TimelineDayStyle,
-    modifier: Modifier = Modifier,
-    emphasized: Boolean = false,
-) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .width(4.dp)
-                    .heightIn(min = if (emphasized) 88.dp else 64.dp)
-                    .clip(RoundedCornerShape(100.dp))
-                    .background(if (emphasized) style.accentColor else style.accentColor.copy(alpha = 0.55f)),
-        )
-        Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-            modifier = Modifier.weight(1f),
-        ) {
-            SectionLabel(
-                text = section.label,
-                color = style.accentColor,
-            )
-            Text(
-                text = section.text,
-                style =
-                    if (emphasized) {
-                        MaterialTheme.typography.titleLarge
-                    } else {
-                        MaterialTheme.typography.bodyLarge
-                    },
-                maxLines = if (emphasized) 4 else 3,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun MediaSection(
-    section: TimelineMediaSectionUiState,
-    style: TimelineDayStyle,
-    layoutMode: TimelineDayLayoutMode,
-    modifier: Modifier = Modifier,
-    emphasized: Boolean = false,
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        SectionLabel(
-            text = section.label,
-            color = style.accentColor,
-        )
-        when (section.items.size) {
-            0 -> Unit
-            1 ->
-                TimelineMediaTile(
-                    media = section.items.first(),
-                    aspectRatio = if (emphasized) 1.2f else 1.05f,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            2 ->
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    TimelineMediaTile(
-                        media = section.items[0],
-                        aspectRatio = if (emphasized) 0.95f else 1f,
-                        modifier = Modifier.weight(1.2f),
-                    )
-                    TimelineMediaTile(
-                        media = section.items[1],
-                        aspectRatio = if (layoutMode == TimelineDayLayoutMode.COMPACT) 0.95f else 1.15f,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            else ->
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    TimelineMediaTile(
-                        media = section.items.first(),
-                        aspectRatio = if (emphasized) 0.9f else 1.05f,
-                        modifier = Modifier.weight(1.35f),
-                    )
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        section.items.drop(1).take(2).forEach { media ->
-                            TimelineMediaTile(
-                                media = media,
-                                aspectRatio = 1.2f,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                    }
-                }
-        }
-    }
-}
-
-@Composable
 internal fun TimelineMediaTile(
     media: TimelineMediaItemUiState,
     aspectRatio: Float,
@@ -1035,76 +623,6 @@ internal fun TimelineMediaTile(
 }
 
 @Composable
-private fun AudioSection(
-    section: TimelineAudioSectionUiState,
-    style: TimelineDayStyle,
-    modifier: Modifier = Modifier,
-    emphasized: Boolean = false,
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        modifier =
-            modifier
-                .clip(RoundedCornerShape(28.dp))
-                .background(style.softAccentColor)
-                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(if (emphasized) 52.dp else 44.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(style.accentColor.copy(alpha = 0.16f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.GraphicEq,
-                    contentDescription = null,
-                    tint = style.accentColor,
-                )
-            }
-            Column(
-                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                modifier = Modifier.weight(1f),
-            ) {
-                SectionLabel(
-                    text = section.label,
-                    color = style.accentColor,
-                )
-                Text(
-                    text = stringResource(Res.string.audio_recording),
-                    style =
-                        if (emphasized) {
-                            MaterialTheme.typography.titleLarge
-                        } else {
-                            MaterialTheme.typography.titleMedium
-                        },
-                )
-            }
-            Text(
-                text = section.note.duration.toDurationLabel(),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        TimelineTranscriptPreview(
-            noteId = section.note.noteId,
-        )
-
-        AudioWaveBars(
-            accentColor = style.accentColor,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
-
-@Composable
 internal fun AudioWaveBars(
     accentColor: Color,
     modifier: Modifier = Modifier,
@@ -1134,98 +652,6 @@ internal fun AudioWaveBars(
                         .height(barHeight)
                         .clip(RoundedCornerShape(100.dp))
                         .background(accentColor.copy(alpha = 0.78f)),
-            )
-        }
-    }
-}
-
-@Composable
-private fun PlaceSection(
-    section: TimelinePlaceSectionUiState,
-    style: TimelineDayStyle,
-    modifier: Modifier = Modifier,
-    emphasized: Boolean = false,
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        SectionLabel(
-            text = section.label,
-            color = style.accentColor,
-        )
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            section.places.forEach { place ->
-                Surface(
-                    color = if (emphasized) style.softAccentColor else style.chipColor,
-                    shape = RoundedCornerShape(20.dp),
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = style.accentColor,
-                        )
-                        Text(
-                            text = place.title,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SectionLabel(
-    text: String,
-    color: Color,
-    modifier: Modifier = Modifier,
-) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = color,
-        modifier = modifier,
-    )
-}
-
-@Composable
-private fun DayMetaPill(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    text: String,
-    style: TimelineDayStyle,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        color = style.chipColor,
-        shape = RoundedCornerShape(18.dp),
-        modifier = modifier,
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = style.accentColor,
-            )
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -1473,20 +899,6 @@ private fun TimelineDayLayoutMode.contentType(): TimelineListContentType =
         TimelineDayLayoutMode.EXPANDED -> TimelineListContentType.DAY_EXPANDED
     }
 
-private fun Int.toSpanLabel(): String =
-    when {
-        this >= 60 -> {
-            val hours = this / 60
-            val minutes = this % 60
-            if (minutes == 0) {
-                "${hours}h span"
-            } else {
-                "${hours}h ${minutes}m span"
-            }
-        }
-        this > 0 -> "${this}m span"
-        else -> "Quick capture"
-    }
 
 internal fun Long.toDurationLabel(): String {
     val totalSeconds = this / 1000

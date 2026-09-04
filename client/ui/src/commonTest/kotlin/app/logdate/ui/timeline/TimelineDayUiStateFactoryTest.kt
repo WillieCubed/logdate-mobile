@@ -1,114 +1,208 @@
 package app.logdate.ui.timeline
 
 import app.logdate.ui.location.PlaceUiState
-import app.logdate.ui.profiles.PersonUiState
 import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * Tests the [createTimelineDayUiState] factory function to ensure it selects the most
- * appropriate layout for a day's timeline card.
+ * Tests [createSemanticTimelineDayUiState], the sole builder behind the timeline.
  *
- * This suite verifies that the factory correctly prioritizes different media types—such
- * as favoring "Media Led" layouts when photos are present or "Voice Led" layouts when
- * audio is the primary signal—to create a visually rich and contextually relevant
- * summary of the user's day.
+ * Two behaviours matter here. The accent treatment must follow what a day actually held, so a
+ * run of days reads as varied rather than uniform. And the builder must always produce at least
+ * one moment, because the timeline has a single renderer and a day that yields no moments would
+ * otherwise render nothing at all.
  */
 class TimelineDayUiStateFactoryTest {
     @Test
-    fun `createTimelineDayUiState chooses media led layout when visual media is present`() {
+    fun `day with photos is media led`() {
         val state =
-            createTimelineDayUiState(
+            createSemanticTimelineDayUiState(
                 summary = "Wrapped up a photowalk and wrote down the best moments.",
                 date = LocalDate(2025, 1, 15),
-                people = listOf(PersonUiState(uid = Uuid.random(), name = "Alex")),
-                placesVisited = listOf(PlaceUiState(id = "coffee", title = "Blue Bottle Coffee")),
-                notes =
+                moments =
                     listOf(
-                        ImageNoteUiState(
-                            noteId = Uuid.random(),
-                            uri = "file://photo.jpg",
-                            timestamp = Instant.parse("2025-01-15T17:00:00Z"),
-                        ),
-                        TextNoteUiState(
-                            noteId = Uuid.random(),
-                            text = "Golden light on Market Street and a lot of good people watching.",
-                            timestamp = Instant.parse("2025-01-15T18:30:00Z"),
+                        MomentUiState(
+                            id = "moment-1",
+                            label = "At Blue Bottle Coffee",
+                            media = listOf(MomentMediaUiState(uri = "file://photo.jpg")),
                         ),
                     ),
+                placesVisited = listOf(PlaceUiState(id = "coffee", title = "Blue Bottle Coffee")),
             )
 
         assertEquals(TimelineDayCardLayout.MEDIA_LED, state.layout)
-        assertIs<TimelineMediaSectionUiState>(state.heroSection)
-        assertEquals(2, state.recap.captureCount)
-        assertEquals(1, state.recap.mediaCount)
-        assertEquals(1, state.recap.placeCount)
-        assertEquals(1, state.recap.peopleCount)
         assertNotNull(state.supportingSummary)
     }
 
     @Test
-    fun `createTimelineDayUiState chooses voice led layout when audio is the richest signal`() {
+    fun `day with audio and no photos is voice led`() {
         val state =
-            createTimelineDayUiState(
-                summary = "",
+            createSemanticTimelineDayUiState(
+                summary = "Talked it through on the walk home.",
                 date = LocalDate(2025, 1, 16),
-                people = emptyList(),
-                placesVisited = emptyList(),
-                notes =
+                moments =
                     listOf(
-                        AudioNoteUiState(
-                            noteId = Uuid.random(),
-                            uri = "file://voice.m4a",
-                            timestamp = Instant.parse("2025-01-16T09:00:00Z"),
-                            duration = 45_000L,
-                        ),
-                        TextNoteUiState(
-                            noteId = Uuid.random(),
-                            text = "Left myself a short note after the walk home.",
-                            timestamp = Instant.parse("2025-01-16T09:05:00Z"),
+                        MomentUiState(
+                            id = "moment-1",
+                            label = "",
+                            audio = MomentAudioUiState(uri = "file://voice.m4a", durationMs = 45_000L),
                         ),
                     ),
             )
 
         assertEquals(TimelineDayCardLayout.VOICE_LED, state.layout)
-        assertIs<TimelineAudioSectionUiState>(state.heroSection)
-        assertEquals(2, state.recap.captureCount)
-        assertEquals(1, state.recap.audioCount)
-        assertEquals(5, state.recap.activeSpanMinutes)
     }
 
     @Test
-    fun `createTimelineDayUiState suppresses boilerplate summary copy`() {
+    fun `photos outrank audio when a day holds both`() {
         val state =
-            createTimelineDayUiState(
-                summary = "No summary available.",
-                date = LocalDate(2025, 1, 17),
-                people = emptyList(),
-                placesVisited = listOf(PlaceUiState(id = "home", title = "Home")),
-                notes =
+            createSemanticTimelineDayUiState(
+                summary = "A day with both.",
+                date = LocalDate(2025, 1, 16),
+                moments =
                     listOf(
-                        TextNoteUiState(
-                            noteId = Uuid.random(),
-                            text = "Quiet evening at home.",
-                            timestamp = Instant.parse("2025-01-17T19:00:00Z"),
+                        MomentUiState(
+                            id = "moment-1",
+                            label = "",
+                            audio = MomentAudioUiState(uri = "file://voice.m4a", durationMs = 45_000L),
+                        ),
+                        MomentUiState(
+                            id = "moment-2",
+                            label = "",
+                            media = listOf(MomentMediaUiState(uri = "file://photo.jpg")),
                         ),
                     ),
             )
 
+        assertEquals(TimelineDayCardLayout.MEDIA_LED, state.layout)
+    }
+
+    @Test
+    fun `day with several places and no media is place led`() {
+        val state =
+            createSemanticTimelineDayUiState(
+                summary = "Moved around a lot.",
+                date = LocalDate(2025, 1, 16),
+                moments = listOf(MomentUiState(id = "moment-1", label = "", textSnippet = "Busy one.")),
+                placesVisited =
+                    listOf(
+                        PlaceUiState(id = "home", title = "Home"),
+                        PlaceUiState(id = "coffee", title = "Blue Bottle Coffee"),
+                    ),
+            )
+
+        assertEquals(TimelineDayCardLayout.PLACE_LED, state.layout)
+    }
+
+    @Test
+    fun `text only day is story led`() {
+        val state =
+            createSemanticTimelineDayUiState(
+                summary = "Quiet one.",
+                date = LocalDate(2025, 1, 17),
+                moments = listOf(MomentUiState(id = "moment-1", label = "", textSnippet = "Quiet evening at home.")),
+                placesVisited = listOf(PlaceUiState(id = "home", title = "Home")),
+            )
+
         assertEquals(TimelineDayCardLayout.STORY_LED, state.layout)
-        assertIs<TimelineTextSnippetSectionUiState>(state.heroSection)
+    }
+
+    @Test
+    fun `suppresses boilerplate summary copy`() {
+        val state =
+            createSemanticTimelineDayUiState(
+                summary = "No summary available.",
+                date = LocalDate(2025, 1, 17),
+                moments = listOf(MomentUiState(id = "moment-1", label = "", textSnippet = "Quiet evening at home.")),
+            )
+
         assertNull(state.supportingSummary)
     }
 
     @Test
-    fun `createSemanticTimelineDayUiState exposes visual notes as media objects`() {
+    fun `synthesizes a moment from notes when inference produced none`() {
+        val audioNoteId = Uuid.random()
+        val state =
+            createSemanticTimelineDayUiState(
+                summary = "A day inference could not describe.",
+                date = LocalDate(2025, 1, 18),
+                moments = emptyList(),
+                notes =
+                    listOf(
+                        AudioNoteUiState(
+                            noteId = audioNoteId,
+                            uri = "file://voice.m4a",
+                            timestamp = Instant.parse("2025-01-18T09:00:00Z"),
+                            duration = 45_000L,
+                        ),
+                        TextNoteUiState(
+                            noteId = Uuid.random(),
+                            text = "Left myself a short note after the walk home.",
+                            timestamp = Instant.parse("2025-01-18T09:05:00Z"),
+                        ),
+                    ),
+                placesVisited = listOf(PlaceUiState(id = "home", title = "Home")),
+            )
+
+        val moment = state.moments.single()
+        assertEquals("", moment.label)
+        assertTrue(moment.isHero)
+        assertEquals("Left myself a short note after the walk home.", moment.textSnippet)
+        assertEquals(audioNoteId, moment.audio?.noteId)
+        assertEquals(45_000L, moment.audio?.durationMs)
+        assertEquals(listOf("home"), moment.places.map(PlaceUiState::id))
+    }
+
+    @Test
+    fun `synthesized moment carries photos so the day still renders media`() {
+        val state =
+            createSemanticTimelineDayUiState(
+                summary = "Photos only.",
+                date = LocalDate(2025, 1, 18),
+                moments = emptyList(),
+                notes =
+                    listOf(
+                        ImageNoteUiState(
+                            noteId = Uuid.random(),
+                            uri = "file://photo.jpg",
+                            timestamp = Instant.parse("2025-01-18T18:00:00Z"),
+                        ),
+                        VideoNoteUiState(
+                            noteId = Uuid.random(),
+                            uri = "file://video.mp4",
+                            thumbnailUri = "file://video-thumb.jpg",
+                            timestamp = Instant.parse("2025-01-18T19:00:00Z"),
+                        ),
+                    ),
+            )
+
+        assertEquals(TimelineDayCardLayout.MEDIA_LED, state.layout)
+        assertEquals(
+            listOf("file://video-thumb.jpg", "file://photo.jpg"),
+            state.moments.single().media.map(MomentMediaUiState::uri),
+        )
+    }
+
+    @Test
+    fun `a day with nothing to show produces no moments`() {
+        val state =
+            createSemanticTimelineDayUiState(
+                summary = "Nothing here.",
+                date = LocalDate(2025, 1, 19),
+                moments = emptyList(),
+            )
+
+        assertTrue(state.moments.isEmpty())
+    }
+
+    @Test
+    fun `exposes visual notes as media objects`() {
         val state =
             createSemanticTimelineDayUiState(
                 summary = "A day with photos and video.",

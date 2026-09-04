@@ -9,17 +9,13 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.ui.audio.TranscriptionProvider
 import app.logdate.ui.audio.TranscriptionState
 import app.logdate.ui.theme.LogDateTheme
-import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.DayPresentation
 import app.logdate.ui.timeline.MomentAudioUiState
 import app.logdate.ui.timeline.MomentUiState
-import app.logdate.ui.timeline.TimelineAudioSectionUiState
-import app.logdate.ui.timeline.TimelineDayCardLayout
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.newstuff.EndOfTimelineUiState
 import app.logdate.ui.timeline.newstuff.TimelineList
 import kotlinx.datetime.LocalDate
-import kotlin.time.Instant
 import kotlin.uuid.Uuid
 import org.junit.Rule
 import org.junit.Test
@@ -28,11 +24,10 @@ import org.junit.runner.RunWith
 /**
  * Instrumented tests for audio transcript visualization in the timeline.
  *
- * This suite verifies that both legacy and semantic audio cards correctly
- * display sentence-bounded excerpts when collapsed and expand to show full
- * transcripts when interacted with. It ensures that the [TimelineList]
- * correctly integrates with the [TranscriptionProvider] to resolve and
- * display text for recorded notes.
+ * A moment's transcript arrives one of two ways: resolved from
+ * [TranscriptionProvider] by note ID, or supplied inline on the moment itself.
+ * This suite covers both, verifying that each shows a sentence-bounded excerpt
+ * when collapsed and the full text once expanded.
  */
 @RunWith(AndroidJUnit4::class)
 class TimelineTranscriptE2ETest {
@@ -41,7 +36,7 @@ class TimelineTranscriptE2ETest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun `legacy audio card shows sentence excerpt and expands inline transcript`() {
+    fun `audio card resolves transcript from the provider and expands it inline`() {
         val noteId = Uuid.random()
         val firstSentence = "This is a deliberately long opening sentence for the transcript."
         val secondSentence = "The hidden follow-up sentence appears after expansion."
@@ -51,7 +46,7 @@ class TimelineTranscriptE2ETest {
             TimelineTestContent(
                 items =
                     listOf(
-                        legacyAudioDay(noteId = noteId),
+                        providerBackedAudioDay(noteId = noteId),
                     ),
                 transcriptionState =
                     TranscriptionState(
@@ -114,23 +109,27 @@ class TimelineTranscriptE2ETest {
     }
 }
 
-private fun legacyAudioDay(noteId: Uuid): TimelineDayUiState =
+/** A day whose transcript is not on the moment, so it must resolve through the provider. */
+private fun providerBackedAudioDay(noteId: Uuid): TimelineDayUiState =
     TimelineDayUiState(
         summary = "Voice note day",
         supportingSummary = "A day with a transcribed voice note",
         date = LocalDate(2026, 3, 25),
-        layout = TimelineDayCardLayout.VOICE_LED,
-        heroSection =
-            TimelineAudioSectionUiState(
-                label = "Recorded",
-                note =
-                    AudioNoteUiState(
-                        noteId = noteId,
-                        uri = "file:///voice-note.m4a",
-                        timestamp = Instant.parse("2026-03-25T18:00:00Z"),
-                        duration = 42_000,
-                    ),
+        moments =
+            listOf(
+                MomentUiState(
+                    id = "moment-provider-audio",
+                    label = "",
+                    audio =
+                        MomentAudioUiState(
+                            uri = "file:///voice-note.m4a",
+                            durationMs = 42_000,
+                            noteId = noteId,
+                        ),
+                    isHero = true,
+                ),
             ),
+        dayPresentation = DayPresentation.FLOWING,
     )
 
 private fun semanticAudioDay(transcript: String): TimelineDayUiState =
