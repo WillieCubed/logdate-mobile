@@ -155,6 +155,11 @@ class EntryEditorViewModelAudioSaveTest {
         Dispatchers.setMain(testDispatcher)
         testScope = TestScope(testDispatcher)
         journalNotesRepository = FakeJournalNotesRepository()
+        // Mirror Room: its own reactive "today's notes" query can complete and be observed
+        // before the coroutine that triggered the write resumes. Draining the test dispatcher
+        // right after the write reproduces that interleaving instead of letting the whole save
+        // run as one uninterrupted, unrealistically atomic block.
+        journalNotesRepository.afterCreate = { testDispatcher.scheduler.runCurrent() }
         entryDraftRepository = FakeEntryDraftRepository()
         fakeFinalizer = RecordingAudioBlockFinalizer()
         mediaCleaner = RecordingMediaCleaner()
@@ -204,6 +209,16 @@ class EntryEditorViewModelAudioSaveTest {
             assertEquals(4_200L, audio.durationMs)
         }
 
+    /**
+     * Regression for a real, live-reproduced bug: this note's own block flips read-only the
+     * moment [journalNotesRepository] observes it (mirrored here by [FakeJournalNotesRepository.afterCreate]
+     * draining the dispatcher right after the write, matching how Room's reactive query can
+     * complete before the saving coroutine resumes). The post-save consistency check used to
+     * re-derive `readOnlyBlocks` live and see that flip as a conflicting external edit, failing
+     * the save with "The editor changed while saving" on every save whose finalize step is slow
+     * enough to let the flip land inside the critical section -- which a real audio recording's
+     * `stopRecordingInternal()` reliably is.
+     */
     @Test
     fun `save entry while actively recording persists resolved audio`() =
         testScope.runTest {
@@ -225,6 +240,36 @@ class EntryEditorViewModelAudioSaveTest {
             val finalState = viewModel.editorState.value
             assertTrue(finalState.shouldExit, "save must complete and request editor exit when finalization succeeds")
             assertNull(finalState.errorMessage)
+        }
+
+    /**
+     * Regression for a real, live-reproduced bug: [AudioBlockFinalizer] resolved by Koin at this
+     * ViewModel's own construction time is backed by an [AudioViewModel][app.logdate.feature.editor.ui.audio.AudioViewModel]
+     * instance disconnected from whatever is actually recording on screen -- `get<AudioViewModel>()`
+     * inside a plain `factory { }` block doesn't go through Compose's screen-scoped `koinViewModel()`
+     * resolution, so it constructs a brand-new, never-started instance. [bindAudioBlockFinalizer]
+     * lets the recording screen -- which owns the one true, live instance via its own
+     * `koinViewModel()` call -- replace the disconnected one once it composes.
+     */
+    @Test
+    fun `bindAudioBlockFinalizer replaces the constructor-injected finalizer for later saves`() =
+        testScope.runTest {
+            val viewModel = buildViewModel(finalizer = AudioBlockFinalizer.NoOp)
+            viewModel.editorState.first()
+            val seeded = viewModel.seedAudioBlock(AudioCaptureState.Recording())
+            advanceUntilIdle()
+            fakeFinalizer.respondWith(
+                seeded.id,
+                AudioCaptureState.Ready(uri = "file:///audio_notes/rebound.m4a", durationMs = 2_000L),
+            )
+
+            viewModel.bindAudioBlockFinalizer(fakeFinalizer)
+            viewModel.saveEntry(viewModel.editorState.value)
+            advanceUntilIdle()
+
+            val saved = journalNotesRepository.allNotesObserved.first()
+            val audio = assertIs<JournalNote.Audio>(saved.single())
+            assertEquals("file:///audio_notes/rebound.m4a", audio.mediaRef)
         }
 
     @Test

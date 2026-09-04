@@ -16,6 +16,7 @@ import app.logdate.feature.editor.audio.formatAudioLabel
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.AudioCaptureState
 import app.logdate.feature.editor.ui.editor.RecordingState
+import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
 import app.logdate.util.formatDateLocalized
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -32,6 +33,8 @@ import org.koin.compose.viewmodel.koinViewModel
  * @param block The audio block state
  * @param onBlockUpdated Callback when the block is updated
  * @param onDeleteRequested Callback when the block should be deleted
+ * @param onResolverReady Called once this composable's own [AudioViewModel] is available, so the
+ *   editor's save path can bind to that same instance (see [EntryEditorViewModel.audioBlockFinalizer][app.logdate.feature.editor.ui.editor.EntryEditorViewModel]).
  * @param modifier Modifier for layout customization
  */
 @Suppress("ktlint:standard:function-naming")
@@ -40,6 +43,7 @@ fun AudioBlockEditor(
     block: AudioBlockUiState,
     onBlockUpdated: (AudioBlockUiState) -> Unit,
     onDeleteRequested: () -> Unit,
+    onResolverReady: (PendingAudioResolver) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val labelResolver = remember { AudioLabelResolver() }
@@ -56,6 +60,7 @@ fun AudioBlockEditor(
 
     // Get the ViewModel at this level, not in child composables
     val audioViewModel: AudioViewModel = koinViewModel()
+    LaunchedEffect(audioViewModel) { onResolverReady(audioViewModel) }
     val audioRouteRepository: AudioRouteRepository = koinInject()
     // Collect audio state from ViewModel
     val audioUiState by audioViewModel.uiState.collectAsState()

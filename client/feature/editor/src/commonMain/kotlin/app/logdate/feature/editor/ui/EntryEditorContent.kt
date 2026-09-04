@@ -36,6 +36,7 @@ import app.logdate.feature.editor.ui.dialog.DraftsBottomSheet
 import app.logdate.feature.editor.ui.dialog.alert.ConfirmEntryExitDialog
 import app.logdate.feature.editor.ui.editor.EditorExitReason
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
+import app.logdate.feature.editor.ui.editor.delegate.DefaultAudioBlockFinalizer
 import app.logdate.feature.editor.ui.editor.rememberEditorAutoSave
 import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
 import app.logdate.feature.editor.ui.state.rememberBlocksUiState
@@ -254,6 +255,9 @@ fun EntryEditorContent(
                 },
                 onBackCancel = {
                     if (isImmersiveBlockActive) scope.launch { chromeProgress.animateTo(0f, tween(300, easing = FastOutSlowInEasing)) }
+                },
+                onAudioResolverReady = { resolver ->
+                    viewModel.bindAudioBlockFinalizer(DefaultAudioBlockFinalizer(resolver))
                 },
             )
         },

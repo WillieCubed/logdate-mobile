@@ -39,6 +39,15 @@ class FakeJournalNotesRepository : JournalNotesRepository {
     var createFailure: Throwable? = null
     var createGate: CompletableDeferred<Unit>? = null
 
+    /**
+     * Invoked synchronously right after a note lands in [notesFlow], before [create] returns.
+     * Real writes go through Room, whose own reactive query dispatches on a separate thread and
+     * can complete before the calling coroutine resumes; tests that need to reproduce that
+     * interleaving set this to drain the test dispatcher (e.g. `testScheduler.runCurrent()`) so
+     * collectors of [allNotesObserved] observe the new row before the caller continues.
+     */
+    var afterCreate: (() -> Unit)? = null
+
     override val allNotesObserved: Flow<List<JournalNote>> = notesFlow
 
     override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> = flowOf(emptyList())
@@ -63,6 +72,7 @@ class FakeJournalNotesRepository : JournalNotesRepository {
         createGate?.await()
         createFailure?.let { throw it }
         notesFlow.value = notesFlow.value + note
+        afterCreate?.invoke()
         return note.uid
     }
 

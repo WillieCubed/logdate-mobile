@@ -43,6 +43,7 @@ import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
+import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
 import app.logdate.feature.editor.ui.layout.EntryEditorSurface
 import app.logdate.feature.editor.ui.layout.LocalEditorIsCompact
 import app.logdate.feature.editor.ui.state.BlocksUiState
@@ -88,6 +89,7 @@ fun MainEditorContent(
     onBackProgress: (Float) -> Unit = {},
     onBackCommit: () -> Unit = {},
     onBackCancel: () -> Unit = {},
+    onAudioResolverReady: (PendingAudioResolver) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
 
@@ -222,6 +224,7 @@ fun MainEditorContent(
                                         onBlockFocused = uiState.onBlockFocused,
                                         onBlockUpdated = uiState.onUpdateBlock,
                                         onBlockDeleted = uiState.onDeleteBlock,
+                                        onAudioResolverReady = onAudioResolverReady,
                                         modifier = Modifier.fillMaxSize(),
                                     )
                                 }
@@ -252,6 +255,7 @@ fun MainEditorContent(
                                                 onBlockFocused = uiState.onBlockFocused,
                                                 onBlockUpdated = uiState.onUpdateBlock,
                                                 onBlockDeleted = uiState.onDeleteBlock,
+                                                onAudioResolverReady = onAudioResolverReady,
                                             )
                                         }
                                     }
@@ -389,6 +393,7 @@ private fun BlockContentInner(
     onBlockFocused: (Uuid) -> Unit,
     onBlockUpdated: (EntryBlockUiState) -> Unit,
     onBlockDeleted: (Uuid) -> Unit,
+    onAudioResolverReady: (PendingAudioResolver) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     when (block) {
@@ -414,6 +419,7 @@ private fun BlockContentInner(
                 block = block,
                 onBlockUpdated = onBlockUpdated,
                 onDeleteRequested = { onBlockDeleted(block.id) },
+                onResolverReady = onAudioResolverReady,
                 modifier = modifier,
             )
 
