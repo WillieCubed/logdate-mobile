@@ -32,8 +32,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import app.logdate.client.media.audio.AudioDurationResolver
-import app.logdate.feature.editor.audio.AudioContextProcessor
 import app.logdate.feature.editor.ui.formatMediaDuration
+import app.logdate.ui.audio.AudioContextProcessor
 import app.logdate.ui.audio.AudioWaveformComponent
 import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res

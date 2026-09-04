@@ -2,7 +2,7 @@ package app.logdate.feature.journals.ui.detail
 
 import app.logdate.client.domain.timeline.GetJournalMembershipUseCase
 import app.logdate.client.repository.journals.JournalNote
-import app.logdate.feature.editor.audio.AudioContextProcessor
+import app.logdate.ui.audio.AudioContextProcessor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher

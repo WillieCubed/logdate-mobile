@@ -1,7 +1,7 @@
-package app.logdate.feature.editor.audio.analysis
+package app.logdate.ui.audio.analysis
 
-import app.logdate.feature.editor.audio.model.AudioSegment
-import app.logdate.feature.editor.audio.model.SegmentType
+import app.logdate.ui.audio.model.AudioSegment
+import app.logdate.ui.audio.model.SegmentType
 
 /**
  * Detects significant segments in audio based on amplitude analysis.

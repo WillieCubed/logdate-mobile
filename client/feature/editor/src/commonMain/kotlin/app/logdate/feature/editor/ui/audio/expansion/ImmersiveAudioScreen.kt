@@ -50,13 +50,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
-import app.logdate.feature.editor.audio.model.AudioPalette
-import app.logdate.feature.editor.audio.model.AudioSegment
 import app.logdate.feature.editor.ui.audio.AnimatedPlayPauseButton
-import app.logdate.feature.editor.ui.audio.waveform.BezierAudioWaveform
 import app.logdate.feature.editor.ui.formatMediaDuration
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
+import app.logdate.ui.audio.model.AudioPalette
+import app.logdate.ui.audio.model.AudioSegment
+import app.logdate.ui.audio.waveform.BezierAudioWaveform
 import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.platform.PlatformIcons
 import kotlinx.coroutines.delay

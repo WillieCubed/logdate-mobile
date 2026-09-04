@@ -83,7 +83,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.audio.AudioLabelResolver
-import app.logdate.feature.editor.audio.color.PaletteGenerator
+import app.logdate.ui.audio.color.PaletteGenerator
 import app.logdate.feature.editor.audio.formatAudioLabel
 import app.logdate.feature.editor.ui.audio.AnimatedPlayPauseButton
 import app.logdate.feature.journals.ui.deriveCoverColor

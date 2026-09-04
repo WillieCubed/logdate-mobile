@@ -1,4 +1,4 @@
-package app.logdate.feature.editor.ui.audio.expansion
+package app.logdate.ui.audio.expansion
 
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue

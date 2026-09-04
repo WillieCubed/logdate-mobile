@@ -17,10 +17,10 @@ import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.media.device.MediaDeviceUiState
-import app.logdate.feature.editor.audio.AudioContext
-import app.logdate.feature.editor.audio.model.AudioPalette
-import app.logdate.feature.editor.audio.model.AudioSegment
-import app.logdate.feature.editor.audio.model.SegmentType
+import app.logdate.ui.audio.AudioContext
+import app.logdate.ui.audio.model.AudioPalette
+import app.logdate.ui.audio.model.AudioSegment
+import app.logdate.ui.audio.model.SegmentType
 import app.logdate.feature.journals.ui.detail.AudioNoteViewerContent
 import app.logdate.feature.journals.ui.detail.AudioNoteViewerUiState
 import app.logdate.feature.journals.ui.detail.AudioPlaybackUiState

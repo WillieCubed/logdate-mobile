@@ -1,4 +1,4 @@
-package app.logdate.feature.editor.audio.extraction
+package app.logdate.ui.audio.extraction
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow

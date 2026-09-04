@@ -1,7 +1,7 @@
-package app.logdate.feature.editor.audio.color
+package app.logdate.ui.audio.color
 
 import app.logdate.client.awareness.daylight.DaylightPeriod
-import app.logdate.feature.editor.audio.model.AudioPalette
+import app.logdate.ui.audio.model.AudioPalette
 
 /**
  * Generates contextual color palettes based on the time of day.

@@ -1,4 +1,4 @@
-package app.logdate.feature.editor.audio.model
+package app.logdate.ui.audio.model
 
 import kotlinx.serialization.Serializable
 

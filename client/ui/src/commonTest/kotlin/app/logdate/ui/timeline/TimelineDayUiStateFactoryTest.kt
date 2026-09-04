@@ -185,7 +185,10 @@ class TimelineDayUiStateFactoryTest {
         assertEquals(TimelineDayCardLayout.MEDIA_LED, state.layout)
         assertEquals(
             listOf("file://video-thumb.jpg", "file://photo.jpg"),
-            state.moments.single().media.map(MomentMediaUiState::uri),
+            state.moments
+                .single()
+                .media
+                .map(MomentMediaUiState::uri),
         )
     }
 

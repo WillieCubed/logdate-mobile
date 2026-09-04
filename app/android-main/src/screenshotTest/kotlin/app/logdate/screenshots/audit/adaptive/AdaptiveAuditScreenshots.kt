@@ -49,10 +49,10 @@ import app.logdate.client.domain.export.ExportCounts
 import app.logdate.client.domain.export.ExportSchemaVersion
 import app.logdate.client.domain.export.ExportStats
 import app.logdate.client.domain.restore.ArchivePreview
-import app.logdate.feature.editor.audio.AudioContext
-import app.logdate.feature.editor.audio.model.AudioPalette
-import app.logdate.feature.editor.audio.model.AudioSegment
-import app.logdate.feature.editor.audio.model.SegmentType
+import app.logdate.ui.audio.AudioContext
+import app.logdate.ui.audio.model.AudioPalette
+import app.logdate.ui.audio.model.AudioSegment
+import app.logdate.ui.audio.model.SegmentType
 import app.logdate.feature.editor.ui.MainEditorContent
 import app.logdate.feature.editor.ui.audio.ActiveRecordingDisplay
 import app.logdate.feature.editor.ui.audio.AudioRecordingControls

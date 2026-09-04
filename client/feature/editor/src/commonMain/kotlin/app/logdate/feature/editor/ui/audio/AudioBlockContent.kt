@@ -56,11 +56,11 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.media.audio.transcription.TimedTranscript
 import app.logdate.client.media.audio.transcription.TimedUtterance
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
-import app.logdate.feature.editor.audio.AudioContextProcessor
 import app.logdate.feature.editor.audio.AudioLabelResolver
 import app.logdate.feature.editor.audio.formatAudioLabel
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.formatMediaDuration
+import app.logdate.ui.audio.AudioContextProcessor
 import app.logdate.ui.audio.AudioWaveformComponent
 import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.platform.PlatformIcons

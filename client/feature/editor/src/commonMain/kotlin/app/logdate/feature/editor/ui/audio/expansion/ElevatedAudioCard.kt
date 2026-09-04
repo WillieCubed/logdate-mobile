@@ -34,10 +34,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import app.logdate.feature.editor.audio.model.AudioPalette
-import app.logdate.feature.editor.audio.model.AudioSegment
-import app.logdate.feature.editor.ui.audio.waveform.BezierAudioWaveform
 import app.logdate.feature.editor.ui.formatMediaDuration
+import app.logdate.ui.audio.model.AudioPalette
+import app.logdate.ui.audio.model.AudioSegment
+import app.logdate.ui.audio.waveform.BezierAudioWaveform
 import app.logdate.ui.platform.PlatformIcons
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.number

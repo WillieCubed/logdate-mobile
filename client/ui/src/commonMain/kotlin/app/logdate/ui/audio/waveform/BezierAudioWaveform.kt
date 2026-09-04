@@ -1,4 +1,4 @@
-package app.logdate.feature.editor.ui.audio.waveform
+package app.logdate.ui.audio.waveform
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -12,8 +12,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
-import app.logdate.feature.editor.audio.model.AudioPalette
-import app.logdate.feature.editor.audio.model.AudioSegment
+import app.logdate.ui.audio.model.AudioPalette
+import app.logdate.ui.audio.model.AudioSegment
 import kotlin.math.abs
 
 /**

@@ -1,4 +1,4 @@
-package app.logdate.feature.editor.audio.extraction
+package app.logdate.ui.audio.extraction
 
 import android.content.Context
 import android.media.MediaCodec

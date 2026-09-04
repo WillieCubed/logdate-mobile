@@ -1,4 +1,4 @@
-package app.logdate.feature.editor.audio.extraction
+package app.logdate.ui.audio.extraction
 
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers

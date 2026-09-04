@@ -11,7 +11,7 @@ import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
-import app.logdate.feature.editor.audio.extraction.AmplitudeExtractor
+import app.logdate.ui.audio.extraction.AmplitudeExtractor
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import app.logdate.ui.audio.WaveformStorage

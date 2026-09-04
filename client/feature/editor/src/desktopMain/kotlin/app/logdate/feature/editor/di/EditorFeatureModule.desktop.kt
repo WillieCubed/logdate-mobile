@@ -1,7 +1,5 @@
 package app.logdate.feature.editor.di
 
-import app.logdate.feature.editor.audio.extraction.AmplitudeExtractor
-import app.logdate.feature.editor.audio.extraction.DesktopAmplitudeExtractor
 import app.logdate.feature.editor.ui.camera.CameraCaptureManager
 import app.logdate.feature.editor.ui.camera.DesktopCameraCaptureManager
 import org.koin.core.module.Module
@@ -16,10 +14,5 @@ actual val platformEditorModule: Module =
         // Provide Desktop capability fallback of CameraCaptureManager
         factory<CameraCaptureManager> {
             DesktopCameraCaptureManager()
-        }
-
-        // Audio waveform processing dependencies
-        single<AmplitudeExtractor> {
-            DesktopAmplitudeExtractor()
         }
     }

@@ -1,6 +1,6 @@
-package app.logdate.feature.editor.audio.analysis
+package app.logdate.ui.audio.analysis
 
-import app.logdate.feature.editor.audio.model.SegmentType
+import app.logdate.ui.audio.model.SegmentType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

@@ -3,7 +3,7 @@ package app.logdate.screenshots.components.editor
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.client.media.audio.transcription.TranscriptionFailure
-import app.logdate.feature.editor.audio.model.AudioPalette
+import app.logdate.ui.audio.model.AudioPalette
 import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.feature.editor.ui.audio.AudioTranscriptionUi
 import app.logdate.feature.editor.ui.audio.AudioUiState
@@ -12,7 +12,7 @@ import app.logdate.feature.editor.ui.audio.AudioRecordingControls
 import app.logdate.feature.editor.ui.audio.AudioRecordingDisplay
 import app.logdate.feature.editor.ui.audio.EmptyAudioBlockContent
 import app.logdate.feature.editor.ui.audio.expansion.ImmersiveAudioScreen
-import app.logdate.feature.editor.ui.audio.expansion.SpatialExpandedAudioBlock
+import app.logdate.ui.audio.expansion.SpatialExpandedAudioBlock
 import app.logdate.feature.editor.ui.content.EmptyEditorStateContent
 import app.logdate.feature.editor.ui.dialog.alert.ExitConfirmationDialog
 import app.logdate.feature.editor.ui.editor.RecordingState

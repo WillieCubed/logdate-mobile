@@ -1,4 +1,4 @@
-package app.logdate.feature.editor.ui.audio.expansion
+package app.logdate.ui.audio.expansion
 
 /**
  * Represents the four expansion states for audio memory display.

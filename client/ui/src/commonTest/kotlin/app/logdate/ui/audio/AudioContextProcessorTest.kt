@@ -1,7 +1,7 @@
-package app.logdate.feature.editor.audio
+package app.logdate.ui.audio
 
-import app.logdate.feature.editor.audio.extraction.AmplitudeExtractor
 import app.logdate.ui.audio.WaveformStorage
+import app.logdate.ui.audio.extraction.AmplitudeExtractor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow

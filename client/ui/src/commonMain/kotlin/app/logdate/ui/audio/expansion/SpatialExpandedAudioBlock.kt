@@ -1,4 +1,4 @@
-package app.logdate.feature.editor.ui.audio.expansion
+package app.logdate.ui.audio.expansion
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
@@ -26,10 +26,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import app.logdate.feature.editor.audio.model.AudioPalette
-import app.logdate.feature.editor.audio.model.AudioSegment
-import app.logdate.feature.editor.ui.audio.waveform.BezierAudioWaveform
-import app.logdate.feature.editor.ui.formatMediaDuration
+import app.logdate.ui.audio.formatAudioDuration
+import app.logdate.ui.audio.model.AudioPalette
+import app.logdate.ui.audio.model.AudioSegment
+import app.logdate.ui.audio.waveform.BezierAudioWaveform
 import app.logdate.ui.platform.PlatformIcons
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -126,7 +126,7 @@ fun SpatialExpandedAudioBlock(
                         horizontalAlignment = Alignment.End,
                     ) {
                         Text(
-                            text = formatMediaDuration(durationMs, false),
+                            text = formatAudioDuration(durationMs),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                         )

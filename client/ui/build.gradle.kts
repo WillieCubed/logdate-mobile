@@ -63,6 +63,7 @@ kotlin {
             implementation(projects.client.util)
             implementation(projects.client.sensor)
             implementation(projects.shared.model)
+            implementation(libs.napier)
             // Compose plugin dependencies
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)

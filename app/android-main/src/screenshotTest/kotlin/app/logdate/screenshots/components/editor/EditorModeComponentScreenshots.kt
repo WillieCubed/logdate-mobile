@@ -6,11 +6,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.client.R
-import app.logdate.feature.editor.audio.model.AudioPalette
+import app.logdate.ui.audio.model.AudioPalette
 import app.logdate.feature.editor.ui.MainEditorContent
 import app.logdate.feature.editor.ui.audio.ActiveRecordingDisplay
 import app.logdate.feature.editor.ui.audio.AudioRecordingControls
-import app.logdate.feature.editor.ui.audio.expansion.SpatialExpandedAudioBlock
+import app.logdate.ui.audio.expansion.SpatialExpandedAudioBlock
 import app.logdate.feature.editor.ui.camera.CameraAspectRatio
 import app.logdate.feature.editor.ui.camera.CameraCapturePreviewContent
 import app.logdate.feature.editor.ui.camera.CameraCapturePreviewState

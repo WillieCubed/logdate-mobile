@@ -1,4 +1,4 @@
-package app.logdate.feature.editor.ui.audio.waveform
+package app.logdate.ui.audio.waveform
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
