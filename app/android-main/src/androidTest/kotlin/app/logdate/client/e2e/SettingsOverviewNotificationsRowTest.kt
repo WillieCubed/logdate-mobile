@@ -1,9 +1,11 @@
 package app.logdate.client.e2e
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.feature.core.settings.ui.SettingsOverviewContent
 import app.logdate.feature.core.settings.ui.UserProfile
@@ -66,6 +68,7 @@ class SettingsOverviewNotificationsRowTest {
             )
         }
 
-        composeRule.onNodeWithText("Notifications").performScrollTo().assertIsDisplayed()
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("Notifications"))
+        composeRule.onNodeWithText("Notifications").assertIsDisplayed()
     }
 }

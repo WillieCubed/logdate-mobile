@@ -13,9 +13,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.espresso.Espresso.pressBack
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.UiDevice
 import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
@@ -64,7 +64,7 @@ class LibraryMediaDetailVideoE2ETest {
             .assertIsDisplayed()
             .assertHasClickAction()
 
-        pressBack()
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
         composeRule.onAllNodesWithText("Stop Presenting")[0].assertIsDisplayed().performClick()
 
         assertEquals(1, stopPresentingCount)
@@ -93,7 +93,7 @@ class LibraryMediaDetailVideoE2ETest {
             .assertIsDisplayed()
             .assertHasClickAction()
 
-        pressBack()
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressBack()
         composeRule.onAllNodesWithContentDescription("Stop presenting")[0].assertIsDisplayed().performClick()
 
         assertEquals(1, stopPresentingCount)

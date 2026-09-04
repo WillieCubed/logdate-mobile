@@ -61,7 +61,7 @@ class ExportWorkerTest {
     fun `worker succeeds and emits completed file path when export completes`() =
         runTest {
             val mockResult =
-                mockk<ExportResult> {
+                mockk<ExportResult>(relaxUnitFun = true) {
                     every { serializeMetadata() } returns
                         """{"version":"1.2","exportDate":"1970-01-01T00:00:00Z","userId":"test","deviceId":"test","appVersion":"1.0","stats":{"journalCount":0,"noteCount":0,"draftCount":0,"mediaCount":0}}"""
                     every { serializeJournals() } returns """{"journals":[]}"""
@@ -73,6 +73,10 @@ class ExportWorkerTest {
                     every { serializeLocationHistory() } returns null
                     every { serializeMediaManifest(any()) } returns null
                     every { renderIssuesText(any()) } returns null
+                    every { hasProfile } returns false
+                    every { hasPlaces } returns false
+                    every { hasLocationHistory } returns false
+                    every { hasMediaManifest(any()) } returns false
                     every { mediaFiles } returns emptyList()
                     every { stats } returns ExportStats(0, 0, 0, 0)
                 }

@@ -104,7 +104,8 @@ class OnboardingJourneyE2ETest {
 
         composeRule.onNodeWithTag(MEMORY_SELECTION_ROOT_TAG).assertIsDisplayed()
         capture(MEMORY_SELECTION_ROOT_TAG, "fresh", "05_memory_selection.png")
-        composeRule.onNodeWithTag(MEMORY_SELECTION_CONTINUE_TAG).performScrollTo()
+        // The Continue button is pinned to the Scaffold's bottomBar, not inside the paginating
+        // list, so it is always on screen without needing to scroll to it.
         composeRule.onNodeWithTag(MEMORY_SELECTION_CONTINUE_TAG).performClick()
         waitForTag(CLOUD_ACCOUNT_SETUP_ROOT_TAG)
 
@@ -119,12 +120,10 @@ class OnboardingJourneyE2ETest {
 
         composeRule.onNodeWithTag(ONBOARDING_RECOMMENDATIONS_ROOT_TAG).assertIsDisplayed()
         capture(ONBOARDING_RECOMMENDATIONS_ROOT_TAG, "fresh", "08_recommendations.png")
-        composeRule.onNodeWithTag(ONBOARDING_RECOMMENDATIONS_TURN_OFF_TAG).performScrollTo()
         composeRule.onNodeWithTag(ONBOARDING_RECOMMENDATIONS_TURN_OFF_TAG).performClick()
 
         composeRule.onNodeWithTag(ONBOARDING_LOCATION_ROOT_TAG).assertIsDisplayed()
         capture(ONBOARDING_LOCATION_ROOT_TAG, "fresh", "09_location.png")
-        composeRule.onNodeWithTag(ONBOARDING_LOCATION_SKIP_TAG).performScrollTo()
         composeRule.onNodeWithTag(ONBOARDING_LOCATION_SKIP_TAG).performClick()
 
         composeRule.onNodeWithTag(ONBOARDING_NOTIFICATIONS_ROOT_TAG).assertIsDisplayed()
@@ -186,7 +185,8 @@ class OnboardingJourneyE2ETest {
         composeRule.onNodeWithTag(MEMORIES_IMPORT_INFO_CONTINUE_TAG).performScrollTo()
         composeRule.onNodeWithTag(MEMORIES_IMPORT_INFO_CONTINUE_TAG).performClick()
         waitForTag(MEMORY_SELECTION_CONTINUE_TAG)
-        composeRule.onNodeWithTag(MEMORY_SELECTION_CONTINUE_TAG).performScrollTo()
+        // The Continue button is pinned to the Scaffold's bottomBar, not inside the paginating
+        // list, so it is always on screen without needing to scroll to it.
         composeRule.onNodeWithTag(MEMORY_SELECTION_CONTINUE_TAG).performClick()
         skipCloudAccountSetup()
         waitForTag(ONBOARDING_BIRTHDAY_ROOT_TAG)
@@ -235,12 +235,10 @@ class OnboardingJourneyE2ETest {
 
         composeRule.onNodeWithTag(ONBOARDING_RECOMMENDATIONS_ROOT_TAG).assertIsDisplayed()
         capture(ONBOARDING_RECOMMENDATIONS_ROOT_TAG, "continue_setup", "04_recommendations.png")
-        composeRule.onNodeWithTag(ONBOARDING_RECOMMENDATIONS_KEEP_ON_TAG).performScrollTo()
         composeRule.onNodeWithTag(ONBOARDING_RECOMMENDATIONS_KEEP_ON_TAG).performClick()
 
         composeRule.onNodeWithTag(ONBOARDING_LOCATION_ROOT_TAG).assertIsDisplayed()
         capture(ONBOARDING_LOCATION_ROOT_TAG, "continue_setup", "05_location.png")
-        composeRule.onNodeWithTag(ONBOARDING_LOCATION_SKIP_TAG).performScrollTo()
         composeRule.onNodeWithTag(ONBOARDING_LOCATION_SKIP_TAG).performClick()
 
         composeRule.onNodeWithTag(ONBOARDING_NOTIFICATIONS_ROOT_TAG).assertIsDisplayed()
@@ -273,14 +271,14 @@ class OnboardingJourneyE2ETest {
         composeRule.onNodeWithTag(MEMORIES_IMPORT_INFO_CONTINUE_TAG).performScrollTo()
         composeRule.onNodeWithTag(MEMORIES_IMPORT_INFO_CONTINUE_TAG).performClick()
         waitForTag(MEMORY_SELECTION_CONTINUE_TAG)
-        composeRule.onNodeWithTag(MEMORY_SELECTION_CONTINUE_TAG).performScrollTo()
+        // The Continue button is pinned to the Scaffold's bottomBar, not inside the paginating
+        // list, so it is always on screen without needing to scroll to it.
         composeRule.onNodeWithTag(MEMORY_SELECTION_CONTINUE_TAG).performClick()
         skipCloudAccountSetup()
         waitForTag(ONBOARDING_BIRTHDAY_ROOT_TAG)
         selectBirthday()
 
         composeRule.onNodeWithTag(ONBOARDING_RECOMMENDATIONS_ROOT_TAG).assertIsDisplayed()
-        composeRule.onNodeWithTag(ONBOARDING_RECOMMENDATIONS_KEEP_ON_TAG).performScrollTo()
         composeRule.onNodeWithTag(ONBOARDING_RECOMMENDATIONS_KEEP_ON_TAG).performClick()
 
         composeRule.onNodeWithTag(ONBOARDING_DAY_BOUNDARIES_ROOT_TAG).assertIsDisplayed()
@@ -321,7 +319,8 @@ class OnboardingJourneyE2ETest {
 
     private fun skipCloudAccountSetup() {
         waitForTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG)
-        composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG).performScrollTo()
+        // The action buttons are pinned to the Scaffold's bottomBar, not inside the
+        // scrollable plan list, so they are always on screen without needing to scroll.
         composeRule.onNodeWithTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG).performClick()
     }
 

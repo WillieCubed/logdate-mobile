@@ -330,7 +330,7 @@ private fun DayBoundariesAdaptiveContent(
         },
         standardContent = {
             FoldableBookLayout(
-                modifier = Modifier.fillMaxSize().testTag(ONBOARDING_DAY_BOUNDARIES_ROOT_TAG),
+                modifier = Modifier.fillMaxSize(),
                 minPaneWidth = 320.dp,
                 startPane = {
                     DayBoundariesInfoPane(
@@ -573,7 +573,6 @@ private fun DayBoundariesCompactContent(
             Column(
                 modifier =
                     Modifier
-                        .testTag(ONBOARDING_DAY_BOUNDARIES_ROOT_TAG)
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = Spacing.lg),

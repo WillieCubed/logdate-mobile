@@ -241,7 +241,7 @@ fun AudioNoteSnippet(
                                     stringResource(
                                         Res.string.timestamp_minutes_seconds,
                                         currentTime / 60,
-                                        currentTime % 60,
+                                        (currentTime % 60).toString().padStart(2, '0'),
                                     ),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -251,7 +251,7 @@ fun AudioNoteSnippet(
                                     stringResource(
                                         Res.string.timestamp_minutes_seconds,
                                         duration.inWholeMinutes,
-                                        duration.inWholeSeconds % 60,
+                                        (duration.inWholeSeconds % 60).toString().padStart(2, '0'),
                                     ),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,

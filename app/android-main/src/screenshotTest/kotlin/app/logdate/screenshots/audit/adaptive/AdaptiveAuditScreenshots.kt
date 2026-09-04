@@ -35,7 +35,6 @@ import app.logdate.feature.core.settings.ui.DataSettingsContent
 import app.logdate.feature.core.settings.ui.ServerSelectionState
 import app.logdate.feature.core.settings.ui.ResetAppSettingsContent
 import app.logdate.feature.core.settings.ui.ResetSettingsScreen
-import app.logdate.feature.core.settings.ui.ConflictsState
 import app.logdate.feature.core.settings.ui.IntegrityState
 import app.logdate.feature.core.settings.ui.StorageQuotaUi
 import app.logdate.feature.core.settings.updates.AppUpdatePrompt
@@ -1759,9 +1758,6 @@ fun A110_DataSettingsExportBookPosture() {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = snackbarHostState,
                 syncStatus = null,
                 isAuthenticated = false,
@@ -1805,9 +1801,6 @@ fun A111_DataSettingsExportProgressBookPosture() {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = snackbarHostState,
                 syncStatus = null,
                 isAuthenticated = false,
@@ -1856,9 +1849,6 @@ fun A112_DataSettingsRestorePreviewBookPosture() {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = snackbarHostState,
                 syncStatus = null,
                 isAuthenticated = false,

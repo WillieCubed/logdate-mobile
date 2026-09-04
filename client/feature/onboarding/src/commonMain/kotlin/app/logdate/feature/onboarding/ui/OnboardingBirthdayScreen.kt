@@ -182,7 +182,7 @@ private fun BirthdayAdaptiveContent(
         },
         standardContent = {
             FoldableBookLayout(
-                modifier = Modifier.fillMaxSize().testTag(ONBOARDING_BIRTHDAY_ROOT_TAG),
+                modifier = Modifier.fillMaxSize(),
                 minPaneWidth = 320.dp,
                 startPane = {
                     BirthdayInfoPane(
@@ -362,7 +362,6 @@ private fun BirthdayCompactContent(
             Column(
                 modifier =
                     Modifier
-                        .testTag(ONBOARDING_BIRTHDAY_ROOT_TAG)
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = Spacing.lg),

@@ -163,7 +163,7 @@ private fun RecommendationsAdaptiveContent(
         },
         standardContent = {
             FoldableBookLayout(
-                modifier = Modifier.fillMaxSize().testTag(ONBOARDING_RECOMMENDATIONS_ROOT_TAG),
+                modifier = Modifier.fillMaxSize(),
                 minPaneWidth = 320.dp,
                 startPane = {
                     RecommendationsInfoPane(
@@ -362,7 +362,6 @@ private fun RecommendationsCompactContent(
             Column(
                 modifier =
                     Modifier
-                        .testTag(ONBOARDING_RECOMMENDATIONS_ROOT_TAG)
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = Spacing.lg),

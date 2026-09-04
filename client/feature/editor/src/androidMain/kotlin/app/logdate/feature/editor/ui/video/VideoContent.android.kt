@@ -501,7 +501,8 @@ actual fun VideoPickerContent(
     val coroutineScope = rememberCoroutineScope()
     val mediaManager: MediaManager = koinInject()
     val currentOnVideoSelected by rememberUpdatedState(onVideoSelected)
-    val managedMediaDiscarder = remember(context) { AndroidManagedMediaDiscarder(context.applicationContext) }
+    val managedMediaDiscarder =
+        remember(context, mediaManager) { AndroidManagedMediaDiscarder(context.applicationContext, mediaManager) }
     val managedMediaImporter =
         remember(context, mediaManager, managedMediaDiscarder) {
             ManagedMediaImporter(

@@ -83,7 +83,7 @@ private fun MemoriesImportInfoAdaptiveContent(
         },
         standardContent = {
             FoldableBookLayout(
-                modifier = Modifier.fillMaxSize().testTag(MEMORIES_IMPORT_INFO_ROOT_TAG),
+                modifier = Modifier.fillMaxSize(),
                 minPaneWidth = 320.dp,
                 startPane = {
                     MemoriesImportInfoIntroPane(
@@ -196,7 +196,6 @@ private fun MemoriesImportInfoCompactContent(
             Column(
                 modifier =
                     Modifier
-                        .testTag(MEMORIES_IMPORT_INFO_ROOT_TAG)
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = Spacing.lg),
