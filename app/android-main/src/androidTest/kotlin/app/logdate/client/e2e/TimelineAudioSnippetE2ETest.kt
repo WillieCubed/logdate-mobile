@@ -56,6 +56,16 @@ class TimelineAudioSnippetE2ETest {
         assertOutputRouteControlsAreUsable()
     }
 
+    @Test
+    fun `timeline audio snippet formats elapsed and remaining playback time`() {
+        setTimelineAudioSnippetContent()
+
+        composeRule.waitForIdle()
+        // 42% progress through a 108s (1:48) note is 45s elapsed, 1:48 remaining total.
+        composeRule.onNodeWithText("0:45").assertIsDisplayed()
+        composeRule.onNodeWithText("1:48").assertIsDisplayed()
+    }
+
     private fun assertOutputRouteControlsAreUsable() {
         composeRule.onNodeWithText("Audio Recording").assertIsDisplayed()
         composeRule.onAllNodesWithTag(MediaDeviceSelectorTags.chip("Audio output"))[0]
