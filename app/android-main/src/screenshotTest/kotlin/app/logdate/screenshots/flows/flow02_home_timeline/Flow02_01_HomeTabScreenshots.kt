@@ -2,6 +2,7 @@ package app.logdate.screenshots.flows.flow02_home_timeline
 
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
+import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.feature.journals.ui.JournalLayoutMode
 import app.logdate.feature.journals.ui.JournalListItemUiState
 import app.logdate.feature.journals.ui.JournalListPanel
@@ -21,6 +22,9 @@ import app.logdate.screenshots.common.ScreenshotTheme
 import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.ImageNoteUiState
+import app.logdate.ui.timeline.MomentAudioUiState
+import app.logdate.ui.timeline.MomentMediaUiState
+import app.logdate.ui.timeline.MomentUiState
 import app.logdate.ui.timeline.TextNoteUiState
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelineLoadingState
@@ -28,53 +32,103 @@ import app.logdate.ui.timeline.TimelinePane
 import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.TimelineUiState
 import app.logdate.ui.timeline.VideoNoteUiState
-import app.logdate.ui.timeline.createTimelineDayUiState
+import app.logdate.ui.timeline.createSemanticTimelineDayUiState
 import com.android.tools.screenshot.PreviewTest
 import kotlinx.datetime.LocalDate
 import kotlin.uuid.Uuid
 
+private const val PREVIEW_IMAGE_URI = "android.resource://studio.hypertext.logdate/mipmap/ic_launcher"
+
+private val blueBottle = PlaceUiState(id = "place-1", title = "Blue Bottle Coffee")
+private val doloresPark = PlaceUiState(id = "place-2", title = "Dolores Park")
+private val home = PlaceUiState(id = "place-3", title = "Home")
+
+private val routePhotoNoteId = Uuid.parse("00000000-0000-0000-0000-000000000031")
+private val routeNoteId = Uuid.parse("00000000-0000-0000-0000-000000000032")
+private val ferryAudioNoteId = Uuid.parse("00000000-0000-0000-0000-000000000033")
+private val ferryNoteId = Uuid.parse("00000000-0000-0000-0000-000000000034")
+
 private val timelineDays =
     listOf(
-        createTimelineDayUiState(
+        createSemanticTimelineDayUiState(
             summary = "Wrapped up the route inventory and started wiring screenshot helpers.",
             date = LocalDate(2025, 2, 20),
+            moments =
+                listOf(
+                    MomentUiState(
+                        id = "moment-2025-02-20-blue-bottle",
+                        label = "At Blue Bottle Coffee",
+                        timeOfDay = DaylightPeriod.MORNING,
+                        media = listOf(MomentMediaUiState(uri = PREVIEW_IMAGE_URI)),
+                        places = listOf(blueBottle),
+                        isHero = true,
+                    ),
+                    MomentUiState(
+                        id = "moment-2025-02-20-dolores-park",
+                        label = "At Dolores Park",
+                        timeOfDay = DaylightPeriod.AFTERNOON,
+                        textSnippet = "Captured the route shell, then tightened spacing around the new timeline cards.",
+                        places = listOf(doloresPark),
+                    ),
+                ),
             notes =
                 listOf(
                     ImageNoteUiState(
-                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000031"),
-                        uri = "android.resource://studio.hypertext.logdate/mipmap/ic_launcher",
+                        noteId = routePhotoNoteId,
+                        uri = PREVIEW_IMAGE_URI,
                         timestamp = ScreenshotTestData.baseInstant,
                     ),
                     TextNoteUiState(
-                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000032"),
+                        noteId = routeNoteId,
                         text = "Captured the route shell, then tightened spacing around the new timeline cards.",
                         timestamp = ScreenshotTestData.baseInstant,
                     ),
                 ),
-            placesVisited =
-                listOf(
-                    PlaceUiState(id = "place-1", title = "Blue Bottle Coffee"),
-                    PlaceUiState(id = "place-2", title = "Dolores Park"),
-                ),
+            placesVisited = listOf(blueBottle, doloresPark),
         ),
-        createTimelineDayUiState(
+        createSemanticTimelineDayUiState(
             summary = "Captured the golden-hour ferry ride home after a long day.",
             date = LocalDate(2025, 2, 19),
+            moments =
+                listOf(
+                    MomentUiState(
+                        id = "moment-2025-02-19-ferry",
+                        label = "",
+                        timeOfDay = DaylightPeriod.GOLDEN_HOUR,
+                        audio =
+                            MomentAudioUiState(
+                                uri = "preview://audio",
+                                durationMs = 67_000L,
+                                transcript =
+                                    "The ferry was nearly empty on the way back, so I recorded this " +
+                                        "instead of typing it out. Everything sounds different over water.",
+                                noteId = ferryAudioNoteId,
+                            ),
+                        isHero = true,
+                    ),
+                    MomentUiState(
+                        id = "moment-2025-02-19-home",
+                        label = "At Home",
+                        timeOfDay = DaylightPeriod.NIGHT,
+                        textSnippet = "Kept the end-of-day note short and let the audio carry the texture instead.",
+                        places = listOf(home),
+                    ),
+                ),
             notes =
                 listOf(
                     AudioNoteUiState(
-                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000033"),
+                        noteId = ferryAudioNoteId,
                         uri = "preview://audio",
                         timestamp = ScreenshotTestData.baseInstant,
                         duration = 67_000L,
                     ),
                     TextNoteUiState(
-                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000034"),
+                        noteId = ferryNoteId,
                         text = "Kept the end-of-day note short and let the audio carry the texture instead.",
                         timestamp = ScreenshotTestData.baseInstant,
                     ),
                 ),
-            placesVisited = listOf(PlaceUiState(id = "place-3", title = "Home")),
+            placesVisited = listOf(home),
         ),
     )
 

@@ -6,6 +6,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.client.domain.location.LocationMemoryTimeFilter
 import app.logdate.feature.location.timeline.ui.LocationTimelineContent
 import app.logdate.feature.location.timeline.ui.LocationTimelineQuickPeekSheet
@@ -24,11 +25,12 @@ import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
 import app.logdate.ui.maps.LocalGoogleMapsAvailabilityOverride
 import app.logdate.ui.location.PlaceUiState
+import app.logdate.ui.timeline.MomentUiState
 import app.logdate.ui.timeline.TextNoteUiState
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelinePane
 import app.logdate.ui.timeline.TimelineUiState
-import app.logdate.ui.timeline.createTimelineDayUiState
+import app.logdate.ui.timeline.createSemanticTimelineDayUiState
 import com.android.tools.screenshot.PreviewTest
 import kotlinx.datetime.LocalDate
 import kotlin.time.Instant
@@ -171,11 +173,26 @@ private val sampleLocationErrorState =
         LocationTimelineErrorUiState.TemporarilyUnavailable,
     )
 
+private val quickPeekBlueBottle = PlaceUiState(id = "place-1", title = "Blue Bottle Coffee")
+private val quickPeekDoloresPark = PlaceUiState(id = "place-2", title = "Dolores Park")
+private val quickPeekHome = PlaceUiState(id = "place-3", title = "Home")
+
 private val timelineQuickPeekDays =
     listOf(
-        createTimelineDayUiState(
+        createSemanticTimelineDayUiState(
             summary = "Stopped by Blue Bottle before heading to Dolores Park and logging a few notes.",
             date = LocalDate(2025, 2, 20),
+            moments =
+                listOf(
+                    MomentUiState(
+                        id = "moment-2025-02-20-quick-peek",
+                        label = "At Dolores Park",
+                        timeOfDay = DaylightPeriod.AFTERNOON,
+                        textSnippet = "Quick location-rich day: coffee, park, then home with just enough time to log the route.",
+                        places = listOf(quickPeekBlueBottle, quickPeekDoloresPark),
+                        isHero = true,
+                    ),
+                ),
             notes =
                 listOf(
                     TextNoteUiState(
@@ -184,15 +201,22 @@ private val timelineQuickPeekDays =
                         timestamp = Instant.parse("2025-02-20T15:00:00Z"),
                     ),
                 ),
-            placesVisited =
-                listOf(
-                    PlaceUiState(id = "place-1", title = "Blue Bottle Coffee"),
-                    PlaceUiState(id = "place-2", title = "Dolores Park"),
-                ),
+            placesVisited = listOf(quickPeekBlueBottle, quickPeekDoloresPark),
         ),
-        createTimelineDayUiState(
+        createSemanticTimelineDayUiState(
             summary = "Wrapped up errands and ended the evening back at home.",
             date = LocalDate(2025, 2, 19),
+            moments =
+                listOf(
+                    MomentUiState(
+                        id = "moment-2025-02-19-quick-peek",
+                        label = "At Home",
+                        timeOfDay = DaylightPeriod.EVENING,
+                        textSnippet = "Errands stayed compact, and the last stop of the day was home.",
+                        places = listOf(quickPeekHome),
+                        isHero = true,
+                    ),
+                ),
             notes =
                 listOf(
                     TextNoteUiState(
@@ -201,7 +225,7 @@ private val timelineQuickPeekDays =
                         timestamp = Instant.parse("2025-02-19T20:00:00Z"),
                     ),
                 ),
-            placesVisited = listOf(PlaceUiState(id = "place-3", title = "Home")),
+            placesVisited = listOf(quickPeekHome),
         ),
     )
 

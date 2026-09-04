@@ -13,6 +13,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.client.database.DatabaseStartupState
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
@@ -22,12 +23,14 @@ import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTheme
 import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.timeline.ImageNoteUiState
+import app.logdate.ui.timeline.MomentMediaUiState
+import app.logdate.ui.timeline.MomentUiState
 import app.logdate.ui.timeline.TextNoteUiState
 import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelinePane
 import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.TimelineUiState
-import app.logdate.ui.timeline.createTimelineDayUiState
+import app.logdate.ui.timeline.createSemanticTimelineDayUiState
 import com.android.tools.screenshot.PreviewTest
 import kotlinx.datetime.LocalDate
 import kotlin.time.Instant
@@ -40,16 +43,40 @@ import logdate.app.composemain.generated.resources.restart
 import logdate.app.composemain.generated.resources.update_ready_restart_to_finish_installing
 import org.jetbrains.compose.resources.stringResource
 
+private const val ROOT_PREVIEW_IMAGE_URI = "android.resource://studio.hypertext.logdate/mipmap/ic_launcher"
+
+private val rootBlueBottle = PlaceUiState(id = "place-1", title = "Blue Bottle Coffee")
+private val rootDoloresPark = PlaceUiState(id = "place-2", title = "Mission Dolores Park")
+private val rootHome = PlaceUiState(id = "place-3", title = "Home")
+
 private val rootTimelineDays =
     listOf(
-        createTimelineDayUiState(
+        createSemanticTimelineDayUiState(
             summary = "Wrapped up the screenshot audit and tightened the adaptive shells for larger windows.",
             date = LocalDate(2025, 2, 20),
+            moments =
+                listOf(
+                    MomentUiState(
+                        id = "moment-2025-02-20-root-blue-bottle",
+                        label = "At Blue Bottle Coffee",
+                        timeOfDay = DaylightPeriod.AFTERNOON,
+                        media = listOf(MomentMediaUiState(uri = ROOT_PREVIEW_IMAGE_URI)),
+                        places = listOf(rootBlueBottle),
+                        isHero = true,
+                    ),
+                    MomentUiState(
+                        id = "moment-2025-02-20-root-dolores-park",
+                        label = "At Mission Dolores Park",
+                        timeOfDay = DaylightPeriod.EVENING,
+                        textSnippet = "Tightened the adaptive timeline shells for larger windows and made the cards feel intentional.",
+                        places = listOf(rootDoloresPark),
+                    ),
+                ),
             notes =
                 listOf(
                     ImageNoteUiState(
                         noteId = Uuid.parse("00000000-0000-0000-0000-000000000061"),
-                        uri = "android.resource://studio.hypertext.logdate/mipmap/ic_launcher",
+                        uri = ROOT_PREVIEW_IMAGE_URI,
                         timestamp = Instant.parse("2025-02-20T18:10:00Z"),
                     ),
                     TextNoteUiState(
@@ -58,15 +85,22 @@ private val rootTimelineDays =
                         timestamp = Instant.parse("2025-02-20T18:25:00Z"),
                     ),
                 ),
-            placesVisited =
-                listOf(
-                    PlaceUiState(id = "place-1", title = "Blue Bottle Coffee"),
-                    PlaceUiState(id = "place-2", title = "Mission Dolores Park"),
-                ),
+            placesVisited = listOf(rootBlueBottle, rootDoloresPark),
         ),
-        createTimelineDayUiState(
+        createSemanticTimelineDayUiState(
             summary = "Reviewed the journals flow on tablet and trimmed the empty padding back to a readable column.",
             date = LocalDate(2025, 2, 19),
+            moments =
+                listOf(
+                    MomentUiState(
+                        id = "moment-2025-02-19-root-home",
+                        label = "At Home",
+                        timeOfDay = DaylightPeriod.EVENING,
+                        textSnippet = "The tablet journals flow finally reads like a deliberate column instead of a stretched phone screen.",
+                        places = listOf(rootHome),
+                        isHero = true,
+                    ),
+                ),
             notes =
                 listOf(
                     TextNoteUiState(
@@ -75,7 +109,7 @@ private val rootTimelineDays =
                         timestamp = Instant.parse("2025-02-19T20:00:00Z"),
                     ),
                 ),
-            placesVisited = listOf(PlaceUiState(id = "place-3", title = "Home")),
+            placesVisited = listOf(rootHome),
         ),
     )
 
