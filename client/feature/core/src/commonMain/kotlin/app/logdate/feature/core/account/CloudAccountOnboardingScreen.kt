@@ -42,6 +42,7 @@ import logdate.client.feature.core.generated.resources.first_sync_progress
 import logdate.client.feature.core.generated.resources.first_sync_running
 import logdate.client.feature.core.generated.resources.first_sync_success
 import logdate.client.feature.core.generated.resources.first_sync_timed_out
+import logdate.client.feature.core.generated.resources.first_sync_timed_out_progress
 import logdate.client.feature.core.generated.resources.google_sign_in_account_conflict
 import logdate.client.feature.core.generated.resources.google_sign_in_cancelled
 import logdate.client.feature.core.generated.resources.google_sign_in_failed
@@ -308,25 +309,78 @@ private fun InitialSyncProgressScreen(
         }
         Text(
             text =
-                when (status) {
-                    InitialSyncStatus.Running ->
-                        if (total != null && total > 0) {
-                            stringResource(Res.string.first_sync_progress, completed, total)
+                when (val message = initialSyncMessageFor(status, total, completed)) {
+                    is InitialSyncMessage.Progress ->
+                        stringResource(Res.string.first_sync_progress, message.completed, message.total)
+
+                    InitialSyncMessage.Running -> stringResource(Res.string.first_sync_running)
+                    InitialSyncMessage.Success -> stringResource(Res.string.first_sync_success)
+                    InitialSyncMessage.Partial -> stringResource(Res.string.first_sync_partial)
+
+                    is InitialSyncMessage.TimedOut ->
+                        if (message.total != null && message.total > 0) {
+                            stringResource(Res.string.first_sync_timed_out_progress, message.completed, message.total)
                         } else {
-                            stringResource(Res.string.first_sync_running)
+                            stringResource(Res.string.first_sync_timed_out)
                         }
 
-                    InitialSyncStatus.Success -> stringResource(Res.string.first_sync_success)
-                    InitialSyncStatus.Partial -> stringResource(Res.string.first_sync_partial)
-                    InitialSyncStatus.TimedOut -> stringResource(Res.string.first_sync_timed_out)
-                    InitialSyncStatus.Failed -> stringResource(Res.string.first_sync_failed)
-                    InitialSyncStatus.NotStarted -> ""
+                    InitialSyncMessage.Failed -> stringResource(Res.string.first_sync_failed)
+                    InitialSyncMessage.None -> ""
                 },
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(top = 24.dp),
         )
     }
 }
+
+/** What [InitialSyncProgressScreen] should say, decided independently of Compose so it's testable. */
+internal sealed class InitialSyncMessage {
+    data class Progress(
+        val completed: Int,
+        val total: Int,
+    ) : InitialSyncMessage()
+
+    data object Running : InitialSyncMessage()
+
+    data object Success : InitialSyncMessage()
+
+    data object Partial : InitialSyncMessage()
+
+    /**
+     * The blocking onboarding wait gave up, but the run may have gotten partway through before
+     * that happened -- when it did, say so instead of falling back to a purely generic message,
+     * since "247 of 312 synced, continuing in the background" is far more reassuring than silence
+     * about what actually happened.
+     */
+    data class TimedOut(
+        val completed: Int,
+        val total: Int?,
+    ) : InitialSyncMessage()
+
+    data object Failed : InitialSyncMessage()
+
+    data object None : InitialSyncMessage()
+}
+
+internal fun initialSyncMessageFor(
+    status: InitialSyncStatus,
+    total: Int?,
+    completed: Int,
+): InitialSyncMessage =
+    when (status) {
+        InitialSyncStatus.Running ->
+            if (total != null && total > 0) {
+                InitialSyncMessage.Progress(completed, total)
+            } else {
+                InitialSyncMessage.Running
+            }
+
+        InitialSyncStatus.Success -> InitialSyncMessage.Success
+        InitialSyncStatus.Partial -> InitialSyncMessage.Partial
+        InitialSyncStatus.TimedOut -> InitialSyncMessage.TimedOut(completed, total)
+        InitialSyncStatus.Failed -> InitialSyncMessage.Failed
+        InitialSyncStatus.NotStarted -> InitialSyncMessage.None
+    }
 
 private data class ServerPresentation(
     val displayName: String,

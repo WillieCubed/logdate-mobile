@@ -165,6 +165,19 @@ class DefaultSyncManager(
     }
 
     /**
+     * Advances the upload run's progress by [count] items and republishes status immediately.
+     *
+     * Called from inside each upload loop as items actually finish, rather than only once at the
+     * start and end of a run -- without this, [runCompleted] sat at zero for the whole run and
+     * jumped straight to the total, so a determinate progress indicator never actually looked
+     * like it was moving.
+     */
+    private suspend fun recordProgress(count: Int = 1) {
+        runCompleted += count
+        publishStatus()
+    }
+
+    /**
      * Why the backup cannot progress right now, or null if nothing is holding it back.
      *
      * Reported whether or not anything is queued: background data being off means entries
@@ -1130,6 +1143,7 @@ class DefaultSyncManager(
                             )
                         if (result.isSuccess) {
                             uploadedCount++
+                            recordProgress()
                             syncMetadataService.markAsSynced(
                                 pending.entityId,
                                 EntityType.JOURNAL,
@@ -1190,6 +1204,7 @@ class DefaultSyncManager(
                         if (result.isSuccess) {
                             val upload = result.getOrThrow()
                             uploadedCount++
+                            recordProgress()
                             syncableRepository?.updateSyncMetadata(journalId, upload.serverVersion, upload.syncedAt)
                             syncMetadataService.markAsSynced(
                                 pending.entityId,
@@ -1312,6 +1327,7 @@ class DefaultSyncManager(
                             )
                         if (result.isSuccess) {
                             uploadedCount++
+                            recordProgress()
                             syncMetadataService.markAsSynced(
                                 pending.entityId,
                                 EntityType.NOTE,
@@ -1415,6 +1431,7 @@ class DefaultSyncManager(
                         if (result.isSuccess) {
                             val upload = result.getOrThrow()
                             uploadedCount++
+                            recordProgress()
                             syncableRepository?.updateSyncMetadata(note, upload.serverVersion, upload.syncedAt)
                             syncMetadataService.markAsSynced(
                                 pending.entityId,
@@ -1561,6 +1578,7 @@ class DefaultSyncManager(
                         retryScheduleStore.clear(EntityType.ASSOCIATION, id)
                     }
                     uploadedCount += createAssociations.size
+                    recordProgress(createAssociations.size)
                     Napier.d("Successfully uploaded associations: ${createAssociations.size}")
                 } else {
                     val error = result.exceptionOrNull() ?: Exception("Unknown upload error")
@@ -1596,6 +1614,7 @@ class DefaultSyncManager(
                         retryScheduleStore.clear(EntityType.ASSOCIATION, id)
                     }
                     uploadedCount += deleteAssociations.size
+                    recordProgress(deleteAssociations.size)
                     Napier.d("Successfully deleted associations: ${deleteAssociations.size}")
                 } else {
                     val error = result.exceptionOrNull() ?: Exception("Unknown delete error")
@@ -1664,6 +1683,7 @@ class DefaultSyncManager(
                             )
                         if (result.isSuccess) {
                             uploadedCount++
+                            recordProgress()
                             syncMetadataService.markAsSynced(pending.entityId, EntityType.DRAFT, Clock.System.now(), 0L)
                             retryScheduleStore.clear(EntityType.DRAFT, pending.entityId)
                         } else {
@@ -1696,6 +1716,7 @@ class DefaultSyncManager(
                         if (result.isSuccess) {
                             val upload = result.getOrThrow()
                             uploadedCount++
+                            recordProgress()
                             syncMetadataService.markAsSynced(
                                 pending.entityId,
                                 EntityType.DRAFT,

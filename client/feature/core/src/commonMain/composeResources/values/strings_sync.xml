@@ -95,5 +95,6 @@
     <string name="first_sync_success">Everything is backed up</string>
     <string name="first_sync_partial">Signed in. Some entries are still going up.</string>
     <string name="first_sync_timed_out">Signed in. Your journal keeps backing up in the background.</string>
+    <string name="first_sync_timed_out_progress">Signed in. %1$d of %2$d backed up so far — the rest is continuing in the background.</string>
     <string name="first_sync_failed">Signed in. We'll pick the backup up again shortly.</string>
 </resources>
