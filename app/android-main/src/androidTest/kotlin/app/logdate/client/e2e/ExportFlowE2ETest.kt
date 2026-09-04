@@ -16,7 +16,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.domain.export.ExportStats
 import app.logdate.feature.core.export.ExportOptions
 import app.logdate.feature.core.export.ExportState
-import app.logdate.feature.core.settings.ui.ConflictsState
 import app.logdate.feature.core.settings.ui.DataSettingsContent
 import app.logdate.feature.core.settings.ui.IntegrityState
 import app.logdate.feature.core.restore.RestoreState
@@ -74,9 +73,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -114,9 +110,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -151,9 +144,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -187,9 +177,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -227,9 +214,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -273,9 +257,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -318,9 +299,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -362,9 +340,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -403,9 +378,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -446,9 +418,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -487,9 +456,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -526,9 +492,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -563,9 +526,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -600,9 +560,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -642,9 +599,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -696,9 +650,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -742,9 +693,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -785,9 +733,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }
@@ -830,9 +775,6 @@ class ExportFlowE2ETest {
                 integrityState = IntegrityState(),
                 onRunIntegrityCheck = {},
                 onRepairIntegrity = {},
-                conflictsState = ConflictsState(),
-                onClearConflicts = {},
-                onRefreshConflicts = {},
                 snackbarHostState = SnackbarHostState(),
             )
         }

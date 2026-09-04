@@ -19,7 +19,6 @@ import app.logdate.feature.core.export.ExportState
 import app.logdate.feature.core.settings.ui.AccountIdentityState
 import app.logdate.feature.core.settings.ui.AccountSettingsContent
 import app.logdate.feature.core.settings.ui.AdvancedSettingsContent
-import app.logdate.feature.core.settings.ui.ConflictsState
 import app.logdate.feature.core.settings.ui.DataSettingsContent
 import app.logdate.feature.core.settings.ui.IntegrityState
 import app.logdate.feature.core.settings.ui.LocationSettingsContent
@@ -187,9 +186,6 @@ fun DataSettings() {
             integrityState = IntegrityState(),
             onRunIntegrityCheck = {},
             onRepairIntegrity = {},
-            conflictsState = ConflictsState(),
-            onClearConflicts = {},
-            onRefreshConflicts = {},
             snackbarHostState = snackbarHostState,
         )
     }
