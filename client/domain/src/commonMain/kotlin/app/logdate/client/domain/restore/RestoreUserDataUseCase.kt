@@ -145,7 +145,7 @@ class RestoreUserDataUseCase(
             Napier.i("Restore: importing ${migrated.notes.size} notes")
             for (note in migrated.notes) {
                 val parsedId = parseUuid(note.id, warnings) ?: continue
-                val mediaResolution = resolveMediaReference(note.mediaPath, manifestIndex, mediaImporter)
+                val mediaResolution = resolveMediaReference(note.mediaPath, manifestIndex, mediaImporter, hasManifest = manifest != null)
                 if (mediaResolution.imported) {
                     mediaImported++
                 }
@@ -199,7 +199,7 @@ class RestoreUserDataUseCase(
                 Napier.i("Restore: importing ${migrated.drafts.size} drafts")
                 for (draft in migrated.drafts) {
                     val restored =
-                        restoreDraft(draft, manifestIndex, mediaImporter) { imported ->
+                        restoreDraft(draft, manifestIndex, mediaImporter, hasManifest = manifest != null) { imported ->
                             if (imported) {
                                 mediaImported++
                             }
@@ -411,6 +411,7 @@ class RestoreUserDataUseCase(
         sourceUri: String?,
         manifestIndex: Map<String, ExportMediaFile>,
         mediaImporter: MediaImporter?,
+        hasManifest: Boolean,
     ): MediaResolution {
         if (sourceUri.isNullOrBlank()) {
             return MediaResolution(uri = null, imported = false, allowSourceFallback = false)
@@ -418,12 +419,18 @@ class RestoreUserDataUseCase(
         val manifestEntry = manifestIndex[sourceUri]
         val exportPath = manifestEntry?.exportPath ?: sourceUri
         val imported = mediaImporter?.importMedia(exportPath)
-        return if (imported != null) {
-            MediaResolution(uri = imported, imported = true, allowSourceFallback = false)
-        } else if (mediaImporter == null || manifestEntry == null) {
-            MediaResolution(uri = sourceUri, imported = false, allowSourceFallback = true)
-        } else {
-            MediaResolution(uri = null, imported = false, allowSourceFallback = false)
+        return when {
+            imported != null -> MediaResolution(uri = imported, imported = true, allowSourceFallback = false)
+            // A manifest exists but has no entry for this file: export already determined the
+            // bytes were unrecoverable and deliberately left it out. sourceUri is a raw path from
+            // the *original* device's private storage and will essentially never resolve here --
+            // falling back to it used to plant a note that looked normal but could never play.
+            // Only the true legacy case below (no manifest at all) gets the best-effort fallback.
+            hasManifest && manifestEntry == null ->
+                MediaResolution(uri = null, imported = false, allowSourceFallback = false)
+            mediaImporter == null || manifestEntry == null ->
+                MediaResolution(uri = sourceUri, imported = false, allowSourceFallback = true)
+            else -> MediaResolution(uri = null, imported = false, allowSourceFallback = false)
         }
     }
 
@@ -431,12 +438,13 @@ class RestoreUserDataUseCase(
         draft: ExportDraft,
         manifestIndex: Map<String, ExportMediaFile>,
         mediaImporter: MediaImporter?,
+        hasManifest: Boolean,
         onMediaImported: (Boolean) -> Unit,
     ): EditorDraft {
         val restoredBlocks =
             if (draft.blocks.isNotEmpty()) {
                 draft.blocks.mapNotNull { block ->
-                    restoreDraftBlock(block, manifestIndex, mediaImporter, onMediaImported)
+                    restoreDraftBlock(block, manifestIndex, mediaImporter, hasManifest, onMediaImported)
                 }
             } else {
                 emptyList()
@@ -466,7 +474,7 @@ class RestoreUserDataUseCase(
         }
 
         draft.mediaReferences.forEach { reference ->
-            val resolution = resolveMediaReference(reference, manifestIndex, mediaImporter)
+            val resolution = resolveMediaReference(reference, manifestIndex, mediaImporter, hasManifest)
             onMediaImported(resolution.imported)
             val uri = resolution.uri ?: return@forEach
             blocks.add(
@@ -545,19 +553,20 @@ class RestoreUserDataUseCase(
         block: SerializableEntryBlock,
         manifestIndex: Map<String, ExportMediaFile>,
         mediaImporter: MediaImporter?,
+        hasManifest: Boolean,
         onMediaImported: (Boolean) -> Unit,
     ): SerializableEntryBlock? =
         when (block) {
             is SerializableTextBlock -> block
             is SerializableImageBlock -> {
-                val resolution = resolveMediaReference(block.uri, manifestIndex, mediaImporter)
+                val resolution = resolveMediaReference(block.uri, manifestIndex, mediaImporter, hasManifest)
                 onMediaImported(resolution.imported)
                 block.copy(uri = resolution.uri)
             }
             is SerializableVideoBlock -> {
-                val mediaResolution = resolveMediaReference(block.uri, manifestIndex, mediaImporter)
+                val mediaResolution = resolveMediaReference(block.uri, manifestIndex, mediaImporter, hasManifest)
                 onMediaImported(mediaResolution.imported)
-                val thumbnailResolution = resolveMediaReference(block.thumbnailUri, manifestIndex, mediaImporter)
+                val thumbnailResolution = resolveMediaReference(block.thumbnailUri, manifestIndex, mediaImporter, hasManifest)
                 onMediaImported(thumbnailResolution.imported)
                 block.copy(
                     uri = mediaResolution.uri,
@@ -565,12 +574,12 @@ class RestoreUserDataUseCase(
                 )
             }
             is SerializableAudioBlock -> {
-                val resolution = resolveMediaReference(block.uri, manifestIndex, mediaImporter)
+                val resolution = resolveMediaReference(block.uri, manifestIndex, mediaImporter, hasManifest)
                 onMediaImported(resolution.imported)
                 block.copy(uri = resolution.uri)
             }
             is SerializableCameraBlock -> {
-                val resolution = resolveMediaReference(block.uri, manifestIndex, mediaImporter)
+                val resolution = resolveMediaReference(block.uri, manifestIndex, mediaImporter, hasManifest)
                 onMediaImported(resolution.imported)
                 block.copy(uri = resolution.uri)
             }

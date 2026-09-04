@@ -750,6 +750,72 @@ class RestoreUserDataUseCaseTest {
             assertEquals(0, result.notesImported)
         }
 
+    @Test
+    fun `restore drops note and warns when the manifest exists but excludes this media`() =
+        runTest {
+            // Simulates a modern archive whose export step recorded MEDIA_BYTES_MISSING for this
+            // file (bytes were already gone on the source device) -- the manifest exists, but has
+            // no entry for this note's media. Falling back to the raw source path here would plant
+            // a note that looks normal but can never play, since that path belongs to another
+            // device's private storage.
+            val noteId = Uuid.random()
+            val sourceUri = "/data/user/0/studio.hypertext.logdate/files/audio_notes/recording_abc.m4a"
+            val bundle =
+                buildBundle(
+                    notes =
+                        listOf(
+                            ExportNote(
+                                id = noteId.toString(),
+                                type = "audio",
+                                mediaPath = sourceUri,
+                                createdAt = now,
+                                updatedAt = now,
+                            ),
+                        ),
+                    mediaManifest = ExportMediaManifest(files = emptyList()),
+                )
+
+            val result = useCase.restore(bundle, mediaImporter = FakeMediaImporter())
+
+            assertEquals(0, result.notesImported)
+            assertTrue(notesRepo.created.isEmpty())
+            assertTrue(
+                result.warnings.any { it.contains(noteId.toString()) && it.contains("not found in archive") },
+                "Expected a warning naming the dropped note and the missing media, got: ${result.warnings}",
+            )
+        }
+
+    @Test
+    fun `restore falls back to the source path for legacy archives with no media manifest at all`() =
+        runTest {
+            // Pre-manifest archive format: there is no way to know whether this media was ever
+            // recorded as present, so the best-effort fallback is preserved rather than dropping
+            // notes we might actually be able to resolve.
+            val noteId = Uuid.random()
+            val sourceUri = "file:///legacy/audio.m4a"
+            val bundle =
+                buildBundle(
+                    notes =
+                        listOf(
+                            ExportNote(
+                                id = noteId.toString(),
+                                type = "audio",
+                                mediaPath = sourceUri,
+                                createdAt = now,
+                                updatedAt = now,
+                            ),
+                        ),
+                    mediaManifest = null,
+                )
+
+            val result = useCase.restore(bundle, mediaImporter = FakeMediaImporter())
+
+            assertEquals(1, result.notesImported)
+            val restored = notesRepo.created.first()
+            assertIs<JournalNote.Audio>(restored)
+            assertEquals(sourceUri, restored.mediaRef)
+        }
+
     // endregion
 
     // region Caption preservation
