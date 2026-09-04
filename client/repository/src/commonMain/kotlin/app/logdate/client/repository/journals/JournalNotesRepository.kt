@@ -85,6 +85,24 @@ interface JournalNotesRepository {
     suspend fun hasNotesBefore(beforeExclusive: Instant): Boolean = getNotesBefore(beforeExclusive, limit = 1).isNotEmpty()
 
     /**
+     * Returns the subset of [paths] that at least one note still references.
+     *
+     * Intended for callers that only need to know whether a handful of candidate media
+     * paths are still owned by a note -- e.g. deciding which files a discarded draft can
+     * safely delete -- without loading and mapping every note in the app.
+     *
+     * The default implementation still scans [allNotesObserved]; an implementation backed
+     * by an indexed store should override this with a targeted query instead.
+     */
+    suspend fun notesReferencingMediaPaths(paths: Set<String>): Set<String> {
+        if (paths.isEmpty()) return emptySet()
+        return allNotesObserved
+            .first()
+            .mapNotNull { it.mediaRefOrNull() }
+            .filterTo(mutableSetOf()) { it in paths }
+    }
+
+    /**
      * Fetches all notes for a single calendar day.
      */
     suspend fun getNotesForDay(day: LocalDate): List<JournalNote> = observeNotesForDay(day).first()
@@ -263,3 +281,12 @@ sealed class JournalNote(
         override val location: NoteLocation? = null,
     ) : JournalNote(NoteType.AUDIO)
 }
+
+/** The media file this note owns, or `null` for note types that don't carry media. */
+fun JournalNote.mediaRefOrNull(): String? =
+    when (this) {
+        is JournalNote.Audio -> mediaRef
+        is JournalNote.Image -> mediaRef
+        is JournalNote.Video -> mediaRef
+        is JournalNote.Text -> null
+    }

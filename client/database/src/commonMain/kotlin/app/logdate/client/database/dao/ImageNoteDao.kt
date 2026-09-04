@@ -84,6 +84,15 @@ interface ImageNoteDao {
     suspend fun countByContentUri(contentUri: String): Int
 
     /**
+     * Returns the subset of [contentUris] that at least one image note still references.
+     *
+     * Indexed lookup used to check whether a handful of candidate paths are still owned
+     * by a note, without loading every image note.
+     */
+    @Query("SELECT DISTINCT contentUri FROM image_notes WHERE contentUri IN (:contentUris)")
+    suspend fun findReferencedContentUris(contentUris: List<String>): List<String>
+
+    /**
      * Removes the given note from the DB.
      */
     @Query("DELETE FROM image_notes WHERE uid = :noteId")

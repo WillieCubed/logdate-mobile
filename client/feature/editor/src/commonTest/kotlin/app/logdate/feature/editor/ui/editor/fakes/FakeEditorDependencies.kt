@@ -76,6 +76,11 @@ class FakeJournalNotesRepository : JournalNotesRepository {
         return note.uid
     }
 
+    /** Test-only: injects a note directly, simulating a write this test didn't itself trigger. */
+    fun seedExternally(note: JournalNote) {
+        notesFlow.value = notesFlow.value + note
+    }
+
     override suspend fun remove(note: JournalNote) {
         notesFlow.value = notesFlow.value.filterNot { it.uid == note.uid }
     }

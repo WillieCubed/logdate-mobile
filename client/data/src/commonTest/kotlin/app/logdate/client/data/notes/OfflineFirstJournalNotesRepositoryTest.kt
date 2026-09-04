@@ -468,6 +468,39 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
+    fun `notesReferencingMediaPaths returns only the paths a note still owns`() =
+        runTest {
+            val referencedAudioPath = "audio-referenced.mp3"
+            val referencedImagePath = "test-image.jpg"
+            val orphanedPath = "not-referenced-anywhere.mp3"
+
+            repository.create(
+                JournalNote.Audio(
+                    uid = Uuid.random(),
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                    mediaRef = referencedAudioPath,
+                ),
+            )
+            imageNoteDao.addNote(createTestImageNote().copy(mediaRef = referencedImagePath).toEntity())
+
+            val result =
+                repository.notesReferencingMediaPaths(
+                    setOf(referencedAudioPath, referencedImagePath, orphanedPath),
+                )
+
+            assertEquals(setOf(referencedAudioPath, referencedImagePath), result)
+        }
+
+    @Test
+    fun `notesReferencingMediaPaths returns empty set for an empty query`() =
+        runTest {
+            val result = repository.notesReferencingMediaPaths(emptySet())
+
+            assertTrue(result.isEmpty())
+        }
+
+    @Test
     fun `remove from journal removes note journal link`() =
         runTest {
             val journal = createTestJournal()

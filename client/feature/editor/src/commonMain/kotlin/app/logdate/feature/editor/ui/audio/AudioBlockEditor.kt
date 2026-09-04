@@ -22,6 +22,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.uuid.Uuid
 
 /**
  * A component that handles audio recording and playback within the editor.
@@ -33,8 +34,9 @@ import org.koin.compose.viewmodel.koinViewModel
  * @param block The audio block state
  * @param onBlockUpdated Callback when the block is updated
  * @param onDeleteRequested Callback when the block should be deleted
- * @param onResolverReady Called once this composable's own [AudioViewModel] is available, so the
- *   editor's save path can bind to that same instance (see [EntryEditorViewModel.audioBlockFinalizer][app.logdate.feature.editor.ui.editor.EntryEditorViewModel]).
+ * @param onResolverReady Called once this composable's own, block-scoped [AudioViewModel] is
+ *   available, together with [block]'s id, so the editor's save path can bind a finalizer for
+ *   this specific block (see [EntryEditorViewModel.bindAudioBlockFinalizer][app.logdate.feature.editor.ui.editor.EntryEditorViewModel]).
  * @param modifier Modifier for layout customization
  */
 @Suppress("ktlint:standard:function-naming")
@@ -43,7 +45,7 @@ fun AudioBlockEditor(
     block: AudioBlockUiState,
     onBlockUpdated: (AudioBlockUiState) -> Unit,
     onDeleteRequested: () -> Unit,
-    onResolverReady: (PendingAudioResolver) -> Unit = {},
+    onResolverReady: (Uuid, PendingAudioResolver) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val labelResolver = remember { AudioLabelResolver() }
@@ -58,9 +60,13 @@ fun AudioBlockEditor(
         }
     val resolvedTitle = formatAudioLabel(labelResult)
 
-    // Get the ViewModel at this level, not in child composables
-    val audioViewModel: AudioViewModel = koinViewModel()
-    LaunchedEffect(audioViewModel) { onResolverReady(audioViewModel) }
+    // Get the ViewModel at this level, not in child composables. Keyed by this block's own id so
+    // multiple audio blocks composed on the same editor screen each get their own AudioViewModel
+    // instance instead of sharing one -- a shared instance can only track one in-flight recording
+    // (lastTargetNoteId) at a time, so a second block's recording would silently steal ownership
+    // from the first.
+    val audioViewModel: AudioViewModel = koinViewModel(key = block.id.toString())
+    LaunchedEffect(audioViewModel) { onResolverReady(block.id, audioViewModel) }
     val audioRouteRepository: AudioRouteRepository = koinInject()
     // Collect audio state from ViewModel
     val audioUiState by audioViewModel.uiState.collectAsState()
@@ -140,7 +146,7 @@ fun AudioBlockEditor(
 
     // Reset stale playback state when the active block changes, but not on initial composition
     // (LaunchedEffect always fires on first composition regardless of key).
-    val previousBlockId = remember { mutableStateOf<kotlin.uuid.Uuid?>(null) }
+    val previousBlockId = remember { mutableStateOf<Uuid?>(null) }
     LaunchedEffect(block.id) {
         if (previousBlockId.value != null && previousBlockId.value != block.id) {
             audioViewModel.resetPlaybackState()

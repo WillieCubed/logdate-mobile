@@ -89,7 +89,7 @@ fun MainEditorContent(
     onBackProgress: (Float) -> Unit = {},
     onBackCommit: () -> Unit = {},
     onBackCancel: () -> Unit = {},
-    onAudioResolverReady: (PendingAudioResolver) -> Unit = {},
+    onAudioResolverReady: (Uuid, PendingAudioResolver) -> Unit = { _, _ -> },
 ) {
     val scope = rememberCoroutineScope()
 
@@ -393,7 +393,7 @@ private fun BlockContentInner(
     onBlockFocused: (Uuid) -> Unit,
     onBlockUpdated: (EntryBlockUiState) -> Unit,
     onBlockDeleted: (Uuid) -> Unit,
-    onAudioResolverReady: (PendingAudioResolver) -> Unit = {},
+    onAudioResolverReady: (Uuid, PendingAudioResolver) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     when (block) {

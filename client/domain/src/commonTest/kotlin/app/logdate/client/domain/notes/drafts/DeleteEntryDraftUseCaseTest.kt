@@ -7,13 +7,16 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.PendingMediaRecord
 import app.logdate.client.repository.journals.PendingMediaType
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -189,6 +192,161 @@ class DeleteEntryDraftUseCaseTest {
         }
 
     @Test
+    fun `invoke propagates CancellationException instead of swallowing it`() =
+        runTest {
+            // A CancellationException thrown by a collaborator inside the guarded try block
+            // (mediaCleaner.delete, in this case) must propagate out of invoke() so structured
+            // concurrency is respected -- not get caught by `catch (e: Exception)`, logged as a
+            // generic failure, and then fall through to deleting the draft record anyway.
+            val now = Clock.System.now()
+            val draftId = Uuid.random()
+            val path = "file:///audio_notes/cancelled.m4a"
+            mockRepository.seedDraft(
+                EntryDraft(
+                    id = draftId,
+                    notes =
+                        listOf(
+                            JournalNote.Audio(
+                                uid = Uuid.random(),
+                                creationTimestamp = now,
+                                lastUpdated = now,
+                                mediaRef = path,
+                            ),
+                        ),
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            )
+            mediaCleaner.cancellationToThrow = CancellationException("cancelled mid-cleanup")
+
+            assertFailsWith<CancellationException> {
+                useCase(draftId)
+            }
+
+            assertTrue(
+                mockRepository.deletedDraftIds.isEmpty(),
+                "a cancelled coroutine must not continue on to delete the draft record",
+            )
+        }
+
+    @Test
+    fun `invoke queries only the candidate media paths instead of scanning all notes`() =
+        runTest {
+            // pathsStillReferencedByNotes() must ask for exactly the draft's candidate paths via
+            // the repository's targeted lookup, not collect allNotesObserved (which would load
+            // and map every note in the app for a routine single-draft discard).
+            val now = Clock.System.now()
+            val draftId = Uuid.random()
+            val orphanedPath = "file:///audio_notes/targeted.m4a"
+            mockRepository.seedDraft(
+                EntryDraft(
+                    id = draftId,
+                    notes =
+                        listOf(
+                            JournalNote.Audio(
+                                uid = Uuid.random(),
+                                creationTimestamp = now,
+                                lastUpdated = now,
+                                mediaRef = orphanedPath,
+                            ),
+                        ),
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            )
+
+            useCase(draftId)
+
+            assertEquals(1, notesRepository.notesReferencingMediaPathsCalls)
+            assertEquals(setOf(orphanedPath), notesRepository.lastQueriedPaths)
+            assertEquals(
+                0,
+                notesRepository.allNotesObservedCollections,
+                "should use the targeted media-path query, not a full scan of allNotesObserved",
+            )
+            assertTrue(orphanedPath in mediaCleaner.deletedPaths)
+        }
+
+    @Test
+    fun `invoke deletes orphaned image and video draft media, not just audio`() =
+        runTest {
+            // collectMediaPaths() used to only look at JournalNote.Audio, so an Image or Video
+            // draft block's media file was never added to the deletion-candidate set and leaked
+            // on disk forever, even though pathsStillReferencedByNotes() already knew how to
+            // protect Image/Video paths that were still owned by a permanent note.
+            val now = Clock.System.now()
+            val draftId = Uuid.random()
+            val imagePath = "file:///media/draft-image.jpg"
+            val videoPath = "file:///media/draft-video.mp4"
+            mockRepository.seedDraft(
+                EntryDraft(
+                    id = draftId,
+                    notes =
+                        listOf(
+                            JournalNote.Image(
+                                uid = Uuid.random(),
+                                creationTimestamp = now,
+                                lastUpdated = now,
+                                mediaRef = imagePath,
+                            ),
+                            JournalNote.Video(
+                                uid = Uuid.random(),
+                                creationTimestamp = now,
+                                lastUpdated = now,
+                                mediaRef = videoPath,
+                            ),
+                        ),
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            )
+
+            useCase(draftId)
+
+            assertTrue(imagePath in mediaCleaner.deletedPaths, "orphaned image draft media should be cleaned up")
+            assertTrue(videoPath in mediaCleaner.deletedPaths, "orphaned video draft media should be cleaned up")
+        }
+
+    @Test
+    fun `invoke does not delete image or video media a permanent note still references`() =
+        runTest {
+            val now = Clock.System.now()
+            val draftId = Uuid.random()
+            val publishedImagePath = "file:///media/published-image.jpg"
+            notesRepository.seed(
+                JournalNote.Image(
+                    uid = Uuid.random(),
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    mediaRef = publishedImagePath,
+                ),
+            )
+            mockRepository.seedDraft(
+                EntryDraft(
+                    id = draftId,
+                    notes =
+                        listOf(
+                            JournalNote.Image(
+                                uid = Uuid.random(),
+                                creationTimestamp = now,
+                                lastUpdated = now,
+                                mediaRef = publishedImagePath,
+                            ),
+                        ),
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            )
+
+            useCase(draftId)
+
+            assertFalse(
+                publishedImagePath in mediaCleaner.deletedPaths,
+                "an image path a permanent note still references must not be deleted",
+            )
+        }
+
+    @Test
     fun `invoke proceeds with draft deletion even if media cleanup fails`() =
         runTest {
             val draftId = Uuid.random()
@@ -270,11 +428,31 @@ class DeleteEntryDraftUseCaseTest {
     private class FakeJournalNotesRepository : JournalNotesRepository {
         private val notes = MutableStateFlow<List<JournalNote>>(emptyList())
 
+        /** Number of times [allNotesObserved] was collected -- a full-table-scan canary. */
+        var allNotesObservedCollections = 0
+        var notesReferencingMediaPathsCalls = 0
+        var lastQueriedPaths: Set<String>? = null
+
         fun seed(note: JournalNote) {
             notes.value = notes.value + note
         }
 
-        override val allNotesObserved: Flow<List<JournalNote>> = notes
+        override val allNotesObserved: Flow<List<JournalNote>> =
+            notes.onEach { allNotesObservedCollections++ }
+
+        override suspend fun notesReferencingMediaPaths(paths: Set<String>): Set<String> {
+            notesReferencingMediaPathsCalls++
+            lastQueriedPaths = paths
+            return notes.value
+                .mapNotNull { note ->
+                    when (note) {
+                        is JournalNote.Audio -> note.mediaRef
+                        is JournalNote.Image -> note.mediaRef
+                        is JournalNote.Video -> note.mediaRef
+                        is JournalNote.Text -> null
+                    }
+                }.filterTo(mutableSetOf()) { it in paths }
+        }
 
         override fun observeNotesInJournal(journalId: Uuid) = flowOf(emptyList<JournalNote>())
 
@@ -325,8 +503,10 @@ class DeleteEntryDraftUseCaseTest {
     private class RecordingMediaCleaner : MediaCleaner {
         val deletedPaths = mutableListOf<String>()
         var shouldThrow = false
+        var cancellationToThrow: CancellationException? = null
 
         override suspend fun delete(path: String) {
+            cancellationToThrow?.let { throw it }
             if (shouldThrow) throw IllegalStateException("simulated cleaner failure")
             deletedPaths.add(path)
         }

@@ -62,6 +62,14 @@ class FakeVideoNoteDao : VideoNoteDao {
 
     override suspend fun countByContentUri(contentUri: String): Int = notes.values.count { it.contentUri == contentUri }
 
+    override suspend fun findReferencedContentUris(contentUris: List<String>): List<String> {
+        val candidates = contentUris.toSet()
+        return notes.values
+            .map { it.contentUri }
+            .filter { it in candidates }
+            .distinct()
+    }
+
     override suspend fun removeNote(noteId: Uuid) {
         notes.remove(noteId)
         updateFlow()

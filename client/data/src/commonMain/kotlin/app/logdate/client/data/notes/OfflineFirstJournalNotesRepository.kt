@@ -212,6 +212,16 @@ class OfflineFirstJournalNotesRepository(
             videoNoteDao.hasNotesBefore(beforeTimestamp)
     }
 
+    override suspend fun notesReferencingMediaPaths(paths: Set<String>): Set<String> {
+        if (paths.isEmpty()) return emptySet()
+        val candidates = paths.toList()
+        return buildSet {
+            addAll(audioNoteDao.findReferencedContentUris(candidates))
+            addAll(imageNoteDao.findReferencedContentUris(candidates))
+            addAll(videoNoteDao.findReferencedContentUris(candidates))
+        }
+    }
+
     override suspend fun getNoteById(noteId: Uuid): JournalNote? {
         // Try each note type DAO until we find the note
         runCatching {

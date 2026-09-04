@@ -39,25 +39,39 @@ class EntryEditorViewModel(
     private val saveEntryUseCase: SaveEntryUseCase,
     private val draftManager: DraftManager,
     private val contentLoader: ContentLoader,
-    audioBlockFinalizer: AudioBlockFinalizer = AudioBlockFinalizer.NoOp,
+    /**
+     * The fallback finalizer consulted for a block whose own `AudioBlockEditor` hasn't
+     * composed/bound a finalizer yet (see [audioBlockFinalizers]).
+     *
+     * There is no live audio state to consult without a bound, block-scoped
+     * `AudioViewModel`, so an already-[AudioCaptureState.Ready] block passes through
+     * unchanged and anything still in flight (Recording/Stopping) fails clearly rather
+     * than being silently dropped by the save mapper's null return. In practice a real
+     * recording's own `AudioBlockEditor` always binds via [bindAudioBlockFinalizer] before
+     * Save is reachable, so this default is a safety net, not the common path.
+     */
+    private val defaultAudioBlockFinalizer: AudioBlockFinalizer =
+        AudioBlockFinalizer { _, currentState ->
+            when (currentState) {
+                is AudioCaptureState.Recording, is AudioCaptureState.Stopping ->
+                    AudioCaptureState.Failed("Recording could not be finalized")
+                else -> currentState
+            }
+        },
     private val pendingAudioRecoverer: PendingAudioRecoverer? = null,
 ) : ViewModel() {
     /**
-     * The finalizer consulted for pending audio at save time.
+     * Per-block finalizers bound by each block's own `AudioBlockEditor` composable, keyed by
+     * block id.
      *
-     * Koin resolves the constructor default at this ViewModel's own construction, via
-     * `get<AudioViewModel>()` inside a plain `factory { }` block (see [EditorFeatureModule]) --
-     * that doesn't go through Compose's screen-scoped `koinViewModel()` resolution, so it
-     * constructs a brand-new [AudioViewModel][app.logdate.feature.editor.ui.audio.AudioViewModel]
-     * disconnected from whatever is actually recording on screen. A save while genuinely
-     * recording would then always fail with "Recording could not be finalized", indistinguishable
-     * from the block's own real state, because the resolver had no idea a recording existed.
-     *
-     * [bindAudioBlockFinalizer] lets the recording screen -- which obtains the one true, live
-     * AudioViewModel via its own `koinViewModel()` call -- replace this with a finalizer backed by
-     * that same instance once it composes.
+     * Each `AudioBlockEditor` now resolves its own, block-scoped
+     * [AudioViewModel][app.logdate.feature.editor.ui.audio.AudioViewModel] instance (Compose's
+     * `koinViewModel(key = ...)`, keyed by block id) instead of sharing one instance across every
+     * audio block on the editor screen. A single mutable finalizer field could therefore only ever
+     * reflect the last block to compose, silently disconnecting every other block's finalizer.
+     * This map lets [finalizePendingAudio] look up the correct, live finalizer per block.
      */
-    private var audioBlockFinalizer: AudioBlockFinalizer = audioBlockFinalizer
+    private val audioBlockFinalizers = mutableMapOf<Uuid, AudioBlockFinalizer>()
 
     // Internal mutable state that can be modified by UI
     private val mutableEditorState =
@@ -483,23 +497,13 @@ class EntryEditorViewModel(
             }
         }
 
-    /**
-     * @param readOnlyBlocksOverride Reuses an already-captured read-only map instead of
-     *   re-deriving it from the live [editorState]. A block's own note being the one this very
-     *   save just persisted flips it read-only in that live flow as a side effect of success, not
-     *   a real conflict -- [publishSnapshotChanged] passes the admission-time map back in here so
-     *   that expected transition can't be mistaken for a concurrent edit.
-     */
-    private fun currentDraftPersistenceState(
-        template: EditorState,
-        readOnlyBlocksOverride: Map<Uuid, Boolean>? = null,
-    ): EditorState {
+    private fun currentDraftPersistenceState(template: EditorState): EditorState {
         val current = mutableEditorState.value
         val combined = editorState.value
         val selectedJournalIds = authoritativeSelectedJournalIds(current, combined)
         return template.copy(
             blocks = current.blocks,
-            readOnlyBlocks = readOnlyBlocksOverride ?: combined.readOnlyBlocks,
+            readOnlyBlocks = combined.readOnlyBlocks,
             selectedJournalIds = selectedJournalIds,
             hasJournalSelectionChanges = current.hasJournalSelectionChanges,
             draftState = current.draftState,
@@ -585,6 +589,7 @@ class EntryEditorViewModel(
                         }
                     effective.toJournalNote()
                 }
+            val publishedBlockIds = notes.map { it.uid }.toSet()
 
             if (notes.isEmpty()) {
                 val activeDraftId = (publishSnapshot.draftState as? DraftState.Active)?.id
@@ -599,7 +604,7 @@ class EntryEditorViewModel(
                     }
                     return@withLock
                 }
-                if (publishSnapshotChanged(admittedContentRevision, publishFingerprint, publishSnapshot)) {
+                if (publishSnapshotChanged(admittedContentRevision, publishFingerprint, publishSnapshot, publishedBlockIds)) {
                     applyResolvedAudio(resolvedAudio)
                     failPublishInvariant()
                     return@withLock
@@ -628,7 +633,7 @@ class EntryEditorViewModel(
                 applyResolvedAudio(resolvedAudio)
                 throw error
             }
-            if (publishSnapshotChanged(admittedContentRevision, publishFingerprint, publishSnapshot)) {
+            if (publishSnapshotChanged(admittedContentRevision, publishFingerprint, publishSnapshot, publishedBlockIds)) {
                 applyResolvedAudio(resolvedAudio)
                 failPublishInvariant()
                 return@withLock
@@ -647,12 +652,24 @@ class EntryEditorViewModel(
         }
     }
 
+    /**
+     * @param publishedBlockIds Block IDs this save just persisted. Their own read-only status
+     *   flipping true is this save's own expected side effect (the reactive "today's notes" flow
+     *   now includes the note it just created), not a conflicting external edit, so it's excluded
+     *   from the comparison below -- every other block's read-only status is still compared live,
+     *   so a genuine concurrent change is still caught.
+     */
     private fun publishSnapshotChanged(
         admittedContentRevision: Long,
         admittedFingerprint: String,
         template: EditorState,
+        publishedBlockIds: Set<Uuid>,
     ): Boolean {
-        val currentSnapshot = currentDraftPersistenceState(template, readOnlyBlocksOverride = template.readOnlyBlocks)
+        val liveReadOnlyBlocks = editorState.value.readOnlyBlocks
+        val readOnlyBlocksIgnoringOwnPublish =
+            liveReadOnlyBlocks + template.readOnlyBlocks.filterKeys { it in publishedBlockIds }
+        val currentSnapshot =
+            currentDraftPersistenceState(template).copy(readOnlyBlocks = readOnlyBlocksIgnoringOwnPublish)
         val currentFingerprint = getEditorDraftFingerprint(currentSnapshot)
         val revisionChanged = currentSnapshot.contentRevision != admittedContentRevision
         val fingerprintChanged = currentFingerprint != admittedFingerprint
@@ -722,7 +739,7 @@ class EntryEditorViewModel(
                         async {
                             block.id to
                                 withTimeoutOrNull(AUDIO_FINALIZE_TIMEOUT_MS) {
-                                    audioBlockFinalizer.finalize(block.id, block.captureState)
+                                    audioBlockFinalizerFor(block.id).finalize(block.id, block.captureState)
                                 }
                         }
                     }.awaitAll()
@@ -788,17 +805,27 @@ class EntryEditorViewModel(
     }
 
     /**
-     * Replaces the audio finalizer consulted at save time.
+     * Registers the audio finalizer consulted for [blockId] at save time.
      *
-     * Call once, from the recording screen, with a finalizer backed by the same live
-     * [AudioViewModel][app.logdate.feature.editor.ui.audio.AudioViewModel] instance that
-     * screen already owns via its own `koinViewModel()` call -- not one Koin resolves during
-     * this ViewModel's own construction, which would be disconnected from any in-progress
-     * recording. See [audioBlockFinalizer] for why this indirection exists at all.
+     * Call once per block, from that block's own `AudioBlockEditor`, with a finalizer backed by
+     * the live, block-scoped [AudioViewModel][app.logdate.feature.editor.ui.audio.AudioViewModel]
+     * instance that composable owns via its own keyed `koinViewModel()` call -- not one Koin
+     * resolves during this ViewModel's own construction, which would be disconnected from any
+     * in-progress recording. See [audioBlockFinalizers] for why this indirection exists at all.
      */
-    fun bindAudioBlockFinalizer(finalizer: AudioBlockFinalizer) {
-        audioBlockFinalizer = finalizer
+    fun bindAudioBlockFinalizer(
+        blockId: Uuid,
+        finalizer: AudioBlockFinalizer,
+    ) {
+        audioBlockFinalizers[blockId] = finalizer
     }
+
+    /**
+     * The finalizer to consult for [blockId]: its own bound finalizer if
+     * [bindAudioBlockFinalizer] has been called for it, otherwise [defaultAudioBlockFinalizer]
+     * for a block whose `AudioBlockEditor` hasn't composed yet.
+     */
+    private fun audioBlockFinalizerFor(blockId: Uuid): AudioBlockFinalizer = audioBlockFinalizers[blockId] ?: defaultAudioBlockFinalizer
 
     /**
      * Removes the lone empty block so the editor can return to the initial content-type picker.

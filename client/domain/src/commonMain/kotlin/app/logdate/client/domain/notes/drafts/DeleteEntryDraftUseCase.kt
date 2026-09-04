@@ -4,9 +4,10 @@ import app.logdate.client.media.MediaCleaner
 import app.logdate.client.media.NoOpMediaCleaner
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
-import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.mediaRefOrNull
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlin.uuid.Uuid
 
@@ -14,18 +15,20 @@ import kotlin.uuid.Uuid
  * Use case for deleting entry drafts.
  *
  * Before removing the draft from storage, every media file referenced by the
- * draft (Ready audio mediaRefs in [EntryDraft.notes] and pending recordings in
- * [EntryDraft.pendingMedia]) is deleted via [mediaCleaner] -- *unless* a permanent
- * note still references that same path. This stops orphan files from
- * accumulating under `filesDir/audio_notes/` after a discard, without being able
- * to destroy a recording a permanent note now depends on: a save flow that calls
- * this discard path right after publishing (the exact mistake that once deleted
- * months of real recordings — see [deleteAfterPublish]) now finds nothing left
- * to delete for that path instead of deleting it out from under the new note.
+ * draft (Ready audio/image/video mediaRefs in [EntryDraft.notes] and pending
+ * recordings in [EntryDraft.pendingMedia]) is deleted via [mediaCleaner] --
+ * *unless* a permanent note still references that same path. This stops orphan
+ * files from accumulating under `filesDir/audio_notes/` after a discard, without
+ * being able to destroy a recording a permanent note now depends on: a save flow
+ * that calls this discard path right after publishing (the exact mistake that
+ * once deleted months of real recordings — see [deleteAfterPublish]) now finds
+ * nothing left to delete for that path instead of deleting it out from under the
+ * new note.
  *
  * Read-only entries that happen to be loaded into the editor are NOT affected:
- * the use case only deletes the draft — its associated [JournalNote.Audio]
- * records were created at autosave time, never copied from a persisted entry.
+ * the use case only deletes the draft — its associated [JournalNote.Audio],
+ * [JournalNote.Image], and [JournalNote.Video] records were created at autosave
+ * time, never copied from a persisted entry.
  */
 class DeleteEntryDraftUseCase(
     private val entryDraftRepository: EntryDraftRepository,
@@ -42,24 +45,17 @@ class DeleteEntryDraftUseCase(
             val draft = entryDraftRepository.getDraft(draftId).first().getOrNull()
             if (draft != null) {
                 val ownedPaths = draft.collectMediaPaths()
-                val stillPublished = pathsStillReferencedByNotes(ownedPaths)
+                val stillPublished = journalNotesRepository.notesReferencingMediaPaths(ownedPaths.toSet())
                 mediaCleaner.deleteAll(ownedPaths - stillPublished)
             }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
         } catch (e: Exception) {
             // Cleanup is best-effort — a failure here must not block deletion of
             // the draft itself, since the draft is the user-visible entity.
             Napier.w("Failed to clean up media for draft $draftId: ${e.message}")
         }
         entryDraftRepository.deleteDraft(draftId)
-    }
-
-    private suspend fun pathsStillReferencedByNotes(paths: List<String>): Set<String> {
-        if (paths.isEmpty()) return emptySet()
-        val candidates = paths.toSet()
-        return journalNotesRepository.allNotesObserved
-            .first()
-            .mapNotNull { it.mediaRefOrNull() }
-            .filterTo(mutableSetOf()) { it in candidates }
     }
 
     /**
@@ -80,13 +76,5 @@ class DeleteEntryDraftUseCase(
  * entries are skipped because there is nothing to delete.
  */
 private fun EntryDraft.collectMediaPaths(): List<String> =
-    notes.mapNotNull { note -> (note as? JournalNote.Audio)?.mediaRef } +
+    notes.mapNotNull { note -> note.mediaRefOrNull() } +
         pendingMedia.mapNotNull { it.filePath }
-
-private fun JournalNote.mediaRefOrNull(): String? =
-    when (this) {
-        is JournalNote.Audio -> mediaRef
-        is JournalNote.Image -> mediaRef
-        is JournalNote.Video -> mediaRef
-        else -> null
-    }

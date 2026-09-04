@@ -256,8 +256,8 @@ fun EntryEditorContent(
                 onBackCancel = {
                     if (isImmersiveBlockActive) scope.launch { chromeProgress.animateTo(0f, tween(300, easing = FastOutSlowInEasing)) }
                 },
-                onAudioResolverReady = { resolver ->
-                    viewModel.bindAudioBlockFinalizer(DefaultAudioBlockFinalizer(resolver))
+                onAudioResolverReady = { blockId, resolver ->
+                    viewModel.bindAudioBlockFinalizer(blockId, DefaultAudioBlockFinalizer(resolver))
                 },
             )
         },

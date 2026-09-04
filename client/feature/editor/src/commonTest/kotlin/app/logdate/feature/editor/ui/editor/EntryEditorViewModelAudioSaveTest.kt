@@ -146,7 +146,7 @@ class EntryEditorViewModelAudioSaveTest {
             saveEntryUseCase = saveEntryUseCase,
             draftManager = draftManager,
             contentLoader = contentLoader,
-            audioBlockFinalizer = finalizer,
+            defaultAudioBlockFinalizer = finalizer,
         )
     }
 
@@ -243,6 +243,41 @@ class EntryEditorViewModelAudioSaveTest {
         }
 
     /**
+     * The fix for the false positive above must not make the check blind to real conflicts: a
+     * block this save is NOT publishing (an empty text block with nothing to save) becoming
+     * read-only for an unrelated reason during the save -- simulating a genuinely concurrent
+     * write landing mid-save -- must still fail the save with "The editor changed while saving".
+     */
+    @Test
+    fun `save entry still detects a genuine conflict on a block it is not publishing`() =
+        testScope.runTest {
+            val viewModel = buildViewModel()
+            viewModel.editorState.first()
+            viewModel.seedTextBlock("today was a good day")
+            val untouchedBlock = viewModel.seedTextBlock("")
+            advanceUntilIdle()
+
+            val unrelatedNote =
+                JournalNote.Text(
+                    uid = untouchedBlock.id,
+                    creationTimestamp = untouchedBlock.timestamp,
+                    lastUpdated = untouchedBlock.timestamp,
+                    content = "written by something else entirely",
+                )
+            journalNotesRepository.afterCreate = {
+                journalNotesRepository.seedExternally(unrelatedNote)
+                testDispatcher.scheduler.runCurrent()
+            }
+
+            viewModel.saveEntry(viewModel.editorState.value)
+            advanceUntilIdle()
+
+            val finalState = viewModel.editorState.value
+            assertFalse(finalState.shouldExit, "a conflict on a block this save didn't publish must still block exit")
+            assertEquals("The editor changed while saving. Review your entry before closing.", finalState.errorMessage)
+        }
+
+    /**
      * Regression for a real, live-reproduced bug: [AudioBlockFinalizer] resolved by Koin at this
      * ViewModel's own construction time is backed by an [AudioViewModel][app.logdate.feature.editor.ui.audio.AudioViewModel]
      * instance disconnected from whatever is actually recording on screen -- `get<AudioViewModel>()`
@@ -263,13 +298,71 @@ class EntryEditorViewModelAudioSaveTest {
                 AudioCaptureState.Ready(uri = "file:///audio_notes/rebound.m4a", durationMs = 2_000L),
             )
 
-            viewModel.bindAudioBlockFinalizer(fakeFinalizer)
+            viewModel.bindAudioBlockFinalizer(seeded.id, fakeFinalizer)
             viewModel.saveEntry(viewModel.editorState.value)
             advanceUntilIdle()
 
             val saved = journalNotesRepository.allNotesObserved.first()
             val audio = assertIs<JournalNote.Audio>(saved.single())
             assertEquals("file:///audio_notes/rebound.m4a", audio.mediaRef)
+        }
+
+    /**
+     * Regression for a real, live-reproduced bug: `AudioBlockEditor` used to resolve its
+     * [AudioViewModel][app.logdate.feature.editor.ui.audio.AudioViewModel] via an unkeyed
+     * `koinViewModel()` call, so every audio block on the same editor screen shared ONE
+     * instance and therefore ONE `lastTargetNoteId`. Recording block B after block A
+     * overwrote the shared instance's notion of which block was recording, so block A's
+     * own finalizer -- resolved via [bindAudioBlockFinalizer] -- would return null for
+     * block A even though A's own recording had genuinely completed.
+     *
+     * The fix keys each `AudioBlockEditor`'s `koinViewModel()` call by its own block id, so
+     * each block gets its own `AudioViewModel`, and [bindAudioBlockFinalizer] now stores
+     * finalizers in a map keyed by block id instead of a single mutable var that the second
+     * block composing would clobber. This test simulates two blocks' own `AudioBlockEditor`
+     * instances each binding their own live finalizer, and asserts both resolve correctly --
+     * neither clobbering the other, and neither falling back to the disconnected default.
+     */
+    @Test
+    fun `bindAudioBlockFinalizer keeps each block's finalizer independent when two blocks are recording`() =
+        testScope.runTest {
+            val viewModel = buildViewModel(finalizer = AudioBlockFinalizer.NoOp)
+            viewModel.editorState.first()
+            val blockA = viewModel.seedAudioBlock(AudioCaptureState.Recording())
+            val blockB = viewModel.seedAudioBlock(AudioCaptureState.Recording())
+            advanceUntilIdle()
+
+            val finalizerA = RecordingAudioBlockFinalizer()
+            val finalizerB = RecordingAudioBlockFinalizer()
+            finalizerA.respondWith(
+                blockA.id,
+                AudioCaptureState.Ready(uri = "file:///audio_notes/block_a.m4a", durationMs = 1_000L),
+            )
+            finalizerB.respondWith(
+                blockB.id,
+                AudioCaptureState.Ready(uri = "file:///audio_notes/block_b.m4a", durationMs = 2_000L),
+            )
+
+            viewModel.bindAudioBlockFinalizer(blockA.id, finalizerA)
+            viewModel.bindAudioBlockFinalizer(blockB.id, finalizerB)
+            viewModel.saveEntry(viewModel.editorState.value)
+            advanceUntilIdle()
+
+            assertEquals(1, finalizerA.invocationCount, "block A's own finalizer must be consulted exactly once")
+            assertEquals(1, finalizerB.invocationCount, "block B's own finalizer must be consulted exactly once")
+
+            val saved = journalNotesRepository.allNotesObserved.first()
+            assertEquals(2, saved.size, "both blocks' audio must be persisted")
+            val audioA = assertIs<JournalNote.Audio>(saved.single { it.uid == blockA.id })
+            val audioB = assertIs<JournalNote.Audio>(saved.single { it.uid == blockB.id })
+            assertEquals("file:///audio_notes/block_a.m4a", audioA.mediaRef)
+            assertEquals(1_000L, audioA.durationMs)
+            assertEquals("file:///audio_notes/block_b.m4a", audioB.mediaRef)
+            assertEquals(2_000L, audioB.durationMs)
+
+            val finalState = viewModel.editorState.value
+            assertTrue(finalState.shouldExit, "save must complete once both blocks' own finalizers resolve")
+            assertNull(finalState.errorMessage)
         }
 
     @Test
