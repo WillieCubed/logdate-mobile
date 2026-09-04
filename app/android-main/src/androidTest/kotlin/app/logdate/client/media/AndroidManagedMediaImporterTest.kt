@@ -1,10 +1,12 @@
 package app.logdate.client.media
 
 import android.Manifest
+import android.content.ContentValues
 import android.content.Context
 import android.database.MatrixCursor
 import android.net.Uri
 import android.os.Build
+import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -17,6 +19,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Rule
@@ -24,7 +27,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.io.ByteArrayInputStream
-import java.io.OutputStream
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -34,12 +36,14 @@ import kotlin.test.assertFailsWith
 import kotlin.uuid.Uuid
 
 /**
- * Exercises the real Android ContentResolver -> flushed staging file -> MediaStore boundary.
+ * Exercises the real Android ContentResolver -> flushed staging file -> app-private canonical
+ * media store boundary.
  *
  * The resulting image/video URI remains readable after the source backing data disappears,
  * and streams are closed before that happens. FileProvider coverage here does not claim to
- * simulate Android revoking a real external picker grant. Managed copies are user-visible
- * MediaStore rows, not app-private durability against deletion outside LogDate.
+ * simulate Android revoking a real external picker grant. Managed copies live in LogDate's
+ * private, content-addressed store -- not the shared MediaStore -- so deleting one never
+ * touches the user's own photo library.
  */
 @RunWith(AndroidJUnit4::class)
 class AndroidManagedMediaImporterTest {
@@ -54,7 +58,7 @@ class AndroidManagedMediaImporterTest {
         ManagedMediaImporter(
             mediaManager = mediaManager,
             source = AndroidManagedMediaImportSource(context, Dispatchers.Unconfined),
-            discardManagedMedia = AndroidManagedMediaDiscarder(context, Dispatchers.Unconfined)::discard,
+            discardManagedMedia = AndroidManagedMediaDiscarder(context, mediaManager, Dispatchers.Unconfined)::discard,
         )
     private val publishedUris = mutableSetOf<String>()
     private val sourceFiles = mutableSetOf<File>()
@@ -74,7 +78,11 @@ class AndroidManagedMediaImporterTest {
     @After
     fun tearDown() {
         publishedUris.forEach { uri ->
-            context.contentResolver.delete(Uri.parse(uri), null, null)
+            if (Uri.parse(uri).scheme == "file") {
+                runBlocking { mediaManager.deleteOwnedMedia(uri) }
+            } else {
+                context.contentResolver.delete(Uri.parse(uri), null, null)
+            }
         }
         sourceFiles.forEach(File::delete)
         File(context.cacheDir, STAGING_DIRECTORY_NAME).listFiles()?.forEach(File::delete)
@@ -84,19 +92,12 @@ class AndroidManagedMediaImporterTest {
     fun `recent media store image is copied before original row disappears`() =
         runTest {
             val imageBytes = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 13, 10, 26, 10)
-            val sourceFile = createSourceFile("recent", "png", imageBytes)
-            val sourceUri =
-                mediaManager
-                    .saveMediaFromFile(
-                        sourceFilePath = sourceFile.absolutePath,
-                        fileName = sourceFile.name,
-                        mimeType = "image/png",
-                    ).also(publishedUris::add)
+            val sourceUri = insertRealMediaStoreImage("recent-${Uuid.random()}.png", imageBytes).also(publishedUris::add)
 
             val managedUri = importer.import(sourceUri).also(publishedUris::add)
 
             assertNotEquals(sourceUri, managedUri)
-            assertTrue(managedUri.startsWith("content://media"))
+            assertTrue(managedUri.startsWith("file:"))
             assertTrue(context.contentResolver.delete(Uri.parse(sourceUri), null, null) > 0)
             publishedUris.remove(sourceUri)
             assertSourceIsUnavailable(sourceUri)
@@ -138,67 +139,52 @@ class AndroidManagedMediaImporterTest {
         }
 
     @Test
-    fun `cancellation during media store copy deletes destination and staging file`() =
+    fun `cancellation after destination is created discards the managed copy and staging file`() =
         runTest {
-            val selectedUri = Uri.parse("content://picker.provider/images/cancelled")
-            val insertedUri = Uri.parse("content://media/external/images/media/911")
-            val fakeResolver = mockk<android.content.ContentResolver>()
-            val fakeContext = mockk<Context>()
-            val fakeRoot = File(context.cacheDir, "cancelled-import-${Uuid.random()}")
-            val fakeCacheDirectory = File(fakeRoot, "cache")
-            val fakeFilesDirectory = File(fakeRoot, "files")
-            val nameCursor =
-                MatrixCursor(arrayOf(android.provider.OpenableColumns.DISPLAY_NAME)).apply {
-                    addRow(arrayOf("cancelled.png"))
-                }
+            val sourceBytes = byteArrayOf(1, 2, 3, 4)
+            val sourceUri =
+                insertRealMediaStoreImage("cancel-source-${Uuid.random()}.png", sourceBytes)
+                    .also(publishedUris::add)
             lateinit var importJob: Job
-            every { fakeContext.applicationContext } returns fakeContext
-            every { fakeContext.contentResolver } returns fakeResolver
-            every { fakeContext.cacheDir } returns fakeCacheDirectory
-            every { fakeContext.filesDir } returns fakeFilesDirectory
-            every { fakeResolver.query(selectedUri, any(), null, null, null) } returns nameCursor
-            every { fakeResolver.getType(selectedUri) } returns "image/png"
-            every { fakeResolver.openInputStream(selectedUri) } returns ByteArrayInputStream(ByteArray(32 * 1024) { 7 })
-            every { fakeResolver.insert(any(), any()) } returns insertedUri
-            every { fakeResolver.openOutputStream(insertedUri, "w") } returns
-                object : OutputStream() {
-                    override fun write(byte: Int) = Unit
-
-                    override fun write(
-                        bytes: ByteArray,
-                        offset: Int,
-                        length: Int,
-                    ) {
-                        importJob.cancel(CancellationException("Editor left during destination copy"))
+            var capturedManagedUri: String? = null
+            val cancelAfterSaveMediaManager =
+                object : MediaManager by mediaManager {
+                    override suspend fun saveMediaFromFile(
+                        sourceFilePath: String,
+                        fileName: String,
+                        mimeType: String,
+                    ): String {
+                        val managedUri = mediaManager.saveMediaFromFile(sourceFilePath, fileName, mimeType)
+                        capturedManagedUri = managedUri
+                        importJob.cancel(CancellationException("Editor left after destination creation"))
+                        return managedUri
                     }
                 }
-            every { fakeResolver.update(any(), any(), any(), any()) } returns 1
-            every { fakeResolver.delete(insertedUri, null, null) } returns 1
-            val manager = AndroidMediaManager(fakeResolver, fakeContext, Dispatchers.Unconfined)
-            val importer =
+            val cancellingImporter =
                 ManagedMediaImporter(
-                    mediaManager = manager,
-                    source = AndroidManagedMediaImportSource(fakeContext, Dispatchers.Unconfined),
-                    discardManagedMedia = AndroidManagedMediaDiscarder(fakeContext, Dispatchers.Unconfined)::discard,
+                    mediaManager = cancelAfterSaveMediaManager,
+                    source = AndroidManagedMediaImportSource(context, Dispatchers.Unconfined),
+                    discardManagedMedia = AndroidManagedMediaDiscarder(context, mediaManager, Dispatchers.Unconfined)::discard,
                 )
 
             try {
                 importJob =
                     launch(start = CoroutineStart.LAZY) {
-                        importer.import(selectedUri.toString())
+                        cancellingImporter.import(sourceUri)
                     }
                 importJob.start()
                 importJob.join()
 
                 assertTrue(importJob.isCancelled)
-                verify(exactly = 1) { fakeResolver.delete(insertedUri, null, null) }
-                verify(exactly = 0) { fakeResolver.update(any(), any(), any(), any()) }
-                assertTrue(
-                    File(fakeCacheDirectory, STAGING_DIRECTORY_NAME).listFiles().isNullOrEmpty(),
-                    "Cancellation must remove the private staging copy",
+                val managedUri = checkNotNull(capturedManagedUri) { "Destination copy never ran" }
+                assertFalse(
+                    mediaManager.deleteOwnedMedia(managedUri),
+                    "Cancellation must have already discarded the managed copy",
                 )
+                assertStagingIsEmpty()
             } finally {
-                fakeRoot.deleteRecursively()
+                context.contentResolver.delete(Uri.parse(sourceUri), null, null)
+                publishedUris.remove(sourceUri)
             }
         }
 
@@ -272,6 +258,25 @@ class AndroidManagedMediaImporterTest {
                 writeBytes(bytes)
                 check(setLastModified(System.currentTimeMillis()))
             }.also(sourceFiles::add)
+    }
+
+    /** Inserts a real row into the shared MediaStore, simulating a photo already on the device. */
+    private fun insertRealMediaStoreImage(
+        displayName: String,
+        bytes: ByteArray,
+    ): String {
+        val values =
+            ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
+                put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+            }
+        val uri =
+            checkNotNull(context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)) {
+                "Unable to insert a real MediaStore row for the test"
+            }
+        context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+            ?: error("Unable to open the inserted MediaStore row for writing")
+        return uri.toString()
     }
 }
 

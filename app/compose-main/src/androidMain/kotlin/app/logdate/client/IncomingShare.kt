@@ -26,7 +26,7 @@ internal suspend fun Context.importIncomingEditorShare(
     mediaManager: MediaManager,
 ): IncomingEditorShare? =
     withContext(Dispatchers.IO) {
-        val managedMediaDiscarder = AndroidManagedMediaDiscarder(this@importIncomingEditorShare)
+        val managedMediaDiscarder = AndroidManagedMediaDiscarder(this@importIncomingEditorShare, mediaManager)
         val mediaImporter =
             ManagedMediaImporter(
                 mediaManager = mediaManager,

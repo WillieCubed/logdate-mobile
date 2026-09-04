@@ -51,7 +51,8 @@ actual fun ImagePickerContent(
     val imagePermissions = remember { imageLibraryPermissions() }
     val coroutineScope = rememberCoroutineScope()
     val currentOnImageSelected by rememberUpdatedState(onImageSelected)
-    val managedMediaDiscarder = remember(context) { AndroidManagedMediaDiscarder(context.applicationContext) }
+    val managedMediaDiscarder =
+        remember(context, mediaManager) { AndroidManagedMediaDiscarder(context.applicationContext, mediaManager) }
     val managedMediaImporter =
         remember(context, mediaManager, managedMediaDiscarder) {
             ManagedMediaImporter(
