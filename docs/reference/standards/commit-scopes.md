@@ -12,6 +12,7 @@ These are the main scopes for user-facing features. **Prefer these scopes** for 
 |-----------|-------|
 | `client/feature/core/` (account) | `account` |
 | `client/feature/core/` (export) | `export` |
+| `client/domain/` (restore) | `restore` |
 | `client/feature/core/` (profile) | `profile` |
 | `client/feature/core/` (settings) | `settings` |
 | `client/feature/editor/` | `editor` |
@@ -70,6 +71,7 @@ These are the main scopes for user-facing features. **Prefer these scopes** for 
 |----------|-------|
 | Multiple modules in different categories | Omit scope or use `infra` |
 | Changes to build/tooling | `build` or `infra` |
+| Error reporting, crash monitoring, logging infra (e.g. Sentry) | `observability` |
 | Changes affecting entire platform | `platform` or omit |
 | Root-level config/docs | omit scope (e.g., `docs: ...`) |
 | iOS-specific changes across modules | `ios` |

@@ -7,6 +7,7 @@
 account  # Cloud account creation, sign-in, sign-out, onboarding flows
 editor  # Journal entry editor, text/media input, voice recording
 export  # Data export options, progress, and results
+restore  # Data restore/import from a backup archive
 profile  # User profile display, editing, avatar
 settings  # App settings screens (data, privacy, danger zone, devices)
 journal  # Journal list, journal detail, journal management
@@ -52,6 +53,7 @@ atproto  # AT Protocol standalone library implementation
 # Cross-cutting scopes
 standards  # Commit message, code style, and contribution guidelines
 infra  # CI/CD, Gradle config, Terraform, build scripts
+observability  # Error reporting, crash monitoring, logging infrastructure (e.g. Sentry)
 build  # Build system changes (plugins, dependencies, versions)
 ios  # iOS-specific platform code
 android  # Android-specific platform code
