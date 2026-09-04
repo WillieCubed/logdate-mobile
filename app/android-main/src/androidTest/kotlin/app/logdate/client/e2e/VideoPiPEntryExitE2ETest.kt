@@ -126,8 +126,15 @@ class VideoPiPEntryExitE2ETest {
      *
      * Reordering the existing task keeps this instance and its composition alive, so a player that
      * is still there afterwards proves the content survived rather than being rebuilt.
+     *
+     * A PiP window is already "on top" from the window manager's point of view, so reordering an
+     * already-visible task to the front is not reliably treated as the same request as a user
+     * tapping the PiP window to expand it -- measured on this suite's managed devices, where PiP
+     * mode simply never cleared afterwards. Pressing Home first backgrounds the task for real, so
+     * the reorder that follows is an unambiguous foreground request and reliably leaves PiP.
      */
     private fun returnHostToForeground() {
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).pressHome()
         val context = ApplicationProvider.getApplicationContext<Context>()
         context.startActivity(
             Intent(context, VideoPlaybackHostActivity::class.java).apply {
