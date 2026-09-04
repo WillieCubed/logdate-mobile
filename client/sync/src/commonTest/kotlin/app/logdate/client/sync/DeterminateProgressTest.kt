@@ -130,7 +130,7 @@ class DeterminateProgressTest {
         }
 
     @Test
-    fun `an opportunistic sync after a completed run reports its own total, not a stale one`() =
+    fun `an opportunistic sync after a completed run reports its own total rather than a stale one`() =
         runTest {
             val notesRepository = fakeJournalNotesRepository()
             val syncMetadataService = fakeSyncMetadataService()

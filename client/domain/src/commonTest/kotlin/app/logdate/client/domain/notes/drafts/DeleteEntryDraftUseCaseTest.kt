@@ -268,7 +268,7 @@ class DeleteEntryDraftUseCaseTest {
         }
 
     @Test
-    fun `invoke deletes orphaned image and video draft media, not just audio`() =
+    fun `invoke deletes orphaned image and video draft media as well as audio`() =
         runTest {
             // collectMediaPaths() used to only look at JournalNote.Audio, so an Image or Video
             // draft block's media file was never added to the deletion-candidate set and leaked

@@ -170,7 +170,7 @@ class DynamicShortcutPublisherTest {
         }
 
     @Test
-    fun `priority order is ContinueDraft, TodayTimeline, WeekRewind`() =
+    fun `priority order is ContinueDraft then TodayTimeline then WeekRewind`() =
         runTest {
             val draft = textDraft(updatedAt = NOW - 30.minutes)
             val rewind = RewindQueryResult.Success(rewindWith(uid = Uuid.random()))
