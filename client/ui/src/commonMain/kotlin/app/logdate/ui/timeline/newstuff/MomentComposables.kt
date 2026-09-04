@@ -37,8 +37,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.client.awareness.daylight.stringRes
-import app.logdate.ui.common.formatting.LocalToday
-import app.logdate.ui.common.formatting.asRelativeDate
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.DayPresentation
@@ -51,40 +49,6 @@ import coil3.compose.AsyncImage
 import logdate.client.ui.generated.resources.Res
 import logdate.client.ui.generated.resources.audio_recording
 import org.jetbrains.compose.resources.stringResource
-
-@Composable
-internal fun SemanticTimelineDayHeader(
-    item: TimelineDayUiState,
-    style: TimelineDayStyle,
-    layoutMode: TimelineDayLayoutMode,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        modifier = modifier,
-    ) {
-        Text(
-            text = item.date.asRelativeDate(LocalToday.current),
-            style = MaterialTheme.typography.labelLarge,
-            color = style.accentColor,
-            fontWeight = FontWeight.SemiBold,
-        )
-        item.supportingSummary?.let { summary ->
-            Text(
-                text = summary,
-                style =
-                    when (layoutMode) {
-                        TimelineDayLayoutMode.COMPACT -> MaterialTheme.typography.titleLarge
-                        TimelineDayLayoutMode.MEDIUM -> MaterialTheme.typography.headlineSmall
-                        TimelineDayLayoutMode.EXPANDED -> MaterialTheme.typography.headlineMedium
-                    },
-                maxLines = if (layoutMode == TimelineDayLayoutMode.COMPACT) 3 else 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-}
 
 @Composable
 internal fun SemanticTimelineDayContent(
@@ -496,7 +460,16 @@ internal fun MomentMediaGrid(
         1 ->
             TimelineMediaTile(
                 media = TimelineMediaItemUiState(uri = media.first().uri, isVideo = media.first().isVideo),
-                aspectRatio = if (emphasized) 1.2f else 1.05f,
+                // A lone photo derives its height from its own width, so a portrait ratio that
+                // reads well on a phone grows taller than the viewport once the column widens.
+                // Widen the ratio as the column does to keep the whole photo on screen.
+                aspectRatio =
+                    when {
+                        layoutMode == TimelineDayLayoutMode.COMPACT && emphasized -> 1.2f
+                        layoutMode == TimelineDayLayoutMode.COMPACT -> 1.05f
+                        emphasized -> 1.5f
+                        else -> 1.35f
+                    },
                 modifier = modifier.fillMaxWidth(),
             )
         2 ->

@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalLayoutApi::class)
+@file:OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @file:Suppress("ktlint:standard:function-naming")
 
 package app.logdate.ui.timeline.newstuff
@@ -8,6 +8,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,12 +27,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -127,9 +127,11 @@ private enum class TimelineListContentType {
     END_OF_TIMELINE,
 }
 
+/** Widest the timeline's reading column is allowed to get, regardless of window size. */
+private val TIMELINE_MAX_CONTENT_WIDTH = 720.dp
+
 internal data class TimelineDayStyle(
     val accentColor: Color,
-    val railColor: Color,
     val softAccentColor: Color,
     val chipColor: Color,
     val textHighlightColor: Color,
@@ -198,7 +200,9 @@ fun TimelineList(
         lastSuggestion = suggestionBlockState
     }
 
-    BoxWithConstraints(modifier = modifier) {
+    // fillMaxWidth so the capped reading column below has room to centre itself; without it the
+    // box shrink-wraps to the column and the feed hugs the left edge on wide windows.
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val layoutMode = maxWidth.toTimelineLayoutMode()
 
         LaunchedEffect(listState, items.size, hasMoreOlderContent, isLoadingMore, appendError) {
@@ -219,14 +223,21 @@ fun TimelineList(
                 }
         }
 
-        LaunchedEffect(listState, items) {
+        // Resolve visible days by item key rather than by list position. Sticky headers mean a
+        // day no longer occupies a single predictable slot, and position arithmetic would keep
+        // resolving to *some* day rather than failing visibly — silently prefetching
+        // transcription for the wrong notes.
+        val dayIndicesByKey =
+            remember(items) {
+                items.withIndex().associate { (index, item) -> item.date.toString() to index }
+            }
+
+        LaunchedEffect(listState, items, dayIndicesByKey) {
             snapshotFlow {
                 val visibleDayIndices =
                     listState.layoutInfo.visibleItemsInfo
-                        .mapNotNull { itemInfo ->
-                            val dayIndex = itemInfo.index - 1
-                            dayIndex.takeIf { it in items.indices }
-                        }.toSet()
+                        .mapNotNull { itemInfo -> dayIndicesByKey[itemInfo.key] }
+                        .toSet()
 
                 collectLazyTimelineAudioNoteIds(
                     items = items,
@@ -239,9 +250,17 @@ fun TimelineList(
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            // Cap the reading column. Without this a day stretches to the full window on a
+            // tablet, which runs the summary out to ~90 characters per line and lets a single
+            // photo — sized by aspect ratio off its own width — grow taller than the viewport.
+            modifier =
+                Modifier
+                    .fillMaxHeight()
+                    .widthIn(max = TIMELINE_MAX_CONTENT_WIDTH)
+                    .align(Alignment.TopCenter),
             state = listState,
-            verticalArrangement = Arrangement.spacedBy(Spacing.xl),
+            // No uniform gap: a day's sticky header must sit tight against the content it
+            // labels. Day-to-day separation is applied by the day item's own bottom padding.
         ) {
             item(
                 contentType = TimelineListContentType.SUGGESTION,
@@ -290,28 +309,39 @@ fun TimelineList(
                     }
                 }
             } else {
-                itemsIndexed(
-                    items = items,
-                    key = { _, item -> item.date.toString() },
-                    contentType = { _, _ -> layoutMode.contentType() },
-                ) { index, item ->
-                    TimelineDayListItem(
-                        item = item,
-                        layoutMode = layoutMode,
-                        onOpenDay = onOpenDay,
-                        modifier =
-                            Modifier.applyPaddingIfLast(
-                                currentIndex = index,
-                                totalItems = items.size,
-                            ),
-                    )
+                items.forEachIndexed { index, item ->
+                    stickyHeader(key = "header-${item.date}") {
+                        TimelineDayHeaderBar(item = item)
+                    }
+
+                    item(
+                        key = item.date.toString(),
+                        contentType = layoutMode.contentType(),
+                    ) {
+                        TimelineDayListItem(
+                            item = item,
+                            layoutMode = layoutMode,
+                            onOpenDay = onOpenDay,
+                            modifier =
+                                Modifier
+                                    .padding(bottom = Spacing.xl)
+                                    .applyPaddingIfLast(
+                                        currentIndex = index,
+                                        totalItems = items.size,
+                                    ),
+                        )
+                    }
 
                     if (index < items.lastIndex) {
-                        val currentDate = item.date
-                        val nextDate = items[index + 1].date
-                        val daysBetween = (currentDate.toEpochDays() - nextDate.toEpochDays()).absoluteValue
+                        val daysBetween =
+                            (item.date.toEpochDays() - items[index + 1].date.toEpochDays()).absoluteValue
                         if (daysBetween > 10) {
-                            TimeGapMessageItem()
+                            item(
+                                key = "gap-${item.date}",
+                                contentType = TimelineListContentType.GAP,
+                            ) {
+                                TimeGapMessageItem()
+                            }
                         }
                     }
                 }
@@ -364,7 +394,7 @@ internal fun TimeGapMessageItem(modifier: Modifier = Modifier) {
         modifier =
             modifier
                 .padding(horizontal = Spacing.lg)
-                .padding(start = 80.dp),
+                .padding(start = Spacing.lg),
     )
 }
 
@@ -446,144 +476,55 @@ private fun TimelineDayListItem(
     onOpenDay: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val style = defaultDayStyle()
-
-    if (layoutMode == TimelineDayLayoutMode.COMPACT) {
-        // Compact: no rail, inline date
-        Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            modifier =
-                modifier
-                    .fillMaxWidth()
-                    .clickable { onOpenDay(item.date) }
-                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-        ) {
-            InlineDateHeader(item = item)
-            SemanticTimelineDayContent(item = item, style = style, layoutMode = layoutMode)
-        }
-    } else {
-        // Medium/Expanded: rail on the left
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.xl),
-            modifier =
-                modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.lg)
-                    .clip(RoundedCornerShape(32.dp))
-                    .clickable { onOpenDay(item.date) }
-                    .padding(vertical = Spacing.md),
-        ) {
-            TimelineDayRail(item = item, style = style, layoutMode = layoutMode)
-            Column(
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                modifier = Modifier.weight(1f),
-            ) {
-                SemanticTimelineDayHeader(item = item, style = style, layoutMode = layoutMode)
-                SemanticTimelineDayContent(item = item, style = style, layoutMode = layoutMode)
-            }
-        }
-    }
-}
-
-@Composable
-private fun InlineDateHeader(
-    item: TimelineDayUiState,
-    modifier: Modifier = Modifier,
-) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .clickable { onOpenDay(item.date) }
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
     ) {
-        Text(
-            text = item.date.asRelativeDate(LocalToday.current),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
         item.supportingSummary?.let { summary ->
             Text(
                 text = summary,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+        SemanticTimelineDayContent(
+            item = item,
+            style = item.layout.style(),
+            layoutMode = layoutMode,
+        )
     }
 }
 
+/**
+ * The day's date, pinned while that day's content is on screen.
+ *
+ * This replaces the old left rail, which reserved up to 88dp of every row to show a day number
+ * beside a header that already named the same date, and whose connecting spine never drew: it
+ * sized itself with [fillMaxHeight] inside a row whose height constraint is unbounded.
+ */
 @Composable
-private fun defaultDayStyle(): TimelineDayStyle =
-    TimelineDayStyle(
-        accentColor = MaterialTheme.colorScheme.primary,
-        railColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
-        softAccentColor = MaterialTheme.colorScheme.primaryContainer,
-        chipColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.32f),
-        textHighlightColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
-    )
-
-@Composable
-private fun TimelineDayRail(
+private fun TimelineDayHeaderBar(
     item: TimelineDayUiState,
-    style: TimelineDayStyle,
-    layoutMode: TimelineDayLayoutMode,
     modifier: Modifier = Modifier,
 ) {
-    val railWidth =
-        when (layoutMode) {
-            TimelineDayLayoutMode.COMPACT -> 56.dp
-            TimelineDayLayoutMode.MEDIUM -> 72.dp
-            TimelineDayLayoutMode.EXPANDED -> 88.dp
-        }
-    val dayStyle =
-        when (layoutMode) {
-            TimelineDayLayoutMode.COMPACT -> MaterialTheme.typography.headlineLarge
-            TimelineDayLayoutMode.MEDIUM -> MaterialTheme.typography.displaySmall
-            TimelineDayLayoutMode.EXPANDED -> MaterialTheme.typography.displayMedium
-        }
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier =
-            modifier
-                .width(railWidth)
-                .fillMaxHeight(),
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier.fillMaxWidth(),
     ) {
         Text(
-            text =
-                item.date.day
-                    .toString()
-                    .padStart(2, '0'),
-            style = dayStyle,
-            color = style.accentColor,
+            text = item.date.asRelativeDate(LocalToday.current),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = item.layout.style().accentColor,
+            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
         )
-        Text(
-            text = item.date.shortMonthLabel(),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Box(
-            modifier =
-                Modifier
-                    .padding(top = Spacing.sm)
-                    .fillMaxHeight(),
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .width(2.dp)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(100.dp))
-                        .background(style.railColor),
-            )
-            Box(
-                modifier =
-                    Modifier
-                        .size(if (layoutMode == TimelineDayLayoutMode.EXPANDED) 16.dp else 12.dp)
-                        .clip(CircleShape)
-                        .background(style.accentColor),
-            )
-        }
     }
 }
 
@@ -694,7 +635,7 @@ private fun TimelineAppendLoadingItem(modifier: Modifier = Modifier) {
         modifier =
             modifier
                 .padding(horizontal = Spacing.lg, vertical = Spacing.md)
-                .padding(start = 80.dp),
+                .padding(start = Spacing.lg),
     ) {
         CircularProgressIndicator(
             modifier = Modifier.size(20.dp),
@@ -721,7 +662,7 @@ private fun TimelineAppendErrorItem(
             modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.lg, vertical = Spacing.md)
-                .padding(start = 80.dp),
+                .padding(start = Spacing.lg),
     ) {
         Text(
             text = message,
@@ -745,59 +686,28 @@ private fun TimelineDaySkeleton(
     layout: TimelineDayCardLayout,
     modifier: Modifier = Modifier,
 ) {
-    val style = layout.style()
-
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xl),
+    Column(
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
         modifier =
             modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.lg),
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.width(72.dp),
-        ) {
-            PlaceholderLine(width = 40.dp, height = 32.dp)
-            PlaceholderLine(width = 28.dp, height = 14.dp)
-            Box(
-                modifier =
-                    Modifier
-                        .padding(top = Spacing.sm)
-                        .width(2.dp)
-                        .height(200.dp)
-                        .clip(RoundedCornerShape(100.dp))
-                        .background(style.railColor),
-            )
+        PlaceholderLine(width = 96.dp, height = 14.dp)
+        PlaceholderLine(width = 280.dp, height = 28.dp)
+        when (layout) {
+            TimelineDayCardLayout.MEDIA_LED -> PlaceholderBlock(height = 280.dp)
+            TimelineDayCardLayout.VOICE_LED -> PlaceholderBlock(height = 120.dp)
+            TimelineDayCardLayout.PLACE_LED -> PlaceholderBlock(height = 132.dp)
+            TimelineDayCardLayout.STORY_LED -> PlaceholderBlock(height = 160.dp)
         }
-        Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            modifier = Modifier.weight(1f),
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            PlaceholderLine(width = 96.dp, height = 14.dp)
-            PlaceholderLine(width = 280.dp, height = 28.dp)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                PlaceholderPill(width = 104.dp)
-                PlaceholderPill(width = 92.dp)
-                PlaceholderPill(width = 120.dp)
-            }
-            when (layout) {
-                TimelineDayCardLayout.MEDIA_LED -> PlaceholderBlock(height = 280.dp)
-                TimelineDayCardLayout.VOICE_LED -> PlaceholderBlock(height = 120.dp)
-                TimelineDayCardLayout.PLACE_LED -> PlaceholderBlock(height = 132.dp)
-                TimelineDayCardLayout.STORY_LED -> PlaceholderBlock(height = 160.dp)
-            }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                PlaceholderPill(width = 116.dp)
-                PlaceholderPill(width = 140.dp)
-                PlaceholderPill(width = 96.dp)
-            }
+            PlaceholderPill(width = 116.dp)
+            PlaceholderPill(width = 140.dp)
+            PlaceholderPill(width = 96.dp)
         }
     }
 }
@@ -854,7 +764,6 @@ private fun TimelineDayCardLayout.style(): TimelineDayStyle =
         TimelineDayCardLayout.MEDIA_LED ->
             TimelineDayStyle(
                 accentColor = MaterialTheme.colorScheme.primary,
-                railColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
                 softAccentColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
                 chipColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.32f),
                 textHighlightColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
@@ -862,7 +771,6 @@ private fun TimelineDayCardLayout.style(): TimelineDayStyle =
         TimelineDayCardLayout.VOICE_LED ->
             TimelineDayStyle(
                 accentColor = MaterialTheme.colorScheme.secondary,
-                railColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.18f),
                 softAccentColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.52f),
                 chipColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.34f),
                 textHighlightColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.22f),
@@ -870,7 +778,6 @@ private fun TimelineDayCardLayout.style(): TimelineDayStyle =
         TimelineDayCardLayout.PLACE_LED ->
             TimelineDayStyle(
                 accentColor = MaterialTheme.colorScheme.tertiary,
-                railColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.18f),
                 softAccentColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.52f),
                 chipColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.34f),
                 textHighlightColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.22f),
@@ -878,7 +785,6 @@ private fun TimelineDayCardLayout.style(): TimelineDayStyle =
         TimelineDayCardLayout.STORY_LED ->
             TimelineDayStyle(
                 accentColor = MaterialTheme.colorScheme.primary,
-                railColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
                 softAccentColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 chipColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 textHighlightColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -898,7 +804,6 @@ private fun TimelineDayLayoutMode.contentType(): TimelineListContentType =
         TimelineDayLayoutMode.MEDIUM -> TimelineListContentType.DAY_MEDIUM
         TimelineDayLayoutMode.EXPANDED -> TimelineListContentType.DAY_EXPANDED
     }
-
 
 internal fun Long.toDurationLabel(): String {
     val totalSeconds = this / 1000
