@@ -1391,12 +1391,20 @@ class DefaultSyncManager(
                                         // never succeed, because the bytes are gone. Counting the
                                         // attempt lets it dead-letter like any other stuck upload,
                                         // where it stays visible for review instead of blocking sync.
+                                        //
+                                        // A single existence check isn't proof of that, though --
+                                        // MediaManager.exists() answers false for a provider that
+                                        // merely failed to answer, not only for bytes truly gone
+                                        // (see its doc comment). Only treat this as permanent once a
+                                        // *previous* attempt for this same note already missed too,
+                                        // so one bad read doesn't wrongly bury a file that's still
+                                        // there.
                                         val movedToDeadLetter =
                                             handleRetryFailure(
                                                 entityType = EntityType.NOTE,
                                                 pending = pending,
                                                 error = error,
-                                                permanent = error is MissingMediaException,
+                                                permanent = error is MissingMediaException && pending.retryCount >= 1,
                                             )
                                         errors.add(
                                             SyncError(
