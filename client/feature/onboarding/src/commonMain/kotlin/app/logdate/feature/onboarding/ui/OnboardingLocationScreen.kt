@@ -167,7 +167,7 @@ private fun LocationAdaptiveContent(
         },
         standardContent = {
             FoldableBookLayout(
-                modifier = Modifier.fillMaxSize().testTag(ONBOARDING_LOCATION_ROOT_TAG),
+                modifier = Modifier.fillMaxSize(),
                 minPaneWidth = 320.dp,
                 startPane = {
                     LocationInfoPane(
@@ -363,7 +363,6 @@ private fun LocationCompactContent(
             Column(
                 modifier =
                     Modifier
-                        .testTag(ONBOARDING_LOCATION_ROOT_TAG)
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = Spacing.lg),

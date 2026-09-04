@@ -59,7 +59,6 @@ import logdate.client.ui.generated.resources.Res as UiRes
 const val CLOUD_ACCOUNT_SETUP_ROOT_TAG = "onboarding_account_root"
 const val CLOUD_ACCOUNT_SETUP_PRIMARY_ACTION_TAG = "onboarding_account_primary_action"
 const val CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG = "onboarding_account_skip_action"
-const val CLOUD_ACCOUNT_SETUP_SKIP_OPTION_TAG = "onboarding_account_skip_option"
 const val CLOUD_ACCOUNT_SETUP_SIGN_IN_ACTION_TAG = "onboarding_account_sign_in_action"
 
 @Composable
@@ -294,7 +293,7 @@ private fun ActionButtons(
         }
         TextButton(
             onClick = onSkip,
-            modifier = Modifier.testTag(CLOUD_ACCOUNT_SETUP_SKIP_OPTION_TAG).testTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG),
+            modifier = Modifier.testTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG),
         ) {
             Text(stringResource(Res.string.continue_without_cloud_sync))
         }
