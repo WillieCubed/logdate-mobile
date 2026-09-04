@@ -11,10 +11,13 @@ import app.logdate.client.sync.test.fakeJournalNotesRepository
 import app.logdate.client.sync.test.fakeSessionStorage
 import app.logdate.client.sync.test.fakeSyncMetadataService
 import app.logdate.client.sync.test.testDefaultSyncManager
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -123,6 +126,111 @@ class DeterminateProgressTest {
                 listOf<Int?>(0, 1, 2),
                 completedBeforeEachUpload,
                 "each upload should see one more item completed than the last, not zero for the whole run",
+            )
+        }
+
+    @Test
+    fun `an opportunistic sync after a completed run reports its own total, not a stale one`() =
+        runTest {
+            val notesRepository = fakeJournalNotesRepository()
+            val syncMetadataService = fakeSyncMetadataService()
+            repeat(5) { index ->
+                val note =
+                    JournalNote.Text(
+                        uid = Uuid.random(),
+                        content = "note $index",
+                        creationTimestamp = Clock.System.now(),
+                        lastUpdated = Clock.System.now(),
+                    )
+                notesRepository.create(note)
+                syncMetadataService.enqueuePending(
+                    entityId = note.uid.toString(),
+                    entityType = EntityType.NOTE,
+                    operation = PendingOperation.CREATE,
+                )
+            }
+
+            val syncManager =
+                testDefaultSyncManager(
+                    sessionStorage = fakeSessionStorage(),
+                    journalNotesRepository = notesRepository,
+                    syncMetadataService = syncMetadataService,
+                )
+
+            // First run: a full backup of five items, completing at a "5 of 5" snapshot.
+            syncManager.uploadPendingChanges()
+            val afterFirstRun = syncManager.getSyncStatus()
+            assertEquals(5, afterFirstRun.totalForRun, "sanity: the first run's own total")
+            assertEquals(5, afterFirstRun.completedInRun, "sanity: the first run finished")
+
+            // A single local edit afterwards triggers an opportunistic, content-only sync --
+            // exactly what OfflineFirstJournalNotesRepository does after a write.
+            val opportunisticNote =
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    content = "opportunistic edit",
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                )
+            notesRepository.create(opportunisticNote)
+            syncMetadataService.enqueuePending(
+                entityId = opportunisticNote.uid.toString(),
+                entityType = EntityType.NOTE,
+                operation = PendingOperation.CREATE,
+            )
+
+            syncManager.syncContent()
+
+            val status = syncManager.getSyncStatus()
+            assertEquals(
+                1,
+                status.totalForRun,
+                "the opportunistic run's total should reflect only its own item, not the earlier run of 5",
+            )
+            assertEquals(1, status.completedInRun)
+        }
+
+    @Test
+    fun `uploading many items does not re-query pending count once per item`() =
+        runTest {
+            val notesRepository = fakeJournalNotesRepository()
+            val syncMetadataService = fakeSyncMetadataService()
+            val itemCount = 20
+            repeat(itemCount) { index ->
+                val note =
+                    JournalNote.Text(
+                        uid = Uuid.random(),
+                        content = "note $index",
+                        creationTimestamp = Clock.System.now(),
+                        lastUpdated = Clock.System.now(),
+                    )
+                notesRepository.create(note)
+                syncMetadataService.enqueuePending(
+                    entityId = note.uid.toString(),
+                    entityType = EntityType.NOTE,
+                    operation = PendingOperation.CREATE,
+                )
+            }
+
+            val syncManager =
+                testDefaultSyncManager(
+                    sessionStorage = fakeSessionStorage(),
+                    journalNotesRepository = notesRepository,
+                    syncMetadataService = syncMetadataService,
+                    // Deterministic: the manager's own republish coroutines run on this scope
+                    // instead of a real background dispatcher, so draining the test scheduler
+                    // accounts for every publishStatus() they might trigger.
+                    syncScope = TestScope(StandardTestDispatcher(testScheduler)),
+                )
+
+            syncManager.uploadPendingChanges()
+            testScheduler.advanceUntilIdle()
+
+            assertTrue(
+                syncMetadataService.getPendingCountCalls < itemCount,
+                "uploading $itemCount items re-queried pending count " +
+                    "${syncMetadataService.getPendingCountCalls} times -- it should be a small " +
+                    "constant per run, not once per item",
             )
         }
 }

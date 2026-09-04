@@ -47,6 +47,7 @@ import app.logdate.feature.core.restore.UserDataRestoreViewModel
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
+import app.logdate.ui.sync.SyncProgressIndicator
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import logdate.client.feature.core.generated.resources.Res
@@ -568,6 +569,16 @@ private fun SyncStatusItem(
     ListItem(
         // The state itself is the headline; see SyncSettingsScreen for why the label went.
         headlineContent = { SyncStatusText(syncStatus) },
+        leadingContent = {
+            // Shown only while something is actually happening, so the row is quiet at rest.
+            if (syncStatus?.isSyncing == true) {
+                SyncProgressIndicator(
+                    total = syncStatus.totalForRun,
+                    completed = syncStatus.completedInRun,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+        },
         trailingContent = {
             Button(
                 onClick = onSyncNow,

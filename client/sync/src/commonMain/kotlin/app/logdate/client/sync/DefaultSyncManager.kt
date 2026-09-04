@@ -15,6 +15,7 @@ import app.logdate.client.repository.journals.SyncableDraftRepository
 import app.logdate.client.repository.journals.SyncableJournalContentRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalRepository
+import app.logdate.client.repository.journals.mediaRefOrNull
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.CloudAssociationDataSource
 import app.logdate.client.sync.cloud.CloudContentDataSource
@@ -165,16 +166,52 @@ class DefaultSyncManager(
     }
 
     /**
+     * Starts a new top-level upload run: forgets whatever the previous run's counters said and
+     * records what *this* run is setting out to do, then republishes so observers see the reset
+     * immediately rather than a stale carryover.
+     *
+     * Must be called at the top of every public entry point that can reach [recordProgress] --
+     * not just [uploadPendingChanges], but also the opportunistic, single-entity-type entry
+     * points ([syncContent], [syncJournals], [syncAssociations], [syncDrafts]) that repositories
+     * call right after a local write. Without this, an opportunistic sync of one item run right
+     * after an earlier five-item run left [runTotal] at the stale value of 5 while [runCompleted]
+     * climbed past it (e.g. reporting "6 of 5" instead of "1 of 1").
+     */
+    private suspend fun beginUploadRun(total: Int?) {
+        runTotal = total
+        runCompleted = 0
+        publishStatus()
+    }
+
+    /** [beginUploadRun] scoped to how many of [entityType] are currently pending. */
+    private suspend fun beginUploadRunForPending(entityType: EntityType) {
+        beginUploadRun(runCatching { syncMetadataService.getPendingUploads(entityType).size }.getOrNull()?.takeIf { it > 0 })
+    }
+
+    /**
      * Advances the upload run's progress by [count] items and republishes status immediately.
      *
      * Called from inside each upload loop as items actually finish, rather than only once at the
      * start and end of a run -- without this, [runCompleted] sat at zero for the whole run and
      * jumped straight to the total, so a determinate progress indicator never actually looked
      * like it was moving.
+     *
+     * Deliberately does *not* go through [publishStatus]: that re-runs
+     * [SyncMetadataService.getPendingCount], which takes a mutex and loops every [EntityType]
+     * doing a promotion check before its final COUNT query. Calling that once per uploaded item
+     * turned a 500-note backup into roughly 500x that overhead for no benefit -- the pending
+     * badge doesn't need to be exactly current between every single item, only the run counters
+     * ([runTotal]/[runCompleted]) do. This reuses the rest of the last-published snapshot and
+     * only touches the two fields that actually changed; a fresh, fully-recomputed status is
+     * still published on every state transition (run start/end) via [publishStatus].
      */
-    private suspend fun recordProgress(count: Int = 1) {
+    private fun recordProgress(count: Int = 1) {
         runCompleted += count
-        publishStatus()
+        _syncStatusFlow.value =
+            _syncStatusFlow.value.copy(
+                totalForRun = runTotal,
+                completedInRun = runCompleted,
+            )
     }
 
     /**
@@ -258,9 +295,7 @@ class DefaultSyncManager(
             syncStateFlow.value = SyncState.Syncing
             // Captured here because this is the only moment the denominator exists: once the run
             // starts draining the queue, the count that is left is all anyone can see.
-            runTotal = runCatching { syncMetadataService.getPendingCount() }.getOrNull()?.takeIf { it > 0 }
-            runCompleted = 0
-            publishStatus()
+            beginUploadRun(runCatching { syncMetadataService.getPendingCount() }.getOrNull()?.takeIf { it > 0 })
 
             try {
                 val accessToken =
@@ -420,6 +455,11 @@ class DefaultSyncManager(
                         accessToken,
                         since,
                     )
+
+                // A fresh top-level run: this entry point only ever uploads notes, so its own
+                // total is the notes currently queued -- not whatever runTotal a prior,
+                // differently-scoped run happened to leave behind. See beginUploadRun().
+                beginUploadRunForPending(EntityType.NOTE)
                 val uploadResult = uploadContent(accessToken)
 
                 val success = uploadResult.success && downloadResult.success
@@ -475,6 +515,10 @@ class DefaultSyncManager(
                         accessToken,
                         since,
                     )
+
+                // See the matching comment in syncContent(): a fresh top-level run scoped to
+                // just the journals this entry point is about to upload.
+                beginUploadRunForPending(EntityType.JOURNAL)
                 val uploadResult = uploadJournals(accessToken)
 
                 val success = uploadResult.success && downloadResult.success
@@ -530,6 +574,10 @@ class DefaultSyncManager(
                         accessToken,
                         since,
                     )
+
+                // See the matching comment in syncContent(): a fresh top-level run scoped to
+                // just the associations this entry point is about to upload.
+                beginUploadRunForPending(EntityType.ASSOCIATION)
                 val uploadResult = uploadAssociations(accessToken)
 
                 val success = uploadResult.success && downloadResult.success
@@ -568,6 +616,10 @@ class DefaultSyncManager(
 
                 val since = cursorFor(EntityType.DRAFT)
                 val downloadResult = downloadDrafts(accessToken, since)
+
+                // See the matching comment in syncContent(): a fresh top-level run scoped to
+                // just the drafts this entry point is about to upload.
+                beginUploadRunForPending(EntityType.DRAFT)
                 val uploadResult = uploadDrafts(accessToken)
                 val success = downloadResult.success && uploadResult.success
 
@@ -864,14 +916,6 @@ class DefaultSyncManager(
             lastModifiedAt = lastUpdated,
         )
 
-    private fun JournalNote.mediaRefOrNull(): String? =
-        when (this) {
-            is JournalNote.Image -> mediaRef
-            is JournalNote.Video -> mediaRef
-            is JournalNote.Audio -> mediaRef
-            else -> null
-        }
-
     private fun JournalNote.withMediaRef(mediaRef: String): JournalNote =
         when (this) {
             is JournalNote.Image -> copy(mediaRef = mediaRef)
@@ -1048,6 +1092,9 @@ class DefaultSyncManager(
     ): Boolean {
         val nextRetryCount = pending.retryCount + 1
         syncMetadataService.incrementRetryCount(pending.entityId, entityType)
+        // Record *after* the caller has already read the prior state to compute [permanent] --
+        // this call is what the *next* attempt for this entity will see as "the previous failure".
+        if (entityType == EntityType.NOTE) recordNoteFailureKind(pending.entityId, error)
 
         // A permanent failure will fail identically every time, so spending the retry budget on it
         // only keeps the queue blocked for longer.
@@ -1070,6 +1117,7 @@ class DefaultSyncManager(
                 0L,
             )
             retryScheduleStore.clear(entityType, pending.entityId)
+            if (entityType == EntityType.NOTE) clearNoteFailureKind(pending.entityId)
             return true
         }
 
@@ -1080,6 +1128,41 @@ class DefaultSyncManager(
             Clock.System.now().toEpochMilliseconds() + delayMs,
         )
         return false
+    }
+
+    /**
+     * For each note, whether its most recent upload attempt failed with [MissingMediaException]
+     * specifically -- as opposed to any other kind of failure (network, server, conflict, ...).
+     * [MissingMediaException] only ever applies to notes (only they carry media), so this is
+     * scoped to [EntityType.NOTE] rather than tracked generically -- keyed by entity id alone,
+     * with nothing to leak for entity types that never write to it.
+     *
+     * [PendingUpload.retryCount] is a single counter shared across every failure reason for an
+     * entity, so it cannot answer "were the last two failures *both* missing-media misses" --
+     * using it directly means one unrelated hiccup (a transient server error, say) followed by
+     * the *first-ever* missing-media miss satisfies "retryCount >= 1" and dead-letters a file
+     * that may still be sitting right there on disk. This map tracks the one thing that
+     * actually matters for that decision: what kind of failure immediately preceded this one.
+     *
+     * In-memory only, not persisted: an app restart just means the next miss for that entity is
+     * treated as the first one again, which costs one extra retry rather than risking a
+     * wrongly-permanent dead-letter.
+     */
+    private val lastNoteFailureWasMissingMedia = mutableMapOf<String, Boolean>()
+
+    /** Whether the failure immediately preceding this one for note [entityId] was [MissingMediaException]. */
+    private fun previousFailureWasMissingMedia(entityId: String): Boolean = lastNoteFailureWasMissingMedia[entityId] == true
+
+    private fun recordNoteFailureKind(
+        entityId: String,
+        error: Throwable,
+    ) {
+        lastNoteFailureWasMissingMedia[entityId] = error is MissingMediaException
+    }
+
+    /** Forgets the tracked failure kind for a note that has left the pending queue. */
+    private fun clearNoteFailureKind(entityId: String) {
+        lastNoteFailureWasMissingMedia.remove(entityId)
     }
 
     private fun computeBackoffMs(retryCount: Int): Long = backoff.nextDelayMs(retryCount)
@@ -1336,6 +1419,7 @@ class DefaultSyncManager(
                             )
                             mediaSyncRefStore.delete(noteId)
                             retryScheduleStore.clear(EntityType.NOTE, pending.entityId)
+                            clearNoteFailureKind(pending.entityId)
                             Napier.d("Successfully deleted content: $noteId")
                         } else {
                             val error = result.exceptionOrNull() ?: Exception("Unknown delete error")
@@ -1390,21 +1474,26 @@ class DefaultSyncManager(
                                         // ever and held the whole queue behind it - the upload can
                                         // never succeed, because the bytes are gone. Counting the
                                         // attempt lets it dead-letter like any other stuck upload,
-                                        // where it stays visible for review instead of blocking sync.
+                                        // where it dead-letters silently -- there is currently no UI
+                                        // surfacing dead-lettered items for review.
                                         //
                                         // A single existence check isn't proof of that, though --
                                         // MediaManager.exists() answers false for a provider that
                                         // merely failed to answer, not only for bytes truly gone
-                                        // (see its doc comment). Only treat this as permanent once a
-                                        // *previous* attempt for this same note already missed too,
-                                        // so one bad read doesn't wrongly bury a file that's still
-                                        // there.
+                                        // (see its doc comment). Only treat this as permanent once
+                                        // the *immediately preceding* attempt for this same note was
+                                        // also a missing-media miss -- not merely once its generic,
+                                        // shared retryCount happens to be >= 1, which an unrelated
+                                        // failure (network, server, ...) could have put there -- so
+                                        // one bad read doesn't wrongly bury a file that's still there.
                                         val movedToDeadLetter =
                                             handleRetryFailure(
                                                 entityType = EntityType.NOTE,
                                                 pending = pending,
                                                 error = error,
-                                                permanent = error is MissingMediaException && pending.retryCount >= 1,
+                                                permanent =
+                                                    error is MissingMediaException &&
+                                                        previousFailureWasMissingMedia(pending.entityId),
                                             )
                                         errors.add(
                                             SyncError(
@@ -1448,6 +1537,7 @@ class DefaultSyncManager(
                                 upload.serverVersion,
                             )
                             retryScheduleStore.clear(EntityType.NOTE, pending.entityId)
+                            clearNoteFailureKind(pending.entityId)
                             Napier.d("Successfully uploaded content: ${note.uid}")
                         } else {
                             val error = result.exceptionOrNull() ?: Exception("Unknown upload error")
@@ -1477,6 +1567,7 @@ class DefaultSyncManager(
                                 )
                                 Napier.w("Queued conflict for note ${note.uid}", error)
                                 retryScheduleStore.clear(EntityType.NOTE, pending.entityId)
+                                clearNoteFailureKind(pending.entityId)
                                 continue
                             }
                             val movedToDeadLetter =

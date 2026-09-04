@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,6 +28,7 @@ import app.logdate.client.sync.SyncStatus
 import app.logdate.feature.core.settings.ui.CustomServerInfoBottomSheet
 import app.logdate.feature.core.settings.ui.ServerPreset
 import app.logdate.shared.model.ServerDescriptor
+import app.logdate.ui.sync.SyncProgressIndicator
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_adopt_local_data_body
 import logdate.client.feature.core.generated.resources.account_adopt_local_data_confirm
@@ -280,7 +279,6 @@ fun CloudAccountOnboardingScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun InitialSyncProgressScreen(
     status: InitialSyncStatus,
@@ -298,15 +296,13 @@ private fun InitialSyncProgressScreen(
         verticalArrangement = Arrangement.Center,
     ) {
         // Material 3 Expressive's loading indicator, which morphs through a shape sequence rather
-        // than spinning a ring - determinate when there is a real fraction to show.
-        if (status == InitialSyncStatus.Running && total != null && total > 0) {
-            LoadingIndicator(
-                progress = { completed.toFloat() / total.toFloat() },
-                modifier = Modifier.size(64.dp),
-            )
-        } else {
-            LoadingIndicator(modifier = Modifier.size(64.dp))
-        }
+        // than spinning a ring - determinate when there is a real fraction to show. Only the
+        // Running status has a fraction worth trusting; other statuses fall back to indeterminate.
+        SyncProgressIndicator(
+            total = total.takeIf { status == InitialSyncStatus.Running },
+            completed = completed,
+            modifier = Modifier.size(64.dp),
+        )
         Text(
             text =
                 when (val message = initialSyncMessageFor(status, total, completed)) {

@@ -673,6 +673,10 @@ class FakeSyncMetadataService(
     private val pendingCountFlow = MutableStateFlow(0)
     var clearPendingCalls: Int = 0
 
+    /** How many times [getPendingCount] has actually been invoked -- see its call site for why. */
+    var getPendingCountCalls: Int = 0
+        private set
+
     override suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload> =
         pendingUploads[entityType]
             ?.map { (entityId, operation) ->
@@ -729,7 +733,10 @@ class FakeSyncMetadataService(
         updatePendingCount()
     }
 
-    override suspend fun getPendingCount(): Int = pendingUploads.values.sumOf { it.size }
+    override suspend fun getPendingCount(): Int {
+        getPendingCountCalls += 1
+        return pendingUploads.values.sumOf { it.size }
+    }
 
     override fun observePendingCount(): Flow<Int> = pendingCountFlow
 
