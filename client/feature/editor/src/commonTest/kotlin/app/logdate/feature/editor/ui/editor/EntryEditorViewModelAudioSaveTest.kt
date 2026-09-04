@@ -108,7 +108,7 @@ class EntryEditorViewModelAudioSaveTest {
                 settingsRepository = FakeLocationTrackingSettingsRepository(),
                 mediaManager = mediaManager,
             )
-        val deleteEntryDraft = DeleteEntryDraftUseCase(entryDraftRepository, mediaCleaner)
+        val deleteEntryDraft = DeleteEntryDraftUseCase(entryDraftRepository, journalNotesRepository, mediaCleaner)
 
         val observeEditorData =
             ObserveEditorDataUseCase(

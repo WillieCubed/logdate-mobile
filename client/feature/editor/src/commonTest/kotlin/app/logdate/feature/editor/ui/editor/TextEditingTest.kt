@@ -98,7 +98,7 @@ class TextEditingTest {
                 settingsRepository = FakeLocationTrackingSettingsRepository(),
                 mediaManager = mediaManager,
             )
-        val deleteEntryDraft = DeleteEntryDraftUseCase(entryDraftRepository)
+        val deleteEntryDraft = DeleteEntryDraftUseCase(entryDraftRepository, journalNotesRepository)
 
         val observeEditorData =
             ObserveEditorDataUseCase(

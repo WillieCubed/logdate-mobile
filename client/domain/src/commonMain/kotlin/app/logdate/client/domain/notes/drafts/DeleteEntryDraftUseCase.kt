@@ -5,6 +5,7 @@ import app.logdate.client.media.NoOpMediaCleaner
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalNotesRepository
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.first
 import kotlin.uuid.Uuid
@@ -14,8 +15,13 @@ import kotlin.uuid.Uuid
  *
  * Before removing the draft from storage, every media file referenced by the
  * draft (Ready audio mediaRefs in [EntryDraft.notes] and pending recordings in
- * [EntryDraft.pendingMedia]) is deleted via [mediaCleaner]. This stops orphan
- * files from accumulating under `filesDir/audio_notes/` after a discard.
+ * [EntryDraft.pendingMedia]) is deleted via [mediaCleaner] -- *unless* a permanent
+ * note still references that same path. This stops orphan files from
+ * accumulating under `filesDir/audio_notes/` after a discard, without being able
+ * to destroy a recording a permanent note now depends on: a save flow that calls
+ * this discard path right after publishing (the exact mistake that once deleted
+ * months of real recordings — see [deleteAfterPublish]) now finds nothing left
+ * to delete for that path instead of deleting it out from under the new note.
  *
  * Read-only entries that happen to be loaded into the editor are NOT affected:
  * the use case only deletes the draft — its associated [JournalNote.Audio]
@@ -23,6 +29,7 @@ import kotlin.uuid.Uuid
  */
 class DeleteEntryDraftUseCase(
     private val entryDraftRepository: EntryDraftRepository,
+    private val journalNotesRepository: JournalNotesRepository,
     private val mediaCleaner: MediaCleaner = NoOpMediaCleaner,
 ) {
     /**
@@ -34,7 +41,9 @@ class DeleteEntryDraftUseCase(
         try {
             val draft = entryDraftRepository.getDraft(draftId).first().getOrNull()
             if (draft != null) {
-                mediaCleaner.deleteAll(draft.collectMediaPaths())
+                val ownedPaths = draft.collectMediaPaths()
+                val stillPublished = pathsStillReferencedByNotes(ownedPaths)
+                mediaCleaner.deleteAll(ownedPaths - stillPublished)
             }
         } catch (e: Exception) {
             // Cleanup is best-effort — a failure here must not block deletion of
@@ -42,6 +51,15 @@ class DeleteEntryDraftUseCase(
             Napier.w("Failed to clean up media for draft $draftId: ${e.message}")
         }
         entryDraftRepository.deleteDraft(draftId)
+    }
+
+    private suspend fun pathsStillReferencedByNotes(paths: List<String>): Set<String> {
+        if (paths.isEmpty()) return emptySet()
+        val candidates = paths.toSet()
+        return journalNotesRepository.allNotesObserved
+            .first()
+            .mapNotNull { it.mediaRefOrNull() }
+            .filterTo(mutableSetOf()) { it in candidates }
     }
 
     /**
@@ -64,3 +82,11 @@ class DeleteEntryDraftUseCase(
 private fun EntryDraft.collectMediaPaths(): List<String> =
     notes.mapNotNull { note -> (note as? JournalNote.Audio)?.mediaRef } +
         pendingMedia.mapNotNull { it.filePath }
+
+private fun JournalNote.mediaRefOrNull(): String? =
+    when (this) {
+        is JournalNote.Audio -> mediaRef
+        is JournalNote.Image -> mediaRef
+        is JournalNote.Video -> mediaRef
+        else -> null
+    }
