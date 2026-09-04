@@ -49,12 +49,11 @@ internal fun SyncStatus.toPresentation(): SyncPresentation {
             SyncErrorType.CONFLICT_ERROR -> SyncPresentation.ConflictError(conflictCount = 1)
             SyncErrorType.NETWORK_ERROR -> SyncPresentation.NetworkError(pendingCount = pendingUploads)
             SyncErrorType.SERVER_ERROR -> SyncPresentation.NetworkError(pendingCount = pendingUploads)
-            SyncErrorType.UNKNOWN_ERROR ->
-                if (pendingUploads > 0) {
-                    SyncPresentation.Pending(pendingCount = pendingUploads)
-                } else {
-                    SyncPresentation.Hidden
-                }
+            // An unclassified failure used to collapse into Pending/Hidden -- indistinguishable
+            // from a perfectly healthy state, so something going genuinely wrong produced no
+            // signal at all. Treat it like a transient network error: a quiet, auto-retried chip,
+            // not a new alarming surface, but no longer invisible.
+            SyncErrorType.UNKNOWN_ERROR -> SyncPresentation.NetworkError(pendingCount = pendingUploads)
         }
     }
 
