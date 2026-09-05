@@ -1130,8 +1130,14 @@ class DefaultSyncManager(
         return false
     }
 
+    /** Identifies a pending entity of any [EntityType] for tracking internal to this class. */
+    private data class PendingEntityKey(
+        val entityType: EntityType,
+        val entityId: String,
+    )
+
     /**
-     * For each entity, whether its most recent upload attempt failed with [MissingMediaException]
+     * Entities whose most recent upload attempt failed with [MissingMediaException]
      * specifically -- as opposed to any other kind of failure (network, server, conflict, ...).
      * Tracked generically across every [EntityType], matching every other piece of retry state in
      * this class ([retryScheduleStore], [syncMetadataService]) -- even though [MissingMediaException]
@@ -1143,28 +1149,33 @@ class DefaultSyncManager(
      * entity, so it cannot answer "were the last two failures *both* missing-media misses" --
      * using it directly means one unrelated hiccup (a transient server error, say) followed by
      * the *first-ever* missing-media miss satisfies "retryCount >= 1" and dead-letters a file
-     * that may still be sitting right there on disk. This map tracks the one thing that
-     * actually matters for that decision: what kind of failure immediately preceded this one.
+     * that may still be sitting right there on disk. This set tracks the one thing that
+     * actually matters for that decision: whether the immediately preceding failure was one too.
      *
      * In-memory only, not persisted: an app restart just means the next miss for that entity is
      * treated as the first one again, which costs one extra retry rather than risking a
      * wrongly-permanent dead-letter. Cleared alongside every [retryScheduleStore] clear so it
      * cannot outlive the entity's own retry state.
      */
-    private val lastFailureWasMissingMedia = mutableMapOf<Pair<EntityType, String>, Boolean>()
+    private val entitiesLastFailedOnMissingMedia = mutableSetOf<PendingEntityKey>()
 
     /** Whether the failure immediately preceding this one for [entityId] was [MissingMediaException]. */
     private fun previousFailureWasMissingMedia(
         entityType: EntityType,
         entityId: String,
-    ): Boolean = lastFailureWasMissingMedia[entityType to entityId] == true
+    ): Boolean = PendingEntityKey(entityType, entityId) in entitiesLastFailedOnMissingMedia
 
     private fun recordFailureKind(
         entityType: EntityType,
         entityId: String,
         error: Throwable,
     ) {
-        lastFailureWasMissingMedia[entityType to entityId] = error is MissingMediaException
+        val key = PendingEntityKey(entityType, entityId)
+        if (error is MissingMediaException) {
+            entitiesLastFailedOnMissingMedia.add(key)
+        } else {
+            entitiesLastFailedOnMissingMedia.remove(key)
+        }
     }
 
     /** Forgets the tracked failure kind for an entity that has left the pending queue. */
@@ -1172,7 +1183,7 @@ class DefaultSyncManager(
         entityType: EntityType,
         entityId: String,
     ) {
-        lastFailureWasMissingMedia.remove(entityType to entityId)
+        entitiesLastFailedOnMissingMedia.remove(PendingEntityKey(entityType, entityId))
     }
 
     private fun computeBackoffMs(retryCount: Int): Long = backoff.nextDelayMs(retryCount)
