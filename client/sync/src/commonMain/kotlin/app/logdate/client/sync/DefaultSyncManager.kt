@@ -1094,7 +1094,7 @@ class DefaultSyncManager(
         syncMetadataService.incrementRetryCount(pending.entityId, entityType)
         // Record *after* the caller has already read the prior state to compute [permanent] --
         // this call is what the *next* attempt for this entity will see as "the previous failure".
-        if (entityType == EntityType.NOTE) recordNoteFailureKind(pending.entityId, error)
+        recordFailureKind(entityType, pending.entityId, error)
 
         // A permanent failure will fail identically every time, so spending the retry budget on it
         // only keeps the queue blocked for longer.
@@ -1117,7 +1117,7 @@ class DefaultSyncManager(
                 0L,
             )
             retryScheduleStore.clear(entityType, pending.entityId)
-            if (entityType == EntityType.NOTE) clearNoteFailureKind(pending.entityId)
+            clearFailureKind(entityType, pending.entityId)
             return true
         }
 
@@ -1131,11 +1131,13 @@ class DefaultSyncManager(
     }
 
     /**
-     * For each note, whether its most recent upload attempt failed with [MissingMediaException]
+     * For each entity, whether its most recent upload attempt failed with [MissingMediaException]
      * specifically -- as opposed to any other kind of failure (network, server, conflict, ...).
-     * [MissingMediaException] only ever applies to notes (only they carry media), so this is
-     * scoped to [EntityType.NOTE] rather than tracked generically -- keyed by entity id alone,
-     * with nothing to leak for entity types that never write to it.
+     * Tracked generically across every [EntityType], matching every other piece of retry state in
+     * this class ([retryScheduleStore], [syncMetadataService]) -- even though [MissingMediaException]
+     * currently only ever originates from the note-upload path, hardcoding that assumption into the
+     * storage shape would make it awkward for a future entity type that grows the same kind of
+     * flaky-first-check failure to reuse this mechanism.
      *
      * [PendingUpload.retryCount] is a single counter shared across every failure reason for an
      * entity, so it cannot answer "were the last two failures *both* missing-media misses" --
@@ -1146,23 +1148,31 @@ class DefaultSyncManager(
      *
      * In-memory only, not persisted: an app restart just means the next miss for that entity is
      * treated as the first one again, which costs one extra retry rather than risking a
-     * wrongly-permanent dead-letter.
+     * wrongly-permanent dead-letter. Cleared alongside every [retryScheduleStore] clear so it
+     * cannot outlive the entity's own retry state.
      */
-    private val lastNoteFailureWasMissingMedia = mutableMapOf<String, Boolean>()
+    private val lastFailureWasMissingMedia = mutableMapOf<Pair<EntityType, String>, Boolean>()
 
-    /** Whether the failure immediately preceding this one for note [entityId] was [MissingMediaException]. */
-    private fun previousFailureWasMissingMedia(entityId: String): Boolean = lastNoteFailureWasMissingMedia[entityId] == true
+    /** Whether the failure immediately preceding this one for [entityId] was [MissingMediaException]. */
+    private fun previousFailureWasMissingMedia(
+        entityType: EntityType,
+        entityId: String,
+    ): Boolean = lastFailureWasMissingMedia[entityType to entityId] == true
 
-    private fun recordNoteFailureKind(
+    private fun recordFailureKind(
+        entityType: EntityType,
         entityId: String,
         error: Throwable,
     ) {
-        lastNoteFailureWasMissingMedia[entityId] = error is MissingMediaException
+        lastFailureWasMissingMedia[entityType to entityId] = error is MissingMediaException
     }
 
-    /** Forgets the tracked failure kind for a note that has left the pending queue. */
-    private fun clearNoteFailureKind(entityId: String) {
-        lastNoteFailureWasMissingMedia.remove(entityId)
+    /** Forgets the tracked failure kind for an entity that has left the pending queue. */
+    private fun clearFailureKind(
+        entityType: EntityType,
+        entityId: String,
+    ) {
+        lastFailureWasMissingMedia.remove(entityType to entityId)
     }
 
     private fun computeBackoffMs(retryCount: Int): Long = backoff.nextDelayMs(retryCount)
@@ -1234,6 +1244,7 @@ class DefaultSyncManager(
                                 0L,
                             )
                             retryScheduleStore.clear(EntityType.JOURNAL, pending.entityId)
+                            clearFailureKind(EntityType.JOURNAL, pending.entityId)
                             Napier.d("Successfully deleted journal: $journalId")
                         } else {
                             val error = result.exceptionOrNull() ?: Exception("Unknown delete error")
@@ -1296,6 +1307,7 @@ class DefaultSyncManager(
                                 upload.serverVersion,
                             )
                             retryScheduleStore.clear(EntityType.JOURNAL, pending.entityId)
+                            clearFailureKind(EntityType.JOURNAL, pending.entityId)
                             Napier.d("Successfully uploaded journal: ${journal.id}")
                         } else {
                             val error = result.exceptionOrNull() ?: Exception("Unknown upload error")
@@ -1325,6 +1337,7 @@ class DefaultSyncManager(
                                 )
                                 Napier.w("Queued conflict for journal ${journal.id}", error)
                                 retryScheduleStore.clear(EntityType.JOURNAL, pending.entityId)
+                                clearFailureKind(EntityType.JOURNAL, pending.entityId)
                                 continue
                             }
                             val movedToDeadLetter =
@@ -1419,7 +1432,7 @@ class DefaultSyncManager(
                             )
                             mediaSyncRefStore.delete(noteId)
                             retryScheduleStore.clear(EntityType.NOTE, pending.entityId)
-                            clearNoteFailureKind(pending.entityId)
+                            clearFailureKind(EntityType.NOTE, pending.entityId)
                             Napier.d("Successfully deleted content: $noteId")
                         } else {
                             val error = result.exceptionOrNull() ?: Exception("Unknown delete error")
@@ -1493,7 +1506,7 @@ class DefaultSyncManager(
                                                 error = error,
                                                 permanent =
                                                     error is MissingMediaException &&
-                                                        previousFailureWasMissingMedia(pending.entityId),
+                                                        previousFailureWasMissingMedia(EntityType.NOTE, pending.entityId),
                                             )
                                         errors.add(
                                             SyncError(
@@ -1537,7 +1550,7 @@ class DefaultSyncManager(
                                 upload.serverVersion,
                             )
                             retryScheduleStore.clear(EntityType.NOTE, pending.entityId)
-                            clearNoteFailureKind(pending.entityId)
+                            clearFailureKind(EntityType.NOTE, pending.entityId)
                             Napier.d("Successfully uploaded content: ${note.uid}")
                         } else {
                             val error = result.exceptionOrNull() ?: Exception("Unknown upload error")
@@ -1567,7 +1580,7 @@ class DefaultSyncManager(
                                 )
                                 Napier.w("Queued conflict for note ${note.uid}", error)
                                 retryScheduleStore.clear(EntityType.NOTE, pending.entityId)
-                                clearNoteFailureKind(pending.entityId)
+                                clearFailureKind(EntityType.NOTE, pending.entityId)
                                 continue
                             }
                             val movedToDeadLetter =
@@ -1675,6 +1688,7 @@ class DefaultSyncManager(
                     createIds.forEach { id ->
                         syncMetadataService.markAsSynced(id, EntityType.ASSOCIATION, uploadedAt, 0L)
                         retryScheduleStore.clear(EntityType.ASSOCIATION, id)
+                        clearFailureKind(EntityType.ASSOCIATION, id)
                     }
                     uploadedCount += createAssociations.size
                     recordProgress(createAssociations.size)
@@ -1711,6 +1725,7 @@ class DefaultSyncManager(
                     deleteIds.forEach { id ->
                         syncMetadataService.markAsSynced(id, EntityType.ASSOCIATION, deletedAt, 0L)
                         retryScheduleStore.clear(EntityType.ASSOCIATION, id)
+                        clearFailureKind(EntityType.ASSOCIATION, id)
                     }
                     uploadedCount += deleteAssociations.size
                     recordProgress(deleteAssociations.size)
@@ -1785,6 +1800,7 @@ class DefaultSyncManager(
                             recordProgress()
                             syncMetadataService.markAsSynced(pending.entityId, EntityType.DRAFT, Clock.System.now(), 0L)
                             retryScheduleStore.clear(EntityType.DRAFT, pending.entityId)
+                            clearFailureKind(EntityType.DRAFT, pending.entityId)
                         } else {
                             val error = result.exceptionOrNull() ?: Exception("Unknown draft delete error")
                             val movedToDeadLetter = handleRetryFailure(EntityType.DRAFT, pending, error)
@@ -1823,6 +1839,7 @@ class DefaultSyncManager(
                                 upload.serverVersion,
                             )
                             retryScheduleStore.clear(EntityType.DRAFT, pending.entityId)
+                            clearFailureKind(EntityType.DRAFT, pending.entityId)
                         } else {
                             val error = result.exceptionOrNull() ?: Exception("Unknown draft upload error")
                             val movedToDeadLetter = handleRetryFailure(EntityType.DRAFT, pending, error)
