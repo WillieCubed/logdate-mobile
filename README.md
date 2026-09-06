@@ -136,6 +136,8 @@ The fastest way to get the LogDate server running locally:
    
    # Option 2: Run locally (connect to containerized database)  
    export DATABASE_URL="jdbc:postgresql://localhost:15432/logdate"
+   export DATABASE_USER=logdate
+   export DATABASE_PASSWORD=logdate
    ./gradlew :server:run
    ```
 
