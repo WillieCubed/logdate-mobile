@@ -404,7 +404,7 @@ class DefaultSyncManager(
                                     Napier.d("Downloaded new ${strategy.logLabel}: $id")
                                 }
                             } catch (e: Exception) {
-                                val id = strategy.idOf(item)
+                                val id = runCatching { strategy.idOf(item) }.getOrNull() ?: "unknown"
                                 batchErrors.add(
                                     SyncError(
                                         SyncErrorType.UNKNOWN_ERROR,
@@ -668,6 +668,15 @@ class DefaultSyncManager(
      *   with it. Kept as a caller-supplied check rather than a fixed one because the four entry
      *   points don't all report "can't sync right now" the same way (some distinguish disabled vs.
      *   unauthenticated with their own [SyncError], one collapses both into a bare failure).
+     * @param updatesGlobalSyncState Whether a run through this template should update
+     *   [lastErrorFlow]/trigger [refreshObservedQuotaFromServer] the way [uploadPendingChanges]-driven
+     *   runs do. `false` for [syncDrafts], which never reported into that shared state even before
+     *   this template existed -- an unrelated, already-surfaced sync error must not be silently
+     *   cleared by a successful draft-only sync, and a draft sync has no reason to trigger a quota
+     *   refresh.
+     * @param onException When non-null, wraps the body (guard excluded) in a catch that reports
+     *   through this instead of letting the exception propagate -- only [syncDrafts] used to do
+     *   this; the other three entry points still let an unexpected exception propagate uncaught.
      */
     private suspend fun syncEntityType(
         entityType: EntityType,
@@ -675,6 +684,8 @@ class DefaultSyncManager(
         disabledOrUnauthenticated: suspend () -> SyncResult?,
         download: suspend (accessToken: String, since: Instant) -> SyncResult,
         upload: suspend (accessToken: String) -> SyncResult,
+        updatesGlobalSyncState: Boolean = true,
+        onException: (suspend (Exception) -> SyncResult)? = null,
     ): SyncResult =
         syncMutex.withLock {
             disabledOrUnauthenticated()?.let { return@withLock it }
@@ -690,11 +701,13 @@ class DefaultSyncManager(
                 val uploadResult = upload(accessToken)
 
                 val success = uploadResult.success && downloadResult.success
-                if (success) {
-                    lastErrorFlow.value = null
-                    refreshObservedQuotaFromServer(quotaContext)
-                } else {
-                    lastErrorFlow.value = (downloadResult.errors + uploadResult.errors).firstOrNull()
+                if (updatesGlobalSyncState) {
+                    if (success) {
+                        lastErrorFlow.value = null
+                        refreshObservedQuotaFromServer(quotaContext)
+                    } else {
+                        lastErrorFlow.value = (downloadResult.errors + uploadResult.errors).firstOrNull()
+                    }
                 }
 
                 SyncResult(
@@ -705,30 +718,32 @@ class DefaultSyncManager(
                     errors = downloadResult.errors + uploadResult.errors,
                     lastSyncTime = latestSyncTime(),
                 )
+            } catch (e: Exception) {
+                if (onException != null) onException(e) else throw e
             } finally {
                 syncStateFlow.value = SyncState.Idle
             }
         }
 
-    /** The "disabled" / "not authenticated" guard shared by every entry point except [syncDrafts]. */
-    private fun disabledOrUnauthenticatedResult(): SyncResult? =
-        when {
-            !isEnabled -> SyncResult(success = false, errors = listOf(SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled")))
-            else -> null
+    /**
+     * The "disabled" / "not authenticated" guard shared by [syncContent]/[syncJournals]/[syncAssociations]
+     * -- each reports disabled vs. unauthenticated as distinct [SyncError]s, unlike [syncDrafts]'s
+     * own single combined check.
+     */
+    private suspend fun disabledOrUnauthenticatedResult(): SyncResult? =
+        if (!isEnabled) {
+            SyncResult(success = false, errors = listOf(SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled")))
+        } else if (!isAuthenticated()) {
+            SyncResult(success = false, errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated")))
+        } else {
+            null
         }
 
     override suspend fun syncContent(): SyncResult =
         syncEntityType(
             entityType = EntityType.NOTE,
             quotaContext = "content sync",
-            disabledOrUnauthenticated = {
-                disabledOrUnauthenticatedResult()
-                    ?: if (!isAuthenticated()) {
-                        SyncResult(success = false, errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated")))
-                    } else {
-                        null
-                    }
-            },
+            disabledOrUnauthenticated = ::disabledOrUnauthenticatedResult,
             download = ::downloadContent,
             upload = ::uploadContent,
         )
@@ -737,14 +752,7 @@ class DefaultSyncManager(
         syncEntityType(
             entityType = EntityType.JOURNAL,
             quotaContext = "journal sync",
-            disabledOrUnauthenticated = {
-                disabledOrUnauthenticatedResult()
-                    ?: if (!isAuthenticated()) {
-                        SyncResult(success = false, errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated")))
-                    } else {
-                        null
-                    }
-            },
+            disabledOrUnauthenticated = ::disabledOrUnauthenticatedResult,
             download = ::downloadJournals,
             upload = ::uploadJournals,
         )
@@ -753,36 +761,29 @@ class DefaultSyncManager(
         syncEntityType(
             entityType = EntityType.ASSOCIATION,
             quotaContext = "association sync",
-            disabledOrUnauthenticated = {
-                disabledOrUnauthenticatedResult()
-                    ?: if (!isAuthenticated()) {
-                        SyncResult(success = false, errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated")))
-                    } else {
-                        null
-                    }
-            },
+            disabledOrUnauthenticated = ::disabledOrUnauthenticatedResult,
             download = ::downloadAssociations,
             upload = ::uploadAssociations,
         )
 
     override suspend fun syncDrafts(): SyncResult =
-        try {
-            syncEntityType(
-                entityType = EntityType.DRAFT,
-                quotaContext = "draft sync",
-                disabledOrUnauthenticated = {
-                    if (!isEnabled || !isAuthenticated()) SyncResult(success = false) else null
-                },
-                download = ::downloadDrafts,
-                upload = ::uploadDrafts,
-            )
-        } catch (e: Exception) {
-            Napier.e("Draft sync failed", e)
-            SyncResult(
-                success = false,
-                errors = listOf(SyncError(SyncErrorType.UNKNOWN_ERROR, "Draft sync failed: ${e.message}")),
-            )
-        }
+        syncEntityType(
+            entityType = EntityType.DRAFT,
+            quotaContext = "draft sync",
+            disabledOrUnauthenticated = {
+                if (!isEnabled || !isAuthenticated()) SyncResult(success = false) else null
+            },
+            download = ::downloadDrafts,
+            upload = ::uploadDrafts,
+            updatesGlobalSyncState = false,
+            onException = { e ->
+                Napier.e("Draft sync failed", e)
+                SyncResult(
+                    success = false,
+                    errors = listOf(SyncError(SyncErrorType.UNKNOWN_ERROR, "Draft sync failed: ${e.message}")),
+                )
+            },
+        )
 
     override suspend fun fullSync(): SyncResult {
         enqueueEverythingOnFirstSync()
@@ -1272,7 +1273,6 @@ class DefaultSyncManager(
         return false
     }
 
-    /** Identifies a pending entity of any [EntityType] for tracking internal to this class. */
     private data class PendingEntityKey(
         val entityType: EntityType,
         val entityId: String,
@@ -1589,8 +1589,12 @@ class DefaultSyncManager(
                         if (result.isSuccess) {
                             uploadedCount++
                             recordProgress()
-                            markUploadSettled(EntityType.NOTE, pending.entityId, Clock.System.now(), 0L)
+                            // Deliberately before markUploadSettled: if this throws, the item must
+                            // stay pending so the next attempt retries the ref-store cleanup too,
+                            // rather than being marked settled with a stale mediaSyncRefStore entry
+                            // that nothing will ever clean up again.
                             mediaSyncRefStore.delete(noteId)
+                            markUploadSettled(EntityType.NOTE, pending.entityId, Clock.System.now(), 0L)
                             Napier.d("Successfully deleted content: $noteId")
                         } else {
                             val error = result.exceptionOrNull() ?: Exception("Unknown delete error")
