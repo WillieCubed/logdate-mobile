@@ -15,7 +15,6 @@
 #   ./tests/e2e/test-multi-window-editor.sh --intent-only      # Test intent launching only
 #   ./tests/e2e/test-multi-window-editor.sh --recents          # Test recents integration
 #   ./tests/e2e/test-multi-window-editor.sh --verbose          # Show all commands
-#   ./tests/e2e/test-multi-window-editor.sh --auto-clear-data  # Clear app data before test
 #
 
 set -e
@@ -29,13 +28,13 @@ GRAY='\033[0;37m'
 NC='\033[0m'
 
 # Configuration
-PACKAGE_NAME="app.logdate"
+# Overridable for builds made with -Plogdate.applicationId.
+PACKAGE_NAME="${PACKAGE_NAME:-studio.hypertext.logdate}"
 EDITOR_ACTIVITY=".EditorActivity"
 VERBOSE=false
 SMOKE_TEST=false
 INTENT_ONLY=false
 RECENTS_TEST=false
-AUTO_CLEAR_DATA=false
 SKIP_DEVICE_CHECK=false
 
 # Test counters
@@ -341,10 +340,6 @@ parse_args() {
                 VERBOSE=true
                 shift
                 ;;
-            --auto-clear-data)
-                AUTO_CLEAR_DATA=true
-                shift
-                ;;
             --skip-device-check)
                 SKIP_DEVICE_CHECK=true
                 shift
@@ -372,14 +367,13 @@ print_help() {
     echo "  --intent-only        Test only intent launching functionality"
     echo "  --recents            Test recents integration"
     echo "  --verbose            Show all adb commands being run"
-    echo "  --auto-clear-data    Clear app data before test"
     echo "  --skip-device-check  Skip device connection verification"
     echo "  --help               Show this help message"
     echo ""
     echo "Examples:"
     echo "  ./tests/e2e/test-multi-window-editor.sh"
     echo "  ./tests/e2e/test-multi-window-editor.sh --smoke"
-    echo "  ./tests/e2e/test-multi-window-editor.sh --verbose --auto-clear-data"
+    echo "  ./tests/e2e/test-multi-window-editor.sh --verbose"
 }
 
 # Main test execution
@@ -390,18 +384,10 @@ main() {
     print_info "Package: $PACKAGE_NAME"
     print_info "Activity: $EDITOR_ACTIVITY"
     [ "$VERBOSE" = true ] && print_info "Verbose mode: ON"
-    [ "$AUTO_CLEAR_DATA" = true ] && print_info "Auto clear data: ON"
     echo ""
 
     # Check prerequisites
     check_prerequisites
-
-    # Clear app data if requested
-    if [ "$AUTO_CLEAR_DATA" = true ]; then
-        print_info "Clearing app data..."
-        adb shell pm clear "$PACKAGE_NAME"
-        sleep 1
-    fi
 
     # Run tests based on mode
     if [ "$SMOKE_TEST" = true ]; then
