@@ -107,10 +107,10 @@ run_test() {
             ;;
 
         accounts)
-            print_banner "Auth V1 Tests"
-            print_info "Running auth v1 e2e tests..."
+            print_banner "Account Journey Tests"
+            print_info "Running account creation and sign-in e2e tests..."
 
-            local cmd="./gradlew :server:test --tests \"app.logdate.server.e2e.auth.AuthV1E2ETest\""
+            local cmd="./gradlew :server:test --tests \"app.logdate.server.e2e.journeys.auth.AuthOnboardingAndSigninJourneyE2ETest\""
 
             if [ "$VERBOSE" = true ] || [ "$ENABLE_DEBUG" = true ]; then
                 cmd="$cmd --info"
@@ -124,7 +124,7 @@ run_test() {
             print_banner "Authentication Tests"
             print_info "Running authentication flow e2e tests..."
 
-            local cmd="./gradlew :server:test --tests \"app.logdate.server.e2e.auth.AuthV1E2ETest\""
+            local cmd="./gradlew :server:test --tests \"app.logdate.server.e2e.journeys.auth.*\""
 
             if [ "$VERBOSE" = true ] || [ "$ENABLE_DEBUG" = true ]; then
                 cmd="$cmd --info"
