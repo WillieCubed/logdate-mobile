@@ -45,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -73,6 +74,10 @@ import logdate.client.ui.generated.resources.common_try_again
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
 
+/** Final step of cloud account creation, where the passkey ceremony starts. */
+const val CLOUD_ACCOUNT_PASSKEY_ROOT_TAG = "cloud_account_passkey_root"
+const val CLOUD_ACCOUNT_PASSKEY_CREATE_TAG = "cloud_account_passkey_create"
+
 /**
  * Final step of LogDate Cloud account setup: confirm who the account will belong to, then create it.
  *
@@ -100,6 +105,7 @@ fun PasskeyAccountCreationFinalContent(
     Column(
         modifier =
             modifier
+                .testTag(CLOUD_ACCOUNT_PASSKEY_ROOT_TAG)
                 .fillMaxSize()
                 .padding(horizontal = Spacing.lg),
     ) {
@@ -162,7 +168,7 @@ fun PasskeyAccountCreationFinalContent(
         Button(
             onClick = onCreateAccount,
             enabled = !isCreatingAccount && isPasskeySupported,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag(CLOUD_ACCOUNT_PASSKEY_CREATE_TAG),
         ) {
             when {
                 isCreatingAccount -> {

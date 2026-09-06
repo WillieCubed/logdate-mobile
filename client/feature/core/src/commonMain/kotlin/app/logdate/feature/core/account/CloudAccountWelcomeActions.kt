@@ -20,6 +20,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
@@ -29,6 +30,11 @@ import logdate.client.feature.core.generated.resources.sign_in
 import logdate.client.ui.generated.resources.common_skip
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
+
+/** Actions on the cloud account welcome step. */
+const val CLOUD_ACCOUNT_WELCOME_CREATE_TAG = "cloud_account_welcome_create"
+const val CLOUD_ACCOUNT_WELCOME_SIGN_IN_TAG = "cloud_account_welcome_sign_in"
+const val CLOUD_ACCOUNT_WELCOME_SKIP_TAG = "cloud_account_welcome_skip"
 
 @Composable
 internal fun CloudAccountWelcomeActionPane(
@@ -115,7 +121,7 @@ private fun CloudAccountWelcomeActions(
 
         Button(
             onClick = onContinue,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag(CLOUD_ACCOUNT_WELCOME_CREATE_TAG),
             enabled = isPasskeySupported,
         ) {
             Text(stringResource(Res.string.create_new_account))
@@ -123,14 +129,14 @@ private fun CloudAccountWelcomeActions(
 
         OutlinedButton(
             onClick = onSignIn,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag(CLOUD_ACCOUNT_WELCOME_SIGN_IN_TAG),
         ) {
             Text(stringResource(Res.string.sign_in))
         }
 
         TextButton(
             onClick = onSkip,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag(CLOUD_ACCOUNT_WELCOME_SKIP_TAG),
         ) {
             Text(stringResource(UiRes.string.common_skip))
         }

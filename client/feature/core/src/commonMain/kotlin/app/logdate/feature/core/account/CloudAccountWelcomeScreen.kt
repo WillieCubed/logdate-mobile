@@ -16,6 +16,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.core.settings.ui.ServerPreset
@@ -23,6 +24,9 @@ import app.logdate.feature.core.settings.ui.ServerSelectionState
 import app.logdate.ui.AdaptiveLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.Spacing
+
+/** Root of the cloud account welcome step. */
+const val CLOUD_ACCOUNT_WELCOME_ROOT_TAG = "cloud_account_welcome_root"
 
 @Composable
 fun CloudAccountWelcomeScreen(
@@ -45,7 +49,9 @@ fun CloudAccountWelcomeScreen(
         onCustomServerUrlChange = onCustomServerUrlChange,
         onShowCustomServerInfo = onShowCustomServerInfo,
         isPasskeySupported = isPasskeySupported,
-        modifier = modifier,
+        // The content puts this modifier on a BoxWithConstraints wrapping both the folded and
+        // standard branches, so the tag resolves to exactly one node on every device.
+        modifier = modifier.testTag(CLOUD_ACCOUNT_WELCOME_ROOT_TAG),
     )
 }
 

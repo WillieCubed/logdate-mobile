@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -36,6 +37,11 @@ import logdate.client.ui.generated.resources.common_go_back
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
 
+/** Display-name step of cloud account creation. */
+const val CLOUD_ACCOUNT_DISPLAY_NAME_ROOT_TAG = "cloud_account_display_name_root"
+const val CLOUD_ACCOUNT_DISPLAY_NAME_FIELD_TAG = "cloud_account_display_name_field"
+const val CLOUD_ACCOUNT_DISPLAY_NAME_CONTINUE_TAG = "cloud_account_display_name_continue"
+
 @Composable
 fun DisplayNameSetupScreen(
     displayName: String,
@@ -51,7 +57,7 @@ fun DisplayNameSetupScreen(
         onContinue = onContinue,
         onBack = onBack,
         isValid = isValid,
-        modifier = modifier,
+        modifier = modifier.testTag(CLOUD_ACCOUNT_DISPLAY_NAME_ROOT_TAG),
     )
 }
 
@@ -172,6 +178,7 @@ private fun DisplayNameSetupContent(
                         ),
                     modifier =
                         Modifier
+                            .testTag(CLOUD_ACCOUNT_DISPLAY_NAME_FIELD_TAG)
                             .fillMaxWidth()
                             .focusRequester(focusRequester),
                 )
@@ -206,7 +213,7 @@ private fun DisplayNameSetupContent(
         Button(
             onClick = onContinue,
             enabled = isValid && displayName.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag(CLOUD_ACCOUNT_DISPLAY_NAME_CONTINUE_TAG),
         ) {
             Text(stringResource(UiRes.string.common_continue))
         }

@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.client.domain.account.GoogleAuthError
@@ -59,6 +60,9 @@ private const val FALLBACK_HANDLE_DOMAIN = "logdate.app"
 private const val FALLBACK_PRIVACY_POLICY_URL = "https://logdate.app/privacy"
 private const val FALLBACK_TERMS_OF_SERVICE_URL = "https://logdate.app/terms"
 private const val CUSTOM_SERVER_FALLBACK_NAME = "Custom server"
+
+/** The blocking first sync shown once an account exists. */
+const val CLOUD_ACCOUNT_INITIAL_SYNC_ROOT_TAG = "cloud_account_initial_sync_root"
 
 /** Resolves a semantic [GoogleAuthError] to a localized message string. */
 @Composable
@@ -291,7 +295,7 @@ private fun InitialSyncProgressScreen(
     val completed = syncStatus?.completedInRun ?: 0
 
     Column(
-        modifier = modifier.fillMaxSize().padding(24.dp),
+        modifier = modifier.testTag(CLOUD_ACCOUNT_INITIAL_SYNC_ROOT_TAG).fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
