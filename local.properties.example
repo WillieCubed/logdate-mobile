@@ -1,4 +1,10 @@
 # Local properties template (copy to `local.properties` and keep untracked)
+#
+# Only the client keys here are read from this file: OPENAI_API_KEY, GOOGLE_MAPS_API_KEY,
+# and metaAppId (see the app/android-main, client/intelligence, and client/sharing build
+# scripts). The server reads DATABASE_*, JWT_SECRET, SERVER_ENCRYPTION_*, ENCRYPTION_MODE,
+# GCS_*, and SYNC_* from the process environment instead -- put those in `.env` (see
+# docs/environment/.env.example) or export them in your shell. Setting them here has no effect.
 
 # OpenAI API for AI features
 OPENAI_API_KEY=replace-with-openai-key
@@ -22,10 +28,6 @@ JWT_SECRET=dev-secret-key-not-for-production-minimum-32-characters-required
 SERVER_ENCRYPTION_KEY=optional-base64-encoded-32-byte-key-for-encryption
 SERVER_ENCRYPTION_KEY_ID=default
 ENCRYPTION_MODE=AT_REST_ONLY
-
-# Server configuration
-PORT=8080
-HOST=0.0.0.0
 
 # GCS (optional - only needed if using Google Cloud Storage)
 # GCS_PROJECT_ID=your-gcp-project-id

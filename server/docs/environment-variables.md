@@ -79,7 +79,10 @@
 ### `PORT`
 - **Description**: Server HTTP port
 - **Type**: Integer
-- **Default**: `8080`
+- **Default**: `8765` (`SERVER_PORT`, defined in `shared/config`)
+- **Note**: Container images set `PORT=8080` explicitly (`Dockerfile`, `docker-compose.yml`),
+  so Docker and Cloud Run listen on 8080. The default applies only when nothing sets `PORT` —
+  for example `./gradlew :server:run`.
 - **Example**: `PORT=3000`
 - **Required**: No
 
@@ -433,8 +436,8 @@ These development/test-only variables provide the local PostgreSQL fallback when
 ### Minimal Development Setup
 
 ```bash
-# Server
-PORT=8080
+# Server (8765 is the default; set PORT only to override it)
+PORT=8765
 HOST=0.0.0.0
 
 # Database
@@ -449,7 +452,7 @@ JWT_SECRET=dev-secret-key-not-for-production-min-32-chars
 ### Production Setup (Google Cloud)
 
 ```bash
-# Server
+# Server (Cloud Run sets PORT itself; the container image defaults it to 8080)
 PORT=8080
 HOST=0.0.0.0
 

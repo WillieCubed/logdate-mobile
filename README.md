@@ -140,7 +140,7 @@ The fastest way to get the LogDate server running locally:
    ```
 
 5. **Access the application**
-   - **Server API**: http://localhost:18080 (Docker) or http://localhost:8080 (local)
+   - **Server API**: http://localhost:18080 (Docker) or http://localhost:8765 (local)
    - **Database**: localhost:15432 (logdate/logdate)
    - **Redis**: localhost:16379
    - **PgAdmin**: http://localhost:15050 (admin@logdate.app/admin)
