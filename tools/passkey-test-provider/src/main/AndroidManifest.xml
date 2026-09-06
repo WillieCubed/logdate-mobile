@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--
+      The ceremony derives its `android:apk-key-hash:` origin from the *calling* app's signing
+      certificate, which means reading that package's signing info. Package visibility on API 30+
+      hides every other app by default, so without this the lookup throws NameNotFoundException and
+      the ceremony fails before it starts.
+
+      Broad visibility rather than a <queries> entry for one package id, because the app under test
+      is built with a configurable applicationId (-Plogdate.applicationId) and a pinned name would
+      silently stop working for any other value. This is an emulator-only developer tool that is
+      never shipped, so the permission costs nothing.
+    -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
+
     <application
         android:label="LogDate Test Authenticator"
         android:allowBackup="false"
