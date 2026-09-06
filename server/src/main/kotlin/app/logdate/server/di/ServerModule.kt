@@ -129,12 +129,11 @@ const val ALLOW_INMEMORY_FALLBACK_ENV: String = "LOGDATE_ALLOW_INMEMORY_FALLBACK
 /**
  * Initializes the database connection and tables.
  *
- * Flyway migrations run only when `AUTO_MIGRATE=true` (the documented production policy is to
- * apply migrations as a separate CI step). The Exposed `createMissingTablesAndColumns`
- * reconciliation, by contrast, runs on every boot — it's idempotent, only adds missing
- * tables/columns, and is what fills in Exposed-defined columns that no Flyway migration owns
- * (e.g. `deleted` / `deleted_at` on `sync_*`). Coupling the two was what let an in-memory
- * fallback hide an empty production database for weeks.
+ * Flyway owns the schema outright. Migrations run only when `AUTO_MIGRATE=true` (the documented
+ * production policy is to apply them as a separate CI step), and that same run's
+ * `beforeMigrate.sql` callback creates the legacy `sync_*` tables, their `deleted` /
+ * `deleted_at` columns included. Nothing reconciles the schema at runtime, so with
+ * `AUTO_MIGRATE=false` the server connects to whatever schema is already there.
  *
  * A database failure now stops startup everywhere. In production (`LOGDATE_ENV=production`) the
  * original failure is rethrown so Cloud Run's startup probe rolls the revision back. Elsewhere it
