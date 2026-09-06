@@ -8,7 +8,6 @@ import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
-import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.CloudAssociationDataSource
 import app.logdate.client.sync.cloud.CloudContentDataSource
 import app.logdate.client.sync.cloud.CloudDraftDataSource
@@ -95,8 +94,8 @@ class DefaultSyncManager(
             transactionManager = transactionManager,
             syncMetadataService = syncMetadataService,
             conflictStore = conflictStore,
-            mapCloudApiError = ::handleCloudApiError,
-            mapException = ::handleSyncException,
+            mapCloudApiError = statusPublisher::handleCloudApiError,
+            mapException = statusPublisher::handleSyncException,
         )
 
     override fun sync(startNow: Boolean) {
@@ -112,155 +111,143 @@ class DefaultSyncManager(
         }
     }
 
-    override suspend fun uploadPendingChanges(): SyncResult =
+    /**
+     * Shared shape behind [uploadPendingChanges] and [downloadRemoteChanges]: the same
+     * disabled/unauthenticated guard, a [syncStateFlow] transition around the body, unexpected
+     * exceptions mapped through [SyncStatusPublisher.handleSyncException], and [SyncState.Idle]
+     * always restored.
+     *
+     * @param beforeAccessToken Runs once the guard has passed and [syncStateFlow] is
+     *   [SyncState.Syncing], but before the access token is fetched -- [uploadPendingChanges]
+     *   needs to capture the pending count as the run's total *before* a possible auth failure,
+     *   since once the queue starts draining, the original count is gone.
+     */
+    private suspend fun runFullSyncPhase(
+        operationName: String,
+        exceptionLabel: String,
+        beforeAccessToken: suspend () -> Unit = {},
+        body: suspend (accessToken: String) -> SyncResult,
+    ): SyncResult =
         syncMutex.withLock {
             if (!isEnabled) {
                 return SyncResult(
                     success = false,
-                    errors =
-                        listOf(
-                            SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled"),
-                        ),
+                    errors = listOf(SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled")),
                 )
             }
 
             if (!tokenRefresher.isAuthenticated()) {
-                Napier.w("Upload attempted without authentication")
+                Napier.w("$operationName attempted without authentication")
                 return SyncResult(
                     success = false,
-                    errors =
-                        listOf(
-                            SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated. Please sign in to sync."),
-                        ),
+                    errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated. Please sign in to sync.")),
                 )
             }
 
             syncStateFlow.value = SyncState.Syncing
-            // Captured here because this is the only moment the denominator exists: once the run
-            // starts draining the queue, the count that is left is all anyone can see.
-            statusPublisher.beginRun(runCatching { syncMetadataService.getPendingCount() }.getOrNull()?.takeIf { it > 0 })
+            beforeAccessToken()
 
             try {
-                val accessToken =
-                    tokenRefresher.getAccessToken()
-                        ?: return authError()
-
-                // Deliberately sequential. Every one of these writes into the same AT Protocol
-                // repo, and a repo write is read-whole-tree, rebuild, write-head. Two of them in
-                // flight at once each build a tree missing the other's record, and the later head
-                // write wins -- the earlier record survives as an orphaned block but is no longer
-                // reachable, so it silently disappears. Running them in parallel bought nothing
-                // (they contend on one repo) and cost entries.
-                val journalResult = uploader.uploadJournals(accessToken)
-                val contentResult = uploader.uploadContent(accessToken)
-                val associationResult = uploader.uploadAssociations(accessToken)
-                val draftResult = uploader.uploadDrafts(accessToken)
-                val totalUploaded =
-                    journalResult.uploadedItems +
-                        contentResult.uploadedItems +
-                        associationResult.uploadedItems +
-                        draftResult.uploadedItems
-                statusPublisher.setRunCompleted(totalUploaded)
-                val errors =
-                    journalResult.errors +
-                        contentResult.errors +
-                        associationResult.errors +
-                        draftResult.errors
-
-                val success = errors.isEmpty()
-                if (success) {
-                    lastErrorFlow.value = null
-                    statusPublisher.refreshObservedQuotaFromServer("pending upload")
-                } else {
-                    lastErrorFlow.value = errors.firstOrNull()
-                }
-
-                return SyncResult(
-                    success = success,
-                    uploadedItems = totalUploaded,
-                    errors = errors,
-                    lastSyncTime = latestSyncTime(),
-                )
+                val accessToken = tokenRefresher.getAccessToken() ?: return authError()
+                body(accessToken)
             } catch (e: Exception) {
-                return handleSyncException(e, "Upload failed")
+                statusPublisher.handleSyncException(e, exceptionLabel)
             } finally {
                 syncStateFlow.value = SyncState.Idle
             }
         }
 
+    override suspend fun uploadPendingChanges(): SyncResult =
+        runFullSyncPhase(
+            operationName = "Upload",
+            exceptionLabel = "Upload failed",
+            beforeAccessToken = {
+                // Captured here because this is the only moment the denominator exists: once the
+                // run starts draining the queue, the count that is left is all anyone can see.
+                statusPublisher.beginRun(runCatching { syncMetadataService.getPendingCount() }.getOrNull()?.takeIf { it > 0 })
+            },
+        ) { accessToken ->
+            // Deliberately sequential. Every one of these writes into the same AT Protocol
+            // repo, and a repo write is read-whole-tree, rebuild, write-head. Two of them in
+            // flight at once each build a tree missing the other's record, and the later head
+            // write wins -- the earlier record survives as an orphaned block but is no longer
+            // reachable, so it silently disappears. Running them in parallel bought nothing
+            // (they contend on one repo) and cost entries.
+            val journalResult = uploader.uploadJournals(accessToken)
+            val contentResult = uploader.uploadContent(accessToken)
+            val associationResult = uploader.uploadAssociations(accessToken)
+            val draftResult = uploader.uploadDrafts(accessToken)
+            val totalUploaded =
+                journalResult.uploadedItems +
+                    contentResult.uploadedItems +
+                    associationResult.uploadedItems +
+                    draftResult.uploadedItems
+            statusPublisher.setRunCompleted(totalUploaded)
+            val errors =
+                journalResult.errors +
+                    contentResult.errors +
+                    associationResult.errors +
+                    draftResult.errors
+
+            val success = errors.isEmpty()
+            if (success) {
+                lastErrorFlow.value = null
+                statusPublisher.refreshObservedQuotaFromServer("pending upload")
+            } else {
+                lastErrorFlow.value = errors.firstOrNull()
+            }
+
+            SyncResult(
+                success = success,
+                uploadedItems = totalUploaded,
+                errors = errors,
+                lastSyncTime = latestSyncTime(),
+            )
+        }
+
     override suspend fun downloadRemoteChanges(): SyncResult =
-        syncMutex.withLock {
-            if (!isEnabled) {
-                return SyncResult(
-                    success = false,
-                    errors =
-                        listOf(
-                            SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled"),
-                        ),
-                )
+        runFullSyncPhase(
+            operationName = "Download",
+            exceptionLabel = "Download failed",
+        ) { accessToken ->
+            val journalSince = cursorFor(EntityType.JOURNAL)
+            val contentSince = cursorFor(EntityType.NOTE)
+            val associationSince = cursorFor(EntityType.ASSOCIATION)
+
+            // Sequential for the same reason as the upload side: these share one server
+            // instance whose per-request cost is proportional to repo size, and fanning out
+            // was enough on its own to starve every request thread it had.
+            val journalResult = downloader.downloadJournals(accessToken, journalSince)
+            val contentResult = downloader.downloadContent(accessToken, contentSince)
+            val associationResult = downloader.downloadAssociations(accessToken, associationSince)
+            val totalDownloaded =
+                journalResult.downloadedItems +
+                    contentResult.downloadedItems +
+                    associationResult.downloadedItems
+            val conflictsResolved =
+                journalResult.conflictsResolved +
+                    contentResult.conflictsResolved +
+                    associationResult.conflictsResolved
+            val errors =
+                journalResult.errors +
+                    contentResult.errors +
+                    associationResult.errors
+
+            val success = errors.isEmpty()
+            if (success) {
+                lastErrorFlow.value = null
+                statusPublisher.refreshObservedQuotaFromServer("remote download")
+            } else {
+                lastErrorFlow.value = errors.firstOrNull()
             }
 
-            if (!tokenRefresher.isAuthenticated()) {
-                Napier.w("Download attempted without authentication")
-                return SyncResult(
-                    success = false,
-                    errors =
-                        listOf(
-                            SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated. Please sign in to sync."),
-                        ),
-                )
-            }
-
-            syncStateFlow.value = SyncState.Syncing
-
-            try {
-                val accessToken =
-                    tokenRefresher.getAccessToken()
-                        ?: return authError()
-
-                val journalSince = cursorFor(EntityType.JOURNAL)
-                val contentSince = cursorFor(EntityType.NOTE)
-                val associationSince = cursorFor(EntityType.ASSOCIATION)
-
-                // Sequential for the same reason as the upload side: these share one server
-                // instance whose per-request cost is proportional to repo size, and fanning out
-                // was enough on its own to starve every request thread it had.
-                val journalResult = downloader.downloadJournals(accessToken, journalSince)
-                val contentResult = downloader.downloadContent(accessToken, contentSince)
-                val associationResult = downloader.downloadAssociations(accessToken, associationSince)
-                val totalDownloaded =
-                    journalResult.downloadedItems +
-                        contentResult.downloadedItems +
-                        associationResult.downloadedItems
-                val conflictsResolved =
-                    journalResult.conflictsResolved +
-                        contentResult.conflictsResolved +
-                        associationResult.conflictsResolved
-                val errors =
-                    journalResult.errors +
-                        contentResult.errors +
-                        associationResult.errors
-
-                val success = errors.isEmpty()
-                if (success) {
-                    lastErrorFlow.value = null
-                    statusPublisher.refreshObservedQuotaFromServer("remote download")
-                } else {
-                    lastErrorFlow.value = errors.firstOrNull()
-                }
-
-                return SyncResult(
-                    success = success,
-                    downloadedItems = totalDownloaded,
-                    conflictsResolved = conflictsResolved,
-                    errors = errors,
-                    lastSyncTime = latestSyncTime(),
-                )
-            } catch (e: Exception) {
-                return handleSyncException(e, "Download failed")
-            } finally {
-                syncStateFlow.value = SyncState.Idle
-            }
+            SyncResult(
+                success = success,
+                downloadedItems = totalDownloaded,
+                conflictsResolved = conflictsResolved,
+                errors = errors,
+                lastSyncTime = latestSyncTime(),
+            )
         }
 
     /**
@@ -446,44 +433,6 @@ class DefaultSyncManager(
             errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "No access token")),
         )
 
-    /**
-     * Helper to handle sync exceptions consistently.
-     */
-    private fun handleSyncException(
-        e: Exception,
-        operation: String,
-    ): SyncResult {
-        val error =
-            SyncError(
-                type = SyncErrorType.UNKNOWN_ERROR,
-                message = "$operation: ${e.message}",
-                cause = e,
-            )
-        lastErrorFlow.value = error
-        Napier.e("$operation failed", e)
-        return SyncResult(success = false, errors = listOf(error))
-    }
-
-    /**
-     * Helper to handle CloudApiException consistently.
-     * Distinguishes 401 Unauthorized errors from other server errors.
-     */
-    private fun handleCloudApiError(e: CloudApiException): SyncResult {
-        val errorType =
-            if (e.statusCode == 401) {
-                SyncErrorType.AUTHENTICATION_ERROR
-            } else {
-                SyncErrorType.SERVER_ERROR
-            }
-        return SyncResult(
-            success = false,
-            errors =
-                listOf(
-                    SyncError(errorType, e.message, e),
-                ),
-        )
-    }
-
     private val tokenRefresher = SyncTokenRefresher(sessionStorage, cloudAccountRepository)
 
     private suspend fun cursorFor(entityType: EntityType): Instant =
@@ -536,8 +485,8 @@ class DefaultSyncManager(
             downloadEngine = downloadEngine,
             mediaTransfer = mediaTransfer,
             tokenRefresher = tokenRefresher,
-            mapCloudApiError = ::handleCloudApiError,
-            mapException = ::handleSyncException,
+            mapCloudApiError = statusPublisher::handleCloudApiError,
+            mapException = statusPublisher::handleSyncException,
         )
 
     private val uploader =
@@ -555,8 +504,8 @@ class DefaultSyncManager(
             tokenRefresher = tokenRefresher,
             mediaTransfer = mediaTransfer,
             retryCoordinator = retryCoordinator,
-            mapCloudApiError = ::handleCloudApiError,
-            mapException = ::handleSyncException,
+            mapCloudApiError = statusPublisher::handleCloudApiError,
+            mapException = statusPublisher::handleSyncException,
             recordProgress = statusPublisher::recordProgress,
             setMediaDeferredForNetwork = statusPublisher::setMediaDeferredForNetwork,
         )

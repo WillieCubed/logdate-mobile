@@ -4,6 +4,7 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.networking.DataRestriction
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.shouldSyncMedia
+import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.shared.model.CloudQuotaManager
@@ -20,9 +21,14 @@ import kotlin.time.Instant
  * Owns [DefaultSyncManager]'s [SyncStatus] snapshot: republishing it on every state/error/session
  * transition, tracking the current upload run's progress, and deciding [SyncPausedReason].
  *
- * @param syncStateFlow,lastErrorFlow Read-only views of state [DefaultSyncManager] itself still
- *   writes directly (both gate control flow there -- `syncMutex`-scoped transitions, error
- *   reporting during upload/download), so this class only ever reads them.
+ * @param syncStateFlow Read-only view of state [DefaultSyncManager] itself still writes directly
+ *   (it gates control flow there -- `syncMutex`-scoped state transitions), so this class only
+ *   ever reads it.
+ * @param lastErrorFlow Read *and* written here: every other write happens directly on
+ *   [DefaultSyncManager] (clearing/setting it around an upload or download run), but mapping an
+ *   exception into a [SyncResult] -- [handleSyncException]/[handleCloudApiError] -- is itself
+ *   part of deciding what the published status's `lastError` should say, so it lives with the
+ *   rest of that decision instead of splitting the two.
  * @param latestSyncTime,isEnabled Reused from [DefaultSyncManager] rather than duplicated: the
  *   former is independently useful for a [SyncResult]'s own `lastSyncTime`, and the latter is a
  *   plain field with no reason to move.
@@ -33,7 +39,7 @@ internal class SyncStatusPublisher(
     private val dataUsagePolicy: DataUsagePolicy,
     private val cloudQuotaManager: CloudQuotaManager?,
     private val syncStateFlow: StateFlow<SyncState>,
-    private val lastErrorFlow: StateFlow<SyncError?>,
+    private val lastErrorFlow: MutableStateFlow<SyncError?>,
     private val syncScope: CoroutineScope,
     private val latestSyncTime: suspend () -> Instant?,
     private val isEnabled: () -> Boolean,
@@ -188,5 +194,41 @@ internal class SyncStatusPublisher(
         val manager = cloudQuotaManager ?: return
         runCatching { manager.syncWithServer() }
             .onFailure { Napier.w("Failed to refresh quota after $reason", it) }
+    }
+
+    /** Helper to handle sync exceptions consistently. */
+    fun handleSyncException(
+        e: Exception,
+        operation: String,
+    ): SyncResult {
+        val error =
+            SyncError(
+                type = SyncErrorType.UNKNOWN_ERROR,
+                message = "$operation: ${e.message}",
+                cause = e,
+            )
+        lastErrorFlow.value = error
+        Napier.e("$operation failed", e)
+        return SyncResult(success = false, errors = listOf(error))
+    }
+
+    /**
+     * Helper to handle CloudApiException consistently.
+     * Distinguishes 401 Unauthorized errors from other server errors.
+     */
+    fun handleCloudApiError(e: CloudApiException): SyncResult {
+        val errorType =
+            if (e.statusCode == 401) {
+                SyncErrorType.AUTHENTICATION_ERROR
+            } else {
+                SyncErrorType.SERVER_ERROR
+            }
+        return SyncResult(
+            success = false,
+            errors =
+                listOf(
+                    SyncError(errorType, e.message, e),
+                ),
+        )
     }
 }
