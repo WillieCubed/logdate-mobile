@@ -1,5 +1,8 @@
 package app.logdate.server.identity
 
+import app.logdate.server.config.RuntimeProfile
+import java.net.URI
+
 /**
  * Server-side configuration for AT Protocol identity surfaces.
  */
@@ -20,7 +23,11 @@ data class AtprotoIdentityConfig(
 ) {
     init {
         require(handleDomain.isNotBlank()) { "handleDomain must not be blank" }
-        require(pdsServiceEndpoint.startsWith("https://")) { "pdsServiceEndpoint must use https" }
+        require(isAcceptableServiceEndpoint(pdsServiceEndpoint)) {
+            "pdsServiceEndpoint must use https; plain http is accepted outside production only for " +
+                "loopback hosts ($LOOPBACK_HOSTS), so an emulator can reach a server running on the " +
+                "developer's machine"
+        }
         require(plcDirectoryUrl.startsWith("https://")) { "plcDirectoryUrl must use https" }
     }
 
@@ -65,4 +72,23 @@ data class AtprotoIdentityConfig(
             )
         }
     }
+}
+
+/** Loopback hosts a device or emulator uses to reach the machine running the server. */
+internal val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "10.0.2.2", "::1", "[::1]")
+
+/**
+ * The endpoint the server advertises to clients. https always; plain http only outside production
+ * and only for a loopback host, which is the single case where the server and the client are the
+ * same machine and TLS buys nothing. Production is additionally gated by
+ * [app.logdate.server.config.ProductionConfigValidator].
+ */
+internal fun isAcceptableServiceEndpoint(
+    endpoint: String,
+    profile: RuntimeProfile = RuntimeProfile.fromEnvironment(),
+): Boolean {
+    if (endpoint.startsWith("https://")) return true
+    if (profile.isProduction || !endpoint.startsWith("http://")) return false
+    val host = runCatching { URI(endpoint).host }.getOrNull().orEmpty()
+    return host in LOOPBACK_HOSTS
 }
