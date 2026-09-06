@@ -712,62 +712,7 @@ class DefaultSyncManager(
         )
     }
 
-    /**
-     * Runs a server call, and if it comes back 401, refreshes the access token and tries once more.
-     *
-     * Every call that talks to the server goes through here. Downloads used to reuse a token
-     * captured once at the start of the run, so an hour-old session made them fail with 401 and
-     * nothing refreshed it. A full sync downloads before it uploads, so that one rejection failed
-     * the whole run -- the device looked signed in and simply stopped backing anything up.
-     */
-    private suspend fun <T> retryWithFreshToken(
-        operation: suspend (accessToken: String) -> Result<T>,
-        operationName: String,
-    ): Result<T> {
-        val currentSession = sessionStorage.getSession()
-        if (currentSession == null) {
-            Napier.w("No active session for $operationName")
-            return Result.failure(
-                CloudApiException("NO_SESSION", "No active session available", statusCode = 401),
-            )
-        }
-
-        // Try initial operation
-        val initialResult = operation(currentSession.accessToken)
-        if (initialResult.isSuccess) {
-            return initialResult
-        }
-
-        // Check if error is 401
-        val exception = initialResult.exceptionOrNull() as? CloudApiException
-        if (exception?.statusCode != 401) {
-            return initialResult // Not a token error, return as-is
-        }
-
-        // Token expired, attempt refresh
-        Napier.i("Token expired (401) during $operationName, attempting refresh")
-        val refreshResult = cloudAccountRepository.refreshAccessToken(currentSession.refreshToken)
-        if (refreshResult.isFailure) {
-            Napier.e("Token refresh failed: ${refreshResult.exceptionOrNull()}")
-            return initialResult // Return original error if refresh fails
-        }
-
-        // Refresh succeeded, retry operation with new token
-        val newToken = refreshResult.getOrNull()
-        if (newToken == null) {
-            Napier.w("Token refresh succeeded but returned null")
-            return initialResult
-        }
-
-        // Keep the refreshed token. The account repository persists it under its own storage key,
-        // which the session storage never reads, so without this the session keeps handing out the
-        // token the server just rejected and every single request pays a 401 and a refresh before
-        // it does any work.
-        sessionStorage.saveSession(currentSession.copy(accessToken = newToken))
-
-        Napier.d("Token refreshed successfully, retrying $operationName")
-        return operation(newToken)
-    }
+    private val tokenRefresher = SyncTokenRefresher(sessionStorage, cloudAccountRepository)
 
     private suspend fun cursorFor(entityType: EntityType): Instant =
         syncMetadataService.getLastSyncTime(entityType)
@@ -869,7 +814,7 @@ class DefaultSyncManager(
                 when (pending.operation) {
                     PendingOperation.DELETE -> {
                         val result =
-                            retryWithFreshToken(
+                            tokenRefresher.withFreshToken(
                                 { token -> cloudJournalDataSource.deleteJournal(token, journalId) },
                                 "deleteJournal($journalId)",
                             )
@@ -916,12 +861,12 @@ class DefaultSyncManager(
 
                         val result =
                             if (pending.operation == PendingOperation.CREATE) {
-                                retryWithFreshToken(
+                                tokenRefresher.withFreshToken(
                                     { token -> cloudJournalDataSource.uploadJournal(token, journal) },
                                     "uploadJournal(${journal.id})",
                                 )
                             } else {
-                                retryWithFreshToken(
+                                tokenRefresher.withFreshToken(
                                     { token -> cloudJournalDataSource.updateJournal(token, journal) },
                                     "updateJournal(${journal.id})",
                                 )
@@ -1015,7 +960,7 @@ class DefaultSyncManager(
                 when (pending.operation) {
                     PendingOperation.DELETE -> {
                         val result =
-                            retryWithFreshToken(
+                            tokenRefresher.withFreshToken(
                                 { token -> cloudContentDataSource.deleteNote(token, noteId) },
                                 "deleteNote($noteId)",
                             )
@@ -1122,12 +1067,12 @@ class DefaultSyncManager(
 
                         val result =
                             if (pending.operation == PendingOperation.CREATE) {
-                                retryWithFreshToken(
+                                tokenRefresher.withFreshToken(
                                     { token -> cloudContentDataSource.uploadNote(token, uploadReadyNote) },
                                     "uploadNote(${note.uid})",
                                 )
                             } else {
-                                retryWithFreshToken(
+                                tokenRefresher.withFreshToken(
                                     { token -> cloudContentDataSource.updateNote(token, uploadReadyNote) },
                                     "updateNote(${note.uid})",
                                 )
@@ -1240,7 +1185,7 @@ class DefaultSyncManager(
 
             if (createAssociations.isNotEmpty()) {
                 val result =
-                    retryWithFreshToken(
+                    tokenRefresher.withFreshToken(
                         { token -> cloudAssociationDataSource.uploadAssociations(token, createAssociations) },
                         "uploadAssociations(${createAssociations.size} items)",
                     )
@@ -1273,7 +1218,7 @@ class DefaultSyncManager(
 
             if (deleteAssociations.isNotEmpty()) {
                 val result =
-                    retryWithFreshToken(
+                    tokenRefresher.withFreshToken(
                         { token -> cloudAssociationDataSource.deleteAssociations(token, deleteAssociations) },
                         "deleteAssociations(${deleteAssociations.size} items)",
                     )
@@ -1337,7 +1282,7 @@ class DefaultSyncManager(
                 when (pending.operation) {
                     PendingOperation.DELETE -> {
                         val result =
-                            retryWithFreshToken(
+                            tokenRefresher.withFreshToken(
                                 { token -> cloudDraftDataSource.deleteDraft(token, draftId) },
                                 "deleteDraft($draftId)",
                             )
@@ -1368,7 +1313,7 @@ class DefaultSyncManager(
                         }
 
                         val result =
-                            retryWithFreshToken(
+                            tokenRefresher.withFreshToken(
                                 { token -> cloudDraftDataSource.uploadDraft(token, draft, deviceId) },
                                 "uploadDraft(${draft.id})",
                             )
@@ -1412,10 +1357,11 @@ class DefaultSyncManager(
                     entityType = EntityType.JOURNAL,
                     logLabel = "journal",
                     fetchChanges = { token, cursor ->
-                        retryWithFreshToken(
-                            { t -> cloudJournalDataSource.getJournalChanges(t, cursor, SYNC_PAGE_SIZE) },
-                            "getJournalChanges",
-                        ).map { ChangesPage(it.changes, it.deletions, it.lastSyncTimestamp, it.hasMore) }
+                        tokenRefresher
+                            .withFreshToken(
+                                { t -> cloudJournalDataSource.getJournalChanges(t, cursor, SYNC_PAGE_SIZE) },
+                                "getJournalChanges",
+                            ).map { ChangesPage(it.changes, it.deletions, it.lastSyncTimestamp, it.hasMore) }
                     },
                     localItems = { journalRepository.allJournalsObserved.first().associateBy { it.id } },
                     idOf = { it.id },
@@ -1452,10 +1398,11 @@ class DefaultSyncManager(
                     entityType = EntityType.NOTE,
                     logLabel = "note",
                     fetchChanges = { token, cursor ->
-                        retryWithFreshToken(
-                            { t -> cloudContentDataSource.getContentChanges(t, cursor, SYNC_PAGE_SIZE) },
-                            "getContentChanges",
-                        ).map { ChangesPage(it.changes, it.deletions, it.lastSyncTimestamp, it.hasMore) }
+                        tokenRefresher
+                            .withFreshToken(
+                                { t -> cloudContentDataSource.getContentChanges(t, cursor, SYNC_PAGE_SIZE) },
+                                "getContentChanges",
+                            ).map { ChangesPage(it.changes, it.deletions, it.lastSyncTimestamp, it.hasMore) }
                     },
                     localItems = { journalNotesRepository.allNotesObserved.first().associateBy { it.uid } },
                     idOf = { it.uid },
@@ -1669,10 +1616,11 @@ class DefaultSyncManager(
 
             while (hasMore) {
                 val result =
-                    retryWithFreshToken(
-                        { token -> cloudAssociationDataSource.getAssociationChanges(token, cursor, SYNC_PAGE_SIZE) },
-                        "getAssociationChanges",
-                    ).getOrThrow()
+                    tokenRefresher
+                        .withFreshToken(
+                            { token -> cloudAssociationDataSource.getAssociationChanges(token, cursor, SYNC_PAGE_SIZE) },
+                            "getAssociationChanges",
+                        ).getOrThrow()
 
                 val batchResult =
                     transactionManager.withTransaction {
