@@ -399,6 +399,18 @@ These development/test-only variables provide the local PostgreSQL fallback when
   - Production should run migrations as a dedicated CI step before the new container goes live; automatic migration on every container start means a rolling deploy can race two versions of the app against the same Flyway lock.
   - When `false`, startup still connects to the database but skips schema mutation.
 
+### `LOGDATE_ALLOW_INMEMORY_FALLBACK`
+- **Description**: Allows the server to start on in-memory repositories when the database is unreachable.
+- **Type**: Boolean
+- **Default**: `false`
+- **Example**: `LOGDATE_ALLOW_INMEMORY_FALLBACK=true`
+- **Required**: No
+- **Notes**:
+  - Unset, a database failure stops startup. The error names the connection variables to fix (`DATABASE_URL`, `DATABASE_USER`, `DATABASE_PASSWORD`) and chains the underlying cause.
+  - Set it only for local work that genuinely does not need persistence — nothing is written and every record is lost when the process exits. Startup logs a warning saying so.
+  - Ignored in production (`LOGDATE_ENV=production`), where a database failure is always rethrown so the deployment's startup probe rolls the revision back.
+  - Also readable as a system property (`-DLOGDATE_ALLOW_INMEMORY_FALLBACK=true`), matching how `PORT` and `HOST` are resolved.
+
 ### `SYNC_TOMBSTONE_RETENTION_DAYS`
 - **Description**: How many days to keep deletion markers before purging
 - **Type**: Integer

@@ -30,6 +30,7 @@ import app.logdate.server.auth.RefreshTokenRevocationRepository
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.TokenService
 import app.logdate.server.config.RuntimeProfile
+import app.logdate.server.config.profileAwareBoolEnv
 import app.logdate.server.database.DatabaseConfig
 import app.logdate.server.database.PostgreSQLAccountIdentityRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
@@ -118,6 +119,14 @@ import studio.hypertext.atproto.repo.RepoEngine
 import studio.hypertext.atproto.repo.RepoRecordStore
 
 /**
+ * Opt-in for starting without a database, for local work that does not need persistence.
+ *
+ * Unset by default: an unreachable database is a startup failure, not something to route around
+ * silently. See [initializeDatabase].
+ */
+const val ALLOW_INMEMORY_FALLBACK_ENV: String = "LOGDATE_ALLOW_INMEMORY_FALLBACK"
+
+/**
  * Initializes the database connection and tables.
  *
  * Flyway migrations run only when `AUTO_MIGRATE=true` (the documented production policy is to
@@ -127,13 +136,20 @@ import studio.hypertext.atproto.repo.RepoRecordStore
  * (e.g. `deleted` / `deleted_at` on `sync_*`). Coupling the two was what let an in-memory
  * fallback hide an empty production database for weeks.
  *
- * In production (`LOGDATE_ENV=production`) any DB failure is rethrown so Cloud Run's startup
- * probe rolls the revision back. In dev/test, the legacy in-memory fallback is preserved so
- * local iteration without a Postgres instance keeps working.
+ * A database failure now stops startup everywhere. In production (`LOGDATE_ENV=production`) the
+ * original failure is rethrown so Cloud Run's startup probe rolls the revision back. Elsewhere it
+ * becomes an [IllegalStateException] naming [ALLOW_INMEMORY_FALLBACK_ENV], which is the only way
+ * to reach the in-memory repositories — set it when you deliberately want a server without
+ * Postgres and accept that nothing survives a restart.
  *
- * @return true if Postgres is wired in, false if the dev/test in-memory fallback was taken.
+ * @param readEnv environment reader, overridable in tests.
+ * @return true if Postgres is wired in, false if the opted-in in-memory fallback was taken.
  */
-fun initializeDatabase(): Boolean =
+fun initializeDatabase(
+    // System property first, then environment — the same order main() uses for PORT and HOST,
+    // so a `-D` flag can opt in without reaching for the process environment.
+    readEnv: (String) -> String? = { System.getProperty(it) ?: System.getenv(it) },
+): Boolean =
     try {
         val dataSource = DatabaseConfig.createDataSource()
         val runFlyway = DatabaseConfig.shouldRunMigrations()
@@ -144,11 +160,33 @@ fun initializeDatabase(): Boolean =
         Napier.i("Database repositories initialized successfully")
         true
     } catch (e: Exception) {
-        if (RuntimeProfile.fromEnvironment().isProduction) {
+        val profile = RuntimeProfile.fromEnvironment(readEnv)
+        if (profile.isProduction) {
             Napier.e("Production database unavailable; refusing to start with in-memory fallback", e)
             throw e
         }
-        Napier.w("Database not available, using in-memory repositories", e)
+        val fallbackAllowed =
+            profileAwareBoolEnv(
+                name = ALLOW_INMEMORY_FALLBACK_ENV,
+                productionDefault = false,
+                devDefault = false,
+                readEnv = readEnv,
+                profile = profile,
+            )
+        if (!fallbackAllowed) {
+            Napier.e("Database unavailable; refusing to start somewhere nothing would persist", e)
+            throw IllegalStateException(
+                "Database unavailable, so nothing would be persisted. Fix the connection — " +
+                    "DATABASE_URL, DATABASE_USER and DATABASE_PASSWORD are all required — or set " +
+                    "$ALLOW_INMEMORY_FALLBACK_ENV=true to run on in-memory repositories on purpose.",
+                e,
+            )
+        }
+        Napier.w(
+            "$ALLOW_INMEMORY_FALLBACK_ENV is set: running on in-memory repositories. Nothing is " +
+                "persisted and every record is lost when the process exits.",
+            e,
+        )
         false
     }
 

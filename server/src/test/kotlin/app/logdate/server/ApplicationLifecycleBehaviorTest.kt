@@ -1,6 +1,7 @@
 package app.logdate.server
 
 import app.logdate.server.config.profileAwareBoolEnv
+import app.logdate.server.di.ALLOW_INMEMORY_FALLBACK_ENV
 import app.logdate.server.logdate.asLogDateCollectionsRepository
 import app.logdate.server.sync.InMemorySyncRepository
 import app.logdate.server.sync.SyncMetricsRegistry
@@ -40,7 +41,11 @@ class ApplicationLifecycleBehaviorTest {
         val previousWait = System.getProperty("LOGDATE_SERVER_WAIT")
         val previousPort = System.getProperty("PORT")
         val previousHost = System.getProperty("HOST")
+        val previousFallback = System.getProperty(ALLOW_INMEMORY_FALLBACK_ENV)
         try {
+            // No database is configured here, and an unreachable one is a startup failure, so
+            // this boot has to opt into the in-memory repositories on purpose.
+            System.setProperty(ALLOW_INMEMORY_FALLBACK_ENV, "true")
             System.setProperty("LOGDATE_SERVER_WAIT", "false")
             System.setProperty("PORT", "0")
             System.setProperty("HOST", "127.0.0.1")
@@ -55,6 +60,11 @@ class ApplicationLifecycleBehaviorTest {
             }
             if (previousPort == null) System.clearProperty("PORT") else System.setProperty("PORT", previousPort)
             if (previousHost == null) System.clearProperty("HOST") else System.setProperty("HOST", previousHost)
+            if (previousFallback == null) {
+                System.clearProperty(ALLOW_INMEMORY_FALLBACK_ENV)
+            } else {
+                System.setProperty(ALLOW_INMEMORY_FALLBACK_ENV, previousFallback)
+            }
         }
     }
 

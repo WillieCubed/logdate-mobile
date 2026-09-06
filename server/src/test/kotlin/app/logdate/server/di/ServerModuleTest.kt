@@ -7,6 +7,7 @@ import app.logdate.server.auth.InMemoryAccountIdentityRepository
 import app.logdate.server.auth.InMemoryAccountRepository
 import app.logdate.server.auth.InMemorySessionManager
 import app.logdate.server.auth.SessionManager
+import app.logdate.server.config.RuntimeProfile
 import app.logdate.server.database.DatabaseConfig
 import app.logdate.server.database.PostgreSQLAccountIdentityRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
@@ -51,6 +52,8 @@ import studio.hypertext.atproto.repo.RepoBlockStore
 import javax.sql.DataSource
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -74,10 +77,45 @@ class ServerModuleTest {
     }
 
     @Test
-    fun `initialize database gracefully falls back when unavailable`() {
-        // Environment-dependent: local developers may have Postgres available.
-        // The contract here is that initialization never crashes the process.
-        initializeDatabase()
+    fun `initialize database refuses to start when the database is unavailable`() {
+        mockkObject(DatabaseConfig)
+        every { DatabaseConfig.createDataSource() } throws
+            IllegalStateException("Database credential missing: set DATABASE_USER")
+
+        val error = assertFailsWith<IllegalStateException> { initializeDatabase(readEnv = { null }) }
+
+        assertTrue(
+            error.message.orEmpty().contains(ALLOW_INMEMORY_FALLBACK_ENV),
+            "The failure should name the opt-in that would allow an in-memory run",
+        )
+    }
+
+    @Test
+    fun `initialize database falls back to in memory only when explicitly allowed`() {
+        mockkObject(DatabaseConfig)
+        every { DatabaseConfig.createDataSource() } throws IllegalStateException("no database here")
+
+        val allowFallback = { name: String -> "true".takeIf { name == ALLOW_INMEMORY_FALLBACK_ENV } }
+
+        assertFalse(initializeDatabase(readEnv = allowFallback))
+    }
+
+    @Test
+    fun `initialize database in production refuses even when the fallback is allowed`() {
+        mockkObject(DatabaseConfig)
+        every { DatabaseConfig.createDataSource() } throws IllegalStateException("no database here")
+
+        val productionAllowingFallback = { name: String ->
+            when (name) {
+                RuntimeProfile.ENV_VAR -> "production"
+                ALLOW_INMEMORY_FALLBACK_ENV -> "true"
+                else -> null
+            }
+        }
+
+        assertFailsWith<IllegalStateException> {
+            initializeDatabase(readEnv = productionAllowingFallback)
+        }
     }
 
     @Test
