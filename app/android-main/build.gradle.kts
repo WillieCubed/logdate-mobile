@@ -73,14 +73,17 @@ val resolvedPlayTrack: String =
         ?: "internal"
 
 /**
- * Release signing material. Set these via env (CI/secrets) or `~/.gradle/gradle.properties`:
+ * Release signing material. Resolved in order:
  *
- *  - `LOGDATE_RELEASE_STORE_FILE` (absolute or project-relative path to the .jks)
- *  - `LOGDATE_RELEASE_STORE_PASSWORD`
- *  - `LOGDATE_RELEASE_KEY_ALIAS`
- *  - `LOGDATE_RELEASE_KEY_PASSWORD`
+ *  1. Env vars (CI/secrets): `LOGDATE_RELEASE_STORE_FILE`, `LOGDATE_RELEASE_STORE_PASSWORD`,
+ *     `LOGDATE_RELEASE_KEY_ALIAS`, `LOGDATE_RELEASE_KEY_PASSWORD`
+ *  2. `~/.gradle/gradle.properties` (`logdate.release.*`)
+ *  3. The env file `scripts/create-signing-keystore.sh` already writes next to the keystore it
+ *     creates -- `$LOGDATE_SIGNING_DIR/production-upload.env` (default
+ *     `~/.logdate-signing/production-upload.env`) -- read automatically so a machine that has
+ *     already run that script needs no further setup at all.
  *
- * A normal release build fails closed when any of these are missing. Local benchmark and
+ * A normal release build fails closed when none of these resolve. Local benchmark and
  * baseline-profile work may explicitly opt into debug signing with
  * `-Plogdate.allowDebugReleaseSigning=true`; that override must never be used for publishing.
  */
@@ -92,9 +95,32 @@ val releaseEnvironmentVariables =
         "keyPassword" to "LOGDATE_RELEASE_KEY_PASSWORD",
     )
 
-fun resolveRelease(prop: String): String? =
-    System.getenv(requireNotNull(releaseEnvironmentVariables[prop]))
+val signingEnvFile: Map<String, String> by lazy {
+    val signingDir = System.getenv("LOGDATE_SIGNING_DIR") ?: "${System.getProperty("user.home")}/.logdate-signing"
+    val envFile = file("$signingDir/production-upload.env")
+    if (!envFile.isFile) {
+        emptyMap()
+    } else {
+        envFile
+            .readLines()
+            .mapNotNull { line ->
+                val trimmed = line.trim()
+                if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                    null
+                } else {
+                    val (key, value) = trimmed.split("=", limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+                    key.trim() to value.trim().trim('"', '\'')
+                }
+            }.toMap()
+    }
+}
+
+fun resolveRelease(prop: String): String? {
+    val envVarName = requireNotNull(releaseEnvironmentVariables[prop])
+    return System.getenv(envVarName)
         ?: providers.gradleProperty("logdate.release.$prop").orNull
+        ?: signingEnvFile[envVarName]
+}
 
 val releaseStoreFile: String? = resolveRelease("storeFile")
 val releaseStorePassword: String? = resolveRelease("storePassword")
