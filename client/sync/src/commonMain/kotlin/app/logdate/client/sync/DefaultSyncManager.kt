@@ -420,57 +420,47 @@ class DefaultSyncManager(
             }
         }
 
-    override suspend fun syncContent(): SyncResult =
+    /**
+     * Shared shape behind every opportunistic, single-entity-type sync entry point
+     * ([syncContent], [syncJournals], [syncAssociations], [syncDrafts]): check the caller-supplied
+     * guard, download first (so a push that 409s has a fresh conflict marker to compare against),
+     * start a run scoped to just this entity type's own pending count, then upload, and merge the
+     * two results the same way every time.
+     *
+     * @param disabledOrUnauthenticated Runs before anything else; a non-null result short-circuits
+     *   with it. Kept as a caller-supplied check rather than a fixed one because the four entry
+     *   points don't all report "can't sync right now" the same way (some distinguish disabled vs.
+     *   unauthenticated with their own [SyncError], one collapses both into a bare failure).
+     */
+    private suspend fun syncEntityType(
+        entityType: EntityType,
+        quotaContext: String,
+        disabledOrUnauthenticated: suspend () -> SyncResult?,
+        download: suspend (accessToken: String, since: Instant) -> SyncResult,
+        upload: suspend (accessToken: String) -> SyncResult,
+    ): SyncResult =
         syncMutex.withLock {
-            if (!isEnabled) {
-                return SyncResult(
-                    success = false,
-                    errors =
-                        listOf(
-                            SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled"),
-                        ),
-                )
-            }
-
-            if (!isAuthenticated()) {
-                return SyncResult(
-                    success = false,
-                    errors =
-                        listOf(
-                            SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated"),
-                        ),
-                )
-            }
+            disabledOrUnauthenticated()?.let { return@withLock it }
 
             syncStateFlow.value = SyncState.Syncing
             try {
-                val accessToken = getAccessToken() ?: return authError()
+                val accessToken = getAccessToken() ?: return@withLock authError()
 
-                // Pull first so the conflict resolver merges remote changes before we attempt
-                // to push local edits — otherwise a push that 409s drops the local op from the
-                // outbox before the puller can use it as a conflict marker.
-                val since = cursorFor(EntityType.NOTE)
-                val downloadResult =
-                    downloadContent(
-                        accessToken,
-                        since,
-                    )
+                val since = cursorFor(entityType)
+                val downloadResult = download(accessToken, since)
 
-                // A fresh top-level run: this entry point only ever uploads notes, so its own
-                // total is the notes currently queued -- not whatever runTotal a prior,
-                // differently-scoped run happened to leave behind. See beginUploadRun().
-                beginUploadRunForPending(EntityType.NOTE)
-                val uploadResult = uploadContent(accessToken)
+                beginUploadRunForPending(entityType)
+                val uploadResult = upload(accessToken)
 
                 val success = uploadResult.success && downloadResult.success
                 if (success) {
                     lastErrorFlow.value = null
-                    refreshObservedQuotaFromServer("content sync")
+                    refreshObservedQuotaFromServer(quotaContext)
                 } else {
                     lastErrorFlow.value = (downloadResult.errors + uploadResult.errors).firstOrNull()
                 }
 
-                return SyncResult(
+                SyncResult(
                     success = success,
                     uploadedItems = uploadResult.uploadedItems,
                     downloadedItems = downloadResult.downloadedItems,
@@ -482,164 +472,79 @@ class DefaultSyncManager(
                 syncStateFlow.value = SyncState.Idle
             }
         }
+
+    /** The "disabled" / "not authenticated" guard shared by every entry point except [syncDrafts]. */
+    private fun disabledOrUnauthenticatedResult(): SyncResult? =
+        when {
+            !isEnabled -> SyncResult(success = false, errors = listOf(SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled")))
+            else -> null
+        }
+
+    override suspend fun syncContent(): SyncResult =
+        syncEntityType(
+            entityType = EntityType.NOTE,
+            quotaContext = "content sync",
+            disabledOrUnauthenticated = {
+                disabledOrUnauthenticatedResult()
+                    ?: if (!isAuthenticated()) {
+                        SyncResult(success = false, errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated")))
+                    } else {
+                        null
+                    }
+            },
+            download = ::downloadContent,
+            upload = ::uploadContent,
+        )
 
     override suspend fun syncJournals(): SyncResult =
-        syncMutex.withLock {
-            if (!isEnabled) {
-                return SyncResult(
-                    success = false,
-                    errors =
-                        listOf(
-                            SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled"),
-                        ),
-                )
-            }
-
-            if (!isAuthenticated()) {
-                return SyncResult(
-                    success = false,
-                    errors =
-                        listOf(
-                            SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated"),
-                        ),
-                )
-            }
-
-            syncStateFlow.value = SyncState.Syncing
-            try {
-                val accessToken = getAccessToken() ?: return authError()
-
-                val since = cursorFor(EntityType.JOURNAL)
-                val downloadResult =
-                    downloadJournals(
-                        accessToken,
-                        since,
-                    )
-
-                // See the matching comment in syncContent(): a fresh top-level run scoped to
-                // just the journals this entry point is about to upload.
-                beginUploadRunForPending(EntityType.JOURNAL)
-                val uploadResult = uploadJournals(accessToken)
-
-                val success = uploadResult.success && downloadResult.success
-                if (success) {
-                    lastErrorFlow.value = null
-                    refreshObservedQuotaFromServer("journal sync")
-                } else {
-                    lastErrorFlow.value = (downloadResult.errors + uploadResult.errors).firstOrNull()
-                }
-
-                return SyncResult(
-                    success = success,
-                    uploadedItems = uploadResult.uploadedItems,
-                    downloadedItems = downloadResult.downloadedItems,
-                    conflictsResolved = downloadResult.conflictsResolved,
-                    errors = downloadResult.errors + uploadResult.errors,
-                    lastSyncTime = latestSyncTime(),
-                )
-            } finally {
-                syncStateFlow.value = SyncState.Idle
-            }
-        }
+        syncEntityType(
+            entityType = EntityType.JOURNAL,
+            quotaContext = "journal sync",
+            disabledOrUnauthenticated = {
+                disabledOrUnauthenticatedResult()
+                    ?: if (!isAuthenticated()) {
+                        SyncResult(success = false, errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated")))
+                    } else {
+                        null
+                    }
+            },
+            download = ::downloadJournals,
+            upload = ::uploadJournals,
+        )
 
     override suspend fun syncAssociations(): SyncResult =
-        syncMutex.withLock {
-            if (!isEnabled) {
-                return SyncResult(
-                    success = false,
-                    errors =
-                        listOf(
-                            SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled"),
-                        ),
-                )
-            }
-
-            if (!isAuthenticated()) {
-                return SyncResult(
-                    success = false,
-                    errors =
-                        listOf(
-                            SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated"),
-                        ),
-                )
-            }
-
-            syncStateFlow.value = SyncState.Syncing
-            try {
-                val accessToken = getAccessToken() ?: return authError()
-
-                val since = cursorFor(EntityType.ASSOCIATION)
-                val downloadResult =
-                    downloadAssociations(
-                        accessToken,
-                        since,
-                    )
-
-                // See the matching comment in syncContent(): a fresh top-level run scoped to
-                // just the associations this entry point is about to upload.
-                beginUploadRunForPending(EntityType.ASSOCIATION)
-                val uploadResult = uploadAssociations(accessToken)
-
-                val success = uploadResult.success && downloadResult.success
-                if (success) {
-                    lastErrorFlow.value = null
-                    refreshObservedQuotaFromServer("association sync")
-                } else {
-                    lastErrorFlow.value = (downloadResult.errors + uploadResult.errors).firstOrNull()
-                }
-
-                return SyncResult(
-                    success = success,
-                    uploadedItems = uploadResult.uploadedItems,
-                    downloadedItems = downloadResult.downloadedItems,
-                    conflictsResolved = downloadResult.conflictsResolved,
-                    errors = downloadResult.errors + uploadResult.errors,
-                    lastSyncTime = latestSyncTime(),
-                )
-            } finally {
-                syncStateFlow.value = SyncState.Idle
-            }
-        }
+        syncEntityType(
+            entityType = EntityType.ASSOCIATION,
+            quotaContext = "association sync",
+            disabledOrUnauthenticated = {
+                disabledOrUnauthenticatedResult()
+                    ?: if (!isAuthenticated()) {
+                        SyncResult(success = false, errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated")))
+                    } else {
+                        null
+                    }
+            },
+            download = ::downloadAssociations,
+            upload = ::uploadAssociations,
+        )
 
     override suspend fun syncDrafts(): SyncResult =
-        syncMutex.withLock {
-            if (!isEnabled || !isAuthenticated()) {
-                return SyncResult(success = false)
-            }
-            syncStateFlow.value = SyncState.Syncing
-            try {
-                val accessToken =
-                    getAccessToken() ?: return SyncResult(
-                        success = false,
-                        errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "No access token")),
-                    )
-
-                val since = cursorFor(EntityType.DRAFT)
-                val downloadResult = downloadDrafts(accessToken, since)
-
-                // See the matching comment in syncContent(): a fresh top-level run scoped to
-                // just the drafts this entry point is about to upload.
-                beginUploadRunForPending(EntityType.DRAFT)
-                val uploadResult = uploadDrafts(accessToken)
-                val success = downloadResult.success && uploadResult.success
-
-                SyncResult(
-                    success = success,
-                    uploadedItems = uploadResult.uploadedItems,
-                    downloadedItems = downloadResult.downloadedItems,
-                    conflictsResolved = downloadResult.conflictsResolved,
-                    errors = downloadResult.errors + uploadResult.errors,
-                    lastSyncTime = latestSyncTime(),
-                )
-            } catch (e: Exception) {
-                Napier.e("Draft sync failed", e)
-                SyncResult(
-                    success = false,
-                    errors = listOf(SyncError(SyncErrorType.UNKNOWN_ERROR, "Draft sync failed: ${e.message}")),
-                )
-            } finally {
-                syncStateFlow.value = SyncState.Idle
-            }
+        try {
+            syncEntityType(
+                entityType = EntityType.DRAFT,
+                quotaContext = "draft sync",
+                disabledOrUnauthenticated = {
+                    if (!isEnabled || !isAuthenticated()) SyncResult(success = false) else null
+                },
+                download = ::downloadDrafts,
+                upload = ::uploadDrafts,
+            )
+        } catch (e: Exception) {
+            Napier.e("Draft sync failed", e)
+            SyncResult(
+                success = false,
+                errors = listOf(SyncError(SyncErrorType.UNKNOWN_ERROR, "Draft sync failed: ${e.message}")),
+            )
         }
 
     override suspend fun fullSync(): SyncResult {
