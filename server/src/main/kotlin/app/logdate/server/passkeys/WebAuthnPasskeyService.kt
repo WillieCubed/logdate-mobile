@@ -20,6 +20,7 @@ import com.webauthn4j.data.RegistrationRequest
 import com.webauthn4j.data.client.Origin
 import com.webauthn4j.data.client.challenge.DefaultChallenge
 import com.webauthn4j.server.ServerProperty
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.runBlocking
 import java.security.SecureRandom
 import java.util.Base64
@@ -52,6 +53,14 @@ class WebAuthnPasskeyService(
 ) {
     private val secureRandom = SecureRandom()
     private val challenges = ConcurrentHashMap<String, PasskeyChallenge>()
+
+    init {
+        // Which verification path a ceremony takes, and what it will be checked against, decides
+        // every passkey failure below — and neither was visible anywhere before.
+        Napier.i(
+            "WebAuthnPasskeyService strict=$strictVerificationEnabled rpId=$relyingPartyId origins=$origins",
+        )
+    }
 
     private val objectConverter = ObjectConverter()
     private val webAuthnManager = WebAuthnManager.createNonStrictWebAuthnManager(objectConverter)
@@ -368,6 +377,9 @@ class WebAuthnPasskeyService(
         } catch (e: DataConversionException) {
             VerificationOutcome.Failure("Registration data conversion failed")
         } catch (e: Exception) {
+            // The origin failure webauthn4j reports names the origin the client presented but not
+            // the set it was checked against, which is the half an operator actually needs.
+            Napier.w("Registration verification failed against origins=$webAuthnOrigins rpId=$relyingPartyId", e)
             VerificationOutcome.Failure("Registration verification failed: ${e.message}")
         }
     }

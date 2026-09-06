@@ -48,6 +48,10 @@ data class WebAuthnConfig(
             val resolvedRpId = relyingPartyId?.trim().orEmpty().ifBlank { deriveRpId(resolvedOrigin) ?: "logdate.app" }
             // The canonical web origin always leads so [origin] resolves to it deterministically.
             val origins = linkedSetOf(resolvedOrigin) + parseAllowedOrigins(allowedOrigins)
+            // A ceremony rejected for a mismatched origin reports the origin it presented but not
+            // the set it was checked against, which leaves an operator guessing. Record the
+            // resolved set once at startup so the two can be compared.
+            Napier.i("WebAuthn rpId=$resolvedRpId origins=$origins")
             return WebAuthnConfig(
                 relyingPartyId = resolvedRpId,
                 relyingPartyName = relyingPartyName?.trim().orEmpty().ifBlank { "LogDate" },
