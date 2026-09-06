@@ -65,4 +65,20 @@ internal class SyncTokenRefresher(
         Napier.d("Token refreshed successfully, retrying $operationName")
         return operation(newToken)
     }
+
+    suspend fun getAccessToken(): String? =
+        try {
+            val session = sessionStorage.getSession()
+            if (session != null) {
+                session.accessToken
+            } else {
+                Napier.w("No active session found, cannot retrieve access token")
+                null
+            }
+        } catch (e: Exception) {
+            Napier.e("Failed to get access token", e)
+            null
+        }
+
+    suspend fun isAuthenticated(): Boolean = sessionStorage.getSession() != null
 }

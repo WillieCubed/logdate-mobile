@@ -18,7 +18,6 @@ import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.MediaSyncRefStore
-import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncBackoff
 import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
@@ -33,7 +32,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -126,7 +124,7 @@ class DefaultSyncManager(
                 )
             }
 
-            if (!isAuthenticated()) {
+            if (!tokenRefresher.isAuthenticated()) {
                 Napier.w("Upload attempted without authentication")
                 return SyncResult(
                     success = false,
@@ -144,7 +142,7 @@ class DefaultSyncManager(
 
             try {
                 val accessToken =
-                    getAccessToken()
+                    tokenRefresher.getAccessToken()
                         ?: return authError()
 
                 // Deliberately sequential. Every one of these writes into the same AT Protocol
@@ -202,7 +200,7 @@ class DefaultSyncManager(
                 )
             }
 
-            if (!isAuthenticated()) {
+            if (!tokenRefresher.isAuthenticated()) {
                 Napier.w("Download attempted without authentication")
                 return SyncResult(
                     success = false,
@@ -217,7 +215,7 @@ class DefaultSyncManager(
 
             try {
                 val accessToken =
-                    getAccessToken()
+                    tokenRefresher.getAccessToken()
                         ?: return authError()
 
                 val journalSince = cursorFor(EntityType.JOURNAL)
@@ -300,7 +298,7 @@ class DefaultSyncManager(
 
             syncStateFlow.value = SyncState.Syncing
             try {
-                val accessToken = getAccessToken() ?: return@withLock authError()
+                val accessToken = tokenRefresher.getAccessToken() ?: return@withLock authError()
 
                 val since = cursorFor(entityType)
                 val downloadResult = download(accessToken, since)
@@ -341,7 +339,7 @@ class DefaultSyncManager(
     private suspend fun disabledOrUnauthenticatedResult(): SyncResult? =
         if (!isEnabled) {
             SyncResult(success = false, errors = listOf(SyncError(SyncErrorType.UNKNOWN_ERROR, "Sync is disabled")))
-        } else if (!isAuthenticated()) {
+        } else if (!tokenRefresher.isAuthenticated()) {
             SyncResult(success = false, errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated")))
         } else {
             null
@@ -379,7 +377,7 @@ class DefaultSyncManager(
             entityType = EntityType.DRAFT,
             quotaContext = "draft sync",
             disabledOrUnauthenticated = {
-                if (!isEnabled || !isAuthenticated()) SyncResult(success = false) else null
+                if (!isEnabled || !tokenRefresher.isAuthenticated()) SyncResult(success = false) else null
             },
             download = downloader::downloadDrafts,
             upload = uploader::uploadDrafts,
@@ -394,7 +392,7 @@ class DefaultSyncManager(
         )
 
     override suspend fun fullSync(): SyncResult {
-        enqueueEverythingOnFirstSync()
+        uploader.enqueueEverythingOnFirstSync()
         val downloadResult = downloadRemoteChanges()
         val uploadResult = uploadPendingChanges()
         val draftResult = syncDrafts()
@@ -407,52 +405,6 @@ class DefaultSyncManager(
             errors = downloadResult.errors + uploadResult.errors + draftResult.errors,
             lastSyncTime = latestSyncTime(),
         )
-    }
-
-    /**
-     * Queues everything already on this device the first time it syncs with a server.
-     *
-     * Entries can exist before the device has ever talked to a server: written offline, or restored
-     * from a backup. Nothing enqueues those retrospectively, so without this they sit on the device
-     * for ever while sync reports success and uploads nothing. Signing in on a second device
-     * promises exactly this, and it has to be true.
-     *
-     * Only runs while the server has never been synced with, and enqueueing coalesces, so an entry
-     * already waiting is not queued twice.
-     */
-    private suspend fun enqueueEverythingOnFirstSync() {
-        val entityTypes = listOf(EntityType.JOURNAL, EntityType.NOTE)
-        val neverSynced = entityTypes.filter { syncMetadataService.getLastSyncTime(it) == null }
-        if (neverSynced.isEmpty()) {
-            return
-        }
-
-        runCatching {
-            if (EntityType.JOURNAL in neverSynced) {
-                val journals = journalRepository.allJournalsObserved.first()
-                journals.forEach { journal ->
-                    syncMetadataService.enqueuePending(
-                        entityId = journal.id.toString(),
-                        entityType = EntityType.JOURNAL,
-                        operation = PendingOperation.CREATE,
-                    )
-                }
-                Napier.i("First sync: queued ${'$'}{journals.size} journals already on this device")
-            }
-            if (EntityType.NOTE in neverSynced) {
-                val notes = journalNotesRepository.allNotesObserved.first()
-                notes.forEach { note ->
-                    syncMetadataService.enqueuePending(
-                        entityId = note.uid.toString(),
-                        entityType = EntityType.NOTE,
-                        operation = PendingOperation.CREATE,
-                    )
-                }
-                Napier.i("First sync: queued ${'$'}{notes.size} entries already on this device")
-            }
-        }.onFailure { error ->
-            Napier.w("Could not queue existing entries for the first sync", error)
-        }
     }
 
     override suspend fun getSyncStatus(): SyncStatus {
@@ -473,18 +425,7 @@ class DefaultSyncManager(
 
     override fun observeDeadLetters(): Flow<List<SyncDeadLetterRecord>> = deadLetterStore.observe()
 
-    override suspend fun retryDeadLetter(id: String) {
-        val record = deadLetterStore.list().firstOrNull { it.id == id } ?: return
-        val entityType = runCatching { EntityType.valueOf(record.entityType) }.getOrNull()
-        val operation = runCatching { PendingOperation.valueOf(record.operation) }.getOrNull()
-        if (entityType == null || operation == null) {
-            Napier.w("Cannot retry dead-letter $id with type=${record.entityType} op=${record.operation}")
-            deadLetterStore.remove(id)
-            return
-        }
-        syncMetadataService.enqueuePending(record.entityId, entityType, operation)
-        deadLetterStore.remove(id)
-    }
+    override suspend fun retryDeadLetter(id: String) = retryCoordinator.retryDeadLetter(id)
 
     override suspend fun discardDeadLetter(id: String) {
         deadLetterStore.remove(id)
@@ -495,22 +436,6 @@ class DefaultSyncManager(
      * Returns null if the last sync succeeded.
      */
     fun getLastSyncError(): SyncError? = lastErrorFlow.value
-
-    private suspend fun getAccessToken(): String? =
-        try {
-            val session = sessionStorage.getSession()
-            if (session != null) {
-                session.accessToken
-            } else {
-                Napier.w("No active session found, cannot retrieve access token")
-                null
-            }
-        } catch (e: Exception) {
-            Napier.e("Failed to get access token", e)
-            null
-        }
-
-    private suspend fun isAuthenticated(): Boolean = sessionStorage.getSession() != null
 
     /**
      * Helper to create authentication error result.

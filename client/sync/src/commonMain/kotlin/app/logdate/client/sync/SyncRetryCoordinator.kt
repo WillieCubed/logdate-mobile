@@ -1,6 +1,7 @@
 package app.logdate.client.sync
 
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncBackoff
 import app.logdate.client.sync.metadata.SyncDeadLetterRecord
@@ -210,6 +211,20 @@ internal class SyncRetryCoordinator(
             error,
             retryable = false,
         )
+    }
+
+    /** Re-queues a dead-lettered entity for upload, forgetting it was ever dead-lettered. */
+    suspend fun retryDeadLetter(id: String) {
+        val record = deadLetterStore.list().firstOrNull { it.id == id } ?: return
+        val entityType = runCatching { EntityType.valueOf(record.entityType) }.getOrNull()
+        val operation = runCatching { PendingOperation.valueOf(record.operation) }.getOrNull()
+        if (entityType == null || operation == null) {
+            Napier.w("Cannot retry dead-letter $id with type=${record.entityType} op=${record.operation}")
+            deadLetterStore.remove(id)
+            return
+        }
+        syncMetadataService.enqueuePending(record.entityId, entityType, operation)
+        deadLetterStore.remove(id)
     }
 
     private companion object {
