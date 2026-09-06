@@ -86,6 +86,32 @@ against the repo.
 
 These are already present; no action needed unless rotating.
 
+### Local dev machine setup (dogfood builds)
+
+The `dogfood` build type (`app/android-main/build.gradle.kts`) is signed
+with the same upload key as `release` instead of the per-machine debug
+keystore, specifically so a locally-built, fully debuggable install still
+passes Android's Digital Asset Links check for passkey sign-in against
+production. `./gradlew :app:android-main:installDogfood` (or `./run
+run:android:dogfood`) falls back to debug signing — and debug's passkey
+limitation — whenever these aren't set, so this is opt-in per machine, not
+required for normal `debug` development.
+
+To enable it on a machine, set these four environment variables (or the
+equivalent `logdate.release.*` Gradle properties — see `resolveRelease()`
+near the top of `app/android-main/build.gradle.kts`) to the *same* upload
+keystore used for real releases, stored however you already keep local
+secrets on that machine:
+
+- `LOGDATE_RELEASE_STORE_FILE` — path to the decoded `.jks` (not the
+  base64 form GitHub Actions stores)
+- `LOGDATE_RELEASE_STORE_PASSWORD`
+- `LOGDATE_RELEASE_KEY_ALIAS`
+- `LOGDATE_RELEASE_KEY_PASSWORD`
+
+If a machine already builds real `release`/`bundleRelease` artifacts,
+these are already in place and `dogfood` works with no further setup.
+
 ---
 
 ## GitHub Secrets — iOS (new — six secrets)
