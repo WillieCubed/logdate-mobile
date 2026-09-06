@@ -98,10 +98,18 @@ class DefaultSyncManager(
             mapException = statusPublisher::handleSyncException,
         )
 
-    // TODO: startNow currently has no effect -- both paths launch fullSync() immediately.
+    /**
+     * Arming a periodic/background schedule is a platform concern this class has no access to --
+     * the platform-specific [SyncManager]s (Android's WorkManager-backed one, [ForegroundSyncManager]
+     * elsewhere) each do their own scheduling and never call this method at all. So the only
+     * meaningful case here is `startNow`: fire a sync immediately; per [SyncManager.sync]'s own
+     * contract, `false` does not start syncing immediately.
+     */
     override fun sync(startNow: Boolean) {
-        syncScope.launch {
-            fullSync()
+        if (startNow) {
+            syncScope.launch {
+                fullSync()
+            }
         }
     }
 
