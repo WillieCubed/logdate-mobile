@@ -7,6 +7,7 @@ import app.logdate.feature.core.profile.ui.ProfileEditState
 import app.logdate.feature.core.profile.ui.ProfileScreenContent
 import app.logdate.feature.core.profile.ui.ProfileUiState
 import app.logdate.feature.core.profile.ui.ProfileUpdateState
+import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
@@ -19,6 +20,9 @@ private val sampleAccount =
         username = "alex_j",
         displayName = "Alex Johnson",
         passkeyCredentialIds = listOf("credential-1"),
+        // Pinned: createdAt defaults to Clock.System.now(), and the profile renders it as
+        // "Member since <date>", so leaving it unset rots these references every night.
+        createdAt = ScreenshotTestData.baseInstant,
     )
 
 @PreviewTest

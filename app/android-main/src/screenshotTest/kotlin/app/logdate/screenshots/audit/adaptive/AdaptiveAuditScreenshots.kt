@@ -240,6 +240,9 @@ private val auditAccount =
         username = "alex_j",
         displayName = "Alex Johnson",
         passkeyCredentialIds = listOf("credential-1"),
+        // Pinned: createdAt defaults to Clock.System.now(), and the profile renders it as
+        // "Member since <date>", so leaving it unset rots these references every night.
+        createdAt = ScreenshotTestData.baseInstant,
     )
 
 private val auditStorageQuota =
