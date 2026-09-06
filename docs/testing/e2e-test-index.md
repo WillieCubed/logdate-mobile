@@ -138,7 +138,7 @@ See: `tests/e2e/test-multi-window-editor.sh` for details on testing actual windo
 - ✅ testEditorWindowHandlesConfigurationChanges - Rotation/foldable support
 
 **Related Documentation**:
-- [E2E Test Journeys](./e2e-test-journeys.md#55-multi-window-editor-journey) - Full user journey
+- [E2E Test Journeys](../e2e-test-journeys.md#55-multi-window-editor-journey) - Full user journey
 - [EditorActivity.kt](../../app/compose-main/src/androidMain/kotlin/app/logdate/client/EditorActivity.kt) - Implementation
 - [EditorManager.kt](../../app/compose-main/src/androidMain/kotlin/app/logdate/navigation/EditorManager.kt) - Window management
 
@@ -153,39 +153,54 @@ Server-side tests verify API endpoints and backend functionality using Ktor's te
 ### Location
 `server/src/test/kotlin/e2e/`
 
-### 1. Auth V1 E2E Tests
+### 1. Auth Onboarding and Sign-in E2E Tests
 
-**File**: `auth/AuthV1E2ETest.kt`
+**File**: `journeys/auth/AuthOnboardingAndSigninJourneyE2ETest.kt`
 
-**Scenario**: Auth v1 passkey/google signup and signin behavior
+**Scenario**: Username availability, passkey signup through to auth tokens, and the response
+when Google sign-in is not configured
 
 ```bash
-./gradlew :server:test --tests "app.logdate.server.e2e.auth.AuthV1E2ETest"
+./gradlew :server:test --tests "app.logdate.server.e2e.journeys.auth.AuthOnboardingAndSigninJourneyE2ETest"
 ./tests/e2e/test-accounts-e2e.sh
 ```
 
-### 2. Basic Endpoint Coverage E2E Tests
+### 2. Auth Restore Credential E2E Tests
 
-**File**: `basic-coverage/BasicEndpointCoverageE2ETest.kt`
+**File**: `journeys/auth/AuthRestoreCredentialJourneyE2ETest.kt`
 
-**Scenario**: Coverage smoke tests for auth and sync APIs
+**Scenario**: Registering and redeeming a restore credential when moving to a new device,
+including the register-then-restore round trip, replay rejection, and the unauthenticated cases
 
 ```bash
-./gradlew :server:test --tests "app.logdate.server.e2e.basic.BasicEndpointCoverageE2ETest"
+./gradlew :server:test --tests "app.logdate.server.e2e.journeys.auth.AuthRestoreCredentialJourneyE2ETest"
+./tests/e2e/run-e2e-tests.sh auth
 ```
 
-### 3. Sync E2E Tests
+### 3. Backup and Sync E2E Tests
 
-**File**: `sync/SyncE2ETest.kt`
+**File**: `journeys/sync/BackupAndSyncJourneyE2ETest.kt`
 
-**Scenario**: Multi-device sync flow, conflict detection, and media download
+**Scenario**: Multi-device sync flow with conflict detection and media download, plus a round
+trip of text, image, video, and audio entries
 
 ```bash
-./gradlew :server:test --tests "app.logdate.server.e2e.sync.SyncE2ETest"
+./gradlew :server:test --tests "app.logdate.server.e2e.journeys.sync.BackupAndSyncJourneyE2ETest"
 ./tests/e2e/test-sync-e2e.sh
 ```
 
-### 4. Real Client-Server Integration E2E Tests
+### 4. Platform Sanity E2E Tests
+
+**File**: `smoke/PlatformSanityE2ETest.kt`
+
+**Scenario**: Smoke coverage that health and root answer, and that the auth and sync endpoints
+validate their requests and reject calls without a token
+
+```bash
+./gradlew :server:test --tests "app.logdate.server.e2e.smoke.PlatformSanityE2ETest"
+```
+
+### 5. Real Client-Server Integration E2E Tests
 
 **Module**: `integration/server-client-e2e`
 
@@ -205,9 +220,10 @@ See [Server-Client E2E README](../../integration/server-client-e2e/README.md) fo
 |-----------|------|----------|--------------|
 | MultiWindowEditorE2ETest | Client Gradle | `app/.../e2e/` | ✅ `managedAndroidMultiWindowDebugAndroidTest` |
 | Share UX Suite | Client Instrumented | `app/.../e2e/` | ✅ `managedAndroidShareDebugAndroidTest` |
-| AuthV1E2ETest | Pure Server | `server/.../auth/` | ✅ `test-accounts-e2e.sh` |
-| BasicEndpointCoverageE2ETest | Pure Server | `server/.../basic-coverage/` | ❌ None |
-| SyncE2ETest | Pure Server | `server/.../sync/` | ✅ `test-sync-e2e.sh` |
+| AuthOnboardingAndSigninJourneyE2ETest | Pure Server | `server/.../e2e/journeys/auth/` | ✅ `test-accounts-e2e.sh` |
+| AuthRestoreCredentialJourneyE2ETest | Pure Server | `server/.../e2e/journeys/auth/` | ✅ `run-e2e-tests.sh auth` |
+| BackupAndSyncJourneyE2ETest | Pure Server | `server/.../e2e/journeys/sync/` | ✅ `test-sync-e2e.sh` |
+| PlatformSanityE2ETest | Pure Server | `server/.../e2e/smoke/` | ❌ None |
 | server-client-e2e | Pure Server + Client API | `integration/server-client-e2e/...` | ❌ None |
 
 **Legend**:
@@ -239,7 +255,7 @@ See [Server-Client E2E README](../../integration/server-client-e2e/README.md) fo
 ./gradlew managedAndroidMultiWindowDebugAndroidTest
 
 # All account tests
-./gradlew :server:test --tests "app.logdate.server.e2e.auth.AuthV1E2ETest"
+./gradlew :server:test --tests "app.logdate.server.e2e.journeys.auth.*"
 
 # All authentication tests
 ./gradlew :server:test --tests "app.logdate.server.e2e.auth.*"
@@ -262,22 +278,28 @@ See [Server-Client E2E README](../../integration/server-client-e2e/README.md) fo
 
 ## CI/CD Integration
 
-E2E tests are automatically run in continuous integration on:
+`.github/workflows/ci.yml` runs on every push and pull request targeting `main` or `develop`.
+Two of its jobs cover the suites on this page:
 
-- **Pull Requests**: Client-side e2e tests on emulator
-- **Main Branch**: Full e2e test suite (client + server)
-- **Release Builds**: Extended test validation
+- **`test` — Unit tests and coverage**: `./gradlew test allTests`, with Postgres and Redis service
+  containers. This is what exercises the `:server:test` e2e classes above.
+- **`e2e-tests` — Server / client e2e**: `./gradlew :integration:server-client-e2e:test`, with a
+  Postgres service container.
 
-Configuration: `.github/workflows/ci.yml`
+**No Android instrumented test runs in CI.** Every Gradle Managed Device task —
+`managedAndroidE2EDebugAndroidTest` and every lane beneath it — is local-only. Breakage in the
+`app/android-main` androidTest suite will not fail a pull request, so run those lanes by hand
+before trusting them.
 
-### Manual CI Simulation
+### Running what CI runs
 
 ```bash
-# Run full CI test suite locally
-./gradlew clean test :server:test --tests "app.logdate.server.e2e.*"
+# The two jobs that cover the suites on this page
+./gradlew test allTests
+./gradlew :integration:server-client-e2e:test
 
-# Just the main quality gates
-./gradlew managedAndroidE2EDebugAndroidTest lint koverVerify
+# The client e2e lane CI does not run
+./gradlew managedAndroidE2EDebugAndroidTest
 ```
 
 ---
@@ -371,7 +393,7 @@ To add a new e2e test:
 
 3. **Add to this index**: Document commands and requirements
 
-4. **Document in e2e-test-journeys.md**: Add user journey if applicable
+4. **Document in ../e2e-test-journeys.md**: Add user journey if applicable
 
 5. **Include terminal commands**: In doc comments for easy reference
 
@@ -387,8 +409,7 @@ To add a new e2e test:
 ## See Also
 
 - [E2E Organization Standard](./e2e-test-organization.md) - Test categorization, shell script standards, and guidelines
-- [Running E2E Tests](./running-e2e-tests.md) - Quick reference for running tests
 - [Testing Strategy](./introduction.md) - Complete testing guide
-- [E2E Test Journeys](./e2e-test-journeys.md) - User workflows being tested
+- [E2E Test Journeys](../e2e-test-journeys.md) - User workflows being tested
 - [Build Commands](../../CLAUDE.md#build-commands) - Project build docs
 - [Android Testing Guide](https://developer.android.com/training/testing) - Official Android docs

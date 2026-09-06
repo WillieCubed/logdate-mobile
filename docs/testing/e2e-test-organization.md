@@ -25,9 +25,10 @@ Use managed-device Gradle tasks for Android instrumented tests and reserve `adb 
 - Pure gradle execution
 
 **Examples**:
-- `AuthV1E2ETest` - Auth v1 signup/signin flows
-- `BasicEndpointCoverageE2ETest` - API endpoint smoke coverage
-- `SyncE2ETest` - Backup/sync server behavior
+- `journeys/auth/AuthOnboardingAndSigninJourneyE2ETest` - Passkey signup and sign-in flows
+- `journeys/auth/AuthRestoreCredentialJourneyE2ETest` - Restore-credential registration and redemption
+- `journeys/sync/BackupAndSyncJourneyE2ETest` - Backup/sync server behavior
+- `smoke/PlatformSanityE2ETest` - Endpoint smoke coverage
 
 **How to Run**:
 ```bash
@@ -35,10 +36,10 @@ Use managed-device Gradle tasks for Android instrumented tests and reserve `adb 
 ./gradlew :server:test --tests "app.logdate.server.e2e.*"
 
 # Run specific test class
-./gradlew :server:test --tests "app.logdate.server.e2e.auth.AuthV1E2ETest"
+./gradlew :server:test --tests "app.logdate.server.e2e.journeys.auth.AuthOnboardingAndSigninJourneyE2ETest"
 
 # Run specific test method
-./gradlew :server:test --tests "app.logdate.server.e2e.auth.AuthV1E2ETest.username availability endpoint works"
+./gradlew :server:test --tests "app.logdate.server.e2e.journeys.auth.AuthOnboardingAndSigninJourneyE2ETest.username availability endpoint works"
 ```
 
 **When to Create Shell Script**: **NEVER** - These don't need shell scripts. Pure gradle.
@@ -406,5 +407,4 @@ CI/CD logs the full output and marks failures.
 ## See Also
 
 - **E2E Test Index**: `docs/testing/e2e-test-index.md` - Complete list of all tests
-- **Running Tests**: `docs/testing/running-e2e-tests.md` - Quick command reference
 - **Test Journeys**: `docs/e2e-test-journeys.md` - User workflows being tested
