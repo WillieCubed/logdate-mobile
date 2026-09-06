@@ -33,18 +33,52 @@ internal object MediaDeviceSelectionResolver {
         devices: List<MediaDeviceUiState>,
         preferredDeviceId: String?,
     ): MediaDeviceSelectionUiState {
-        val availableDevices = devices.ifEmpty { listOf(DefaultMediaDevices.systemOutput) }
+        val availableDevices =
+            collapseToPhysicalDevices(devices).ifEmpty { listOf(DefaultMediaDevices.systemOutput) }
         val selectedId =
             preferredDeviceId
-                ?.takeIf { preferred -> availableDevices.any { it.id == preferred } }
+                ?.let { preferred -> resolveWithinGroup(preferred, devices, availableDevices) }
                 ?: availableDevices.first().id
 
         return MediaDeviceSelectionUiState(
             kind = MediaDeviceKind.AUDIO_OUTPUT,
             devices = availableDevices,
             selectedDeviceId = selectedId,
-            isSelectionControllable = false,
-            routeControlMessage = systemControlledRouteControlMessage(MediaDeviceKind.AUDIO_OUTPUT),
+            isSelectionControllable =
+                availableDevices.any { it.category != MediaDeviceCategory.SYSTEM_DEFAULT },
+            routeControlMessage =
+                systemControlledRouteControlMessage(MediaDeviceKind.AUDIO_OUTPUT)
+                    .takeIf {
+                        availableDevices.all { device ->
+                            device.category == MediaDeviceCategory.SYSTEM_DEFAULT
+                        }
+                    },
         )
+    }
+
+    /**
+     * Keeps one entry per physical device: the best-quality profile in each group, in the order
+     * the groups were first seen.
+     */
+    private fun collapseToPhysicalDevices(devices: List<MediaDeviceUiState>): List<MediaDeviceUiState> =
+        devices
+            .groupBy { it.groupKey }
+            .values
+            .mapNotNull { group -> group.maxByOrNull { it.qualityRank } }
+            .sortedBy { collapsed -> devices.indexOfFirst { it.groupKey == collapsed.groupKey } }
+
+    /**
+     * Maps a stored preference onto the surviving row. A preference recorded against a profile
+     * that later lost its group — the A2DP entry when LE Audio connects, say — must still select
+     * that device rather than silently falling back to the built-in speaker.
+     */
+    private fun resolveWithinGroup(
+        preferredDeviceId: String,
+        allDevices: List<MediaDeviceUiState>,
+        availableDevices: List<MediaDeviceUiState>,
+    ): String? {
+        availableDevices.firstOrNull { it.id == preferredDeviceId }?.let { return it.id }
+        val preferredGroup = allDevices.firstOrNull { it.id == preferredDeviceId }?.groupKey ?: return null
+        return availableDevices.firstOrNull { it.groupKey == preferredGroup }?.id
     }
 }

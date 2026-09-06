@@ -87,7 +87,7 @@ class AndroidAudioRouteRepository(
         val devices =
             audioManager
                 .getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-                .filter { it.isSink }
+                .filter { it.isSink && it.isSelectableMediaOutput() }
                 .map { it.toMediaDeviceUiState(MediaDeviceKind.AUDIO_OUTPUT) }
 
         return MediaDeviceSelectionResolver.resolveAudioOutput(
@@ -101,6 +101,9 @@ object AndroidAudioRouteDevices {
     private const val PREFS_NAME = "logdate_media_routes"
     private const val KEY_INPUT_DEVICE_ID = "preferred_input_device_id"
     private const val KEY_OUTPUT_DEVICE_ID = "preferred_output_device_id"
+
+    /** The shared preferences the route selection is persisted in. */
+    fun routePreferences(context: Context) = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     fun getPreferredInputDeviceId(context: Context): String? =
         context
@@ -149,11 +152,48 @@ object AndroidAudioRouteDevices {
             .firstOrNull { it.isSource && deviceKey(it, MediaDeviceKind.AUDIO_INPUT) == deviceId }
     }
 
+    fun findPreferredOutputDevice(
+        context: Context,
+        preferredDeviceId: String? = null,
+    ): AudioDeviceInfo? {
+        val audioManager = context.applicationContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val deviceId = preferredDeviceId ?: getPreferredOutputDeviceId(context) ?: return null
+        return audioManager
+            .getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            .firstOrNull { it.isSink && deviceKey(it, MediaDeviceKind.AUDIO_OUTPUT) == deviceId }
+    }
+
     fun deviceKey(
         device: AudioDeviceInfo,
         kind: MediaDeviceKind,
     ): String = "${kind.name.lowercase()}-${device.type}-${device.id}"
 }
+
+/**
+ * True for outputs a person would actually choose for listening.
+ *
+ * The platform reports the earpiece and telephony routes as playback sinks, but neither is a
+ * sensible destination for a voice note, and listing them only pads the picker.
+ */
+private fun AudioDeviceInfo.isSelectableMediaOutput(): Boolean =
+    type != AudioDeviceInfo.TYPE_BUILTIN_EARPIECE && type != AudioDeviceInfo.TYPE_TELEPHONY
+
+/**
+ * Groups the profiles of one physical device together.
+ *
+ * Bluetooth hardware is reported once per profile — A2DP, hands-free and LE Audio — all sharing
+ * one address, so the address is the identity. Anything without an address is its own device.
+ */
+private fun AudioDeviceInfo.routeGroupId(): String? = address?.takeIf { it.isNotBlank() }
+
+/** Which profile wins when one device is reported several times. Higher is better. */
+private fun AudioDeviceInfo.routeQualityRank(): Int =
+    when (type) {
+        AudioDeviceInfo.TYPE_BLE_HEADSET, AudioDeviceInfo.TYPE_BLE_SPEAKER -> 3
+        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> 2
+        AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> 1
+        else -> 0
+    }
 
 private fun AudioDeviceInfo.toMediaDeviceUiState(kind: MediaDeviceKind): MediaDeviceUiState =
     MediaDeviceUiState(
@@ -162,6 +202,8 @@ private fun AudioDeviceInfo.toMediaDeviceUiState(kind: MediaDeviceKind): MediaDe
         kind = kind,
         category = categoryForType(type),
         isExternal = isExternalType(type),
+        groupId = routeGroupId(),
+        qualityRank = routeQualityRank(),
     )
 
 private fun AudioDeviceInfo.labelFor(kind: MediaDeviceKind): String {

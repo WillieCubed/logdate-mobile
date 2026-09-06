@@ -10,7 +10,27 @@ data class MediaDeviceUiState(
     val category: MediaDeviceCategory,
     val isAvailable: Boolean = true,
     val isExternal: Boolean = false,
-)
+    /**
+     * Identifies the physical device behind this entry.
+     *
+     * Android reports one entry per audio *profile*, so a single pair of earbuds appears three
+     * times — A2DP, hands-free and LE Audio — each with the same name. Entries sharing a
+     * [groupId] are the same hardware and collapse to one row.
+     *
+     * Null means "this entry is its own device", resolved through [groupKey]. It is deliberately
+     * not defaulted to [id]: a default is evaluated once at construction, so `copy(id = ...)`
+     * would carry the original device's group and silently collapse two unrelated devices.
+     */
+    val groupId: String? = null,
+    /**
+     * Which entry wins when several share a [groupId]. Higher is better; LE Audio beats A2DP,
+     * which beats hands-free. Meaningless across groups.
+     */
+    val qualityRank: Int = 0,
+) {
+    /** The group this entry belongs to; its own [id] unless it shares hardware with another. */
+    val groupKey: String get() = groupId ?: id
+}
 
 enum class MediaDeviceKind {
     CAMERA,

@@ -3,6 +3,7 @@ package app.logdate.client.media.device
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class MediaDeviceSelectionUiStateTest {
     @Test
@@ -118,7 +119,7 @@ class MediaDeviceSelectionUiStateTest {
     }
 
     @Test
-    fun `audio output resolver keeps preferred output visible while using system routing copy`() {
+    fun `audio output resolver keeps the preferred output selected and controllable`() {
         val speaker = DefaultMediaDevices.systemOutput.copy(id = "speaker", label = "Built-in speaker")
         val headset =
             DefaultMediaDevices.systemOutput.copy(
@@ -136,11 +137,10 @@ class MediaDeviceSelectionUiStateTest {
 
         assertEquals(headset.id, selection.selectedDeviceId)
         assertEquals("USB headset", selection.selectedDevice?.label)
-        assertEquals(false, selection.isSelectionControllable)
-        assertEquals(
-            "Use Android's output switcher to route playback.",
-            selection.routeControlMessage,
-        )
+        // Output routing is applied by the playback service now, so the picker is live rather
+        // than deferring to Android's switcher.
+        assertTrue(selection.isSelectionControllable)
+        assertNull(selection.routeControlMessage)
     }
 
     @Test
@@ -202,4 +202,107 @@ class MediaDeviceSelectionUiStateTest {
         assertEquals("Open system settings to change the microphone.", overriddenInput.routeControlMessage)
         assertEquals(input.devices, overriddenInput.devices)
     }
+    // region output collapsing
+
+    private fun output(
+        id: String,
+        label: String,
+        groupId: String,
+        qualityRank: Int,
+        category: MediaDeviceCategory = MediaDeviceCategory.BLUETOOTH,
+    ) = MediaDeviceUiState(
+        id = id,
+        label = label,
+        kind = MediaDeviceKind.AUDIO_OUTPUT,
+        category = category,
+        isExternal = category != MediaDeviceCategory.BUILT_IN,
+        groupId = groupId,
+        qualityRank = qualityRank,
+    )
+
+    @Test
+    fun `one pair of earbuds registered under three profiles collapses to a single row`() {
+        // A real Pixel reports the same earbuds as A2DP, hands-free SCO and LE Audio, all
+        // sharing one Bluetooth address and all labelled with the same product name.
+        val selection =
+            MediaDeviceSelectionResolver.resolveAudioOutput(
+                devices =
+                    listOf(
+                        output("a2dp", "Willie's Earbuds v4", groupId = "AA:BB", qualityRank = 2),
+                        output("sco", "Willie's Earbuds v4", groupId = "AA:BB", qualityRank = 1),
+                        output("le", "Willie's Earbuds v4", groupId = "AA:BB", qualityRank = 3),
+                    ),
+                preferredDeviceId = null,
+            )
+
+        assertEquals(1, selection.devices.size)
+        assertEquals("le", selection.devices.single().id)
+    }
+
+    @Test
+    fun `two distinct devices stay two rows`() {
+        val selection =
+            MediaDeviceSelectionResolver.resolveAudioOutput(
+                devices =
+                    listOf(
+                        output("earbuds-a2dp", "Earbuds", groupId = "AA:BB", qualityRank = 2),
+                        output("earbuds-sco", "Earbuds", groupId = "AA:BB", qualityRank = 1),
+                        output("speaker-a2dp", "Kitchen speaker", groupId = "CC:DD", qualityRank = 2),
+                    ),
+                preferredDeviceId = null,
+            )
+
+        assertEquals(listOf("Earbuds", "Kitchen speaker"), selection.devices.map { it.label })
+    }
+
+    @Test
+    fun `collapsing preserves the order devices were first seen`() {
+        val selection =
+            MediaDeviceSelectionResolver.resolveAudioOutput(
+                devices =
+                    listOf(
+                        output("speaker", "Built-in speaker", groupId = "type-2", qualityRank = 0, category = MediaDeviceCategory.BUILT_IN),
+                        output("earbuds-a2dp", "Earbuds", groupId = "AA:BB", qualityRank = 2),
+                        output("earbuds-le", "Earbuds", groupId = "AA:BB", qualityRank = 3),
+                    ),
+                preferredDeviceId = null,
+            )
+
+        assertEquals(listOf("Built-in speaker", "Earbuds"), selection.devices.map { it.label })
+    }
+
+    @Test
+    fun `a preferred profile that lost to a better one still selects its device`() {
+        // The stored preference names the A2DP entry, but LE Audio wins the group. The user
+        // still expects their earbuds selected rather than a silent fall back to the speaker.
+        val selection =
+            MediaDeviceSelectionResolver.resolveAudioOutput(
+                devices =
+                    listOf(
+                        output("speaker", "Built-in speaker", groupId = "type-2", qualityRank = 0, category = MediaDeviceCategory.BUILT_IN),
+                        output("earbuds-a2dp", "Earbuds", groupId = "AA:BB", qualityRank = 2),
+                        output("earbuds-le", "Earbuds", groupId = "AA:BB", qualityRank = 3),
+                    ),
+                preferredDeviceId = "earbuds-a2dp",
+            )
+
+        assertEquals("earbuds-le", selection.selectedDeviceId)
+    }
+
+    @Test
+    fun `output selection is controllable once real devices exist`() {
+        val selection =
+            MediaDeviceSelectionResolver.resolveAudioOutput(
+                devices =
+                    listOf(
+                        output("speaker", "Built-in speaker", groupId = "type-2", qualityRank = 0, category = MediaDeviceCategory.BUILT_IN),
+                        output("earbuds-le", "Earbuds", groupId = "AA:BB", qualityRank = 3),
+                    ),
+                preferredDeviceId = null,
+            )
+
+        assertTrue(selection.isSelectionControllable)
+    }
+
+    // endregion
 }

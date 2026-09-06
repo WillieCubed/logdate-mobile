@@ -1,7 +1,12 @@
 package app.logdate.client.media.audio
 
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -11,6 +16,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import app.logdate.client.media.device.AndroidAudioRouteDevices
 import app.logdate.client.notifications.AndroidLogDateNotificationCatalog
 import app.logdate.client.notifications.LogDateNotificationChannelKey
 
@@ -21,6 +27,25 @@ class AudioPlaybackService : MediaSessionService() {
     }
 
     private var mediaSession: MediaSession? = null
+    private var routePreferences: SharedPreferences? = null
+
+    /**
+     * Re-applies the chosen output whenever the user picks a different one. The picker writes the
+     * preference from the app process; this service owns the player, so it has to hear about it.
+     */
+    private val routePreferenceListener =
+        SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> applyPreferredOutputDevice() }
+
+    /**
+     * Re-applies on hardware changes so unplugging the chosen device falls back to the system
+     * default instead of leaving playback pinned to something no longer there.
+     */
+    private val routeDeviceCallback =
+        object : AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) = applyPreferredOutputDevice()
+
+            override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) = applyPreferredOutputDevice()
+        }
 
     override fun onCreate() {
         super.onCreate()
@@ -55,6 +80,13 @@ class AudioPlaybackService : MediaSessionService() {
                 .build()
         setMediaNotificationProvider(notificationProvider)
 
+        routePreferences =
+            AndroidAudioRouteDevices.routePreferences(this).also {
+                it.registerOnSharedPreferenceChangeListener(routePreferenceListener)
+            }
+        audioManager().registerAudioDeviceCallback(routeDeviceCallback, null)
+        applyPreferredOutputDevice()
+
         player.addListener(
             object : Player.Listener {
                 override fun onMediaItemTransition(
@@ -74,10 +106,27 @@ class AudioPlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
 
     override fun onDestroy() {
+        routePreferences?.unregisterOnSharedPreferenceChangeListener(routePreferenceListener)
+        routePreferences = null
+        audioManager().unregisterAudioDeviceCallback(routeDeviceCallback)
         mediaSession?.player?.release()
         mediaSession?.release()
         mediaSession = null
         super.onDestroy()
+    }
+
+    private fun audioManager(): AudioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+    /**
+     * Points the player at the output the user chose.
+     *
+     * A preference naming a device that is gone resolves to null, which is Media3's way of
+     * saying "use the system default" — so a disconnected pair of earbuds degrades to the
+     * speaker rather than failing.
+     */
+    private fun applyPreferredOutputDevice() {
+        val player = mediaSession?.player as? ExoPlayer ?: return
+        player.setPreferredAudioDevice(AndroidAudioRouteDevices.findPreferredOutputDevice(this))
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
