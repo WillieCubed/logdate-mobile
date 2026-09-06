@@ -27,6 +27,7 @@ import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
+import app.logdate.server.logging.installServerLogging
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
 import app.logdate.server.oauth.OAuthConfig
@@ -159,6 +160,10 @@ private fun initializeSentry(
 }
 
 fun main() {
+    // First: until an antilog is registered Napier discards everything, so anything logged
+    // before this line is lost — including why startup validation refused to continue.
+    installServerLogging()
+
     val profile = RuntimeProfile.fromEnvironment()
     ProductionConfigValidator.validate(profile)
 
