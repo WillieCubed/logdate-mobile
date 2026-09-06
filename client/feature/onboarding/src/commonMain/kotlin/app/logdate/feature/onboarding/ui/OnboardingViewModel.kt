@@ -106,6 +106,7 @@ class OnboardingViewModel(
                         identity.cloudAccountId != null ||
                         !identity.username.isNullOrBlank(),
                 hasIdentityKey = hasIdentityKey,
+                accountRequiresE2ee = identity.requiresE2ee,
                 recommendationsHandledOnThisDevice = inputs.deviceState.recommendationsHandledOnThisDevice,
                 contextualRecommendationsEnabled = inputs.recommendationsEnabled,
                 dayBoundariesHandledOnThisDevice = inputs.deviceState.dayBoundariesHandledOnThisDevice,

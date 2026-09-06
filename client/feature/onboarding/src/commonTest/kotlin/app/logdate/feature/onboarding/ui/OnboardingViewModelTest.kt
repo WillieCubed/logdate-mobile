@@ -269,9 +269,15 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun `complete onboarding if eligible fails when identity key missing`() =
+    fun `complete onboarding if eligible fails when identity key missing and account requires E2EE`() =
         runTest {
             identityKeyManager.clearIdentityKey()
+            // The recovery-phrase gate only applies when the deployment actually requires E2EE
+            // (see OnboardingFlowPlanner) -- without an account that says so, a missing identity
+            // key is not itself a reason to block completion.
+            fakeAccountRepository.setAccount(
+                LogDateAccount(username = "alex", displayName = "Alex", requiresE2ee = true),
+            )
             viewModel.refreshIdentityKeyState()
             fakeProfileRepository.setProfile(
                 LogDateProfile(
@@ -291,6 +297,34 @@ class OnboardingViewModelTest {
             assertTrue(result.isFailure)
             assertEquals(false, fakeUserStateRepository.isOnboardingComplete)
             assertEquals(OnboardingStep.RECOVERY_PHRASE, viewModel.firstIncompleteRequiredOnboardingStep())
+        }
+
+    @Test
+    fun `complete onboarding if eligible succeeds despite missing identity key when account does not require E2EE`() =
+        runTest {
+            // Regression coverage for the recovery-phrase gate firing unconditionally on any
+            // fresh device: without setAccount(...requiresE2ee = true), the fake account
+            // repository's default (no account / requiresE2ee = false) must not block completion
+            // on a missing identity key -- there was never anything for it to decrypt.
+            identityKeyManager.clearIdentityKey()
+            viewModel.refreshIdentityKeyState()
+            fakeProfileRepository.setProfile(
+                LogDateProfile(
+                    displayName = "Alex",
+                    bio = "Bio",
+                ),
+            )
+            fakeUserStateRepository.setBirthday(Instant.fromEpochMilliseconds(946684800000))
+            fakeOnboardingDeviceStateRepository.markRecommendationsHandled()
+            fakeOnboardingDeviceStateRepository.markLocationHandled()
+            fakeOnboardingDeviceStateRepository.markDayBoundariesHandled()
+            fakeOnboardingDeviceStateRepository.markNotificationsHandled()
+            advanceUntilIdle()
+
+            val result = viewModel.completeOnboardingIfEligible()
+
+            assertTrue(result.isSuccess)
+            assertTrue(fakeUserStateRepository.isOnboardingComplete)
         }
 
     @Test
@@ -453,6 +487,10 @@ private class FakeProfileRepository : ProfileRepository {
 private class FakeAccountRepository : AccountRepository {
     private val state = MutableStateFlow<LogDateAccount?>(null)
     override val currentAccount: Flow<LogDateAccount?> = state
+
+    fun setAccount(account: LogDateAccount?) {
+        state.value = account
+    }
 
     override suspend fun updateProfile(
         displayName: String?,

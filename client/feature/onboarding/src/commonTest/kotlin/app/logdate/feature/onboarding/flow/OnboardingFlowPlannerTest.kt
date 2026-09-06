@@ -15,8 +15,8 @@ import kotlin.test.assertTrue
  */
 class OnboardingFlowPlannerTest {
     @Test
-    fun `fresh flow includes full setup sequence when nothing is configured`() {
-        val snapshot = OnboardingProgressSnapshot()
+    fun `fresh flow includes full setup sequence when nothing is configured and the deployment requires E2EE`() {
+        val snapshot = OnboardingProgressSnapshot(accountRequiresE2ee = true)
 
         assertEquals(
             listOf(
@@ -37,6 +37,21 @@ class OnboardingFlowPlannerTest {
                 entryMode = OnboardingEntryMode.FRESH,
                 snapshot = snapshot,
             ),
+        )
+    }
+
+    @Test
+    fun `fresh flow skips recovery phrase when the deployment does not require E2EE`() {
+        // OnboardingProgressSnapshot() defaults accountRequiresE2ee to false (the AT_REST_ONLY
+        // default): a device with no cached identity key still shouldn't be asked for a recovery
+        // phrase when there was never anything client-side-encrypted for it to decrypt.
+        val snapshot = OnboardingProgressSnapshot()
+
+        assertFalse(
+            onboardingStepsFor(
+                entryMode = OnboardingEntryMode.FRESH,
+                snapshot = snapshot,
+            ).contains(OnboardingStep.RECOVERY_PHRASE),
         )
     }
 

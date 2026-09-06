@@ -28,6 +28,13 @@ data class OnboardingProgressSnapshot(
     val hasBirthday: Boolean = false,
     val hasCloudAccount: Boolean = false,
     val hasIdentityKey: Boolean = false,
+    /**
+     * Whether the signed-in account's deployment actually requires client-side E2EE (a
+     * deployment-wide rollout flag -- see server's `EncryptionMode` -- not a per-account choice).
+     * Under the `AT_REST_ONLY` default, nothing was ever encrypted with the recovery-phrase-derived
+     * key, so [OnboardingStep.RECOVERY_PHRASE] has nothing to recover and must not gate onboarding.
+     */
+    val accountRequiresE2ee: Boolean = false,
     val recommendationsHandledOnThisDevice: Boolean = false,
     val contextualRecommendationsEnabled: Boolean = true,
     val dayBoundariesHandledOnThisDevice: Boolean = false,
@@ -95,7 +102,7 @@ private fun shouldIncludeStep(
     when (step) {
         OnboardingStep.PERSONAL_INTRO -> !snapshot.hasPersonalIntro
         OnboardingStep.ACCOUNT -> !snapshot.hasCloudAccount
-        OnboardingStep.RECOVERY_PHRASE -> !snapshot.hasIdentityKey
+        OnboardingStep.RECOVERY_PHRASE -> !snapshot.hasIdentityKey && snapshot.accountRequiresE2ee
         OnboardingStep.BIRTHDAY -> !snapshot.hasBirthday
         OnboardingStep.RECOMMENDATIONS -> !snapshot.hasResolvedRecommendations()
         OnboardingStep.DAY_BOUNDARIES -> !snapshot.hasResolvedDayBoundaries()
@@ -106,7 +113,7 @@ private fun shouldIncludeStep(
 
 fun OnboardingProgressSnapshot.canCompleteOnboarding(): Boolean =
     hasPersonalIntro &&
-        hasIdentityKey &&
+        (hasIdentityKey || !accountRequiresE2ee) &&
         hasBirthday &&
         hasResolvedRecommendations() &&
         hasResolvedDayBoundaries() &&
@@ -116,7 +123,7 @@ fun OnboardingProgressSnapshot.canCompleteOnboarding(): Boolean =
 fun OnboardingProgressSnapshot.firstIncompleteRequiredOnboardingStep(): OnboardingStep? =
     when {
         !hasPersonalIntro -> OnboardingStep.PERSONAL_INTRO
-        !hasIdentityKey -> OnboardingStep.RECOVERY_PHRASE
+        !hasIdentityKey && accountRequiresE2ee -> OnboardingStep.RECOVERY_PHRASE
         !hasBirthday -> OnboardingStep.BIRTHDAY
         !hasResolvedRecommendations() -> OnboardingStep.RECOMMENDATIONS
         !hasResolvedDayBoundaries() -> OnboardingStep.DAY_BOUNDARIES

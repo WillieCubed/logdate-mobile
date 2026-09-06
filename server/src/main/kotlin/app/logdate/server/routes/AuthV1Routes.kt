@@ -18,6 +18,7 @@ import app.logdate.server.auth.RefreshTokenRevocationRepository
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.SessionType
 import app.logdate.server.auth.TokenService
+import app.logdate.server.crypto.EncryptionMode
 import app.logdate.server.entitlements.EntitlementService
 import app.logdate.server.entitlements.EntitlementStatus
 import app.logdate.server.entitlements.EntitlementTier
@@ -198,6 +199,11 @@ data class AuthAccountView(
     val passkeyCredentialIds: List<String>,
     val createdAt: String,
     val updatedAt: String,
+    // Whether this deployment requires client-side E2EE (a deployment-wide rollout flag, not a
+    // per-account setting -- see EncryptionMode). The client uses this to decide whether its
+    // local recovery-phrase-derived key is ever actually needed to decrypt anything: under
+    // AT_REST_ONLY, nothing was ever encrypted with it, so there's nothing to recover.
+    val requiresE2ee: Boolean = false,
 )
 
 @Serializable
@@ -1778,6 +1784,7 @@ private suspend fun issueAuthResponse(
                         passkeyCredentialIds = passkeyCredentialIds,
                         createdAt = fresh.createdAt.toString(),
                         updatedAt = (fresh.lastSignInAt ?: fresh.createdAt).toString(),
+                        requiresE2ee = EncryptionMode.fromEnvironment() == EncryptionMode.E2EE_REQUIRED,
                     ),
                 tokens = tokens,
             ),

@@ -23,4 +23,6 @@ data class ResolvedUserIdentity(
     val isAuthenticated: Boolean,
     /** Cloud account ID, null without an account. */
     val cloudAccountId: String?,
+    /** Whether the signed-in account's deployment currently requires client-side E2EE. False without an account. */
+    val requiresE2ee: Boolean = false,
 )

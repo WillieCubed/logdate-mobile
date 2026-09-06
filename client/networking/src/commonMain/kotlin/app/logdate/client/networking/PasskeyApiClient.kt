@@ -746,6 +746,7 @@ private data class AuthAccountDto(
     val email: String? = null,
     val emailVerified: Boolean = false,
     val emailVerifiedAt: String? = null,
+    val requiresE2ee: Boolean = false,
 )
 
 @Serializable
@@ -790,6 +791,7 @@ private fun AuthAccountDto.toLogDateAccount(): LogDateAccount =
         email = email,
         emailVerified = emailVerified,
         emailVerifiedAt = emailVerifiedAt?.let { Instant.parse(it) },
+        requiresE2ee = requiresE2ee,
     )
 
 /** The wrapped shape `GET /auth/me/passkeys` replies with. */
