@@ -98,16 +98,10 @@ class DefaultSyncManager(
             mapException = statusPublisher::handleSyncException,
         )
 
+    // TODO: startNow currently has no effect -- both paths launch fullSync() immediately.
     override fun sync(startNow: Boolean) {
-        if (startNow) {
-            syncScope.launch {
-                fullSync()
-            }
-        } else {
-            // Schedule background sync
-            syncScope.launch {
-                fullSync()
-            }
+        syncScope.launch {
+            fullSync()
         }
     }
 
