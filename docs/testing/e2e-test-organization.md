@@ -175,7 +175,7 @@ BLUE='\\033[0;34m'
 NC='\\033[0m'
 
 # Configuration
-PACKAGE_NAME="app.logdate"
+PACKAGE_NAME="${PACKAGE_NAME:-studio.hypertext.logdate}"
 VERBOSE=false
 
 # Test counters
@@ -281,17 +281,17 @@ Does the test involve:
 
 ```bash
 # Activity launching
-adb shell am start -n "app.logdate/.ActivityName"
-adb shell am start -n "app.logdate/.ActivityName" --es key "value"
+adb shell am start -n "studio.hypertext.logdate/.ActivityName"
+adb shell am start -n "studio.hypertext.logdate/.ActivityName" --es key "value"
 
 # Window/task verification
 adb shell dumpsys activity recents
 adb shell dumpsys activity | grep "EditorActivity"
-adb shell dumpsys package app.logdate
+adb shell dumpsys package studio.hypertext.logdate
 
-# App management
-adb shell pm clear app.logdate
-adb shell am force-stop app.logdate
+# App management. `pm clear` and `pm uninstall` are developer-only for LogDate packages --
+# they destroy real journals, and scripts/block-device-wipe.sh blocks them. Force-stop instead.
+adb shell am force-stop studio.hypertext.logdate
 adb shell pm list packages | grep logdate
 
 # Device info
