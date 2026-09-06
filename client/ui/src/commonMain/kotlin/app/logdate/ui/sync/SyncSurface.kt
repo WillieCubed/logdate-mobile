@@ -23,11 +23,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MergeType
-import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.SyncProblem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -51,7 +51,9 @@ import app.logdate.ui.theme.Spacing
  *
  * - `Syncing` → primary container with a continuously rotating sync glyph
  * - `Pending` → secondary container with a count
- * - `NetworkError` → tertiary container with a count and a "cloud off" glyph
+ * - `NetworkError` → tertiary container with a count and a "sync problem" glyph -- covers real
+ *   connectivity loss, a server error, and any unclassified exception alike, so the label must
+ *   stay connectivity-neutral rather than specifically claiming "Offline"
  *
  * The chip never speaks for `AuthError` / `StorageError` / `ConflictError` — those promote to
  * a banner instead. This split is deliberate: chip = ambient progress, banner = needs the
@@ -186,8 +188,11 @@ private fun SyncPresentation.toChipVisual(): ChipVisual? {
 
         is SyncPresentation.NetworkError ->
             ChipVisual(
-                label = if (pendingCount > 0) "Offline · $pendingCount" else "Offline",
-                icon = Icons.Filled.CloudOff,
+                // Backs NETWORK_ERROR, SERVER_ERROR, and UNKNOWN_ERROR alike (SyncStatusObserver)
+                // -- only the first of those is ever actually "offline" -- so this can't claim a
+                // specific connectivity diagnosis it isn't verifying.
+                label = if (pendingCount > 0) "Couldn't sync · $pendingCount" else "Couldn't sync",
+                icon = Icons.Filled.SyncProblem,
                 showSpinner = false,
                 containerColor = scheme.tertiaryContainer,
                 contentColor = scheme.onTertiaryContainer,
