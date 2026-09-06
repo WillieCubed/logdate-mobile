@@ -3,6 +3,7 @@
 package app.logdate.ui.audio
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -87,6 +88,12 @@ fun MomentAudioCard(
             )
         }
 
+    // What expandOnPlayback was always for: a recording opens itself while it plays and closes
+    // again when it finishes, so the card never has to steal the tap that opens the day.
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) controller.onPlaybackStarted() else controller.onPlaybackCompleted()
+    }
+
     val togglePlayback = {
         when {
             isPlaying -> playbackState.pause()
@@ -121,7 +128,6 @@ fun MomentAudioCard(
                 transcriptExcerpt = excerpt,
                 isTranscribing = isTranscribing,
                 onPlayPause = togglePlayback,
-                onExpand = controller::onCollapseToggle,
                 modifier = modifier,
             )
     }

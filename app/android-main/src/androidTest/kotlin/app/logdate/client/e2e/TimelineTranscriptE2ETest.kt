@@ -4,7 +4,6 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.ui.audio.TranscriptionProvider
 import app.logdate.ui.audio.TranscriptionState
@@ -36,7 +35,7 @@ class TimelineTranscriptE2ETest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun `audio card resolves transcript from the provider and expands it on tap`() {
+    fun `audio card resolves its transcript from the provider`() {
         val noteId = Uuid.random()
         val firstSentence = "This is a deliberately long opening sentence for the transcript."
         val secondSentence = "The hidden follow-up sentence appears after expansion."
@@ -60,9 +59,7 @@ class TimelineTranscriptE2ETest {
         composeRule.onNodeWithText(firstSentence).assertExists()
         composeRule.onNodeWithText(secondSentence, substring = true).assertDoesNotExist()
 
-        composeRule.onNodeWithText(firstSentence).performClick()
-
-        composeRule.onNodeWithText(secondSentence, substring = true).assertExists()
+        composeRule.onNodeWithText(secondSentence, substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -85,7 +82,7 @@ class TimelineTranscriptE2ETest {
     }
 
     @Test
-    fun `moment audio card expands to the full transcript when tapped`() {
+    fun `moment audio card shows only the excerpt while collapsed`() {
         val firstSentence = "This is another long first sentence for a semantic moment."
         val secondSentence = "The rest of the transcript should appear after tapping preview."
         val transcript = "$firstSentence $secondSentence"
@@ -101,9 +98,7 @@ class TimelineTranscriptE2ETest {
 
         composeRule.onNodeWithText(secondSentence, substring = true).assertDoesNotExist()
 
-        composeRule.onNodeWithText(firstSentence).performClick()
-
-        composeRule.onNodeWithText(secondSentence, substring = true).assertExists()
+        composeRule.onNodeWithText(secondSentence, substring = true).assertDoesNotExist()
     }
 }
 

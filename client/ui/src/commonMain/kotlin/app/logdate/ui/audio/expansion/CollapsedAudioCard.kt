@@ -42,9 +42,13 @@ private val COLLAPSED_WAVEFORM_HEIGHT = 40.dp
  * it is the play target and the progress readout at once, drawn from the recording's own
  * amplitudes rather than a decorative stand-in.
  *
+ * The card body is deliberately not clickable. It sits inside a day that opens on tap, and a
+ * card that swallowed that tap would leave a day whose only content is a recording with no way
+ * to open it at all. Expansion is driven by playback instead, which is what
+ * [AudioExpansionController]'s `expandOnPlayback` is for.
+ *
  * @param transcriptExcerpt Sentence-bounded preview, or null while transcription is pending.
  * @param onPlayPause Toggles playback for this recording.
- * @param onExpand Promotes to [AudioExpansionState.SPATIAL_EXPANDED].
  */
 @Composable
 fun CollapsedAudioCard(
@@ -57,14 +61,13 @@ fun CollapsedAudioCard(
     transcriptExcerpt: String? = null,
     isTranscribing: Boolean = false,
     onPlayPause: () -> Unit = {},
-    onExpand: () -> Unit = {},
 ) {
     val accentColor = remember(palette) { Color(palette.accentColor) }
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = RoundedCornerShape(20.dp),
-        modifier = modifier.fillMaxWidth().clickable(onClick = onExpand),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
