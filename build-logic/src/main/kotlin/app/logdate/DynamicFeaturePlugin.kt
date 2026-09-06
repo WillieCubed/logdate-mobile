@@ -34,6 +34,10 @@ class DynamicFeaturePlugin : Plugin<Project> {
                         initWith(getByName("release"))
                         matchingFallbacks += listOf("release")
                     }
+                    maybeCreate("dogfood").apply {
+                        initWith(getByName("debug"))
+                        matchingFallbacks += listOf("debug")
+                    }
                 }
 
                 compileOptions {

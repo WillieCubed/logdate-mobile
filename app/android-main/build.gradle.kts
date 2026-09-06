@@ -234,6 +234,22 @@ extensions.configure<ApplicationExtension> {
             signingConfig = signingConfigs.getByName("debug")
             isProfileable = true
         }
+        create("dogfood") {
+            initWith(getByName("debug"))
+            matchingFallbacks += listOf("debug")
+            // Signed with the upload key (already trusted for logdate.app's Digital Asset
+            // Links) instead of the per-machine debug keystore, so passkey sign-in against
+            // production works on a locally-built, fully debuggable install. Falls back to
+            // debug signing only when the upload keystore isn't configured on this machine --
+            // everything else about the build is unaffected, but passkey sign-in won't work
+            // until it is.
+            signingConfig =
+                if (hasReleaseSigningConfig) {
+                    signingConfigs.getByName("release")
+                } else {
+                    signingConfigs.getByName("debug")
+                }
+        }
     }
 
     androidResources {
