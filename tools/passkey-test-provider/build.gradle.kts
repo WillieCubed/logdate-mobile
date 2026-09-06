@@ -32,6 +32,14 @@ android {
                 .toInt()
         versionCode = 1
         versionName = "1.0"
+
+        // The app whose signing certificate the ceremony reads. Same property the app
+        // module uses for its own applicationId, so the two cannot drift apart.
+        manifestPlaceholders["appUnderTestId"] =
+            providers
+                .gradleProperty("logdate.applicationId")
+                .orElse("studio.hypertext.logdate")
+                .get()
     }
 
     buildTypes {
