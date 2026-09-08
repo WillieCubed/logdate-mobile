@@ -4,6 +4,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.ui.audio.TranscriptionProvider
 import app.logdate.ui.audio.TranscriptionState
@@ -16,6 +17,7 @@ import app.logdate.ui.timeline.newstuff.EndOfTimelineUiState
 import app.logdate.ui.timeline.newstuff.TimelineList
 import kotlinx.datetime.LocalDate
 import kotlin.uuid.Uuid
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -100,6 +102,26 @@ class TimelineTranscriptE2ETest {
 
         composeRule.onNodeWithText(secondSentence, substring = true).assertDoesNotExist()
     }
+
+    @Test
+    fun `a day whose only content is a recording still opens on tap`() {
+        // Regression guard. The audio card once put a click handler on its whole body to expand
+        // itself, which swallowed the tap that opens the day. On a day holding nothing but a
+        // recording the card covers the entire row, so those days could not be opened at all.
+        val transcript = "A recording that fills the whole day card on its own."
+        var openedDay: LocalDate? = null
+
+        composeRule.setContent {
+            TimelineTestContent(
+                items = listOf(semanticAudioDay(transcript = transcript)),
+                onOpenDay = { date -> openedDay = date },
+            )
+        }
+
+        composeRule.onNodeWithText(transcript, substring = true).performClick()
+
+        assertEquals(LocalDate(2026, 3, 24), openedDay)
+    }
 }
 
 /** A day whose transcript is not on the moment, so it must resolve through the provider. */
@@ -152,13 +174,14 @@ private fun semanticAudioDay(transcript: String): TimelineDayUiState =
 private fun TimelineTestContent(
     items: List<TimelineDayUiState>,
     transcriptionState: TranscriptionState = TranscriptionState(),
+    onOpenDay: (LocalDate) -> Unit = {},
 ) {
     LogDateTheme(dynamicColor = false, darkTheme = false) {
         TranscriptionProvider(state = transcriptionState) {
             TimelineList(
                 items = items,
                 endOfTimelineState = EndOfTimelineUiState.DiscoveryEasterEgg,
-                onOpenDay = {},
+                onOpenDay = onOpenDay,
             )
         }
     }
