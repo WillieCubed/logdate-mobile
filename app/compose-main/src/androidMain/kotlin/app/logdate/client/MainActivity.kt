@@ -163,7 +163,11 @@ class MainActivity : FragmentActivity() {
 
         enableEdgeToEdge()
         enableHandoffIfSupported()
-        pendingNavKey = resolveMainActivityNavKey(intent)
+        // A recreated activity receives the launch intent again; resolving it a second time
+        // would overwrite the Navigation 3 back stack restored across rotation.
+        if (savedInstanceState == null) {
+            pendingNavKey = resolveMainActivityNavKey(intent)
+        }
 
         setContent {
             val state = appUiState as? GlobalAppUiLoadedState
@@ -184,7 +188,7 @@ class MainActivity : FragmentActivity() {
         markLaunchStage(LaunchStage.ComposeAttached)
         Napier.i("MainActivity onCreate: Compose content attached", tag = APP_LAUNCH_TAG)
 
-        if (intent?.let { handleMultiWindowIntent(it) } == true) {
+        if (savedInstanceState == null && intent?.let { handleMultiWindowIntent(it) } == true) {
             return
         }
     }
@@ -311,7 +315,9 @@ class MainActivity : FragmentActivity() {
     override fun onPause() {
         super.onPause()
         locationTrackingManager.onActivityPaused()
-        viewModel.onAppBackgrounded()
+        if (!isChangingConfigurations) {
+            viewModel.onAppBackgrounded()
+        }
         if (activityProvider.currentActivity === this) {
             activityProvider.currentActivity = null
         }

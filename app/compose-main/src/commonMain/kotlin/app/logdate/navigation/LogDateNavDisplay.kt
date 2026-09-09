@@ -130,11 +130,17 @@ fun LogDateNavDisplay(
     var hasRequestedUnlock by remember { mutableStateOf(false) }
 
     LaunchedEffect(appUiState.isOnboarded, appUiState.requiresUnlock) {
-        if (!appUiState.isOnboarded) {
+        val action =
+            resolveNavBootstrapAction(
+                backStack = backStack,
+                isOnboarded = appUiState.isOnboarded,
+                requiresUnlock = appUiState.requiresUnlock,
+            )
+        if (action is NavBootstrapAction.ResetTo) {
             backStack.clear()
-            backStack.add(app.logdate.feature.onboarding.navigation.OnboardingStart)
-            return@LaunchedEffect
+            backStack.add(action.key)
         }
+        if (!appUiState.isOnboarded) return@LaunchedEffect
         if (appUiState.requiresUnlock) {
             if (!hasRequestedUnlock) {
                 hasRequestedUnlock = true
@@ -143,10 +149,6 @@ fun LogDateNavDisplay(
             return@LaunchedEffect
         }
         hasRequestedUnlock = false
-        if (backStack.lastOrNull() != HomeRoute) {
-            backStack.clear()
-            backStack.add(HomeRoute)
-        }
     }
 
     LaunchedEffect(pendingNavKey, appUiState.isOnboarded, appUiState.requiresUnlock) {
