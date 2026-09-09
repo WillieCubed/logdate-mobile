@@ -182,6 +182,10 @@ extensions.configure<ApplicationExtension> {
         // The account type res/xml/authenticator.xml declares. AndroidAccountManager derives the
         // same value from the installed package name, so the two cannot drift apart.
         resValue("string", "logdate_account_type", "$applicationId.account")
+        // res/xml is not subject to ${applicationId} manifest placeholder substitution, so the
+        // static launcher shortcut reads its target package from here. Hardcoding it means a
+        // build made with -Plogdate.applicationId ships a shortcut that silently never launches.
+        resValue("string", "logdate_application_id", applicationId!!)
         // Maps and Places use a dedicated Android-restricted credential. Never fall back to the
         // general Firebase API key generated from google-services.json.
         resValue("string", "google_maps_api_key", resolvedGoogleMapsApiKey)
@@ -577,7 +581,9 @@ afterEvaluate {
         doFirst {
             throw GradleException(
                 "Uninstall tasks are disabled to protect app data on connected devices. " +
-                    "Use 'installDebug' to upgrade in place.",
+                    "Install the same variant already on the device to upgrade in place. Note " +
+                    "debug and dogfood are signed with different keys, so neither can replace " +
+                    "the other.",
             )
         }
     }
