@@ -46,6 +46,31 @@ val resolvedGoogleMapsApiKey =
         ?: ""
 
 /**
+ * LogDate ships as studio.hypertext.logdate. The retired co.reasonabletech.logdate is still
+ * installed on developer devices holding real data, and an install only upgrades in place when
+ * the package matches, so -Plogdate.applicationId rebuilds the current source under the old
+ * identity until those installs are migrated.
+ */
+val baseApplicationId: String =
+    providers
+        .gradleProperty("logdate.applicationId")
+        .orElse("studio.hypertext.logdate")
+        .get()
+
+/**
+ * Debug installs under their own identity so they can sit beside a dogfood build rather than
+ * colliding with it. The two are signed with different keys -- dogfood with the upload key, debug
+ * with the per-machine debug keystore -- so sharing one package makes them mutually exclusive:
+ * neither can update the other, and the only way to swap is an uninstall that takes the user's
+ * journal with it.
+ *
+ * Only debug moves. Dogfood must keep the production package because its whole purpose is passing
+ * Digital Asset Links for passkey sign-in, which binds package and certificate together. Debug
+ * cannot do passkey sign-in under any identity, so it gives up nothing here.
+ */
+val debugApplicationIdSuffix = ".debug"
+
+/**
  * Production release versionCode comes from CI. Priority order:
  *
  *  1. `LOGDATE_VERSION_CODE` env var (CI sets this from the commit graph plus a
@@ -170,22 +195,15 @@ extensions.configure<ApplicationExtension> {
             ":client:feature:speechrecognition",
         )
     defaultConfig {
-        // LogDate ships as studio.hypertext.logdate. The retired co.reasonabletech.logdate is
-        // still installed on developer devices holding real data, and an install only upgrades
-        // in place when the package matches, so -Plogdate.applicationId rebuilds the current
-        // source under the old identity until those installs are migrated.
-        applicationId =
-            providers
-                .gradleProperty("logdate.applicationId")
-                .orElse("studio.hypertext.logdate")
-                .get()
+        applicationId = baseApplicationId
         // The account type res/xml/authenticator.xml declares. AndroidAccountManager derives the
-        // same value from the installed package name, so the two cannot drift apart.
-        resValue("string", "logdate_account_type", "$applicationId.account")
-        // res/xml is not subject to ${applicationId} manifest placeholder substitution, so the
-        // static launcher shortcut reads its target package from here. Hardcoding it means a
-        // build made with -Plogdate.applicationId ships a shortcut that silently never launches.
-        resValue("string", "logdate_application_id", applicationId!!)
+        // same value from the installed package name, so the two cannot drift apart. This is the
+        // unsuffixed default; the debug build type overrides it to match its own package.
+        resValue("string", "logdate_account_type", "$baseApplicationId.account")
+        // res/xml files are not subject to ${applicationId} manifest placeholder substitution,
+        // so the static launcher shortcut reads its target package from here instead. A shortcut
+        // naming a package that is not installed simply fails to launch, silently.
+        resValue("string", "logdate_application_id", baseApplicationId)
         // Maps and Places use a dedicated Android-restricted credential. Never fall back to the
         // general Firebase API key generated from google-services.json.
         resValue("string", "google_maps_api_key", resolvedGoogleMapsApiKey)
@@ -227,6 +245,19 @@ extensions.configure<ApplicationExtension> {
 
     buildTypes {
         getByName("debug") {
+            applicationIdSuffix = debugApplicationIdSuffix
+            versionNameSuffix = "-debug"
+            // defaultConfig builds this from the unsuffixed id, and a buildType suffix is applied
+            // too late to be visible there. AndroidAccountManager derives the same string from
+            // context.packageName, which does include the suffix, and authenticator.xml notes that
+            // a mismatch fails addAccountExplicitly with a SecurityException rather than anything
+            // clearer -- so the two have to be restated together here.
+            resValue(
+                "string",
+                "logdate_account_type",
+                "$baseApplicationId$debugApplicationIdSuffix.account",
+            )
+            resValue("string", "logdate_application_id", "$baseApplicationId$debugApplicationIdSuffix")
             enableUnitTestCoverage = true
             // Local managed-device runs can disable instrumentation coverage to
             // reduce emulator memory pressure while keeping CI coverage enabled.
@@ -267,6 +298,13 @@ extensions.configure<ApplicationExtension> {
         create("dogfood") {
             initWith(getByName("debug"))
             matchingFallbacks += listOf("debug")
+            // initWith copies debug's applicationIdSuffix, which would rename dogfood and break the
+            // Digital Asset Links match this build type exists for -- silently, with no build
+            // error. Reset both, and restore the unsuffixed account type debug overrode.
+            applicationIdSuffix = null
+            versionNameSuffix = null
+            resValue("string", "logdate_account_type", "$baseApplicationId.account")
+            resValue("string", "logdate_application_id", baseApplicationId)
             // Signed with the upload key (already trusted for logdate.app's Digital Asset
             // Links) instead of the per-machine debug keystore, so passkey sign-in against
             // production works on a locally-built, fully debuggable install. Falls back to
@@ -581,9 +619,9 @@ afterEvaluate {
         doFirst {
             throw GradleException(
                 "Uninstall tasks are disabled to protect app data on connected devices. " +
-                    "Install the same variant already on the device to upgrade in place. Note " +
-                    "debug and dogfood are signed with different keys, so neither can replace " +
-                    "the other.",
+                    "Install the variant already on the device to upgrade in place: debug and " +
+                    "dogfood have different applicationIds and signing keys, so neither can " +
+                    "replace the other.",
             )
         }
     }
@@ -595,18 +633,15 @@ afterEvaluate {
  * placeholder, and it has to be rewritten whenever -Plogdate.applicationId changes. Doing that by
  * hand means a confusing "No matching client found" failure every time it is forgotten.
  */
-val resolvedApplicationId =
-    providers
-        .gradleProperty("logdate.applicationId")
-        .orElse("studio.hypertext.logdate")
-        .get()
-
 val writeLocalGoogleServices by tasks.registering(Exec::class) {
-    description = "Regenerates the placeholder google-services.json for the applicationId being built."
+    description = "Regenerates the placeholder google-services.json for the applicationIds being built."
     val config = layout.projectDirectory.file("google-services.json").asFile
     // A real Firebase configuration is left alone; the script refuses to overwrite one.
     onlyIf { !config.exists() || config.readText().contains("logdate-local-stub") }
-    environment("LOGDATE_APPLICATION_ID", resolvedApplicationId)
+    // Every id that any variant builds under. The plugin matches the variant's full applicationId,
+    // so a stub naming only the base id fails the debug build with "No matching client found".
+    environment("LOGDATE_APPLICATION_ID", baseApplicationId)
+    environment("LOGDATE_APPLICATION_ID_EXTRA", "$baseApplicationId$debugApplicationIdSuffix")
     commandLine("bash", rootProject.file("scripts/write-local-google-services.sh").absolutePath)
 }
 
