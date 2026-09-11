@@ -302,7 +302,13 @@ class LogDateCloudApiClient(
      */
     private suspend fun <T> handleApiError(response: HttpResponse): Result<T> {
         val statusCode = response.status.value
-        val errorPayload = runCatching { response.bodyAsText() }.getOrDefault("")
+        val errorPayload =
+            runCatching { response.bodyAsText() }
+                .onFailure { Napier.w("Could not read error body for HTTP $statusCode", it) }
+                .getOrDefault("")
+        // Every HTTP failure used to be built here silently, so a server rejecting an upload left
+        // no trace anywhere -- the one thing that would have explained months of failed syncs.
+        Napier.w("HTTP $statusCode from sync API: ${errorPayload.take(512)}")
         val parsedError = parseErrorPayload(errorPayload)
         return if (parsedError != null) {
             Result.failure(

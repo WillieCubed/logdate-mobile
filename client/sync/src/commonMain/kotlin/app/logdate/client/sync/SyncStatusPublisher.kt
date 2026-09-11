@@ -217,6 +217,7 @@ internal class SyncStatusPublisher(
      * Distinguishes 401 Unauthorized errors from other server errors.
      */
     fun handleCloudApiError(e: CloudApiException): SyncResult {
+        Napier.e("Sync failed with ${e.statusCode ?: "no"} status (${e.errorCode}): ${e.message}", e)
         val errorType =
             if (e.statusCode == 401) {
                 SyncErrorType.AUTHENTICATION_ERROR

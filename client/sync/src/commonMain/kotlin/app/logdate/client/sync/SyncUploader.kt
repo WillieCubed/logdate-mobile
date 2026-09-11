@@ -127,6 +127,10 @@ internal class SyncUploader(
                     -> {
                         val journal = journalsById[pending.entityId]
                         if (journal == null) {
+                            // Queued for upload but absent locally. Settling it is right -- there is
+                            // nothing left to send -- but it must not happen silently: the entry
+                            // never reached the server and this is the only trace it existed.
+                            Napier.w("Dropping queued journal ${pending.entityId}: no longer present locally")
                             syncMetadataService.markAsSynced(
                                 pending.entityId,
                                 EntityType.JOURNAL,
@@ -275,6 +279,7 @@ internal class SyncUploader(
                     -> {
                         val note = notesById[pending.entityId]
                         if (note == null) {
+                            Napier.w("Dropping queued note ${pending.entityId}: no longer present locally")
                             syncMetadataService.markAsSynced(
                                 pending.entityId,
                                 EntityType.NOTE,
@@ -324,7 +329,16 @@ internal class SyncUploader(
                                             )
                                         errors.add(
                                             SyncError(
-                                                SyncErrorType.STORAGE_ERROR,
+                                                // STORAGE_ERROR renders as "Cloud storage is full",
+                                                // which is a lie for a file missing from this device
+                                                // and sends the user to a billing page for a local
+                                                // problem. Only a real server-side storage refusal
+                                                // earns that message.
+                                                if (error is MissingMediaException) {
+                                                    SyncErrorType.UNKNOWN_ERROR
+                                                } else {
+                                                    SyncErrorType.STORAGE_ERROR
+                                                },
                                                 "Failed to upload media for note ${note.uid}: ${error.message}",
                                                 error,
                                                 retryable = !movedToDeadLetter,
@@ -579,6 +593,7 @@ internal class SyncUploader(
                     -> {
                         val draft = draftsById[pending.entityId]
                         if (draft == null) {
+                            Napier.w("Dropping queued draft ${pending.entityId}: no longer present locally")
                             syncMetadataService.markAsSynced(pending.entityId, EntityType.DRAFT, Clock.System.now(), 0L)
                             continue
                         }

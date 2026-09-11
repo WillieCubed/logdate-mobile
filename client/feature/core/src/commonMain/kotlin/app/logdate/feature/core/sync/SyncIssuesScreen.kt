@@ -71,8 +71,10 @@ fun SyncIssuesScreen(
     viewModel: SyncIssuesViewModel = koinViewModel(),
 ) {
     val records by viewModel.records.collectAsStateWithLifecycle()
+    val pendingCount by viewModel.pendingCount.collectAsStateWithLifecycle()
     SyncIssuesContent(
         records = records,
+        pendingCount = pendingCount,
         onRetry = viewModel::retry,
         onDiscard = viewModel::discard,
         onGoBack = onGoBack,
@@ -84,6 +86,7 @@ fun SyncIssuesScreen(
 @Composable
 fun SyncIssuesContent(
     records: List<SyncDeadLetterRecord>,
+    pendingCount: Int = 0,
     onRetry: (String) -> Unit,
     onDiscard: (String) -> Unit,
     onGoBack: () -> Unit,
@@ -103,7 +106,7 @@ fun SyncIssuesContent(
         },
     ) { padding ->
         if (records.isEmpty()) {
-            EmptyState(modifier = Modifier.padding(padding))
+            EmptyState(pendingCount = pendingCount, modifier = Modifier.padding(padding))
         } else {
             FoldableBookLayout(
                 modifier = Modifier.fillMaxSize().padding(padding),
@@ -136,10 +139,18 @@ fun SyncIssuesContent(
 }
 
 @Composable
-private fun EmptyState(modifier: Modifier = Modifier) {
+private fun EmptyState(
+    pendingCount: Int,
+    modifier: Modifier = Modifier,
+) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
-            text = "Everything is synced.",
+            text =
+                when {
+                    pendingCount == 1 -> "An entry is still waiting to back up."
+                    pendingCount > 1 -> "$pendingCount entries are still waiting to back up."
+                    else -> "Everything is synced."
+                },
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

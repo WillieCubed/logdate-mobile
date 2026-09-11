@@ -207,8 +207,29 @@ private fun SyncPresentation.toBannerVisual(): BannerVisual? {
         SyncPresentation.Hidden,
         is SyncPresentation.Syncing,
         is SyncPresentation.Pending,
-        is SyncPresentation.NetworkError,
         -> null
+
+        // Entries that cannot sync used to render a chip and nothing else, and the only route to
+        // the screen listing them hung off the conflict banner -- so the one state a user needs to
+        // act on was the one with no way to act. Once anything is actually stuck, offer the door.
+        is SyncPresentation.NetworkError ->
+            if (pendingCount > 0) {
+                BannerVisual(
+                    message =
+                        if (pendingCount == 1) {
+                            "An entry hasn't backed up yet."
+                        } else {
+                            "$pendingCount entries haven't backed up yet."
+                        },
+                    icon = Icons.Filled.SyncProblem,
+                    containerColor = scheme.tertiaryContainer,
+                    contentColor = scheme.onTertiaryContainer,
+                    action = "Review" to SyncAction.ReviewConflicts,
+                    dismissible = true,
+                )
+            } else {
+                null
+            }
 
         SyncPresentation.AuthError ->
             BannerVisual(
