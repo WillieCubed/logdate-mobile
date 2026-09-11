@@ -5,6 +5,7 @@ import app.logdate.client.sync.crypto.CLIENT_MEDIA_PREFIX_BYTES
 import app.logdate.client.sync.test.FakeCloudApiClient
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -45,6 +46,35 @@ class CloudMediaE2EEncryptionTest {
 
             val download = dataSource.downloadMedia("token", upload.mediaId).getOrElse { throw it }
             assertTrue(download.data.contentEquals(plaintext))
+        }
+
+    @Test
+    fun `declared size matches the encrypted bytes actually sent`() =
+        runTest {
+            // The server rejects any upload whose sizeBytes disagrees with the payload it receives,
+            // so declaring the plaintext length while sending ciphertext fails every media upload
+            // with a 400 -- forever, for every entry that has a photo, video, or recording.
+            val crypto = AesGcmMediaPayloadCrypto(ByteArray(32) { index -> (index + 3).toByte() })
+            val apiClient = RecordingCloudApiClient()
+            val dataSource = DefaultCloudMediaDataSource(apiClient, crypto)
+            val plaintext = ByteArray(64) { index -> index.toByte() }
+            val media =
+                MediaFile(
+                    contentId = Uuid.random(),
+                    fileName = "recording.m4a",
+                    mimeType = "audio/mp4",
+                    sizeBytes = plaintext.size.toLong(),
+                    data = plaintext,
+                )
+
+            dataSource.uploadMedia("token", media).getOrElse { throw it }
+
+            val uploaded = apiClient.lastUpload ?: fail("Upload request not captured")
+            assertEquals(
+                uploaded.data.size.toLong(),
+                uploaded.sizeBytes,
+                "sizeBytes must describe the bytes actually uploaded, not the plaintext",
+            )
         }
 
     @Test

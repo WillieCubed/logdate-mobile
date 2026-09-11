@@ -100,7 +100,10 @@ class DefaultCloudMediaDataSource(
                 contentId = media.contentId.toString(),
                 fileName = media.fileName,
                 mimeType = media.mimeType,
-                sizeBytes = media.sizeBytes,
+                // The encrypted payload carries a prefix, an IV and an auth tag, so it is always
+                // larger than the file on disk. The server checks this against the bytes it
+                // actually receives and rejects a mismatch, so it has to describe the ciphertext.
+                sizeBytes = encrypted.size.toLong(),
                 data = encrypted,
             )
 
