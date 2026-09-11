@@ -99,7 +99,7 @@ class DefaultCloudAssociationDataSource(
         since: Instant,
         limit: Int?,
     ): Result<AssociationSyncResult> =
-        cloudApiClient.getAssociationChanges(accessToken, since.toEpochMilliseconds(), limit).map { response ->
+        cloudApiClient.getAssociationChanges(accessToken, since.toEpochMilliseconds(), limit).mapCatching { response ->
             AssociationSyncResult(
                 additions = response.changes.filter { !it.isDeleted }.map { it.toAssociation() },
                 deletions =

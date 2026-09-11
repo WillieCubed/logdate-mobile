@@ -100,7 +100,7 @@ class DefaultCloudDraftDataSource(
         since: Instant,
         limit: Int?,
     ): Result<DraftSyncResult> =
-        cloudApiClient.getDraftChanges(accessToken, since.toEpochMilliseconds(), limit).map { response ->
+        cloudApiClient.getDraftChanges(accessToken, since.toEpochMilliseconds(), limit).mapCatching { response ->
             DraftSyncResult(
                 changes =
                     response.drafts.filter { !it.isDeleted }.map { change ->

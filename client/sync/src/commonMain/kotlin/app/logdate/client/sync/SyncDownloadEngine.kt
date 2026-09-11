@@ -74,6 +74,9 @@ internal class SyncDownloadEngine(
     private val mapCloudApiError: (CloudApiException) -> SyncResult,
     private val mapException: (Exception, String) -> SyncResult,
 ) {
+    /** Consecutive failed pages per entity type, so a poison page cannot pin the feed forever. */
+    private val consecutiveBatchFailures = mutableMapOf<EntityType, Int>()
+
     suspend fun <T : Any> download(
         strategy: DownloadStrategy<T>,
         accessToken: String,
@@ -241,9 +244,26 @@ internal class SyncDownloadEngine(
                 errors.addAll(batchResult.errors)
 
                 if (batchResult.errors.isNotEmpty()) {
+                    // Holding the cursor is right for a local write that failed and may succeed
+                    // next time. It is wrong for a remote item this build can never apply -- an
+                    // undecryptable payload, an unknown type -- because the same page is refetched
+                    // and fails identically forever, blocking every later page behind it. Hold for
+                    // a few attempts, then step over the page so the feed keeps moving. The errors
+                    // are still reported either way.
+                    val failures = (consecutiveBatchFailures[strategy.entityType] ?: 0) + 1
+                    consecutiveBatchFailures[strategy.entityType] = failures
+                    if (failures < MAX_CONSECUTIVE_BATCH_FAILURES) {
+                        break
+                    }
+                    Napier.e(
+                        "${strategy.logLabel} page at $cursor failed $failures times; advancing past it to unblock sync",
+                    )
+                    syncMetadataService.updateLastSyncTime(strategy.entityType, page.lastSyncTimestamp)
+                    consecutiveBatchFailures.remove(strategy.entityType)
                     break
                 }
 
+                consecutiveBatchFailures.remove(strategy.entityType)
                 syncMetadataService.updateLastSyncTime(strategy.entityType, page.lastSyncTimestamp)
 
                 if (!page.hasMore) {
@@ -312,4 +332,9 @@ internal class SyncDownloadEngine(
         } else {
             localUpdatedAt to remoteUpdatedAt
         }
+
+    private companion object {
+        /** Attempts at the same page before stepping over it. */
+        const val MAX_CONSECUTIVE_BATCH_FAILURES = 3
+    }
 }

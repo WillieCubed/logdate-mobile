@@ -299,10 +299,13 @@ class AndroidSyncManager(
                 .setRequiresBatteryNotLow(true)
                 .build()
 
+        // A download-only schedule meant nothing ever retried an upload on its own: an entry that
+        // failed could only be attempted again when the user wrote something new or tapped sync,
+        // so it never worked through its retry budget and simply sat unsynced indefinitely.
         val inputData =
             Data
                 .Builder()
-                .putString(AndroidLogDateSyncWorker.KEY_SYNC_TYPE, AndroidLogDateSyncWorker.SYNC_TYPE_DOWNLOAD)
+                .putString(AndroidLogDateSyncWorker.KEY_SYNC_TYPE, AndroidLogDateSyncWorker.SYNC_TYPE_FULL)
                 .build()
 
         val periodicRequest =

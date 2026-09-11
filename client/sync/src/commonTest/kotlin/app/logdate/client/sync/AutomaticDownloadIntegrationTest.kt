@@ -563,6 +563,16 @@ class AutomaticDownloadIntegrationTest {
                 syncMetadataService.getLastSyncTime(EntityType.NOTE),
                 "Cursor should not advance when applying changes fails",
             )
+
+            // Holding the cursor is only worth doing while the failure might be transient. A page
+            // this build can never apply would otherwise be refetched forever, blocking every later
+            // page behind it -- so after a few attempts the feed steps over it.
+            repeat(2) { syncManager.downloadRemoteChanges() }
+
+            assertNotNull(
+                syncMetadataService.getLastSyncTime(EntityType.NOTE),
+                "Cursor must eventually advance so one unapplicable page cannot block sync forever",
+            )
         }
 
     @Test
