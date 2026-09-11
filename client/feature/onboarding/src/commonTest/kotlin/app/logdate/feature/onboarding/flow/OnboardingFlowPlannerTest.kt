@@ -4,6 +4,7 @@ import app.logdate.client.domain.dayboundary.HealthConnectStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
@@ -44,7 +45,7 @@ class OnboardingFlowPlannerTest {
         // The identity key is provisioned for the device (OnboardingViewModel), so there is
         // nothing for a fresh user to recover and nothing to block them on. Reading the phrase
         // is a settings action, not an onboarding gate.
-        val snapshot = OnboardingProgressSnapshot(hasIdentityKey = false)
+        val snapshot = OnboardingProgressSnapshot()
 
         assertFalse(
             onboardingStepsFor(
@@ -52,7 +53,10 @@ class OnboardingFlowPlannerTest {
                 snapshot = snapshot,
             ).contains(OnboardingStep.RECOVERY_PHRASE),
         )
-        assertTrue(snapshot.canCompleteOnboarding() || snapshot.firstIncompleteRequiredOnboardingStep() != OnboardingStep.RECOVERY_PHRASE)
+        assertNotEquals(
+            OnboardingStep.RECOVERY_PHRASE,
+            snapshot.firstIncompleteRequiredOnboardingStep(),
+        )
     }
 
     @Test
@@ -76,7 +80,6 @@ class OnboardingFlowPlannerTest {
             OnboardingProgressSnapshot(
                 hasPersonalIntro = true,
                 hasBirthday = false,
-                hasIdentityKey = true,
                 notificationsHandledOnThisDevice = false,
                 recommendationsHandledOnThisDevice = true,
                 locationHandledOnThisDevice = true,
@@ -103,7 +106,6 @@ class OnboardingFlowPlannerTest {
             OnboardingProgressSnapshot(
                 hasPersonalIntro = true,
                 hasCloudAccount = true,
-                hasIdentityKey = true,
                 hasBirthday = true,
                 notificationsHandledOnThisDevice = true,
                 recommendationsHandledOnThisDevice = true,
@@ -139,7 +141,6 @@ class OnboardingFlowPlannerTest {
             OnboardingProgressSnapshot(
                 hasPersonalIntro = true,
                 hasBirthday = true,
-                hasIdentityKey = true,
                 recommendationsHandledOnThisDevice = true,
                 locationHandledOnThisDevice = true,
                 dayBoundariesHandledOnThisDevice = false,
@@ -151,7 +152,6 @@ class OnboardingFlowPlannerTest {
             OnboardingProgressSnapshot(
                 hasPersonalIntro = true,
                 hasBirthday = true,
-                hasIdentityKey = true,
                 recommendationsHandledOnThisDevice = true,
                 locationHandledOnThisDevice = true,
                 dayBoundariesHandledOnThisDevice = true,
@@ -200,7 +200,6 @@ class OnboardingFlowPlannerTest {
             OnboardingProgressSnapshot(
                 hasPersonalIntro = true,
                 hasBirthday = true,
-                hasIdentityKey = true,
                 healthConnectStatus = HealthConnectStatus.NOT_AVAILABLE,
             )
 
@@ -226,7 +225,6 @@ class OnboardingFlowPlannerTest {
             OnboardingProgressSnapshot(
                 hasPersonalIntro = true,
                 hasBirthday = true,
-                hasIdentityKey = true,
                 notificationsHandledOnThisDevice = true,
             ).firstIncompleteRequiredOnboardingStep(),
         )

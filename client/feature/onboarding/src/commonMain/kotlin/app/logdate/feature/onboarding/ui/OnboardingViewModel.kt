@@ -50,7 +50,6 @@ class OnboardingViewModel(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(OnboardingUiState())
     private val _healthConnectStatus = MutableStateFlow(HealthConnectStatus.CHECKING)
-    private val hasIdentityKeyState = MutableStateFlow(false)
     private var healthStatusJob: Job? = null
 
     val uiState: StateFlow<OnboardingUiState> =
@@ -70,7 +69,6 @@ class OnboardingViewModel(
     val progressSnapshot: StateFlow<OnboardingProgressSnapshot> =
         combine(
             observeUserIdentity(),
-            hasIdentityKeyState,
             combine(
                 combine(
                     onboardingDeviceStateRepository.deviceState,
@@ -95,7 +93,7 @@ class OnboardingViewModel(
                     sleepBasedDayBoundariesEnabled = dayBoundarySettings.sleepBasedBoundariesEnabled,
                 )
             },
-        ) { identity, hasIdentityKey, inputs ->
+        ) { identity, inputs ->
             OnboardingProgressSnapshot(
                 // Only the name is asked for; a blank bio must not send someone back through the
                 // introduction every time they open the app.
@@ -105,7 +103,6 @@ class OnboardingViewModel(
                     identity.isAuthenticated ||
                         identity.cloudAccountId != null ||
                         !identity.username.isNullOrBlank(),
-                hasIdentityKey = hasIdentityKey,
                 recommendationsHandledOnThisDevice = inputs.deviceState.recommendationsHandledOnThisDevice,
                 contextualRecommendationsEnabled = inputs.recommendationsEnabled,
                 dayBoundariesHandledOnThisDevice = inputs.deviceState.dayBoundariesHandledOnThisDevice,
@@ -145,7 +142,7 @@ class OnboardingViewModel(
 
     init {
         refreshHealthStatus()
-        refreshIdentityKeyState()
+        provisionIdentityKey()
     }
 
     /**
@@ -252,22 +249,18 @@ class OnboardingViewModel(
     }
 
     /**
-     * Provisions this device's identity key if it has none, then publishes the result.
+     * Provisions this device's identity key if it has none.
      *
-     * Sync encrypts every note, journal, and draft with a key derived from this one, so a device
-     * that reaches the timeline without it silently fails every upload. Provisioning here rather
-     * than behind a recovery-phrase screen keeps that guarantee independent of what the user is
-     * shown -- they read the phrase from settings when they want it, and are never blocked on it.
+     * Doing it here rather than behind a recovery-phrase screen keeps the guarantee independent of
+     * what the user is shown: they read the phrase from settings when they want it, never as a gate.
      */
-    fun refreshIdentityKeyState() {
+    fun provisionIdentityKey() {
         viewModelScope.launch {
-            hasIdentityKeyState.value =
-                runCatching {
-                    identityKeyManager.ensureIdentityKey()
-                    identityKeyManager.hasIdentityKey()
-                }.getOrElse { error ->
-                    Napier.w("Failed to provision identity key", error)
-                    false
+            runCatching { identityKeyManager.ensureIdentityKey() }
+                .onFailure { error ->
+                    // Sync provisions the key too, so this is recoverable rather than terminal --
+                    // but uploads fail until then, so it is not a warning.
+                    Napier.e("Failed to provision identity key", error)
                 }
         }
     }

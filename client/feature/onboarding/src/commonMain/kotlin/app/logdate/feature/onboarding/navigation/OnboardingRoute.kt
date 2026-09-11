@@ -287,13 +287,13 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
         val setupState by recoveryViewModel.setupState.collectAsState()
 
         fun continueAfterRecovery() {
-            flowViewModel.refreshIdentityKeyState()
+            flowViewModel.provisionIdentityKey()
             onGoToItem(
                 routeForStep(
                     nextOnboardingStepAfter(
                         currentStep = OnboardingStep.RECOVERY_PHRASE,
                         entryMode = entryMode,
-                        snapshot = progressSnapshot.copy(hasIdentityKey = true),
+                        snapshot = progressSnapshot,
                     ) ?: terminalStepFor(entryMode),
                 ),
             )

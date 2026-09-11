@@ -198,10 +198,6 @@ data class AuthAccountView(
     val passkeyCredentialIds: List<String>,
     val createdAt: String,
     val updatedAt: String,
-    // Whether this deployment requires client-side E2EE (a deployment-wide rollout flag, not a
-    // per-account setting -- see EncryptionMode). The client uses this to decide whether its
-    // local recovery-phrase-derived key is ever actually needed to decrypt anything: under
-    // AT_REST_ONLY, nothing was ever encrypted with it, so there's nothing to recover.
 )
 
 @Serializable

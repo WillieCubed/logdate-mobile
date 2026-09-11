@@ -275,11 +275,10 @@ class OnboardingViewModelTest {
             // the first upload. Nothing else in production creates it.
             identityKeyManager.clearIdentityKey()
 
-            viewModel.refreshIdentityKeyState()
+            viewModel.provisionIdentityKey()
             advanceUntilIdle()
 
             assertTrue(identityKeyManager.hasIdentityKey())
-            assertTrue(viewModel.progressSnapshot.value.hasIdentityKey)
         }
 
     @Test
@@ -288,7 +287,7 @@ class OnboardingViewModelTest {
             // A returning user must never be stopped by a phrase prompt: the key is provisioned
             // for them, and the phrase is theirs to read from settings whenever they want it.
             identityKeyManager.clearIdentityKey()
-            viewModel.refreshIdentityKeyState()
+            viewModel.provisionIdentityKey()
             fakeProfileRepository.setProfile(
                 LogDateProfile(
                     displayName = "Alex",
@@ -468,10 +467,6 @@ private class FakeProfileRepository : ProfileRepository {
 private class FakeAccountRepository : AccountRepository {
     private val state = MutableStateFlow<LogDateAccount?>(null)
     override val currentAccount: Flow<LogDateAccount?> = state
-
-    fun setAccount(account: LogDateAccount?) {
-        state.value = account
-    }
 
     override suspend fun updateProfile(
         displayName: String?,

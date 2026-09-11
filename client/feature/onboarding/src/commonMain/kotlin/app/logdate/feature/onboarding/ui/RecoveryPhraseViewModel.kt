@@ -43,9 +43,11 @@ class RecoveryPhraseViewModel(
                                 errorMessage = "Enter your existing recovery phrase to make it available from settings.",
                             )
                         else -> {
-                            val phrase = identityKeyManager.setupNewIdentity()
+                            // Goes through ensureIdentityKey so this shares the lock with the sync
+                            // and onboarding provisioning paths; setupNewIdentity would race them.
+                            identityKeyManager.ensureIdentityKey()
                             RecoveryPhraseSetupUiState(
-                                words = phrase.words,
+                                words = identityKeyManager.getStoredRecoveryPhrase()?.words.orEmpty(),
                                 isLoading = false,
                             )
                         }

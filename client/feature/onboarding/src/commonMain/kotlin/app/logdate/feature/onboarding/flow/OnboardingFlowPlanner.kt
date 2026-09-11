@@ -13,6 +13,13 @@ enum class OnboardingStep {
     MEMORY_IMPORT,
     MEMORY_SELECTION,
     ACCOUNT,
+
+    /**
+     * Parked: deliberately absent from [onboardingStepOrderFor], so nothing navigates here today.
+     * The key is provisioned for the device instead, and the phrase is read from privacy settings.
+     * Kept for the recovery flow that offers it when content is found that this device cannot
+     * decrypt -- restoring an identity, rather than gating a new one.
+     */
     RECOVERY_PHRASE,
     BIRTHDAY,
     RECOMMENDATIONS,
@@ -27,7 +34,6 @@ data class OnboardingProgressSnapshot(
     val hasPersonalIntro: Boolean = false,
     val hasBirthday: Boolean = false,
     val hasCloudAccount: Boolean = false,
-    val hasIdentityKey: Boolean = false,
     val recommendationsHandledOnThisDevice: Boolean = false,
     val contextualRecommendationsEnabled: Boolean = true,
     val dayBoundariesHandledOnThisDevice: Boolean = false,
