@@ -14,6 +14,7 @@ import app.logdate.client.sync.cloud.CloudContentDataSource
 import app.logdate.client.sync.cloud.CloudDraftDataSource
 import app.logdate.client.sync.cloud.CloudJournalDataSource
 import app.logdate.client.sync.cloud.JournalContentAssociation
+import app.logdate.client.sync.cloud.MediaTooLargeException
 import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.MediaSyncRefStore
@@ -324,8 +325,14 @@ internal class SyncUploader(
                                                 pending = pending,
                                                 error = error,
                                                 permanent =
-                                                    error is MissingMediaException &&
-                                                        retryCoordinator.previousFailureWasMissingMedia(EntityType.NOTE, pending.entityId),
+                                                    error is MediaTooLargeException ||
+                                                        (
+                                                            error is MissingMediaException &&
+                                                                retryCoordinator.previousFailureWasMissingMedia(
+                                                                    EntityType.NOTE,
+                                                                    pending.entityId,
+                                                                )
+                                                        ),
                                             )
                                         errors.add(
                                             SyncError(

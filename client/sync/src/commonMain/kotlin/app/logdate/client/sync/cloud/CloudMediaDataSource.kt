@@ -95,6 +95,18 @@ class DefaultCloudMediaDataSource(
             } catch (error: Exception) {
                 return Result.failure(error)
             }
+        if (encrypted.size > MAX_MEDIA_UPLOAD_BYTES) {
+            // The hosting platform refuses a request this large before the server ever sees it, so
+            // retrying can never succeed. Failing here names the reason instead of leaving the
+            // entry queued forever behind an unexplained rejection.
+            return Result.failure(
+                MediaTooLargeException(
+                    "Media for ${media.contentId} is ${encrypted.size} bytes, over the " +
+                        "$MAX_MEDIA_UPLOAD_BYTES byte upload limit",
+                ),
+            )
+        }
+
         val request =
             MediaUploadRequest(
                 contentId = media.contentId.toString(),
@@ -142,3 +154,14 @@ class DefaultCloudMediaDataSource(
         )
     }
 }
+
+/** Raised when a media payload exceeds what the upload endpoint will accept. */
+class MediaTooLargeException(
+    message: String,
+) : Exception(message)
+
+/**
+ * Ceiling for a single media upload. Cloud Run rejects a non-streaming request above 32 MiB before
+ * it reaches the server, leaving a little headroom for the multipart envelope.
+ */
+private const val MAX_MEDIA_UPLOAD_BYTES = 31 * 1024 * 1024

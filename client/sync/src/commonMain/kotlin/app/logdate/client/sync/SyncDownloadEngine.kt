@@ -151,6 +151,16 @@ internal class SyncDownloadEngine(
                                             Napier.d("Resolved conflict for ${strategy.logLabel} $id: keeping remote")
                                         }
                                         is ConflictResolution.KeepLocal -> {
+                                            // Keeping the local copy is only half the resolution:
+                                            // without re-queueing it the server keeps its own
+                                            // version, the next download resolves the same conflict
+                                            // the same way, and the two never converge.
+                                            syncMetadataService.enqueuePending(
+                                                entityId = id.toString(),
+                                                entityType = strategy.entityType,
+                                                operation = PendingOperation.UPDATE,
+                                            )
+                                            conflictsResolved++
                                             Napier.d("Resolved conflict for ${strategy.logLabel} $id: keeping local")
                                         }
                                         is ConflictResolution.Merge -> {

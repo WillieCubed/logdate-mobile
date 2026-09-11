@@ -42,6 +42,7 @@ class KeyValueSyncDeadLetterStore(
     private val mutex = Mutex()
     private val recordsFlow = MutableStateFlow<List<SyncDeadLetterRecord>>(emptyList())
     private var loaded = false
+    private var corrupted = false
 
     override fun observe(): Flow<List<SyncDeadLetterRecord>> = recordsFlow.asStateFlow()
 
@@ -66,6 +67,10 @@ class KeyValueSyncDeadLetterStore(
     private suspend fun mutate(update: (List<SyncDeadLetterRecord>) -> List<SyncDeadLetterRecord>) {
         mutex.withLock {
             val current = if (loaded) recordsFlow.value else readFromStorage().also { loaded = true }
+            if (corrupted) {
+                Napier.w("Refusing to overwrite an undecodable dead-letter store")
+                return
+            }
             val next = update(current)
             storage.putString(DEAD_LETTER_KEY, json.encodeToString(next))
             recordsFlow.value = next
@@ -84,8 +89,14 @@ class KeyValueSyncDeadLetterStore(
     private suspend fun readFromStorage(): List<SyncDeadLetterRecord> {
         val raw = storage.getString(DEAD_LETTER_KEY) ?: return emptyList()
         return runCatching { json.decodeFromString<List<SyncDeadLetterRecord>>(raw) }
-            .onFailure { Napier.w("Failed to decode sync dead-letter store", it) }
-            .getOrElse { emptyList() }
+            .getOrElse { error ->
+                // Reading an unparseable blob as "no records" is not harmless: the next write
+                // persists that empty list and destroys every record of what failed -- the one
+                // thing that could explain a queue that will not drain. Keep the raw blob.
+                Napier.e("Sync dead-letter store could not be decoded; preserving it unread", error)
+                corrupted = true
+                emptyList()
+            }
     }
 
     private companion object {

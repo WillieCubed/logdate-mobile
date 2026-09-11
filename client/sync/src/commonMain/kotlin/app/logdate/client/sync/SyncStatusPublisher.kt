@@ -95,7 +95,11 @@ internal class SyncStatusPublisher(
     suspend fun publish() {
         val authenticated = sessionStorage.getSession() != null
         val pendingCount =
-            runCatching { syncMetadataService.getPendingCount() }.getOrDefault(0)
+            runCatching { syncMetadataService.getPendingCount() }
+                // Falling back to zero renders as "everything is backed up", which is exactly the
+                // healthy state -- so a metadata failure would otherwise look like success.
+                .onFailure { Napier.e("Could not read the pending upload count", it) }
+                .getOrDefault(0)
         _syncStatusFlow.value =
             SyncStatus(
                 isEnabled = authenticated && isEnabled(),
