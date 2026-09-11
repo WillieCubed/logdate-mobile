@@ -22,13 +22,6 @@ data class LogDateAccount(
     val email: String? = null,
     val emailVerified: Boolean = false,
     val emailVerifiedAt: Instant? = null,
-    /**
-     * Whether this account's deployment currently requires client-side E2EE (a deployment-wide
-     * rollout flag, not a per-account choice -- see the server's `EncryptionMode`). Lets the
-     * client decide whether its local recovery-phrase-derived key is ever actually needed to
-     * decrypt anything, instead of demanding it on every new device regardless.
-     */
-    val requiresE2ee: Boolean = false,
 )
 
 @Serializable

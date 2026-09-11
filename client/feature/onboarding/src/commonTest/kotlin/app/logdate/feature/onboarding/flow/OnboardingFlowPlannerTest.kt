@@ -15,8 +15,8 @@ import kotlin.test.assertTrue
  */
 class OnboardingFlowPlannerTest {
     @Test
-    fun `fresh flow includes full setup sequence when nothing is configured and the deployment requires E2EE`() {
-        val snapshot = OnboardingProgressSnapshot(accountRequiresE2ee = true)
+    fun `fresh flow includes full setup sequence when nothing is configured`() {
+        val snapshot = OnboardingProgressSnapshot()
 
         assertEquals(
             listOf(
@@ -25,7 +25,6 @@ class OnboardingFlowPlannerTest {
                 OnboardingStep.MEMORY_IMPORT,
                 OnboardingStep.MEMORY_SELECTION,
                 OnboardingStep.ACCOUNT,
-                OnboardingStep.RECOVERY_PHRASE,
                 OnboardingStep.BIRTHDAY,
                 OnboardingStep.RECOMMENDATIONS,
                 OnboardingStep.DAY_BOUNDARIES,
@@ -41,11 +40,11 @@ class OnboardingFlowPlannerTest {
     }
 
     @Test
-    fun `fresh flow skips recovery phrase when the deployment does not require E2EE`() {
-        // OnboardingProgressSnapshot() defaults accountRequiresE2ee to false (the AT_REST_ONLY
-        // default): a device with no cached identity key still shouldn't be asked for a recovery
-        // phrase when there was never anything client-side-encrypted for it to decrypt.
-        val snapshot = OnboardingProgressSnapshot()
+    fun `fresh flow never asks for a recovery phrase`() {
+        // The identity key is provisioned for the device (OnboardingViewModel), so there is
+        // nothing for a fresh user to recover and nothing to block them on. Reading the phrase
+        // is a settings action, not an onboarding gate.
+        val snapshot = OnboardingProgressSnapshot(hasIdentityKey = false)
 
         assertFalse(
             onboardingStepsFor(
@@ -53,6 +52,7 @@ class OnboardingFlowPlannerTest {
                 snapshot = snapshot,
             ).contains(OnboardingStep.RECOVERY_PHRASE),
         )
+        assertTrue(snapshot.canCompleteOnboarding() || snapshot.firstIncompleteRequiredOnboardingStep() != OnboardingStep.RECOVERY_PHRASE)
     }
 
     @Test

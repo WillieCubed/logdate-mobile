@@ -30,6 +30,42 @@ class IdentityKeyManagerTest {
         }
 
     @Test
+    fun `ensure identity key creates one when absent`() =
+        runTest {
+            assertFalse(manager.hasIdentityKey())
+
+            manager.ensureIdentityKey()
+
+            assertTrue(manager.hasIdentityKey())
+            assertEquals(12, manager.getStoredRecoveryPhrase()?.words?.size)
+        }
+
+    @Test
+    fun `ensure identity key is idempotent and preserves the original phrase`() =
+        runTest {
+            manager.ensureIdentityKey()
+            val firstPhrase = manager.getStoredRecoveryPhrase()
+            val firstKey = manager.getIdentityKey()
+
+            manager.ensureIdentityKey()
+
+            assertEquals(firstPhrase, manager.getStoredRecoveryPhrase())
+            assertTrue(firstKey.contentEquals(manager.getIdentityKey()))
+        }
+
+    @Test
+    fun `ensure identity key leaves a recovered identity untouched`() =
+        runTest {
+            val original = manager.setupNewIdentity()
+            manager.clearIdentityKey()
+            manager.recoverIdentity(original.words)
+
+            manager.ensureIdentityKey()
+
+            assertEquals(original, manager.getStoredRecoveryPhrase())
+        }
+
+    @Test
     fun `setup new identity`() =
         runTest {
             val phrase = manager.setupNewIdentity()

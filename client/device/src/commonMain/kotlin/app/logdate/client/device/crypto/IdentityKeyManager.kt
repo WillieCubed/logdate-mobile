@@ -4,6 +4,8 @@ import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.device.storage.getBytes
 import app.logdate.client.device.storage.putBytes
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 
 /**
@@ -20,6 +22,26 @@ class IdentityKeyManager(
      * Checks if this device has already been set up with an identity key.
      */
     suspend fun hasIdentityKey(): Boolean = secureStorage.getBytes(KEY_IDENTITY_KEY) != null
+
+    private val identityMutex = Mutex()
+
+    /**
+     * Guarantees this device has an identity key, creating one if it does not.
+     *
+     * Sync encrypts every note, journal, and draft with a key derived from this one, so the key
+     * is infrastructure rather than a user-facing choice -- it must exist before the first upload
+     * regardless of whether the user has been shown their recovery phrase yet. Showing the phrase
+     * is a separate concern, handled from settings.
+     *
+     * Idempotent, and safe to call concurrently: callers racing here would otherwise each derive a
+     * different key and the later write would orphan content encrypted under the earlier one.
+     */
+    suspend fun ensureIdentityKey() {
+        identityMutex.withLock {
+            if (hasIdentityKey()) return@withLock
+            setupNewIdentity()
+        }
+    }
 
     /**
      * Sets up a new identity for the first time.

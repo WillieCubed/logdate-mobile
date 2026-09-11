@@ -106,7 +106,6 @@ class OnboardingViewModel(
                         identity.cloudAccountId != null ||
                         !identity.username.isNullOrBlank(),
                 hasIdentityKey = hasIdentityKey,
-                accountRequiresE2ee = identity.requiresE2ee,
                 recommendationsHandledOnThisDevice = inputs.deviceState.recommendationsHandledOnThisDevice,
                 contextualRecommendationsEnabled = inputs.recommendationsEnabled,
                 dayBoundariesHandledOnThisDevice = inputs.deviceState.dayBoundariesHandledOnThisDevice,
@@ -252,14 +251,24 @@ class OnboardingViewModel(
             }
     }
 
+    /**
+     * Provisions this device's identity key if it has none, then publishes the result.
+     *
+     * Sync encrypts every note, journal, and draft with a key derived from this one, so a device
+     * that reaches the timeline without it silently fails every upload. Provisioning here rather
+     * than behind a recovery-phrase screen keeps that guarantee independent of what the user is
+     * shown -- they read the phrase from settings when they want it, and are never blocked on it.
+     */
     fun refreshIdentityKeyState() {
         viewModelScope.launch {
             hasIdentityKeyState.value =
-                runCatching { identityKeyManager.hasIdentityKey() }
-                    .getOrElse { error ->
-                        Napier.w("Failed to read identity key state", error)
-                        false
-                    }
+                runCatching {
+                    identityKeyManager.ensureIdentityKey()
+                    identityKeyManager.hasIdentityKey()
+                }.getOrElse { error ->
+                    Napier.w("Failed to provision identity key", error)
+                    false
+                }
         }
     }
 

@@ -269,43 +269,24 @@ class OnboardingViewModelTest {
         }
 
     @Test
-    fun `complete onboarding if eligible fails when identity key missing and account requires E2EE`() =
+    fun `onboarding provisions an identity key when the device has none`() =
         runTest {
+            // Sync encrypts every note with a key derived from this one, so it has to exist before
+            // the first upload. Nothing else in production creates it.
             identityKeyManager.clearIdentityKey()
-            // The recovery-phrase gate only applies when the deployment actually requires E2EE
-            // (see OnboardingFlowPlanner) -- without an account that says so, a missing identity
-            // key is not itself a reason to block completion.
-            fakeAccountRepository.setAccount(
-                LogDateAccount(username = "alex", displayName = "Alex", requiresE2ee = true),
-            )
+
             viewModel.refreshIdentityKeyState()
-            fakeProfileRepository.setProfile(
-                LogDateProfile(
-                    displayName = "Alex",
-                    bio = "Bio",
-                ),
-            )
-            fakeUserStateRepository.setBirthday(Instant.fromEpochMilliseconds(946684800000))
-            fakeOnboardingDeviceStateRepository.markRecommendationsHandled()
-            fakeOnboardingDeviceStateRepository.markLocationHandled()
-            fakeOnboardingDeviceStateRepository.markDayBoundariesHandled()
-            fakeOnboardingDeviceStateRepository.markNotificationsHandled()
             advanceUntilIdle()
 
-            val result = viewModel.completeOnboardingIfEligible()
-
-            assertTrue(result.isFailure)
-            assertEquals(false, fakeUserStateRepository.isOnboardingComplete)
-            assertEquals(OnboardingStep.RECOVERY_PHRASE, viewModel.firstIncompleteRequiredOnboardingStep())
+            assertTrue(identityKeyManager.hasIdentityKey())
+            assertTrue(viewModel.progressSnapshot.value.hasIdentityKey)
         }
 
     @Test
-    fun `complete onboarding if eligible succeeds despite missing identity key when account does not require E2EE`() =
+    fun `complete onboarding if eligible is never blocked on a recovery phrase`() =
         runTest {
-            // Regression coverage for the recovery-phrase gate firing unconditionally on any
-            // fresh device: without setAccount(...requiresE2ee = true), the fake account
-            // repository's default (no account / requiresE2ee = false) must not block completion
-            // on a missing identity key -- there was never anything for it to decrypt.
+            // A returning user must never be stopped by a phrase prompt: the key is provisioned
+            // for them, and the phrase is theirs to read from settings whenever they want it.
             identityKeyManager.clearIdentityKey()
             viewModel.refreshIdentityKeyState()
             fakeProfileRepository.setProfile(

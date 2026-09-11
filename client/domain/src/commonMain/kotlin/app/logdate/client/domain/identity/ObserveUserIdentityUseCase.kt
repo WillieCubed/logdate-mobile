@@ -47,7 +47,6 @@ class ObserveUserIdentityUseCase(
                 onboardedDate = resolvedOnboardedDate,
                 isAuthenticated = session != null,
                 cloudAccountId = cloudAccount?.id?.toString(),
-                requiresE2ee = cloudAccount?.requiresE2ee ?: false,
             )
         }
 }
