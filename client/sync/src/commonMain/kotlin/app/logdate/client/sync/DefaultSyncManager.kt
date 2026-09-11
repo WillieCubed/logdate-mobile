@@ -1,6 +1,7 @@
 package app.logdate.client.sync
 
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.media.MediaManager
 import app.logdate.client.networking.DataUsagePolicy
@@ -64,6 +65,8 @@ class DefaultSyncManager(
     private val transactionManager: SyncTransactionManager,
     private val dataUsagePolicy: DataUsagePolicy,
     private val deviceIdProvider: DeviceIdProvider? = null,
+    /** Wired on every platform; optional only so tests that never encrypt can omit it. */
+    private val identityKeyManager: IdentityKeyManager? = null,
     private val cloudQuotaManager: CloudQuotaManager? = null,
     private val backoff: SyncBackoff = SyncBackoff(),
     private val syncScope: CoroutineScope = CoroutineScope(platformIODispatcher),
@@ -114,6 +117,16 @@ class DefaultSyncManager(
     }
 
     /**
+     * Every note, journal, and draft is encrypted with a key derived from this device's identity
+     * key, so a device without one fails every upload. Onboarding provisions it for new devices;
+     * this covers the ones that finished onboarding back when nothing did.
+     */
+    private suspend fun provisionIdentityKey() {
+        runCatching { identityKeyManager?.ensureIdentityKey() }
+            .onFailure { Napier.e("Could not provision an identity key; uploads will fail", it) }
+    }
+
+    /**
      * Shared shape behind [uploadPendingChanges] and [downloadRemoteChanges]: the same
      * disabled/unauthenticated guard, a [syncStateFlow] transition around the body, unexpected
      * exceptions mapped through [SyncStatusPublisher.handleSyncException], and [SyncState.Idle]
@@ -147,6 +160,7 @@ class DefaultSyncManager(
             }
 
             syncStateFlow.value = SyncState.Syncing
+            provisionIdentityKey()
             beforeAccessToken()
 
             try {
@@ -286,6 +300,7 @@ class DefaultSyncManager(
             disabledOrUnauthenticated()?.let { return@withLock it }
 
             syncStateFlow.value = SyncState.Syncing
+            provisionIdentityKey()
             try {
                 val accessToken = tokenRefresher.getAccessToken() ?: return@withLock authError()
 
@@ -416,9 +431,7 @@ class DefaultSyncManager(
 
     override suspend fun retryDeadLetter(id: String) = retryCoordinator.retryDeadLetter(id)
 
-    override suspend fun discardDeadLetter(id: String) {
-        deadLetterStore.remove(id)
-    }
+    override suspend fun discardDeadLetter(id: String) = retryCoordinator.discardDeadLetter(id)
 
     /**
      * Gets the last sync error, used for network recovery decisions.

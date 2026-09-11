@@ -38,8 +38,9 @@ class IdentityKeyManager(
      */
     suspend fun ensureIdentityKey() {
         identityMutex.withLock {
-            if (hasIdentityKey()) return@withLock
-            setupNewIdentity()
+            if (!hasIdentityKey()) {
+                setupNewIdentity()
+            }
         }
     }
 

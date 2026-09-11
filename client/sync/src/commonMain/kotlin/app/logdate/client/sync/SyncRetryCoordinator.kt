@@ -72,10 +72,9 @@ internal class SyncRetryCoordinator(
                 ),
             )
             // Deliberately left in the pending queue. Removing it here would report an entry that
-            // never reached the server as synced to every count and indicator the user can see,
-            // and the entry would never be attempted again. Instead it stays queued behind a long
-            // backoff: visibly unsynced, cheap to carry, and able to recover on its own once
-            // whatever broke it is fixed.
+            // never reached the server as synced to every count the user can see, and it would
+            // never be attempted again. Queued behind a long backoff it stays visibly unsynced and
+            // recovers on its own once whatever broke it is fixed.
             retryScheduleStore.setNextAttemptAt(
                 entityType,
                 pending.entityId,
@@ -227,7 +226,27 @@ internal class SyncRetryCoordinator(
             return
         }
         syncMetadataService.enqueuePending(record.entityId, entityType, operation)
+        // Dead-lettering parked this entity behind a day-long backoff. Asking for a retry means
+        // asking for it now, so the schedule has to go with the dead-letter record.
+        retryScheduleStore.clear(entityType, record.entityId)
         deadLetterStore.remove(id)
+    }
+
+    /**
+     * Abandons a dead-lettered entity: drops the queued upload along with the record of why it
+     * failed. The pending row outlives dead-lettering so the entry stays visibly unsynced, which
+     * makes this the only way to clear one.
+     */
+    suspend fun discardDeadLetter(id: String) {
+        val record = deadLetterStore.list().firstOrNull { it.id == id }
+        deadLetterStore.remove(id)
+        if (record == null) return
+        val entityType =
+            runCatching { EntityType.valueOf(record.entityType) }.getOrNull() ?: run {
+                Napier.w("Cannot discard dead-letter $id with type=${record.entityType}")
+                return
+            }
+        markUploadSettled(entityType, record.entityId, Clock.System.now(), 0L)
     }
 
     private companion object {

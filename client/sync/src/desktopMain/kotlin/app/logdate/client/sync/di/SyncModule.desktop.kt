@@ -57,6 +57,7 @@ actual val syncModule: Module =
                 transactionManager = get(),
                 dataUsagePolicy = get(),
                 deviceIdProvider = get(),
+                identityKeyManager = get(),
                 cloudQuotaManager = get(),
             )
         }

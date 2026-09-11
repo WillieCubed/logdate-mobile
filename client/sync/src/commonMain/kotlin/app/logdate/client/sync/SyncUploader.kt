@@ -18,6 +18,7 @@ import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.PendingOperation
+import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.shared.model.sync.DeviceId
 import io.github.aakira.napier.Napier
@@ -57,11 +58,19 @@ internal class SyncUploader(
     private val recordProgress: (Int) -> Unit,
     private val setMediaDeferredForNetwork: (Boolean) -> Unit,
 ) {
+    /**
+     * Drops entries still inside their retry backoff before callers decide whether there is any
+     * work. Dead-lettered entries stay queued indefinitely, so without this an entry that can
+     * never upload keeps every sync run loading a whole table to do nothing with.
+     */
+    private suspend fun List<PendingUpload>.dueNow(entityType: EntityType): List<PendingUpload> =
+        filter { retryCoordinator.shouldAttempt(entityType, it.entityId) }
+
     suspend fun uploadJournals(accessToken: String): SyncResult {
         return try {
             var uploadedCount = 0
             val errors = mutableListOf<SyncError>()
-            val pendingUploads = syncMetadataService.getPendingUploads(EntityType.JOURNAL)
+            val pendingUploads = syncMetadataService.getPendingUploads(EntityType.JOURNAL).dueNow(EntityType.JOURNAL)
             if (pendingUploads.isEmpty()) {
                 return SyncResult(success = true, uploadedItems = 0)
             }
@@ -76,9 +85,6 @@ internal class SyncUploader(
                 val journalId = runCatching { Uuid.parse(pending.entityId) }.getOrNull()
                 if (journalId == null) {
                     errors.add(retryCoordinator.recordUnparsableOutboxEntry(EntityType.JOURNAL, pending.entityId, "journal ID"))
-                    continue
-                }
-                if (!retryCoordinator.shouldAttempt(EntityType.JOURNAL, pending.entityId)) {
                     continue
                 }
 
@@ -207,7 +213,7 @@ internal class SyncUploader(
             val errors = mutableListOf<SyncError>()
             setMediaDeferredForNetwork(false)
 
-            val pendingUploads = syncMetadataService.getPendingUploads(EntityType.NOTE)
+            val pendingUploads = syncMetadataService.getPendingUploads(EntityType.NOTE).dueNow(EntityType.NOTE)
             if (pendingUploads.isEmpty()) {
                 return SyncResult(success = true, uploadedItems = 0)
             }
@@ -222,9 +228,6 @@ internal class SyncUploader(
                 val noteId = runCatching { Uuid.parse(pending.entityId) }.getOrNull()
                 if (noteId == null) {
                     errors.add(retryCoordinator.recordUnparsableOutboxEntry(EntityType.NOTE, pending.entityId, "note ID"))
-                    continue
-                }
-                if (!retryCoordinator.shouldAttempt(EntityType.NOTE, pending.entityId)) {
                     continue
                 }
 
@@ -532,7 +535,7 @@ internal class SyncUploader(
         return try {
             var uploadedCount = 0
             val errors = mutableListOf<SyncError>()
-            val pendingUploads = syncMetadataService.getPendingUploads(EntityType.DRAFT)
+            val pendingUploads = syncMetadataService.getPendingUploads(EntityType.DRAFT).dueNow(EntityType.DRAFT)
             if (pendingUploads.isEmpty()) {
                 return SyncResult(success = true, uploadedItems = 0)
             }
@@ -544,9 +547,6 @@ internal class SyncUploader(
                 val draftId = runCatching { Uuid.parse(pending.entityId) }.getOrNull()
                 if (draftId == null) {
                     errors.add(retryCoordinator.recordUnparsableOutboxEntry(EntityType.DRAFT, pending.entityId, "draft ID"))
-                    continue
-                }
-                if (!retryCoordinator.shouldAttempt(EntityType.DRAFT, pending.entityId)) {
                     continue
                 }
 

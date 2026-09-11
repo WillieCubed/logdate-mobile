@@ -37,22 +37,18 @@ class SyncDeadLetterRetentionTest {
 
     private val entityId = Uuid.random().toString()
 
+    /** Fails uploads until the coordinator gives up, so the test never restates the retry budget. */
     private suspend fun exhaustRetries() {
         metadataService.enqueuePending(entityId, EntityType.NOTE, PendingOperation.CREATE)
-        // Drives real failures until the coordinator itself reports the item dead-lettered, so the
-        // test does not have to restate the retry budget.
-        var attempt = 0
-        while (attempt < 100) {
-            val deadLettered =
+        val deadLettered =
+            (0 until 100).any { attempt ->
                 coordinator.handleRetryFailure(
                     entityType = EntityType.NOTE,
                     pending = PendingUpload(entityId, PendingOperation.CREATE, retryCount = attempt),
                     error = IllegalStateException("No identity key found"),
                 )
-            attempt += 1
-            if (deadLettered) return
-        }
-        error("Entry was never dead-lettered after $attempt attempts")
+            }
+        assertTrue(deadLettered, "Entry was never dead-lettered")
     }
 
     @Test
@@ -75,6 +71,33 @@ class SyncDeadLetterRetentionTest {
             assertFalse(
                 coordinator.shouldAttempt(EntityType.NOTE, entityId),
                 "A dead-lettered entry must not be retried on the very next sync",
+            )
+        }
+
+    @Test
+    fun `discarding a dead-lettered entry also drains it from the pending queue`() =
+        runTest {
+            exhaustRetries()
+
+            coordinator.discardDeadLetter("${EntityType.NOTE.name}:$entityId")
+
+            assertTrue(deadLetterStore.list().isEmpty())
+            assertFalse(
+                metadataService.getPendingUploads(EntityType.NOTE).any { it.entityId == entityId },
+                "A discarded entry must not stay queued forever",
+            )
+        }
+
+    @Test
+    fun `retrying a dead-lettered entry lifts its throttle`() =
+        runTest {
+            exhaustRetries()
+
+            coordinator.retryDeadLetter("${EntityType.NOTE.name}:$entityId")
+
+            assertTrue(
+                coordinator.shouldAttempt(EntityType.NOTE, entityId),
+                "Asking for a retry means asking for it now, not in a day",
             )
         }
 }
