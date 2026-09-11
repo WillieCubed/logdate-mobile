@@ -71,13 +71,16 @@ internal class SyncRetryCoordinator(
                     failedAt = Clock.System.now().toEpochMilliseconds(),
                 ),
             )
-            syncMetadataService.markAsSynced(
-                pending.entityId,
+            // Deliberately left in the pending queue. Removing it here would report an entry that
+            // never reached the server as synced to every count and indicator the user can see,
+            // and the entry would never be attempted again. Instead it stays queued behind a long
+            // backoff: visibly unsynced, cheap to carry, and able to recover on its own once
+            // whatever broke it is fixed.
+            retryScheduleStore.setNextAttemptAt(
                 entityType,
-                Clock.System.now(),
-                0L,
+                pending.entityId,
+                Clock.System.now().toEpochMilliseconds() + DEAD_LETTER_RETRY_INTERVAL_MS,
             )
-            retryScheduleStore.clear(entityType, pending.entityId)
             clearFailureKind(entityType, pending.entityId)
             return true
         }
@@ -229,5 +232,8 @@ internal class SyncRetryCoordinator(
 
     private companion object {
         const val MAX_RETRY_ATTEMPTS = 9
+
+        /** How long a dead-lettered entry waits before it is quietly tried again. */
+        const val DEAD_LETTER_RETRY_INTERVAL_MS = 24L * 60 * 60 * 1000
     }
 }
