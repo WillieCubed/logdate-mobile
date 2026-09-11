@@ -46,7 +46,13 @@ class DatabaseSyncMetadataService(
         syncedAt: Instant,
         version: Long,
     ) {
-        dao.deletePending(currentOwnerId(), currentOrigin(), entityType.name, entityId)
+        val serverOrigin = currentOrigin()
+        dao.deletePending(currentOwnerId(), serverOrigin, entityType.name, entityId)
+        // Promotion copies a legacy row forward instead of moving it, so the owner-less original
+        // outlives the copy. Left behind, it is promoted again the next time this entity type is
+        // read -- refilling the outbox after every successful sync, forever. Settling the entity
+        // has to retire both.
+        dao.deletePending(LEGACY_OWNER_ID, serverOrigin, entityType.name, entityId)
     }
 
     override suspend fun getLastSyncTime(entityType: EntityType): Instant? {
@@ -221,5 +227,10 @@ class DatabaseSyncMetadataService(
         legacyPending.forEach { pending ->
             dao.insertPending(pending.copy(ownerId = ownerId))
         }
+    }
+
+    private companion object {
+        /** Rows written before sync metadata was scoped by owner. */
+        const val LEGACY_OWNER_ID = ""
     }
 }

@@ -12,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 class DatabaseSyncMetadataServiceTest {
     @Test
@@ -43,6 +44,33 @@ class DatabaseSyncMetadataServiceTest {
 
             assertTrue(dao.pendingRows.any { it.ownerId.isEmpty() && it.entityId == "journal-1" })
             assertTrue(dao.cursors.any { it.ownerId.isEmpty() && it.entityType == EntityType.JOURNAL.name })
+        }
+
+    @Test
+    fun `a settled upload does not come back from the legacy queue`() =
+        runTest {
+            // Promotion copies a legacy row forward rather than moving it. If settling only removed
+            // the copy, the next read would promote the same row again -- an outbox that refills
+            // itself after every successful sync and a pending count that can never reach zero.
+            val ownerId = "2e10a582-197e-48fd-97df-5a1fc1669a9e"
+            val serverOrigin = "https://cloud.logdate.app"
+            val dao = InMemorySyncMetadataDao()
+            dao.pendingRows +=
+                PendingUploadEntity(
+                    ownerId = "",
+                    serverOrigin = serverOrigin,
+                    entityType = EntityType.NOTE.name,
+                    entityId = "note-1",
+                    operation = PendingOperation.CREATE.name,
+                    createdAt = 1L,
+                )
+            val service = service(dao, ownerId, serverOrigin)
+
+            assertEquals(listOf("note-1"), service.getPendingUploads(EntityType.NOTE).map { it.entityId })
+            service.markAsSynced("note-1", EntityType.NOTE, Instant.fromEpochMilliseconds(10L), 1L)
+
+            assertEquals(emptyList(), service.getPendingUploads(EntityType.NOTE).map { it.entityId })
+            assertEquals(0, service.getPendingCount())
         }
 
     private fun service(
