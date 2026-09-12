@@ -8,6 +8,7 @@ import app.logdate.server.logdate.LogDateDraft
 import app.logdate.server.logdate.LogDateEntry
 import app.logdate.server.logdate.LogDateJournal
 import app.logdate.server.responses.error
+import app.logdate.server.routes.docs.SyncCollectionDocs
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.shared.model.sync.AssociationChangesResponse
 import app.logdate.shared.model.sync.AssociationDeleteRequest
@@ -69,22 +70,7 @@ private fun Route.contentRoutes(
     collectionsRepository: LogDateCollectionsRepository,
 ) {
     route("/contents") {
-        put("/{contentId}", {
-            tags = listOf("Contents")
-            summary = "Upsert content"
-            description = "Create or update a content entry by ID."
-            securitySchemeNames = listOf("bearerAuth")
-            request {
-                pathParameter<String>("contentId") {
-                    description = "The ID of the content to upsert."
-                }
-                body<ContentUploadRequest>()
-            }
-            response {
-                HttpStatusCode.OK to { description = "Content updated" }
-                HttpStatusCode.Created to { description = "Content created" }
-            }
-        }) {
+        put("/{contentId}", SyncCollectionDocs.upsertContent) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -135,18 +121,7 @@ private fun Route.contentRoutes(
             }
         }
 
-        get({
-            tags = listOf("Contents")
-            summary = "Get contents"
-            description = "Retrieve all contents for the authenticated user."
-            securitySchemeNames = listOf("bearerAuth")
-            response {
-                HttpStatusCode.OK to {
-                    description = "Successful retrieval"
-                    body<ContentChangesResponse>()
-                }
-            }
-        }) {
+        get(SyncCollectionDocs.listContentChanges) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -163,7 +138,7 @@ private fun Route.contentRoutes(
             }
         }
 
-        get("/{contentId}") {
+        get("/{contentId}", SyncCollectionDocs.getContent) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -179,24 +154,7 @@ private fun Route.contentRoutes(
             }
         }
 
-        patch("/{contentId}", {
-            tags = listOf("Contents")
-            summary = "Patch content"
-            description = "Update specific fields of a content entry with optimistic locking."
-            securitySchemeNames = listOf("bearerAuth")
-            request {
-                pathParameter<String>("contentId") {
-                    description = "The ID of the content to patch."
-                }
-                body<ContentUpdateRequest>()
-            }
-            response {
-                HttpStatusCode.OK to {
-                    description = "Content patched successfully"
-                    body<ContentUpdateResponse>()
-                }
-            }
-        }) {
+        patch("/{contentId}", SyncCollectionDocs.patchContent) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -236,7 +194,7 @@ private fun Route.contentRoutes(
             }
         }
 
-        delete("/{contentId}") {
+        delete("/{contentId}", SyncCollectionDocs.deleteContent) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -258,28 +216,7 @@ private fun Route.journalRoutes(
     collectionsRepository: LogDateCollectionsRepository,
 ) {
     route("/journals") {
-        put("/{journalId}", {
-            tags = listOf("Journals")
-            summary = "Upsert journal"
-            description = "Create or update a journal by ID."
-            securitySchemeNames = listOf("bearerAuth")
-            request {
-                pathParameter<String>("journalId") {
-                    description = "The ID of the journal to upsert."
-                }
-                body<JournalUploadRequest>()
-            }
-            response {
-                HttpStatusCode.OK to {
-                    description = "Journal updated"
-                    body<JournalUploadResponse>()
-                }
-                HttpStatusCode.Created to {
-                    description = "Journal created"
-                    body<JournalUploadResponse>()
-                }
-            }
-        }) {
+        put("/{journalId}", SyncCollectionDocs.upsertJournal) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -321,18 +258,7 @@ private fun Route.journalRoutes(
             }
         }
 
-        get({
-            tags = listOf("Journals")
-            summary = "Get journals"
-            description = "Retrieve all journals for the authenticated user."
-            securitySchemeNames = listOf("bearerAuth")
-            response {
-                HttpStatusCode.OK to {
-                    description = "Successful retrieval"
-                    body<JournalChangesResponse>()
-                }
-            }
-        }) {
+        get(SyncCollectionDocs.listJournalChanges) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -349,7 +275,7 @@ private fun Route.journalRoutes(
             }
         }
 
-        get("/{journalId}") {
+        get("/{journalId}", SyncCollectionDocs.getJournal) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -365,24 +291,7 @@ private fun Route.journalRoutes(
             }
         }
 
-        patch("/{journalId}", {
-            tags = listOf("Journals")
-            summary = "Patch journal"
-            description = "Update specific fields of a journal with optimistic locking."
-            securitySchemeNames = listOf("bearerAuth")
-            request {
-                pathParameter<String>("journalId") {
-                    description = "The ID of the journal to patch."
-                }
-                body<JournalUpdateRequest>()
-            }
-            response {
-                HttpStatusCode.OK to {
-                    description = "Journal patched successfully"
-                    body<JournalUpdateResponse>()
-                }
-            }
-        }) {
+        patch("/{journalId}", SyncCollectionDocs.patchJournal) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -419,7 +328,7 @@ private fun Route.journalRoutes(
             }
         }
 
-        delete("/{journalId}") {
+        delete("/{journalId}", SyncCollectionDocs.deleteJournal) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -441,21 +350,7 @@ private fun Route.associationRoutes(
     collectionsRepository: LogDateCollectionsRepository,
 ) {
     route("/associations") {
-        post({
-            tags = listOf("Associations")
-            summary = "Upload associations"
-            description = "Batch upload associations between entities."
-            securitySchemeNames = listOf("bearerAuth")
-            request {
-                body<AssociationUploadRequest>()
-            }
-            response {
-                HttpStatusCode.OK to {
-                    description = "Associations uploaded successfully"
-                    body<AssociationUploadResponse>()
-                }
-            }
-        }) {
+        post(SyncCollectionDocs.uploadAssociations) {
             val start = System.currentTimeMillis()
 
             var success = false
@@ -483,18 +378,7 @@ private fun Route.associationRoutes(
             }
         }
 
-        get({
-            tags = listOf("Associations")
-            summary = "Get associations"
-            description = "Retrieve all associations for the authenticated user."
-            securitySchemeNames = listOf("bearerAuth")
-            response {
-                HttpStatusCode.OK to {
-                    description = "Successful retrieval"
-                    body<AssociationChangesResponse>()
-                }
-            }
-        }) {
+        get(SyncCollectionDocs.listAssociationChanges) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -518,7 +402,7 @@ private fun Route.associationRoutes(
             }
         }
 
-        put("/{journalId}/{contentId}") {
+        put("/{journalId}/{contentId}", SyncCollectionDocs.upsertAssociation) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -546,7 +430,7 @@ private fun Route.associationRoutes(
             }
         }
 
-        delete("/{journalId}/{contentId}") {
+        delete("/{journalId}/{contentId}", SyncCollectionDocs.deleteAssociation) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -565,7 +449,7 @@ private fun Route.associationRoutes(
             }
         }
 
-        delete {
+        delete(SyncCollectionDocs.deleteAssociations) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -590,7 +474,7 @@ private fun Route.draftRoutes(
     collectionsRepository: LogDateCollectionsRepository,
 ) {
     route("/drafts") {
-        put("/{draftId}") {
+        put("/{draftId}", SyncCollectionDocs.upsertDraft) {
             val userId = extractUserId(call, tokenService) ?: return@put
             val draftId = call.requiredPathParam("draftId")
             val req = call.receive<DraftUploadRequest>()
@@ -619,7 +503,7 @@ private fun Route.draftRoutes(
             )
         }
 
-        get("/changes") {
+        get("/changes", SyncCollectionDocs.listDraftChanges) {
             val userId = extractUserId(call, tokenService) ?: return@get
             val since = call.request.queryParameters["since"]?.toLongOrNull() ?: 0L
             val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DRAFT_SYNC_PAGE_SIZE
@@ -643,7 +527,7 @@ private fun Route.draftRoutes(
             )
         }
 
-        delete("/{draftId}") {
+        delete("/{draftId}", SyncCollectionDocs.deleteDraft) {
             val userId = extractUserId(call, tokenService) ?: return@delete
             val draftId = call.requiredPathParam("draftId")
             collectionsRepository.deleteDraft(userId, draftId, System.currentTimeMillis())

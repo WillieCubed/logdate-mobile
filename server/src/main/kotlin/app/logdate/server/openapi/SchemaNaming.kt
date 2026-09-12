@@ -91,8 +91,15 @@ private fun readableNames(keys: Collection<String>): Map<String, String> {
     return candidates.filter { (key, simple) -> simple != key && simple !in collisions }
 }
 
-/** `app.logdate.shared.model.sync.VersionConstraint.Known` → `VersionConstraint.Known`. */
-private fun simpleName(qualified: String): String {
+/**
+ * `app.logdate.shared.model.sync.VersionConstraint.Known` → `VersionConstraint.Known`. Generic
+ * wrappers are keyed `Outer_inner.qualified.Name` by the generator, so each `_`-separated part
+ * is shortened on its own: `SimpleSuccessResponse_app…SyncStatusSnapshot` →
+ * `SimpleSuccessResponse_SyncStatusSnapshot`.
+ */
+private fun simpleName(qualified: String): String = qualified.split('_').joinToString("_", transform = ::simpleTypeName)
+
+private fun simpleTypeName(qualified: String): String {
     val segments = qualified.split('.')
     val firstTypeIndex = segments.indexOfFirst { it.firstOrNull()?.isUpperCase() == true }
     if (firstTypeIndex < 0) return qualified

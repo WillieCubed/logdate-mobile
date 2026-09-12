@@ -3,10 +3,10 @@ package app.logdate.server.routes.sync
 import app.logdate.server.auth.TokenService
 import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.responses.simpleSuccess
+import app.logdate.server.routes.docs.SyncStorageDocs
 import app.logdate.server.sync.SyncMetricsRegistry
 import io.github.smiley4.ktoropenapi.get
 import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
@@ -25,18 +25,7 @@ internal fun Route.syncStatusRoutes(
     metrics: SyncMetricsRegistry,
     collectionsRepository: LogDateCollectionsRepository,
 ) {
-    get("/ops/sync/status", {
-        tags = listOf("Sync")
-        summary = "Get sync status"
-        description = "Retrieve the count of entities synced for the current account."
-        securitySchemeNames = listOf("bearerAuth")
-        response {
-            HttpStatusCode.OK to {
-                description = "Sync status retrieved successfully"
-                body<SyncStatusSnapshot>()
-            }
-        }
-    }) {
+    get("/ops/sync/status", SyncStorageDocs.getSyncStatus) {
         val start = System.currentTimeMillis()
         var success = false
         try {

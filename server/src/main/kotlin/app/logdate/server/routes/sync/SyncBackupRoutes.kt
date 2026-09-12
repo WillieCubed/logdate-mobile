@@ -11,6 +11,7 @@ import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateBlobWriteRequest
 import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.responses.error
+import app.logdate.server.routes.docs.SyncStorageDocs
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.shared.model.sync.BackupInfoResponse
 import app.logdate.shared.model.sync.BackupListResponse
@@ -46,23 +47,7 @@ internal fun Route.syncBackupRoutes(
 ) {
     val mediaAccessPolicy = config.mediaAccessPolicy
     route("/backups") {
-        post({
-            tags = listOf("Backups")
-            summary = "Upload backup"
-            description = "Upload an encrypted device backup."
-            securitySchemeNames = listOf("bearerAuth")
-            request {
-                body<ByteArray> {
-                    mediaTypes = setOf(ContentType.MultiPart.FormData)
-                }
-            }
-            response {
-                HttpStatusCode.Created to {
-                    description = "Backup uploaded successfully"
-                    body<BackupUploadResponse>()
-                }
-            }
-        }) {
+        post(SyncStorageDocs.uploadBackup) {
             val start = System.currentTimeMillis()
             var success = false
             var bytes = 0L
@@ -160,18 +145,7 @@ internal fun Route.syncBackupRoutes(
             }
         }
 
-        get({
-            tags = listOf("Backups")
-            summary = "List backups"
-            description = "Retrieve a list of all backups for the authenticated user."
-            securitySchemeNames = listOf("bearerAuth")
-            response {
-                HttpStatusCode.OK to {
-                    description = "Backups listed successfully"
-                    body<BackupListResponse>()
-                }
-            }
-        }) {
+        get(SyncStorageDocs.listBackups) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -197,7 +171,7 @@ internal fun Route.syncBackupRoutes(
             }
         }
 
-        get("/{backupId}", {}) {
+        get("/{backupId}", SyncStorageDocs.getBackup) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -223,25 +197,7 @@ internal fun Route.syncBackupRoutes(
             }
         }
 
-        get("/{backupId}/binary", {
-            tags = listOf("Backups")
-            summary = "Download backup binary"
-            description = "Download the raw encrypted binary data of a backup."
-            securitySchemeNames = listOf("bearerAuth")
-            request {
-                pathParameter<String>("backupId") {
-                    description = "The ID of the backup to download."
-                }
-            }
-            response {
-                HttpStatusCode.OK to {
-                    description = "Backup binary data retrieved successfully"
-                    body<ByteArray> {
-                        mediaTypes = setOf(ContentType.Application.OctetStream)
-                    }
-                }
-            }
-        }) {
+        get("/{backupId}/binary", SyncStorageDocs.downloadBackup) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -280,7 +236,7 @@ internal fun Route.syncBackupRoutes(
             }
         }
 
-        delete("/{backupId}", {}) {
+        delete("/{backupId}", SyncStorageDocs.deleteBackup) {
             val start = System.currentTimeMillis()
             var success = false
             try {

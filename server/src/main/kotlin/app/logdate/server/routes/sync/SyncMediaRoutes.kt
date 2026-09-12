@@ -11,6 +11,7 @@ import app.logdate.server.logdate.LogDateMedia
 import app.logdate.server.logdate.LogDateMediaBlobRepository
 import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.responses.error
+import app.logdate.server.routes.docs.SyncStorageDocs
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.shared.model.sync.DeviceId
 import app.logdate.shared.model.sync.MediaMetadataResponse
@@ -48,23 +49,7 @@ internal fun Route.syncMediaRoutes(
 ) {
     val mediaAccessPolicy = config.mediaAccessPolicy
     route("/media") {
-        post({
-            tags = listOf("Media")
-            summary = "Upload media"
-            description = "Upload a media file (image, video, etc.) for a content entry."
-            securitySchemeNames = listOf("bearerAuth")
-            request {
-                body<ByteArray> {
-                    mediaTypes = setOf(ContentType.MultiPart.FormData)
-                }
-            }
-            response {
-                HttpStatusCode.Created to {
-                    description = "Media uploaded successfully"
-                    body<MediaUploadResponse>()
-                }
-            }
-        }) {
+        post(SyncStorageDocs.uploadMedia) {
             val start = System.currentTimeMillis()
             var success = false
             var bytes = 0L
@@ -183,23 +168,7 @@ internal fun Route.syncMediaRoutes(
             }
         }
 
-        get("/{mediaId}", {
-            tags = listOf("Media")
-            summary = "Get media metadata"
-            description = "Retrieve metadata for a specific media file."
-            securitySchemeNames = listOf("bearerAuth")
-            request {
-                pathParameter<String>("mediaId") {
-                    description = "The ID of the media to retrieve metadata for."
-                }
-            }
-            response {
-                HttpStatusCode.OK to {
-                    description = "Media metadata retrieved successfully"
-                    body<MediaMetadataResponse>()
-                }
-            }
-        }) {
+        get("/{mediaId}", SyncStorageDocs.getMediaMetadata) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -226,25 +195,7 @@ internal fun Route.syncMediaRoutes(
             }
         }
 
-        get("/{mediaId}/binary", {
-            tags = listOf("Media")
-            summary = "Download media binary"
-            description = "Download the raw binary data of a media file."
-            securitySchemeNames = listOf("bearerAuth")
-            request {
-                pathParameter<String>("mediaId") {
-                    description = "The ID of the media to download."
-                }
-            }
-            response {
-                HttpStatusCode.OK to {
-                    description = "Media binary data retrieved successfully"
-                    body<ByteArray> {
-                        mediaTypes = setOf(ContentType.Application.OctetStream)
-                    }
-                }
-            }
-        }) {
+        get("/{mediaId}/binary", SyncStorageDocs.downloadMedia) {
             val start = System.currentTimeMillis()
             var success = false
             var bytes = 0L
@@ -292,22 +243,7 @@ internal fun Route.syncMediaRoutes(
             }
         }
 
-        delete("/{mediaId}", {
-            tags = listOf("Media")
-            summary = "Delete media"
-            description = "Delete a specific media file and its metadata."
-            securitySchemeNames = listOf("bearerAuth")
-            request {
-                pathParameter<String>("mediaId") {
-                    description = "The ID of the media to delete."
-                }
-            }
-            response {
-                HttpStatusCode.NoContent to {
-                    description = "Media deleted successfully"
-                }
-            }
-        }) {
+        delete("/{mediaId}", SyncStorageDocs.deleteMedia) {
             val start = System.currentTimeMillis()
             var success = false
             try {
