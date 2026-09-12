@@ -308,7 +308,7 @@ private class RecordingPayloadCloudApiClient : FakeCloudApiClient() {
     }
 }
 
-private class InMemorySecureStorage : SecureStorage {
+internal class InMemorySecureStorage : SecureStorage {
     private val storage = mutableMapOf<String, String>()
     private val updates = MutableStateFlow<Map<String, String>>(emptyMap())
 
@@ -341,7 +341,7 @@ private class InMemorySecureStorage : SecureStorage {
     override suspend fun decrypt(data: ByteArray): ByteArray? = data
 }
 
-private class TestCryptoManager : CryptoManager {
+internal class TestCryptoManager : CryptoManager {
     override suspend fun generateRecoveryPhrase(): List<String> = (1..12).map { "word-$it" }
 
     override suspend fun deriveMasterKey(phrase: List<String>): ByteArray = pseudoHash(phrase.joinToString(",").encodeToByteArray(), 32)

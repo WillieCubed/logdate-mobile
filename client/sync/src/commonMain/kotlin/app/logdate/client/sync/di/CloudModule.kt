@@ -43,7 +43,7 @@ val cloudModule =
         single<CloudAssociationDataSource> { DefaultCloudAssociationDataSource(get()) }
         single<CloudBackupDataSource> { DefaultCloudBackupDataSource(get()) }
         single<CloudDraftDataSource> { DefaultCloudDraftDataSource(get(), get()) }
-        single { MediaPayloadKeyProvider(get(), get()) }
+        single { MediaPayloadKeyProvider(get(), get(), get(), get()) }
         single<MediaPayloadCrypto> { StoredMediaPayloadCrypto(get()) }
         single<CloudMediaDataSource> { DefaultCloudMediaDataSource(get(), get()) }
     }

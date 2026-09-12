@@ -167,7 +167,15 @@ internal class SyncDownloader(
             val errors = mutableListOf<SyncError>()
 
             while (true) {
-                val result = cloudDraftDataSource.getDraftChanges(accessToken, cursor, SYNC_PAGE_SIZE).getOrThrow()
+                // Journals, notes and associations all refresh the token per page; drafts reused
+                // the one captured when the run started, so a session that expired mid-sync failed
+                // with a 401 that never triggered a refresh.
+                val result =
+                    tokenRefresher
+                        .withFreshToken(
+                            { token -> cloudDraftDataSource.getDraftChanges(token, cursor, SYNC_PAGE_SIZE) },
+                            "getDraftChanges",
+                        ).getOrThrow()
 
                 val batchResult =
                     transactionManager.withTransaction {
