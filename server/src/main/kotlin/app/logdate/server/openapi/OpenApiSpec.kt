@@ -1,6 +1,5 @@
 package app.logdate.server.openapi
 
-import app.logdate.server.completeOpenApiContract
 import app.logdate.server.serverJson
 import io.github.smiley4.ktoropenapi.OpenApi
 import io.github.smiley4.ktoropenapi.config.AuthKeyLocation
@@ -112,7 +111,6 @@ fun Application.installLogDateOpenApi(openApiSpec: AtomicReference<OpenAPI?>) {
             useReadableSchemaNames(api)
             describeSealedDiscriminators(api)
             applySchemaDocumentation(api)
-            completeOpenApiContract(api)
             openApiSpec.set(api)
         }
     }

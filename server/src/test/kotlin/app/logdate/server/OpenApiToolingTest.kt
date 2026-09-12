@@ -96,7 +96,8 @@ class OpenApiToolingTest {
                     "securitySchemes": {
                       "bearerAuth": {}
                     }
-                  }
+                  },
+                  "x-tagGroups": [{ "name": "Sync", "tags": ["Contents"] }]
                 }
                 """.trimIndent(),
             )
@@ -117,6 +118,7 @@ class OpenApiToolingTest {
                 /api/v1/media:
                 /api/v1/media/{mediaId}/binary:
                 bearerAuth:
+                x-tagGroups:
                 """.trimIndent(),
             )
 
@@ -163,7 +165,8 @@ class OpenApiToolingTest {
                     "securitySchemes": {
                       "bearerAuth": {}
                     }
-                  }
+                  },
+                  "x-tagGroups": [{ "name": "Sync", "tags": ["Contents"] }]
                 }
                 """.trimIndent(),
             )
@@ -185,6 +188,7 @@ class OpenApiToolingTest {
                 /api/v1/media/{mediaId}/binary:
                 /api/v1/backups:
                 bearerAuth:
+                x-tagGroups:
                 """.trimIndent(),
             )
 

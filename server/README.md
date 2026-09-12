@@ -73,7 +73,7 @@ Server Module
 ### Configuration
 
 See **[Environment Variables Documentation](docs/environment-variables.md)** for complete configuration reference.
-See **[Auth V1 API](docs/auth-v1-api.md)** for the launch authentication contract.
+See the **API reference** at `/docs` on any running server (`http://localhost:8080/docs` locally) for every endpoint with examples; [`docs/openapi.md`](docs/openapi.md) explains how it is maintained. [`docs/auth-v1-api.md`](docs/auth-v1-api.md) and [`docs/sync-v1-api.md`](docs/sync-v1-api.md) keep the rules that span endpoints.
 See **[Audit Schema](docs/audit-schema.md)** for centralized audit categories and keys.
 
 **Quick start:**
@@ -134,14 +134,22 @@ See **[Audit Schema](docs/audit-schema.md)** for centralized audit categories an
 ### Endpoint Structure
 ```
 /api/v1/
-├── /auth          # Authentication endpoints
-├── /users         # User management
-├── /journals      # Journal operations
-├── /entries       # Entry CRUD operations
-├── /sync          # Data synchronization
-├── /media         # File upload/download
-└── /admin         # Administrative functions
+├── /server/info     # What this deployment is and can do
+├── /plans           # Plans on offer
+├── /auth            # Sign-up, sign-in, tokens, the signed-in account
+├── /identity        # AT Protocol signing keys and PLC history
+├── /contents        # Entries (sync)
+├── /journals        # Journals (sync)
+├── /associations    # Entry-to-journal links (sync)
+├── /drafts          # In-progress entries (sync)
+├── /media           # Photos, video, audio
+├── /backups         # Encrypted device backups
+├── /quota           # Storage allowance and usage
+├── /transcription   # Cloud speech-to-text sessions
+└── /resources       # Shared-link resolution
+/oauth/, /xrpc/, /.well-known/   # AT Protocol OAuth, XRPC and discovery
 ```
+The full contract with examples is at `/docs`.
 
 ### Request Flow
 ```
@@ -229,7 +237,7 @@ FROM eclipse-temurin:17-jre-alpine AS runtime
 ## TODOs
 
 ### Core API Features
-- [x] Publish comprehensive OpenAPI documentation with the self-hosted Scalar API reference at `/docs`
+- [x] Publish a complete, newcomer-friendly API reference with the self-hosted Scalar page at `/docs`
 - [ ] Add API rate limiting and throttling
 - [ ] Implement advanced authentication (OAuth, SSO)
 - [ ] Add server monitoring and metrics collection

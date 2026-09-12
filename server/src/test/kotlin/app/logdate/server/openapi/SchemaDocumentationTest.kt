@@ -1,6 +1,5 @@
 package app.logdate.server.openapi
 
-import app.logdate.server.AUTODOC_EXTENSION
 import app.logdate.server.module
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
@@ -16,8 +15,8 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /**
- * Every schema a hand-documented operation can send or receive must describe itself and each of
- * its fields, and the registry must not describe things that no longer exist.
+ * Every schema an operation can send or receive must describe itself and each of its fields,
+ * and the registry must not describe things that no longer exist.
  */
 class SchemaDocumentationTest {
     private val json = Json { ignoreUnknownKeys = true }
@@ -74,7 +73,7 @@ class SchemaDocumentationTest {
             assertTrue(stale.isEmpty(), "registry entries with no matching schema:\n" + stale.joinToString("\n"))
         }
 
-    /** Every schema referenced, directly or through other schemas, by an operation that is not auto-documented. */
+    /** Every schema referenced, directly or through other schemas, by any published operation. */
     private fun reachableSchemas(
         document: JsonObject,
         schemas: JsonObject,
@@ -83,7 +82,6 @@ class SchemaDocumentationTest {
         document["paths"]!!.jsonObject.values.forEach { item ->
             item.jsonObject.values.forEach { op ->
                 val operation = op as? JsonObject ?: return@forEach
-                if (operation[AUTODOC_EXTENSION]?.jsonPrimitive?.content == "true") return@forEach
                 collectRefs(operation, roots)
             }
         }

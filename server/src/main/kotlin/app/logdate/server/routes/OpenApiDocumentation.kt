@@ -14,10 +14,6 @@ import kotlinx.serialization.Serializable
 import studio.hypertext.atproto.pds.OAuthErrorResponse
 import studio.hypertext.atproto.pds.PdsErrorResponse
 
-/** Marks an operation as documented with the current helpers rather than machine-filled. */
-internal const val DOCS_MARKER_EXTENSION = "x-logdate-docs"
-internal const val DOCS_MARKER_VERSION = "v2"
-
 /** The `{"error": "..."}` shape the quota and transcription endpoints answer with. */
 @Serializable
 internal data class MessageErrorResponse(
@@ -56,7 +52,6 @@ private fun RouteConfig.operation(
     tags = listOf(tag)
     this.summary = summary
     this.description = renderApiText(description.trimIndent())
-    extensions = mapOf(DOCS_MARKER_EXTENSION to DOCS_MARKER_VERSION)
 }
 
 internal fun RouteConfig.publicOperation(

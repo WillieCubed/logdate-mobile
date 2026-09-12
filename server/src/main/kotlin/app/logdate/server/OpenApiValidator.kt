@@ -38,4 +38,6 @@ private fun validateSpecContent(
         "OpenAPI $label missing /api/v1/backups/{backupId}/binary."
     }
     require("bearerAuth" in content) { "OpenAPI $label missing bearerAuth security scheme." }
+    require("x-tagGroups" in content) { "OpenAPI $label missing x-tagGroups; the reference sidebar would be flat." }
+    require("x-logdate-" !in content) { "OpenAPI $label leaks an internal x-logdate- extension." }
 }

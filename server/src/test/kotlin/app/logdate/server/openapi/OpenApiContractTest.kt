@@ -1,6 +1,5 @@
 package app.logdate.server.openapi
 
-import app.logdate.server.AUTODOC_EXTENSION
 import app.logdate.server.module
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
@@ -16,11 +15,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * The gates every published operation has to pass. While the reference is being rewritten,
- * operations still carrying machine-generated text are listed in [PENDING_DOCUMENTATION]; the
- * list can only shrink, and the enricher that produces that text goes away when it is empty.
- */
+/** The gates every published operation has to pass before it reaches a reader. */
 class OpenApiContractTest {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -31,7 +26,6 @@ class OpenApiContractTest {
     ) {
         val label get() = "$method $path"
         val operationId get() = body["operationId"]?.jsonPrimitive?.content
-        val isAutoDocumented get() = body[AUTODOC_EXTENSION]?.jsonPrimitive?.content == "true"
         val responses get() = body["responses"]?.jsonObject.orEmpty()
         val tags get() = body["tags"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty()
         val hasSecurity get() = body["security"]?.jsonArray?.isNotEmpty() == true
@@ -53,20 +47,11 @@ class OpenApiContractTest {
             block(document, operations)
         }
 
-    private fun List<Operation>.documented() = filterNot { it.isAutoDocumented }
-
-    @Test
-    fun `machine documented operations are exactly the pending list`() =
-        withSpec { _, operations ->
-            val autoDocumented = operations.filter { it.isAutoDocumented }.map { it.label }.toSet()
-            assertEquals(PENDING_DOCUMENTATION, autoDocumented, "PENDING_DOCUMENTATION must match the operations the enricher touched")
-        }
-
     @Test
     fun `every documented operation is hand written`() =
         withSpec { _, operations ->
             val ids = mutableSetOf<String>()
-            operations.documented().forEach { op ->
+            operations.forEach { op ->
                 val summary =
                     op.body["summary"]
                         ?.jsonPrimitive
@@ -109,19 +94,17 @@ class OpenApiContractTest {
             val grouped = groups.flatMap { it.jsonObject["tags"]!!.jsonArray.map { t -> t.jsonPrimitive.content } }
             assertEquals(grouped.size, grouped.toSet().size, "a tag appears in more than one group: $grouped")
             assertEquals(declared.keys, grouped.toSet(), "declared tags and grouped tags differ")
-            operations.documented().forEach { op ->
+            operations.forEach { op ->
                 op.tags.forEach { assertTrue(it in declared, "${op.label}: tag '$it' is not declared in ApiTags") }
             }
-            if (PENDING_DOCUMENTATION.isEmpty()) {
-                val used = operations.flatMap { it.tags }.toSet()
-                assertEquals(declared.keys, used, "every declared tag must be used by at least one operation")
-            }
+            val used = operations.flatMap { it.tags }.toSet()
+            assertEquals(declared.keys, used, "every declared tag must be used by at least one operation")
         }
 
     @Test
     fun `path templates and path parameters agree`() =
         withSpec { _, operations ->
-            operations.documented().forEach { op ->
+            operations.forEach { op ->
                 val templated = PATH_PARAM.findAll(op.path).map { it.groupValues[1] }.toSet()
                 val declared =
                     op.body["parameters"]?.jsonArray.orEmpty().map { it.jsonObject }.filter {
@@ -145,7 +128,7 @@ class OpenApiContractTest {
     @Test
     fun `every documented operation declares a success response with content`() =
         withSpec { _, operations ->
-            operations.documented().forEach { op ->
+            operations.forEach { op ->
                 val successes = op.responses.filterKeys { it.startsWith("2") || it.startsWith("3") }
                 assertTrue(successes.isNotEmpty(), "${op.label}: no 2xx or 3xx response")
                 successes.forEach { (status, response) ->
@@ -179,7 +162,7 @@ class OpenApiContractTest {
     @Test
     fun `every json body carries an example`() =
         withSpec { _, operations ->
-            operations.documented().forEach { op ->
+            operations.forEach { op ->
                 op.body["requestBody"]?.jsonObject?.get("content")?.jsonObject?.forEach { (mediaType, media) ->
                     if (mediaType ==
                         "application/json"
@@ -198,7 +181,7 @@ class OpenApiContractTest {
     @Test
     fun `protected operations document 401 in their family's envelope`() =
         withSpec { _, operations ->
-            operations.documented().forEach { op ->
+            operations.forEach { op ->
                 if (op.hasSecurity && !op.onlyDpop) {
                     val unauthorized = assertNotNull(op.responses["401"], "${op.label}: protected but no 401 documented").jsonObject
                     val ref =
@@ -221,7 +204,7 @@ class OpenApiContractTest {
     @Test
     fun `rate limited operations document 429 and quota enforced operations document 402`() =
         withSpec { _, operations ->
-            operations.documented().forEach { op ->
+            operations.forEach { op ->
                 if (op.operationId in RATE_LIMITED_WITH_RETRY_AFTER + RATE_LIMITED_WITHOUT_RETRY_AFTER) {
                     val limited = assertNotNull(op.responses["429"], "${op.label}: rate limited but no 429").jsonObject
                     val hasRetryAfter = limited["headers"]?.jsonObject?.containsKey("Retry-After") == true
@@ -267,12 +250,7 @@ class OpenApiContractTest {
                 .first { it.isDirectory }
         routesDir.walkTopDown().filter { it.isFile && it.extension == "kt" }.forEach { file ->
             val relative = file.relativeTo(routesDir).path
-            if (relative.startsWith("docs/") ||
-                relative == "OpenApiDocumentation.kt" ||
-                relative in PENDING_INLINE_DOCS_FILES
-            ) {
-                return@forEach
-            }
+            if (relative.startsWith("docs/") || relative == "OpenApiDocumentation.kt") return@forEach
             val offending = file.readLines().withIndex().filter { (_, line) -> INLINE_DOC_LINE.containsMatchIn(line) }
             assertTrue(offending.isEmpty(), "$relative documents routes inline; move it to routes/docs: ${offending.map { it.index + 1 }}")
         }
@@ -365,11 +343,5 @@ class OpenApiContractTest {
             )
         private val RATE_LIMITED_WITH_RETRY_AFTER = setOf("uploadMedia", "uploadBackup", "createTranscriptionSession")
         private val QUOTA_ENFORCED = setOf("uploadMedia", "uploadBackup")
-
-        /** Route files that still document inline; shrinks as each family moves to routes/docs. */
-        private val PENDING_INLINE_DOCS_FILES = setOf<String>()
-
-        /** Operations whose text is still machine generated. Entries are removed as they are written; never added. */
-        private val PENDING_DOCUMENTATION = setOf<String>()
     }
 }
