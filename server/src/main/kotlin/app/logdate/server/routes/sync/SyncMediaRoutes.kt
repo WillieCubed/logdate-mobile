@@ -85,7 +85,14 @@ internal fun Route.syncMediaRoutes(
                         return@post respondQuotaExceeded(call, quota)
                     }
                 }
-                val mediaId = UUID.randomUUID().toString()
+                // A random id made every retry a new upload: if the response was lost after the
+                // blob was stored, the client retried and the server kept both copies, charging
+                // the account twice and orphaning one. Deriving the id from what the upload is
+                // means a retry upserts the same row instead.
+                val mediaId =
+                    UUID
+                        .nameUUIDFromBytes("$userId:${req.contentId}:${req.fileName}".encodeToByteArray())
+                        .toString()
 
                 val encryptedPayload =
                     runCatching {
