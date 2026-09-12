@@ -25,6 +25,7 @@ import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import studio.hypertext.atproto.pds.AuthorizationCodeTokenRequest
 import studio.hypertext.atproto.pds.AuthorizationDecisionRequest
@@ -291,16 +292,20 @@ fun Route.oauthRoutes(
     }
 }
 
+/**
+ * Documentation-only view of the `application/x-www-form-urlencoded` body that
+ * `POST /oauth/token` reads with `receiveParameters()`. Field names mirror RFC 6749 exactly.
+ */
 @Serializable
 internal data class OAuthTokenForm(
-    val grantType: String,
+    @SerialName("grant_type") val grantType: String,
     val code: String? = null,
-    val redirectUri: String? = null,
-    val clientId: String,
-    val codeVerifier: String? = null,
-    val refreshToken: String? = null,
-    val clientAssertionType: String? = null,
-    val clientAssertion: String? = null,
+    @SerialName("redirect_uri") val redirectUri: String? = null,
+    @SerialName("client_id") val clientId: String,
+    @SerialName("code_verifier") val codeVerifier: String? = null,
+    @SerialName("refresh_token") val refreshToken: String? = null,
+    @SerialName("client_assertion_type") val clientAssertionType: String? = null,
+    @SerialName("client_assertion") val clientAssertion: String? = null,
 )
 
 private suspend fun ApplicationCall.respondOAuthToken(
