@@ -240,8 +240,15 @@ class ApplicationTest {
             client.get("/docs").apply {
                 assertEquals(HttpStatusCode.OK, status)
                 val responseBody = bodyAsText()
-                assertTrue(responseBody.contains("LogDate API Reference"))
+                assertTrue(responseBody.contains("LogDate Cloud API Reference"))
                 assertTrue(responseBody.contains("/openapi.json"))
+                assertTrue(responseBody.contains("bearerAuth"), "bearer auth should be preselected in the Try-it panel")
+                assertTrue(Regex("\"telemetry\"\\s*:\\s*false").containsMatchIn(responseBody), "Scalar telemetry must stay off")
+                assertTrue(responseBody.contains("/favicon.svg"))
+            }
+            client.get("/favicon.svg").apply {
+                assertEquals(HttpStatusCode.OK, status)
+                assertTrue(contentType()?.match(ContentType.Image.SVG) == true)
             }
             client.get("/docs/scalar.js").apply {
                 assertEquals(HttpStatusCode.OK, status)

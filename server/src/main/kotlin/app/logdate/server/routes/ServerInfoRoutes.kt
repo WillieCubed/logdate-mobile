@@ -8,7 +8,10 @@ import io.ktor.server.routing.Route
 
 fun Route.serverInfoRoutes(serverDescriptor: ServerDescriptor) {
     get("/server/info", {
-        publicOperation("getServerInfo", "Server", "Get server information", "Discover this deployment and its supported capabilities.")
+        operationId = "getServerInfo"
+        tags = listOf("Server")
+        summary = "Get server information"
+        description = "Discover this deployment and its supported capabilities."
         response { io.ktor.http.HttpStatusCode.OK to { body<ServerInfoResponse>() } }
     }) {
         call.respond(ServerInfoResponse(success = true, data = serverDescriptor))

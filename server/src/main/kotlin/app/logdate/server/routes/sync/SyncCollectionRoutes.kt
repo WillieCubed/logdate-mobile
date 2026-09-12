@@ -622,7 +622,7 @@ private fun Route.draftRoutes(
         get("/changes") {
             val userId = extractUserId(call, tokenService) ?: return@get
             val since = call.request.queryParameters["since"]?.toLongOrNull() ?: 0L
-            val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 100
+            val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DRAFT_SYNC_PAGE_SIZE
             val changeSet = collectionsRepository.draftChanges(userId, since, limit)
             call.respond(
                 DraftChangesResponse(

@@ -29,7 +29,7 @@ internal fun Route.syncMaintenanceRoutes(
     backupRepository: LogDateBackupRepository,
 ) {
     route("/ops/sync") {
-        post("/tombstones:purge", {}) {
+        post("/tombstones:purge", { hidden = true }) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -62,7 +62,7 @@ internal fun Route.syncMaintenanceRoutes(
     }
 
     route("/ops") {
-        post("/backups:purge", {}) {
+        post("/backups:purge", { hidden = true }) {
             val start = System.currentTimeMillis()
             var success = false
             try {

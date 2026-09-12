@@ -36,6 +36,9 @@ import java.util.UUID
 
 internal const val DEFAULT_SYNC_PAGE_SIZE = 200
 internal const val MAX_SYNC_PAGE_SIZE = 500
+
+/** Drafts page smaller and, unlike the other feeds, do not clamp the caller's `limit`. */
+internal const val DRAFT_SYNC_PAGE_SIZE = 100
 internal const val MILLIS_PER_DAY = 86_400_000L
 
 internal const val METRIC_SYNC_STATUS = "sync.status"

@@ -26,7 +26,12 @@ fun Route.quotaRoutes(
 ) {
     route("/quota") {
         get({
-            bearerOperation("getQuota", "Quota", "Get storage quota", "Return storage entitlement and usage for the authenticated account.")
+            operationId = "getQuota"
+            tags = listOf("Quota")
+            summary = "Get storage quota"
+            description = "Return storage entitlement and usage for the authenticated account."
+            protected = true
+            securitySchemeNames = listOf("bearerAuth")
             response {
                 HttpStatusCode.OK to { body<QuotaUsage>() }
                 HttpStatusCode.Unauthorized to { body<MessageErrorResponse>() }

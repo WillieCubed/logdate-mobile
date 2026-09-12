@@ -42,12 +42,12 @@ fun Route.transcriptionRoutes(
 ) {
     route("/transcription") {
         post("/sessions", {
-            bearerOperation(
-                "createTranscriptionSession",
-                "Transcription",
-                "Create a transcription session",
-                "Reserve a short-lived cloud transcription session.",
-            )
+            operationId = "createTranscriptionSession"
+            tags = listOf("Transcription")
+            summary = "Create a transcription session"
+            description = "Reserve a short-lived cloud transcription session."
+            protected = true
+            securitySchemeNames = listOf("bearerAuth")
             request { body<CloudTranscriptionSessionRequest>() }
             response {
                 HttpStatusCode.Created to { body<CloudTranscriptionSessionResponse>() }

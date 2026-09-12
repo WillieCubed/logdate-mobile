@@ -184,12 +184,12 @@ fun Route.oauthRoutes(
     }
 
     post("/oauth/token", {
-        dpopOperation(
-            "exchangeOAuthToken",
-            "OAuth",
-            "Exchange an OAuth token",
-            "Exchange an authorization code or refresh token for DPoP-bound credentials.",
-        )
+        operationId = "exchangeOAuthToken"
+        tags = listOf("OAuth")
+        summary = "Exchange an OAuth token"
+        description = "Exchange an authorization code or refresh token for DPoP-bound credentials."
+        protected = true
+        securitySchemeNames = listOf("dpopProof")
         request {
             headerParameter<String>(DPOP_HEADER) { description = "DPoP proof JWT for this request." }
             body<OAuthTokenForm> {

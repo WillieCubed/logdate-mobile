@@ -24,6 +24,7 @@ import app.logdate.server.entitlements.EntitlementTier
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnPasskeyService
+import app.logdate.server.ratelimit.RateLimitPolicy
 import app.logdate.shared.model.AccountInfoResponse
 import app.logdate.shared.model.AccountTokens
 import app.logdate.shared.model.ApiError
@@ -91,8 +92,8 @@ private val RESERVED_USERNAME_LABELS =
         "status",
     )
 private const val EMAIL_BINDING_SOURCE_GOOGLE = "google_id_token"
-private val SIGNUP_RATE_LIMIT = AuthRateLimitPolicy(maxRequests = 5, windowSeconds = 60 * 60)
-private val SIGNIN_RATE_LIMIT = AuthRateLimitPolicy(maxRequests = 10, windowSeconds = 60)
+internal val SIGNUP_RATE_LIMIT = RateLimitPolicy(maxRequests = 5, windowSeconds = 60 * 60)
+internal val SIGNIN_RATE_LIMIT = RateLimitPolicy(maxRequests = 10, windowSeconds = 60)
 private const val METRIC_AUTH_SIGNUP_USERNAME_AVAILABLE = "auth.signup.username.available"
 private const val METRIC_AUTH_SIGNUP_PASSKEY_BEGIN = "auth.signup.passkey.begin"
 private const val METRIC_AUTH_SIGNUP_PASSKEY_COMPLETE = "auth.signup.passkey.complete"
@@ -1105,7 +1106,7 @@ fun Route.authV1Routes(
             }
         }
 
-        get("/metrics") {
+        get("/metrics", { hidden = true }) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -1122,7 +1123,7 @@ fun Route.authV1Routes(
             }
         }
 
-        get("/metrics/prometheus") {
+        get("/metrics/prometheus", { hidden = true }) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -1140,12 +1141,12 @@ fun Route.authV1Routes(
         }
 
         get("/me", {
-            bearerOperation(
-                "getCurrentAccount",
-                "Authentication",
-                "Get current account",
-                "Return the authenticated account and fresh credentials.",
-            )
+            operationId = "getCurrentAccount"
+            tags = listOf("Authentication")
+            summary = "Get current account"
+            description = "Return the authenticated account and fresh credentials."
+            protected = true
+            securitySchemeNames = listOf("bearerAuth")
             response {
                 HttpStatusCode.OK to { body<AuthResponse>() }
                 HttpStatusCode.Unauthorized to { body<ApiErrorResponse>() }
@@ -1853,17 +1854,12 @@ private fun EntitlementStatus.toWire(): EntitlementStatusWire =
         EntitlementStatus.SELF_HOST -> EntitlementStatusWire.SELF_HOST
     }
 
-private data class AuthRateLimitPolicy(
-    val maxRequests: Int,
-    val windowSeconds: Int,
-)
-
 private class InMemoryAuthRateLimiter {
     private val requestsByKey = ConcurrentHashMap<String, ArrayDeque<Long>>()
 
     fun allow(
         key: String,
-        policy: AuthRateLimitPolicy,
+        policy: RateLimitPolicy,
         nowEpochMillis: Long = Clock.System.now().toEpochMilliseconds(),
     ): Boolean {
         val windowStart = nowEpochMillis - (policy.windowSeconds * 1000L)
@@ -1998,7 +1994,7 @@ private suspend fun ApplicationCall.respondForRequestException(
 private suspend fun ApplicationCall.enforceRateLimit(
     rateLimiter: InMemoryAuthRateLimiter,
     operation: String,
-    policy: AuthRateLimitPolicy,
+    policy: RateLimitPolicy,
     metrics: AuthMetricsRegistry?,
 ): Boolean {
     val ipKey = hashRemoteIp() ?: request.local.remoteHost.ifBlank { "unknown" }

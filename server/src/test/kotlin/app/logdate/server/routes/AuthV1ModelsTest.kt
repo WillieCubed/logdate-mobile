@@ -5,6 +5,7 @@ import app.logdate.server.auth.AccountIdentity
 import app.logdate.server.auth.AuthMetricsSnapshot
 import app.logdate.server.auth.AuthOperationMetricsSnapshot
 import app.logdate.server.auth.IdentityProvider
+import app.logdate.server.ratelimit.RateLimitPolicy
 import app.logdate.shared.model.AccountTokens
 import app.logdate.shared.model.PasskeyAssertionAuthenticatorResponse
 import app.logdate.shared.model.PasskeyAssertionResponse
@@ -382,14 +383,8 @@ class AuthV1ModelsTest {
         limiterCtor.isAccessible = true
         val limiter = limiterCtor.newInstance()
 
-        val policyClass = Class.forName("app.logdate.server.routes.AuthRateLimitPolicy")
-        val policyCtor =
-            policyClass.getDeclaredConstructor(
-                Int::class.javaPrimitiveType,
-                Int::class.javaPrimitiveType,
-            )
-        policyCtor.isAccessible = true
-        val policy = policyCtor.newInstance(2, 60)
+        val policyClass = RateLimitPolicy::class.java
+        val policy = RateLimitPolicy(maxRequests = 2, windowSeconds = 60)
 
         val allow =
             limiterClass.getDeclaredMethod(

@@ -56,17 +56,7 @@ internal fun Route.syncStatusRoutes(
         }
     }
 
-    get("/ops/sync/metrics", {
-        tags = listOf("Ops")
-        summary = "Get sync metrics"
-        description = "Retrieve a snapshot of the server's sync metrics."
-        securitySchemeNames = listOf("bearerAuth")
-        response {
-            HttpStatusCode.OK to {
-                description = "Metrics retrieved successfully"
-            }
-        }
-    }) {
+    get("/ops/sync/metrics", { hidden = true }) {
         val start = System.currentTimeMillis()
         var success = false
         try {
@@ -79,20 +69,7 @@ internal fun Route.syncStatusRoutes(
         }
     }
 
-    get("/ops/sync/metrics/prometheus", {
-        tags = listOf("Ops")
-        summary = "Get Prometheus metrics"
-        description = "Retrieve server metrics in Prometheus exposition format."
-        securitySchemeNames = listOf("bearerAuth")
-        response {
-            HttpStatusCode.OK to {
-                description = "Prometheus metrics retrieved successfully"
-                body<String> {
-                    mediaTypes = setOf(ContentType.Text.Plain)
-                }
-            }
-        }
-    }) {
+    get("/ops/sync/metrics/prometheus", { hidden = true }) {
         val start = System.currentTimeMillis()
         var success = false
         try {

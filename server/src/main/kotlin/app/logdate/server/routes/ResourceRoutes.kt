@@ -30,12 +30,10 @@ fun Route.resourceRoutes(
 ) {
     route("/resources") {
         get("/{resourceId}", {
-            publicOperation(
-                "resolveResource",
-                "Resources",
-                "Resolve a public resource",
-                "Resolve an opaque resource ID to its canonical public URL.",
-            )
+            operationId = "resolveResource"
+            tags = listOf("Resources")
+            summary = "Resolve a public resource"
+            description = "Resolve an opaque resource ID to its canonical public URL."
             request { pathParameter<String>("resourceId") { description = "Opaque LogDate resource identifier." } }
             response {
                 HttpStatusCode.OK to { body<ResourceResponse>() }
