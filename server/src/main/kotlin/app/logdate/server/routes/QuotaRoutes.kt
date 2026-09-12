@@ -3,6 +3,7 @@ package app.logdate.server.routes
 import app.logdate.server.auth.TokenService
 import app.logdate.server.entitlements.EntitlementService
 import app.logdate.server.entitlements.UsageCalculator
+import app.logdate.server.routes.docs.CloudServiceDocs
 import app.logdate.shared.model.QuotaUsage
 import io.github.smiley4.ktoropenapi.get
 import io.ktor.http.HttpStatusCode
@@ -25,18 +26,7 @@ fun Route.quotaRoutes(
     usageCalculator: UsageCalculator,
 ) {
     route("/quota") {
-        get({
-            operationId = "getQuota"
-            tags = listOf("Quota")
-            summary = "Get storage quota"
-            description = "Return storage entitlement and usage for the authenticated account."
-            protected = true
-            securitySchemeNames = listOf("bearerAuth")
-            response {
-                HttpStatusCode.OK to { body<QuotaUsage>() }
-                HttpStatusCode.Unauthorized to { body<MessageErrorResponse>() }
-            }
-        }) {
+        get(CloudServiceDocs.getQuota) {
             val authHeader = call.request.headers["Authorization"]
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
                 call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "missing or invalid Authorization header"))

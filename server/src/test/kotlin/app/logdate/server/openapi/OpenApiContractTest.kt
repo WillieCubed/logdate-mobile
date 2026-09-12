@@ -35,6 +35,9 @@ class OpenApiContractTest {
         val responses get() = body["responses"]?.jsonObject.orEmpty()
         val tags get() = body["tags"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty()
         val hasSecurity get() = body["security"]?.jsonArray?.isNotEmpty() == true
+
+        /** DPoP-only endpoints answer a malformed proof with `400`, never `401`. */
+        val onlyDpop get() = body["security"]?.jsonArray?.all { it.jsonObject.keys == setOf("dpopProof") } == true
     }
 
     private fun withSpec(block: (JsonObject, List<Operation>) -> Unit) =
@@ -143,8 +146,8 @@ class OpenApiContractTest {
     fun `every documented operation declares a success response with content`() =
         withSpec { _, operations ->
             operations.documented().forEach { op ->
-                val successes = op.responses.filterKeys { it.startsWith("2") }
-                assertTrue(successes.isNotEmpty(), "${op.label}: no 2xx response")
+                val successes = op.responses.filterKeys { it.startsWith("2") || it.startsWith("3") }
+                assertTrue(successes.isNotEmpty(), "${op.label}: no 2xx or 3xx response")
                 successes.forEach { (status, response) ->
                     val body = response.jsonObject
                     assertTrue(
@@ -155,7 +158,14 @@ class OpenApiContractTest {
                             .isNotBlank(),
                         "${op.label}: $status needs a description",
                     )
-                    if (status != "204") assertTrue(body.containsKey("content"), "${op.label}: $status must declare a body")
+                    if (status.startsWith("3")) {
+                        assertTrue(
+                            body["headers"]?.jsonObject?.containsKey("Location") == true,
+                            "${op.label}: $status must document Location",
+                        )
+                    } else if (status != "204" && op.operationId !in SUCCESS_WITHOUT_BODY) {
+                        assertTrue(body.containsKey("content"), "${op.label}: $status must declare a body")
+                    }
                     if (status == "201" && op.operationId !in CREATED_WITHOUT_LOCATION) {
                         assertTrue(
                             body["headers"]?.jsonObject?.containsKey("Location") == true,
@@ -189,7 +199,7 @@ class OpenApiContractTest {
     fun `protected operations document 401 in their family's envelope`() =
         withSpec { _, operations ->
             operations.documented().forEach { op ->
-                if (op.hasSecurity) {
+                if (op.hasSecurity && !op.onlyDpop) {
                     val unauthorized = assertNotNull(op.responses["401"], "${op.label}: protected but no 401 documented").jsonObject
                     val ref =
                         unauthorized["content"]
@@ -202,7 +212,7 @@ class OpenApiContractTest {
                             ?.jsonPrimitive
                             ?.content
                     assertEquals("#/components/schemas/${envelopeFor(op.path)}", ref, "${op.label}: 401 envelope")
-                } else {
+                } else if (!op.hasSecurity) {
                     assertTrue(op.operationId in PUBLIC_OPERATIONS, "${op.label}: no security declared but not listed as public")
                 }
             }
@@ -218,7 +228,9 @@ class OpenApiContractTest {
                     assertEquals(op.operationId in RATE_LIMITED_WITH_RETRY_AFTER, hasRetryAfter, "${op.label}: Retry-After header")
                 }
                 if (op.operationId in QUOTA_ENFORCED) assertNotNull(op.responses["402"], "${op.label}: quota enforced but no 402")
-                if (op.path.startsWith("/xrpc/")) assertNotNull(op.responses["501"], "${op.label}: XRPC methods answer 501 when disabled")
+                if (op.path.startsWith("/xrpc/") && op.operationId !in XRPC_ALWAYS_AVAILABLE) {
+                    assertNotNull(op.responses["501"], "${op.label}: XRPC methods answer 501 when disabled")
+                }
             }
         }
 
@@ -312,10 +324,35 @@ class OpenApiContractTest {
                 "logout",
                 "resolveAtprotoDid",
                 "getDidDocument",
+                "getServerInfo",
+                "listPlans",
+                "getAssetLinks",
+                "resolveResource",
+                "getOAuthAuthorizationServerMetadata",
+                "getOAuthProtectedResourceMetadata",
+                "getOAuthJwks",
+                "resolveHandle",
+                "describeAtprotoServer",
+                "describeRepo",
+                "createAtprotoAccount",
+                "createAtprotoSession",
+                "getRepo",
+                "getLatestCommit",
+                "getRepoStatus",
+                "getRecord",
+                "listRecords",
+                "getBlob",
             )
 
+        /** XRPC methods that work without any optional service and therefore never answer 501. */
+        private val XRPC_ALWAYS_AVAILABLE = setOf("resolveHandle", "describeAtprotoServer", "describeRepo")
+
+        /** Operations that answer 200 with an empty body, as their protocol specifies. */
+        private val SUCCESS_WITHOUT_BODY = setOf("revokeOAuthToken")
+
         /** Operations that answer 201 without a Location header because the created thing has no URL of its own. */
-        private val CREATED_WITHOUT_LOCATION = setOf("completePasskeySignup", "completeAddPasskey")
+        private val CREATED_WITHOUT_LOCATION =
+            setOf("completePasskeySignup", "completeAddPasskey", "pushAuthorizationRequest", "createTranscriptionSession")
 
         private val RATE_LIMITED_WITHOUT_RETRY_AFTER =
             setOf(
@@ -330,50 +367,9 @@ class OpenApiContractTest {
         private val QUOTA_ENFORCED = setOf("uploadMedia", "uploadBackup")
 
         /** Route files that still document inline; shrinks as each family moves to routes/docs. */
-        private val PENDING_INLINE_DOCS_FILES =
-            setOf(
-                "OAuthRoutes.kt",
-                "QuotaRoutes.kt",
-                "ResourceRoutes.kt",
-                "ServerInfoRoutes.kt",
-                "TranscriptionRoutes.kt",
-            )
+        private val PENDING_INLINE_DOCS_FILES = setOf<String>()
 
         /** Operations whose text is still machine generated. Entries are removed as they are written; never added. */
-        private val PENDING_DOCUMENTATION =
-            setOf(
-                "GET /.well-known/assetlinks.json",
-                "GET /.well-known/oauth-authorization-server",
-                "GET /.well-known/oauth-protected-resource",
-                "GET /oauth/jwks",
-                "POST /oauth/par",
-                "GET /oauth/authorize",
-                "POST /oauth/authorize",
-                "POST /oauth/token",
-                "POST /oauth/revoke",
-                "GET /xrpc/com.atproto.identity.resolveHandle",
-                "POST /xrpc/com.atproto.server.createAccount",
-                "POST /xrpc/com.atproto.server.createSession",
-                "GET /xrpc/com.atproto.server.getSession",
-                "POST /xrpc/com.atproto.server.refreshSession",
-                "POST /xrpc/com.atproto.server.deleteSession",
-                "GET /xrpc/com.atproto.server.describeServer",
-                "GET /xrpc/com.atproto.repo.describeRepo",
-                "GET /xrpc/com.atproto.sync.getRepo",
-                "GET /xrpc/com.atproto.sync.getLatestCommit",
-                "GET /xrpc/com.atproto.sync.getRepoStatus",
-                "GET /xrpc/com.atproto.repo.getRecord",
-                "GET /xrpc/com.atproto.repo.listRecords",
-                "POST /xrpc/com.atproto.repo.createRecord",
-                "POST /xrpc/com.atproto.repo.putRecord",
-                "POST /xrpc/com.atproto.repo.deleteRecord",
-                "POST /xrpc/com.atproto.repo.uploadBlob",
-                "GET /xrpc/com.atproto.sync.getBlob",
-                "GET /api/v1/server/info",
-                "GET /api/v1/plans",
-                "GET /api/v1/quota",
-                "GET /api/v1/resources/{resourceId}",
-                "POST /api/v1/transcription/sessions",
-            )
+        private val PENDING_DOCUMENTATION = setOf<String>()
     }
 }

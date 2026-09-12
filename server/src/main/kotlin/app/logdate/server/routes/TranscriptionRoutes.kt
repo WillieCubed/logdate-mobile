@@ -8,6 +8,7 @@ import app.logdate.server.entitlements.EntitlementStatus
 import app.logdate.server.entitlements.EntitlementTier
 import app.logdate.server.ratelimit.RateLimitPolicy
 import app.logdate.server.ratelimit.SlidingWindowRateLimiter
+import app.logdate.server.routes.docs.CloudServiceDocs
 import app.logdate.server.transcription.CloudTranscriptionSessionProvider
 import app.logdate.server.transcription.CloudTranscriptionSessionUnavailableException
 import app.logdate.server.transcription.DisabledCloudTranscriptionSessionProvider
@@ -41,22 +42,7 @@ fun Route.transcriptionRoutes(
     rateLimiter: SlidingWindowRateLimiter = SlidingWindowRateLimiter(),
 ) {
     route("/transcription") {
-        post("/sessions", {
-            operationId = "createTranscriptionSession"
-            tags = listOf("Transcription")
-            summary = "Create a transcription session"
-            description = "Reserve a short-lived cloud transcription session."
-            protected = true
-            securitySchemeNames = listOf("bearerAuth")
-            request { body<CloudTranscriptionSessionRequest>() }
-            response {
-                HttpStatusCode.Created to { body<CloudTranscriptionSessionResponse>() }
-                HttpStatusCode.Unauthorized to { body<MessageErrorResponse>() }
-                HttpStatusCode.PaymentRequired to { body<MessageErrorResponse>() }
-                HttpStatusCode.TooManyRequests to { body<MessageErrorResponse>() }
-                HttpStatusCode.ServiceUnavailable to { body<MessageErrorResponse>() }
-            }
-        }) {
+        post("/sessions", CloudServiceDocs.createTranscriptionSession) {
             val accountId =
                 call.resolveBearerAccountId(tokenService)
                     ?: return@post call.respond(

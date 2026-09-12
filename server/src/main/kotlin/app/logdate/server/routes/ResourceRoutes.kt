@@ -6,6 +6,7 @@ import app.logdate.server.database.toKotlinUuid
 import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.logdate.ResourceKind
 import app.logdate.server.logdate.ResourceRouteRepository
+import app.logdate.server.routes.docs.CloudServiceDocs
 import io.github.smiley4.ktoropenapi.get
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.response.respond
@@ -29,17 +30,7 @@ fun Route.resourceRoutes(
     resourceRouteRepository: ResourceRouteRepository,
 ) {
     route("/resources") {
-        get("/{resourceId}", {
-            operationId = "resolveResource"
-            tags = listOf("Resources")
-            summary = "Resolve a public resource"
-            description = "Resolve an opaque resource ID to its canonical public URL."
-            request { pathParameter<String>("resourceId") { description = "Opaque LogDate resource identifier." } }
-            response {
-                HttpStatusCode.OK to { body<ResourceResponse>() }
-                HttpStatusCode.NotFound to { description = "Resource not found" }
-            }
-        }) {
+        get("/{resourceId}", CloudServiceDocs.resolveResource) {
             val resourceId = call.parameters["resourceId"]?.trim().orEmpty()
             if (resourceId.isBlank()) {
                 call.respond(HttpStatusCode.NotFound)

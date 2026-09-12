@@ -1,6 +1,7 @@
 package app.logdate.server.routes
 
 import app.logdate.server.entitlements.PlanCatalogService
+import app.logdate.server.routes.docs.CloudServiceDocs
 import app.logdate.shared.model.PlanCatalogResponse
 import io.github.smiley4.ktoropenapi.get
 import io.ktor.server.response.respond
@@ -14,7 +15,7 @@ import io.ktor.server.routing.Route
  * which clients read as "this server does not sell anything" and hide plan selection accordingly.
  */
 fun Route.planRoutes(planCatalogService: PlanCatalogService) {
-    get("/plans", {}) {
+    get("/plans", CloudServiceDocs.listPlans) {
         call.respond(
             PlanCatalogResponse(
                 success = true,

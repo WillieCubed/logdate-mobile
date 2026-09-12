@@ -10,9 +10,9 @@ import app.logdate.server.oauth.OAuthException
 import app.logdate.server.oauth.OAuthInvalidRequestException
 import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthUseDpopNonceException
+import app.logdate.server.routes.docs.OAuthDocs
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
-import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -54,19 +54,19 @@ fun Route.oauthRoutes(
     tokenService: TokenService? = null,
     identityService: AtprotoIdentityService? = null,
 ) {
-    get("/.well-known/oauth-authorization-server", {}) {
+    get("/.well-known/oauth-authorization-server", OAuthDocs.getAuthorizationServerMetadata) {
         call.respond(HttpStatusCode.OK, discoveryService?.authorizationServerMetadata() ?: config.authorizationServerMetadata())
     }
 
-    get("/.well-known/oauth-protected-resource", {}) {
+    get("/.well-known/oauth-protected-resource", OAuthDocs.getProtectedResourceMetadata) {
         call.respond(HttpStatusCode.OK, discoveryService?.protectedResourceMetadata() ?: config.protectedResourceMetadata())
     }
 
-    get("/oauth/jwks", {}) {
+    get("/oauth/jwks", OAuthDocs.getJwks) {
         call.respond(HttpStatusCode.OK, keyService.jwks())
     }
 
-    post("/oauth/par", {}) {
+    post("/oauth/par", OAuthDocs.pushAuthorizationRequest) {
         val service =
             authorizationService ?: return@post call.respond(
                 HttpStatusCode.NotImplemented,
@@ -109,7 +109,7 @@ fun Route.oauthRoutes(
         }
     }
 
-    get("/oauth/authorize", {}) {
+    get("/oauth/authorize", OAuthDocs.getAuthorizationPrompt) {
         val service =
             authorizationService ?: return@get call.respond(
                 HttpStatusCode.NotImplemented,
@@ -141,7 +141,7 @@ fun Route.oauthRoutes(
         }
     }
 
-    post("/oauth/authorize", {}) {
+    post("/oauth/authorize", OAuthDocs.submitAuthorizationDecision) {
         val service =
             authorizationService ?: return@post call.respond(
                 HttpStatusCode.NotImplemented,
@@ -183,26 +183,7 @@ fun Route.oauthRoutes(
         }
     }
 
-    post("/oauth/token", {
-        operationId = "exchangeOAuthToken"
-        tags = listOf("OAuth")
-        summary = "Exchange an OAuth token"
-        description = "Exchange an authorization code or refresh token for DPoP-bound credentials."
-        protected = true
-        securitySchemeNames = listOf("dpopProof")
-        request {
-            headerParameter<String>(DPOP_HEADER) { description = "DPoP proof JWT for this request." }
-            body<OAuthTokenForm> {
-                required = true
-                mediaTypes(ContentType.Application.FormUrlEncoded)
-            }
-        }
-        response {
-            HttpStatusCode.OK to { body<OAuthTokenResponse>() }
-            HttpStatusCode.BadRequest to { body<OAuthErrorResponse>() }
-            HttpStatusCode.NotImplemented to { body<OAuthErrorResponse>() }
-        }
-    }) {
+    post("/oauth/token", OAuthDocs.exchangeToken) {
         val service =
             authorizationService ?: return@post call.respond(
                 HttpStatusCode.NotImplemented,
@@ -257,7 +238,7 @@ fun Route.oauthRoutes(
         }
     }
 
-    post("/oauth/revoke", {}) {
+    post("/oauth/revoke", OAuthDocs.revokeToken) {
         val service =
             authorizationService ?: return@post call.respond(
                 HttpStatusCode.NotImplemented,

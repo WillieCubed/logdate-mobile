@@ -1,5 +1,6 @@
 package app.logdate.server.routes
 
+import app.logdate.server.routes.docs.CloudServiceDocs
 import io.github.smiley4.ktoropenapi.get
 import io.ktor.server.application.call
 import io.ktor.server.response.respond
@@ -66,7 +67,7 @@ data class AssetLinkTarget(
  * (`delegate_permission/common.handle_all_urls`) for this host.
  */
 fun Route.assetLinksRoutes(config: AssetLinksConfig) {
-    get("/.well-known/assetlinks.json", {}) {
+    get("/.well-known/assetlinks.json", CloudServiceDocs.getAssetLinks) {
         call.respond(
             listOf(
                 AssetLinkStatement(

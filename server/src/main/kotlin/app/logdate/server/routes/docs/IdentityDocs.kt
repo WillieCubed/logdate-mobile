@@ -41,6 +41,29 @@ import studio.hypertext.atproto.identity.VerificationMethod
 
 /** Documentation for `IdentityApiRoutes.kt` and the `.well-known` DID routes in `IdentityRoutes.kt`. */
 internal object IdentityDocs {
+    val didDocumentExample: DidDocument =
+        DidDocument(
+            id = AtprotoDid.require("did:web:${DocExamples.HANDLE}"),
+            alsoKnownAs = listOf("at://${DocExamples.HANDLE}"),
+            verificationMethod =
+                listOf(
+                    VerificationMethod(
+                        id = "did:web:${DocExamples.HANDLE}#atproto",
+                        type = "Multikey",
+                        controller = AtprotoDid.require("did:web:${DocExamples.HANDLE}"),
+                        publicKeyMultibase = PUBLIC_MULTIBASE,
+                    ),
+                ),
+            service =
+                listOf(
+                    Service(
+                        id = "#atproto_pds",
+                        type = "AtprotoPersonalDataServer",
+                        serviceEndpoint = "https://cloud.logdate.app",
+                    ),
+                ),
+        )
+
     private const val PUBLIC_MULTIBASE = "zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme"
     private const val PUBLIC_DID_KEY = "did:key:$PUBLIC_MULTIBASE"
     private const val NEXT_DID_KEY = "did:key:zQ3shXjHeiBuRCKmM36cuYnm7YEMzhGnCmCyW92sRJ9pribSF"
@@ -479,30 +502,7 @@ internal object IdentityDocs {
             """,
         )
         response {
-            ok(
-                "The DID document for the identity named by the `Host` header.",
-                DidDocument(
-                    id = AtprotoDid.require("did:web:${DocExamples.HANDLE}"),
-                    alsoKnownAs = listOf("at://${DocExamples.HANDLE}"),
-                    verificationMethod =
-                        listOf(
-                            VerificationMethod(
-                                id = "did:web:${DocExamples.HANDLE}#atproto",
-                                type = "Multikey",
-                                controller = AtprotoDid.require("did:web:${DocExamples.HANDLE}"),
-                                publicKeyMultibase = PUBLIC_MULTIBASE,
-                            ),
-                        ),
-                    service =
-                        listOf(
-                            Service(
-                                id = "#atproto_pds",
-                                type = "AtprotoPersonalDataServer",
-                                serviceEndpoint = "https://cloud.logdate.app",
-                            ),
-                        ),
-                ),
-            )
+            ok("The DID document for the identity named by the `Host` header.", didDocumentExample)
             code(HttpStatusCode.NotFound) {
                 description = "No hosted `did:web` identity has the handle named by the `Host` header. The body is empty."
             }

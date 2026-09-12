@@ -77,6 +77,18 @@ internal fun RouteConfig.bearerOperation(
     securitySchemeNames = listOf("bearerAuth")
 }
 
+/** An operation that accepts either a LogDate bearer token or a DPoP-bound OAuth token. */
+internal fun RouteConfig.bearerOrDpopOperation(
+    id: String,
+    tag: String,
+    summary: String,
+    description: String,
+) {
+    operation(id, tag, summary, description)
+    protected = true
+    securitySchemeNames = listOf("bearerAuth", "dpopProof")
+}
+
 internal fun RouteConfig.dpopOperation(
     id: String,
     tag: String,
