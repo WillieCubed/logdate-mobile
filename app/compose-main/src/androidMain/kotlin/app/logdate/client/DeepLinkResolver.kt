@@ -1,19 +1,44 @@
 package app.logdate.client
 
+import android.content.Intent
 import android.net.Uri
 import androidx.navigation3.runtime.NavKey
+import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_DRAFT
+import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_EVENT_DETAIL
+import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_MEMORY_RECALL
+import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_NEW_ENTRY
+import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_DRAFT_ID
+import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_EVENT_ID
+import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_RECALL_DATE
+import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_TARGET
+import app.logdate.client.feature.widgets.EXTRA_WIDGET_TARGET_DATE
+import app.logdate.client.feature.widgets.NAV_SOURCE_ON_THIS_DAY_WIDGET
+import app.logdate.client.location.tracking.NAV_SOURCE_LOCATION_HISTORY
+import app.logdate.client.media.audio.EXTRA_NAV_SOURCE
+import app.logdate.client.media.audio.EXTRA_NOTE_ID
+import app.logdate.client.media.audio.NAV_SOURCE_AUDIO_PLAYBACK
+import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_ID
+import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_TARGET
+import app.logdate.client.rewind.REWIND_NOTIFICATION_TARGET_DETAIL
+import app.logdate.client.testing.navigation.readNavigationTestDestination
 import app.logdate.client.ui.navigation.LocationTimelineRoute
 import app.logdate.client.ui.navigation.LogdateHostClass
 import app.logdate.client.ui.navigation.SearchRoute
 import app.logdate.client.ui.navigation.classifyLogdateHost
 import app.logdate.client.ui.navigation.searchRouteFromParams
+import app.logdate.feature.core.notifications.NAV_SOURCE_DATA_TRANSFER
+import app.logdate.feature.core.settings.navigation.ExportSettingsRoute
+import app.logdate.feature.editor.navigation.EntryEditorRoute
 import app.logdate.feature.events.navigation.EventDetailRoute
 import app.logdate.feature.journals.navigation.JournalDetailsRoute
 import app.logdate.feature.journals.navigation.NoteDetailRoute
 import app.logdate.feature.postcards.navigation.PostcardViewerRoute
 import app.logdate.feature.rewind.navigation.RewindDetailRoute
 import app.logdate.navigation.TimelineDetailRoute
+import kotlinx.datetime.LocalDate
 import kotlin.uuid.Uuid
+import app.logdate.client.location.tracking.EXTRA_NAV_SOURCE as EXTRA_LOCATION_NAV_SOURCE
+import app.logdate.feature.core.notifications.EXTRA_NAV_SOURCE as EXTRA_DATA_TRANSFER_NAV_SOURCE
 
 private const val PATH_JOURNAL = "journal"
 private const val PATH_JOURNAL_SHORT = "j"
@@ -161,3 +186,68 @@ private inline fun <T : NavKey> String.parseDateString(create: (String) -> T): T
         kotlinx.datetime.LocalDate.parse(this)
         create(this)
     }.getOrNull()
+
+/**
+ * Resolves the optional launch destination from the activity intent.
+ *
+ * This is the single resolver used by `MainActivity` for deep links, notification taps,
+ * widget launches, ambient prompts, and the Android 16 handoff fallback URI.
+ */
+fun resolveMainActivityNavKey(intent: Intent?): NavKey? {
+    if (intent == null) return null
+    intent.readNavigationTestDestination()?.let { return it }
+    return when {
+        intent.getStringExtra(EXTRA_NAV_SOURCE) == NAV_SOURCE_AUDIO_PLAYBACK -> {
+            val noteId = intent.getStringExtra(EXTRA_NOTE_ID) ?: return null
+            runCatching { NoteDetailRoute(Uuid.parse(noteId)) }.getOrNull()
+        }
+
+        intent.getStringExtra(EXTRA_NAV_SOURCE) == NAV_SOURCE_ON_THIS_DAY_WIDGET -> {
+            val dateStr = intent.getStringExtra(EXTRA_WIDGET_TARGET_DATE) ?: return null
+            runCatching {
+                LocalDate.parse(dateStr)
+                TimelineDetailRoute(dateStr)
+            }.getOrNull()
+        }
+
+        intent.getStringExtra(EXTRA_LOCATION_NAV_SOURCE) == NAV_SOURCE_LOCATION_HISTORY -> {
+            LocationTimelineRoute
+        }
+
+        intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_NEW_ENTRY -> {
+            EntryEditorRoute()
+        }
+
+        intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_DRAFT -> {
+            val draftId = intent.getStringExtra(EXTRA_AMBIENT_PROMPT_DRAFT_ID) ?: return null
+            runCatching { EntryEditorRoute(draftId = Uuid.parse(draftId).toString()) }.getOrNull()
+        }
+
+        intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_MEMORY_RECALL -> {
+            val dateStr = intent.getStringExtra(EXTRA_AMBIENT_PROMPT_RECALL_DATE) ?: return null
+            runCatching {
+                LocalDate.parse(dateStr)
+                TimelineDetailRoute(dateStr)
+            }.getOrNull()
+        }
+
+        intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_EVENT_DETAIL -> {
+            val eventId = intent.getStringExtra(EXTRA_AMBIENT_PROMPT_EVENT_ID) ?: return null
+            runCatching { EventDetailRoute(eventId) }.getOrNull()
+        }
+
+        intent.getStringExtra(EXTRA_REWIND_NOTIFICATION_TARGET) == REWIND_NOTIFICATION_TARGET_DETAIL -> {
+            val rewindId = intent.getStringExtra(EXTRA_REWIND_NOTIFICATION_ID) ?: return null
+            runCatching { RewindDetailRoute(Uuid.parse(rewindId)) }.getOrNull()
+        }
+
+        intent.getStringExtra(EXTRA_DATA_TRANSFER_NAV_SOURCE) == NAV_SOURCE_DATA_TRANSFER -> {
+            ExportSettingsRoute
+        }
+
+        // Deep link URIs: logdate://journal/{id}, logdate://day/{date}, etc.
+        intent.data != null -> resolveDeepLinkUri(intent.data!!)
+
+        else -> null
+    }
+}
