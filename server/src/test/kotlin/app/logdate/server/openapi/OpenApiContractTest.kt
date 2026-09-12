@@ -156,9 +156,7 @@ class OpenApiContractTest {
                         "${op.label}: $status needs a description",
                     )
                     if (status != "204") assertTrue(body.containsKey("content"), "${op.label}: $status must declare a body")
-                    if (status ==
-                        "201"
-                    ) {
+                    if (status == "201" && op.operationId !in CREATED_WITHOUT_LOCATION) {
                         assertTrue(
                             body["headers"]?.jsonObject?.containsKey("Location") == true,
                             "${op.label}: 201 must document Location",
@@ -299,7 +297,25 @@ class OpenApiContractTest {
             )
 
         /** Operations that are public by design; every other documented operation must declare security. */
-        private val PUBLIC_OPERATIONS = setOf<String>()
+        private val PUBLIC_OPERATIONS =
+            setOf(
+                "checkUsernameAvailability",
+                "beginPasskeySignup",
+                "completePasskeySignup",
+                "signupWithGoogle",
+                "beginPasskeySignin",
+                "completePasskeySignin",
+                "signinWithGoogle",
+                "beginRestoreSignin",
+                "completeRestoreSignin",
+                "refreshAccessToken",
+                "logout",
+                "resolveAtprotoDid",
+                "getDidDocument",
+            )
+
+        /** Operations that answer 201 without a Location header because the created thing has no URL of its own. */
+        private val CREATED_WITHOUT_LOCATION = setOf("completePasskeySignup", "completeAddPasskey")
 
         private val RATE_LIMITED_WITHOUT_RETRY_AFTER =
             setOf(
@@ -316,7 +332,6 @@ class OpenApiContractTest {
         /** Route files that still document inline; shrinks as each family moves to routes/docs. */
         private val PENDING_INLINE_DOCS_FILES =
             setOf(
-                "AuthV1Routes.kt",
                 "OAuthRoutes.kt",
                 "QuotaRoutes.kt",
                 "ResourceRoutes.kt",
@@ -331,8 +346,6 @@ class OpenApiContractTest {
         /** Operations whose text is still machine generated. Entries are removed as they are written; never added. */
         private val PENDING_DOCUMENTATION =
             setOf(
-                "GET /.well-known/atproto-did",
-                "GET /.well-known/did.json",
                 "GET /.well-known/assetlinks.json",
                 "GET /.well-known/oauth-authorization-server",
                 "GET /.well-known/oauth-protected-resource",
@@ -362,38 +375,6 @@ class OpenApiContractTest {
                 "GET /xrpc/com.atproto.sync.getBlob",
                 "GET /api/v1/server/info",
                 "GET /api/v1/plans",
-                "GET /api/v1/auth/signup/username/{username}/available",
-                "POST /api/v1/auth/signup/passkey/begin",
-                "POST /api/v1/auth/signup/passkey/complete",
-                "POST /api/v1/auth/signup/google",
-                "POST /api/v1/auth/signin/passkey/begin",
-                "POST /api/v1/auth/signin/passkey/complete",
-                "POST /api/v1/auth/signin/google",
-                "POST /api/v1/auth/restore/register/begin",
-                "POST /api/v1/auth/restore/register/complete",
-                "POST /api/v1/auth/restore/begin",
-                "POST /api/v1/auth/restore/complete",
-                "POST /api/v1/auth/token/refresh",
-                "POST /api/v1/auth/logout",
-                "GET /api/v1/auth/me",
-                "PUT /api/v1/auth/me",
-                "DELETE /api/v1/auth/me",
-                "GET /api/v1/auth/me/passkeys",
-                "POST /api/v1/auth/me/passkeys/begin",
-                "POST /api/v1/auth/me/passkeys/complete",
-                "DELETE /api/v1/auth/me/passkeys/{credentialId}",
-                "POST /api/v1/auth/me/email/verify/begin",
-                "POST /api/v1/auth/me/email/verify/complete",
-                "GET /api/v1/auth/me/entitlement",
-                "GET /api/v1/auth/me/identities",
-                "GET /api/v1/identity",
-                "POST /api/v1/identity/signing-key/export",
-                "POST /api/v1/identity/signing-key/rotate",
-                "POST /api/v1/identity/signing-key/import",
-                "POST /api/v1/identity/signing-key/import/recovery/prepare",
-                "POST /api/v1/identity/signing-key/import/recovery/complete",
-                "POST /api/v1/identity/plc/recovery-key",
-                "GET /api/v1/identity/plc/operations",
                 "GET /api/v1/ops/sync/status",
                 "GET /api/v1/contents/{contentId}",
                 "PUT /api/v1/contents/{contentId}",

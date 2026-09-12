@@ -1,5 +1,6 @@
 package app.logdate.server.openapi
 
+import app.logdate.server.openapi.schemadocs.AuthSchemaDocs
 import io.swagger.v3.oas.models.OpenAPI
 
 /**
@@ -27,7 +28,7 @@ internal data class SchemaDocumentationGaps(
  * schema generator's annotations are unavailable, so the text is attached here at build time.
  */
 internal object SchemaDocumentation {
-    val registry: Map<String, SchemaDoc> = emptyMap()
+    val registry: Map<String, SchemaDoc> = AuthSchemaDocs.docs
 }
 
 /**

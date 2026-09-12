@@ -8,6 +8,7 @@ import app.logdate.server.identity.IdentityLifecycleConflictException
 import app.logdate.server.identity.IdentityLifecycleValidationException
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.identity.didKeyFor
+import app.logdate.server.routes.docs.IdentityDocs
 import app.logdate.shared.model.ApiError
 import app.logdate.shared.model.ApiErrorResponse
 import io.github.aakira.napier.Napier
@@ -177,7 +178,7 @@ fun Route.identityApiRoutes(
         }
 
     route("/identity") {
-        get({}) {
+        get(IdentityDocs.getIdentityStatus) {
             val account =
                 resolveIdentityApiAccount(
                     call = call,
@@ -218,7 +219,7 @@ fun Route.identityApiRoutes(
             }
         }
 
-        post("/signing-key/export", {}) {
+        post("/signing-key/export", IdentityDocs.exportSigningKey) {
             val account =
                 resolveIdentityApiAccount(
                     call = call,
@@ -270,7 +271,7 @@ fun Route.identityApiRoutes(
             }
         }
 
-        post("/signing-key/rotate", {}) {
+        post("/signing-key/rotate", IdentityDocs.rotateSigningKey) {
             val account =
                 resolveIdentityApiAccount(
                     call = call,
@@ -324,7 +325,7 @@ fun Route.identityApiRoutes(
             }
         }
 
-        post("/signing-key/import", {}) {
+        post("/signing-key/import", IdentityDocs.importSigningKey) {
             val account =
                 resolveIdentityApiAccount(
                     call = call,
@@ -381,7 +382,7 @@ fun Route.identityApiRoutes(
             }
         }
 
-        post("/signing-key/import/recovery/prepare", {}) {
+        post("/signing-key/import/recovery/prepare", IdentityDocs.prepareRecoverySigningKeyImport) {
             val account =
                 resolveIdentityApiAccount(
                     call = call,
@@ -440,7 +441,7 @@ fun Route.identityApiRoutes(
             }
         }
 
-        post("/signing-key/import/recovery/complete", {}) {
+        post("/signing-key/import/recovery/complete", IdentityDocs.completeRecoverySigningKeyImport) {
             val account =
                 resolveIdentityApiAccount(
                     call = call,
@@ -502,7 +503,7 @@ fun Route.identityApiRoutes(
             }
         }
 
-        post("/plc/recovery-key", {}) {
+        post("/plc/recovery-key", IdentityDocs.registerPlcRecoveryKey) {
             val account =
                 resolveIdentityApiAccount(
                     call = call,
@@ -562,7 +563,7 @@ fun Route.identityApiRoutes(
             }
         }
 
-        get("/plc/operations", {}) {
+        get("/plc/operations", IdentityDocs.listPlcOperations) {
             val account =
                 resolveIdentityApiAccount(
                     call = call,

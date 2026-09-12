@@ -25,6 +25,8 @@ import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.ratelimit.RateLimitPolicy
+import app.logdate.server.routes.docs.AccountDocs
+import app.logdate.server.routes.docs.AuthDocs
 import app.logdate.shared.model.AccountInfoResponse
 import app.logdate.shared.model.AccountTokens
 import app.logdate.shared.model.ApiError
@@ -311,7 +313,7 @@ fun Route.authV1Routes(
 
     route("/auth") {
         route("/signup") {
-            get("/username/{username}/available") {
+            get("/username/{username}/available", AuthDocs.checkUsernameAvailability) {
                 val start = System.currentTimeMillis()
                 var success = false
                 try {
@@ -338,7 +340,7 @@ fun Route.authV1Routes(
             }
 
             route("/passkey") {
-                post("/begin") {
+                post("/begin", AuthDocs.beginPasskeySignup) {
                     val start = System.currentTimeMillis()
                     var success = false
                     try {
@@ -408,7 +410,7 @@ fun Route.authV1Routes(
                     }
                 }
 
-                post("/complete") {
+                post("/complete", AuthDocs.completePasskeySignup) {
                     val start = System.currentTimeMillis()
                     var success = false
                     try {
@@ -596,20 +598,7 @@ fun Route.authV1Routes(
                 }
             }
 
-            post("/google", {
-                tags = listOf("Auth")
-                summary = "Authenticate with Google"
-                description = "Register a new account or sign in using a Google ID token."
-                request {
-                    body<GoogleAuthRequest>()
-                }
-                response {
-                    HttpStatusCode.OK to {
-                        description = "Successfully authenticated"
-                        body<AccountTokens>()
-                    }
-                }
-            }) {
+            post("/google", AuthDocs.signupWithGoogle) {
                 val start = System.currentTimeMillis()
                 var success = false
                 try {
@@ -700,7 +689,7 @@ fun Route.authV1Routes(
 
         route("/signin") {
             route("/passkey") {
-                post("/begin") {
+                post("/begin", AuthDocs.beginPasskeySignin) {
                     val start = System.currentTimeMillis()
                     var success = false
                     try {
@@ -739,7 +728,7 @@ fun Route.authV1Routes(
                     }
                 }
 
-                post("/complete") {
+                post("/complete", AuthDocs.completePasskeySignin) {
                     val start = System.currentTimeMillis()
                     var success = false
                     try {
@@ -824,20 +813,7 @@ fun Route.authV1Routes(
                 }
             }
 
-            post("/google", {
-                tags = listOf("Auth")
-                summary = "Authenticate with Google"
-                description = "Register a new account or sign in using a Google ID token."
-                request {
-                    body<GoogleAuthRequest>()
-                }
-                response {
-                    HttpStatusCode.OK to {
-                        description = "Successfully authenticated"
-                        body<AccountTokens>()
-                    }
-                }
-            }) {
+            post("/google", AuthDocs.signinWithGoogle) {
                 val start = System.currentTimeMillis()
                 var success = false
                 try {
@@ -921,7 +897,7 @@ fun Route.authV1Routes(
         }
 
         route("/restore") {
-            post("/register/begin") {
+            post("/register/begin", AuthDocs.beginRestoreCredentialRegistration) {
                 try {
                     val account = resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics) ?: return@post
                     val options =
@@ -937,7 +913,7 @@ fun Route.authV1Routes(
                 }
             }
 
-            post("/register/complete") {
+            post("/register/complete", AuthDocs.completeRestoreCredentialRegistration) {
                 try {
                     val account = resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics) ?: return@post
                     val body = call.receive<RestoreRegisterCompleteRequest>()
@@ -961,7 +937,7 @@ fun Route.authV1Routes(
                 }
             }
 
-            post("/begin") {
+            post("/begin", AuthDocs.beginRestoreSignin) {
                 try {
                     val options = restoreCredentialService.generateAuthOptions()
                     call.respond(
@@ -984,7 +960,7 @@ fun Route.authV1Routes(
                 }
             }
 
-            post("/complete") {
+            post("/complete", AuthDocs.completeRestoreSignin) {
                 try {
                     val request = call.receive<SigninPasskeyCompleteRequest>()
                     val result =
@@ -1041,7 +1017,7 @@ fun Route.authV1Routes(
         }
 
         route("/token") {
-            post("/refresh") {
+            post("/refresh", AuthDocs.refreshAccessToken) {
                 val start = System.currentTimeMillis()
                 var success = false
                 try {
@@ -1087,7 +1063,7 @@ fun Route.authV1Routes(
             }
         }
 
-        post("/logout") {
+        post("/logout", AuthDocs.logout) {
             try {
                 val request = call.receive<LogoutRequestV1>()
                 if (request.refreshToken.isBlank()) {
@@ -1140,18 +1116,7 @@ fun Route.authV1Routes(
             }
         }
 
-        get("/me", {
-            operationId = "getCurrentAccount"
-            tags = listOf("Authentication")
-            summary = "Get current account"
-            description = "Return the authenticated account and fresh credentials."
-            protected = true
-            securitySchemeNames = listOf("bearerAuth")
-            response {
-                HttpStatusCode.OK to { body<AuthResponse>() }
-                HttpStatusCode.Unauthorized to { body<ApiErrorResponse>() }
-            }
-        }) {
+        get("/me", AccountDocs.getCurrentAccount) {
             try {
                 val account =
                     resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
@@ -1172,7 +1137,7 @@ fun Route.authV1Routes(
             }
         }
 
-        put("/me") {
+        put("/me", AccountDocs.updateProfile) {
             try {
                 val account =
                     resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
@@ -1246,7 +1211,7 @@ fun Route.authV1Routes(
             }
         }
 
-        get("/me/passkeys") {
+        get("/me/passkeys", AccountDocs.listPasskeys) {
             try {
                 val account =
                     resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
@@ -1264,7 +1229,7 @@ fun Route.authV1Routes(
             }
         }
 
-        post("/me/passkeys/begin") {
+        post("/me/passkeys/begin", AccountDocs.beginAddPasskey) {
             try {
                 val account =
                     resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
@@ -1282,7 +1247,7 @@ fun Route.authV1Routes(
             }
         }
 
-        post("/me/passkeys/complete") {
+        post("/me/passkeys/complete", AccountDocs.completeAddPasskey) {
             try {
                 val account =
                     resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
@@ -1335,7 +1300,7 @@ fun Route.authV1Routes(
             }
         }
 
-        delete("/me/passkeys/{credentialId}") {
+        delete("/me/passkeys/{credentialId}", AccountDocs.deletePasskey) {
             try {
                 val account =
                     resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
@@ -1377,7 +1342,7 @@ fun Route.authV1Routes(
             }
         }
 
-        delete("/me") {
+        delete("/me", AccountDocs.deleteAccount) {
             try {
                 val account =
                     resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
@@ -1410,7 +1375,7 @@ fun Route.authV1Routes(
             }
         }
 
-        post("/me/email/verify/begin") {
+        post("/me/email/verify/begin", AccountDocs.beginEmailVerification) {
             try {
                 val account =
                     resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
@@ -1445,7 +1410,7 @@ fun Route.authV1Routes(
             }
         }
 
-        post("/me/email/verify/complete") {
+        post("/me/email/verify/complete", AccountDocs.completeEmailVerification) {
             try {
                 val account =
                     resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
@@ -1502,7 +1467,7 @@ fun Route.authV1Routes(
             }
         }
 
-        get("/me/entitlement") {
+        get("/me/entitlement", AccountDocs.getEntitlement) {
             try {
                 val account =
                     resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
@@ -1547,7 +1512,7 @@ fun Route.authV1Routes(
             }
         }
 
-        get("/me/identities") {
+        get("/me/identities", AccountDocs.listIdentities) {
             try {
                 val account =
                     resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)

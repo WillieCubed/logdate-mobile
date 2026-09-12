@@ -30,6 +30,12 @@ internal data class OkResponse(
     val ok: Boolean,
 )
 
+/** The `{"success": true}` acknowledgement returned when a restore credential is registered. */
+@Serializable
+internal data class SuccessResponse(
+    val success: Boolean,
+)
+
 /** Which error envelope a family of endpoints answers with. See the overview's Errors section. */
 internal enum class ErrorEnvelope { API, SYNC, PDS, OAUTH, MESSAGE }
 
