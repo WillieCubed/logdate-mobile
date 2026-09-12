@@ -109,7 +109,7 @@ internal object AuthDocs {
             ApiTags.AUTHENTICATION,
             "Check a username",
             """
-            Tells you whether a username is free before you start sign-up, so a form can show a green tick as the
+            Reports whether a username is available before sign-up starts, so a form can show availability as the
             person types. It also validates the username against the same rules sign-up applies.
 
             Availability is not a reservation: another person can take the name between this call and
@@ -142,14 +142,14 @@ internal object AuthDocs {
             "Begin passkey sign-up",
             """
             Step one of two for creating an account with a passkey. You send the person's chosen username and
-            display name; the server reserves nothing yet but hands back a `sessionToken` and the WebAuthn
+            display name; the server reserves nothing yet but returns a `sessionToken` and the WebAuthn
             `registrationOptions` (a challenge, the relying party, and the user record) that the device needs to
             create a key pair.
 
             Pass `registrationOptions` to the platform's credential API (`navigator.credentials.create()` in a
             browser, Credential Manager on Android, AuthenticationServices on iOS). It returns a credential; send
             that together with the `sessionToken` to **Complete passkey sign-up**. The session is short-lived, so
-            do both steps in one sitting.
+            complete both steps promptly.
 
             `requestedOwnerId` is a UUID the app generates once per install. It becomes the account's ID, which
             is what lets a device that already holds local data claim the same identity in the cloud.
@@ -171,7 +171,7 @@ internal object AuthDocs {
         }
         response {
             ok(
-                "Registration can proceed. Keep `sessionToken` for the next step and hand `registrationOptions` to the authenticator.",
+                "Registration can proceed. Keep `sessionToken` for the next step and pass `registrationOptions` to the authenticator.",
                 SignupPasskeyBeginResponse(
                     success = true,
                     data = SignupPasskeyBeginData(sessionToken = SESSION_TOKEN, registrationOptions = DocExamples.registrationOptions),
@@ -180,7 +180,11 @@ internal object AuthDocs {
             apiError(HttpStatusCode.BadRequest, usernameRules, ownerIdRequired, ownerIdInvalid, DocExamples.apiInvalidRequest)
             apiError(
                 HttpStatusCode.Conflict,
-                ErrorCase("USERNAME_TAKEN", "Somebody already has that username. Ask for another one.", "Username is already taken"),
+                ErrorCase(
+                    "USERNAME_TAKEN",
+                    "Another account already has that username. Choose a different one.",
+                    "Username is already taken",
+                ),
                 ownerIdTaken,
             )
             signupRateLimited()
@@ -200,7 +204,7 @@ internal object AuthDocs {
             in; there is no separate sign-in call to make.
 
             Verification happens before anything is written, so a failed attempt leaves no half-created account
-            behind and you can simply start again from step one.
+            behind and you can start again from step one.
 
             Optionally include `emailBinding` with a Google ID token to attach a verified email address to the
             new account in the same step. That is how the app gets an email onto a passkey-only account.
@@ -279,9 +283,9 @@ internal object AuthDocs {
             Creates an account from a Google ID token in a single call and signs the person in. The token must
             come from one of the client IDs this deployment trusts and its email must be verified by Google.
 
-            If an account already has this Google identity, you simply get that account back. If exactly one
-            existing account has the same verified email, the Google identity is linked to it and you get that
-            account. If more than one account matches, nothing is linked and you get `409 ACCOUNT_LINK_CONFLICT`.
+            If an account already has this Google identity, that account is returned. If exactly one existing
+            account has the same verified email, the Google identity is linked to it and that account is
+            returned. If more than one account matches, nothing is linked and the response is `409 ACCOUNT_LINK_CONFLICT`.
 
             `username` and `displayName` are optional; when omitted the server derives them from the Google
             profile. `requestedOwnerId` is the app's per-install UUID and becomes the account ID.
@@ -326,7 +330,7 @@ internal object AuthDocs {
                 HttpStatusCode.Conflict,
                 ErrorCase(
                     "ACCOUNT_LINK_CONFLICT",
-                    "More than one account carries this verified email, so the server cannot pick one to link. Sign in with a passkey.",
+                    "More than one account carries this verified email, so the server cannot choose one to link. Sign in with a passkey.",
                     "Google account could not be linked automatically",
                 ),
             )
@@ -343,12 +347,12 @@ internal object AuthDocs {
             "Begin passkey sign-in",
             """
             Step one of two for signing in with a passkey. The server returns a fresh `challenge` and the relying
-            party ID. Hand `data` to the platform's credential API (`navigator.credentials.get()` in a browser);
-            it will pick a passkey and sign the challenge.
+            party ID. Pass `data` to the platform's credential API (`navigator.credentials.get()` in a browser);
+            it will select a passkey and sign the challenge.
 
             `username` is optional. Send it and `allowCredentials` lists that account's passkeys so the
-            authenticator can go straight to the right one. Leave it out for a "discoverable" sign-in where the
-            person chooses a passkey and the server works out the account from it.
+            authenticator can select the right one directly. Omit it for a "discoverable" sign-in, where the
+            person chooses a passkey and the server determines the account from it.
 
             The response looks the same whether or not the username exists, so this call cannot be used to
             discover usernames.
@@ -438,7 +442,7 @@ internal object AuthDocs {
             identity or, failing that, by exactly one account with the same verified email, which then gets the
             Google identity linked to it.
 
-            If no account matches you get `404 ACCOUNT_NOT_FOUND_SIGNUP_REQUIRED`; call **Sign up with Google**
+            If no account matches, the response is `404 ACCOUNT_NOT_FOUND_SIGNUP_REQUIRED`; call **Sign up with Google**
             with the same token to create one. This call never creates accounts, so a sign-in button cannot
             accidentally register someone.
 
@@ -492,11 +496,11 @@ internal object AuthDocs {
             "Begin restore credential setup",
             """
             A restore credential is a special passkey the app registers while a person is signed in, kept by the
-            platform's credential manager, and used later to get back into the account when every other device
+            platform's credential manager, and used later to regain access to the account when every other device
             is gone. This call returns the registration options for creating one; it works exactly like
             **Begin passkey sign-up** except that the account already exists and you are authenticated.
 
-            Hand `data` to the credential API, then send the result to **Complete restore credential setup**.
+            Pass `data` to the credential API, then send the result to **Complete restore credential setup**.
             """,
         )
         response {
@@ -558,7 +562,7 @@ internal object AuthDocs {
             Starts signing in with a restore credential on a device that has nothing else: no tokens, no
             username. The server returns a challenge with an empty `allowCredentials` list, so the credential
             manager offers whatever restore credentials it holds for this relying party. `userVerification` is
-            `discouraged` because the whole point is to work when the person cannot do anything else.
+            `discouraged` because the credential must work when the person has no other option.
 
             Send the signed result to **Complete restore sign-in**.
             """,
@@ -624,7 +628,7 @@ internal object AuthDocs {
             ApiTags.AUTHENTICATION,
             "Refresh the access token",
             """
-            Trades a refresh token for a new access token. This is the one authentication call a client makes
+            Exchanges a refresh token for a new access token. This is the one authentication call a client makes
             routinely: whenever a request answers `401`, refresh once and retry it. The refresh token itself is
             not rotated; keep using it until it expires or the person logs out.
 
@@ -662,7 +666,7 @@ internal object AuthDocs {
             "Log out",
             """
             Revokes a refresh token so it can never mint another access token. Call it when the person signs
-            out, then discard both tokens locally. The current access token is not revoked; it simply expires
+            out, then discard both tokens locally. The current access token is not revoked; it expires
             on its own within minutes, which is why logout takes the refresh token and not the access token.
 
             Logging out an already revoked token succeeds again; the call is safe to repeat.

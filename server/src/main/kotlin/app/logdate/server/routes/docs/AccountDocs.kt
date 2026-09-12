@@ -125,7 +125,7 @@ internal object AccountDocs {
                 HttpStatusCode.Conflict,
                 ErrorCase(
                     "USERNAME_TAKEN",
-                    "Somebody else already has the requested username. Ask for another one.",
+                    "Another account already has the requested username. Choose a different one.",
                     "Username is already taken",
                 ),
             )
@@ -141,7 +141,7 @@ internal object AccountDocs {
             """
             Permanently deletes the account and everything it owns: entries, journals, media, backups, passkeys
             and linked identities. There is no undo and no grace period, so confirm with the person first.
-            Tokens for the account stop working as soon as the call returns.
+            Tokens for the account are rejected as soon as the call returns.
 
             > [!WARNING]
             > This cannot be reversed. Export the person's data before calling it.
@@ -195,7 +195,7 @@ internal object AccountDocs {
             """
             Returns registration options for adding another passkey to the signed-in account, for example on
             a second device. Hand `data` to the platform's credential API, then send the result to
-            **Complete adding a passkey**. Works the same way as sign-up, minus the session token.
+            **Complete adding a passkey**. This works like sign-up, without the session token.
             """,
         )
         response {
@@ -314,7 +314,7 @@ internal object AccountDocs {
             """
             Starts proving that the person controls an email address using a digital credential from the
             device's wallet (Android Credential Manager). The server issues a `transactionId`, a `nonce` to bind
-            the credential to this attempt, and the `audience` the credential must be issued for. Feed those to
+            the credential to this attempt, and the `audience` the credential must be issued for. Pass those to
             the credential request, then send the result to **Complete email verification**.
 
             Only available when this deployment has the verifier configured and the account's plan includes
@@ -427,7 +427,7 @@ internal object AccountDocs {
             ApiTags.ACCOUNT,
             "Get the plan and limits",
             """
-            Tells you which plan the account is on, whether it is currently paid up, the limits that apply, and
+            Reports which plan the account is on, whether it is in good standing, the limits that apply, and
             which premium features are switched on. Apps use it to render the "Your plan" row and to cap
             uploads before the server would answer `402`.
 

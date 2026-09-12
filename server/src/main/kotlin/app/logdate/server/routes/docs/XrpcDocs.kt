@@ -129,7 +129,7 @@ internal object XrpcDocs {
             ApiTags.XRPC,
             "Resolve a handle",
             """
-            `com.atproto.identity.resolveHandle`. Turns a handle such as `willie.logdate.app` into the DID it
+            `com.atproto.identity.resolveHandle`. Resolves a handle such as `willie.logdate.app` into the DID it
             currently points at. A handle is the human-readable name; the DID is the stable identifier
             everything else keys on, so most other methods want the DID.
             """,
@@ -321,7 +321,7 @@ internal object XrpcDocs {
             """
             `com.atproto.server.refreshSession`. Send the `refreshJwt` (not the access token) as
             `Authorization: Bearer` and get a new `accessJwt` and `refreshJwt`. Replace both; the old refresh
-            token is spent.
+            token is invalidated.
             """,
         )
         response {
@@ -523,7 +523,7 @@ internal object XrpcDocs {
             "Create a record",
             """
             `com.atproto.repo.createRecord`. Writes a new record into a collection of your own repository
-            and returns its URI and CID. Leave `rkey` out to let the server pick a key. Send `swapCommit` with
+            and returns its URI and CID. Omit `rkey` to let the server choose a key. Send `swapCommit` with
             the commit CID you last saw to fail instead of writing over a change you have not seen.
 
             Authenticate with either a LogDate access token (`Authorization: Bearer`) or an OAuth token

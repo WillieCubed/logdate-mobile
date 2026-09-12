@@ -107,7 +107,7 @@ internal object SyncStorageDocs {
             `sizeBytes` must equal the actual length of `data` so that a truncated upload is rejected instead of
             stored half-finished. The media ID is derived from the account, `contentId` and `fileName`, so
             retrying an interrupted upload replaces the same file rather than creating a duplicate; upload a
-            different file under the same name to replace it on purpose.
+            different file under the same name to replace it deliberately.
 
             The server encrypts the bytes at rest. `downloadUrl` in the response is either a short-lived signed
             URL into blob storage or this API's own **Download a media file** endpoint, depending on how the
@@ -237,7 +237,7 @@ internal object SyncStorageDocs {
             ApiTags.MEDIA,
             "Delete a media file",
             """
-            Removes a media file and its record, freeing its bytes from the storage quota. Deleting a file that
+            Removes a media file and its record, releasing its bytes from the storage quota. Deleting a file that
             does not exist still answers `204`, so retries are safe. The entry the file belonged to is not
             changed; update its `mediaUri` yourself.
             """,
@@ -339,7 +339,7 @@ internal object SyncStorageDocs {
             "List backups",
             """
             Lists every backup the account has, with the manifest each was uploaded with and a `downloadUrl`.
-            This is what a restore screen shows so the person can pick which device and which date to restore
+            This is what a restore screen shows so the person can choose which device and which date to restore
             from.
             """,
         )
@@ -377,7 +377,7 @@ internal object SyncStorageDocs {
             "Download a backup",
             """
             Streams the backup archive as `application/octet-stream`, with the server's at-rest encryption
-            removed. What you get is exactly what the app uploaded, which the app still has to decrypt with its
+            removed. The result is exactly what the app uploaded, which the app still has to decrypt with its
             own key.
             """,
         )
@@ -416,7 +416,7 @@ internal object SyncStorageDocs {
             ApiTags.BACKUPS,
             "Delete a backup",
             """
-            Removes a backup and its archive, freeing its bytes and its slot in the backup-count limit. Deleting
+            Removes a backup and its archive, releasing its bytes and its slot in the backup-count limit. Deleting
             a backup that does not exist still answers `204`.
             """,
         )

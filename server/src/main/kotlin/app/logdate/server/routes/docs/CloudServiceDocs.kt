@@ -42,13 +42,13 @@ internal object CloudServiceDocs {
             ApiTags.SERVER,
             "Describe this server",
             """
-            The first call any client should make. It tells you where the API lives, whether this is LogDate
+            The first call any client should make. It reports where the API lives, whether this is LogDate
             Cloud or a self-hosted server, which features are switched on, and the passkey relying party to use.
             No token needed.
 
             Read `capabilities` before showing a sign-in or feature button: a deployment without
-            `CLOUD_TRANSCRIPTION` will refuse transcription sessions, one without `ATPROTO_OAUTH` has no OAuth
-            endpoints worth calling, and so on. `protocolFeatures` lists additive behaviors newer servers have
+            `CLOUD_TRANSCRIPTION` will refuse transcription sessions, one without `ATPROTO_OAUTH` has no usable
+            OAuth endpoints, and so on. `protocolFeatures` lists additive behaviors newer servers have
             that older clients can safely ignore.
             """,
         )
@@ -84,7 +84,7 @@ internal object CloudServiceDocs {
             Lists the subscription plans this deployment sells, so an app can show them before a person has
             an account. No token needed.
 
-            Prices are not included on purpose: the app store (Google Play or Stripe) returns them already
+            Prices are deliberately not included: the app store (Google Play or Stripe) returns them already
             formatted for the viewer's locale and currency, using `playProductId` or `stripePriceId` as the
             key. A self-hosted server with billing switched off answers an empty list, which means "this server
             sells nothing"; hide plan selection in that case rather than treating it as an error.
@@ -257,7 +257,7 @@ internal object CloudServiceDocs {
             ApiTags.RESOURCES,
             "Resolve a shared link",
             """
-            Turns the opaque ID from a shared LogDate link into the public URL it points at, on the owner's
+            Resolves the opaque ID from a shared LogDate link to the public URL it points at, on the owner's
             own handle domain (for example `https://willie.logdate.app/journal/<id>`). No token needed.
 
             `kind` says whether the ID is a journal or a note. Unknown IDs, and IDs whose owner has no handle

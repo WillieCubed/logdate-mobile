@@ -353,7 +353,7 @@ internal object AuthSchemaDocs {
                     mapOf(
                         "planId" to "Stable public plan identifier such as `free`, `cloud-standard` or `self_host_unlimited`.",
                         "tier" to "Coarse tier for UI copy.",
-                        "status" to "Whether the subscription is currently paid up.",
+                        "status" to "Whether the subscription is currently in good standing.",
                         "storageBytesLimit" to "Maximum synced media and backup bytes, or `null` for unlimited.",
                         "backupCountLimit" to "Maximum stored backups, or `null` for unlimited.",
                         "transcriptionSecondsPerMonthLimit" to
@@ -378,7 +378,8 @@ internal object AuthSchemaDocs {
                     enumValues =
                         mapOf(
                             "ACTIVE" to "Paid and current.",
-                            "PAST_DUE" to "A payment failed but the grace window is still open; treat as active and nudge.",
+                            "PAST_DUE" to
+                                "A payment failed but the grace window is still open; treat as active and prompt the person to update payment.",
                             "GRACE" to "The store's own grace period (for example a Play hold); treat as active.",
                             "CANCELLED" to "The subscription ended. Reads keep working; uploads fail with `402` once over the free limits.",
                             "SELF_HOST" to "This server runs without billing. Hide billing UI and treat the account as unlimited.",

@@ -164,7 +164,7 @@ internal object OAuthDocs {
             "Push an authorization request",
             """
             Step one of the OAuth flow (RFC 9126, required here). Instead of putting your authorization
-            parameters in a browser URL, you POST them as a form and get back a short-lived `request_uri`.
+            parameters in a browser URL, you POST them as a form and receive a short-lived `request_uri`.
             Then send the person to `/oauth/authorize?request_uri=<it>`.
 
             The form fields are `client_id` (the URL of your client metadata document), `redirect_uri`,
@@ -305,7 +305,7 @@ internal object OAuthDocs {
             "Exchange a code or refresh token",
             """
             Step four. Send `grant_type=authorization_code` with the `code` from the redirect, your
-            `redirect_uri`, `client_id` and the PKCE `code_verifier`, and get back a DPoP-bound access token
+            `redirect_uri`, `client_id` and the PKCE `code_verifier`, and receive a DPoP-bound access token
             and a refresh token. Later, send `grant_type=refresh_token` with `refresh_token` and `client_id`
             to get a new pair.
 
@@ -385,7 +385,7 @@ internal object OAuthDocs {
             "Revoke a refresh token",
             """
             Ends an OAuth session (RFC 7009): send `token` (the refresh token) and `client_id` as a form, with
-            a `DPoP` proof, and the refresh token stops working. Access tokens already issued expire on their
+            a `DPoP` proof, and the refresh token is invalidated. Access tokens already issued expire on their
             own. Call it when the person disconnects your app.
             """,
         )

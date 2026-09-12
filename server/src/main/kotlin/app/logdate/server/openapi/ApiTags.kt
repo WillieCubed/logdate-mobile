@@ -48,7 +48,7 @@ internal val apiTagGroups: List<ApiTagGroup> =
                     Start here. These endpoints answer "what am I talking to?": which deployment this is, what it can do,
                     and which subscription plans it offers. None of them need a token.
 
-                    Call **Describe this server** first. Its `capabilities` list tells you whether Google sign-in, passkeys,
+                    Call **Describe this server** first. Its `capabilities` list states whether Google sign-in, passkeys,
                     cloud transcription and AT Protocol features are switched on for this particular deployment, so your
                     client can hide what is not available instead of discovering it through errors.
                     """.trimIndent(),
@@ -61,13 +61,13 @@ internal val apiTagGroups: List<ApiTagGroup> =
                 ApiTag(
                     ApiTags.AUTHENTICATION,
                     """
-                    How a person proves who they are and gets tokens. Every flow ends the same way: an `accessToken` you
-                    send on each request and a `refreshToken` you trade in for a new access token when the old one
+                    How a person proves who they are and obtains tokens. Every flow ends the same way: an `accessToken`
+                    sent on each request and a `refreshToken` exchanged for a new access token when the old one
                     expires. Both are explained in the **Concepts** section of the overview.
 
                     Passkeys and Google are both first-class ways in. Each passkey flow is a two-step *begin/complete*
-                    exchange: the server hands your client a challenge, the device's authenticator signs it, and you send
-                    the signature back. Sign-up is limited to {{auth.signup}} and sign-in to {{auth.signin}}, per IP address.
+                    exchange: the server issues a challenge, the device's authenticator signs it, and the client returns
+                    the signature. Sign-up is limited to {{auth.signup}} and sign-in to {{auth.signin}}, per IP address.
                     """.trimIndent(),
                 ),
                 ApiTag(
@@ -157,8 +157,8 @@ internal val apiTagGroups: List<ApiTagGroup> =
                     ApiTags.SYNC_STATUS,
                     """
                     A quick picture of the account's synced data: how many entries, journals and associations the server
-                    holds and the newest version it has seen. Handy for a "last synced" screen, or for working out
-                    whether a client that seems to be missing data ever uploaded it.
+                    holds and the newest version it has seen. Useful for a "last synced" screen, or for determining
+                    whether a client that appears to be missing data ever uploaded it.
                     """.trimIndent(),
                 ),
             ),
@@ -177,7 +177,7 @@ internal val apiTagGroups: List<ApiTagGroup> =
                 ApiTag(
                     ApiTags.TRANSCRIPTION,
                     """
-                    Cloud speech-to-text for voice entries. The server hands your client a short-lived session it uses to
+                    Cloud speech-to-text for voice entries. The server issues the client a short-lived session it uses to
                     talk to the transcription provider directly, so audio never passes through LogDate Cloud.
 
                     Needs an active subscription with the matching entitlement and is limited to
@@ -187,7 +187,7 @@ internal val apiTagGroups: List<ApiTagGroup> =
                 ApiTag(
                     ApiTags.RESOURCES,
                     """
-                    Turn the opaque resource ID from a shared link into the public URL it points at. No token needed,
+                    Resolve the opaque resource ID from a shared link to the public URL it points at. No token needed,
                     and safe to call from a link-preview service.
                     """.trimIndent(),
                 ),

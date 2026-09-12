@@ -60,8 +60,8 @@ fun Application.installLogDateOpenApi(openApiSpec: AtomicReference<OpenAPI?>) {
                 bearerFormat = "JWT"
                 description =
                     "Send the `accessToken` from any sign-in response as `Authorization: Bearer <accessToken>`. It is a " +
-                    "JWT (a signed token the server verifies without a database lookup) and expires after a short " +
-                    "while on purpose. On `401`, call **Refresh the access token** with your `refreshToken` and retry."
+                    "JWT (a signed token the server verifies without a database lookup) and is deliberately " +
+                    "short-lived. On `401`, call **Refresh the access token** with your `refreshToken` and retry."
             }
             securityScheme("dpopProof") {
                 type = AuthType.API_KEY

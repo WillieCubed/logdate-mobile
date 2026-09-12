@@ -6,7 +6,7 @@ The sidebar on the left groups endpoints by what they are for. Each endpoint pag
 
 ## Your first request
 
-The only endpoint you need before you have an account is the one that describes the server. It needs no token and tells you which features are switched on:
+The only endpoint you need before you have an account is the one that describes the server. It needs no token and reports which features are switched on:
 
 ```bash
 curl https://cloud.logdate.app/api/v1/server/info
@@ -35,13 +35,13 @@ curl https://cloud.logdate.app/api/v1/server/info
 }
 ```
 
-Two things to take from this response. `apiBaseUrl` is the prefix for everything under **Sync**, **Account** and **Cloud services**. `capabilities` is the list of things this deployment can do; a self-hosted server with no Google credentials configured will not list `AUTH_PASSKEY` alone but will refuse Google sign-in with `503 GOOGLE_AUTH_NOT_CONFIGURED`, so check the list before you show a button.
+Two things to note in this response. `apiBaseUrl` is the prefix for everything under **Sync**, **Account** and **Cloud services**. `capabilities` is the list of things this deployment can do; a self-hosted server without Google credentials still lists `AUTH_PASSKEY` but refuses Google sign-in with `503 GOOGLE_AUTH_NOT_CONFIGURED`, so check the list before showing a sign-in button.
 
 If you are running the server yourself, replace `https://cloud.logdate.app` with your own origin everywhere in this guide. Relative paths in the examples work against whichever server is serving this page.
 
 ## Your first sync
 
-Here is the whole loop a client performs, in three requests: get a token, save an entry, ask what changed.
+Here is the complete loop a client performs, in three requests: get a token, save an entry, ask what changed.
 
 **1. Get a token.** The quickest way to a token from a terminal is a Google ID token, because passkeys need a browser or phone to sign the challenge. Get an ID token for a Google account (the OAuth 2.0 Playground works), then:
 
@@ -74,7 +74,7 @@ curl -X POST https://cloud.logdate.app/api/v1/auth/signin/google \
 }
 ```
 
-If that Google account has never signed up, you get `404 ACCOUNT_NOT_FOUND_SIGNUP_REQUIRED`; call **Sign up with Google** instead, which takes the same body plus a `username`. On your own server, add your Google client ID to the `GOOGLE_OIDC_CLIENT_IDS` environment variable first.
+If that Google account has never signed up, the response is `404 ACCOUNT_NOT_FOUND_SIGNUP_REQUIRED`; call **Sign up with Google** instead, which takes the same body plus a `username`. On your own server, add your Google client ID to the `GOOGLE_OIDC_CLIENT_IDS` environment variable first.
 
 From here on, every request carries the access token:
 
@@ -82,7 +82,7 @@ From here on, every request carries the access token:
 Authorization: Bearer eyJhbGciOiJIUzI1NiIs…
 ```
 
-**2. Save an entry.** An entry is a *content*. You choose its ID (the apps use ULIDs; any stable string works) and `PUT` it. The same request sent twice is harmless: the first creates, the second updates.
+**2. Save an entry.** An entry is a *content*. You choose its ID (the apps use ULIDs; any stable string works) and `PUT` it. The same request sent twice is safe: the first creates, the second updates.
 
 ```bash
 curl -X PUT https://cloud.logdate.app/api/v1/contents/01J7Q2X4Y5Z6A7B8C9D0E1F2G3 \
@@ -136,23 +136,23 @@ curl 'https://cloud.logdate.app/api/v1/contents?since=0&limit={{sync.limit.defau
 }
 ```
 
-Store `lastTimestamp`. Next time, send it as `since` and you will only get what is new. While `hasMore` is `true`, call again with the returned `lastTimestamp` before you consider yourself caught up. That is the entire sync protocol; the rest of this guide fills in the details.
+Store `lastTimestamp`. Next time, send it as `since` and you will receive only what is new. While `hasMore` is `true`, call again with the returned `lastTimestamp` before treating the client as up to date. That is the entire sync protocol; the rest of this guide fills in the details.
 
 ## Concepts
 
-**Access token and refresh token.** Signing in gives you two tokens. The *access token* is what you send on every request. It is a JWT, a signed string the server can verify without looking anything up, and it expires after a short time on purpose: if it leaks, the damage is bounded. The *refresh token* lives longer and has exactly one job: trading it in at **Refresh the access token** for a new access token. When you see `401 INVALID_TOKEN`, refresh and retry once. When the refresh itself fails, sign in again. **Log out** takes the refresh token, not the access token, because revoking the refresh token is what stops new access tokens from being minted; the old access token simply expires.
+**Access token and refresh token.** Signing in returns two tokens. The *access token* is what you send on every request. It is a JWT, a signed string the server can verify without looking anything up, and it expires after a short time on purpose: if it leaks, the damage is bounded. The *refresh token* lives longer and has exactly one job: exchanging it at **Refresh the access token** for a new access token. When you see `401 INVALID_TOKEN`, refresh and retry once. When the refresh itself fails, sign in again. **Log out** takes the refresh token, not the access token, because revoking the refresh token is what stops new access tokens from being minted; the old access token simply expires.
 
 **Passkeys, and why there is a begin and a complete.** A passkey is a key pair stored on the person's device (or in their password manager). The server never sees the private key. To prove ownership, the server sends a random *challenge* (**begin**), the device signs it with the private key, and the client sends the signature back (**complete**). That is why every passkey flow is two calls, and why the second call must carry the `sessionToken` or `challenge` from the first. In a browser the signing step is `navigator.credentials.get()`; on Android and iOS it is the platform credential manager.
 
-**The `since` cursor.** Every write the server accepts gets a *version*: a number that only ever goes up for that account, whatever the device's clock says. The change feeds take `since`, return every record whose version is greater than it, and hand back `lastTimestamp`, the highest version in that page. Despite the name it is a version, not a time. Send it back as the next `since`. Because versions are assigned by the server, two devices with wrong clocks still see changes in the order the server accepted them, and a change is never skipped.
+**The `since` cursor.** Every write the server accepts gets a *version*: a number that only ever increases for that account, whatever the device's clock says. The change feeds take `since`, return every record whose version is greater than it, and return `lastTimestamp`, the highest version in that page. Despite the name it is a version, not a time. Send it back as the next `since`. Because versions are assigned by the server, two devices with wrong clocks still see changes in the order the server accepted them, and a change is never skipped.
 
-**Tombstones.** Deleting something does not remove it from the feed; it turns it into a *tombstone*, a small record saying "this ID was deleted at this time" with a fresh version. Tombstones arrive in the `deletions` list of a change-feed response so every device learns about the deletion, however long it was offline. The `isDeleted` field on items in `changes` is always `false`; deletions only travel in `deletions`.
+**Tombstones.** Deleting something does not remove it from the feed; it becomes a *tombstone*, a small record saying "this ID was deleted at this time" with a fresh version. Tombstones arrive in the `deletions` list of a change-feed response so every device learns about the deletion, however long it was offline. The `isDeleted` field on items in `changes` is always `false`; deletions only travel in `deletions`.
 
-**Conflicts and `versionConstraint`.** A `PUT` always wins: last write in is the new truth. A `PATCH` can ask for protection by sending `"versionConstraint": { "type": "known", "serverVersion": 1789221791530 }`, meaning "I last saw this version". If the server has moved on, it answers `409 CONFLICT` instead of overwriting, and your client can fetch the newer copy and merge. Send `{ "type": "none" }` (or leave it out) to skip the check.
+**Conflicts and `versionConstraint`.** A `PUT` always succeeds: the last write becomes the current version. A `PATCH` can ask for protection by sending `"versionConstraint": { "type": "known", "serverVersion": 1789221791530 }`, meaning "I last saw this version". If the server has moved on, it answers `409 CONFLICT` instead of overwriting, and your client can fetch the newer copy and merge. Send `{ "type": "none" }` (or leave it out) to skip the check.
 
 **Multipart uploads.** Photos, recordings and backups are sent as `multipart/form-data`, the same encoding a browser uses for a file-upload form: several named *parts* in one request, some text and one binary. `curl -F name=value -F data=@file` builds one for you. Each upload endpoint lists its parts; for media, `sizeBytes` must equal the byte length of `data` exactly, so that a truncated upload is rejected rather than stored half-finished.
 
-**OAuth and DPoP (skip unless you are building an AT Protocol client).** OAuth 2.0 is how a third-party app gets permission to act on someone's data without ever seeing their password: the app sends the person to the server to approve, and gets back a code it exchanges for tokens. DPoP ("Demonstrating Proof of Possession") adds one thing: the app signs each token request with its own key, so the token only works together with that key. The LogDate apps do not use either; they use **Authentication**.
+**OAuth and DPoP (skip unless you are building an AT Protocol client).** OAuth 2.0 is how a third-party app gets permission to act on someone's data without ever seeing their password: the app sends the person to the server to approve, and receives a code it exchanges for tokens. DPoP ("Demonstrating Proof of Possession") adds one thing: the app signs each token request with its own key, so the token only works together with that key. The LogDate apps do not use either; they use **Authentication**.
 
 ## Base URLs and self-hosting
 
@@ -165,12 +165,12 @@ Paths in this reference are relative, so the **Try it** panel talks to whichever
 
 ## Authentication in depth
 
-There are four ways to end up holding an access token:
+There are four ways to obtain an access token:
 
 1. **Passkey sign-up or sign-in** (`/auth/signup/passkey/*`, `/auth/signin/passkey/*`): two calls each, see Concepts.
-2. **Google sign-up or sign-in** (`/auth/signup/google`, `/auth/signin/google`): one call with a Google ID token. If exactly one existing account has the same *verified* email, sign-in links the Google identity to it; if more than one matches, you get `409 ACCOUNT_LINK_CONFLICT` and must sign in another way first.
-3. **Restore credential** (`/auth/restore/*`): a special passkey the app registers so a person who lost every device can still get back in. Register it while signed in; use it later without a username.
-4. **Refresh** (`/auth/token/refresh`): turns a refresh token into a new access token. This is the only auth call a client makes routinely.
+2. **Google sign-up or sign-in** (`/auth/signup/google`, `/auth/signin/google`): one call with a Google ID token. If exactly one existing account has the same *verified* email, sign-in links the Google identity to it; if more than one matches, the response is `409 ACCOUNT_LINK_CONFLICT` and must sign in another way first.
+3. **Restore credential** (`/auth/restore/*`): a special passkey the app registers so a person who has lost every device can still regain access. Register it while signed in; use it later without a username.
+4. **Refresh** (`/auth/token/refresh`): exchanges a refresh token for a new access token. This is the only auth call a client makes routinely.
 
 Send the access token as `Authorization: Bearer <accessToken>` on every endpoint marked with a lock icon. Logging out (`/auth/logout`) revokes the refresh token; a revoked token answers `401 REFRESH_TOKEN_REVOKED` forever after.
 
@@ -178,7 +178,7 @@ Third-party AT Protocol clients use the **OAuth** section instead, and send DPoP
 
 ## Errors
 
-Every error response has an HTTP status that says *how bad* and a machine-readable code that says *what*. Because LogDate Cloud grew out of several protocols, there are four envelope shapes. Which one you get depends on the section the endpoint is in, and each endpoint's response list shows the exact shape.
+Every error response has an HTTP status that indicates the severity and a machine-readable code that identifies the cause. Because LogDate Cloud implements several protocols, there are four envelope shapes. Which one you get depends on the section the endpoint is in, and each endpoint's response list shows the exact shape.
 
 | Section | Envelope | Example |
 |---|---|---|
@@ -188,7 +188,7 @@ Every error response has an HTTP status that says *how bad* and a machine-readab
 | XRPC | `{ "error", "message" }` with an AT Protocol error name | `{"error":"RecordNotFound","message":"Could not locate record"}` |
 | OAuth | `{ "error", "error_description" }` per RFC 6749 | `{"error":"invalid_grant","error_description":"Authorization code has expired"}` |
 
-Codes you will meet everywhere, and what to do about them:
+Codes that appear across the API, and what to do about them:
 
 | Code | Status | What happened | What to do |
 |---|---|---|---|
@@ -199,12 +199,12 @@ Codes you will meet everywhere, and what to do about them:
 | `NOT_FOUND` | 404 | No such record for this account. | Treat as deleted. |
 | `CONFLICT` | 409 | Your `versionConstraint` is behind the server. | Fetch the current record, merge, patch again. |
 | `RATE_LIMIT_EXCEEDED` | 429 | Too many requests in the window. | Wait; honor `Retry-After` when it is present. |
-| `SERVER_ERROR` | 500 | Something failed on the server. | Retry with backoff; if it persists, it is a bug on our side. |
+| `SERVER_ERROR` | 500 | Something failed on the server. | Retry with backoff; if it persists, report it. |
 | `SERVER_MISCONFIGURED`, `*_NOT_CONFIGURED`, `*_UNAVAILABLE` | 500, 501, 503 | This deployment has the feature switched off. | Check `capabilities` on **Describe this server** and hide the feature. |
 
 ## Rate limits
 
-Limits exist to stop credential stuffing and runaway upload loops, not to meter normal use. A client that syncs every few minutes will never see one.
+Limits exist to stop credential stuffing and misbehaving upload loops, not to meter normal use. A client that syncs every few minutes will never encounter one.
 
 | What | Limit | Counted per | On exceed |
 |---|---|---|---|

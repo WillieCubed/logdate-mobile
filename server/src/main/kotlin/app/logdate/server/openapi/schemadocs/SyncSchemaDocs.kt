@@ -324,7 +324,7 @@ internal object SyncSchemaDocs {
                         "lastUpdated" to "When it was last edited on the device. $EPOCH_MS",
                         "deviceId" to "Which device last saved it.",
                         "serverVersion" to SERVER_VERSION_ASSIGNED,
-                        "is_deleted" to "`true` when the draft was deleted; drop your copy.",
+                        "is_deleted" to "`true` when the draft was deleted; discard the local copy.",
                     ),
                 ),
             // ---- Media ----------------------------------------------------------------------------

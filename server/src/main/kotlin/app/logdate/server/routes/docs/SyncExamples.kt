@@ -27,7 +27,7 @@ internal object SyncExamples {
     val serverMisconfigured =
         ErrorCase(
             "SERVER_MISCONFIGURED",
-            "This deployment cannot validate tokens (no signing secret configured). Nothing to do client-side; the operator must fix the server.",
+            "This deployment cannot validate tokens (no signing secret configured). No client action helps; the operator must fix the server configuration.",
             "Token service is not configured",
         )
     val invalidSince =

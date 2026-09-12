@@ -179,7 +179,7 @@ internal object CloudSchemaDocs {
                     "A credential scoped to one realtime session.",
                     mapOf(
                         "value" to "The secret to present when connecting.",
-                        "expiresAtEpochSeconds" to "When it stops working, as seconds since the Unix epoch.",
+                        "expiresAtEpochSeconds" to "When it expires, as seconds since the Unix epoch.",
                     ),
                 ),
             // ---- Resources ----------------------------------------------------------------------------------

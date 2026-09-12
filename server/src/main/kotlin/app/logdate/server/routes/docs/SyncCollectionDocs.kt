@@ -53,7 +53,7 @@ internal object SyncCollectionDocs {
         """
         Only the fields you send change; omitted fields keep their values. To ask for conflict detection, send
         `"versionConstraint": { "type": "known", "serverVersion": <the version you last saw> }`; if another device
-        has written since, you get `409 CONFLICT` and nothing changes. Leave `versionConstraint` out (or send
+        has written since, the response is `409 CONFLICT` and nothing changes. Leave `versionConstraint` out (or send
         `{ "type": "none" }`) for last-write-wins. Patching an ID that does not exist creates it.
         """
 
@@ -104,7 +104,7 @@ internal object SyncCollectionDocs {
             "Create or replace an entry",
             """
             Saves an entry under the ID in the path, creating it if it is new and replacing it wholesale if it
-            exists. Sending the same request twice is harmless, which makes it the right call to retry after a
+            exists. Sending the same request twice is safe, which makes it the correct call to retry after a
             dropped connection.
 
             The first save answers `201 Created` with a `Location` header; later saves answer `200 OK`. Either
@@ -169,9 +169,9 @@ internal object SyncCollectionDocs {
             "Page entry changes",
             """
             Returns entries that changed after the `since` cursor, plus tombstones for entries deleted after it.
-            This is the read half of sync: call it with `since=0` the first time, store the `lastTimestamp` you
-            get back, and send it as `since` next time to receive only what is new. While `hasMore` is `true`,
-            call again with the returned `lastTimestamp` before treating yourself as caught up.
+            This is the read half of sync: call it with `since=0` the first time, store the `lastTimestamp`
+            returned, and send it as `since` next time to receive only what is new. While `hasMore` is `true`,
+            call again with the returned `lastTimestamp` before treating the client as up to date.
 
             `lastTimestamp` is a server version, not a clock time; see **Concepts** in the overview. Deleted
             entries appear only in `deletions`, never in `changes`.
@@ -200,7 +200,7 @@ internal object SyncCollectionDocs {
             ApiTags.CONTENTS,
             "Get one entry",
             """
-            Fetches a single entry by ID, in the same shape the change feed uses. Handy after a `409 CONFLICT`
+            Fetches a single entry by ID, in the same shape the change feed uses. Useful after a `409 CONFLICT`
             to see what the server currently holds before you merge and patch again.
             """,
         )
@@ -261,7 +261,7 @@ internal object SyncCollectionDocs {
             ApiTags.CONTENTS,
             "Delete an entry",
             """
-            Soft-deletes an entry. It disappears from **Get one entry** and shows up as a tombstone in the
+            Soft-deletes an entry. It disappears from **Get one entry** and appears as a tombstone in the
             `deletions` list of every device's next **Page entry changes**, so all devices learn about it.
             Deleting an entry that is already gone still answers `204`, so retries are safe.
 
@@ -450,7 +450,7 @@ internal object SyncCollectionDocs {
             "Link entries to journals in bulk",
             """
             Creates or refreshes many entry-to-journal links in one request. Each item names a `journalId` and a
-            `contentId`; the pair is the link's identity, so sending the same pair again just updates it. This
+            `contentId`; the pair is the link's identity, so sending the same pair again updates it. This
             is what the app calls after a batch of new entries; for a single link there is also
             **Link one entry to a journal**.
 
@@ -534,7 +534,7 @@ internal object SyncCollectionDocs {
             "Link one entry to a journal",
             """
             Creates or refreshes a single link between the journal and the entry named in the path. Safe to
-            repeat. Answers `204` with no body; the link's version shows up in the next **Page link changes**.
+            repeat. Answers `204` with no body; the link's version appears in the next **Page link changes**.
             """,
         )
         request {
@@ -607,7 +607,7 @@ internal object SyncCollectionDocs {
             ApiTags.DRAFTS,
             "Save a draft",
             """
-            Saves an in-progress entry under the ID in the path so another device can pick it up. Creating and
+            Saves an in-progress entry under the ID in the path so another device can continue it. Creating and
             updating are the same call and both answer `200`; unlike entries, drafts never answer `201` or send
             a `Location` header. The server assigns `serverVersion`.
 
@@ -652,7 +652,7 @@ internal object SyncCollectionDocs {
             ApiTags.DRAFTS,
             "Page draft changes",
             """
-            Returns drafts changed after the `since` cursor. Deleted drafts come back in the same list with
+            Returns drafts changed after the `since` cursor. Deleted drafts are returned in the same list with
             `is_deleted` set to `true` rather than in a separate tombstone list.
 
             This feed is simpler than the others and behaves a little differently: there is no `hasMore` or
@@ -693,7 +693,7 @@ internal object SyncCollectionDocs {
             "Delete a draft",
             """
             Soft-deletes a draft. Other devices see it in **Page draft changes** with `is_deleted` set to `true`
-            and drop their copy. Call this once the finished entry has been saved. Repeating the call answers
+            and discard their copy. Call this once the finished entry has been saved. Repeating the call answers
             `204` again.
             """,
         )
