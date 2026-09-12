@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>LongMethod:SherpaOnnxModelManager.kt:SherpaOnnxModelManager$private fun downloadAndExtractTarBz2: Flow&lt;ModelDownloadStatus></ID>
+    <ID>LongMethod:SherpaOnnxRecognizerProvider.kt:SherpaOnnxRecognizerProvider$suspend fun ensureInitialized</ID>
+    <ID>LongMethod:SherpaOnnxTranscriptionService.kt:SherpaOnnxTranscriptionService$override suspend fun startLiveTranscription: TranscriptionStartResult</ID>
+    <ID>LongMethod:SherpaOnnxTranscriptionService.kt:SherpaOnnxTranscriptionService$override suspend fun stopLiveTranscription: TranscriptionResult</ID>
+  </CurrentIssues>
+</SmellBaseline>

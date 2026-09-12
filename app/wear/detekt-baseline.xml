@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>LongMethod:WearAudioRecordingService.kt:WearAudioRecordingService$private fun startRecording</ID>
+  </CurrentIssues>
+</SmellBaseline>

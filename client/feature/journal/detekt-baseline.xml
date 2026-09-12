@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>LongMethod:AudioNoteViewerViewModel.kt:AudioNoteViewerViewModel$private suspend fun startPlayback</ID>
+  </CurrentIssues>
+</SmellBaseline>

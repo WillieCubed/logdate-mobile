@@ -170,6 +170,7 @@ repository.
 | Commit message format     | [`docs/reference/standards/commit-messages.md`](./docs/reference/standards/commit-messages.md)                                              |
 | Valid commit scopes       | [`allowed-scopes.txt`](./allowed-scopes.txt) and [`docs/reference/standards/commit-scopes.md`](./docs/reference/standards/commit-scopes.md) |
 | Git workflow & safety     | [`docs/reference/standards/git-guidelines.md`](./docs/reference/standards/git-guidelines.md)                                                |
+| Entrypoint structure & size limits | [`docs/reference/standards/entrypoint-structure.md`](./docs/reference/standards/entrypoint-structure.md) |
 
 ## Code Conventions
 

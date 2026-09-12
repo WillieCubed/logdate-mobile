@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>LargeClass:AndroidMediaManager.kt:AndroidMediaManager : MediaManager</ID>
+    <ID>LongMethod:AndroidMediaManager.kt:AndroidMediaManager$private suspend fun getRecentMediaInternal: List&lt;MediaObject></ID>
+    <ID>LongMethod:AndroidMediaManager.kt:AndroidMediaManager$private suspend fun publishStreamToMediaStore: String</ID>
+    <ID>LongMethod:AndroidMediaManager.kt:AndroidMediaManager$private suspend fun queryMediaByDateInternal: List&lt;MediaObject></ID>
+    <ID>LongMethod:AudioRecordingService.kt:AudioRecordingService$private fun startRecording</ID>
+    <ID>LongMethod:DesktopSherpaModelManager.kt:DesktopSherpaModelManager$private fun downloadAndExtractTarBz2: Flow&lt;ModelDownloadStatus></ID>
+    <ID>LongMethod:TimedTranscript.kt:TimedTranscriptBuilder$fun buildUtterance: TimedUtterance?</ID>
+  </CurrentIssues>
+</SmellBaseline>

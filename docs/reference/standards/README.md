@@ -7,6 +7,7 @@ This directory contains authoritative standards for LogDate development.
 - **[Commit Message Standards](./commit-messages.md)** — How to write clear, maintainable commit messages
 - **[Commit Scopes Reference](./commit-scopes.md)** — Lookup table for module scope names
 - **[Git Guidelines](./git-guidelines.md)** — Staging safety, atomic workflow, branch management
+- **[Entrypoint Structure](./entrypoint-structure.md)** — Keeping module entrypoints small, and the detekt size limits that enforce it
 
 ## Quick Reference
 

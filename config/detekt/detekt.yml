@@ -1,0 +1,67 @@
+# detekt configuration for LogDate.
+#
+# Only size limits are active. Everything else stays off until detekt 2.0 is stable; the repo
+# runs a 2.0 alpha because no stable detekt release supports Kotlin 2.3.
+# See docs/reference/standards/entrypoint-structure.md for the convention these rules enforce.
+
+comments:
+  active: false
+
+coroutines:
+  active: false
+
+empty-blocks:
+  active: false
+
+exceptions:
+  active: false
+
+naming:
+  active: false
+
+performance:
+  active: false
+
+potential-bugs:
+  active: false
+
+style:
+  active: false
+
+complexity:
+  active: true
+  LongMethod:
+    active: true
+    allowedLines: 60
+    # Screens are long by nature; ratchet this later if wanted.
+    ignoreAnnotated: ['Composable']
+  LargeClass:
+    active: true
+    allowedLines: 600
+  # Everything else in the ruleset is explicitly off so defaults can't creep in on upgrade.
+  CognitiveComplexMethod:
+    active: false
+  ComplexCondition:
+    active: false
+  ComplexInterface:
+    active: false
+  CyclomaticComplexMethod:
+    active: false
+  LabeledExpression:
+    active: false
+  LongParameterList:
+    active: false
+  MethodOverloading:
+    active: false
+  NamedArguments:
+    active: false
+  NestedBlockDepth:
+    active: false
+  NestedScopeFunctions:
+    active: false
+  ReplaceSafeCallChainWithRun:
+    active: false
+  StringLiteralDuplication:
+    active: false
+  TooManyFunctions:
+    active: false

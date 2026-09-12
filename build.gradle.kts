@@ -2,6 +2,8 @@
 
 import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.dsl.ManagedVirtualDevice
+import dev.detekt.gradle.DetektCreateBaselineTask
+import dev.detekt.gradle.extensions.DetektExtension
 import org.jlleitschuh.gradle.ktlint.KtlintExtension
 import org.gradle.api.Project
 import org.gradle.api.tasks.testing.Test
@@ -27,6 +29,7 @@ plugins {
     alias(libs.plugins.gradlePlayPublisher) apply false
     alias(libs.plugins.dokka) apply false
     alias(libs.plugins.ktlint) apply false
+    alias(libs.plugins.detekt) apply false
     alias(libs.plugins.kover)
     alias(libs.plugins.benManesVersions)
     jacoco
@@ -51,6 +54,28 @@ subprojects {
         filter {
             exclude { it.file.path.contains("/build/") }
         }
+    }
+
+    // Size limits only (see config/detekt/detekt.yml and
+    // docs/reference/standards/entrypoint-structure.md). Only the plain `detekt` task runs;
+    // type-resolution tasks are disabled in gradle.properties.
+    apply { plugin("dev.detekt") }
+    configure<DetektExtension> {
+        buildUponDefaultConfig.set(true)
+        config.setFrom(rootProject.file("config/detekt/detekt.yml"))
+        // Main source sets only: every `src/<name>Test*/` and `src/test/` tree is skipped.
+        source.setFrom(
+            fileTree("src") {
+                include("**/*.kt")
+                exclude("test/**", "*Test*/**")
+            },
+        )
+        // Only modules with pre-existing findings carry a baseline; a missing file is not an error.
+        baseline.set(file("detekt-baseline.xml").takeIf { it.exists() })
+        parallel.set(false)
+    }
+    tasks.withType<DetektCreateBaselineTask>().configureEach {
+        baseline.set(file("detekt-baseline.xml"))
     }
 
     val dokkaPlugin by configurations

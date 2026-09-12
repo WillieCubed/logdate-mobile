@@ -169,6 +169,9 @@ jobs:
       - name: Run lint
         run: ./gradlew lint
 
+      - name: Check function and class size limits
+        run: ./gradlew detekt
+
   android-release:
     name: Android release artifact
     runs-on: ubuntu-latest
