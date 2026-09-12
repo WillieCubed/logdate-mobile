@@ -155,7 +155,7 @@ internal object AuthDocs {
             is what lets a device that already holds local data claim the same identity in the cloud.
 
             > [!NOTE]
-            > Limited to {{auth.signup}} per IP address, shared with the other sign-up calls.
+            > Limited to {{auth.signup}} per IP address, counted separately for each sign-up call.
             """,
         )
         request {
@@ -210,7 +210,7 @@ internal object AuthDocs {
             new account in the same step. That is how the app gets an email onto a passkey-only account.
 
             > [!NOTE]
-            > Limited to {{auth.signup}} per IP address, shared with the other sign-up calls.
+            > Limited to {{auth.signup}} per IP address, counted separately for each sign-up call.
             """,
         )
         request {
@@ -291,7 +291,7 @@ internal object AuthDocs {
             profile. `requestedOwnerId` is the app's per-install UUID and becomes the account ID.
 
             > [!NOTE]
-            > Limited to {{auth.signup}} per IP address, shared with the other sign-up calls.
+            > Limited to {{auth.signup}} per IP address, counted separately for each sign-up call.
             """,
         )
         request {
@@ -354,11 +354,11 @@ internal object AuthDocs {
             authenticator can select the right one directly. Omit it for a "discoverable" sign-in, where the
             person chooses a passkey and the server determines the account from it.
 
-            The response looks the same whether or not the username exists, so this call cannot be used to
-            discover usernames.
+            Because `allowCredentials` is only filled in for an existing account, the response reveals whether a
+            username exists. Do not expose this call as a public username checker.
 
             > [!NOTE]
-            > Limited to {{auth.signin}} per IP address, shared with the other sign-in calls.
+            > Limited to {{auth.signin}} per IP address, counted separately for each sign-in call.
             """,
         )
         request {
@@ -399,7 +399,7 @@ internal object AuthDocs {
             pair of tokens.
 
             > [!NOTE]
-            > Limited to {{auth.signin}} per IP address, shared with the other sign-in calls.
+            > Limited to {{auth.signin}} per IP address, counted separately for each sign-in call.
             """,
         )
         request {
@@ -447,7 +447,7 @@ internal object AuthDocs {
             accidentally register someone.
 
             > [!NOTE]
-            > Limited to {{auth.signin}} per IP address, shared with the other sign-in calls.
+            > Limited to {{auth.signin}} per IP address, counted separately for each sign-in call.
             """,
         )
         request {

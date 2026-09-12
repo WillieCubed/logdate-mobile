@@ -17,6 +17,7 @@ import app.logdate.server.routes.jsonBody
 import app.logdate.server.routes.noContent
 import app.logdate.server.routes.ok
 import app.logdate.shared.model.AccountInfoResponse
+import app.logdate.shared.model.ApiErrorResponse
 import app.logdate.shared.model.BeginEmailVerificationResponse
 import app.logdate.shared.model.CompleteEmailVerificationRequest
 import app.logdate.shared.model.EmailVerificationConflictResponse
@@ -32,7 +33,11 @@ import app.logdate.shared.model.PasskeyInfo
 import app.logdate.shared.model.UpdateAccountProfileRequest
 import io.github.smiley4.ktoropenapi.config.ResponsesConfig
 import io.github.smiley4.ktoropenapi.config.RouteConfig
+import io.github.smiley4.ktoropenapi.config.descriptors.AnyOfTypeDescriptor
+import io.github.smiley4.ktoropenapi.config.descriptors.KTypeDescriptor
 import io.ktor.http.HttpStatusCode
+import io.swagger.v3.oas.models.examples.Example
+import kotlin.reflect.typeOf
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -97,8 +102,8 @@ internal object AccountDocs {
             "Update the profile",
             """
             Changes the username, display name or bio. Send only the fields you want to change; the others keep
-            their values. At least one field must be present. Changing the username also moves the account's
-            AT Protocol handle when this deployment hosts identities.
+            their values. At least one field must be present. Changing the username does not change the account's
+            AT Protocol handle.
             """,
         )
         request {
@@ -141,7 +146,8 @@ internal object AccountDocs {
             """
             Permanently deletes the account and everything it owns: entries, journals, media, backups, passkeys
             and linked identities. There is no undo and no grace period, so confirm with the person first.
-            Tokens for the account are rejected as soon as the call returns.
+            Discard the account's tokens on the client: the access token is a stateless JWT and stays technically
+            valid until it expires, although endpoints that look the account up answer `404` from now on.
 
             > [!WARNING]
             > This cannot be reversed. Export the person's data before calling it.
@@ -383,11 +389,25 @@ internal object AccountDocs {
             )
             code(HttpStatusCode.BadRequest) {
                 description =
-                    "The credential did not verify. `reason` is a stable code from the verifier (for example an " +
-                    "expired credential or a nonce mismatch); start again from step one. A malformed `transactionId` " +
-                    "instead answers the standard envelope with `INVALID_TRANSACTION_ID`."
-                body<EmailVerificationErrorResponse> {
-                    example("Verifier rejected") { value = EmailVerificationErrorResponse(reason = "nonce_mismatch") }
+                    "Two shapes. When the credential did not verify, `{ \"reason\" }` carries a stable code from the " +
+                    "verifier (for example an expired credential or a nonce mismatch); start again from step one. A " +
+                    "malformed `transactionId` or an unreadable body instead answers the standard envelope with " +
+                    "`INVALID_TRANSACTION_ID` or `INVALID_REQUEST`."
+                body(
+                    AnyOfTypeDescriptor(
+                        listOf(
+                            KTypeDescriptor(typeOf<EmailVerificationErrorResponse>()),
+                            KTypeDescriptor(typeOf<ApiErrorResponse>()),
+                        ),
+                    ),
+                ) {
+                    example("Verifier rejected", Example().value(mapOf("reason" to "nonce_mismatch")))
+                    example(
+                        "Malformed transaction id",
+                        Example().value(
+                            mapOf("error" to mapOf("code" to "INVALID_TRANSACTION_ID", "message" to "Malformed transaction id")),
+                        ),
+                    )
                 }
             }
             bearerUnauthorized(ErrorEnvelope.API)

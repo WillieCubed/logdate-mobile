@@ -48,7 +48,7 @@ internal val apiTagGroups: List<ApiTagGroup> =
                     Start here. These endpoints answer "what am I talking to?": which deployment this is, what it can do,
                     and which subscription plans it offers. None of them need a token.
 
-                    Call **Describe this server** first. Its `capabilities` list states whether Google sign-in, passkeys,
+                    Call **Describe this server** first. Its `capabilities` list states whether passkeys,
                     cloud transcription and AT Protocol features are switched on for this particular deployment, so your
                     client can hide what is not available instead of discovering it through errors.
                     """.trimIndent(),
@@ -213,10 +213,11 @@ internal val apiTagGroups: List<ApiTagGroup> =
                     """
                     The AT Protocol's HTTP RPC surface, served under `/xrpc/`. Method names are lexicon IDs such as
                     `com.atproto.repo.getRecord`. LogDate Cloud implements the subset a personal data server needs for
-                    identity, sessions, repository reads and writes, and blobs: 17 methods.
+                    identity, sessions, repository reads and writes, and blobs: 18 methods.
 
                     It is deliberately not a complete PDS. There is no firehose, no `applyWrites`, and no invite codes,
-                    and each method answers `501 Unsupported` on a deployment that has AT Protocol switched off.
+                    and every method except handle resolution and the two describe calls answers `501 Unsupported` on a
+                    deployment that has AT Protocol switched off.
                     """.trimIndent(),
                 ),
             ),

@@ -49,12 +49,13 @@ import io.ktor.http.HttpStatusCode
 
 /** Documentation for the contents, journals, associations and drafts endpoints in `SyncCollectionRoutes.kt`. */
 internal object SyncCollectionDocs {
+    // Indented to match the descriptions it is spliced into, so `trimIndent()` strips evenly.
     private const val PATCH_RULES =
         """
-        Only the fields you send change; omitted fields keep their values. To ask for conflict detection, send
-        `"versionConstraint": { "type": "known", "serverVersion": <the version you last saw> }`; if another device
-        has written since, the response is `409 CONFLICT` and nothing changes. Leave `versionConstraint` out (or send
-        `{ "type": "none" }`) for last-write-wins. Patching an ID that does not exist creates it.
+            Only the fields you send change; omitted fields keep their values. To ask for conflict detection, send
+            `"versionConstraint": { "type": "known", "serverVersion": <the version you last saw> }`; if another device
+            has written since, the response is `409 CONFLICT` and nothing changes. Leave `versionConstraint` out (or send
+            `{ "type": "none" }`) for last-write-wins. Patching an ID that does not exist creates it.
         """
 
     private fun ResponsesConfig.syncUnauthorized() = bearerUnauthorized(ErrorEnvelope.SYNC)
@@ -81,7 +82,7 @@ internal object SyncCollectionDocs {
             type = "TEXT",
             content = SyncExamples.NOTE_TEXT,
             createdAt = SyncExamples.CREATED_AT,
-            lastUpdated = SyncExamples.SERVER_VERSION,
+            lastUpdated = SyncExamples.CREATED_AT,
             serverVersion = SyncExamples.SERVER_VERSION,
         )
 
@@ -91,7 +92,7 @@ internal object SyncCollectionDocs {
             title = "Morning walks",
             description = "One entry per walk, fog permitting.",
             createdAt = SyncExamples.CREATED_AT,
-            lastUpdated = SyncExamples.SERVER_VERSION,
+            lastUpdated = SyncExamples.CREATED_AT,
             serverVersion = SyncExamples.SERVER_VERSION,
         )
 
@@ -652,8 +653,9 @@ internal object SyncCollectionDocs {
             ApiTags.DRAFTS,
             "Page draft changes",
             """
-            Returns drafts changed after the `since` cursor. Deleted drafts are returned in the same list with
-            `is_deleted` set to `true` rather than in a separate tombstone list.
+            Returns drafts created or updated after the `since` cursor. Deleted drafts are not delivered: they
+            stop appearing, and `is_deleted` is always `false`. Remove a draft locally once its finished entry
+            exists.
 
             This feed is simpler than the others and behaves a little differently: there is no `hasMore` or
             `lastTimestamp`, so use the highest `serverVersion` in the page as your next `since`; `limit`
@@ -692,8 +694,8 @@ internal object SyncCollectionDocs {
             ApiTags.DRAFTS,
             "Delete a draft",
             """
-            Soft-deletes a draft. Other devices see it in **Page draft changes** with `is_deleted` set to `true`
-            and discard their copy. Call this once the finished entry has been saved. Repeating the call answers
+            Soft-deletes a draft. Other devices are not told about the deletion by **Page draft changes**, so
+            delete the draft on each device once the finished entry has been saved. Repeating the call answers
             `204` again.
             """,
         )

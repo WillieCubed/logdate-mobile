@@ -35,7 +35,7 @@ curl https://cloud.logdate.app/api/v1/server/info
 }
 ```
 
-Two things to note in this response. `apiBaseUrl` is the prefix for everything under **Sync**, **Account** and **Cloud services**. `capabilities` is the list of things this deployment can do; a self-hosted server without Google credentials still lists `AUTH_PASSKEY` but refuses Google sign-in with `503 GOOGLE_AUTH_NOT_CONFIGURED`, so check the list before showing a sign-in button.
+Two things to note in this response. `apiBaseUrl` is the prefix for everything under **Sync**, **Account** and **Cloud services**. `capabilities` is the list of things this deployment can do, so check it before showing a feature. Google sign-in has no capability flag: a server without Google credentials refuses it with `503 GOOGLE_AUTH_NOT_CONFIGURED`, so handle that response rather than assuming.
 
 If you are running the server yourself, replace `https://cloud.logdate.app` with your own origin everywhere in this guide. Relative paths in the examples work against whichever server is serving this page.
 
@@ -125,7 +125,7 @@ curl 'https://cloud.logdate.app/api/v1/contents?since=0&limit={{sync.limit.defau
       "type": "TEXT",
       "content": "Walked to the lake before work. Fog on the water.",
       "createdAt": 1789221791412,
-      "lastUpdated": 1789221791530,
+      "lastUpdated": 1789221791412,
       "serverVersion": 1789221791530,
       "isDeleted": false
     }
@@ -168,7 +168,7 @@ Paths in this reference are relative, so the **Try it** panel talks to whichever
 There are four ways to obtain an access token:
 
 1. **Passkey sign-up or sign-in** (`/auth/signup/passkey/*`, `/auth/signin/passkey/*`): two calls each, see Concepts.
-2. **Google sign-up or sign-in** (`/auth/signup/google`, `/auth/signin/google`): one call with a Google ID token. If exactly one existing account has the same *verified* email, sign-in links the Google identity to it; if more than one matches, the response is `409 ACCOUNT_LINK_CONFLICT` and must sign in another way first.
+2. **Google sign-up or sign-in** (`/auth/signup/google`, `/auth/signin/google`): one call with a Google ID token. If exactly one existing account has the same *verified* email, sign-in links the Google identity to it. If more than one matches, sign-up answers `409 ACCOUNT_LINK_CONFLICT` and sign-in answers `404 ACCOUNT_NOT_FOUND_SIGNUP_REQUIRED`; sign in with a passkey instead.
 3. **Restore credential** (`/auth/restore/*`): a special passkey the app registers so a person who has lost every device can still regain access. Register it while signed in; use it later without a username.
 4. **Refresh** (`/auth/token/refresh`): exchanges a refresh token for a new access token. This is the only auth call a client makes routinely.
 
@@ -223,7 +223,7 @@ Uploads count against the account's plan. Media and backup uploads that would ex
 ## Sync model in depth
 
 - **Identity.** You choose IDs for contents, journals and drafts; the server never renames them. Associations are identified by `(journalId, contentId)`. Media IDs are assigned by the server, deterministically from `(account, contentId, fileName)`, so the same upload retried lands on the same ID. Backup IDs are random.
-- **Writes.** `PUT /{collection}/{id}` creates or replaces and is safe to retry. It answers `201 Created` with a `Location` header the first time and `200 OK` after that. `PATCH` changes only the fields you send and honors `versionConstraint`. `DELETE` answers `204` even when the record is already gone.
+- **Writes.** `PUT /{collection}/{id}` creates or replaces and is safe to retry. For contents and journals it answers `201 Created` with a `Location` header the first time and `200 OK` after that; a single association link answers `204`, and a draft always `200`. `PATCH` changes only the fields you send and honors `versionConstraint`. `DELETE` answers `204` even when the record is already gone.
 - **Versions.** Every accepted write gets a new server version (`serverVersion` in responses), strictly increasing per account across all collections. Whatever `syncVersion` or `serverVersion` a client sends is ignored; only `versionConstraint` is read.
 - **Reading.** `GET /{collection}?since=<version>&limit=<n>` returns `changes`, `deletions`, `lastTimestamp` and `hasMore`. `since` is exclusive and defaults to `0`. `limit` defaults to {{sync.limit.default}} and is clamped to 1…{{sync.limit.max}}; it applies to `changes` and `deletions` separately, so a page can hold up to twice `limit` records. A non-numeric `since` is a `400 INVALID_PARAMETER`; a non-numeric `limit` silently falls back to the default.
 - **Drafts** are the exception: their feed lives at `/drafts/changes`, defaults `limit` to {{drafts.limit.default}} without clamping, and treats a bad `since` as `0`.

@@ -137,7 +137,7 @@ internal object SyncSchemaDocs {
                         "mediaUri" to "Reference to the entry's media, or `null`.",
                         "durationMs" to "Length of an audio or video entry in milliseconds; `0` otherwise.",
                         "createdAt" to "When the entry was written on the device. $EPOCH_MS",
-                        "lastUpdated" to "When the server last accepted a write for it. $EPOCH_MS",
+                        "lastUpdated" to "The `lastUpdated` the client sent on its last write, stored as given. $EPOCH_MS",
                         "serverVersion" to SERVER_VERSION_ASSIGNED,
                         "isDeleted" to IS_DELETED_ALWAYS_FALSE,
                         "caption" to "Caption for an image or video, or `null`. $ENCRYPTED_BY_APPS",
@@ -211,7 +211,7 @@ internal object SyncSchemaDocs {
                         "title" to "The journal's name.",
                         "description" to "Its description; may be empty.",
                         "createdAt" to "When it was created on the device. $EPOCH_MS",
-                        "lastUpdated" to "When the server last accepted a write for it. $EPOCH_MS",
+                        "lastUpdated" to "The `lastUpdated` the client sent on its last write, stored as given. $EPOCH_MS",
                         "serverVersion" to SERVER_VERSION_ASSIGNED,
                         "isDeleted" to IS_DELETED_ALWAYS_FALSE,
                     ),
@@ -308,7 +308,7 @@ internal object SyncSchemaDocs {
                 SchemaDoc(
                     "Drafts changed since a cursor. Unlike the other feeds there is no `hasMore` or `lastTimestamp`; use the highest `serverVersion` in `drafts` as your next `since`.",
                     mapOf(
-                        "drafts" to "Drafts created, updated or deleted after `since`.",
+                        "drafts" to "Drafts created or updated after `since`. Deleted drafts are omitted, not flagged.",
                         "cursor" to "Reserved; currently always absent.",
                     ),
                 ),
@@ -324,7 +324,7 @@ internal object SyncSchemaDocs {
                         "lastUpdated" to "When it was last edited on the device. $EPOCH_MS",
                         "deviceId" to "Which device last saved it.",
                         "serverVersion" to SERVER_VERSION_ASSIGNED,
-                        "is_deleted" to "`true` when the draft was deleted; discard the local copy.",
+                        "is_deleted" to "Always `false` today; deleted drafts are omitted from the feed rather than flagged.",
                     ),
                 ),
             // ---- Media ----------------------------------------------------------------------------

@@ -73,7 +73,7 @@ Server Module
 ### Configuration
 
 See **[Environment Variables Documentation](docs/environment-variables.md)** for complete configuration reference.
-See the **API reference** at `/docs` on any running server (`http://localhost:8080/docs` locally) for every endpoint with examples; [`docs/openapi.md`](docs/openapi.md) explains how it is maintained. [`docs/auth-v1-api.md`](docs/auth-v1-api.md) and [`docs/sync-v1-api.md`](docs/sync-v1-api.md) keep the rules that span endpoints.
+See the **API reference** at `/docs` on any running server (`http://localhost:8765/docs` locally) for every endpoint with examples; [`docs/openapi.md`](docs/openapi.md) explains how it is maintained. [`docs/auth-v1-api.md`](docs/auth-v1-api.md) and [`docs/sync-v1-api.md`](docs/sync-v1-api.md) keep the rules that span endpoints.
 See **[Audit Schema](docs/audit-schema.md)** for centralized audit categories and keys.
 
 **Quick start:**

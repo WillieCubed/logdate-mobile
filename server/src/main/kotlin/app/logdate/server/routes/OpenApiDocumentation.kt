@@ -177,8 +177,9 @@ private fun ResponsesConfig.errorResponse(
         description =
             buildString {
                 cases.forEach { case ->
+                    // The bare `{"error"}` envelope carries no code, so its bullets quote the message.
                     append("- `")
-                        .append(case.code)
+                        .append(if (envelope == ErrorEnvelope.MESSAGE) case.message else case.code)
                         .append("` — ")
                         .append(case.description)
                         .append('\n')
@@ -257,7 +258,11 @@ internal fun ResponsesConfig.bearerUnauthorized(envelope: ErrorEnvelope) {
         ErrorEnvelope.SYNC ->
             syncError(
                 HttpStatusCode.Unauthorized,
-                ErrorCase("UNAUTHORIZED", "The access token is missing, malformed or expired. $advice", "Invalid or missing token"),
+                ErrorCase(
+                    "UNAUTHORIZED",
+                    "The access token is missing, malformed or expired. $advice",
+                    "Missing or invalid Authorization header",
+                ),
             )
         ErrorEnvelope.PDS ->
             pdsError(
@@ -300,11 +305,29 @@ internal fun ResponsesConfig.rateLimited(
     val limit =
         app.logdate.server.openapi.ApiLimits
             .describe(policy)
-    val wait = if (retryAfterHeader) "Wait the number of seconds in `Retry-After`, then try again." else "Wait a minute and try again."
-    val case = ErrorCase("RATE_LIMIT_EXCEEDED", "More than $limit from one $scope. $wait", "Too many requests. Please retry later.")
+    val wait =
+        if (retryAfterHeader) {
+            "Wait the number of seconds in `Retry-After`, then try again."
+        } else {
+            "Wait for the ${windowName(policy)} window to pass, then try again."
+        }
+    val message =
+        when (envelope) {
+            ErrorEnvelope.SYNC -> "Too many uploads. Try again in 42 seconds."
+            ErrorEnvelope.MESSAGE -> "cloud transcription session rate limit exceeded"
+            else -> "Too many requests. Please retry later."
+        }
+    val case = ErrorCase("RATE_LIMIT_EXCEEDED", "More than $limit from one $scope. $wait", message)
     val details = if (retryAfterHeader) mapOf("retryAfterSeconds" to "42") else emptyMap()
     errorResponse(HttpStatusCode.TooManyRequests, envelope, listOf(case), details = details, retryAfterHeader = retryAfterHeader)
 }
+
+private fun windowName(policy: RateLimitPolicy): String =
+    when (policy.windowSeconds) {
+        60 -> "one-minute"
+        60 * 60 -> "one-hour"
+        else -> "${policy.windowSeconds}-second"
+    }
 
 /** The `402` an upload answers when the account's plan has no room for it. */
 internal fun ResponsesConfig.quotaExceeded() =

@@ -96,7 +96,7 @@ are present.
 LOGDATE_ALLOW_INMEMORY_FALLBACK=true ./run server
 ```
 
-Then open <http://localhost:8080/docs>. The Try-it panel sends requests to the same server; sign
+Then open <http://localhost:8765/docs>. The Try-it panel sends requests to the same server; sign
 in with **Sign up with Google** or use an existing token.
 
 ## Behaviour the docs describe as-is
