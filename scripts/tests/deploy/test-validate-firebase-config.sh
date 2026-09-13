@@ -27,6 +27,19 @@ write_android_config() {
         }' >"$path"
 }
 
+add_debug_client() {
+    local path="$1" package_name="$2"
+    jq --arg package_name "$package_name" '
+        .client += [{
+            client_info: {
+                mobilesdk_app_id: "1:786734185325:android:d1d954e3ec8b414b23f8ff",
+                android_client_info: {package_name: $package_name}
+            },
+            api_key: [{current_key: "test-key"}]
+        }]' "$path" >"$path.tmp"
+    mv "$path.tmp" "$path"
+}
+
 write_ios_config() {
     local path="$1" project_id="$2" app_id="$3" bundle_id="$4"
     plutil -create xml1 "$path"
@@ -56,6 +69,7 @@ write_android_config \
     "logdate-dev" \
     "1:786734185325:android:d1d954e3ec8b414b23f864" \
     "studio.hypertext.logdate"
+add_debug_client "$debug_config" "studio.hypertext.logdate.debug"
 "$VALIDATOR" android-debug "$debug_config"
 
 release_config="$TEMP_DIR/release.json"
@@ -79,6 +93,7 @@ write_android_config \
     "logdate" \
     "1:786734185325:android:d1d954e3ec8b414b23f864" \
     "studio.hypertext.logdate"
+add_debug_client "$debug_config" "studio.hypertext.logdate.debug"
 assert_rejected "expected project logdate-dev" "$VALIDATOR" android-debug "$debug_config"
 
 write_android_config \
@@ -87,6 +102,14 @@ write_android_config \
     "1:786734185325:android:d1d954e3ec8b414b23f864" \
     "co.reasonabletech.logdate"
 assert_rejected "expected Android package studio.hypertext.logdate" "$VALIDATOR" android-debug "$debug_config"
+
+write_android_config \
+    "$debug_config" \
+    "logdate-dev" \
+    "1:786734185325:android:d1d954e3ec8b414b23f864" \
+    "studio.hypertext.logdate"
+assert_rejected "expected Android package studio.hypertext.logdate.debug" \
+    "$VALIDATOR" android-debug "$debug_config"
 
 write_android_config \
     "$release_config" \

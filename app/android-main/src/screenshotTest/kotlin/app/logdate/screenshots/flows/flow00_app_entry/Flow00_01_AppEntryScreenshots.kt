@@ -43,7 +43,7 @@ import logdate.app.composemain.generated.resources.restart
 import logdate.app.composemain.generated.resources.update_ready_restart_to_finish_installing
 import org.jetbrains.compose.resources.stringResource
 
-private const val ROOT_PREVIEW_IMAGE_URI = "android.resource://studio.hypertext.logdate/mipmap/ic_launcher"
+private const val ROOT_PREVIEW_IMAGE_URI = "android.resource://studio.hypertext.logdate.debug/mipmap/ic_launcher"
 
 private val rootBlueBottle = PlaceUiState(id = "place-1", title = "Blue Bottle Coffee")
 private val rootDoloresPark = PlaceUiState(id = "place-2", title = "Mission Dolores Park")

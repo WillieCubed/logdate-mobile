@@ -29,7 +29,7 @@ import kotlin.uuid.Uuid
  * realistic content so the visual relationship to the timeline reads correctly.
  */
 
-private const val SYNC_PREVIEW_IMAGE_URI = "android.resource://studio.hypertext.logdate/mipmap/ic_launcher"
+private const val SYNC_PREVIEW_IMAGE_URI = "android.resource://studio.hypertext.logdate.debug/mipmap/ic_launcher"
 
 private val missionStudio = PlaceUiState(id = "place-201", title = "Mission Studio")
 private val tartine = PlaceUiState(id = "place-202", title = "Tartine")

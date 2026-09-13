@@ -29,7 +29,7 @@ NC='\033[0m'
 
 # Configuration
 # Overridable for builds made with -Plogdate.applicationId.
-PACKAGE_NAME="${PACKAGE_NAME:-studio.hypertext.logdate}"
+PACKAGE_NAME="${PACKAGE_NAME:-studio.hypertext.logdate.debug}"
 EDITOR_ACTIVITY=".EditorActivity"
 VERBOSE=false
 SMOKE_TEST=false

@@ -3,6 +3,7 @@
 set -euo pipefail
 
 readonly ANDROID_PACKAGE="studio.hypertext.logdate"
+readonly ANDROID_PACKAGE_DEBUG="studio.hypertext.logdate.debug"
 readonly IOS_BUNDLE="studio.hypertext.LogDate"
 
 die() {
@@ -41,6 +42,24 @@ validate_android() {
         || die "$path is missing API key for $ANDROID_PACKAGE."
 }
 
+validate_android_debug_client() {
+    local path="$1"
+
+    jq -e --arg package "$ANDROID_PACKAGE_DEBUG" \
+        '.client[]? | select(.client_info.android_client_info.package_name == $package)' \
+        "$path" >/dev/null \
+        || die "$path expected Android package $ANDROID_PACKAGE_DEBUG for debug builds."
+
+    jq -e --arg package "$ANDROID_PACKAGE_DEBUG" '
+        .client[]?
+        | select(.client_info.android_client_info.package_name == $package)
+        | .api_key[]?.current_key
+        | strings
+        | select(length > 0)
+    ' "$path" >/dev/null \
+        || die "$path is missing API key for $ANDROID_PACKAGE_DEBUG."
+}
+
 plist_value() {
     plutil -extract "$2" raw -o - "$1" 2>/dev/null || true
 }
@@ -75,6 +94,7 @@ case "$CONFIG_KIND" in
             "$CONFIG_PATH" \
             "logdate-dev" \
             "1:786734185325:android:d1d954e3ec8b414b23f864"
+        validate_android_debug_client "$CONFIG_PATH"
         ;;
     android-release)
         validate_android \

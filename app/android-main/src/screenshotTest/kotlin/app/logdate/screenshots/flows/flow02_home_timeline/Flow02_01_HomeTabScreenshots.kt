@@ -37,7 +37,7 @@ import com.android.tools.screenshot.PreviewTest
 import kotlinx.datetime.LocalDate
 import kotlin.uuid.Uuid
 
-private const val PREVIEW_IMAGE_URI = "android.resource://studio.hypertext.logdate/mipmap/ic_launcher"
+private const val PREVIEW_IMAGE_URI = "android.resource://studio.hypertext.logdate.debug/mipmap/ic_launcher"
 
 private val blueBottle = PlaceUiState(id = "place-1", title = "Blue Bottle Coffee")
 private val doloresPark = PlaceUiState(id = "place-2", title = "Dolores Park")
@@ -145,7 +145,7 @@ private val timelineDetailState =
                 ),
                 ImageNoteUiState(
                     noteId = Uuid.parse("00000000-0000-0000-0000-000000000042"),
-                    uri = "android.resource://studio.hypertext.logdate/mipmap/ic_launcher",
+                    uri = "android.resource://studio.hypertext.logdate.debug/mipmap/ic_launcher",
                     timestamp = ScreenshotTestData.baseInstant,
                 ),
                 AudioNoteUiState(
@@ -158,7 +158,7 @@ private val timelineDetailState =
                     noteId = Uuid.parse("00000000-0000-0000-0000-000000000044"),
                     uri = "preview://video",
                     timestamp = ScreenshotTestData.baseInstant,
-                    thumbnailUri = "android.resource://studio.hypertext.logdate/mipmap/ic_launcher",
+                    thumbnailUri = "android.resource://studio.hypertext.logdate.debug/mipmap/ic_launcher",
                     duration = 61_000L,
                 ),
             ),

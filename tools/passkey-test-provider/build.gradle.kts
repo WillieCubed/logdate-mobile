@@ -39,7 +39,7 @@ android {
             providers
                 .gradleProperty("logdate.applicationId")
                 .orElse("studio.hypertext.logdate")
-                .get()
+                .get() + ".debug"
     }
 
     buildTypes {
