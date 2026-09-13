@@ -3,18 +3,8 @@ package app.logdate.server.routes.docs
 import app.logdate.server.openapi.ApiTags
 import app.logdate.server.routes.EmailBindingRequest
 import app.logdate.server.routes.ErrorCase
-import app.logdate.server.routes.ErrorEnvelope
 import app.logdate.server.routes.GoogleAuthRequest
-import app.logdate.server.routes.LogoutRequestV1
-import app.logdate.server.routes.OkResponse
 import app.logdate.server.routes.PasskeyAllowCredentialDto
-import app.logdate.server.routes.RefreshTokenDataV1
-import app.logdate.server.routes.RefreshTokenRequestV1
-import app.logdate.server.routes.RefreshTokenResponseV1
-import app.logdate.server.routes.RestoreRegisterBeginResponse
-import app.logdate.server.routes.RestoreRegisterCompleteRequest
-import app.logdate.server.routes.SIGNIN_RATE_LIMIT
-import app.logdate.server.routes.SIGNUP_RATE_LIMIT
 import app.logdate.server.routes.SigninPasskeyBeginData
 import app.logdate.server.routes.SigninPasskeyBeginRequest
 import app.logdate.server.routes.SigninPasskeyBeginResponse
@@ -23,84 +13,17 @@ import app.logdate.server.routes.SignupPasskeyBeginData
 import app.logdate.server.routes.SignupPasskeyBeginRequest
 import app.logdate.server.routes.SignupPasskeyBeginResponse
 import app.logdate.server.routes.SignupPasskeyCompleteRequest
-import app.logdate.server.routes.SuccessResponse
 import app.logdate.server.routes.apiError
-import app.logdate.server.routes.bearerOperation
-import app.logdate.server.routes.bearerUnauthorized
 import app.logdate.server.routes.jsonBody
 import app.logdate.server.routes.ok
 import app.logdate.server.routes.publicOperation
-import app.logdate.server.routes.rateLimited
-import app.logdate.shared.model.PasskeyAssertionAuthenticatorResponse
-import app.logdate.shared.model.PasskeyAssertionResponse
-import app.logdate.shared.model.PasskeyAuthenticatorResponse
-import app.logdate.shared.model.PasskeyCredentialResponse
 import app.logdate.shared.model.UsernameAvailabilityData
 import app.logdate.shared.model.UsernameAvailabilityResponse
-import io.github.smiley4.ktoropenapi.config.ResponsesConfig
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.HttpStatusCode
 
-/** Documentation for the sign-up, sign-in, restore and token endpoints in `AuthV1Routes.kt`. */
+/** Documentation for the username, passkey and Google sign-up and sign-in endpoints in `AuthV1Routes.kt`. */
 internal object AuthDocs {
-    private const val SESSION_TOKEN = "st_5f2c9e1a7b3d4c6e8f0a1b2c3d4e5f60"
-
-    private val passkeyCredential =
-        PasskeyCredentialResponse(
-            id = DocExamples.CREDENTIAL_ID,
-            rawId = DocExamples.CREDENTIAL_ID,
-            response =
-                PasskeyAuthenticatorResponse(
-                    clientDataJSON = DocExamples.CLIENT_DATA_JSON,
-                    attestationObject = DocExamples.ATTESTATION_OBJECT,
-                ),
-        )
-
-    private val passkeyAssertion =
-        PasskeyAssertionResponse(
-            id = DocExamples.CREDENTIAL_ID,
-            rawId = DocExamples.CREDENTIAL_ID,
-            response =
-                PasskeyAssertionAuthenticatorResponse(
-                    clientDataJSON = DocExamples.CLIENT_DATA_JSON,
-                    authenticatorData = DocExamples.AUTHENTICATOR_DATA,
-                    signature = DocExamples.SIGNATURE,
-                    userHandle = DocExamples.ACCOUNT_ID,
-                ),
-        )
-
-    private val usernameRules =
-        ErrorCase(
-            "VALIDATION_ERROR",
-            "The username or display name breaks a rule: usernames are 3–50 characters of letters, digits and " +
-                "underscores and cannot be a reserved word such as `admin` or `api`; display names are 1–100 " +
-                "characters. The `message` says which rule.",
-            "Username can only contain letters, numbers, and underscores",
-        )
-
-    private val ownerIdRequired =
-        ErrorCase(
-            "CANONICAL_OWNER_ID_REQUIRED",
-            "`requestedOwnerId` is missing. The app generates this UUID once per install and it becomes the account ID; " +
-                "send one, and keep sending the same one.",
-            "A canonical device identity is required to create a Cloud account",
-        )
-    private val ownerIdInvalid =
-        ErrorCase("CANONICAL_OWNER_ID_INVALID", "`requestedOwnerId` is not a UUID.", "The canonical device identity must be a UUID")
-    private val ownerIdTaken =
-        ErrorCase(
-            "CANONICAL_OWNER_ID_TAKEN",
-            "An account with this `requestedOwnerId` already exists. That usually means this device already signed up: " +
-                "sign in instead.",
-            "This device identity is already associated with an account",
-        )
-
-    private fun ResponsesConfig.signupRateLimited() = rateLimited(SIGNUP_RATE_LIMIT, ErrorEnvelope.API)
-
-    private fun ResponsesConfig.signinRateLimited() = rateLimited(SIGNIN_RATE_LIMIT, ErrorEnvelope.API)
-
-    private fun ResponsesConfig.serverError() = apiError(HttpStatusCode.InternalServerError, DocExamples.apiServerError)
-
     val checkUsernameAvailability: RouteConfig.() -> Unit = {
         publicOperation(
             "checkUsernameAvailability",
@@ -129,7 +52,7 @@ internal object AuthDocs {
                 ),
             )
             apiError(HttpStatusCode.BadRequest, usernameRules)
-            serverError()
+            apiServerError()
         }
     }
 
@@ -186,7 +109,7 @@ internal object AuthDocs {
                 ownerIdTaken,
             )
             signupRateLimited()
-            serverError()
+            apiServerError()
         }
     }
 
@@ -338,7 +261,7 @@ internal object AuthDocs {
                 ),
             )
             signupRateLimited()
-            serverError()
+            apiServerError()
             apiError(HttpStatusCode.ServiceUnavailable, DocExamples.googleNotConfigured)
         }
     }
@@ -387,7 +310,7 @@ internal object AuthDocs {
             )
             apiError(HttpStatusCode.BadRequest, DocExamples.apiInvalidRequest)
             signinRateLimited()
-            serverError()
+            apiServerError()
         }
     }
 
@@ -431,7 +354,7 @@ internal object AuthDocs {
                 ),
             )
             signinRateLimited()
-            serverError()
+            apiServerError()
         }
     }
 
@@ -489,210 +412,8 @@ internal object AuthDocs {
                 ),
             )
             signinRateLimited()
-            serverError()
+            apiServerError()
             apiError(HttpStatusCode.ServiceUnavailable, DocExamples.googleNotConfigured)
-        }
-    }
-
-    val beginRestoreCredentialRegistration: RouteConfig.() -> Unit = {
-        bearerOperation(
-            "beginRestoreCredentialRegistration",
-            ApiTags.AUTHENTICATION,
-            "Begin restore credential setup",
-            """
-            A restore credential is a special passkey the app registers while a person is signed in, kept by the
-            platform's credential manager, and used later to regain access to the account when every other device
-            is gone. This call returns the registration options for creating one; it works exactly like
-            **Begin passkey sign-up** except that the account already exists and you are authenticated.
-
-            Pass `data` to the credential API, then send the result to **Complete restore credential setup**.
-            """,
-        )
-        response {
-            ok(
-                "Registration options for the restore credential.",
-                RestoreRegisterBeginResponse(success = true, data = DocExamples.registrationOptions),
-            )
-            bearerUnauthorized(ErrorEnvelope.API)
-            apiError(HttpStatusCode.NotFound, DocExamples.apiAccountNotFound)
-            serverError()
-        }
-    }
-
-    val completeRestoreCredentialRegistration: RouteConfig.() -> Unit = {
-        bearerOperation(
-            "completeRestoreCredentialRegistration",
-            ApiTags.AUTHENTICATION,
-            "Complete restore credential setup",
-            """
-            Verifies and stores the restore credential created from **Begin restore credential setup**.
-            `credentialJson` is a JSON string with only `id`, `rawId`, `type` and `response.clientDataJSON` /
-            `response.attestationObject`, the same fields as the `credential` object of **Complete passkey
-            sign-up**. Unlike that endpoint, this one rejects any other key, so strip `authenticatorAttachment`,
-            `clientExtensionResults`, `response.transports` and the like before sending, or the answer is
-            `400 INVALID_REQUEST`.
-            """,
-        )
-        request {
-            jsonBody(
-                RestoreRegisterCompleteRequest(
-                    credentialJson =
-                        """{"id":"${DocExamples.CREDENTIAL_ID}","rawId":"${DocExamples.CREDENTIAL_ID}","type":"public-key",""" +
-                            """"response":{"clientDataJSON":"${DocExamples.CLIENT_DATA_JSON}","attestationObject":"${DocExamples.ATTESTATION_OBJECT}"}}""",
-                    challenge = DocExamples.CHALLENGE,
-                ),
-                "The credential as a JSON string, and the challenge it was created for.",
-            )
-        }
-        response {
-            ok("The restore credential is stored.", SuccessResponse(success = true))
-            apiError(
-                HttpStatusCode.BadRequest,
-                ErrorCase(
-                    "RESTORE_KEY_REGISTRATION_FAILED",
-                    "The credential did not verify against the challenge. Start again from **Begin restore credential setup**.",
-                    "Challenge mismatch",
-                ),
-                DocExamples.apiInvalidRequest,
-            )
-            bearerUnauthorized(ErrorEnvelope.API)
-            apiError(HttpStatusCode.NotFound, DocExamples.apiAccountNotFound)
-            serverError()
-        }
-    }
-
-    val beginRestoreSignin: RouteConfig.() -> Unit = {
-        publicOperation(
-            "beginRestoreSignin",
-            ApiTags.AUTHENTICATION,
-            "Begin restore sign-in",
-            """
-            Starts signing in with a restore credential on a device that has nothing else: no tokens, no
-            username. The server returns a challenge with an empty `allowCredentials` list, so the credential
-            manager offers whatever restore credentials it holds for this relying party. `userVerification` is
-            `discouraged` because the credential must work when the person has no other option.
-
-            Send the signed result to **Complete restore sign-in**.
-            """,
-        )
-        response {
-            ok(
-                "A challenge to sign with the restore credential.",
-                SigninPasskeyBeginResponse(
-                    success = true,
-                    data =
-                        SigninPasskeyBeginData(
-                            challenge = DocExamples.CHALLENGE,
-                            rpId = "logdate.app",
-                            allowCredentials = emptyList(),
-                            timeout = 300_000,
-                            userVerification = "discouraged",
-                        ),
-                ),
-            )
-            serverError()
-        }
-    }
-
-    val completeRestoreSignin: RouteConfig.() -> Unit = {
-        publicOperation(
-            "completeRestoreSignin",
-            ApiTags.AUTHENTICATION,
-            "Complete restore sign-in",
-            """
-            Verifies the restore credential's signature over the challenge from **Begin restore sign-in** and,
-            if it matches an account, signs the person in with fresh tokens. From here the app can register a
-            normal passkey on the new device with **Begin adding a passkey**.
-            """,
-        )
-        request {
-            jsonBody(
-                SigninPasskeyCompleteRequest(credential = passkeyAssertion, challenge = DocExamples.CHALLENGE),
-                "The assertion produced by the restore credential and the challenge it signed.",
-            )
-        }
-        response {
-            ok("Signed in. Store both tokens.", DocExamples.authResponse)
-            apiError(HttpStatusCode.BadRequest, DocExamples.apiInvalidRequest)
-            apiError(
-                HttpStatusCode.Unauthorized,
-                ErrorCase(
-                    "RESTORE_FAILED",
-                    "The signature did not verify or the credential is not a registered restore credential. Start again from step one.",
-                    "Restore sign-in failed",
-                ),
-            )
-            apiError(
-                HttpStatusCode.NotFound,
-                ErrorCase("ACCOUNT_NOT_FOUND", "The credential verified but its account no longer exists.", "Account not found"),
-            )
-            serverError()
-        }
-    }
-
-    val refreshAccessToken: RouteConfig.() -> Unit = {
-        publicOperation(
-            "refreshAccessToken",
-            ApiTags.AUTHENTICATION,
-            "Refresh the access token",
-            """
-            Exchanges a refresh token for a new access token. This is the one authentication call a client makes
-            routinely: whenever a request answers `401`, refresh once and retry it. The refresh token itself is
-            not rotated; keep using it until it expires or the person logs out.
-
-            No `Authorization` header is needed; the refresh token in the body is the credential.
-            """,
-        )
-        request { jsonBody(RefreshTokenRequestV1(refreshToken = DocExamples.REFRESH_TOKEN), "The refresh token from sign-in.") }
-        response {
-            ok(
-                "A new access token. The refresh token stays the same.",
-                RefreshTokenResponseV1(success = true, data = RefreshTokenDataV1(accessToken = DocExamples.ACCESS_TOKEN)),
-            )
-            apiError(HttpStatusCode.BadRequest, DocExamples.apiInvalidRequest)
-            apiError(
-                HttpStatusCode.Unauthorized,
-                ErrorCase(
-                    "INVALID_REFRESH_TOKEN",
-                    "The refresh token is blank, malformed or expired. Sign the person in again.",
-                    "Invalid or expired refresh token",
-                ),
-                ErrorCase(
-                    "REFRESH_TOKEN_REVOKED",
-                    "This refresh token was invalidated by **Log out**. Sign the person in again; do not retry.",
-                    "Refresh token has been revoked",
-                ),
-            )
-            serverError()
-        }
-    }
-
-    val logout: RouteConfig.() -> Unit = {
-        publicOperation(
-            "logout",
-            ApiTags.AUTHENTICATION,
-            "Log out",
-            """
-            Revokes a refresh token so it can never mint another access token. Call it when the person signs
-            out, then discard both tokens locally. The current access token is not revoked; it expires
-            on its own within minutes, which is why logout takes the refresh token and not the access token.
-
-            Logging out an already revoked token succeeds again; the call is safe to repeat.
-            """,
-        )
-        request { jsonBody(LogoutRequestV1(refreshToken = DocExamples.REFRESH_TOKEN), "The refresh token to revoke.") }
-        response {
-            ok("The refresh token is revoked.", OkResponse(ok = true))
-            apiError(
-                HttpStatusCode.BadRequest,
-                ErrorCase(
-                    "INVALID_REFRESH_TOKEN",
-                    "`refreshToken` is blank. Send the token you want revoked.",
-                    "Refresh token is required",
-                ),
-                DocExamples.apiInvalidRequest,
-            )
-            serverError()
         }
     }
 }

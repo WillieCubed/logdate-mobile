@@ -27,6 +27,7 @@ import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.ratelimit.RateLimitPolicy
 import app.logdate.server.routes.docs.AccountDocs
 import app.logdate.server.routes.docs.AuthDocs
+import app.logdate.server.routes.docs.AuthSessionDocs
 import app.logdate.shared.model.AccountInfoResponse
 import app.logdate.shared.model.AccountTokens
 import app.logdate.shared.model.ApiError
@@ -897,7 +898,7 @@ fun Route.authV1Routes(
         }
 
         route("/restore") {
-            post("/register/begin", AuthDocs.beginRestoreCredentialRegistration) {
+            post("/register/begin", AuthSessionDocs.beginRestoreCredentialRegistration) {
                 try {
                     val account = resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics) ?: return@post
                     val options =
@@ -913,7 +914,7 @@ fun Route.authV1Routes(
                 }
             }
 
-            post("/register/complete", AuthDocs.completeRestoreCredentialRegistration) {
+            post("/register/complete", AuthSessionDocs.completeRestoreCredentialRegistration) {
                 try {
                     val account = resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics) ?: return@post
                     val body = call.receive<RestoreRegisterCompleteRequest>()
@@ -937,7 +938,7 @@ fun Route.authV1Routes(
                 }
             }
 
-            post("/begin", AuthDocs.beginRestoreSignin) {
+            post("/begin", AuthSessionDocs.beginRestoreSignin) {
                 try {
                     val options = restoreCredentialService.generateAuthOptions()
                     call.respond(
@@ -960,7 +961,7 @@ fun Route.authV1Routes(
                 }
             }
 
-            post("/complete", AuthDocs.completeRestoreSignin) {
+            post("/complete", AuthSessionDocs.completeRestoreSignin) {
                 try {
                     val request = call.receive<SigninPasskeyCompleteRequest>()
                     val result =
@@ -1017,7 +1018,7 @@ fun Route.authV1Routes(
         }
 
         route("/token") {
-            post("/refresh", AuthDocs.refreshAccessToken) {
+            post("/refresh", AuthSessionDocs.refreshAccessToken) {
                 val start = System.currentTimeMillis()
                 var success = false
                 try {
@@ -1063,7 +1064,7 @@ fun Route.authV1Routes(
             }
         }
 
-        post("/logout", AuthDocs.logout) {
+        post("/logout", AuthSessionDocs.logout) {
             try {
                 val request = call.receive<LogoutRequestV1>()
                 if (request.refreshToken.isBlank()) {

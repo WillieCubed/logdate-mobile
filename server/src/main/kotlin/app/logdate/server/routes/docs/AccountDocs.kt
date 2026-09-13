@@ -72,7 +72,7 @@ internal object AccountDocs {
     private fun ResponsesConfig.standardFailures() {
         bearerUnauthorized(ErrorEnvelope.API)
         apiError(HttpStatusCode.NotFound, DocExamples.apiAccountNotFound)
-        apiError(HttpStatusCode.InternalServerError, DocExamples.apiServerError)
+        apiServerError()
     }
 
     val getCurrentAccount: RouteConfig.() -> Unit = {
@@ -133,7 +133,7 @@ internal object AccountDocs {
                     "Username is already taken",
                 ),
             )
-            apiError(HttpStatusCode.InternalServerError, DocExamples.apiServerError)
+            apiServerError()
         }
     }
 
@@ -312,7 +312,7 @@ internal object AccountDocs {
                     "Cannot delete the last sign-in factor",
                 ),
             )
-            apiError(HttpStatusCode.InternalServerError, DocExamples.apiServerError)
+            apiServerError()
         }
     }
 
@@ -350,7 +350,7 @@ internal object AccountDocs {
                 ),
                 DocExamples.apiAccountNotFound,
             )
-            apiError(HttpStatusCode.InternalServerError, DocExamples.apiServerError)
+            apiServerError()
             apiError(
                 HttpStatusCode.NotImplemented,
                 ErrorCase(
@@ -433,7 +433,7 @@ internal object AccountDocs {
                     }
                 }
             }
-            apiError(HttpStatusCode.InternalServerError, DocExamples.apiServerError)
+            apiServerError()
             apiError(
                 HttpStatusCode.NotImplemented,
                 ErrorCase(

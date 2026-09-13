@@ -11,6 +11,7 @@ import app.logdate.server.oauth.OAuthDpopVerifier
 import app.logdate.server.oauth.OAuthNonceService
 import app.logdate.server.oauth.OAuthUseDpopNonceException
 import app.logdate.server.routes.docs.XrpcDocs
+import app.logdate.server.routes.docs.XrpcRepoDocs
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.ktor.http.ContentType
@@ -216,7 +217,7 @@ fun Route.xrpcRoutes(
             call.respond(HttpStatusCode.OK, repoDescription)
         }
 
-        get("/com.atproto.sync.getRepo", XrpcDocs.getRepo) {
+        get("/com.atproto.sync.getRepo", XrpcRepoDocs.getRepo) {
             val syncApi =
                 syncService ?: return@get call.respond(
                     HttpStatusCode.NotImplemented,
@@ -254,7 +255,7 @@ fun Route.xrpcRoutes(
             )
         }
 
-        get("/com.atproto.sync.getLatestCommit", XrpcDocs.getLatestCommit) {
+        get("/com.atproto.sync.getLatestCommit", XrpcRepoDocs.getLatestCommit) {
             val syncApi =
                 syncService ?: return@get call.respond(
                     HttpStatusCode.NotImplemented,
@@ -278,7 +279,7 @@ fun Route.xrpcRoutes(
             call.respond(HttpStatusCode.OK, latestCommit)
         }
 
-        get("/com.atproto.sync.getRepoStatus", XrpcDocs.getRepoStatus) {
+        get("/com.atproto.sync.getRepoStatus", XrpcRepoDocs.getRepoStatus) {
             val syncApi =
                 syncService ?: return@get call.respond(
                     HttpStatusCode.NotImplemented,
@@ -302,7 +303,7 @@ fun Route.xrpcRoutes(
             call.respond(HttpStatusCode.OK, repoStatus)
         }
 
-        get("/com.atproto.repo.getRecord", XrpcDocs.getRecord) {
+        get("/com.atproto.repo.getRecord", XrpcRepoDocs.getRecord) {
             val repoApi =
                 repoService ?: return@get call.respond(
                     HttpStatusCode.NotImplemented,
@@ -363,7 +364,7 @@ fun Route.xrpcRoutes(
             call.respond(HttpStatusCode.OK, record)
         }
 
-        get("/com.atproto.repo.listRecords", XrpcDocs.listRecords) {
+        get("/com.atproto.repo.listRecords", XrpcRepoDocs.listRecords) {
             val repoApi =
                 repoService ?: return@get call.respond(
                     HttpStatusCode.NotImplemented,
@@ -421,7 +422,7 @@ fun Route.xrpcRoutes(
             call.respondForRepoError(result.exceptionOrNull())
         }
 
-        post("/com.atproto.repo.createRecord", XrpcDocs.createRecord) {
+        post("/com.atproto.repo.createRecord", XrpcRepoDocs.createRecord) {
             val repoApi =
                 repoService ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
@@ -469,7 +470,7 @@ fun Route.xrpcRoutes(
             call.respondForRepoError(result.exceptionOrNull())
         }
 
-        post("/com.atproto.repo.putRecord", XrpcDocs.putRecord) {
+        post("/com.atproto.repo.putRecord", XrpcRepoDocs.putRecord) {
             val repoApi =
                 repoService ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
@@ -517,7 +518,7 @@ fun Route.xrpcRoutes(
             call.respondForRepoError(result.exceptionOrNull())
         }
 
-        post("/com.atproto.repo.deleteRecord", XrpcDocs.deleteRecord) {
+        post("/com.atproto.repo.deleteRecord", XrpcRepoDocs.deleteRecord) {
             val repoApi =
                 repoService ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
@@ -562,7 +563,7 @@ fun Route.xrpcRoutes(
             call.respondForRepoError(result.exceptionOrNull())
         }
 
-        post("/com.atproto.repo.uploadBlob", XrpcDocs.uploadBlob) {
+        post("/com.atproto.repo.uploadBlob", XrpcRepoDocs.uploadBlob) {
             val pdsBlobService =
                 blobService ?: return@post call.respond(
                     HttpStatusCode.NotImplemented,
@@ -615,7 +616,7 @@ fun Route.xrpcRoutes(
             call.respondForBlobError(result.exceptionOrNull())
         }
 
-        get("/com.atproto.sync.getBlob", XrpcDocs.getBlob) {
+        get("/com.atproto.sync.getBlob", XrpcRepoDocs.getBlob) {
             val pdsBlobService =
                 blobService ?: return@get call.respond(
                     HttpStatusCode.NotImplemented,

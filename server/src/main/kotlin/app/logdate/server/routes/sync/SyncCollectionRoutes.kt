@@ -8,7 +8,9 @@ import app.logdate.server.logdate.LogDateDraft
 import app.logdate.server.logdate.LogDateEntry
 import app.logdate.server.logdate.LogDateJournal
 import app.logdate.server.responses.error
+import app.logdate.server.routes.docs.SyncAssociationDocs
 import app.logdate.server.routes.docs.SyncCollectionDocs
+import app.logdate.server.routes.docs.SyncDraftDocs
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.shared.model.sync.AssociationChangesResponse
 import app.logdate.shared.model.sync.AssociationDeleteRequest
@@ -350,7 +352,7 @@ private fun Route.associationRoutes(
     collectionsRepository: LogDateCollectionsRepository,
 ) {
     route("/associations") {
-        post(SyncCollectionDocs.uploadAssociations) {
+        post(SyncAssociationDocs.uploadAssociations) {
             val start = System.currentTimeMillis()
 
             var success = false
@@ -378,7 +380,7 @@ private fun Route.associationRoutes(
             }
         }
 
-        get(SyncCollectionDocs.listAssociationChanges) {
+        get(SyncAssociationDocs.listAssociationChanges) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -402,7 +404,7 @@ private fun Route.associationRoutes(
             }
         }
 
-        put("/{journalId}/{contentId}", SyncCollectionDocs.upsertAssociation) {
+        put("/{journalId}/{contentId}", SyncAssociationDocs.upsertAssociation) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -430,7 +432,7 @@ private fun Route.associationRoutes(
             }
         }
 
-        delete("/{journalId}/{contentId}", SyncCollectionDocs.deleteAssociation) {
+        delete("/{journalId}/{contentId}", SyncAssociationDocs.deleteAssociation) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -449,7 +451,7 @@ private fun Route.associationRoutes(
             }
         }
 
-        delete(SyncCollectionDocs.deleteAssociations) {
+        delete(SyncAssociationDocs.deleteAssociations) {
             val start = System.currentTimeMillis()
             var success = false
             try {
@@ -474,7 +476,7 @@ private fun Route.draftRoutes(
     collectionsRepository: LogDateCollectionsRepository,
 ) {
     route("/drafts") {
-        put("/{draftId}", SyncCollectionDocs.upsertDraft) {
+        put("/{draftId}", SyncDraftDocs.upsertDraft) {
             val userId = extractUserId(call, tokenService) ?: return@put
             val draftId = call.requiredPathParam("draftId")
             val req = call.receive<DraftUploadRequest>()
@@ -503,7 +505,7 @@ private fun Route.draftRoutes(
             )
         }
 
-        get("/changes", SyncCollectionDocs.listDraftChanges) {
+        get("/changes", SyncDraftDocs.listDraftChanges) {
             val userId = extractUserId(call, tokenService) ?: return@get
             val since = call.request.queryParameters["since"]?.toLongOrNull() ?: 0L
             val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: DRAFT_SYNC_PAGE_SIZE
@@ -527,7 +529,7 @@ private fun Route.draftRoutes(
             )
         }
 
-        delete("/{draftId}", SyncCollectionDocs.deleteDraft) {
+        delete("/{draftId}", SyncDraftDocs.deleteDraft) {
             val userId = extractUserId(call, tokenService) ?: return@delete
             val draftId = call.requiredPathParam("draftId")
             collectionsRepository.deleteDraft(userId, draftId, System.currentTimeMillis())

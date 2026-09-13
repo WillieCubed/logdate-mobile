@@ -5,7 +5,6 @@ import app.logdate.server.responses.SimpleSuccessResponse
 import app.logdate.server.routes.ErrorCase
 import app.logdate.server.routes.ErrorEnvelope
 import app.logdate.server.routes.bearerOperation
-import app.logdate.server.routes.bearerUnauthorized
 import app.logdate.server.routes.binarySchema
 import app.logdate.server.routes.created
 import app.logdate.server.routes.noContent
@@ -22,7 +21,6 @@ import app.logdate.shared.model.sync.BackupUploadResponse
 import app.logdate.shared.model.sync.MediaMetadataResponse
 import app.logdate.shared.model.sync.MediaUploadResponse
 import io.github.smiley4.ktoropenapi.config.RequestConfig
-import io.github.smiley4.ktoropenapi.config.ResponsesConfig
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -53,8 +51,6 @@ internal object SyncStorageDocs {
             sizeBytes = 48_318_382,
             downloadUrl = BACKUP_DOWNLOAD_URL,
         )
-
-    private fun ResponsesConfig.syncUnauthorized() = bearerUnauthorized(ErrorEnvelope.SYNC)
 
     private val storageUnavailable =
         ErrorCase(
@@ -189,7 +185,7 @@ internal object SyncStorageDocs {
             ok("The file's details.", mediaMetadata)
             syncUnauthorized()
             syncError(HttpStatusCode.NotFound, ErrorCase("NOT_FOUND", "No media with that ID belongs to this account.", "Media not found"))
-            syncError(HttpStatusCode.InternalServerError, SyncExamples.serverMisconfigured)
+            syncServerError()
         }
     }
 
@@ -347,7 +343,7 @@ internal object SyncStorageDocs {
         response {
             ok("The account's backups.", BackupListResponse(backups = listOf(backupInfo)))
             syncUnauthorized()
-            syncError(HttpStatusCode.InternalServerError, SyncExamples.serverMisconfigured)
+            syncServerError()
         }
     }
 
@@ -367,7 +363,7 @@ internal object SyncStorageDocs {
                 HttpStatusCode.NotFound,
                 ErrorCase("NOT_FOUND", "No backup with that ID belongs to this account.", "Backup not found"),
             )
-            syncError(HttpStatusCode.InternalServerError, SyncExamples.serverMisconfigured)
+            syncServerError()
         }
     }
 
@@ -470,7 +466,7 @@ internal object SyncStorageDocs {
                 ),
             )
             syncUnauthorized()
-            syncError(HttpStatusCode.InternalServerError, SyncExamples.serverMisconfigured)
+            syncServerError()
         }
     }
 }
