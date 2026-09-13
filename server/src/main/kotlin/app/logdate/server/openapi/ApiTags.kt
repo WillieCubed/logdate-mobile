@@ -223,5 +223,3 @@ internal val apiTagGroups: List<ApiTagGroup> =
             ),
         ),
     )
-
-internal val apiTags: List<ApiTag> = apiTagGroups.flatMap { it.tags }

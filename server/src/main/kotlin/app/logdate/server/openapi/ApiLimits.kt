@@ -39,7 +39,8 @@ internal object ApiLimits {
                 SECONDS_PER_HOUR -> "hour"
                 else -> "${policy.windowSeconds} seconds"
             }
-        return "${policy.maxRequests} requests per $window"
+        val noun = if (policy.maxRequests == 1) "request" else "requests"
+        return "${policy.maxRequests} $noun per $window"
     }
 }
 

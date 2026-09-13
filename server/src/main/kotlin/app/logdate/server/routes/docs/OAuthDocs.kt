@@ -36,6 +36,8 @@ internal object OAuthDocs {
                 "There is nothing a client can do; use the LogDate sign-in instead.",
             "OAuth is not configured",
         )
+    private val serverError =
+        ErrorCase("server_error", "Something failed on the server. Retry with backoff.", "OAuth request failed")
 
     private val invalidRequest =
         ErrorCase(
@@ -200,10 +202,7 @@ internal object OAuthDocs {
                 }
             }
             oauthError(HttpStatusCode.BadRequest, invalidRequest, invalidClient, invalidDpop, useDpopNonce)
-            oauthError(
-                HttpStatusCode.InternalServerError,
-                ErrorCase("server_error", "Something failed on the server. Retry with backoff.", "OAuth request failed"),
-            )
+            oauthError(HttpStatusCode.InternalServerError, serverError)
             oauthError(HttpStatusCode.NotImplemented, notConfigured)
         }
     }
@@ -253,6 +252,7 @@ internal object OAuthDocs {
                 ),
             )
             bearerUnauthorized(ErrorEnvelope.OAUTH)
+            oauthError(HttpStatusCode.InternalServerError, serverError)
             oauthError(HttpStatusCode.NotImplemented, notConfigured)
         }
     }
@@ -294,6 +294,7 @@ internal object OAuthDocs {
                 ),
             )
             bearerUnauthorized(ErrorEnvelope.OAUTH)
+            oauthError(HttpStatusCode.InternalServerError, serverError)
             oauthError(HttpStatusCode.NotImplemented, notConfigured)
         }
     }
@@ -370,10 +371,7 @@ internal object OAuthDocs {
                 invalidDpop,
                 useDpopNonce,
             )
-            oauthError(
-                HttpStatusCode.InternalServerError,
-                ErrorCase("server_error", "Something failed on the server. Retry with backoff.", "OAuth request failed"),
-            )
+            oauthError(HttpStatusCode.InternalServerError, serverError)
             oauthError(HttpStatusCode.NotImplemented, notConfigured)
         }
     }
@@ -405,10 +403,7 @@ internal object OAuthDocs {
                 header<String>("DPoP-Nonce") { this.description = "The nonce to put in your next DPoP proof." }
             }
             oauthError(HttpStatusCode.BadRequest, invalidRequest, invalidClient, invalidDpop, useDpopNonce)
-            oauthError(
-                HttpStatusCode.InternalServerError,
-                ErrorCase("server_error", "Something failed on the server. Retry with backoff.", "OAuth request failed"),
-            )
+            oauthError(HttpStatusCode.InternalServerError, serverError)
             oauthError(HttpStatusCode.NotImplemented, notConfigured)
         }
     }

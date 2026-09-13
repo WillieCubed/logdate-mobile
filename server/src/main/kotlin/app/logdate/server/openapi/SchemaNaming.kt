@@ -2,6 +2,8 @@ package app.logdate.server.openapi
 
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.media.Schema
+import java.util.Collections
+import java.util.IdentityHashMap
 
 private const val SCHEMA_REF_PREFIX = "#/components/schemas/"
 
@@ -36,7 +38,7 @@ internal fun useReadableSchemaNames(api: OpenAPI) {
     }
     api.components.schemas = renamed
 
-    val visited = HashSet<Schema<*>>()
+    val visited: MutableSet<Schema<*>> = Collections.newSetFromMap(IdentityHashMap())
 
     fun rewrite(schema: Schema<*>?) {
         if (schema == null || !visited.add(schema)) return

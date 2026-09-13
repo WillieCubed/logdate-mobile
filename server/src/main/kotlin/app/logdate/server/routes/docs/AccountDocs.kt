@@ -2,7 +2,6 @@ package app.logdate.server.routes.docs
 
 import app.logdate.server.openapi.ApiTags
 import app.logdate.server.routes.AddPasskeyCompleteRequest
-import app.logdate.server.routes.AuthResponse
 import app.logdate.server.routes.ErrorCase
 import app.logdate.server.routes.ErrorEnvelope
 import app.logdate.server.routes.IdentityListResponse
@@ -517,8 +516,4 @@ internal object AccountDocs {
             standardFailures()
         }
     }
-
-    /** Kept so the account examples and the auth examples share one shape. */
-    @Suppress("unused")
-    private val authResponseType: AuthResponse = DocExamples.authResponse
 }

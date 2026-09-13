@@ -21,9 +21,6 @@ internal object SyncExamples {
 
     const val NOTE_TEXT = "Walked to the lake before work. Fog on the water."
 
-    val unauthorizedNote =
-        "Every sync call needs `Authorization: Bearer <accessToken>`; see **Authentication in depth** in the overview."
-
     val serverMisconfigured =
         ErrorCase(
             "SERVER_MISCONFIGURED",

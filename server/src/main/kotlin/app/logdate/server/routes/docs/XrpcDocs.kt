@@ -94,6 +94,18 @@ internal object XrpcDocs {
 
     private fun ResponsesConfig.notConfigured() = pdsError(HttpStatusCode.NotImplemented, unsupported)
 
+    /** Write operations answer every credential problem with `AuthRequired`; only the session methods use `InvalidToken`. */
+    private fun ResponsesConfig.authRequired() =
+        pdsError(
+            HttpStatusCode.Unauthorized,
+            ErrorCase(
+                "AuthRequired",
+                "The bearer or DPoP-bound access token is missing, invalid, or belongs to no account here. " +
+                    "Sign in again (**Sign in with a password**) or refresh the session, then retry.",
+                "Missing bearer token",
+            ),
+        )
+
     private fun RequestConfig.didParameter() {
         queryParameter<String>("did") {
             description = "The repository's DID."
@@ -547,7 +559,7 @@ internal object XrpcDocs {
                 ),
                 invalidSwap,
             )
-            bearerUnauthorized(ErrorEnvelope.PDS)
+            authRequired()
             pdsError(HttpStatusCode.Forbidden, repoMismatch)
             notConfigured()
         }
@@ -587,7 +599,7 @@ internal object XrpcDocs {
                 ),
                 invalidSwap,
             )
-            bearerUnauthorized(ErrorEnvelope.PDS)
+            authRequired()
             pdsError(HttpStatusCode.Forbidden, repoMismatch)
             notConfigured()
         }
@@ -617,7 +629,7 @@ internal object XrpcDocs {
                 ErrorCase("InvalidRequest", "The body is malformed or the repo is unknown.", "Invalid repo"),
                 invalidSwap,
             )
-            bearerUnauthorized(ErrorEnvelope.PDS)
+            authRequired()
             pdsError(HttpStatusCode.Forbidden, repoMismatch)
             notConfigured()
         }
@@ -661,7 +673,7 @@ internal object XrpcDocs {
                     "Authenticated account does not have a valid DID",
                 ),
             )
-            bearerUnauthorized(ErrorEnvelope.PDS)
+            authRequired()
             notConfigured()
         }
     }

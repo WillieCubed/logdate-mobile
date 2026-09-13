@@ -61,7 +61,7 @@ internal object AuthSchemaDocs {
                         "linkedProviders" to "Which sign-in methods are linked: any of `passkey`, `google`.",
                         "passkeyCredentialIds" to "The `credentialId` of every active passkey.",
                         "createdAt" to "When the account was created. $ISO_TIME",
-                        "updatedAt" to "When the account last changed or signed in. $ISO_TIME",
+                        "updatedAt" to "When the account last signed in, or when it was created if it never has. $ISO_TIME",
                     ),
                 ),
             "LogDateAccount" to
@@ -76,7 +76,7 @@ internal object AuthSchemaDocs {
                         "bio" to "Free-text bio, or `null`.",
                         "passkeyCredentialIds" to "The `credentialId` of every active passkey.",
                         "createdAt" to "When the account was created. $ISO_TIME",
-                        "updatedAt" to "When the account last changed or signed in. $ISO_TIME",
+                        "updatedAt" to "When the account last signed in, or when it was created if it never has. $ISO_TIME",
                         "email" to "Email attached to the account, or `null` if none.",
                         "emailVerified" to "`true` once the email has been verified.",
                         "emailVerifiedAt" to "When the email was verified, or `null`. $ISO_TIME",

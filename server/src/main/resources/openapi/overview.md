@@ -43,7 +43,7 @@ If you are running the server yourself, replace `https://cloud.logdate.app` with
 
 Here is the complete loop a client performs, in three requests: get a token, save an entry, ask what changed.
 
-**1. Get a token.** The quickest way to a token from a terminal is a Google ID token, because passkeys need a browser or phone to sign the challenge. Get an ID token for a Google account (the OAuth 2.0 Playground works), then:
+**1. Get a token.** The quickest way to a token from a terminal is a Google ID token, because passkeys need a browser or phone to sign the challenge. The ID token must be issued to one of the client IDs the server trusts (its `GOOGLE_OIDC_CLIENT_IDS` setting), so obtain it through the app or a client you registered with that ID, then:
 
 ```bash
 curl -X POST https://cloud.logdate.app/api/v1/auth/signin/google \
@@ -193,7 +193,7 @@ Codes that appear across the API, and what to do about them:
 | Code | Status | What happened | What to do |
 |---|---|---|---|
 | `INVALID_REQUEST`, `VALIDATION_ERROR` | 400 | The body was not valid JSON, or a field was missing or malformed. | Fix the request; the `message` names the field. Do not retry unchanged. |
-| `INVALID_PARAMETER`, `MISSING_PARAMETER` | 400 | A query or path parameter was missing or the wrong type. | Same as above. |
+| `INVALID_PARAMETER` | 400 | A query or path parameter was missing or the wrong type. | Same as above. |
 | `INVALID_TOKEN`, `UNAUTHORIZED` | 401 | The access token is missing, malformed or expired. | Refresh the access token and retry once; if that fails, sign in again. |
 | `QUOTA_EXCEEDED` | 402 | The account has no room for this upload. | Show the person their usage (**Get storage quota**) and stop retrying. |
 | `NOT_FOUND` | 404 | No such record for this account. | Treat as deleted. |

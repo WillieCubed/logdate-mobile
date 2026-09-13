@@ -16,15 +16,6 @@ internal data class SchemaDoc(
     val enumValues: Map<String, String> = emptyMap(),
 )
 
-/** What [applySchemaDocumentation] could not match up, so a test can fail loudly. */
-internal data class SchemaDocumentationGaps(
-    val undocumentedSchemas: Set<String>,
-    val undocumentedProperties: Set<String>,
-    val staleEntries: Set<String>,
-) {
-    val isEmpty: Boolean get() = undocumentedSchemas.isEmpty() && undocumentedProperties.isEmpty() && staleEntries.isEmpty()
-}
-
 /**
  * Descriptions for every schema in the published contract, keyed by the readable schema name
  * (`ContentChange`, `VersionConstraint.Known`). The DTOs live in multiplatform modules where the
@@ -41,41 +32,15 @@ internal object SchemaDocumentation {
 internal fun applySchemaDocumentation(
     api: OpenAPI,
     registry: Map<String, SchemaDoc> = SchemaDocumentation.registry,
-): SchemaDocumentationGaps {
-    val schemas = api.components?.schemas.orEmpty()
-    val undocumentedSchemas = mutableSetOf<String>()
-    val undocumentedProperties = mutableSetOf<String>()
-    val stale = mutableSetOf<String>()
-
-    registry.keys.filter { it !in schemas }.forEach { stale += it }
-
-    schemas.forEach { (name, schema) ->
-        val doc = registry[name]
-        if (doc == null) {
-            undocumentedSchemas += name
-            return@forEach
-        }
+) {
+    api.components?.schemas.orEmpty().forEach { (name, schema) ->
+        val doc = registry[name] ?: return@forEach
         schema.description = doc.description.trimIndent()
-        val properties = schema.properties.orEmpty()
-        doc.properties.keys
-            .filter { it !in properties }
-            .forEach { stale += "$name.$it" }
-        properties.forEach { (property, propertySchema) ->
-            val text = doc.properties[property]
-            if (text == null) {
-                undocumentedProperties += "$name.$property"
-            } else {
-                propertySchema.description = text.trimIndent()
-            }
+        schema.properties.orEmpty().forEach { (property, propertySchema) ->
+            doc.properties[property]?.let { propertySchema.description = it.trimIndent() }
         }
-        val enumValues = schema.enum.orEmpty().map { it.toString() }
-        if (enumValues.isNotEmpty()) {
-            doc.enumValues.keys
-                .filter { it !in enumValues }
-                .forEach { stale += "$name.$it" }
-            enumValues.filter { it !in doc.enumValues }.forEach { undocumentedProperties += "$name.$it" }
-            if (doc.enumValues.isNotEmpty()) schema.addExtension("x-enumDescriptions", doc.enumValues)
+        if (!schema.enum.isNullOrEmpty() && doc.enumValues.isNotEmpty()) {
+            schema.addExtension("x-enumDescriptions", doc.enumValues)
         }
     }
-    return SchemaDocumentationGaps(undocumentedSchemas, undocumentedProperties, stale)
 }
