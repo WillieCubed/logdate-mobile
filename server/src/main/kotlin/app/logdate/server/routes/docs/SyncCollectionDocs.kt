@@ -52,7 +52,9 @@ internal object SyncCollectionDocs {
     // Indented to match the descriptions it is spliced into, so `trimIndent()` strips evenly.
     private const val PATCH_RULES =
         """
-            Only the fields you send change; omitted fields keep their values. To ask for conflict detection, send
+            Omitted text fields keep their values (`content`, `mediaUri`, `caption` and `location` on entries; `title`
+            and `description` on journals). `deviceId`, and `durationMs` on entries, are always written, so omitting
+            them resets them to `unknown` and `0`: resend them. To ask for conflict detection, send
             `"versionConstraint": { "type": "known", "serverVersion": <the version you last saw> }`; if another device
             has written since, the response is `409 CONFLICT` and nothing changes. Leave `versionConstraint` out (or send
             `{ "type": "none" }`) for last-write-wins. Patching an ID that does not exist creates it.
@@ -172,7 +174,8 @@ internal object SyncCollectionDocs {
             Returns entries that changed after the `since` cursor, plus tombstones for entries deleted after it.
             This is the read half of sync: call it with `since=0` the first time, store the `lastTimestamp`
             returned, and send it as `since` next time to receive only what is new. While `hasMore` is `true`,
-            call again with the returned `lastTimestamp` before treating the client as up to date.
+            call again with the returned `lastTimestamp` before treating the client as up to date, and read the
+            caveat on `hasMore` in **Concepts**: a full page can leave a lower-versioned record behind.
 
             `lastTimestamp` is a server version, not a clock time; see **Concepts** in the overview. Deleted
             entries appear only in `deletions`, never in `changes`.

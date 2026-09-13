@@ -11,11 +11,8 @@ private const val SCHEMA_REF_PREFIX = "#/components/schemas/"
  * Names sealed subtypes appear under when the kotlinx generator falls back to their
  * `@SerialName`. Readers should see them under their parent, not as bare lowercase words.
  */
-private val serialNameAliases =
-    mapOf(
-        "known" to "VersionConstraint.Known",
-        "none" to "VersionConstraint.None",
-    )
+private val serialNameAliases: Map<String, String> =
+    publishedSealedSchemas.flatMap { it.subtypesBySerialName.entries }.associate { it.toPair() }
 
 /**
  * Rewrites component schema keys from fully qualified class names

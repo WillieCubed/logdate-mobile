@@ -102,7 +102,12 @@ internal object IdentityDocs {
         apiError(HttpStatusCode.Conflict, ErrorCase(conflictCode, conflictMeaning, "Identity state conflict"))
         apiError(
             HttpStatusCode.InternalServerError,
-            ErrorCase(failedCode, "Something failed on the server. Retry with backoff.", failedMessage),
+            ErrorCase(
+                failedCode,
+                "Something failed on the server, or the body was not valid JSON for this request (that case answers `500` here, " +
+                    "not `400`). Check the body first; retry with backoff only if it is well-formed.",
+                failedMessage,
+            ),
         )
     }
 
@@ -183,7 +188,7 @@ internal object IdentityDocs {
             )
             identityFailures(
                 "SIGNING_KEY_EXPORT_INVALID",
-                "The request is malformed; the `message` says what.",
+                "Reserved for payload validation failures; not sent today.",
                 "SIGNING_KEY_EXPORT_CONFLICT",
                 "The identity is mid-change (a rotation or import is in flight). Wait a moment and retry.",
                 "SIGNING_KEY_EXPORT_FAILED",
@@ -228,7 +233,7 @@ internal object IdentityDocs {
             )
             identityFailures(
                 "SIGNING_KEY_ROTATION_INVALID",
-                "The request is malformed; the `message` says what.",
+                "Reserved for payload validation failures; not sent today.",
                 "SIGNING_KEY_ROTATION_CONFLICT",
                 "The identity cannot be rotated right now without risking an inconsistent published state. Wait and retry.",
                 "SIGNING_KEY_ROTATION_FAILED",

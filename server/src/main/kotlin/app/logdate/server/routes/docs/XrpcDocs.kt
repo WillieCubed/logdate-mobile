@@ -9,6 +9,8 @@ import app.logdate.server.routes.PutRecordInput
 import app.logdate.server.routes.bearerOperation
 import app.logdate.server.routes.bearerOrDpopOperation
 import app.logdate.server.routes.bearerUnauthorized
+import app.logdate.server.routes.binarySchema
+import app.logdate.server.routes.dpopNonceHeader
 import app.logdate.server.routes.jsonBody
 import app.logdate.server.routes.ok
 import app.logdate.server.routes.pdsError
@@ -91,6 +93,7 @@ internal object XrpcDocs {
             "swapRecord did not match",
         )
     private val repoNotFound = ErrorCase("RepoNotFound", "No repository with that DID is hosted here.", "Unknown repo: did:plc:…")
+    private val accountTakedown = ErrorCase("AccountTakedown", "The account has been deactivated by the operator.", "Account is not active")
 
     private fun ResponsesConfig.notConfigured() = pdsError(HttpStatusCode.NotImplemented, unsupported)
 
@@ -101,9 +104,11 @@ internal object XrpcDocs {
             ErrorCase(
                 "AuthRequired",
                 "The bearer or DPoP-bound access token is missing, invalid, or belongs to no account here. " +
-                    "Sign in again (**Sign in with a password**) or refresh the session, then retry.",
+                    "Sign in again (**Sign in with a password**) or refresh the session, then retry. When the " +
+                    "`message` says the DPoP nonce is stale, take the new one from `DPoP-Nonce` and retry once.",
                 "Missing bearer token",
             ),
+            headers = dpopNonceHeader,
         )
 
     private fun RequestConfig.didParameter() {
@@ -257,15 +262,12 @@ internal object XrpcDocs {
                 ),
                 ErrorCase(
                     "InvalidRequest",
-                    "The body is malformed or the handle is taken. The `message` says which.",
+                    "The handle is taken or a field failed validation; the `message` says which. A body that is not valid JSON for this method answers `400` with an empty body instead.",
                     "Invalid session request",
                 ),
             )
             pdsError(HttpStatusCode.Unauthorized, ErrorCase("InvalidToken", "The credentials were rejected.", "Authentication failed"))
-            pdsError(
-                HttpStatusCode.Forbidden,
-                ErrorCase("AccountTakedown", "The account has been deactivated by the operator.", "Account is not active"),
-            )
+            pdsError(HttpStatusCode.Forbidden, accountTakedown)
             notConfigured()
         }
     }
@@ -289,12 +291,16 @@ internal object XrpcDocs {
         }
         response {
             ok("Signed in. Send `accessJwt` as `Authorization: Bearer`.", session)
-            pdsError(HttpStatusCode.BadRequest, ErrorCase("InvalidRequest", "The body is malformed.", "Invalid session request"))
-            pdsError(HttpStatusCode.Unauthorized, ErrorCase("InvalidToken", "Wrong handle or password.", "Authentication failed"))
             pdsError(
-                HttpStatusCode.Forbidden,
-                ErrorCase("AccountTakedown", "The account has been deactivated by the operator.", "Account is not active"),
+                HttpStatusCode.BadRequest,
+                ErrorCase(
+                    "InvalidRequest",
+                    "The identifier or password could not be processed. A body that is not valid JSON for this method answers `400` with an empty body instead.",
+                    "Invalid session request",
+                ),
             )
+            pdsError(HttpStatusCode.Unauthorized, ErrorCase("InvalidToken", "Wrong handle or password.", "Authentication failed"))
+            pdsError(HttpStatusCode.Forbidden, accountTakedown)
             notConfigured()
         }
     }
@@ -384,7 +390,7 @@ internal object XrpcDocs {
         response {
             code(HttpStatusCode.OK) {
                 description = "The CAR archive."
-                body<ByteArray> { mediaTypes(ContentType.parse("application/vnd.ipld.car")) }
+                body(binarySchema()) { mediaTypes(ContentType.parse("application/vnd.ipld.car")) }
             }
             pdsError(
                 HttpStatusCode.BadRequest,
@@ -470,8 +476,11 @@ internal object XrpcDocs {
             pdsError(
                 HttpStatusCode.BadRequest,
                 invalidRequest,
-                ErrorCase("RecordNotFound", "No record with that key exists in the collection.", "Record not found"),
-                invalidSwap,
+                ErrorCase(
+                    "RecordNotFound",
+                    "No record with that key exists in the collection, or `cid` does not match it.",
+                    "Record not found",
+                ),
             )
             notConfigured()
         }
@@ -554,7 +563,7 @@ internal object XrpcDocs {
                 HttpStatusCode.BadRequest,
                 ErrorCase(
                     "InvalidRequest",
-                    "The body is malformed, the repo is unknown, or the collection is not one this server stores.",
+                    "The repo is unknown or the collection is not one this server stores. A body that is not valid JSON for this method answers `400` with an empty body instead.",
                     "Invalid repo",
                 ),
                 invalidSwap,
@@ -594,7 +603,7 @@ internal object XrpcDocs {
                 HttpStatusCode.BadRequest,
                 ErrorCase(
                     "InvalidRequest",
-                    "The body is malformed, the repo is unknown, or the collection is not one this server stores.",
+                    "The repo is unknown or the collection is not one this server stores. A body that is not valid JSON for this method answers `400` with an empty body instead.",
                     "Invalid repo",
                 ),
                 invalidSwap,
@@ -626,7 +635,11 @@ internal object XrpcDocs {
             ok("The record is gone. The body is an empty object.", EmptyPdsResponse())
             pdsError(
                 HttpStatusCode.BadRequest,
-                ErrorCase("InvalidRequest", "The body is malformed or the repo is unknown.", "Invalid repo"),
+                ErrorCase(
+                    "InvalidRequest",
+                    "The repo is unknown or not yours to write. A body that is not valid JSON for this method answers `400` with an empty body instead.",
+                    "Invalid repo",
+                ),
                 invalidSwap,
             )
             authRequired()
@@ -649,13 +662,10 @@ internal object XrpcDocs {
             """,
         )
         request {
-            headerParameter<String>("Content-Type") {
-                description = "The blob's media type, such as `image/jpeg`. Defaults to `application/octet-stream`."
-                required = false
-                example("Example") { value = "image/jpeg" }
-            }
-            body<ByteArray> {
-                description = "The file's bytes."
+            body(binarySchema()) {
+                description =
+                    "The file's bytes. The request's `Content-Type` (for example `image/jpeg`) is stored as the blob's media type " +
+                    "and defaults to `application/octet-stream`."
                 required = true
                 mediaTypes(ContentType.Application.OctetStream, ContentType.Image.Any)
             }
@@ -699,7 +709,7 @@ internal object XrpcDocs {
         response {
             code(HttpStatusCode.OK) {
                 description = "The blob's bytes. `Content-Type` is the type given at upload."
-                body<ByteArray> { mediaTypes(ContentType.Application.OctetStream) }
+                body(binarySchema()) { mediaTypes(ContentType.Application.OctetStream) }
             }
             pdsError(
                 HttpStatusCode.BadRequest,

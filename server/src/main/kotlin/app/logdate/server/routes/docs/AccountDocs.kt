@@ -160,7 +160,8 @@ internal object AccountDocs {
                 HttpStatusCode.InternalServerError,
                 ErrorCase(
                     "DELETION_FAILED",
-                    "The account row could not be removed; nothing was deleted. Retry later, and report it if it persists.",
+                    "The account row could not be removed. Media and backup files are deleted first and are not restored, so the " +
+                        "account still exists but its uploads may already be gone. Retry, and report it if it persists.",
                     "Account could not be deleted",
                 ),
                 DocExamples.apiServerError,
@@ -187,7 +188,11 @@ internal object AccountDocs {
             """,
         )
         response {
-            ok("The account's passkeys, newest first.", PasskeyListResponse(success = true, data = listOf(passkeyInfo)))
+            ok(
+                "The account's active passkeys, most recently used first. Passkeys that have never signed in come before " +
+                    "those, in no defined order.",
+                PasskeyListResponse(success = true, data = listOf(passkeyInfo)),
+            )
             standardFailures()
         }
     }
@@ -484,7 +489,8 @@ internal object AccountDocs {
             """
             Lists the identities linked to the account: one entry per passkey and one for Google, with the
             email each carries and when it was last used to sign in. This is how a settings screen shows
-            "Signed in with Google as willie@example.com".
+            "Signed in with Google as willie@example.com". `lastSignInAt` is absent for a passkey that was
+            registered but has not signed in yet; Google identities always carry it.
             """,
         )
         response {
@@ -500,7 +506,7 @@ internal object AccountDocs {
                                 email = DocExamples.EMAIL,
                                 emailVerified = true,
                                 createdAt = DocExamples.ISO_NOW,
-                                lastSignInAt = DocExamples.ISO_NOW,
+                                lastSignInAt = null,
                             ),
                             IdentityView(
                                 provider = "google",
@@ -508,7 +514,7 @@ internal object AccountDocs {
                                 email = DocExamples.EMAIL,
                                 emailVerified = true,
                                 createdAt = DocExamples.ISO_NOW,
-                                lastSignInAt = null,
+                                lastSignInAt = DocExamples.ISO_NOW,
                             ),
                         ),
                 ),

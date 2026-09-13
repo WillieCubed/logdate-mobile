@@ -5,6 +5,8 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -29,9 +31,6 @@ class OpenApiContractTest {
         val responses get() = body["responses"]?.jsonObject.orEmpty()
         val tags get() = body["tags"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty()
         val hasSecurity get() = body["security"]?.jsonArray?.isNotEmpty() == true
-
-        /** DPoP-only endpoints answer a malformed proof with `400`, never `401`. */
-        val onlyDpop get() = body["security"]?.jsonArray?.all { it.jsonObject.keys == setOf("dpopProof") } == true
     }
 
     private fun withSpec(block: (JsonObject, List<Operation>) -> Unit) =
@@ -182,7 +181,7 @@ class OpenApiContractTest {
     fun `protected operations document 401 in their family's envelope`() =
         withSpec { _, operations ->
             operations.forEach { op ->
-                if (op.hasSecurity && !op.onlyDpop) {
+                if (op.hasSecurity) {
                     val unauthorized = assertNotNull(op.responses["401"], "${op.label}: protected but no 401 documented").jsonObject
                     val ref =
                         unauthorized["content"]
@@ -215,6 +214,34 @@ class OpenApiContractTest {
                     assertNotNull(op.responses["501"], "${op.label}: XRPC methods answer 501 when disabled")
                 }
             }
+        }
+
+    @Test
+    fun `no placeholder or dangling schema reference reaches the document`() =
+        withSpec { document, _ ->
+            assertTrue("{{" !in document.toString(), "a {{placeholder}} was published unrendered")
+            val schemas =
+                document["components"]
+                    ?.jsonObject
+                    ?.get("schemas")
+                    ?.jsonObject
+                    ?.keys
+                    .orEmpty()
+            val refs = mutableSetOf<String>()
+
+            fun collect(element: JsonElement) {
+                when (element) {
+                    is JsonObject -> {
+                        element["\$ref"]?.jsonPrimitive?.content?.let(refs::add)
+                        element.values.forEach(::collect)
+                    }
+                    is JsonArray -> element.forEach(::collect)
+                    else -> Unit
+                }
+            }
+            collect(document)
+            val dangling = refs.filterNot { it.startsWith(SCHEMA_REF_PREFIX) && it.removePrefix(SCHEMA_REF_PREFIX) in schemas }
+            assertTrue(dangling.isEmpty(), "references that resolve to nothing: $dangling")
         }
 
     @Test
@@ -268,11 +295,12 @@ class OpenApiContractTest {
         }
 
     companion object {
+        private const val SCHEMA_REF_PREFIX = "#/components/schemas/"
         private val HTTP_METHODS = setOf("get", "post", "put", "patch", "delete")
         private val MACHINE_TEXT = Regex("^(Get|Post|Put|Patch|Delete) [A-Za-z.]+\\.?$")
         private val OPERATION_ID = Regex("^[a-z][A-Za-z0-9]*$")
         private val PATH_PARAM = Regex("\\{([^}]+)}")
-        private val INLINE_DOC_LINE = Regex("^\\s*(summary|description) = \"|^\\s*tags = listOf\\(")
+        private val INLINE_DOC_LINE = Regex("^\\s*(summary|description|operationId|tags)\\s*=\\s*(\"|listOf\\(|$)")
         private val HIDDEN_PATHS =
             setOf(
                 "/health",
@@ -305,6 +333,9 @@ class OpenApiContractTest {
                 "getServerInfo",
                 "listPlans",
                 "getAssetLinks",
+                "pushAuthorizationRequest",
+                "exchangeOAuthToken",
+                "revokeOAuthToken",
                 "resolveResource",
                 "getOAuthAuthorizationServerMetadata",
                 "getOAuthProtectedResourceMetadata",
@@ -342,6 +373,6 @@ class OpenApiContractTest {
                 "signinWithGoogle",
             )
         private val RATE_LIMITED_WITH_RETRY_AFTER = setOf("uploadMedia", "uploadBackup", "createTranscriptionSession")
-        private val QUOTA_ENFORCED = setOf("uploadMedia", "uploadBackup")
+        private val QUOTA_ENFORCED = setOf("uploadMedia", "uploadBackup", "createTranscriptionSession")
     }
 }

@@ -10,7 +10,11 @@ private const val SYNC_VERSION_IGNORED = "Ignored. The server assigns versions i
 private const val CURSOR_LAST_TIMESTAMP =
     "The highest version in this page, or the `since` you sent if the page is empty. Send it as the next `since`. " +
         "Despite the name it is a version, not a clock time."
-private const val HAS_MORE = "`true` when more changes exist beyond this page; call again with `since` = `lastTimestamp`."
+private const val HAS_MORE =
+    "`true` when more changes exist beyond this page; call again with `since` = `lastTimestamp`. `changes` and `deletions` " +
+        "are cut to `limit` separately but share this one cursor, so when it is `true` a record with a lower version than " +
+        "`lastTimestamp` can still be waiting in the list that was cut short. Use a `limit` large enough that pages are " +
+        "rarely full, or re-page from your previous cursor rather than from `lastTimestamp` when it is `true`."
 private const val IS_DELETED_ALWAYS_FALSE = "Always `false`. Deletions are delivered in the `deletions` list, not here."
 private const val ENCRYPTED_BY_APPS = "The LogDate apps send this encrypted; the server never reads it."
 
@@ -47,7 +51,9 @@ internal object SyncSchemaDocs {
                         "journalCount" to "Journals the server holds, excluding deleted ones.",
                         "associationCount" to "Entry-to-journal links the server holds, excluding removed ones.",
                         "lastTimestamp" to
-                            "The newest version the server has assigned for this account. If it is higher than your stored cursor, there is something to fetch.",
+                            "The newest version the server has assigned for this account. If it is higher than your stored cursor, " +
+                            "there is something to fetch. An account that has never synced anything has no version yet and gets " +
+                            "the current time instead, so also check that the counts are non-zero.",
                     ),
                 ),
             // ---- Versioning ---------------------------------------------------------------------
@@ -286,7 +292,8 @@ internal object SyncSchemaDocs {
                 SchemaDoc(
                     "An in-progress entry, as sent to **Save a draft**.",
                     mapOf(
-                        "id" to "The draft's ID. Should equal the `draftId` in the path.",
+                        "id" to
+                            "Ignored. The draft is keyed by the `draftId` in the path and the response echoes that; unlike entries, a mismatch is not rejected.",
                         "content" to "The draft's text so far.",
                         "blockTypes" to "The kinds of block in the draft, in order, such as `TEXT` or `IMAGE`.",
                         "journalIds" to "Journals the finished entry will belong to.",

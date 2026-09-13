@@ -213,7 +213,7 @@ internal val apiTagGroups: List<ApiTagGroup> =
                     """
                     The AT Protocol's HTTP RPC surface, served under `/xrpc/`. Method names are lexicon IDs such as
                     `com.atproto.repo.getRecord`. LogDate Cloud implements the subset a personal data server needs for
-                    identity, sessions, repository reads and writes, and blobs: 18 methods.
+                    identity, sessions, repository reads and writes, and blobs.
 
                     It is deliberately not a complete PDS. There is no firehose, no `applyWrites`, and no invite codes,
                     and every method except handle resolution and the two describe calls answers `501 Unsupported` on a

@@ -42,6 +42,14 @@ internal object ApiLimits {
         val noun = if (policy.maxRequests == 1) "request" else "requests"
         return "${policy.maxRequests} $noun per $window"
     }
+
+    /** `RateLimitPolicy(5, 3600)` → `one-hour`, for "wait for the one-hour window to pass". */
+    fun windowName(policy: RateLimitPolicy): String =
+        when (policy.windowSeconds) {
+            SECONDS_PER_MINUTE -> "one-minute"
+            SECONDS_PER_HOUR -> "one-hour"
+            else -> "${policy.windowSeconds}-second"
+        }
 }
 
 private val placeholderPattern = Regex("""\{\{([a-zA-Z0-9_.]+)}}""")

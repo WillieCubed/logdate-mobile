@@ -230,6 +230,9 @@ internal object CloudServiceDocs {
                     }
                 }
             }
+            code(HttpStatusCode.BadRequest) {
+                description = "The body is not valid JSON for this request (for example an unknown `mode`). The body is empty."
+            }
             bearerUnauthorized(ErrorEnvelope.MESSAGE)
             messageError(
                 HttpStatusCode.PaymentRequired,
@@ -239,7 +242,7 @@ internal object CloudServiceDocs {
                     "cloud transcription requires an active LogDate Cloud subscription",
                 ),
             )
-            rateLimited(CLOUD_TRANSCRIPTION_SESSION_LIMIT, ErrorEnvelope.MESSAGE, "account", retryAfterHeader = true)
+            rateLimited(CLOUD_TRANSCRIPTION_SESSION_LIMIT, ErrorEnvelope.MESSAGE)
             messageError(
                 HttpStatusCode.ServiceUnavailable,
                 ErrorCase(
@@ -260,8 +263,8 @@ internal object CloudServiceDocs {
             Resolves the opaque ID from a shared LogDate link to the public URL it points at, on the owner's
             own handle domain (for example `https://willie.logdate.app/journal/<id>`). No token needed.
 
-            `kind` says whether the ID is a journal or a note. Unknown IDs, and IDs whose owner has no handle
-            yet, answer `404` with an empty body.
+            `kind` says whether the ID is a `journal`, a `note` or a `rewind`. Unknown IDs, and IDs whose owner
+            has no handle yet, answer `404` with an empty body.
             """,
         )
         request {
@@ -280,7 +283,7 @@ internal object CloudServiceDocs {
                     canonicalUrl = "https://${DocExamples.HANDLE}/journal/${SyncExamples.JOURNAL_ID}",
                 ),
             )
-            code(HttpStatusCode.NotFound) { description = "No journal or note has that ID, or its owner has no handle. The body is empty." }
+            code(HttpStatusCode.NotFound) { description = "No resource has that ID, or its owner has no handle. The body is empty." }
         }
     }
 }

@@ -106,8 +106,10 @@ internal object CloudSchemaDocs {
                         "totalBytes" to "The plan's allowance in bytes. The largest 64-bit value means unlimited.",
                         "usedBytes" to "Bytes in use across media and backups.",
                         "categories" to "Per-category breakdown. Currently always empty.",
-                        "isOverQuota" to "`true` when `usedBytes` exceeds `totalBytes`.",
-                        "usagePercentage" to "`usedBytes / totalBytes` as a fraction from 0.0 upward (1.0 means full). 0.0 when unlimited.",
+                        "isOverQuota" to "Not sent by the server today. Compute it as `usedBytes > totalBytes`.",
+                        "usagePercentage" to
+                            "Not sent by the server today. Compute it as `usedBytes / totalBytes`, treating the largest 64-bit " +
+                            "`totalBytes` as unlimited rather than dividing.",
                     ),
                 ),
             "QuotaCategoryUsage" to
@@ -188,7 +190,7 @@ internal object CloudSchemaDocs {
                     "Where a shared resource lives.",
                     mapOf(
                         "ownerHandle" to "The owner's handle, which is also the host the resource is served from.",
-                        "kind" to "`journal` or `note`.",
+                        "kind" to "`journal`, `note` or `rewind`.",
                         "canonicalPath" to "Path of the resource on the owner's host.",
                         "canonicalUrl" to "The full public URL.",
                     ),

@@ -2,7 +2,6 @@ package app.logdate.server.openapi
 
 import app.logdate.server.serverJson
 import io.github.smiley4.ktoropenapi.OpenApi
-import io.github.smiley4.ktoropenapi.config.AuthKeyLocation
 import io.github.smiley4.ktoropenapi.config.AuthScheme
 import io.github.smiley4.ktoropenapi.config.AuthType
 import io.github.smiley4.ktoropenapi.config.ExampleEncoder
@@ -64,13 +63,14 @@ fun Application.installLogDateOpenApi(openApiSpec: AtomicReference<OpenAPI?>) {
                     "short-lived. On `401`, call **Refresh the access token** with your `refreshToken` and retry."
             }
             securityScheme("dpopProof") {
-                type = AuthType.API_KEY
-                name = "DPoP"
-                location = AuthKeyLocation.HEADER
+                // The DSL's AuthScheme enum has no DPoP entry; postBuild rewrites the scheme name below.
+                type = AuthType.HTTP
+                scheme = AuthScheme.BEARER
                 description =
-                    "A DPoP proof: a short-lived JWT your client signs with its own key pair for this exact request " +
-                    "(method and URL). It ties an OAuth token to the client holding the private key, so a stolen " +
-                    "token is useless on its own. Only AT Protocol OAuth clients need this."
+                    "An OAuth access token bound to your DPoP key, sent as `Authorization: DPoP <token>` together " +
+                    "with a `DPoP` header carrying a proof: a short-lived JWT your client signs with its own key " +
+                    "pair for this exact request (method and URL). A stolen token is useless without the key. " +
+                    "Only AT Protocol OAuth clients need this."
             }
             securityScheme("oauth2") {
                 type = AuthType.OAUTH2
@@ -108,6 +108,7 @@ fun Application.installLogDateOpenApi(openApiSpec: AtomicReference<OpenAPI?>) {
             publishedPrefixes.any(path::startsWith)
         }
         postBuild = { api, _ ->
+            api.components.securitySchemes["dpopProof"]?.scheme = "DPoP"
             useReadableSchemaNames(api)
             describeSealedDiscriminators(api)
             applySchemaDocumentation(api)

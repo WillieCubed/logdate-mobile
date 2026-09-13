@@ -42,8 +42,9 @@ cannot change in code without the docs following.
    ```kotlin
    val deleteDraft: RouteConfig.() -> Unit = {
        bearerOperation("deleteDraft", ApiTags.DRAFTS, "Delete a draft", """
-           Soft-deletes a draft. Other devices see it in **Page draft changes** with `is_deleted`
-           set to `true`. Repeating the call answers `204` again.
+           Soft-deletes a draft. Other devices are not told about the deletion by **Page draft
+           changes**, so delete it on each device once the finished entry is saved. Repeating the
+           call answers `204` again.
        """)
        request { pathParameter<String>("draftId") { description = "The draft's ID."; example("Example") { value = SyncExamples.DRAFT_ID } } }
        response {
@@ -86,9 +87,10 @@ anything that needs more than a sentence.
 | `OpenApiOverviewTest` | The overview has every section, every placeholder resolved, and quotes the limits the server enforces. |
 | `ApplicationTest` | `/docs`, `/openapi.json`, `/openapi.yaml` and the favicon are served; Scalar telemetry stays off. |
 
-`./gradlew :server:validateOpenApi` (part of `:server:check`) exports the spec from a live
-in-process server to `server/build/openapi/` and checks the launch-critical paths and tag groups
-are present.
+`./gradlew :server:generateOpenApi` exports the spec from a live in-process server to
+`server/build/openapi/openapi.json` and `openapi.yaml`, for client generators or a diff.
+`./gradlew :server:validateOpenApi` (part of `:server:check`) runs it and checks the
+launch-critical paths and tag groups are present.
 
 ## Previewing locally
 

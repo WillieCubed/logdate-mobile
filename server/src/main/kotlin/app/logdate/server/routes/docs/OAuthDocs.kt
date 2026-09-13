@@ -5,10 +5,13 @@ import app.logdate.server.oauth.JsonWebKeySet
 import app.logdate.server.openapi.ApiTags
 import app.logdate.server.routes.ErrorCase
 import app.logdate.server.routes.ErrorEnvelope
+import app.logdate.server.routes.OAuthAuthorizationDecisionForm
+import app.logdate.server.routes.OAuthParForm
+import app.logdate.server.routes.OAuthRevokeForm
 import app.logdate.server.routes.OAuthTokenForm
 import app.logdate.server.routes.bearerOperation
 import app.logdate.server.routes.bearerUnauthorized
-import app.logdate.server.routes.dpopOperation
+import app.logdate.server.routes.dpopNonceHeader
 import app.logdate.server.routes.oauthError
 import app.logdate.server.routes.ok
 import app.logdate.server.routes.publicOperation
@@ -160,7 +163,7 @@ internal object OAuthDocs {
     }
 
     val pushAuthorizationRequest: RouteConfig.() -> Unit = {
-        dpopOperation(
+        publicOperation(
             "pushAuthorizationRequest",
             ApiTags.OAUTH,
             "Push an authorization request",
@@ -178,17 +181,22 @@ internal object OAuthDocs {
         )
         request {
             dpopHeader()
-            body<String> {
+            body<OAuthParForm> {
                 description =
-                    "`application/x-www-form-urlencoded`: `client_id`, `redirect_uri`, `scope`, `response_type`, `code_challenge`, " +
-                    "`code_challenge_method`, and optionally `state`, `login_hint`, `client_assertion_type`, `client_assertion`."
+                    "`application/x-www-form-urlencoded`. Confidential clients add `client_assertion_type` and `client_assertion`."
                 required = true
                 mediaTypes(ContentType.Application.FormUrlEncoded)
                 example("Example") {
                     value =
-                        "client_id=$CLIENT_ID&redirect_uri=https%3A%2F%2Fjournalviewer.example%2Fcallback" +
-                        "&scope=atproto&response_type=code" +
-                        "&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256&state=af0ifjsldkj"
+                        OAuthParForm(
+                            clientId = CLIENT_ID,
+                            redirectUri = "https://journalviewer.example/callback",
+                            scope = "atproto",
+                            responseType = "code",
+                            codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                            codeChallengeMethod = "S256",
+                            state = "af0ifjsldkj",
+                        )
                 }
             }
         }
@@ -201,7 +209,7 @@ internal object OAuthDocs {
                     example("Example") { value = PushedAuthorizationBody(requestUri = REQUEST_URI, expiresInSeconds = 300) }
                 }
             }
-            oauthError(HttpStatusCode.BadRequest, invalidRequest, invalidClient, invalidDpop, useDpopNonce)
+            oauthError(HttpStatusCode.BadRequest, invalidRequest, invalidClient, invalidDpop, useDpopNonce, headers = dpopNonceHeader)
             oauthError(HttpStatusCode.InternalServerError, serverError)
             oauthError(HttpStatusCode.NotImplemented, notConfigured)
         }
@@ -270,11 +278,11 @@ internal object OAuthDocs {
             """,
         )
         request {
-            body<String> {
-                description = "`application/x-www-form-urlencoded`: `request_uri` and `decision` (`approve` or `deny`)."
+            body<OAuthAuthorizationDecisionForm> {
+                description = "`application/x-www-form-urlencoded`."
                 required = true
                 mediaTypes(ContentType.Application.FormUrlEncoded)
-                example("Approve") { value = "request_uri=${REQUEST_URI.replace(":", "%3A")}&decision=approve" }
+                example("Approve") { value = OAuthAuthorizationDecisionForm(requestUri = REQUEST_URI, decision = "approve") }
             }
         }
         response {
@@ -300,7 +308,7 @@ internal object OAuthDocs {
     }
 
     val exchangeToken: RouteConfig.() -> Unit = {
-        dpopOperation(
+        publicOperation(
             "exchangeOAuthToken",
             ApiTags.OAUTH,
             "Exchange a code or refresh token",
@@ -370,6 +378,7 @@ internal object OAuthDocs {
                 ),
                 invalidDpop,
                 useDpopNonce,
+                headers = dpopNonceHeader,
             )
             oauthError(HttpStatusCode.InternalServerError, serverError)
             oauthError(HttpStatusCode.NotImplemented, notConfigured)
@@ -377,7 +386,7 @@ internal object OAuthDocs {
     }
 
     val revokeToken: RouteConfig.() -> Unit = {
-        dpopOperation(
+        publicOperation(
             "revokeOAuthToken",
             ApiTags.OAUTH,
             "Revoke a refresh token",
@@ -389,12 +398,12 @@ internal object OAuthDocs {
         )
         request {
             dpopHeader()
-            body<String> {
+            body<OAuthRevokeForm> {
                 description =
-                    "`application/x-www-form-urlencoded`: `token`, `client_id`, and optionally `client_assertion_type` and `client_assertion`."
+                    "`application/x-www-form-urlencoded`. Confidential clients add `client_assertion_type` and `client_assertion`."
                 required = true
                 mediaTypes(ContentType.Application.FormUrlEncoded)
-                example("Example") { value = "token=rt-9a8b7c6d5e4f&client_id=${CLIENT_ID.replace(":", "%3A").replace("/", "%2F")}" }
+                example("Example") { value = OAuthRevokeForm(token = "rt-9a8b7c6d5e4f", clientId = CLIENT_ID) }
             }
         }
         response {
@@ -402,7 +411,7 @@ internal object OAuthDocs {
                 description = "The refresh token is revoked. The body is empty."
                 header<String>("DPoP-Nonce") { this.description = "The nonce to put in your next DPoP proof." }
             }
-            oauthError(HttpStatusCode.BadRequest, invalidRequest, invalidClient, invalidDpop, useDpopNonce)
+            oauthError(HttpStatusCode.BadRequest, invalidRequest, invalidClient, invalidDpop, useDpopNonce, headers = dpopNonceHeader)
             oauthError(HttpStatusCode.InternalServerError, serverError)
             oauthError(HttpStatusCode.NotImplemented, notConfigured)
         }

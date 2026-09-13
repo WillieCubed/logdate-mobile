@@ -6,6 +6,7 @@ import app.logdate.server.routes.ErrorCase
 import app.logdate.server.routes.ErrorEnvelope
 import app.logdate.server.routes.bearerOperation
 import app.logdate.server.routes.bearerUnauthorized
+import app.logdate.server.routes.binarySchema
 import app.logdate.server.routes.created
 import app.logdate.server.routes.noContent
 import app.logdate.server.routes.ok
@@ -126,7 +127,7 @@ internal object SyncStorageDocs {
                 part<String>("mimeType") { required = true }
                 part<String>("sizeBytes") { required = true }
                 part<String>("deviceId") { required = true }
-                part<ByteArray>("data") {
+                part("data", binarySchema()) {
                     required = true
                     mediaTypes(ContentType.Application.OctetStream)
                 }
@@ -154,7 +155,7 @@ internal object SyncStorageDocs {
             )
             syncUnauthorized()
             quotaExceeded()
-            rateLimited(MEDIA_UPLOAD_RATE_LIMIT, ErrorEnvelope.SYNC, "account", retryAfterHeader = true)
+            rateLimited(MEDIA_UPLOAD_RATE_LIMIT, ErrorEnvelope.SYNC)
             syncError(
                 HttpStatusCode.InternalServerError,
                 ErrorCase(
@@ -207,7 +208,7 @@ internal object SyncStorageDocs {
         response {
             code(HttpStatusCode.OK) {
                 description = "The file's bytes. `Content-Type` is the media type given at upload."
-                body<ByteArray> { mediaTypes(ContentType.Application.OctetStream) }
+                body(binarySchema()) { mediaTypes(ContentType.Application.OctetStream) }
             }
             syncUnauthorized()
             syncError(
@@ -291,7 +292,7 @@ internal object SyncStorageDocs {
                 mediaTypes(ContentType.MultiPart.FormData)
                 part<String>("deviceId") { required = true }
                 part<String>("manifest") { required = true }
-                part<ByteArray>("data") {
+                part("data", binarySchema()) {
                     required = true
                     mediaTypes(ContentType.Application.OctetStream)
                 }
@@ -313,7 +314,7 @@ internal object SyncStorageDocs {
             )
             syncUnauthorized()
             quotaExceeded()
-            rateLimited(BACKUP_UPLOAD_RATE_LIMIT, ErrorEnvelope.SYNC, "account", retryAfterHeader = true)
+            rateLimited(BACKUP_UPLOAD_RATE_LIMIT, ErrorEnvelope.SYNC)
             syncError(
                 HttpStatusCode.InternalServerError,
                 ErrorCase(
@@ -385,7 +386,7 @@ internal object SyncStorageDocs {
         response {
             code(HttpStatusCode.OK) {
                 description = "The archive's bytes."
-                body<ByteArray> { mediaTypes(ContentType.Application.OctetStream) }
+                body(binarySchema()) { mediaTypes(ContentType.Application.OctetStream) }
             }
             syncError(HttpStatusCode.BadRequest, invalidBackupId)
             syncUnauthorized()
@@ -448,7 +449,8 @@ internal object SyncStorageDocs {
             """
             Returns how many entries, journals and links the server holds for the account and the newest
             version it has assigned. Compare `lastTimestamp` with the cursor you have stored: if the server's is
-            higher, there is something to fetch. The counts exclude tombstones.
+            higher, there is something to fetch. The counts exclude tombstones. An account that has never synced
+            anything has no version yet and gets the current time as `lastTimestamp`, so check the counts too.
 
             The payload is wrapped in the generic `{ "data", "message", "timestamp" }` success envelope.
             """,

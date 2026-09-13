@@ -144,7 +144,9 @@ Store `lastTimestamp`. Next time, send it as `since` and you will receive only w
 
 **Passkeys, and why there is a begin and a complete.** A passkey is a key pair stored on the person's device (or in their password manager). The server never sees the private key. To prove ownership, the server sends a random *challenge* (**begin**), the device signs it with the private key, and the client sends the signature back (**complete**). That is why every passkey flow is two calls, and why the second call must carry the `sessionToken` or `challenge` from the first. In a browser the signing step is `navigator.credentials.get()`; on Android and iOS it is the platform credential manager.
 
-**The `since` cursor.** Every write the server accepts gets a *version*: a number that only ever increases for that account, whatever the device's clock says. The change feeds take `since`, return every record whose version is greater than it, and return `lastTimestamp`, the highest version in that page. Despite the name it is a version, not a time. Send it back as the next `since`. Because versions are assigned by the server, two devices with wrong clocks still see changes in the order the server accepted them, and a change is never skipped.
+**The `since` cursor.** Every write the server accepts gets a *version*: a number that only ever increases for that account, whatever the device's clock says. The change feeds take `since`, return every record whose version is greater than it, and return `lastTimestamp`, the highest version in that page. Despite the name it is a version, not a time. Send it back as the next `since`. Because versions are assigned by the server, two devices with wrong clocks still see changes in the order the server accepted them.
+
+One caveat when `hasMore` is `true`: `changes` and `deletions` are each cut to `limit` separately but share the one `lastTimestamp`, so a record with a lower version than `lastTimestamp` can still be waiting in whichever list was cut short. Use a `limit` large enough that pages are rarely full (the default is {{sync.limit.default}}), or when `hasMore` is `true` page again from the cursor you sent rather than from `lastTimestamp`.
 
 **Tombstones.** Deleting something does not remove it from the feed; it becomes a *tombstone*, a small record saying "this ID was deleted at this time" with a fresh version. Tombstones arrive in the `deletions` list of a change-feed response so every device learns about the deletion, however long it was offline. The `isDeleted` field on items in `changes` is always `false`; deletions only travel in `deletions`.
 
@@ -168,21 +170,21 @@ Paths in this reference are relative, so the **Try it** panel talks to whichever
 There are four ways to obtain an access token:
 
 1. **Passkey sign-up or sign-in** (`/auth/signup/passkey/*`, `/auth/signin/passkey/*`): two calls each, see Concepts.
-2. **Google sign-up or sign-in** (`/auth/signup/google`, `/auth/signin/google`): one call with a Google ID token. If exactly one existing account has the same *verified* email, sign-in links the Google identity to it. If more than one matches, sign-up answers `409 ACCOUNT_LINK_CONFLICT` and sign-in answers `404 ACCOUNT_NOT_FOUND_SIGNUP_REQUIRED`; sign in with a passkey instead.
+2. **Google sign-up or sign-in** (`/auth/signup/google`, `/auth/signin/google`): one call with a Google ID token. If exactly one existing account has the same *verified* email, both calls link the Google identity to it (sign-up additionally requires that account's ID to equal `requestedOwnerId`, otherwise `409 ACCOUNT_LINK_CONFLICT`). If more than one matches, sign-up answers `409 ACCOUNT_LINK_CONFLICT` and sign-in answers `404 ACCOUNT_NOT_FOUND_SIGNUP_REQUIRED`; sign in with a passkey instead.
 3. **Restore credential** (`/auth/restore/*`): a special passkey the app registers so a person who has lost every device can still regain access. Register it while signed in; use it later without a username.
 4. **Refresh** (`/auth/token/refresh`): exchanges a refresh token for a new access token. This is the only auth call a client makes routinely.
 
-Send the access token as `Authorization: Bearer <accessToken>` on every endpoint marked with a lock icon. Logging out (`/auth/logout`) revokes the refresh token; a revoked token answers `401 REFRESH_TOKEN_REVOKED` forever after.
+Send the access token as `Authorization: Bearer <accessToken>` on every endpoint marked with a lock icon (the XRPC write methods also accept the OAuth form described next). Logging out (`/auth/logout`) revokes the refresh token; a revoked token answers `401 REFRESH_TOKEN_REVOKED` forever after.
 
 Third-party AT Protocol clients use the **OAuth** section instead, and send DPoP-bound tokens as `Authorization: DPoP <token>` together with a `DPoP` proof header.
 
 ## Errors
 
-Every error response has an HTTP status that indicates the severity and a machine-readable code that identifies the cause. Because LogDate Cloud implements several protocols, there are four envelope shapes. Which one you get depends on the section the endpoint is in, and each endpoint's response list shows the exact shape.
+Every error response has an HTTP status that indicates the severity and a machine-readable code that identifies the cause. Because LogDate Cloud implements several protocols, there are five envelope shapes. Which one you get depends on the section the endpoint is in, and each endpoint's response list shows the exact shape.
 
 | Section | Envelope | Example |
 |---|---|---|
-| Authentication, Account, Identity | `{ "error": { "code", "message" } }` | `{"error":{"code":"INVALID_TOKEN","message":"Invalid or expired token"}}` |
+| Authentication, Account, Identity | `{ "error": { "code", "message" } }` | `{"error":{"code":"INVALID_TOKEN","message":"Invalid or expired access token"}}` |
 | Contents, Journals, Associations, Drafts, Media, Backups, Sync status | `{ "code", "message", "details", "timestamp" }` | `{"code":"CONFLICT","message":"Server has a newer version","details":{},"timestamp":"2026-09-12T14:03:11.412Z"}` |
 | Quota, Transcription | `{ "error" }` | `{"error":"missing or invalid Authorization header"}` |
 | XRPC | `{ "error", "message" }` with an AT Protocol error name | `{"error":"RecordNotFound","message":"Could not locate record"}` |

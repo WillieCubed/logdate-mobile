@@ -95,11 +95,9 @@ internal object AuthDocs {
             "This device identity is already associated with an account",
         )
 
-    private fun ResponsesConfig.signupRateLimited() =
-        rateLimited(SIGNUP_RATE_LIMIT, ErrorEnvelope.API, "IP address", retryAfterHeader = false)
+    private fun ResponsesConfig.signupRateLimited() = rateLimited(SIGNUP_RATE_LIMIT, ErrorEnvelope.API)
 
-    private fun ResponsesConfig.signinRateLimited() =
-        rateLimited(SIGNIN_RATE_LIMIT, ErrorEnvelope.API, "IP address", retryAfterHeader = false)
+    private fun ResponsesConfig.signinRateLimited() = rateLimited(SIGNIN_RATE_LIMIT, ErrorEnvelope.API)
 
     private fun ResponsesConfig.serverError() = apiError(HttpStatusCode.InternalServerError, DocExamples.apiServerError)
 
@@ -283,12 +281,15 @@ internal object AuthDocs {
             Creates an account from a Google ID token in a single call and signs the person in. The token must
             come from one of the client IDs this deployment trusts and its email must be verified by Google.
 
-            If an account already has this Google identity, that account is returned. If exactly one existing
-            account has the same verified email, the Google identity is linked to it and that account is
-            returned. If more than one account matches, nothing is linked and the response is `409 ACCOUNT_LINK_CONFLICT`.
+            If an account already has this Google identity, or exactly one existing account has the same
+            verified email, that account is returned (linking the Google identity to it in the second case),
+            but only when its ID equals `requestedOwnerId`. Any other outcome is `409 ACCOUNT_LINK_CONFLICT`:
+            the resolved account has a different ID, more than one account carries the verified email,
+            `requestedOwnerId` already belongs to an unrelated account, or no unique username can be derived.
 
             `username` and `displayName` are optional; when omitted the server derives them from the Google
-            profile. `requestedOwnerId` is the app's per-install UUID and becomes the account ID.
+            profile. `requestedOwnerId` is the app's per-install UUID: a new account takes it as its ID, and an
+            existing account must already have it.
 
             > [!NOTE]
             > Limited to {{auth.signup}} per IP address, counted separately for each sign-up call.
@@ -330,7 +331,9 @@ internal object AuthDocs {
                 HttpStatusCode.Conflict,
                 ErrorCase(
                     "ACCOUNT_LINK_CONFLICT",
-                    "More than one account carries this verified email, so the server cannot choose one to link. Sign in with a passkey.",
+                    "The account this Google identity or verified email resolves to is not the one named by `requestedOwnerId`, " +
+                        "more than one account carries the verified email, `requestedOwnerId` is already taken, or no unique username " +
+                        "could be derived. If the account exists, call **Sign in with Google**; otherwise sign in with a passkey.",
                     "Google account could not be linked automatically",
                 ),
             )
@@ -479,7 +482,9 @@ internal object AuthDocs {
                 HttpStatusCode.NotFound,
                 ErrorCase(
                     "ACCOUNT_NOT_FOUND_SIGNUP_REQUIRED",
-                    "No account is linked to this Google identity or its verified email. Call **Sign up with Google**.",
+                    "No account is linked to this Google identity, and either no account or more than one account has its verified " +
+                        "email. If none does, call **Sign up with Google** with the same token; if several do, the server will not " +
+                        "pick one, so sign in with a passkey.",
                     "No account found. Use Google signup first.",
                 ),
             )
@@ -521,8 +526,11 @@ internal object AuthDocs {
             "Complete restore credential setup",
             """
             Verifies and stores the restore credential created from **Begin restore credential setup**.
-            `credentialJson` is the credential object exactly as the platform returned it, serialized to a JSON
-            string (the same shape as the `credential` field of **Complete passkey sign-up**).
+            `credentialJson` is a JSON string with only `id`, `rawId`, `type` and `response.clientDataJSON` /
+            `response.attestationObject`, the same fields as the `credential` object of **Complete passkey
+            sign-up**. Unlike that endpoint, this one rejects any other key, so strip `authenticatorAttachment`,
+            `clientExtensionResults`, `response.transports` and the like before sending, or the answer is
+            `400 INVALID_REQUEST`.
             """,
         )
         request {

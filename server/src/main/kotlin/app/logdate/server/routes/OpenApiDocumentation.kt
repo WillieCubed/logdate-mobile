@@ -1,15 +1,18 @@
 package app.logdate.server.routes
 
+import app.logdate.server.openapi.ApiLimits
 import app.logdate.server.openapi.renderApiText
 import app.logdate.server.ratelimit.RateLimitPolicy
 import app.logdate.server.responses.SimpleErrorResponse
 import app.logdate.shared.model.ApiError
 import app.logdate.shared.model.ApiErrorResponse
 import io.github.smiley4.ktoropenapi.config.RequestConfig
+import io.github.smiley4.ktoropenapi.config.ResponseConfig
 import io.github.smiley4.ktoropenapi.config.ResponsesConfig
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.swagger.v3.oas.models.media.Schema
 import kotlinx.serialization.Serializable
 import studio.hypertext.atproto.pds.OAuthErrorResponse
 import studio.hypertext.atproto.pds.PdsErrorResponse
@@ -39,7 +42,7 @@ internal enum class ErrorEnvelope { API, SYNC, PDS, OAUTH, MESSAGE }
 internal data class ErrorCase(
     val code: String,
     val description: String,
-    val message: String = description,
+    val message: String,
 )
 
 private fun RouteConfig.operation(
@@ -72,7 +75,10 @@ internal fun RouteConfig.bearerOperation(
     securitySchemeNames = listOf("bearerAuth")
 }
 
-/** An operation that accepts either a LogDate bearer token or a DPoP-bound OAuth token. */
+/**
+ * An operation that accepts either a LogDate bearer token or a DPoP-bound OAuth token
+ * (`Authorization: DPoP <token>` together with a `DPoP` proof header).
+ */
 internal fun RouteConfig.bearerOrDpopOperation(
     id: String,
     tag: String,
@@ -84,18 +90,17 @@ internal fun RouteConfig.bearerOrDpopOperation(
     securitySchemeNames = listOf("bearerAuth", "dpopProof")
 }
 
-internal fun RouteConfig.dpopOperation(
-    id: String,
-    tag: String,
-    summary: String,
-    description: String,
-) {
-    operation(id, tag, summary, description)
-    protected = true
-    securitySchemeNames = listOf("dpopProof")
-}
-
 // ---- Requests -------------------------------------------------------------------------------
+
+/**
+ * `type: string, format: binary`. The kotlinx generator would describe a `ByteArray` as a JSON
+ * array of bytes, which is not what a file upload or download looks like on the wire.
+ */
+internal fun binarySchema(): Schema<*> =
+    Schema<Any>().apply {
+        types = setOf("string")
+        format = "binary"
+    }
 
 internal inline fun <reified T> RequestConfig.jsonBody(
     example: T,
@@ -116,8 +121,13 @@ internal fun RequestConfig.sinceAndLimit(
 ) {
     queryParameter<Long>("since") {
         description =
-            "Exclusive version cursor. Send `0` (or omit) for everything, then the `lastTimestamp` from the previous " +
-            "page. Non-numeric values answer `400 INVALID_PARAMETER`."
+            if (maxLimit != null) {
+                "Exclusive version cursor. Send `0` (or omit) for everything, then the `lastTimestamp` from the previous " +
+                    "page. Non-numeric values answer `400 INVALID_PARAMETER`."
+            } else {
+                "Exclusive version cursor. Send `0` (or omit) for everything, then the highest `serverVersion` from the " +
+                    "previous page. Non-numeric values are treated as `0`, not rejected."
+            }
         required = false
         example("First page") { value = 0L }
     }
@@ -168,11 +178,14 @@ private fun ResponsesConfig.errorResponse(
     status: HttpStatusCode,
     envelope: ErrorEnvelope,
     cases: List<ErrorCase>,
-    extraDescription: String? = null,
     details: Map<String, String> = emptyMap(),
     retryAfterHeader: Boolean = false,
+    headers: ResponseConfig.() -> Unit = {},
 ) {
     require(cases.isNotEmpty()) { "an error response needs at least one case" }
+    require(getResponses().none { it.statusCode == status.value.toString() }) {
+        "$status is already documented on this operation; pass every case in one call, a second call would replace the first"
+    }
     code(status) {
         description =
             buildString {
@@ -184,11 +197,11 @@ private fun ResponsesConfig.errorResponse(
                         .append(case.description)
                         .append('\n')
                 }
-                extraDescription?.let { append('\n').append(it.trimIndent()) }
             }.trim()
         if (retryAfterHeader) {
             header<Int>("Retry-After") { this.description = "Seconds to wait before trying again." }
         }
+        headers()
         when (envelope) {
             ErrorEnvelope.API ->
                 body<ApiErrorResponse> {
@@ -232,13 +245,20 @@ internal fun ResponsesConfig.syncError(
 internal fun ResponsesConfig.pdsError(
     status: HttpStatusCode,
     vararg cases: ErrorCase,
-) = errorResponse(status, ErrorEnvelope.PDS, cases.toList())
+    headers: ResponseConfig.() -> Unit = {},
+) = errorResponse(status, ErrorEnvelope.PDS, cases.toList(), headers = headers)
 
 /** An error in the OAuth envelope; [ErrorCase.code] is the RFC 6749 `error` value. */
 internal fun ResponsesConfig.oauthError(
     status: HttpStatusCode,
     vararg cases: ErrorCase,
-) = errorResponse(status, ErrorEnvelope.OAUTH, cases.toList())
+    headers: ResponseConfig.() -> Unit = {},
+) = errorResponse(status, ErrorEnvelope.OAUTH, cases.toList(), headers = headers)
+
+/** The `DPoP-Nonce` header a DPoP endpoint sets on the response that asks for a fresh nonce. */
+internal val dpopNonceHeader: ResponseConfig.() -> Unit = {
+    header<String>("DPoP-Nonce") { description = "The nonce to put in your next DPoP proof." }
+}
 
 /** An error in the bare `{"error": "..."}` envelope. */
 internal fun ResponsesConfig.messageError(
@@ -253,7 +273,7 @@ internal fun ResponsesConfig.bearerUnauthorized(envelope: ErrorEnvelope) {
         ErrorEnvelope.API ->
             apiError(
                 HttpStatusCode.Unauthorized,
-                ErrorCase("INVALID_TOKEN", "The access token is missing, malformed or expired. $advice", "Invalid or expired token"),
+                ErrorCase("INVALID_TOKEN", "The access token is missing, malformed or expired. $advice", "Invalid or expired access token"),
             )
         ErrorEnvelope.SYNC ->
             syncError(
@@ -267,12 +287,12 @@ internal fun ResponsesConfig.bearerUnauthorized(envelope: ErrorEnvelope) {
         ErrorEnvelope.PDS ->
             pdsError(
                 HttpStatusCode.Unauthorized,
+                ErrorCase("AuthRequired", "No `Authorization: Bearer` header was sent.", "Missing bearer token"),
                 ErrorCase(
-                    "AuthRequired",
-                    "No usable credentials were sent. Send a bearer access token or a DPoP-bound token.",
-                    "Authentication required",
+                    "InvalidToken",
+                    "The token is malformed, expired or was issued for another account. $advice",
+                    "Authentication failed",
                 ),
-                ErrorCase("InvalidToken", "The token is malformed, expired or was issued for another account. $advice", "Invalid token"),
             )
         ErrorEnvelope.MESSAGE ->
             messageError(
@@ -289,27 +309,30 @@ internal fun ResponsesConfig.bearerUnauthorized(envelope: ErrorEnvelope) {
                 ErrorCase(
                     "login_required",
                     "The person is not signed in to LogDate. Sign them in, then repeat the request.",
-                    "Sign in to continue",
+                    "LogDate bearer authentication is required",
                 ),
             )
     }
 }
 
-/** The `429` a rate-limited endpoint answers; the numbers come from the policy the handler enforces. */
+/**
+ * The `429` a rate-limited endpoint answers; the numbers come from the policy the handler enforces.
+ * The auth endpoints count per IP address and send no `Retry-After`; every other family counts
+ * per account and does.
+ */
 internal fun ResponsesConfig.rateLimited(
     policy: RateLimitPolicy,
     envelope: ErrorEnvelope,
-    scope: String,
-    retryAfterHeader: Boolean,
 ) {
-    val limit =
-        app.logdate.server.openapi.ApiLimits
-            .describe(policy)
+    val perIp = envelope == ErrorEnvelope.API
+    val retryAfterHeader = !perIp
+    val scope = if (perIp) "IP address" else "account"
+    val limit = ApiLimits.describe(policy)
     val wait =
         if (retryAfterHeader) {
             "Wait the number of seconds in `Retry-After`, then try again."
         } else {
-            "Wait for the ${windowName(policy)} window to pass, then try again."
+            "Wait for the ${ApiLimits.windowName(policy)} window to pass, then try again."
         }
     val message =
         when (envelope) {
@@ -321,13 +344,6 @@ internal fun ResponsesConfig.rateLimited(
     val details = if (retryAfterHeader) mapOf("retryAfterSeconds" to "42") else emptyMap()
     errorResponse(HttpStatusCode.TooManyRequests, envelope, listOf(case), details = details, retryAfterHeader = retryAfterHeader)
 }
-
-private fun windowName(policy: RateLimitPolicy): String =
-    when (policy.windowSeconds) {
-        60 -> "one-minute"
-        60 * 60 -> "one-hour"
-        else -> "${policy.windowSeconds}-second"
-    }
 
 /** The `402` an upload answers when the account's plan has no room for it. */
 internal fun ResponsesConfig.quotaExceeded() =

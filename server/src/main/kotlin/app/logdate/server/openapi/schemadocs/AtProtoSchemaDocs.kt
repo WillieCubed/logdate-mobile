@@ -112,6 +112,41 @@ internal object AtProtoSchemaDocs {
                         "handle" to "The signed-in person's handle.",
                     ),
                 ),
+            "OAuthParForm" to
+                SchemaDoc(
+                    "The form body of **Push an authorization request**.",
+                    mapOf(
+                        "client_id" to "The URL of your client metadata document.",
+                        "redirect_uri" to "Where the person is sent back to after consenting. Must be listed in your client metadata.",
+                        "scope" to "`atproto`, plus any transition scopes your client metadata declares.",
+                        "response_type" to "Always `code`.",
+                        "code_challenge" to
+                            "The `S256` hash of the PKCE `code_verifier` you will send to **Exchange a code or refresh token**.",
+                        "code_challenge_method" to "Always `S256`.",
+                        "state" to "An opaque value echoed back on the redirect so you can match it to this request.",
+                        "login_hint" to "The handle or DID the person is expected to sign in as, if you know it.",
+                        "client_assertion_type" to "`urn:ietf:params:oauth:client-assertion-type:jwt-bearer` for confidential clients.",
+                        "client_assertion" to "The signed client assertion JWT for confidential clients.",
+                    ),
+                ),
+            "OAuthAuthorizationDecisionForm" to
+                SchemaDoc(
+                    "The form body of **Approve or deny the request**.",
+                    mapOf(
+                        "request_uri" to "The `request_uri` from **Push an authorization request**.",
+                        "decision" to "`approve` or `deny`.",
+                    ),
+                ),
+            "OAuthRevokeForm" to
+                SchemaDoc(
+                    "The form body of **Revoke a refresh token**.",
+                    mapOf(
+                        "token" to "The refresh token to invalidate.",
+                        "client_id" to "Your client metadata URL; it must be the client the token was issued to.",
+                        "client_assertion_type" to "`urn:ietf:params:oauth:client-assertion-type:jwt-bearer` for confidential clients.",
+                        "client_assertion" to "The signed client assertion JWT for confidential clients.",
+                    ),
+                ),
             "OAuthTokenForm" to
                 SchemaDoc(
                     "The form body of **Exchange a code or refresh token**. Which fields are required depends on `grant_type`.",

@@ -26,8 +26,9 @@ internal object SchemaDocumentation {
 }
 
 /**
- * Writes [registry] into the schemas of [api] and reports every gap in both directions:
- * published schemas or properties without prose, and prose without a matching schema.
+ * Writes [registry] into the schemas of [api]: the schema description, one description per
+ * property, and `x-enumDescriptions` for enums. `SchemaDocumentationTest` asserts there are no
+ * gaps in either direction.
  */
 internal fun applySchemaDocumentation(
     api: OpenAPI,

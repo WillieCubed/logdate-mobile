@@ -289,6 +289,37 @@ internal data class OAuthTokenForm(
     @SerialName("client_assertion") val clientAssertion: String? = null,
 )
 
+/** Documentation-only view of the form `POST /oauth/par` reads with `receiveParameters()`. */
+@Serializable
+internal data class OAuthParForm(
+    @SerialName("client_id") val clientId: String,
+    @SerialName("redirect_uri") val redirectUri: String,
+    val scope: String,
+    @SerialName("response_type") val responseType: String,
+    @SerialName("code_challenge") val codeChallenge: String,
+    @SerialName("code_challenge_method") val codeChallengeMethod: String,
+    val state: String? = null,
+    @SerialName("login_hint") val loginHint: String? = null,
+    @SerialName("client_assertion_type") val clientAssertionType: String? = null,
+    @SerialName("client_assertion") val clientAssertion: String? = null,
+)
+
+/** Documentation-only view of the form `POST /oauth/authorize` reads with `receiveParameters()`. */
+@Serializable
+internal data class OAuthAuthorizationDecisionForm(
+    @SerialName("request_uri") val requestUri: String,
+    val decision: String,
+)
+
+/** Documentation-only view of the form `POST /oauth/revoke` reads with `receiveParameters()`. */
+@Serializable
+internal data class OAuthRevokeForm(
+    val token: String,
+    @SerialName("client_id") val clientId: String,
+    @SerialName("client_assertion_type") val clientAssertionType: String? = null,
+    @SerialName("client_assertion") val clientAssertion: String? = null,
+)
+
 private suspend fun ApplicationCall.respondOAuthToken(
     tokenResponse: OAuthTokenResponse,
     nonce: String,

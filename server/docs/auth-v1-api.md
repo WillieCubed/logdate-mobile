@@ -19,9 +19,9 @@ rules that are not visible from a single endpoint.
 - Ambiguous or conflicting linking attempts return a conflict error.
 
 ## Rate Limits
-- Signup endpoints (`/signup/passkey/*`, `/signup/google`) are limited to **5 requests/hour per source IP**.
-- Signin endpoints (`/signin/passkey/*`, `/signin/google`) are limited to **10 requests/minute per source IP**.
-- Limit violations return `429` with code `RATE_LIMIT_EXCEEDED`.
+The sign-up and sign-in limits are rendered from the policies the server enforces in the
+**Rate limits** table of the `/docs` overview; this page does not repeat the numbers. Limit
+violations return `429` with code `RATE_LIMIT_EXCEEDED`.
 
 ## Google Verification
 - Server validates Google ID tokens via Google token introspection endpoint.
