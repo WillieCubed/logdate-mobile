@@ -113,3 +113,13 @@ These are documented truthfully rather than papered over. Fixing them is code wo
 - Auth sign-up and sign-in `429`s carry no `Retry-After` header.
 - `syncVersion` on upload requests is never read; `isDeleted` on change items is always `false`.
 - `POST /auth/me/email/verify/complete` answers `400` in two different shapes.
+- Change feeds cut `changes` and `deletions` to `limit` separately but share one `lastTimestamp`,
+  so a full page can leave a lower-versioned record behind (the overview tells clients how to cope).
+- Account deletion removes media and backup blobs before the account row, so `DELETION_FAILED`
+  can arrive after the files are gone.
+- Malformed JSON answers a bare `400` on XRPC and transcription (no `StatusPages`) and a `500` on
+  the identity endpoints, whose generic catch swallows the request-parsing error.
+- `POST /auth/restore/register/complete` parses `credentialJson` with the strict default `Json`,
+  so platform credential JSON with extra keys is rejected while the passkey endpoints accept it.
+- `QuotaUsage.isOverQuota` and `usagePercentage` are computed defaults the handler never passes,
+  so they never reach the wire even though the schema lists them.
