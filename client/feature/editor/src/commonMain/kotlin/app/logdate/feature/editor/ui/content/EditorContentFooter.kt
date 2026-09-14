@@ -68,12 +68,14 @@ fun EditorContentFooter(
 
     PlatformBackHandler(enabled = expanded) { expanded = false }
 
-    // Pre-generate stable IDs for each block type button
-    val textId = remember { Uuid.random() }
-    val imageId = remember { Uuid.random() }
-    val audioId = remember { Uuid.random() }
-    val videoId = remember { Uuid.random() }
-    val cameraId = remember { Uuid.random() }
+    // Pre-generate stable IDs for each block type button. Each id is consumed by one tap:
+    // this footer stays on screen after a block is added, so a second tap on the same
+    // button must produce a fresh block rather than one that collides with the first.
+    var textId by remember { mutableStateOf(Uuid.random()) }
+    var imageId by remember { mutableStateOf(Uuid.random()) }
+    var audioId by remember { mutableStateOf(Uuid.random()) }
+    var videoId by remember { mutableStateOf(Uuid.random()) }
+    var cameraId by remember { mutableStateOf(Uuid.random()) }
 
     val sts = LocalSharedTransitionScope.current
     val avs = LocalAnimatedVisibilityScope.current
@@ -148,6 +150,7 @@ fun EditorContentFooter(
                 modifier = textBounds,
                 onClick = {
                     onAddBlock(BlockType.TEXT, textId)
+                    textId = Uuid.random()
                     collapseToolbar(coroutineScope, expanded) { expanded = false }
                 },
             )
@@ -156,28 +159,40 @@ fun EditorContentFooter(
                 icon = PlatformIcons.library(),
                 contentDescription = stringResource(Res.string.editor_action_add_image),
                 modifier = imageBounds,
-                onClick = { onAddBlock(BlockType.IMAGE, imageId) },
+                onClick = {
+                    onAddBlock(BlockType.IMAGE, imageId)
+                    imageId = Uuid.random()
+                },
             )
 
             BlockTypeButton(
                 icon = PlatformIcons.audioFile(),
                 contentDescription = stringResource(Res.string.editor_action_add_audio),
                 modifier = audioBounds,
-                onClick = { onAddBlock(BlockType.AUDIO, audioId) },
+                onClick = {
+                    onAddBlock(BlockType.AUDIO, audioId)
+                    audioId = Uuid.random()
+                },
             )
 
             BlockTypeButton(
                 icon = PlatformIcons.videoFile(),
                 contentDescription = stringResource(Res.string.editor_action_add_video),
                 modifier = videoBounds,
-                onClick = { onAddBlock(BlockType.VIDEO, videoId) },
+                onClick = {
+                    onAddBlock(BlockType.VIDEO, videoId)
+                    videoId = Uuid.random()
+                },
             )
 
             BlockTypeButton(
                 icon = PlatformIcons.camera(),
                 contentDescription = stringResource(Res.string.take_photo),
                 modifier = cameraBounds,
-                onClick = { onAddBlock(BlockType.CAMERA, cameraId) },
+                onClick = {
+                    onAddBlock(BlockType.CAMERA, cameraId)
+                    cameraId = Uuid.random()
+                },
             )
         }
 
