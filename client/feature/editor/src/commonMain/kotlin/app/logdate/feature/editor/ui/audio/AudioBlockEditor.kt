@@ -197,6 +197,7 @@ fun AudioBlockEditor(
                             (audioUiState.transcriptionState as? AudioUiState.TranscriptionState.Success)?.isFinal == true,
                         transcriptionIsRefining =
                             (audioUiState.transcriptionState as? AudioUiState.TranscriptionState.Success)?.isRefining == true,
+                        transcriptionHasError = audioUiState.transcriptionState is AudioUiState.TranscriptionState.Error,
                         isPaused = audioUiState.isPaused,
                         onRestart = { audioViewModel.restartRecording() },
                         onPause = { audioViewModel.toggleRecordingPause() },
