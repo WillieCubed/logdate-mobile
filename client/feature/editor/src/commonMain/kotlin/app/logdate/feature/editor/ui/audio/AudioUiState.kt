@@ -13,8 +13,20 @@ import kotlin.uuid.Uuid
 data class AudioUiState(
     // Recording state
     val isRecording: Boolean = false,
+    /**
+     * True from the moment a start is accepted until the platform confirms the recorder is
+     * running (or refuses). The record control is disabled meanwhile so repeated taps cannot
+     * queue a second session.
+     */
+    val isStartingRecording: Boolean = false,
     val isPaused: Boolean = false, // New state for pause/resume functionality
     val recordedAudioUri: String? = null,
+    /**
+     * Block id of a recording that ended without producing a file. The block editor uses it to
+     * drop the block back to an empty state so the user can record again or save without it.
+     * Cleared when the next recording starts.
+     */
+    val failedRecordingTargetNoteId: Uuid? = null,
     /**
      * Filesystem path of the recording the manager is currently writing to. Surfaced so
      * the editor can persist it as the recovery anchor in the draft's pending-media list

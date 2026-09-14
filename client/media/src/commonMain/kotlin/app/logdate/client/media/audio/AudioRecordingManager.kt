@@ -52,6 +52,18 @@ interface AudioRecordingManager {
     fun getStructuredTranscriptionFlow(): Flow<TranscriptionResult> = emptyFlow()
 
     /**
+     * Emits whether a recording session is active.
+     *
+     * A session can end outside the editor: a notification action, the platform reclaiming
+     * the microphone, or the recorder failing mid-session. Emitting `false` lets the UI that
+     * started the session finalize it (collect the file through [stopRecording]) instead of
+     * showing a live recording that no longer exists. The default never emits, which keeps
+     * the UI's own start/stop calls as the only source of truth on platforms without
+     * out-of-band stops.
+     */
+    fun getRecordingStateFlow(): Flow<Boolean> = emptyFlow()
+
+    /**
      * Sets the transcription service to use for speech recognition
      */
     fun setTranscriptionService(service: TranscriptionService)

@@ -50,6 +50,9 @@ import kotlin.time.Duration
  * @param onStartRecording Callback when recording should start
  * @param onStopRecording Callback when recording should stop
  * @param modifier Modifier for the root component
+ * @param isStarting True while a start is waiting on the platform; the record button is
+ *   disabled so repeated taps cannot queue a second session
+ * @param errorMessage Message shown under the controls when the last start or stop failed
  */
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -62,6 +65,8 @@ fun AudioRecordingControls(
     modifier: Modifier = Modifier,
     inputSelection: MediaDeviceSelectionUiState? = null,
     onInputSelected: (String) -> Unit = {},
+    isStarting: Boolean = false,
+    errorMessage: String? = null,
 ) {
     val haptics = rememberLogDateHaptics()
     FoldableTabletopLayout(
@@ -111,8 +116,10 @@ fun AudioRecordingControls(
                         haptics.recordingFinished()
                         onStopRecording()
                     },
+                    enabled = !isStarting,
                     modifier = Modifier.fillMaxWidth(0.8f),
                 )
+                RecordingErrorText(errorMessage)
             }
         },
         standardContent = {
@@ -122,6 +129,8 @@ fun AudioRecordingControls(
                 recordingDuration = recordingDuration,
                 inputSelection = inputSelection,
                 onInputSelected = onInputSelected,
+                isStarting = isStarting,
+                errorMessage = errorMessage,
                 onStartRecording = {
                     haptics.recordingStarted()
                     onStartRecording()
@@ -148,6 +157,8 @@ private fun AudioRecordingControlsColumn(
     onInputSelected: (String) -> Unit,
     onStartRecording: () -> Unit,
     onStopRecording: () -> Unit,
+    isStarting: Boolean,
+    errorMessage: String?,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -176,9 +187,25 @@ private fun AudioRecordingControlsColumn(
             recordingState = recordingState,
             onStartRecording = onStartRecording,
             onStopRecording = onStopRecording,
+            enabled = !isStarting,
             modifier = Modifier.fillMaxWidth(0.8f),
         )
+        RecordingErrorText(errorMessage)
     }
+}
+
+@Composable
+private fun RecordingErrorText(
+    errorMessage: String?,
+    modifier: Modifier = Modifier,
+) {
+    if (errorMessage.isNullOrBlank()) return
+    Text(
+        text = errorMessage,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.error,
+        modifier = modifier.testTag("audio_record_error"),
+    )
 }
 
 @Composable
@@ -306,11 +333,13 @@ private fun RecordingActionButton(
     recordingState: RecordingState,
     onStartRecording: () -> Unit,
     onStopRecording: () -> Unit,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     if (recordingState == RecordingState.RECORDING) {
         Button(
             onClick = onStopRecording,
+            enabled = enabled,
             colors =
                 ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error,
@@ -331,6 +360,7 @@ private fun RecordingActionButton(
     } else {
         Button(
             onClick = onStartRecording,
+            enabled = enabled,
             colors =
                 ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,

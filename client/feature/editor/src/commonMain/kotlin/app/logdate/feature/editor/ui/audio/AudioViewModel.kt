@@ -19,8 +19,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.uuid.Uuid
@@ -46,7 +49,16 @@ class AudioViewModel(
     val uiState: StateFlow<AudioUiState> = _uiState.asStateFlow()
     private var audioLevelJob: Job? = null
     private var durationJob: Job? = null
+    private var recordingStateJob: Job? = null
     private var structuredTranscriptionJob: Job? = null
+
+    /**
+     * Serializes every recording transition so a tap that lands while a start or stop is
+     * still in flight waits its turn and then sees the settled state. Without this, two quick
+     * taps on Record raced each other: the second was refused by the platform and overwrote
+     * the first's "recording" state with "idle" while the microphone stayed live.
+     */
+    private val recordingMutex = Mutex()
 
     /**
      * Held across stop/restart so a [restartRecording] call still persists the
@@ -56,7 +68,6 @@ class AudioViewModel(
 
     init {
         audioRecordingManager.setTranscriptionService(transcriptionService)
-        startTranscriptionCollector()
         observeEnhancedModelDownloads()
     }
 
@@ -100,43 +111,33 @@ class AudioViewModel(
      *   has long since been cleared.
      */
     fun startRecording(targetNoteId: Uuid? = null) {
-        viewModelScope.launch {
+        viewModelScope.launch { startRecordingInternal(targetNoteId) }
+    }
+
+    private suspend fun startRecordingInternal(targetNoteId: Uuid?) {
+        recordingMutex.withLock {
+            if (!admitStart()) return
             Napier.d("AudioViewModel: Starting recording")
             try {
-                // Stop any ongoing playback
                 if (_uiState.value.isPlaying) {
                     audioPlaybackManager.stopPlayback()
                 }
-
                 lastTargetNoteId = targetNoteId
                 val started = audioRecordingManager.startRecording(targetNoteId)
                 if (!started) {
-                    _uiState.update { it.copy(isRecording = false, error = "Failed to start recording") }
-                    return@launch
+                    failStart("Recording could not start")
+                    return
                 }
-
                 startRecordingCollectors()
-                val transcriptionState =
-                    when (val current = _uiState.value.transcriptionState) {
-                        is AudioUiState.TranscriptionState.Error -> current
-                        else ->
-                            if (
-                                transcriptionService.supportsLiveTranscription ||
-                                transcriptionService.supportsFileTranscription
-                            ) {
-                                AudioUiState.TranscriptionState.InProgress
-                            } else {
-                                AudioUiState.TranscriptionState.NotRequested
-                            }
-                    }
                 _uiState.update {
                     it.copy(
                         isRecording = true,
+                        isStartingRecording = false,
                         isPaused = false,
                         isPlaying = false,
                         audioLevels = emptyList(),
                         duration = Duration.ZERO,
-                        transcriptionState = transcriptionState,
+                        transcriptionState = initialTranscriptionState(it.transcriptionState),
                         error = null,
                         recordingFilePath = audioRecordingManager.currentRecordingPath,
                         recordingTargetNoteId = targetNoteId,
@@ -145,19 +146,71 @@ class AudioViewModel(
                 Napier.d("AudioViewModel: Recording started")
             } catch (e: Exception) {
                 Napier.e("Failed to start recording: ${e.message}", e)
-                _uiState.update { it.copy(isRecording = false, error = "Failed to start recording") }
+                failStart("Recording could not start")
             }
         }
     }
 
     /**
+     * Marks a start as in flight unless a session is already active or starting. Runs under
+     * [recordingMutex], so a second tap queued behind the first sees the first's outcome.
+     */
+    private fun admitStart(): Boolean {
+        while (true) {
+            val current = _uiState.value
+            if (current.isRecording || current.isStartingRecording) {
+                Napier.d("AudioViewModel: Ignoring start while a session is active or starting")
+                return false
+            }
+            val admitted =
+                current.copy(
+                    isStartingRecording = true,
+                    error = null,
+                    failedRecordingTargetNoteId = null,
+                )
+            if (_uiState.compareAndSet(current, admitted)) return true
+        }
+    }
+
+    private fun failStart(message: String) {
+        _uiState.update {
+            it.copy(
+                isRecording = false,
+                isStartingRecording = false,
+                recordingTargetNoteId = null,
+                recordingFilePath = null,
+                error = message,
+            )
+        }
+    }
+
+    private fun initialTranscriptionState(current: AudioUiState.TranscriptionState): AudioUiState.TranscriptionState =
+        when (current) {
+            is AudioUiState.TranscriptionState.Error -> current
+            else ->
+                if (transcriptionService.supportsLiveTranscription || transcriptionService.supportsFileTranscription) {
+                    AudioUiState.TranscriptionState.InProgress
+                } else {
+                    AudioUiState.TranscriptionState.NotRequested
+                }
+        }
+
+    /**
      * Stops audio recording, saves the file, and updates the UI state.
      */
     fun stopRecording() {
-        viewModelScope.launch { stopRecordingInternal() }
+        viewModelScope.launch {
+            recordingMutex.withLock { stopRecordingInternal() }
+        }
     }
 
+    /** Must be called with [recordingMutex] held. A stop while idle is ignored. */
     private suspend fun stopRecordingInternal() {
+        val session = _uiState.value
+        if (!session.isRecording) {
+            Napier.d("AudioViewModel: Ignoring stop while not recording")
+            return
+        }
         Napier.d("AudioViewModel: Stopping recording")
         try {
             val uri = audioRecordingManager.stopRecording()
@@ -166,18 +219,7 @@ class AudioViewModel(
                 uri
                     ?.let { audioDurationResolver.resolveDurationMs(it) }
                     ?.milliseconds
-
             _uiState.update {
-                val updatedTranscription =
-                    when (val state = it.transcriptionState) {
-                        is AudioUiState.TranscriptionState.Success -> state
-                        else ->
-                            if (transcriptionService.supportsFileTranscription) {
-                                AudioUiState.TranscriptionState.InProgress
-                            } else {
-                                AudioUiState.TranscriptionState.NotRequested
-                            }
-                    }
                 it.copy(
                     isRecording = false,
                     isPaused = false,
@@ -185,16 +227,38 @@ class AudioViewModel(
                     recordingFilePath = null,
                     recordingTargetNoteId = null,
                     duration = resolvedDuration ?: it.duration,
-                    transcriptionState = updatedTranscription,
+                    transcriptionState = transcriptionStateAfterStop(it.transcriptionState),
+                    failedRecordingTargetNoteId = if (uri == null) session.recordingTargetNoteId else null,
+                    error = if (uri == null) "Recording could not be saved" else it.error,
                 )
             }
-
             Napier.d("AudioViewModel: Recording stopped, URI: $uri")
         } catch (e: Exception) {
             Napier.e("Failed to stop recording: ${e.message}", e)
-            _uiState.update { it.copy(isRecording = false, isPaused = false, error = "Failed to stop recording") }
+            stopRecordingCollectors()
+            _uiState.update {
+                it.copy(
+                    isRecording = false,
+                    isPaused = false,
+                    recordingFilePath = null,
+                    recordingTargetNoteId = null,
+                    failedRecordingTargetNoteId = session.recordingTargetNoteId,
+                    error = "Recording could not be saved",
+                )
+            }
         }
     }
+
+    private fun transcriptionStateAfterStop(current: AudioUiState.TranscriptionState): AudioUiState.TranscriptionState =
+        when (current) {
+            is AudioUiState.TranscriptionState.Success -> current
+            else ->
+                if (transcriptionService.supportsFileTranscription) {
+                    AudioUiState.TranscriptionState.InProgress
+                } else {
+                    AudioUiState.TranscriptionState.NotRequested
+                }
+        }
 
     /**
      * Pauses the current recording.
@@ -245,17 +309,22 @@ class AudioViewModel(
      */
     fun restartRecording() {
         viewModelScope.launch {
-            stopRecordingInternal()
-            audioRecordingManager.resetTranscription()
-            _uiState.update {
-                it.copy(
-                    transcriptionState = AudioUiState.TranscriptionState.NotRequested,
-                    audioLevels = emptyList(),
-                    duration = Duration.ZERO,
-                    recordedAudioUri = null,
-                )
+            recordingMutex.withLock {
+                if (!_uiState.value.isRecording) return@withLock
+                stopRecordingInternal()
+                audioRecordingManager.resetTranscription()
+                _uiState.update {
+                    it.copy(
+                        transcriptionState = AudioUiState.TranscriptionState.NotRequested,
+                        audioLevels = emptyList(),
+                        duration = Duration.ZERO,
+                        recordedAudioUri = null,
+                        failedRecordingTargetNoteId = null,
+                        error = null,
+                    )
+                }
             }
-            startRecording(targetNoteId = lastTargetNoteId)
+            startRecordingInternal(targetNoteId = lastTargetNoteId)
         }
     }
 
@@ -297,9 +366,7 @@ class AudioViewModel(
             Napier.d("AudioViewModel: Starting playback of $uri")
             try {
                 // Stop any ongoing recording and await completion before starting playback
-                if (_uiState.value.isRecording) {
-                    stopRecordingInternal()
-                }
+                recordingMutex.withLock { stopRecordingInternal() }
 
                 _uiState.update {
                     it.copy(
@@ -406,7 +473,8 @@ class AudioViewModel(
         Napier.d("AudioViewModel: Being cleared")
         try {
             stopRecordingCollectors()
-            if (audioRecordingManager.isRecording || _uiState.value.isRecording) {
+            val state = _uiState.value
+            if (audioRecordingManager.isRecording || state.isRecording || state.isStartingRecording) {
                 audioRecordingManager.requestStopRecording()
             }
             // AudioPlaybackManager is also a process-lifetime singleton.
@@ -436,22 +504,22 @@ class AudioViewModel(
      */
     override suspend fun resolvePending(blockId: Uuid): AudioCaptureState? {
         if (lastTargetNoteId != blockId) return null
-        val initial = _uiState.value
-        val pendingUri = initial.recordedAudioUri
-        if (pendingUri != null) {
-            _uiState.update { it.copy(recordedAudioUri = null) }
-            return AudioCaptureState.Ready(uri = pendingUri, durationMs = initial.duration.inWholeMilliseconds)
-        }
-        if (initial.isRecording) {
+        return recordingMutex.withLock {
+            val initial = _uiState.value
+            val pendingUri = initial.recordedAudioUri
+            if (pendingUri != null) {
+                _uiState.update { it.copy(recordedAudioUri = null) }
+                return@withLock AudioCaptureState.Ready(uri = pendingUri, durationMs = initial.duration.inWholeMilliseconds)
+            }
+            if (!initial.isRecording) return@withLock null
             stopRecordingInternal()
             val after = _uiState.value
             val resolvedUri =
                 after.recordedAudioUri
-                    ?: return AudioCaptureState.Failed("Recording could not be finalized")
+                    ?: return@withLock AudioCaptureState.Failed("Recording could not be finalized")
             _uiState.update { it.copy(recordedAudioUri = null) }
-            return AudioCaptureState.Ready(uri = resolvedUri, durationMs = after.duration.inWholeMilliseconds)
+            AudioCaptureState.Ready(uri = resolvedUri, durationMs = after.duration.inWholeMilliseconds)
         }
-        return null
     }
 
     /**
@@ -486,6 +554,21 @@ class AudioViewModel(
     private fun startRecordingCollectors() {
         audioLevelJob?.cancel()
         durationJob?.cancel()
+        recordingStateJob?.cancel()
+        recordingStateJob =
+            viewModelScope.launch {
+                audioRecordingManager
+                    .getRecordingStateFlow()
+                    // Ignore anything before the platform confirms this session is live; the
+                    // first false after that is a stop the editor did not initiate.
+                    .dropWhile { active -> !active }
+                    .collect { active ->
+                        if (!active && _uiState.value.isRecording) {
+                            Napier.d("AudioViewModel: Recording ended outside the editor; finalizing")
+                            stopRecording()
+                        }
+                    }
+            }
         audioLevelJob =
             viewModelScope.launch {
                 audioRecordingManager.getAudioLevelFlow().collect { level ->
@@ -507,9 +590,11 @@ class AudioViewModel(
     private fun stopRecordingCollectors() {
         audioLevelJob?.cancel()
         durationJob?.cancel()
+        recordingStateJob?.cancel()
         structuredTranscriptionJob?.cancel()
         audioLevelJob = null
         durationJob = null
+        recordingStateJob = null
         structuredTranscriptionJob = null
     }
 
