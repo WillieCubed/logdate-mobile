@@ -472,9 +472,15 @@ class SherpaOnnxTranscriptionService(
 
     override suspend fun cancelTranscription() {
         isListening = false
-        cancelJobs()
-        clearRefinementBuffer()
+        // Stop capture first so the recognition loop exits, then wait for it: the loop
+        // touches the native stream and VAD, and releasing them underneath it is a
+        // use-after-free in the JNI layer rather than a Kotlin exception.
         stopAudioRecord()
+        recognitionJob?.cancelAndJoin()
+        recognitionJob = null
+        refinementJob?.cancelAndJoin()
+        refinementJob = null
+        clearRefinementBuffer()
         vadProvider.reset()
         releaseStream()
         terminalizer.cancel()
