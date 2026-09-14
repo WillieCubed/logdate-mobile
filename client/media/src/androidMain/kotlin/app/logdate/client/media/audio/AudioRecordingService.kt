@@ -14,12 +14,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
-import java.io.IOException
 
 /**
  * Extension function to start the recording service
@@ -57,6 +57,11 @@ fun Context.stopAudioRecordingService() {
  *
  * Handles recording in the background with a persistent notification.
  * Provides binding for clients to interact with the recording.
+ *
+ * The recorder is prepared and started off the main thread; [recordingState] reports the
+ * outcome so a bound client can wait for a confirmed start (or an error) instead of
+ * assuming one. Every recorder transition is serialized on [recorderLock] because the
+ * bound client, the notification actions, and [onDestroy] reach it from different threads.
  */
 class AudioRecordingService : Service() {
     companion object {
@@ -67,6 +72,9 @@ class AudioRecordingService : Service() {
         const val SERVICE_ACTION_RESUME = AndroidAudioNotificationHandler.ACTION_RESUME
         const val EXTRA_OUTPUT_PATH = "app.logdate.extra.OUTPUT_PATH"
         const val EXTRA_INPUT_DEVICE_ID = "app.logdate.extra.INPUT_DEVICE_ID"
+        private const val LEVEL_POLL_INTERVAL_MS = 100L
+        private const val DURATION_TICK_MS = 1000L
+        private const val MAX_AMPLITUDE = 32768f
     }
 
     // Service binder for clients
@@ -82,11 +90,17 @@ class AudioRecordingService : Service() {
     // Notification handler
     private lateinit var notificationHandler: AndroidAudioNotificationHandler
 
-    // Recording state
+    // Recording state, guarded by recorderLock
+    private val recorderLock = Any()
     private var mediaRecorder: MediaRecorder? = null
     private var outputFile: File? = null
     private var recordingStartTime: Long = 0
+
+    @Volatile
     private var isPaused: Boolean = false
+
+    @Volatile
+    private var destroyed: Boolean = false
 
     // State flow for UI updates
     private val _recordingState = MutableStateFlow(RecordingServiceState())
@@ -133,6 +147,7 @@ class AudioRecordingService : Service() {
 
     override fun onDestroy() {
         Napier.d("Audio recording service destroyed")
+        destroyed = true
         stopRecording()
         stopForeground(STOP_FOREGROUND_REMOVE)
         serviceScope.cancel() // Cancel all coroutines
@@ -140,7 +155,9 @@ class AudioRecordingService : Service() {
     }
 
     /**
-     * Starts foreground recording with notification
+     * Enters the foreground with the recording notification, then prepares the recorder off
+     * the main thread. Any failure lands in [recordingState] as an error so the bound client
+     * can report it instead of waiting on a recorder that never starts.
      */
     private fun startForegroundRecording(
         outputPath: String?,
@@ -159,27 +176,16 @@ class AudioRecordingService : Service() {
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
-
-            startRecording(outputPath, inputDeviceId)
-
-            // Update recording state
-            serviceScope.launch {
-                var elapsedTimeSeconds = 0
-                while (_recordingState.value.isRecording) {
-                    kotlinx.coroutines.delay(1000)
-                    if (!isPaused) {
-                        elapsedTimeSeconds++
-                    }
-
-                    _recordingState.update {
-                        it.copy(durationSeconds = elapsedTimeSeconds)
-                    }
-                }
-            }
         } catch (e: Exception) {
             Napier.e("Error starting foreground service", e)
+            _recordingState.update {
+                it.copy(isRecording = false, error = "Recording is not allowed right now: ${e.message}")
+            }
             stopSelf()
+            return
         }
+
+        serviceScope.launch { startRecording(outputPath, inputDeviceId) }
     }
 
     /**
@@ -192,7 +198,7 @@ class AudioRecordingService : Service() {
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                mediaRecorder?.pause()
+                synchronized(recorderLock) { mediaRecorder?.pause() }
                 isPaused = true
             } else {
                 Napier.w("Pause recording not supported below Android N")
@@ -221,7 +227,7 @@ class AudioRecordingService : Service() {
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                mediaRecorder?.resume()
+                synchronized(recorderLock) { mediaRecorder?.resume() }
                 isPaused = false
             } else {
                 Napier.w("Resume recording not supported below Android N")
@@ -241,148 +247,158 @@ class AudioRecordingService : Service() {
     }
 
     /**
-     * Starts the actual recording process
+     * Prepares and starts the recorder. A start that arrives while a recording is already
+     * running finalizes that recording first so its file is playable and the old recorder
+     * does not leak the microphone.
      */
     private fun startRecording(
         outputPath: String?,
         inputDeviceId: String?,
     ) {
-        try {
-            // Create output file
-            outputFile =
-                if (outputPath != null) {
-                    val file = File(outputPath)
-                    file.parentFile?.mkdirs()
-                    if (file.exists()) {
-                        file.delete()
-                    }
-                    file
-                } else {
-                    val outputDir = applicationContext.cacheDir
-                    File.createTempFile("audio_recording_", ".m4a", outputDir)
+        synchronized(recorderLock) {
+            if (destroyed) {
+                Napier.w("Ignoring a start that arrived after the service was destroyed")
+                return
+            }
+            if (_recordingState.value.isRecording) {
+                Napier.w("A start arrived while recording; finalizing the previous recording first")
+                stopRecordingLocked()
+            }
+            var recorder: MediaRecorder? = null
+            try {
+                val file = resolveOutputFile(outputPath)
+                outputFile = file
+                recorder = createRecorder(file, inputDeviceId)
+                recorder.prepare()
+                recorder.start()
+                mediaRecorder = recorder
+                recordingStartTime = System.currentTimeMillis()
+                isPaused = false
+                _recordingState.update {
+                    it.copy(
+                        isRecording = true,
+                        startTime = recordingStartTime,
+                        recordedFilePath = null,
+                        error = null,
+                    )
                 }
-
-            // Initialize MediaRecorder
-            mediaRecorder =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    MediaRecorder(this)
-                } else {
-                    @Suppress("DEPRECATION")
-                    MediaRecorder()
-                }
-
-            mediaRecorder?.apply {
-                setAudioSource(MediaRecorder.AudioSource.MIC)
-                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                setOutputFile(outputFile?.absolutePath)
-                setAudioEncodingBitRate(128000)
-                setAudioSamplingRate(44100)
-                applyPreferredInputDevice(inputDeviceId)
-
-                try {
-                    prepare()
-                    start()
-                    recordingStartTime = System.currentTimeMillis()
-                    isPaused = false
-
-                    // Update state
-                    _recordingState.update {
-                        it.copy(
-                            isRecording = true,
-                            startTime = recordingStartTime,
-                        )
-                    }
-
-                    // Start monitoring audio levels
-                    serviceScope.launch {
-                        while (_recordingState.value.isRecording) {
-                            if (!isPaused) {
-                                try {
-                                    val amplitude = mediaRecorder?.maxAmplitude ?: 0
-                                    // Convert amplitude to a 0-1 range
-                                    val level = (amplitude / 32768f).coerceIn(0f, 1f)
-
-                                    // Update the audio level in the state
-                                    _recordingState.update {
-                                        it.copy(audioLevel = level)
-                                    }
-                                } catch (e: Exception) {
-                                    Napier.e("Error getting audio level", e)
-                                }
-                            }
-                            kotlinx.coroutines.delay(100)
-                        }
-                    }
-
-                    Napier.d("Recording started successfully")
-                } catch (e: IOException) {
-                    Napier.e("Failed to start recording", e)
-                    reset()
-                    release()
-
-                    // Update state with error
-                    _recordingState.update {
-                        it.copy(
-                            isRecording = false,
-                            error = "Failed to start recording: ${e.message}",
-                        )
-                    }
+                monitorRecording()
+                Napier.d("Recording started successfully")
+            } catch (e: Exception) {
+                Napier.e("Failed to start recording", e)
+                releaseQuietly(recorder)
+                mediaRecorder = null
+                _recordingState.update {
+                    it.copy(isRecording = false, error = "Failed to start recording: ${e.message}")
                 }
             }
-        } catch (e: Exception) {
-            Napier.e("Error setting up recording", e)
-            stopRecording()
+        }
+    }
 
-            // Update state with error
-            _recordingState.update {
-                it.copy(
-                    isRecording = false,
-                    error = "Error setting up recording: ${e.message}",
-                )
+    private fun resolveOutputFile(outputPath: String?): File =
+        if (outputPath != null) {
+            File(outputPath).also { file ->
+                file.parentFile?.mkdirs()
+                if (file.exists()) file.delete()
+            }
+        } else {
+            File.createTempFile("audio_recording_", ".m4a", applicationContext.cacheDir)
+        }
+
+    private fun createRecorder(
+        file: File,
+        inputDeviceId: String?,
+    ): MediaRecorder {
+        val recorder =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                MediaRecorder(this)
+            } else {
+                @Suppress("DEPRECATION")
+                MediaRecorder()
+            }
+        return recorder.apply {
+            setAudioSource(MediaRecorder.AudioSource.MIC)
+            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            setOutputFile(file.absolutePath)
+            setAudioEncodingBitRate(128000)
+            setAudioSamplingRate(44100)
+            applyPreferredInputDevice(inputDeviceId)
+        }
+    }
+
+    /** Polls the input level and advances the elapsed time while the recorder runs. */
+    private fun monitorRecording() {
+        serviceScope.launch {
+            while (_recordingState.value.isRecording) {
+                if (!isPaused) {
+                    val amplitude =
+                        try {
+                            synchronized(recorderLock) { mediaRecorder?.maxAmplitude ?: 0 }
+                        } catch (e: Exception) {
+                            Napier.e("Error getting audio level", e)
+                            0
+                        }
+                    val level = (amplitude / MAX_AMPLITUDE).coerceIn(0f, 1f)
+                    _recordingState.update { it.copy(audioLevel = level) }
+                }
+                delay(LEVEL_POLL_INTERVAL_MS)
+            }
+        }
+        serviceScope.launch {
+            var elapsedTimeSeconds = 0
+            while (_recordingState.value.isRecording) {
+                delay(DURATION_TICK_MS)
+                if (!isPaused) {
+                    elapsedTimeSeconds++
+                }
+                _recordingState.update { it.copy(durationSeconds = elapsedTimeSeconds) }
             }
         }
     }
 
     /**
-     * Stops the current recording
-     * @return The path to the recorded file, or null if recording failed
+     * Stops the current recording and finalizes its file.
+     * @return The path to the recorded file, or null if nothing was recording or the file
+     *   could not be finalized
      */
-    fun stopRecording(): String? {
+    fun stopRecording(): String? = synchronized(recorderLock) { stopRecordingLocked() }
+
+    private fun stopRecordingLocked(): String? {
         if (!_recordingState.value.isRecording) {
             return null
         }
-
-        try {
-            mediaRecorder?.apply {
-                stop()
-                release()
-            }
-
-            mediaRecorder = null
-
-            // Update state
+        val recorder = mediaRecorder
+        mediaRecorder = null
+        return try {
+            recorder?.stop()
+            recorder?.release()
+            val path = outputFile?.absolutePath
             _recordingState.update {
-                it.copy(
-                    isRecording = false,
-                    recordedFilePath = outputFile?.absolutePath,
-                )
+                it.copy(isRecording = false, recordedFilePath = path)
             }
-
-            // Return the path to the recorded file
-            return outputFile?.absolutePath
+            path
         } catch (e: Exception) {
             Napier.e("Error stopping recording", e)
-
-            // Update state with error
+            releaseQuietly(recorder)
             _recordingState.update {
-                it.copy(
-                    isRecording = false,
-                    error = "Error stopping recording: ${e.message}",
-                )
+                it.copy(isRecording = false, recordedFilePath = null, error = "Error stopping recording: ${e.message}")
             }
+            null
+        }
+    }
 
-            return null
+    private fun releaseQuietly(recorder: MediaRecorder?) {
+        if (recorder == null) return
+        try {
+            recorder.reset()
+        } catch (e: Exception) {
+            Napier.w("Error resetting recorder", e)
+        }
+        try {
+            recorder.release()
+        } catch (e: Exception) {
+            Napier.w("Error releasing recorder", e)
         }
     }
 
@@ -404,7 +420,7 @@ class AudioRecordingService : Service() {
      */
     fun updatePreferredInputDevice(inputDeviceId: String?) {
         if (!_recordingState.value.isRecording) return
-        mediaRecorder?.applyPreferredInputDevice(inputDeviceId)
+        synchronized(recorderLock) { mediaRecorder?.applyPreferredInputDevice(inputDeviceId) }
     }
 
     private fun MediaRecorder.applyPreferredInputDevice(inputDeviceId: String?) {
