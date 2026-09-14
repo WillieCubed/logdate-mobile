@@ -12,6 +12,7 @@ import app.logdate.client.media.audio.transcription.TranscriptionFailure
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import app.logdate.client.media.audio.transcription.TranscriptionStartResult
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -30,9 +31,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlin.uuid.Uuid
 
 /**
  * Unit tests for [AudioViewModel].
@@ -232,6 +235,162 @@ class AudioViewModelTest {
             assertTrue(successState.isFinal)
         }
 
+    private fun buildViewModel(recordingManager: FakeAudioRecordingManager): AudioViewModel =
+        AudioViewModel(
+            audioRecordingManager = recordingManager,
+            audioPlaybackManager = FakeAudioPlaybackManager(),
+            audioDurationResolver = FakeAudioDurationResolver(),
+            transcriptionService = FakeTranscriptionService(),
+            audioTaggingService = NoopAudioTaggingService,
+        )
+
+    @Test
+    fun `tapping record twice starts a single recording`() =
+        runTest(dispatcher) {
+            val recordingManager =
+                FakeAudioRecordingManager(
+                    outputUri = "file:///test/audio.m4a",
+                    initialDuration = Duration.ZERO,
+                    initialLevel = 0f,
+                )
+            val gate = CompletableDeferred<Unit>()
+            recordingManager.startGate = gate
+            val viewModel = buildViewModel(recordingManager)
+            val blockId = Uuid.random()
+
+            viewModel.startRecording(blockId)
+            viewModel.startRecording(blockId)
+            advanceUntilIdle()
+
+            assertTrue(viewModel.uiState.value.isStartingRecording, "Should report the start in flight")
+            assertFalse(viewModel.uiState.value.isRecording)
+
+            gate.complete(Unit)
+            advanceUntilIdle()
+
+            assertEquals(1, recordingManager.startCalls, "Second tap must not start a second session")
+            assertTrue(viewModel.uiState.value.isRecording)
+            assertFalse(viewModel.uiState.value.isStartingRecording)
+            assertNull(viewModel.uiState.value.error)
+        }
+
+    @Test
+    fun `a start the platform rejects returns to idle with an error`() =
+        runTest(dispatcher) {
+            val recordingManager =
+                FakeAudioRecordingManager(
+                    outputUri = "file:///test/audio.m4a",
+                    initialDuration = Duration.ZERO,
+                    initialLevel = 0f,
+                    startSucceeds = false,
+                )
+            val viewModel = buildViewModel(recordingManager)
+
+            viewModel.startRecording(Uuid.random())
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertFalse(state.isRecording)
+            assertFalse(state.isStartingRecording)
+            assertNotNull(state.error, "The user must be told the recording did not start")
+            assertNull(state.recordingTargetNoteId)
+        }
+
+    @Test
+    fun `stop while idle does not reach the platform`() =
+        runTest(dispatcher) {
+            val recordingManager =
+                FakeAudioRecordingManager(
+                    outputUri = "file:///test/audio.m4a",
+                    initialDuration = Duration.ZERO,
+                    initialLevel = 0f,
+                )
+            val viewModel = buildViewModel(recordingManager)
+
+            viewModel.stopRecording()
+            advanceUntilIdle()
+
+            assertEquals(0, recordingManager.stopCalls)
+            assertFalse(viewModel.uiState.value.isRecording)
+        }
+
+    @Test
+    fun `a stop that yields no file clears the session and flags the block`() =
+        runTest(dispatcher) {
+            val recordingManager =
+                FakeAudioRecordingManager(
+                    outputUri = null,
+                    initialDuration = Duration.ZERO,
+                    initialLevel = 0f,
+                )
+            val viewModel = buildViewModel(recordingManager)
+            val blockId = Uuid.random()
+
+            viewModel.startRecording(blockId)
+            advanceUntilIdle()
+            viewModel.stopRecording()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertFalse(state.isRecording)
+            assertNull(state.recordedAudioUri)
+            assertEquals(blockId, state.failedRecordingTargetNoteId)
+            assertNotNull(state.error)
+
+            // The next start clears the failure so the block can record again.
+            viewModel.startRecording(blockId)
+            advanceUntilIdle()
+            assertNull(viewModel.uiState.value.failedRecordingTargetNoteId)
+            assertNull(viewModel.uiState.value.error)
+        }
+
+    @Test
+    fun `a recording ended outside the editor is finalized`() =
+        runTest(dispatcher) {
+            val recordingManager =
+                FakeAudioRecordingManager(
+                    outputUri = "file:///test/audio.m4a",
+                    initialDuration = 2.seconds,
+                    initialLevel = 0f,
+                )
+            val viewModel = buildViewModel(recordingManager)
+            val blockId = Uuid.random()
+
+            viewModel.startRecording(blockId)
+            advanceUntilIdle()
+            assertTrue(viewModel.uiState.value.isRecording)
+
+            recordingManager.endRecordingExternally()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertFalse(state.isRecording, "The editor must follow a stop it did not initiate")
+            assertEquals("file:///test/audio.m4a", state.recordedAudioUri)
+            assertEquals(1, recordingManager.stopCalls, "Finalizing collects the file through the manager")
+        }
+
+    @Test
+    fun `a new view model does not adopt a previous session's transcript`() =
+        runTest(dispatcher) {
+            val recordingManager =
+                FakeAudioRecordingManager(
+                    outputUri = "file:///test/audio.m4a",
+                    initialDuration = Duration.ZERO,
+                    initialLevel = 0f,
+                )
+            recordingManager.emitStructuredTranscription(
+                TranscriptionResult.Success(text = "Words from another block", isFinal = true),
+            )
+
+            val viewModel = buildViewModel(recordingManager)
+            advanceUntilIdle()
+
+            assertEquals(
+                AudioUiState.TranscriptionState.NotRequested,
+                viewModel.uiState.value.transcriptionState,
+            )
+        }
+
     @Test
     fun `seek to position ms uses absolute seek and updates playback progress`() =
         runTest(dispatcher) {
@@ -260,28 +419,51 @@ class AudioViewModelTest {
 }
 
 private class FakeAudioRecordingManager(
-    private val outputUri: String,
+    private val outputUri: String?,
     initialDuration: Duration,
     initialLevel: Float,
     private val startResult: TranscriptionResult? = null,
+    private val startSucceeds: Boolean = true,
 ) : AudioRecordingManager {
     private val audioLevelFlow = MutableStateFlow(initialLevel)
     private val durationFlow = MutableStateFlow(initialDuration)
     private val transcriptionFlow = MutableStateFlow<String?>(null)
     private val structuredFlow = MutableSharedFlow<TranscriptionResult>(replay = 1)
+    private val recordingStateFlow = MutableStateFlow(false)
+
+    /** When set, [startRecording] suspends until it completes so tests can observe the in-flight state. */
+    var startGate: CompletableDeferred<Unit>? = null
+    var startCalls: Int = 0
+        private set
+    var stopCalls: Int = 0
+        private set
 
     override var isRecording: Boolean = false
         private set
 
     override suspend fun startRecording(targetNoteId: kotlin.uuid.Uuid?): Boolean {
+        startCalls++
+        startGate?.await()
+        if (!startSucceeds) return false
         isRecording = true
+        recordingStateFlow.value = true
         startResult?.let { structuredFlow.emit(it) }
         return true
     }
 
     override suspend fun stopRecording(): String? {
+        stopCalls++
         isRecording = false
+        recordingStateFlow.value = false
         return outputUri
+    }
+
+    override fun getRecordingStateFlow(): Flow<Boolean> = recordingStateFlow
+
+    /** Simulates the platform ending the recording outside the editor (for example a notification action). */
+    fun endRecordingExternally() {
+        isRecording = false
+        recordingStateFlow.value = false
     }
 
     override fun getAudioLevelFlow(): Flow<Float> = audioLevelFlow

@@ -137,6 +137,16 @@ fun AudioBlockEditor(
         }
     }
 
+    // A recording that ended without a file leaves nothing to keep. Drop the block back to
+    // empty so the user can record again or save the entry without it, instead of a
+    // permanently "recording" block that blocks every save.
+    LaunchedEffect(audioUiState.failedRecordingTargetNoteId, block.captureState) {
+        val failedFor = audioUiState.failedRecordingTargetNoteId
+        if (failedFor == block.id && block.captureState is AudioCaptureState.Recording) {
+            onBlockUpdated(block.copy(captureState = AudioCaptureState.Empty))
+        }
+    }
+
     LaunchedEffect(audioUiState.transcription, block.uri, block.transcription) {
         val latestTranscript = audioUiState.transcription?.trim().orEmpty()
         if (block.uri != null && latestTranscript.isNotBlank() && latestTranscript != block.transcription) {
@@ -205,6 +215,8 @@ fun AudioBlockEditor(
                         modifier = Modifier.fillMaxSize(),
                         inputSelection = inputSelection,
                         onInputSelected = audioRouteRepository::selectInputDevice,
+                        isStarting = audioUiState.isStartingRecording,
+                        errorMessage = audioUiState.error,
                     )
                 }
             }
