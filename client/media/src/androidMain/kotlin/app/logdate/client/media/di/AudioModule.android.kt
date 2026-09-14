@@ -4,6 +4,7 @@ import app.logdate.client.media.audio.AndroidAudioDurationResolver
 import app.logdate.client.media.audio.AndroidAudioPlaybackManager
 import app.logdate.client.media.audio.AndroidAudioRecordingManager
 import app.logdate.client.media.audio.AndroidAudioStorage
+import app.logdate.client.media.audio.AndroidRecordingServiceController
 import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioRecordingManager
@@ -28,12 +29,12 @@ actual val audioModule: Module =
         // Provide the Android implementation of AudioRecordingManager as a singleton
         single<AudioRecordingManager> {
             AndroidAudioRecordingManager(
-                context = androidContext(),
                 audioStorage = get(),
                 transcriptionRepository = get(),
                 audioTaggingService = get(),
                 audioTagRepository = get(),
                 audioRouteRepository = get(),
+                serviceController = AndroidRecordingServiceController(androidContext()),
             )
         }
         single<AudioPlaybackManager> { AndroidAudioPlaybackManager(androidContext(), get()) }
