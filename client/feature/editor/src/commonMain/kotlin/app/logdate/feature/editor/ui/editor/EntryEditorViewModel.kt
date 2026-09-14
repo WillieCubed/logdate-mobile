@@ -213,11 +213,22 @@ class EntryEditorViewModel(
 
     /**
      * Adds a new block to the editor.
+     *
+     * Picker tiles pre-generate the block id so the tile can morph into the block. A
+     * second tap on the same tile (while that morph is still animating, or from a picker
+     * that stays on screen) arrives with the same id. Adding it again would give the block
+     * list two entries with one key, which crashes the lazy list, so an id that already
+     * exists focuses the block it created instead.
      */
     fun createNewBlock(
         type: BlockType,
         id: Uuid = Uuid.random(),
     ): EntryBlockUiState {
+        val existing = mutableEditorState.value.blocks.find { it.id == id }
+        if (existing != null) {
+            if (type != BlockType.TEXT) setExpandedBlockId(existing.id)
+            return existing
+        }
         val location = null
         val timestamp = Clock.System.now()
 
@@ -260,11 +271,15 @@ class EntryEditorViewModel(
             }
 
         mutateEditorContent { currentState ->
-            currentState.copy(
-                blocks = currentState.blocks + newBlock,
-                expandedBlockId = if (type != BlockType.TEXT) newBlock.id else currentState.expandedBlockId,
-                isModified = true,
-            )
+            if (currentState.blocks.any { it.id == id }) {
+                currentState
+            } else {
+                currentState.copy(
+                    blocks = currentState.blocks + newBlock,
+                    expandedBlockId = if (type != BlockType.TEXT) newBlock.id else currentState.expandedBlockId,
+                    isModified = true,
+                )
+            }
         }
         return newBlock
     }

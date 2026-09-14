@@ -22,7 +22,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -95,11 +98,32 @@ fun EmptyEditorStateContent(
     val isCompact = LocalEditorIsCompact.current
 
     // Stable IDs pre-generated for each tile; used as the shared element key so
-    // the tile morphs into the expanded block surface on tap.
-    val textId = remember(textTileId) { textTileId ?: Uuid.random() }
-    val audioId = remember(audioTileId) { audioTileId ?: Uuid.random() }
-    val cameraId = remember(cameraTileId) { cameraTileId ?: Uuid.random() }
-    val photoId = remember(photoTileId) { photoTileId ?: Uuid.random() }
+    // the tile morphs into the expanded block surface on tap. A generated id is
+    // consumed by one tap: in the side-pane layouts this picker stays on screen
+    // after the block is added, so the next tap must not reuse the id. A supplied
+    // tile id belongs to the block that is morphing back into this picker and is
+    // kept so the shared element still connects.
+    var textId by remember(textTileId) { mutableStateOf(textTileId ?: Uuid.random()) }
+    var audioId by remember(audioTileId) { mutableStateOf(audioTileId ?: Uuid.random()) }
+    var cameraId by remember(cameraTileId) { mutableStateOf(cameraTileId ?: Uuid.random()) }
+    var photoId by remember(photoTileId) { mutableStateOf(photoTileId ?: Uuid.random()) }
+
+    val startTextBlock = {
+        onStartTextBlock(textId)
+        if (textTileId == null) textId = Uuid.random()
+    }
+    val startAudioBlock = {
+        onStartAudioBlock(audioId)
+        if (audioTileId == null) audioId = Uuid.random()
+    }
+    val startCameraBlock = {
+        onStartCameraBlock(cameraId)
+        if (cameraTileId == null) cameraId = Uuid.random()
+    }
+    val startPhotoBlock = {
+        onStartPhotoBlock(photoId)
+        if (photoTileId == null) photoId = Uuid.random()
+    }
 
     val sts = LocalSharedTransitionScope.current
     val avs = LocalAnimatedVisibilityScope.current
@@ -113,19 +137,19 @@ fun EmptyEditorStateContent(
             horizontalArrangement = Arrangement.spacedBy(spacing),
         ) {
             TextEntrySurface(
-                onClick = { onStartTextBlock(textId) },
+                onClick = startTextBlock,
                 modifier = tileModifier(textId, sts, avs),
             )
             AudioRecordingSurface(
-                onClick = { onStartAudioBlock(audioId) },
+                onClick = startAudioBlock,
                 modifier = tileModifier(audioId, sts, avs),
             )
             CameraCaptureSurface(
-                onClick = { onStartCameraBlock(cameraId) },
+                onClick = startCameraBlock,
                 modifier = tileModifier(cameraId, sts, avs),
             )
             PhotoSurface(
-                onClick = { onStartPhotoBlock(photoId) },
+                onClick = startPhotoBlock,
                 modifier = tileModifier(photoId, sts, avs),
             )
         }
@@ -142,11 +166,11 @@ fun EmptyEditorStateContent(
                 horizontalArrangement = Arrangement.spacedBy(spacing),
             ) {
                 TextEntrySurface(
-                    onClick = { onStartTextBlock(textId) },
+                    onClick = startTextBlock,
                     modifier = tileModifier(textId, sts, avs),
                 )
                 AudioRecordingSurface(
-                    onClick = { onStartAudioBlock(audioId) },
+                    onClick = startAudioBlock,
                     modifier = tileModifier(audioId, sts, avs),
                 )
             }
@@ -156,11 +180,11 @@ fun EmptyEditorStateContent(
                 horizontalArrangement = Arrangement.spacedBy(spacing),
             ) {
                 CameraCaptureSurface(
-                    onClick = { onStartCameraBlock(cameraId) },
+                    onClick = startCameraBlock,
                     modifier = tileModifier(cameraId, sts, avs),
                 )
                 PhotoSurface(
-                    onClick = { onStartPhotoBlock(photoId) },
+                    onClick = startPhotoBlock,
                     modifier = tileModifier(photoId, sts, avs),
                 )
             }

@@ -159,6 +159,39 @@ class TextEditingTest {
         }
 
     @Test
+    fun `creating a block with an id that already exists reuses it instead of duplicating`() =
+        testScope.runTest {
+            val first = viewModel.createNewBlock(BlockType.AUDIO)
+            advanceUntilIdle()
+
+            // A picker tile fires with the same pre-generated id when it is tapped again
+            // while its morph into the block is still animating.
+            val second = viewModel.createNewBlock(BlockType.AUDIO, id = first.id)
+            advanceUntilIdle()
+
+            val state = viewModel.editorState.value
+            assertEquals(1, state.blocks.count { it.id == first.id })
+            assertEquals(first.id, second.id)
+            assertEquals(first.id, state.expandedBlockId)
+        }
+
+    @Test
+    fun `creating a block with an existing id keeps the existing block content`() =
+        testScope.runTest {
+            val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
+            viewModel.updateBlock(block.copy(content = "Keep me"))
+            advanceUntilIdle()
+
+            val reused = viewModel.createNewBlock(BlockType.TEXT, id = block.id) as TextBlockUiState
+            advanceUntilIdle()
+
+            assertEquals("Keep me", reused.content)
+            val state = viewModel.editorState.value
+            assertEquals(1, state.blocks.size)
+            assertEquals("Keep me", (state.blocks.single() as TextBlockUiState).content)
+        }
+
+    @Test
     fun `update text block content`() =
         testScope.runTest {
             val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
