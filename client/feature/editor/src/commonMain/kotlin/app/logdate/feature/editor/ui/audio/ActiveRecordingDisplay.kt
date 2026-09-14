@@ -41,6 +41,7 @@ import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.finish
 import logdate.client.feature.editor.generated.resources.listening
 import logdate.client.feature.editor.generated.resources.restart
+import logdate.client.feature.editor.generated.resources.we_couldnt_convert_this_recording_to_text
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration
 
@@ -66,6 +67,14 @@ fun ActiveRecordingDisplay(
     transcriptionText: String? = null,
     transcriptionIsFinal: Boolean = false,
     transcriptionIsRefining: Boolean = false,
+    /**
+     * True when the live transcription attempt has failed (e.g. the on-device model
+     * couldn't be loaded). Without this, a transcription failure was indistinguishable
+     * from "still listening" -- the transcript pane just stayed on the same placeholder
+     * forever, silently, with no indication anything had gone wrong. The recording
+     * itself is unaffected; only the text conversion failed.
+     */
+    transcriptionHasError: Boolean = false,
     isPaused: Boolean = false,
 ) {
     FoldableTabletopLayout(
@@ -76,6 +85,7 @@ fun ActiveRecordingDisplay(
                 transcriptionText = transcriptionText,
                 transcriptionIsFinal = transcriptionIsFinal,
                 transcriptionIsRefining = transcriptionIsRefining,
+                transcriptionHasError = transcriptionHasError,
                 isPaused = isPaused,
                 inputSelection = inputSelection,
                 onInputSelected = onInputSelected,
@@ -107,6 +117,7 @@ fun ActiveRecordingDisplay(
                     transcriptionText = transcriptionText,
                     transcriptionIsFinal = transcriptionIsFinal,
                     transcriptionIsRefining = transcriptionIsRefining,
+                    transcriptionHasError = transcriptionHasError,
                     isPaused = isPaused,
                     inputSelection = inputSelection,
                     onInputSelected = onInputSelected,
@@ -135,6 +146,7 @@ private fun ActiveRecordingTranscriptPane(
     transcriptionText: String?,
     transcriptionIsFinal: Boolean,
     transcriptionIsRefining: Boolean,
+    transcriptionHasError: Boolean,
     isPaused: Boolean,
     inputSelection: MediaDeviceSelectionUiState?,
     onInputSelected: (String) -> Unit,
@@ -153,6 +165,7 @@ private fun ActiveRecordingTranscriptPane(
             isFinal = transcriptionIsFinal,
             isRefining = transcriptionIsRefining,
             hasTranscript = !transcriptionText.isNullOrBlank(),
+            hasError = transcriptionHasError,
         )
 
         inputSelection?.let { selection ->
@@ -174,7 +187,13 @@ private fun ActiveRecordingTranscriptPane(
                     .verticalScroll(scrollState),
         ) {
             val text = transcriptionText.takeUnless { it.isNullOrBlank() }
-            if (text == null) {
+            if (text == null && transcriptionHasError) {
+                Text(
+                    text = stringResource(Res.string.we_couldnt_convert_this_recording_to_text),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            } else if (text == null) {
                 Text(
                     text = stringResource(Res.string.listening),
                     style = MaterialTheme.typography.displaySmall,
@@ -294,9 +313,11 @@ private fun RecordingTranscriptStatus(
     isFinal: Boolean,
     isRefining: Boolean,
     hasTranscript: Boolean,
+    hasError: Boolean,
 ) {
     val label =
         when {
+            hasError -> "Transcription unavailable"
             isPaused -> "Paused"
             isRefining -> "Improving transcript"
             isFinal -> "Transcript ready"
@@ -305,6 +326,7 @@ private fun RecordingTranscriptStatus(
         }
     val indicatorColor =
         when {
+            hasError -> MaterialTheme.colorScheme.error
             isPaused -> MaterialTheme.colorScheme.outline
             isFinal -> MaterialTheme.colorScheme.primary
             else -> MaterialTheme.colorScheme.error
