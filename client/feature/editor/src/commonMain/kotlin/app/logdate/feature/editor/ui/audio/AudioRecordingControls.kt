@@ -84,6 +84,7 @@ fun AudioRecordingControls(
                 RecordingStateRow(
                     recordingState = recordingState,
                     recordingDuration = recordingDuration,
+                    isStarting = isStarting,
                 )
                 RecordingWaveformBox(
                     recordingState = recordingState,
@@ -169,6 +170,7 @@ private fun AudioRecordingControlsColumn(
         RecordingStateRow(
             recordingState = recordingState,
             recordingDuration = recordingDuration,
+            isStarting = isStarting,
         )
 
         RecordingInputSelector(
@@ -213,6 +215,7 @@ private fun RecordingStateRow(
     recordingState: RecordingState,
     recordingDuration: Duration,
     modifier: Modifier = Modifier,
+    isStarting: Boolean = false,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -221,10 +224,13 @@ private fun RecordingStateRow(
     ) {
         Text(
             text =
-                if (recordingState == RecordingState.RECORDING) {
-                    "Recording in progress"
-                } else {
-                    "Ready to record"
+                when {
+                    recordingState == RecordingState.RECORDING -> "Recording in progress"
+                    // The tap was accepted and the button is disabled, but without this the
+                    // wait for the platform to confirm the recorder is running looked
+                    // identical to nothing having happened at all.
+                    isStarting -> "Starting…"
+                    else -> "Ready to record"
                 },
             style = MaterialTheme.typography.titleMedium,
             color =

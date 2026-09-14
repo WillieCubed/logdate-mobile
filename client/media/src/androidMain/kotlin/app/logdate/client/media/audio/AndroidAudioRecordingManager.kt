@@ -102,6 +102,16 @@ class AndroidAudioRecordingManager(
 
     @Volatile
     private var liveTranscriptionStarted = false
+
+    /**
+     * The in-flight (or most recently finished) call to [startLiveTranscription]. Recording
+     * is confirmed to the caller as soon as the platform recorder is running; transcription
+     * setup -- a second, separate microphone acquisition -- runs alongside it instead of
+     * serially after it, since the app treats transcription as best-effort and recording
+     * must not wait on it. [stopSessionLocked] and [pauseRecording] join this job first so
+     * they never race a still-initializing transcription session.
+     */
+    private var transcriptionStartJob: Job? = null
     private var serviceStateJob: Job? = null
     private var routeSyncJob: Job? = null
     private var transcriptPersistenceJob: Job? = null
@@ -203,7 +213,7 @@ class AndroidAudioRecordingManager(
         }
         recordingStateFlow.value = true
         observeService()
-        startLiveTranscription()
+        transcriptionStartJob = scope.launch { startLiveTranscription() }
         return true
     }
 
@@ -306,6 +316,11 @@ class AndroidAudioRecordingManager(
             Napier.w("Attempted to stop recording while not recording")
             return null
         }
+        // A stop that lands while the transcription session is still spinning up (start and
+        // stop tapped in immediate succession) must wait for that setup to settle before
+        // tearing it down, or the AudioRecord it is about to open would never get closed.
+        transcriptionStartJob?.join()
+        transcriptionStartJob = null
         serviceStateJob?.cancel()
         serviceStateJob = null
         routeSyncJob?.cancel()
@@ -391,6 +406,9 @@ class AndroidAudioRecordingManager(
             sessionMutex.withLock {
                 if (!recordingStateFlow.value) return@withLock false
                 try {
+                    // Same ordering guard as stop: don't ask a still-initializing
+                    // transcription session to stop before it has finished starting.
+                    transcriptionStartJob?.join()
                     val paused = serviceController.pause()
                     if (paused) transcriptionService?.stopLiveTranscription()
                     paused

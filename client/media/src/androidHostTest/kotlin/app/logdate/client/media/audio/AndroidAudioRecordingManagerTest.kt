@@ -12,6 +12,7 @@ import app.logdate.client.repository.audio.AudioTagRepository
 import app.logdate.client.repository.transcription.TranscriptionData
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.transcription.TranscriptionStatus
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -228,6 +229,46 @@ class AndroidAudioRecordingManagerTest {
             assertEquals(1, transcription.warmUpCalls)
         }
 
+    @Test
+    fun `start does not wait on transcription setup to report the recorder is running`() =
+        testScope.runTest {
+            val startGate = CompletableDeferred<Unit>()
+            val manager = buildManager(FakeTranscriptionService(startGate = startGate))
+
+            var result: Boolean? = null
+            val starter = launch { result = manager.startRecording(Uuid.random()) }
+            runCurrent()
+            controller.connect(RecordingServiceState(isRecording = true))
+            advanceUntilIdle()
+
+            assertEquals(true, result, "Recording must be confirmed without waiting on a second microphone acquisition")
+            starter.join()
+
+            startGate.complete(Unit)
+            advanceUntilIdle()
+        }
+
+    @Test
+    fun `stop right after start waits for transcription setup before tearing it down`() =
+        testScope.runTest {
+            val startGate = CompletableDeferred<Unit>()
+            val order = mutableListOf<String>()
+            val manager = buildManager(FakeTranscriptionService(startGate = startGate, callOrder = order))
+            controller.stopResult = "/recordings/quick.m4a"
+
+            startAndConfirm(manager)
+            val stopper = launch { manager.stopRecording() }
+            runCurrent()
+
+            assertTrue(order.isEmpty(), "Stop must not race a transcription start still in flight")
+
+            startGate.complete(Unit)
+            advanceUntilIdle()
+            stopper.join()
+
+            assertEquals(listOf("startLiveTranscription", "stopLiveTranscription"), order)
+        }
+
     private suspend fun TestScope.startAndConfirm(manager: AndroidAudioRecordingManager) {
         val starter = launch { assertTrue(manager.startRecording(Uuid.random())) }
         runCurrent()
@@ -341,15 +382,22 @@ private class FakeAudioTagRepository : AudioTagRepository {
 
 private class FakeTranscriptionService(
     private val stopThrows: Boolean = false,
+    private val startGate: CompletableDeferred<Unit>? = null,
+    private val callOrder: MutableList<String>? = null,
 ) : TranscriptionService {
     private val results = MutableSharedFlow<TranscriptionResult>(replay = 1)
     var warmUpCalls = 0
 
     override fun getTranscriptionFlow(): SharedFlow<TranscriptionResult> = results
 
-    override suspend fun startLiveTranscription(): TranscriptionStartResult = TranscriptionStartResult.Started
+    override suspend fun startLiveTranscription(): TranscriptionStartResult {
+        startGate?.await()
+        callOrder?.add("startLiveTranscription")
+        return TranscriptionStartResult.Started
+    }
 
     override suspend fun stopLiveTranscription(): TranscriptionResult {
+        callOrder?.add("stopLiveTranscription")
         if (stopThrows) throw IllegalStateException("transcription stop failed")
         return TranscriptionResult.Cancelled
     }
