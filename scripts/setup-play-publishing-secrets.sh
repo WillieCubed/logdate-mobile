@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# This script holds signing passwords in variables; `bash -x` would print them.
+{ set +x; } 2>/dev/null
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SIGNING_DIR="${LOGDATE_SIGNING_DIR:-$HOME/.logdate-signing}"
+
 NON_INTERACTIVE="false"
+GH_ENVIRONMENT="production"
+SERVICE_ACCOUNT_FILE=""
+UPLOAD_ENV_FILE="$SIGNING_DIR/production-upload.env"
+KEYSTORE_FILE=""
 ENABLE_INTERNAL=""
 ENABLE_PRODUCTION=""
 
@@ -25,28 +33,44 @@ die() {
 }
 
 print_usage() {
-    cat <<'EOF'
+    cat <<EOF
 setup-play-publishing-secrets.sh
 
-Interactive helper for Google Play publishing setup. It can:
-  - help locate the Play service-account JSON and Android release keystore
-  - delegate Firebase config (google-services.json) to scripts/sync-firebase-configs.sh
-  - collect the required keystore passwords and alias
-  - upload the resulting values to GitHub Actions secrets via `gh secret set`
-  - optionally enable internal and production publish paths independently
+Uploads the Google Play publishing inputs to a GitHub Actions environment:
+  ANDROID_PUBLISHER_CREDENTIALS    Play service-account JSON
+  LOGDATE_RELEASE_STORE_BASE64     upload keystore, base64-encoded
+  LOGDATE_RELEASE_STORE_PASSWORD   } read from the upload env file written by
+  LOGDATE_RELEASE_KEY_ALIAS        } scripts/create-signing-keystore.sh, or
+  LOGDATE_RELEASE_KEY_PASSWORD     } prompted for interactively
+
+Every value reaches 'gh secret set' on stdin. None is placed in argv, where
+other processes and shell tracing could see it, and none is printed.
 
 Usage:
-  ./scripts/setup-play-publishing-secrets.sh [--non-interactive] [--enable-internal true|false] [--enable-production true|false]
+  ./scripts/setup-play-publishing-secrets.sh [options]
+
+Options:
+  --env NAME                  GitHub environment to write to (default: production)
+  --service-account FILE      Play service-account JSON
+                              (default: $SIGNING_DIR/play-publisher.json)
+  --upload-env FILE           Upload key env file (default: $SIGNING_DIR/production-upload.env)
+  --keystore FILE             Upload keystore (default: LOGDATE_RELEASE_STORE_FILE from the env file)
+  --non-interactive           Never prompt; fail when an input is missing
+  --enable-internal BOOL      Set LOGDATE_PLAY_INTERNAL_PUBLISH_ENABLED
+  --enable-production BOOL    Set LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED
 EOF
 }
 
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            --env) GH_ENVIRONMENT="${2:?--env needs a value}"; shift 2 ;;
+            --service-account) SERVICE_ACCOUNT_FILE="${2:?--service-account needs a value}"; shift 2 ;;
+            --upload-env) UPLOAD_ENV_FILE="${2:?--upload-env needs a value}"; shift 2 ;;
+            --keystore) KEYSTORE_FILE="${2:?--keystore needs a value}"; shift 2 ;;
             --non-interactive) NON_INTERACTIVE="true"; shift ;;
-            --enable-internal) ENABLE_INTERNAL="$2"; shift 2 ;;
-            --enable-production) ENABLE_PRODUCTION="$2"; shift 2 ;;
-            --enable-workflow) ENABLE_INTERNAL="$2"; shift 2 ;;
+            --enable-internal) ENABLE_INTERNAL="${2:?--enable-internal needs a value}"; shift 2 ;;
+            --enable-production) ENABLE_PRODUCTION="${2:?--enable-production needs a value}"; shift 2 ;;
             -h|--help) print_usage; exit 0 ;;
             *) die "Unknown flag: $1" ;;
         esac
@@ -55,28 +79,16 @@ parse_args() {
 
 prompt_value() {
     local prompt="$1"
-    local default="${2:-}"
     local value=""
-    if [[ "$NON_INTERACTIVE" == "true" ]]; then
-        printf '%s' "$default"
-        return 0
-    fi
-    if [[ -n "$default" ]]; then
-        read -rp "$prompt [$default]: " value
-        printf '%s' "${value:-$default}"
-    else
-        read -rp "$prompt: " value
-        printf '%s' "$value"
-    fi
+    [[ "$NON_INTERACTIVE" == "true" ]] && die "$prompt is required and --non-interactive was set."
+    read -rp "$prompt: " value
+    printf '%s' "$value"
 }
 
 prompt_secret() {
     local prompt="$1"
     local value=""
-    if [[ "$NON_INTERACTIVE" == "true" ]]; then
-        printf ''
-        return 0
-    fi
+    [[ "$NON_INTERACTIVE" == "true" ]] && die "$prompt is required and --non-interactive was set."
     read -rsp "$prompt: " value
     echo >&2
     printf '%s' "$value"
@@ -84,15 +96,10 @@ prompt_secret() {
 
 confirm() {
     local prompt="$1"
-    local default="${2:-y}"
     local reply=""
-    if [[ "$NON_INTERACTIVE" == "true" ]]; then
-        [[ "$default" == "y" ]]
-        return
-    fi
-    read -rp "$prompt [$default]: " reply
-    reply="${reply:-$default}"
-    reply="$(printf '%s' "$reply" | tr '[:upper:]' '[:lower:]')"
+    [[ "$NON_INTERACTIVE" == "true" ]] && return 1
+    read -rp "$prompt [n]: " reply
+    reply="$(printf '%s' "${reply:-n}" | tr '[:upper:]' '[:lower:]')"
     [[ "$reply" == "y" || "$reply" == "yes" ]]
 }
 
@@ -101,87 +108,44 @@ require_gh() {
     gh auth status >/dev/null 2>&1 || die "Run 'gh auth login' before using this helper."
 }
 
-collect_candidates() {
-    local pattern="$1"
-    shift
-    local roots=("$@")
-    local candidates=()
-    local root
-    for root in "${roots[@]}"; do
-        [[ -d "$root" ]] || continue
-        while IFS= read -r file; do
-            candidates+=("$file")
-        done < <(find "$root" -maxdepth 3 -type f $pattern 2>/dev/null | sort)
-    done
-    printf '%s\n' "${candidates[@]}"
+# Reads one key from a KEY=value file with the same rules as the Gradle
+# signingEnvFile parser: blank and '#' lines skipped, whitespace and one layer
+# of quotes trimmed.
+read_env_value() {
+    local file="$1"
+    local wanted="$2"
+    local line key value
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line#"${line%%[![:space:]]*}"}"
+        [[ -z "$line" || "$line" == \#* || "$line" != *=* ]] && continue
+        key="${line%%=*}"
+        key="${key%"${key##*[![:space:]]}"}"
+        [[ "$key" == "$wanted" ]] || continue
+        value="${line#*=}"
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
+        value="${value#[\"\']}"
+        value="${value%[\"\']}"
+        printf '%s' "$value"
+        return 0
+    done < "$file"
+    return 1
 }
 
-pick_file() {
-    local label="$1"
-    local pattern="$2"
-    shift 2
-    local roots=("$@")
-    local candidates=()
-    local choice=""
-    local manual=""
-
-    while IFS= read -r candidate; do
-        [[ -n "$candidate" ]] && candidates+=("$candidate")
-    done < <(collect_candidates "$pattern" "${roots[@]}")
-
-    if [[ "${#candidates[@]}" -gt 0 && "$NON_INTERACTIVE" != "true" ]]; then
-        printf '%s\n' "$label candidates:"
-        local i
-        for i in "${!candidates[@]}"; do
-            printf '  %d. %s\n' "$((i + 1))" "${candidates[$i]}"
-        done
-        printf '  %d. Enter a path manually\n' "$((${#candidates[@]} + 1))"
-        while :; do
-            read -rp "Select $label source: " choice
-            if [[ "$choice" =~ ^[0-9]+$ ]]; then
-                if (( choice >= 1 && choice <= ${#candidates[@]} )); then
-                    printf '%s' "${candidates[$((choice - 1))]}"
-                    return 0
-                fi
-                if (( choice == ${#candidates[@]} + 1 )); then
-                    break
-                fi
-            fi
-            log_warn "Choose a listed number."
-        done
-    fi
-
-    manual="$(prompt_value "Path to $label")"
-    [[ -f "$manual" ]] || die "$label file not found: $manual"
-    printf '%s' "$manual"
-}
-
-validate_json_file() {
-    local path="$1"
-    local required_fragment="$2"
-    grep -q "$required_fragment" "$path" || die "Expected '$required_fragment' in $path"
-}
-
-upload_secret_from_file() {
+set_secret_from_stdin() {
     local name="$1"
-    local file="$2"
-    gh secret set "$name" < "$file"
-    log_info "Set GitHub secret $name from $file"
-}
-
-upload_secret_from_body() {
-    local name="$1"
-    local value="$2"
-    gh secret set "$name" --body "$value"
-    log_info "Set GitHub secret $name"
+    gh secret set "$name" --env "$GH_ENVIRONMENT"
+    log_info "Set $name in environment '$GH_ENVIRONMENT'"
 }
 
 maybe_set_publish_variable() {
     local variable_name="$1"
     local should_enable="$2"
+    # Repo-level on purpose: the publish jobs gate on these in their job-level
+    # 'if:', which is evaluated before an environment's variables are loaded.
     if [[ "$should_enable" == "true" ]]; then
         gh variable set "$variable_name" --body "true"
-        log_info "Enabled Play publishing via repository variable ${variable_name}=true"
+        log_info "Set repository variable ${variable_name}=true"
     else
         log_warn "Leaving ${variable_name} unchanged."
     fi
@@ -192,77 +156,69 @@ main() {
     require_gh
     cd "$REPO_ROOT"
 
+    gh api "repos/{owner}/{repo}/environments/$GH_ENVIRONMENT" >/dev/null 2>&1 \
+        || die "GitHub environment '$GH_ENVIRONMENT' does not exist."
+
     log_phase "Collect Google Play publishing inputs"
 
-    local play_json
-    play_json="$(
-        pick_file \
-            "Play service-account JSON" \
-            "\\( -name '*.json' \\)" \
-            "$HOME/Downloads" \
-            "$HOME/Documents" \
-            "$REPO_ROOT"
-    )"
-    validate_json_file "$play_json" '"type"[[:space:]]*:[[:space:]]*"service_account"'
+    if [[ -z "$SERVICE_ACCOUNT_FILE" ]]; then
+        SERVICE_ACCOUNT_FILE="$SIGNING_DIR/play-publisher.json"
+        [[ -f "$SERVICE_ACCOUNT_FILE" ]] || SERVICE_ACCOUNT_FILE="$(prompt_value "Path to Play service-account JSON")"
+    fi
+    [[ -f "$SERVICE_ACCOUNT_FILE" ]] || die "Service-account JSON not found: $SERVICE_ACCOUNT_FILE"
+    grep -q '"type"[[:space:]]*:[[:space:]]*"service_account"' "$SERVICE_ACCOUNT_FILE" \
+        || die "$SERVICE_ACCOUNT_FILE is not a service-account key."
 
-    local keystore_path
-    keystore_path="$(
-        pick_file \
-            "Android release keystore" \
-            "\\( -name '*.jks' -o -name '*.keystore' \\)" \
-            "$HOME/Downloads" \
-            "$HOME/Documents" \
-            "$REPO_ROOT"
-    )"
+    local store_password="" key_alias="" key_password=""
+    if [[ -f "$UPLOAD_ENV_FILE" ]]; then
+        log_info "Reading upload key settings from $UPLOAD_ENV_FILE"
+        [[ -n "$KEYSTORE_FILE" ]] || KEYSTORE_FILE="$(read_env_value "$UPLOAD_ENV_FILE" LOGDATE_RELEASE_STORE_FILE || true)"
+        store_password="$(read_env_value "$UPLOAD_ENV_FILE" LOGDATE_RELEASE_STORE_PASSWORD || true)"
+        key_alias="$(read_env_value "$UPLOAD_ENV_FILE" LOGDATE_RELEASE_KEY_ALIAS || true)"
+        key_password="$(read_env_value "$UPLOAD_ENV_FILE" LOGDATE_RELEASE_KEY_PASSWORD || true)"
+    else
+        log_warn "No upload env file at $UPLOAD_ENV_FILE; prompting instead."
+    fi
 
-    local store_password
-    store_password="$(prompt_secret "Release keystore password")"
-    [[ -n "$store_password" ]] || die "Release keystore password is required."
+    [[ -n "$KEYSTORE_FILE" ]] || KEYSTORE_FILE="$(prompt_value "Path to upload keystore")"
+    [[ -f "$KEYSTORE_FILE" ]] || die "Upload keystore not found: $KEYSTORE_FILE"
+    [[ -n "$store_password" ]] || store_password="$(prompt_secret "Upload keystore password")"
+    [[ -n "$key_alias" ]] || key_alias="$(prompt_value "Upload key alias")"
+    [[ -n "$key_password" ]] || key_password="$(prompt_secret "Upload key password")"
+    [[ -n "$store_password" && -n "$key_alias" && -n "$key_password" ]] \
+        || die "The keystore password, key alias, and key password are all required."
 
-    local key_alias
-    key_alias="$(prompt_value "Release key alias")"
-    [[ -n "$key_alias" ]] || die "Release key alias is required."
-
-    local key_password
-    key_password="$(prompt_secret "Release key password")"
-    [[ -n "$key_password" ]] || die "Release key password is required."
-
-    log_phase "Upload GitHub Actions secrets"
-    upload_secret_from_file "ANDROID_PUBLISHER_CREDENTIALS" "$play_json"
-    upload_secret_from_body "LOGDATE_RELEASE_STORE_BASE64" "$(base64 < "$keystore_path" | tr -d '\n')"
-    upload_secret_from_body "LOGDATE_RELEASE_STORE_PASSWORD" "$store_password"
-    upload_secret_from_body "LOGDATE_RELEASE_KEY_ALIAS" "$key_alias"
-    upload_secret_from_body "LOGDATE_RELEASE_KEY_PASSWORD" "$key_password"
+    log_phase "Upload secrets to GitHub environment '$GH_ENVIRONMENT'"
+    set_secret_from_stdin ANDROID_PUBLISHER_CREDENTIALS < "$SERVICE_ACCOUNT_FILE"
+    base64 < "$KEYSTORE_FILE" | tr -d '\n' | set_secret_from_stdin LOGDATE_RELEASE_STORE_BASE64
+    printf '%s' "$store_password" | set_secret_from_stdin LOGDATE_RELEASE_STORE_PASSWORD
+    printf '%s' "$key_alias" | set_secret_from_stdin LOGDATE_RELEASE_KEY_ALIAS
+    printf '%s' "$key_password" | set_secret_from_stdin LOGDATE_RELEASE_KEY_PASSWORD
 
     log_info "Firebase google-services.json upload is handled by scripts/sync-firebase-configs.sh"
-    log_info "Run: ./scripts/sync-firebase-configs.sh android-all"
 
     local enable_internal="$ENABLE_INTERNAL"
     if [[ -z "$enable_internal" ]]; then
-        if confirm "Enable automated internal-track publishing after this setup?" "n"; then
+        if confirm "Publish every main commit to the Play internal track?"; then
             enable_internal="true"
         else
             enable_internal="false"
         fi
     fi
-
     local enable_production="$ENABLE_PRODUCTION"
     if [[ -z "$enable_production" ]]; then
-        if confirm "Enable production publishing from android-v* tags after this setup?" "n"; then
+        if confirm "Promote to Play production from android-v* tags?"; then
             enable_production="true"
         else
             enable_production="false"
         fi
     fi
-
-    maybe_set_publish_variable "LOGDATE_PLAY_INTERNAL_PUBLISH_ENABLED" "$enable_internal"
-    maybe_set_publish_variable "LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED" "$enable_production"
+    maybe_set_publish_variable LOGDATE_PLAY_INTERNAL_PUBLISH_ENABLED "$enable_internal"
+    maybe_set_publish_variable LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED "$enable_production"
 
     log_phase "Next steps"
-    log_info "Internal publishing runs from every main commit and workflow_dispatch once LOGDATE_PLAY_INTERNAL_PUBLISH_ENABLED=true."
-    log_info "Production publishing now promotes the matching internal release from android-v<major>.<minor>.<patch> tag pushes once LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED=true."
-    log_info "Tag only commits that have already been published successfully to the internal track."
-    log_info "Google Play still requires the very first app upload to be done manually in Play Console."
+    log_info "Google Play requires the very first bundle to be uploaded by hand in Play Console."
+    log_info "Tag only commits that already reached the internal track; tags promote, they do not rebuild."
 }
 
 main "$@"
