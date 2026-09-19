@@ -158,6 +158,10 @@ val hasReleaseSigningConfig: Boolean =
         !releaseKeyPassword.isNullOrBlank()
 val allowDebugReleaseSigning: Boolean =
     providers.gradleProperty("logdate.allowDebugReleaseSigning").orNull?.toBoolean() == true
+val playPublishRequested: Boolean =
+    gradle.startParameter.taskNames.any { taskName ->
+        taskName.contains("publish", ignoreCase = true) || taskName.contains("promote", ignoreCase = true)
+    }
 val releaseTaskRequested: Boolean =
     gradle.startParameter.taskNames.any { taskName ->
         taskName.contains("Release", ignoreCase = true) ||
@@ -405,9 +409,17 @@ play {
     // Keyless: CI signs in with Workload Identity Federation as the Play service
     // account. A service-account JSON in ANDROID_PUBLISHER_CREDENTIALS still wins.
     useApplicationDefaultCredentials.set(System.getenv("ANDROID_PUBLISHER_CREDENTIALS").isNullOrBlank())
-    // Play assigns each upload its highest existing versionCode + 1, so codes
-    // never collide or go backwards whatever happens to git history.
-    resolutionStrategy.set(com.github.triplet.gradle.androidpublisher.ResolutionStrategy.AUTO)
+    // Uploads get Play's highest versionCode + 1, so codes never collide or go
+    // backwards whatever happens to git history. AUTO queries Play during every
+    // release build, so it is limited to publishing; plain builds keep their
+    // local versionCode and need no Play credentials.
+    resolutionStrategy.set(
+        if (playPublishRequested) {
+            com.github.triplet.gradle.androidpublisher.ResolutionStrategy.AUTO
+        } else {
+            com.github.triplet.gradle.androidpublisher.ResolutionStrategy.FAIL
+        },
+    )
 }
 
 fun registerSpeechBundleVerification(variantName: String) =
