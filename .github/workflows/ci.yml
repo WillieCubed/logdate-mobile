@@ -174,7 +174,9 @@ jobs:
 
   scripts:
     name: Script tests
-    runs-on: ubuntu-latest
+    # The scripts target developer Macs and use macOS tools (plutil, BSD stat),
+    # so their tests run there too.
+    runs-on: macos-latest
     timeout-minutes: 15
     steps:
       - name: Check out repository
@@ -189,7 +191,9 @@ jobs:
         run: ./run setup --only test-deps --non-interactive
 
       - name: Lint setup scripts
-        run: shellcheck -x -e SC1091 run scripts/lib/*.sh scripts/setup/*.sh scripts/setup/steps/*.sh
+        run: |
+          command -v shellcheck >/dev/null || brew install shellcheck
+          shellcheck -x -e SC1091 run scripts/lib/*.sh scripts/setup/*.sh scripts/setup/steps/*.sh
 
       - name: Run script tests
         run: ./scripts/tests/run-all.sh
