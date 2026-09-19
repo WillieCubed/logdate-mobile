@@ -42,16 +42,16 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.search.DateRangeFilter
 import app.logdate.client.domain.search.SearchFilters
@@ -60,6 +60,7 @@ import app.logdate.client.repository.search.SearchResult
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.PlatformSheet
+import app.logdate.ui.platform.plainTextClipEntry
 import app.logdate.ui.search.SearchBarMaxWidth
 import app.logdate.ui.search.UniversalSearchResultItem
 import app.logdate.ui.search.UniversalSearchResultUiState
@@ -68,6 +69,7 @@ import app.logdate.ui.search.searchBarMaxWidth
 import app.logdate.ui.search.toUniversalSearchResultUiState
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import logdate.client.feature.search.generated.resources.Res
 import logdate.client.feature.search.generated.resources.clear_search
@@ -205,7 +207,8 @@ fun SearchScreenContent(
             TextFieldState(initialText = initialQuery)
         }
     var sheetTarget by remember { mutableStateOf<SearchResult?>(null) }
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         searchBarState.animateToExpanded()
@@ -305,7 +308,8 @@ fun SearchScreenContent(
                 sheetTarget = null
             },
             onCopyText = {
-                clipboard.setText(AnnotatedString(target.content))
+                val text = target.content
+                coroutineScope.launch { clipboard.setClipEntry(plainTextClipEntry(text)) }
                 sheetTarget = null
             },
             onShare =
