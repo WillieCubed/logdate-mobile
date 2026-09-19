@@ -230,6 +230,14 @@ sealed class JournalNote(
     abstract val location: NoteLocation?
 
     /**
+     * IANA id of the time zone the note was captured in, or null when it was not recorded (notes
+     * written before the zone was captured, or received from a device that did not send one).
+     * Kept as an opaque string; parse it with a failure-tolerant lookup, since a zone added to the
+     * tz database after this device's release does not resolve here.
+     */
+    abstract val timeZoneId: String?
+
+    /**
      * A text note, like a unit of content on a microblog (e.g. post, tweet).
      *
      * Text notes can constitute simple statements or long form content.
@@ -243,6 +251,7 @@ sealed class JournalNote(
         val content: String,
         override val syncVersion: Long = 0,
         override val location: NoteLocation? = null,
+        override val timeZoneId: String? = null,
     ) : JournalNote(NoteType.TEXT)
 
     @Serializable
@@ -255,6 +264,7 @@ sealed class JournalNote(
         val caption: String = "",
         override val syncVersion: Long = 0,
         override val location: NoteLocation? = null,
+        override val timeZoneId: String? = null,
     ) : JournalNote(NoteType.IMAGE)
 
     @Serializable
@@ -267,6 +277,7 @@ sealed class JournalNote(
         val caption: String = "",
         override val syncVersion: Long = 0,
         override val location: NoteLocation? = null,
+        override val timeZoneId: String? = null,
     ) : JournalNote(NoteType.VIDEO)
 
     @Serializable
@@ -279,6 +290,7 @@ sealed class JournalNote(
         override val lastUpdated: Instant,
         override val syncVersion: Long = 0,
         override val location: NoteLocation? = null,
+        override val timeZoneId: String? = null,
     ) : JournalNote(NoteType.AUDIO)
 }
 

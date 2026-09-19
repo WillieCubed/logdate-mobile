@@ -52,6 +52,7 @@ fun TextNoteEntity.toModel(place: NotePlace? = null) =
         lastUpdated = lastUpdated,
         syncVersion = syncVersion,
         location = mapLocation(latitude, longitude, altitude, locationAccuracy, place),
+        timeZoneId = timeZoneId,
     )
 
 fun JournalNote.Text.toEntity() =
@@ -66,6 +67,7 @@ fun JournalNote.Text.toEntity() =
         altitude = location?.coordinates?.altitude,
         locationAccuracy = location?.coordinates?.accuracy,
         placeId = location?.place?.id,
+        timeZoneId = timeZoneId,
     )
 
 fun ImageNoteEntity.toModel(
@@ -79,6 +81,7 @@ fun ImageNoteEntity.toModel(
     lastUpdated = lastUpdated,
     syncVersion = syncVersion,
     location = mapLocation(latitude, longitude, altitude, locationAccuracy, place),
+    timeZoneId = timeZoneId,
 )
 
 fun JournalNote.Image.toEntity() =
@@ -93,6 +96,7 @@ fun JournalNote.Image.toEntity() =
         altitude = location?.coordinates?.altitude,
         locationAccuracy = location?.coordinates?.accuracy,
         placeId = location?.place?.id,
+        timeZoneId = timeZoneId,
     )
 
 fun VideoNoteEntity.toModel(
@@ -106,6 +110,7 @@ fun VideoNoteEntity.toModel(
     lastUpdated = lastUpdated,
     syncVersion = syncVersion,
     location = mapLocation(latitude, longitude, altitude, locationAccuracy, place),
+    timeZoneId = timeZoneId,
 )
 
 fun JournalNote.Video.toEntity() =
@@ -120,6 +125,7 @@ fun JournalNote.Video.toEntity() =
         altitude = location?.coordinates?.altitude,
         locationAccuracy = location?.coordinates?.accuracy,
         placeId = location?.place?.id,
+        timeZoneId = timeZoneId,
     )
 
 fun AudioNoteEntity.toModel(place: NotePlace? = null): JournalNote.Audio =
@@ -131,6 +137,7 @@ fun AudioNoteEntity.toModel(place: NotePlace? = null): JournalNote.Audio =
         lastUpdated = lastUpdated,
         syncVersion = syncVersion,
         location = mapLocation(latitude, longitude, altitude, locationAccuracy, place),
+        timeZoneId = timeZoneId,
     )
 
 fun JournalNote.Audio.toEntity() =
@@ -146,6 +153,7 @@ fun JournalNote.Audio.toEntity() =
         altitude = location?.coordinates?.altitude,
         locationAccuracy = location?.coordinates?.accuracy,
         placeId = location?.place?.id,
+        timeZoneId = timeZoneId,
     )
 
 internal fun PlaceEntity.toNotePlace() =
