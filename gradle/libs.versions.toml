@@ -269,6 +269,7 @@ coil-video = { group = "io.coil-kt.coil3", name = "coil-video", version.ref = "c
 okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinxIo" }
 okio-fakefilesystem = { module = "com.squareup.okio:okio-fakefilesystem", version.ref = "okio" }
+json-schema-validator = { module = "com.networknt:json-schema-validator", version = "3.0.7" }
 cryptography-provider-optimal = { module = "dev.whyoleg.cryptography:cryptography-provider-optimal", version.ref = "cryptographyKotlin" }
 nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimbusJoseJwt" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
