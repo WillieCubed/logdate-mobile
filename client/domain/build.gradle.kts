@@ -83,7 +83,7 @@ kotlin {
             implementation(libs.koin.test)
             implementation(libs.ktor.client.mock)
             implementation(libs.androidx.datastore.preferences)
-            implementation("com.squareup.okio:okio-fakefilesystem:3.16.4")
+            implementation(libs.okio.fakefilesystem)
         }
         jvmTest.dependencies {
             implementation(libs.mockk)
