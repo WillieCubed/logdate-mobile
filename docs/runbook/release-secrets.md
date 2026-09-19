@@ -74,17 +74,24 @@ against the repo.
 
 ---
 
-## GitHub Secrets — Android publish (existing)
+## GitHub Secrets — Android publish (`production` environment)
 
 | Secret | What it is | Rotation |
 |---|---|---|
-| `ANDROID_PUBLISHER_CREDENTIALS` | JSON service-account key with `Android Publisher` role on the Play Console project. | When the service-account key is regenerated in Google Cloud Console. |
 | `LOGDATE_RELEASE_STORE_BASE64` | Base64 of the Android release keystore (`logdate-release.jks`). | Never (a new keystore = a new app on Play). |
 | `LOGDATE_RELEASE_STORE_PASSWORD` | Password for the keystore. | When rotated alongside the keystore. |
 | `LOGDATE_RELEASE_KEY_ALIAS` | Key alias inside the keystore. | When rotated alongside the keystore. |
 | `LOGDATE_RELEASE_KEY_PASSWORD` | Password for the signing key. | When rotated alongside the keystore. |
 
-These are already present; no action needed unless rotating.
+These live in the `production` GitHub environment, not at repository scope,
+so only `main` and release tags can read them. `./run setup production`
+uploads them and reports when they drift; see
+[`docs/reference/project-setup.md`](../reference/project-setup.md).
+
+Play API access needs no secret. The publish jobs authenticate through
+Workload Identity Federation as the service account named by the
+`LOGDATE_PLAY_SERVICE_ACCOUNT` environment variable, so there is no key to
+rotate.
 
 ### Local dev machine setup (dogfood builds)
 
@@ -206,25 +213,26 @@ hardcode the profile name in any committed file.
 
 ---
 
-## GitHub Environments — required reviewers
+## GitHub Environments
 
-Both workflows gate the production track on a GitHub Environment so a
-human has to approve before traffic shifts.
+**Android** publishes through the `production` environment, which
+`./run setup production` configures. It has no required reviewer, because
+pushing an `android-v*` tag is already a deliberate release act and a reviewer
+gate would also pause every internal (dogfood) publish from `main`. Instead,
+its deployment policy lets only `main`, `android-v*` tags, and `server-v*`
+tags use it, so pull requests and other branches can never read its secrets.
 
-For each of `android-production` and `ios-production`:
+**iOS** still uses `ios-production`, set up by hand:
 
-1. **Settings → Environments → New environment** (named exactly
-   `android-production` or `ios-production` — the workflow YAML
-   references these strings).
-2. **Required reviewers** → add the people who can approve a
-   production release.
-3. Optionally add a **Wait timer** (e.g. 5 minutes) to give a paged
-   reviewer a window to abort.
-4. Don't add environment-level secrets — the publish secrets are
-   repo-level so both jobs can see them.
+1. **Settings → Environments → New environment**, named exactly
+   `ios-production` (the workflow YAML references this string).
+2. **Required reviewers** → add the people who can approve a production
+   release.
+3. Optionally add a **Wait timer** (e.g. 5 minutes) to give a paged reviewer
+   a window to abort.
 
-Without the environment, a `git push origin ios-v1.0.0` would
-auto-submit to Apple's review queue with no human gate.
+Without the environment, a `git push origin ios-v1.0.0` would auto-submit to
+Apple's review queue with no human gate.
 
 ---
 
@@ -235,7 +243,6 @@ auto-submit to Apple's review queue with no human gate.
 | Apple Distribution cert | every 3 years | _record date here_ |
 | App Store provisioning profile | every 1 year | _record date here_ |
 | App Store Connect API key | when team membership changes | _record date here_ |
-| Android service account key | when team membership changes | _record date here_ |
 | Android keystore | never (one keystore for the app's lifetime on Play) | n/a |
 
 Add a recurring calendar reminder 30 days ahead of each rotation
@@ -250,8 +257,9 @@ Run through this once before the first production tag:
 
 1. `gh secret list --repo WillieCubed/logdate-mobile` — confirm all
    six iOS secrets are present.
-2. **Settings → Environments** lists both `android-production` and
-   `ios-production` with at least one required reviewer each.
+2. `./run setup production --check` reports every step ok, and
+   **Settings → Environments** lists `ios-production` with at least one
+   required reviewer.
 3. `gh workflow list` shows `Publish iOS` (after the runbook patch
    lands).
 4. Local: `./scripts/resolve-ios-app-version.sh` runs cleanly against

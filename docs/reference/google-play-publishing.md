@@ -12,9 +12,23 @@ The automated path is intentionally narrow:
 - publish **internal** track builds on every push to `main`
 - allow **manual** internal publishes via `workflow_dispatch`
 - promote **production** releases only from `android-v*` tag pushes
-- gate the production path behind a required-reviewer GitHub Environment
-  (`android-production`)
+- read the publishing secrets from the `production` GitHub Environment, which
+  only `main` and release tags may use
 - stay disabled until maintainers explicitly enable each path
+
+`./run setup production` sets all of this up and verifies it; see
+[`project-setup.md`](project-setup.md).
+
+### Dogfood and production
+
+"Dogfood" is the Play **internal testing** track. Every push to `main`
+publishes a real, non-debuggable `release` bundle there, built against the
+production backend `https://cloud.logdate.app`. The local `dogfood` Gradle
+build type is something else: a debuggable build for sideloading, which Play
+would reject.
+
+Production is the same bundle, promoted from internal testing by an
+`android-v*` tag. Nothing is rebuilt for production.
 
 The workflow lives in [`publish-android-play.yml`](../../.github/workflows/publish-android-play.yml).
 
@@ -34,17 +48,17 @@ and production roll out independently.
 
 ## Required GitHub Environment
 
-The production-track job declares `environment: android-production`. Create
-that environment under **Settings → Environments → New environment**, then
-add the Android leads as required reviewers. Without reviewers configured,
-an `android-v*` tag push will queue the production job indefinitely waiting
-for approval — which is the desired behavior, not a bug.
+Both jobs declare `environment: production`. Its deployment policy, not a
+required reviewer, is what protects the secrets: only `main`, `android-v*`
+tags, and `server-v*` tags may use it. A reviewer gate would also pause every
+internal publish from `main`, which defeats continuous dogfooding. The
+`gh-environment` setup step enforces this policy.
 
 ## Required Secrets
 
 | Purpose | Secret name | Required for | Notes |
 | --- | --- | --- | --- |
-| Play Developer API credentials | `ANDROID_PUBLISHER_CREDENTIALS` | Internal + production | Raw service-account JSON content. |
+| Play Developer API access | none (variable `LOGDATE_PLAY_SERVICE_ACCOUNT`) | Internal + production | Keyless. Both jobs authenticate through Workload Identity Federation as this service account, and Gradle Play Publisher uses the resulting application-default credentials. |
 | Firebase debug config | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64` | CI, screenshot tests, local debug parity | Base64 of `app/android-main/google-services.json`. Materialized by [`setup-firebase-configs`](../../.github/actions/setup-firebase-configs/action.yml) with `android-flavor: debug` (default). |
 | Firebase release config | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_RELEASE_BASE64` | Internal + production Play publishing | Base64 of `app/android-main/src/release/google-services.json`. Materialized by [`setup-firebase-configs`](../../.github/actions/setup-firebase-configs/action.yml) with `android-flavor: release`. |
 | Release keystore file | `LOGDATE_RELEASE_STORE_BASE64` | Internal | Base64-encoded `.jks` or `.keystore` file content. |
@@ -60,12 +74,12 @@ full secret rotation runbook.
 
 ## Helper Scripts
 
-Setup splits across three scripts:
+`./run setup production` calls these for you. They remain usable on their own:
 
 ```bash
 ./scripts/create-signing-keystore.sh --environment production   # creates the keystore
 ./scripts/sync-firebase-configs.sh android-all       # uploads both Firebase JSONs
-./scripts/setup-play-publishing-secrets.sh           # uploads Play API creds + keystore
+./scripts/upload-play-keystore.sh --keyless # uploads the upload keystore
 ```
 
 `create-signing-keystore.sh` owns the keystore itself. It creates one per
@@ -84,12 +98,15 @@ app-signing certificate in, and `--write-assetlinks PATH` to write the
 sanity-checks `.project_info.project_id`) and is idempotent — re-running
 with a newer file rotates the secret in place.
 
-`setup-play-publishing-secrets.sh`:
+`upload-play-keystore.sh`:
 
 - validates that `gh` is installed and authenticated
-- helps locate the Play service-account JSON and release keystore
-- prompts for the keystore password, key alias, and key password
-- uploads the matching GitHub secrets
+- reads the keystore settings from `~/.logdate-signing/production-upload.env`,
+  prompting only for what is missing (`--non-interactive` never prompts)
+- uploads the keystore secrets to the `production` environment on stdin, so no
+  value ever appears in a command line
+- with `--keyless` (what setup uses), skips `ANDROID_PUBLISHER_CREDENTIALS`,
+  because CI authenticates to Play through Workload Identity Federation
 - can optionally set the internal and production enable variables
 
 If you want either publish path to stay disabled until later, leave its
@@ -156,6 +173,8 @@ The workflow has two publish paths:
 
   using:
 
+  - `-Plogdate.backendUrl=https://cloud.logdate.app`, explicitly, so a change
+    to `gradle.properties` can never retarget Play builds
   - `LOGDATE_PLAY_TRACK=internal`
   - `LOGDATE_VERSION_CODE=<derived>`
   - `LOGDATE_VERSION_NAME=<derived>`
@@ -168,7 +187,7 @@ The workflow has two publish paths:
 
 - Triggers only on `android-v<major>.<minor>.<patch>` tag pushes
 - Requires `LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED=true`
-- Requires `android-production` Environment approval before any work begins
+- Runs in the `production` Environment, which only release tags and `main` may use
 - Materializes the **release** Firebase config
 - Promotes the already-tested internal release with:
 

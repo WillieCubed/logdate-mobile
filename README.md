@@ -100,22 +100,31 @@ Each module contains detailed documentation in its respective `README.md` file:
   - macOS install: `brew install --cask android-platform-tools`
   - See `docs/environment/setup.md` for links to Android and Homebrew references.
 
+### Set Up Your Machine
+
+One command sets up a fresh clone or worktree, and is safe to re-run at any
+time:
+
+```bash
+git clone https://github.com/WillieCubed/logdate-mobile.git
+cd logdate-mobile
+./run setup            # tools, git hooks, local.properties, Firebase configs, test deps
+./run setup --check    # report what is missing without changing anything
+```
+
+To prepare a deployment environment (GitHub secrets, Firebase apps, signing
+keys, Google Play), add its name: `./run setup staging` or
+`./run setup production`. Every step, and the few that need a person, is
+explained in [docs/reference/project-setup.md](docs/reference/project-setup.md).
+
 ### Quick Start with Docker
 
 The fastest way to get the LogDate server running locally:
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/your-org/logdate.git
-   cd logdate
-   ```
+1. **Set up your machine** with `./run setup`, as above.
 
-2. **Set up local configuration**
-   ```bash
-   cp local.properties.example local.properties
-   # Edit local.properties and fill in required values
-   # See server/docs/environment-variables.md for details
-   ```
+2. **Add optional API keys** (Maps, Meta) to `local.properties`. See
+   `docs/environment/setup.md` and `server/docs/environment-variables.md`.
 
 3. **Start the development environment**
    ```bash
@@ -159,11 +168,10 @@ If you prefer to set up dependencies manually:
    Follow the [server database documentation](server/DATABASE.md) for PostgreSQL setup.
 
 3. **Firebase Setup**
-   - Follow the [Firebase documentation](https://firebase.google.com/docs/android/setup)
-   - Drop the dev `google-services.json` into `app/android-main/`. For Release
-     builds, place the production `google-services.json` in
-     `app/android-main/src/release/` — the google-services plugin picks the
-     release-specific source set automatically.
+   - `./run setup` downloads both Android configs for you: the dev
+     `google-services.json` into `app/android-main/`, and the production one
+     into `app/android-main/src/release/`, which the google-services plugin
+     picks for release builds.
    - For iOS, see [`docs/reference/ios-build-setup.md`](docs/reference/ios-build-setup.md)
      for the bundle id and `GoogleService-Info-Release.plist` requirements.
    - For staging/production server and app configuration rules, see

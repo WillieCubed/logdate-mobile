@@ -19,8 +19,8 @@ enable_domain_mapping = true
 domains               = ["cloud-staging.logdate.app"]
 
 # This is the isolated non-debug signer used only for staging Cloud builds.
-# Play does not yet have a LogDate application or app-signing certificate; the
-# production contract therefore remains the only place that can authorize it.
+# Play-distributed builds are re-signed with Play's app-signing certificate,
+# which only the production contract authorizes, so Play builds use production.
 android_signing_certificates = {
   staging = {
     fingerprint         = "DB:66:7C:A5:99:80:91:23:E2:F1:8B:86:98:42:A0:23:1B:52:D5:8B:94:A2:95:76:07:B9:A1:0D:1D:EC:26:88"
