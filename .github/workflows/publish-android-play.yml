@@ -81,7 +81,6 @@ jobs:
           --release-name "${{ steps.version.outputs.internal_release_name }}"
         env:
           LOGDATE_PLAY_TRACK: ${{ env.PLAY_TRACK }}
-          LOGDATE_VERSION_CODE: ${{ steps.version.outputs.version_code }}
           LOGDATE_VERSION_NAME: ${{ steps.version.outputs.version_name }}
 
       - name: Upload release bundle
@@ -119,10 +118,13 @@ jobs:
           fetch-depth: 0
 
       - name: Authenticate as the Play publishing service account
+        id: auth
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.LOGDATE_PLAY_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -144,12 +146,19 @@ jobs:
         shell: bash
         run: ./scripts/prepare-android-play-publishing.sh production
 
+      - name: Find the internal release built from this tag
+        id: internal
+        shell: bash
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: ./scripts/resolve-play-internal-release.sh studio.hypertext.logdate "${{ steps.version.outputs.short_sha }}"
+
       - name: Promote tested internal release to Play production
         run: >
           ./gradlew :app:android-main:promoteReleaseArtifact
           --from-track internal
           --promote-track production
-          --version-code "${{ steps.version.outputs.version_code }}"
+          --version-code "${{ steps.internal.outputs.version_code }}"
           --release-name "${{ steps.version.outputs.production_release_name }}"
           --release-status completed
 
@@ -161,4 +170,4 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --draft \
             --generate-notes \
-            --title "Android ${{ steps.version.outputs.version_name }} (${{ steps.version.outputs.version_code }})"
+            --title "Android ${{ steps.version.outputs.version_name }} (${{ steps.internal.outputs.version_code }})"

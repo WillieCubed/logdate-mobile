@@ -32,7 +32,7 @@ play_first_bundle_signer() {
 }
 
 play_first_bundle_apply() {
-    local version version_code version_name bundle expected actual
+    local version version_name bundle expected actual
     # Never build a release with the stub Firebase config.
     # shellcheck source=scripts/setup/steps/firebase-configs.sh
     source "$SETUP_STEPS_DIR/firebase-configs.sh"
@@ -47,13 +47,13 @@ play_first_bundle_apply() {
     fi
 
     version="$("$LOGDATE_REPO_ROOT/scripts/resolve-android-play-version.sh")" || return 1
-    version_code="$(sed -n 's/^version_code=//p' <<< "$version")"
     version_name="$(sed -n 's/^version_name=//p' <<< "$version")"
 
-    log_info "Building $ANDROID_PACKAGE $version_name ($version_code) against $BACKEND_URL"
+    # versionCode 1: CI uploads then take Play's highest code + 1.
+    log_info "Building $ANDROID_PACKAGE $version_name (versionCode 1) against $BACKEND_URL"
     "$LOGDATE_REPO_ROOT/gradlew" -p "$LOGDATE_REPO_ROOT" :app:android-main:bundleRelease \
         "-Plogdate.backendUrl=$BACKEND_URL" \
-        "-Plogdate.versionCode=$version_code" \
+        "-Plogdate.versionCode=1" \
         "-Plogdate.versionName=$version_name" || return 1
 
     bundle="$(find "$LOGDATE_REPO_ROOT/app/android-main/build/outputs/bundle/release" -name '*.aab' -print -quit)"

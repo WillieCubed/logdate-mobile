@@ -118,7 +118,23 @@ tested internal release instead of rebuilding the app bundle from source.
 
 ## Versioning Model
 
-Automated Play publishing derives app versioning from git history via:
+### versionCode: assigned by Play
+
+Play rejects any upload whose `versionCode` is not higher than every code it
+has seen for the app. Rather than derive codes from git, which breaks when
+history is rewritten, squashed, or fetched shallowly, Gradle Play Publisher
+runs with `resolutionStrategy = AUTO`. Every upload gets Play's highest
+existing `versionCode` + 1, so codes can never collide or go backwards.
+
+A commit therefore has no predictable `versionCode`. To promote a tag,
+`scripts/resolve-play-internal-release.sh` looks up the internal release whose
+name contains the tag's short SHA, and the workflow promotes that release's
+code. When the tagged commit never reached the internal track, the lookup fails
+and nothing is promoted.
+
+### versionName: derived from tags
+
+The version name comes from git history via:
 
 ```bash
 ./scripts/resolve-android-play-version.sh
@@ -136,22 +152,13 @@ Examples:
 Rules:
 
 1. The latest reachable `android-v*` tag defines the base version.
-2. `versionCode` is commit-stable and does **not** depend on whether a
-   release tag exists yet for that commit.
-3. The high-significance digits come from the reachable commit count.
-4. The low-significance three digits are a deterministic fragment derived
-   from the short commit SHA.
-5. Internal builds from non-tag refs use a derived `versionName` like
+2. Internal builds from non-tag refs use a derived `versionName` like
    `1.4.2-main.3+abc1234`.
-6. Tag builds resolve a tag-flavored `versionName`, but production promotion
-   uses the already-tested internal artifact identified by the same
-   commit-stable `versionCode`.
-7. The first-ever Play upload must still be done manually in Play Console
+3. Tag builds resolve a tag-flavored `versionName`.
+4. Internal release names include the short SHA, which is how promotion finds
+   the build for a tag.
+5. The first-ever Play upload must still be done manually in Play Console
    before Gradle Play Publisher can publish subsequent releases.
-
-Because `versionCode` is anchored to the commit graph, the same commit
-resolves to the same Play version code on `main`, manual dispatch, and a
-later `android-v*` tag. This is what makes promotion-from-internal possible.
 
 ## Workflow Behavior
 
@@ -176,8 +183,7 @@ The workflow has two publish paths:
   - `-Plogdate.backendUrl=https://cloud.logdate.app`, explicitly, so a change
     to `gradle.properties` can never retarget Play builds
   - `LOGDATE_PLAY_TRACK=internal`
-  - `LOGDATE_VERSION_CODE=<derived>`
-  - `LOGDATE_VERSION_NAME=<derived>`
+  - `LOGDATE_VERSION_NAME=<derived>` (Play assigns the `versionCode`)
   - `--release-name "<internal release name with short SHA>"`
 
 - Uploads the release bundle (`.aab`) as a workflow artifact
@@ -195,7 +201,7 @@ The workflow has two publish paths:
   ./gradlew :app:android-main:promoteReleaseArtifact \
     --from-track internal \
     --promote-track production \
-    --version-code <derived> \
+    --version-code <from resolve-play-internal-release.sh> \
     --release-name "<tag release name with short SHA>" \
     --release-status completed
   ```
@@ -211,7 +217,7 @@ The production path is intentionally lighter than the internal one:
 - it does **not** require the keystore
 
 That optimization is safe only because the production job promotes the
-exact internal artifact already tested for the same commit/versionCode.
+exact internal artifact already tested for the tagged commit.
 
 ## Local Verification
 

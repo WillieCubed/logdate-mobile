@@ -62,19 +62,11 @@ parse_semver() {
 resolve_commit_metadata() {
     COMMIT_COUNT="$(git rev-list --count HEAD)"
     SHORT_SHA="$(git rev-parse --short=7 HEAD)"
-
-    local hash_seed
-    hash_seed="${SHORT_SHA:0:5}"
-    HASH_FRAGMENT=$((16#$hash_seed % 1000))
 }
 
 resolve_commit_distance() {
     local tag="$1"
     DISTANCE="$(git rev-list --count "${tag}..HEAD")"
-    if (( DISTANCE > 999 )); then
-        log_error "Found ${DISTANCE} commits since ${tag}. Cut a new android-v* tag before publishing more than 999 builds from the same base version."
-        exit 1
-    fi
 }
 
 resolve_version_name() {
@@ -82,15 +74,6 @@ resolve_version_name() {
         VERSION_NAME="${CURRENT_TAG#android-v}+${SHORT_SHA}"
     else
         VERSION_NAME="${VERSION_NAME_BASE}-main.${DISTANCE}+${SHORT_SHA}"
-    fi
-}
-
-resolve_version_code() {
-    VERSION_CODE=$(( (COMMIT_COUNT * 1000) + HASH_FRAGMENT ))
-
-    if (( VERSION_CODE > 2147483647 )); then
-        log_error "Resolved versionCode ${VERSION_CODE} exceeds the Android int limit."
-        exit 1
     fi
 }
 
@@ -112,7 +95,6 @@ main() {
     resolve_commit_metadata
     resolve_commit_distance "$BASE_TAG"
     resolve_version_name
-    resolve_version_code
     resolve_release_names
 
     write_output "base_tag" "$BASE_TAG"
@@ -121,9 +103,8 @@ main() {
     write_output "commit_count" "$COMMIT_COUNT"
     write_output "distance" "$DISTANCE"
     write_output "short_sha" "$SHORT_SHA"
-    write_output "hash_fragment" "$HASH_FRAGMENT"
+    # No version_code: Gradle Play Publisher assigns Play's highest code + 1.
     write_output "version_name" "$VERSION_NAME"
-    write_output "version_code" "$VERSION_CODE"
     write_output "internal_release_name" "$INTERNAL_RELEASE_NAME"
     write_output "production_release_name" "$PRODUCTION_RELEASE_NAME"
 }

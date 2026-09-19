@@ -405,6 +405,9 @@ play {
     // Keyless: CI signs in with Workload Identity Federation as the Play service
     // account. A service-account JSON in ANDROID_PUBLISHER_CREDENTIALS still wins.
     useApplicationDefaultCredentials.set(System.getenv("ANDROID_PUBLISHER_CREDENTIALS").isNullOrBlank())
+    // Play assigns each upload its highest existing versionCode + 1, so codes
+    // never collide or go backwards whatever happens to git history.
+    resolutionStrategy.set(com.github.triplet.gradle.androidpublisher.ResolutionStrategy.AUTO)
 }
 
 fun registerSpeechBundleVerification(variantName: String) =
