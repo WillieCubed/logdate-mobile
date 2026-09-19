@@ -9,7 +9,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -19,14 +18,15 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -41,12 +41,12 @@ import kotlin.math.sin
 val LocalCampfireAnimationEnabled = staticCompositionLocalOf { true }
 
 /**
- * A small illustrated campfire that shows where the user's journaling streak stands.
+ * A sticker-style campfire that shows where the user's journaling streak stands.
  *
- * A burning fire flickers above two crossed logs and grows taller with [size]. Embers glow on the
- * logs with a couple of rising sparks. A fire that went out leaves charred logs and a thin line of
- * smoke, and an unlit fire is just the logs, ready to go. Motion stops when the system asks for
- * reduced motion.
+ * Every shape is a flat fill with a chunky dark outline and a white die-cut border, like a sticker
+ * on a page. A burning fire sways above two crossed logs and grows taller with [size]. Embers sit on
+ * the logs with a spark rising off them. A fire that went out leaves grey logs and a curl of smoke,
+ * and an unlit fire is just the logs. Motion stops when the system asks for reduced motion.
  *
  * @param waitingForToday Draws a lower flame for a fire that nothing has been added to today.
  * @param contentDescription Spoken description of the fire, or `null` when a parent describes it.
@@ -62,7 +62,6 @@ fun Campfire(
     val reduceMotion by rememberSystemReduceMotion()
     val animationEnabled = LocalCampfireAnimationEnabled.current && !LocalInspectionMode.current
     val progress = rememberCampfireProgress(animate = animationEnabled && !reduceMotion && phase != CampfirePhase.UNLIT)
-    val onSurface = MaterialTheme.colorScheme.onSurface
     val semanticsModifier =
         if (contentDescription != null) {
             Modifier.semantics { this.contentDescription = contentDescription }
@@ -76,12 +75,11 @@ fun Campfire(
             fireSize = size,
             waitingForToday = waitingForToday,
             progress = progress.value,
-            onSurface = onSurface,
         )
     }
 }
 
-/** A 0..1 loop that drives the flicker, or a constant 0 when the fire should not move. */
+/** A 0..1 loop that drives the motion, or a constant 0 when the fire should not move. */
 @Composable
 private fun rememberCampfireProgress(animate: Boolean): State<Float> {
     if (!animate) return remember { mutableFloatStateOf(0f) }
@@ -94,222 +92,263 @@ private fun rememberCampfireProgress(animate: Boolean): State<Float> {
     )
 }
 
+/**
+ * Maps the 64-unit design grid the campfire is drawn on onto the canvas, centered and scaled to fit.
+ */
+private class StickerGrid(
+    canvasWidth: Float,
+    canvasHeight: Float,
+) {
+    val scale = minOf(canvasWidth, canvasHeight) / GRID_SIZE
+    private val originX = (canvasWidth - GRID_SIZE * scale) / 2f
+    private val originY = (canvasHeight - GRID_SIZE * scale) / 2f
+
+    fun x(gridX: Float) = originX + gridX * scale
+
+    fun y(gridY: Float) = originY + gridY * scale
+
+    fun point(
+        gridX: Float,
+        gridY: Float,
+    ) = Offset(x(gridX), y(gridY))
+}
+
+private data class StickerShape(
+    val path: Path,
+    val fill: Color,
+    val outlineWidth: Float,
+)
+
 private fun DrawScope.drawCampfire(
     phase: CampfirePhase,
     fireSize: CampfireSize?,
     waitingForToday: Boolean,
     progress: Float,
-    onSurface: Color,
 ) {
-    val unit = size.minDimension
-    val centerX = size.width / 2f
-    val groundY = size.height - unit * 0.14f
-    val logCenterY = groundY - unit * 0.07f
-    val logTopY = groundY - unit * 0.13f
+    val grid = StickerGrid(size.width, size.height)
+    val outline = OUTLINE_WIDTH * grid.scale
     val angle = progress * 2f * PI.toFloat()
+    val charred = phase == CampfirePhase.OUT
 
-    drawOval(
-        color = onSurface.copy(alpha = 0.08f),
-        topLeft = Offset(centerX - unit * 0.36f, groundY - unit * 0.035f),
-        size = Size(unit * 0.72f, unit * 0.07f),
-    )
+    val shapes = mutableListOf<StickerShape>()
+    shapes += logShape(grid, degrees = 14f, fill = if (charred) CharredLogColor else LogColor, outline = outline)
+    shapes += logShape(grid, degrees = -14f, fill = if (charred) CharredLogShadeColor else LogShadeColor, outline = outline)
 
-    val flameHeight = unit * flameHeightFraction(fireSize) * if (waitingForToday) WAITING_FLAME_SCALE else 1f
     when (phase) {
-        CampfirePhase.BURNING -> drawGlow(Offset(centerX, logTopY - flameHeight * 0.3f), flameHeight * 0.9f, 0.32f)
-        CampfirePhase.EMBERS -> drawGlow(Offset(centerX, logTopY), unit * 0.36f, 0.42f + 0.08f * sin(angle))
+        CampfirePhase.BURNING -> {
+            val scale = flameScale(fireSize) * if (waitingForToday) WAITING_FLAME_SCALE else 1f
+            val sway = sin(angle) * 1.6f
+            val stretch = 1f + 0.04f * sin(2f * angle + 1f)
+            shapes += StickerShape(flamePath(grid, OuterFlame, scale, sway, stretch), OuterFlameColor, outline)
+            shapes += StickerShape(flamePath(grid, InnerFlame, scale, sway * 0.6f, stretch), InnerFlameColor, outline * 0.8f)
+        }
+        CampfirePhase.EMBERS -> {
+            EMBERS.forEach { ember ->
+                shapes += StickerShape(circlePath(grid, ember.x, ember.y, ember.radius), ember.color, outline * 0.8f)
+            }
+        }
         CampfirePhase.OUT, CampfirePhase.UNLIT -> Unit
     }
 
-    val charred = phase == CampfirePhase.OUT
-    drawLog(Offset(centerX, logCenterY), unit, degrees = 14f, grainAtEnd = true, charred = charred)
-    drawLog(Offset(centerX, logCenterY), unit, degrees = -14f, grainAtEnd = false, charred = charred)
-
-    when (phase) {
-        CampfirePhase.BURNING -> drawFlame(centerX, logTopY + unit * 0.02f, flameHeight, angle)
-        CampfirePhase.EMBERS -> drawEmbers(centerX, logTopY, unit, angle, progress)
-        CampfirePhase.OUT -> drawSmoke(centerX, logTopY, unit, angle, onSurface)
-        CampfirePhase.UNLIT -> Unit
+    val backing = Stroke(width = outline * DIE_CUT_SCALE, join = StrokeJoin.Round, cap = StrokeCap.Round)
+    shapes.forEach { drawPath(it.path, DieCutColor, style = backing) }
+    if (phase == CampfirePhase.OUT) {
+        drawSmoke(grid, angle, backingWidth = outline * SMOKE_DIE_CUT_SCALE)
     }
-}
-
-private fun flameHeightFraction(fireSize: CampfireSize?): Float =
-    when (fireSize) {
-        null, CampfireSize.SPARK -> 0.34f
-        CampfireSize.SMALL -> 0.44f
-        CampfireSize.CAMPFIRE -> 0.54f
-        CampfireSize.BONFIRE -> 0.62f
-        CampfireSize.BEACON -> 0.7f
-    }
-
-private fun DrawScope.drawGlow(
-    center: Offset,
-    radius: Float,
-    alpha: Float,
-) {
-    drawCircle(
-        brush = Brush.radialGradient(listOf(GlowColor.copy(alpha = alpha), Color.Transparent), center, radius),
-        radius = radius,
-        center = center,
-    )
-}
-
-private fun DrawScope.drawLog(
-    center: Offset,
-    unit: Float,
-    degrees: Float,
-    grainAtEnd: Boolean,
-    charred: Boolean,
-) {
-    val length = unit * 0.66f
-    val thickness = unit * 0.12f
-    val bark = if (charred) CharredBarkColor else BarkColor
-    val grain = if (charred) CharredGrainColor else GrainColor
-    rotate(degrees = degrees, pivot = center) {
-        drawRoundRect(
-            color = bark,
-            topLeft = Offset(center.x - length / 2f, center.y - thickness / 2f),
-            size = Size(length, thickness),
-            cornerRadius = CornerRadius(thickness / 2f),
-        )
-        val grainCenter =
-            Offset(
-                x = if (grainAtEnd) center.x + length / 2f - thickness / 2f else center.x - length / 2f + thickness / 2f,
-                y = center.y,
-            )
-        drawCircle(color = grain, radius = thickness * 0.4f, center = grainCenter)
-        drawCircle(color = bark, radius = thickness * 0.2f, center = grainCenter, style = Stroke(width = unit * 0.01f))
-    }
-}
-
-private fun DrawScope.drawFlame(
-    centerX: Float,
-    baseY: Float,
-    height: Float,
-    angle: Float,
-) {
-    val width = height * 0.64f
-    val layers =
-        listOf(
-            FlameLayer(OuterFlameColor, heightScale = 1f, widthScale = 1f, phaseOffset = 0f),
-            FlameLayer(MiddleFlameColor, heightScale = 0.72f, widthScale = 0.7f, phaseOffset = 1.3f),
-            FlameLayer(InnerFlameColor, heightScale = 0.44f, widthScale = 0.42f, phaseOffset = 2.6f),
-        )
-    layers.forEach { layer ->
-        val stretch = 1f + 0.05f * sin(2f * angle + layer.phaseOffset)
-        val sway = sin(angle + layer.phaseOffset) * width * 0.07f
+    shapes.forEach { shape ->
+        drawPath(shape.path, shape.fill)
         drawPath(
-            path =
-                flamePath(
-                    centerX = centerX,
-                    baseY = baseY,
-                    width = width * layer.widthScale,
-                    height = height * layer.heightScale * stretch,
-                    sway = sway,
-                ),
-            color = layer.color,
+            shape.path,
+            OutlineColor,
+            style = Stroke(width = shape.outlineWidth, join = StrokeJoin.Round, cap = StrokeCap.Round),
         )
+    }
+    if (phase == CampfirePhase.EMBERS) {
+        drawRisingSpark(grid, progress, outline)
     }
 }
 
-/** A teardrop with a rounded base centered on [centerX] and a tip that leans by [sway]. */
+private fun flameScale(fireSize: CampfireSize?): Float =
+    when (fireSize) {
+        null, CampfireSize.SPARK -> 0.62f
+        CampfireSize.SMALL -> 0.76f
+        CampfireSize.CAMPFIRE -> 0.88f
+        CampfireSize.BONFIRE -> 0.98f
+        CampfireSize.BEACON -> 1.08f
+    }
+
+private fun logShape(
+    grid: StickerGrid,
+    degrees: Float,
+    fill: Color,
+    outline: Float,
+): StickerShape {
+    val rect = Rect(grid.x(12f), grid.y(47f), grid.x(52f), grid.y(56f))
+    val radius = 4.5f * grid.scale
+    val pivot = grid.point(32f, 52f)
+    val path =
+        Path().apply {
+            addRoundRect(RoundRect(rect, CornerRadius(radius)))
+            transform(
+                Matrix().apply {
+                    translate(pivot.x, pivot.y)
+                    rotateZ(degrees)
+                    translate(-pivot.x, -pivot.y)
+                },
+            )
+        }
+    return StickerShape(path, fill, outline)
+}
+
+private fun circlePath(
+    grid: StickerGrid,
+    x: Float,
+    y: Float,
+    radius: Float,
+): Path =
+    Path().apply {
+        addOval(Rect(center = grid.point(x, y), radius = radius * grid.scale))
+    }
+
+/**
+ * A teardrop flame on the design grid: a start point followed by cubic segments of three points
+ * each, tracing a pointed tip, curved shoulders, and a round base that rests on the logs.
+ */
+private class FlameOutline(
+    val points: List<Pair<Float, Float>>,
+)
+
+private val OuterFlame =
+    FlameOutline(
+        listOf(
+            32f to 7f,
+            41f to 18f,
+            47f to 27f,
+            47f to 35f,
+            47f to 43.28f,
+            40.28f to 50f,
+            32f to 50f,
+            23.72f to 50f,
+            17f to 43.28f,
+            17f to 35f,
+            17f to 27f,
+            23f to 18f,
+            32f to 7f,
+        ),
+    )
+
+private val InnerFlame =
+    FlameOutline(
+        listOf(
+            32f to 24f,
+            36f to 30f,
+            39f to 33f,
+            39f to 37f,
+            39f to 40.87f,
+            35.87f to 44f,
+            32f to 44f,
+            28.13f to 44f,
+            25f to 40.87f,
+            25f to 37f,
+            25f to 33f,
+            28f to 30f,
+            32f to 24f,
+        ),
+    )
+
+/**
+ * Places [outline] on the canvas, scaled about the flame's base by [scale], leaned by [sway] grid
+ * units at the tip, and stretched vertically by [stretch].
+ */
 private fun flamePath(
-    centerX: Float,
-    baseY: Float,
-    width: Float,
-    height: Float,
+    grid: StickerGrid,
+    outline: FlameOutline,
+    scale: Float,
     sway: Float,
+    stretch: Float,
 ): Path {
-    val half = width / 2f
-    val tipX = centerX + sway
-    val tipY = baseY - height
-    val shoulderY = baseY - height * 0.22f
+    fun place(point: Pair<Float, Float>): Offset {
+        val (x, y) = point
+        val rise = (FLAME_BASE_Y - y) / FLAME_HEIGHT
+        return grid.point(
+            FLAME_BASE_X + (x - FLAME_BASE_X) * scale + sway * rise,
+            FLAME_BASE_Y - (FLAME_BASE_Y - y) * scale * stretch,
+        )
+    }
+
+    val points = outline.points.map(::place)
     return Path().apply {
-        moveTo(tipX, tipY)
-        cubicTo(tipX + half * 0.2f, tipY + height * 0.35f, centerX + half, baseY - height * 0.5f, centerX + half, shoulderY)
-        cubicTo(centerX + half, baseY + half * 0.15f, centerX - half, baseY + half * 0.15f, centerX - half, shoulderY)
-        cubicTo(centerX - half, baseY - height * 0.5f, tipX - half * 0.2f, tipY + height * 0.35f, tipX, tipY)
+        moveTo(points[0].x, points[0].y)
+        for (index in 1 until points.size step 3) {
+            val (control1, control2, end) = Triple(points[index], points[index + 1], points[index + 2])
+            cubicTo(control1.x, control1.y, control2.x, control2.y, end.x, end.y)
+        }
         close()
     }
 }
 
-private fun DrawScope.drawEmbers(
-    centerX: Float,
-    logTopY: Float,
-    unit: Float,
-    angle: Float,
-    progress: Float,
-) {
-    EMBER_OFFSETS.forEachIndexed { index, offset ->
-        val center = Offset(centerX + offset * unit, logTopY - unit * 0.01f)
-        val pulse = 0.8f + 0.2f * sin(angle + index * 1.7f)
-        drawOval(
-            color = EmberColor.copy(alpha = pulse),
-            topLeft = Offset(center.x - unit * 0.07f, center.y - unit * 0.045f),
-            size = Size(unit * 0.14f, unit * 0.09f),
-        )
-        drawCircle(color = EmberCoreColor.copy(alpha = pulse), radius = unit * 0.026f, center = center)
-    }
-    repeat(SPARK_COUNT) { index ->
-        val rise = (progress + index.toFloat() / SPARK_COUNT) % 1f
-        val center =
-            Offset(
-                x = centerX + sin(rise * 6f + index * 2f) * unit * 0.06f,
-                y = logTopY - rise * unit * 0.42f,
-            )
-        drawCircle(color = EmberCoreColor.copy(alpha = 1f - rise), radius = unit * 0.02f, center = center)
-    }
-}
-
 private fun DrawScope.drawSmoke(
-    centerX: Float,
-    logTopY: Float,
-    unit: Float,
+    grid: StickerGrid,
     angle: Float,
-    onSurface: Color,
+    backingWidth: Float,
 ) {
-    val height = unit * 0.46f
+    val drift = sin(angle) * 1.5f
     val path =
         Path().apply {
-            moveTo(centerX, logTopY)
-            for (step in 1..SMOKE_STEPS) {
-                val t = step.toFloat() / SMOKE_STEPS
-                val x = centerX + sin(t * 3f * PI.toFloat() + angle) * unit * 0.05f * t
-                lineTo(x, logTopY - t * height)
-            }
+            moveTo(grid.x(32f), grid.y(41f))
+            cubicTo(grid.x(28f + drift), grid.y(35f), grid.x(36f + drift), grid.y(31f), grid.x(32f + drift), grid.y(25f))
+            cubicTo(grid.x(28f - drift), grid.y(19f), grid.x(34f - drift), grid.y(15f), grid.x(32f), grid.y(11f))
         }
-    drawPath(
-        path = path,
-        brush =
-            Brush.verticalGradient(
-                colors = listOf(Color.Transparent, onSurface.copy(alpha = 0.32f)),
-                startY = logTopY - height,
-                endY = logTopY,
-            ),
-        style = Stroke(width = unit * 0.022f, cap = StrokeCap.Round),
-    )
+    val width = SMOKE_WIDTH * grid.scale
+    drawPath(path, DieCutColor, style = Stroke(width = width + backingWidth, cap = StrokeCap.Round))
+    drawPath(path, SmokeColor, style = Stroke(width = width, cap = StrokeCap.Round))
 }
 
-private data class FlameLayer(
+private fun DrawScope.drawRisingSpark(
+    grid: StickerGrid,
+    progress: Float,
+    outline: Float,
+) {
+    val rise = (progress + SPARK_START) % 1f
+    val alpha = 1f - rise
+    val center = grid.point(36f + sin(rise * 6f) * 2f, 36f - rise * 18f)
+    val radius = 2.2f * grid.scale
+    drawCircle(OuterFlameColor.copy(alpha = alpha), radius = radius, center = center)
+    drawCircle(OutlineColor.copy(alpha = alpha), radius = radius, center = center, style = Stroke(width = outline * 0.7f))
+}
+
+private data class Ember(
+    val x: Float,
+    val y: Float,
+    val radius: Float,
     val color: Color,
-    val heightScale: Float,
-    val widthScale: Float,
-    val phaseOffset: Float,
 )
 
+private const val GRID_SIZE = 64f
+private const val FLAME_BASE_X = 32f
+private const val FLAME_BASE_Y = 50f
+private const val FLAME_HEIGHT = 43f
+private const val OUTLINE_WIDTH = 3f
+private const val DIE_CUT_SCALE = 2.6f
+private const val SMOKE_DIE_CUT_SCALE = 1.2f
+private const val SMOKE_WIDTH = 3.5f
+private const val SPARK_START = 0.35f
 private const val FLICKER_PERIOD_MILLIS = 1_600
-private const val WAITING_FLAME_SCALE = 0.78f
-private const val SPARK_COUNT = 2
-private const val SMOKE_STEPS = 16
-private val EMBER_OFFSETS = listOf(-0.15f, -0.05f, 0.05f, 0.15f)
+private const val WAITING_FLAME_SCALE = 0.82f
 
-private val BarkColor = Color(0xFF8B5A3C)
-private val GrainColor = Color(0xFFDDB083)
-private val CharredBarkColor = Color(0xFF5E5A57)
-private val CharredGrainColor = Color(0xFF8E8883)
-private val OuterFlameColor = Color(0xFFFF7A1A)
-private val MiddleFlameColor = Color(0xFFFFA630)
-private val InnerFlameColor = Color(0xFFFFE08A)
-private val GlowColor = Color(0xFFFF9A3C)
-private val EmberColor = Color(0xFFE8531F)
-private val EmberCoreColor = Color(0xFFFFB347)
+private val OutlineColor = Color(0xFF3B1F0E)
+private val DieCutColor = Color(0xFFFFFFFF)
+private val LogColor = Color(0xFFC27A45)
+private val LogShadeColor = Color(0xFFB06A38)
+private val CharredLogColor = Color(0xFFA8A29C)
+private val CharredLogShadeColor = Color(0xFF8F8983)
+private val OuterFlameColor = Color(0xFFFF8A3D)
+private val InnerFlameColor = Color(0xFFFFD166)
+private val SmokeColor = Color(0xFFB4B2A9)
+
+private val EMBERS =
+    listOf(
+        Ember(x = 25f, y = 44f, radius = 4.5f, color = OuterFlameColor),
+        Ember(x = 40f, y = 45f, radius = 4f, color = OuterFlameColor),
+        Ember(x = 33f, y = 42f, radius = 5f, color = InnerFlameColor),
+    )
