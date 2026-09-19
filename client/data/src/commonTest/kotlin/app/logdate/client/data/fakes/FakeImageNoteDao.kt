@@ -24,6 +24,8 @@ class FakeImageNoteDao : ImageNoteDao {
 
     override fun getAllNotes(): Flow<List<ImageNoteEntity>> = notesFlow
 
+    override fun observeCreatedTimestamps(): Flow<List<Long>> = notesFlow.map { notes -> notes.map { it.created.toEpochMilliseconds() } }
+
     override suspend fun getAll(): List<ImageNoteEntity> = notes.values.toList()
 
     override fun getRecentNotes(limit: Int): Flow<List<ImageNoteEntity>> =

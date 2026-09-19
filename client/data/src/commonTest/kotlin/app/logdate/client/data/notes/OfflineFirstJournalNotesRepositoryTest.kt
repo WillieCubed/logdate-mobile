@@ -124,6 +124,22 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
+    fun `entry timestamps include the creation time of every note type`() =
+        runTest {
+            val textNote = createTestTextNote()
+            val imageNote = createTestImageNote()
+            textNoteDao.addNote(textNote.toEntity())
+            imageNoteDao.addNote(imageNote.toEntity())
+
+            val timestamps = repository.observeEntryTimestamps().first()
+
+            assertEquals(
+                setOf(textNote.creationTimestamp, imageNote.creationTimestamp).map { it.toEpochMilliseconds() }.toSet(),
+                timestamps.map { it.toEpochMilliseconds() }.toSet(),
+            )
+        }
+
+    @Test
     fun `observe notes in journal filters notes by journal`() =
         runTest {
             val journal = createTestJournal()

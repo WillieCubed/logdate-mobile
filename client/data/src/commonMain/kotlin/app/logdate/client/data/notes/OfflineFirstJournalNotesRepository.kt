@@ -143,6 +143,16 @@ class OfflineFirstJournalNotesRepository(
         // This gives us immediate responsiveness since Room already caches data
         allNotesObserved
 
+    override fun observeEntryTimestamps(): Flow<List<Instant>> =
+        combine(
+            textNoteDao.observeCreatedTimestamps(),
+            imageNoteDao.observeCreatedTimestamps(),
+            audioNoteDao.observeCreatedTimestamps(),
+            videoNoteDao.observeCreatedTimestamps(),
+        ) { text, image, audio, video ->
+            (text + image + audio + video).map(Instant::fromEpochMilliseconds)
+        }
+
     override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> =
         notePlaceResolver
             .observeAll()

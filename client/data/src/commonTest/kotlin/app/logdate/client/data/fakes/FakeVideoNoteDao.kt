@@ -24,6 +24,8 @@ class FakeVideoNoteDao : VideoNoteDao {
 
     override fun getAllNotes(): Flow<List<VideoNoteEntity>> = notesFlow
 
+    override fun observeCreatedTimestamps(): Flow<List<Long>> = notesFlow.map { notes -> notes.map { it.created.toEpochMilliseconds() } }
+
     override suspend fun getAll(): List<VideoNoteEntity> = notes.values.toList()
 
     override fun getRecentNotes(limit: Int): Flow<List<VideoNoteEntity>> =

@@ -25,6 +25,8 @@ class FakeTextNoteDao : TextNoteDao {
 
     override fun getAllNotes(): Flow<List<TextNoteEntity>> = notesFlow
 
+    override fun observeCreatedTimestamps(): Flow<List<Long>> = notesFlow.map { notes -> notes.map { it.created.toEpochMilliseconds() } }
+
     override suspend fun getAll(): List<TextNoteEntity> = notes.values.toList()
 
     override fun getRecentNotes(limit: Int): Flow<List<TextNoteEntity>> =

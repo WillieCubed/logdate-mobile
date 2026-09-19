@@ -25,6 +25,8 @@ class FakeAudioNoteDao : AudioNoteDao {
 
     override fun getAllNotes(): Flow<List<AudioNoteEntity>> = notesFlow
 
+    override fun observeCreatedTimestamps(): Flow<List<Long>> = notesFlow.map { notes -> notes.map { it.created.toEpochMilliseconds() } }
+
     override suspend fun getAll(): List<AudioNoteEntity> = notes.values.toList()
 
     override fun getRecentNotes(limit: Int): Flow<List<AudioNoteEntity>> =

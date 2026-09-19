@@ -29,6 +29,15 @@ interface TextNoteDao {
     fun getAllNotes(): Flow<List<TextNoteEntity>>
 
     /**
+     * Returns the creation time, in epoch milliseconds, of every note in this table.
+     *
+     * Reads only the `created` column so callers that need when notes were written, such as
+     * streak calculation, do not load whole notes.
+     */
+    @Query("SELECT created FROM text_notes")
+    fun observeCreatedTimestamps(): Flow<List<Long>>
+
+    /**
      * Returns all text notes as a list (for quota calculation).
      */
     @Query("SELECT * FROM text_notes")

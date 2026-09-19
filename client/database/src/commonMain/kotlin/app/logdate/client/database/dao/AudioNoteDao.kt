@@ -30,6 +30,15 @@ interface AudioNoteDao {
     fun getAllNotes(): Flow<List<AudioNoteEntity>>
 
     /**
+     * Returns the creation time, in epoch milliseconds, of every note in this table.
+     *
+     * Reads only the `created` column so callers that need when notes were written, such as
+     * streak calculation, do not load whole notes.
+     */
+    @Query("SELECT created FROM audio_notes")
+    fun observeCreatedTimestamps(): Flow<List<Long>>
+
+    /**
      * Returns all audio notes as a list (for quota calculation).
      */
     @Query("SELECT * FROM audio_notes")

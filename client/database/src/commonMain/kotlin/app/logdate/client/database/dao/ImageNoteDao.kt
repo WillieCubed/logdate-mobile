@@ -29,6 +29,15 @@ interface ImageNoteDao {
     fun getAllNotes(): Flow<List<ImageNoteEntity>>
 
     /**
+     * Returns the creation time, in epoch milliseconds, of every note in this table.
+     *
+     * Reads only the `created` column so callers that need when notes were written, such as
+     * streak calculation, do not load whole notes.
+     */
+    @Query("SELECT created FROM image_notes")
+    fun observeCreatedTimestamps(): Flow<List<Long>>
+
+    /**
      * Returns all image notes as a list (for quota calculation).
      */
     @Query("SELECT * FROM image_notes")

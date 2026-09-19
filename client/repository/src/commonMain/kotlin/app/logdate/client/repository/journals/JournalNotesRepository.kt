@@ -125,6 +125,15 @@ interface JournalNotesRepository {
     }
 
     /**
+     * Observes when every note was created, across all note types.
+     *
+     * Used by streak calculation, which needs every entry's creation time across all of history
+     * but none of its content. The default derives it from [allNotesObserved]; implementations
+     * backed by a database should read the creation column directly instead.
+     */
+    fun observeEntryTimestamps(): Flow<List<Instant>> = allNotesObserved.map { notes -> notes.map { it.creationTimestamp } }
+
+    /**
      * Fetches a specific note by its ID. Used for loading entries for editing in new windows.
      *
      * @param noteId The unique identifier of the note to fetch

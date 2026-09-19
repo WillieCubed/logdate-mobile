@@ -90,6 +90,7 @@ import app.logdate.client.domain.search.SearchInJournalUseCase
 import app.logdate.client.domain.search.SearchJournalsUseCase
 import app.logdate.client.domain.search.UniversalSearchUseCase
 import app.logdate.client.domain.streak.CalculateStreakUseCase
+import app.logdate.client.domain.streak.ObserveCampfireUseCase
 import app.logdate.client.domain.streak.ObserveStreakUseCase
 import app.logdate.client.domain.streak.RefreshStreakUseCase
 import app.logdate.client.domain.streak.SetStreakEnabledUseCase
@@ -279,6 +280,7 @@ val domainModule: Module =
         single<MemoriesSettingsRepository> { DefaultMemoriesSettingsRepository(get()) }
 
         // Streaks
+        factory { ObserveCampfireUseCase(get(), get(), get()) }
         factory { CalculateStreakUseCase(get()) }
         factory { ObserveStreakUseCase(get()) }
         single { RefreshStreakUseCase(get(), get()) }

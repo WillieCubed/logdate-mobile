@@ -42,6 +42,12 @@ enum class FeatureFlag(
      */
     PEOPLE(key = "people_enabled", defaultEnabled = true),
 
+    /**
+     * The forgiving campfire streak that replaces the consecutive-day counter.
+     *
+     * Off by default until every surface that shows a streak renders the campfire.
+     */
+    CAMPFIRE_STREAKS(key = "campfire_streaks_enabled", defaultEnabled = false),
     ;
 
     companion object {
