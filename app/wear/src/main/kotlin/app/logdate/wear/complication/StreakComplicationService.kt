@@ -5,12 +5,15 @@ import android.content.Intent
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationType
 import androidx.wear.watchface.complications.data.LongTextComplicationData
+import androidx.wear.watchface.complications.data.NoDataComplicationData
 import androidx.wear.watchface.complications.data.PlainComplicationText
 import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import app.logdate.client.domain.streak.CalculateStreakUseCase
+import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.R
+import io.github.aakira.napier.Napier
 
 /**
  * Complication showing the user's current journaling streak.
@@ -35,7 +38,7 @@ class StreakComplicationService : SuspendingComplicationDataSourceService() {
         }
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData {
-        val streak = calculateStreak()
+        val streak = calculateStreak() ?: return NoDataComplicationData()
         val description =
             resources.getQuantityString(
                 R.plurals.wear_complication_streak_full,
@@ -49,15 +52,20 @@ class StreakComplicationService : SuspendingComplicationDataSourceService() {
         }
     }
 
-    private suspend fun calculateStreak(): Int =
+    /**
+     * The watch's Koin graph provides the data layer but not the domain use cases, so the
+     * calculator is built here from the repository instead of being resolved.
+     */
+    private suspend fun calculateStreak(): Int? =
         try {
-            val calculateStreakUseCase =
+            val repository =
                 org.koin.java.KoinJavaComponent
                     .getKoin()
-                    .get<CalculateStreakUseCase>()
-            calculateStreakUseCase()
+                    .get<JournalNotesRepository>()
+            CalculateStreakUseCase(repository)()
         } catch (e: Exception) {
-            0
+            Napier.e("Failed to calculate streak for the Wear complication", e)
+            null
         }
 
     private fun createOpenAppIntent(): PendingIntent {
