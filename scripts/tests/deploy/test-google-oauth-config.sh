@@ -2,7 +2,8 @@
 
 set -euo pipefail
 
-readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+readonly ROOT_DIR
 readonly ACTION="$ROOT_DIR/.github/actions/setup-firebase-configs/action.yml"
 
 fail() {
@@ -10,21 +11,21 @@ fail() {
     exit 1
 }
 
-rg -F 'environmentVariable("LOGDATE_GOOGLE_SERVER_CLIENT_ID")' \
+grep -F 'environmentVariable("LOGDATE_GOOGLE_SERVER_CLIENT_ID")' \
     "$ROOT_DIR/shared/config/build.gradle.kts" >/dev/null \
     || fail "shared config does not read the Google server client ID from the environment"
 
-rg -F 'google-server-client-id:' "$ACTION" >/dev/null \
+grep -F 'google-server-client-id:' "$ACTION" >/dev/null \
     || fail "Firebase setup action does not accept a Google server client ID"
-rg -F 'LOGDATE_GOOGLE_SERVER_CLIENT_ID=' "$ACTION" >/dev/null \
+grep -F 'LOGDATE_GOOGLE_SERVER_CLIENT_ID=' "$ACTION" >/dev/null \
     || fail "Firebase setup action does not export the Google server client ID"
 
-rg -F 'vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG' \
+grep -F 'vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG' \
     "$ROOT_DIR/.github/workflows/ci.yml" \
     "$ROOT_DIR/.github/workflows/screenshot-test.yml" >/dev/null \
     || fail "debug workflows do not provide the staging Google OAuth client ID"
 
-rg -F 'vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_RELEASE' \
+grep -F 'vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_RELEASE' \
     "$ROOT_DIR/.github/workflows/publish-android-play.yml" \
     "$ROOT_DIR/.github/workflows/publish-ios-app-store.yml" >/dev/null \
     || fail "release workflows do not provide the production Google OAuth client ID"

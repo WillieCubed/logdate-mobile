@@ -2,14 +2,15 @@
 
 set -euo pipefail
 
-readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+readonly ROOT_DIR
 
 fail() {
     printf 'FAIL: %s\n' "$*" >&2
     exit 1
 }
 
-if rg -n \
+if grep -rnE --exclude-dir=build --exclude-dir=.gradle \
     'firebase-firestore|libs\.firebase\.firestore|FirebaseFirestore|FirebaseRemoteJournalDataSource' \
     "$ROOT_DIR/gradle/libs.versions.toml" \
     "$ROOT_DIR/client/data" \
@@ -18,7 +19,7 @@ if rg -n \
     fail "production modules still contain the retired Firestore journal path"
 fi
 
-rg -F 'factory<RemoteJournalDataSource> { NoOpJournalDataSource }' \
+grep -F 'factory<RemoteJournalDataSource> { NoOpJournalDataSource }' \
     "$ROOT_DIR/client/data/src/androidMain/kotlin/app/logdate/client/data/di/DataModule.android.kt" \
     >/dev/null \
     || fail "Android must keep the compatibility interface bound to NoOpJournalDataSource"

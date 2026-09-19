@@ -49,6 +49,9 @@ iosApp/Configuration/Version.xcconfig
 __pycache__/
 *.pyc
 
+# Python virtual environments
+.venv/
+
 # Local debug dumps and scratch state
 tmp/
 

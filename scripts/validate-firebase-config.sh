@@ -2,8 +2,12 @@
 
 set -euo pipefail
 
-readonly ANDROID_PACKAGE="studio.hypertext.logdate"
-readonly ANDROID_PACKAGE_DEBUG="studio.hypertext.logdate.debug"
+# shellcheck source=scripts/lib/common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+
+# Not readonly: environment_value sources files that assign ANDROID_PACKAGE too.
+ANDROID_PACKAGE="$(environment_value production ANDROID_PACKAGE)"
+ANDROID_PACKAGE_DEBUG="$(environment_value staging ANDROID_DEBUG_PACKAGE)"
 readonly IOS_BUNDLE="studio.hypertext.LogDate"
 
 die() {
@@ -92,15 +96,15 @@ case "$CONFIG_KIND" in
     android-debug)
         validate_android \
             "$CONFIG_PATH" \
-            "logdate-dev" \
-            "1:786734185325:android:d1d954e3ec8b414b23f864"
+            "$(environment_value staging FIREBASE_PROJECT_ID)" \
+            "$(environment_value staging FIREBASE_ANDROID_APP_ID)"
         validate_android_debug_client "$CONFIG_PATH"
         ;;
     android-release)
         validate_android \
             "$CONFIG_PATH" \
-            "logdate" \
-            "1:216887423795:android:1d5cb98b3aaefc568ec446"
+            "$(environment_value production FIREBASE_PROJECT_ID)" \
+            "$(environment_value production FIREBASE_ANDROID_APP_ID)"
         ;;
     ios) validate_ios "$CONFIG_PATH" ;;
     *) die "unknown config kind: $CONFIG_KIND" ;;

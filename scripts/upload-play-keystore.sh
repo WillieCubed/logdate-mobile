@@ -3,11 +3,13 @@ set -euo pipefail
 # This script holds signing passwords in variables; `bash -x` would print them.
 { set +x; } 2>/dev/null
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=scripts/lib/common.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+REPO_ROOT="$LOGDATE_REPO_ROOT"
 SIGNING_DIR="${LOGDATE_SIGNING_DIR:-$HOME/.logdate-signing}"
 
 NON_INTERACTIVE="false"
+KEYLESS="false"
 GH_ENVIRONMENT="production"
 SERVICE_ACCOUNT_FILE=""
 UPLOAD_ENV_FILE="$SIGNING_DIR/production-upload.env"
@@ -15,26 +17,9 @@ KEYSTORE_FILE=""
 ENABLE_INTERNAL=""
 ENABLE_PRODUCTION=""
 
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-NC='\033[0m'
-
-log_phase() { printf '\n%b==> %s%b\n' "${CYAN}${BOLD}" "$1" "$NC"; }
-log_info() { printf '%b[info]%b %s\n' "$GREEN" "$NC" "$1"; }
-log_warn() { printf '%b[warn]%b %s\n' "$YELLOW" "$NC" "$1"; }
-log_error() { printf '%b[error]%b %s\n' "$RED" "$NC" "$1" >&2; }
-
-die() {
-    log_error "$1"
-    exit 1
-}
-
 print_usage() {
     cat <<EOF
-setup-play-publishing-secrets.sh
+upload-play-keystore.sh
 
 Uploads the Google Play publishing inputs to a GitHub Actions environment:
   ANDROID_PUBLISHER_CREDENTIALS    Play service-account JSON
@@ -47,12 +32,14 @@ Every value reaches 'gh secret set' on stdin. None is placed in argv, where
 other processes and shell tracing could see it, and none is printed.
 
 Usage:
-  ./scripts/setup-play-publishing-secrets.sh [options]
+  ./scripts/upload-play-keystore.sh [options]
 
 Options:
   --env NAME                  GitHub environment to write to (default: production)
   --service-account FILE      Play service-account JSON
                               (default: $SIGNING_DIR/play-publisher.json)
+  --keyless                   Skip ANDROID_PUBLISHER_CREDENTIALS; CI impersonates
+                              the service account through Workload Identity
   --upload-env FILE           Upload key env file (default: $SIGNING_DIR/production-upload.env)
   --keystore FILE             Upload keystore (default: LOGDATE_RELEASE_STORE_FILE from the env file)
   --non-interactive           Never prompt; fail when an input is missing
@@ -69,38 +56,13 @@ parse_args() {
             --upload-env) UPLOAD_ENV_FILE="${2:?--upload-env needs a value}"; shift 2 ;;
             --keystore) KEYSTORE_FILE="${2:?--keystore needs a value}"; shift 2 ;;
             --non-interactive) NON_INTERACTIVE="true"; shift ;;
+            --keyless) KEYLESS="true"; shift ;;
             --enable-internal) ENABLE_INTERNAL="${2:?--enable-internal needs a value}"; shift 2 ;;
             --enable-production) ENABLE_PRODUCTION="${2:?--enable-production needs a value}"; shift 2 ;;
             -h|--help) print_usage; exit 0 ;;
             *) die "Unknown flag: $1" ;;
         esac
     done
-}
-
-prompt_value() {
-    local prompt="$1"
-    local value=""
-    [[ "$NON_INTERACTIVE" == "true" ]] && die "$prompt is required and --non-interactive was set."
-    read -rp "$prompt: " value
-    printf '%s' "$value"
-}
-
-prompt_secret() {
-    local prompt="$1"
-    local value=""
-    [[ "$NON_INTERACTIVE" == "true" ]] && die "$prompt is required and --non-interactive was set."
-    read -rsp "$prompt: " value
-    echo >&2
-    printf '%s' "$value"
-}
-
-confirm() {
-    local prompt="$1"
-    local reply=""
-    [[ "$NON_INTERACTIVE" == "true" ]] && return 1
-    read -rp "$prompt [n]: " reply
-    reply="$(printf '%s' "${reply:-n}" | tr '[:upper:]' '[:lower:]')"
-    [[ "$reply" == "y" || "$reply" == "yes" ]]
 }
 
 require_gh() {
@@ -161,39 +123,41 @@ main() {
 
     log_phase "Collect Google Play publishing inputs"
 
-    if [[ -z "$SERVICE_ACCOUNT_FILE" ]]; then
-        SERVICE_ACCOUNT_FILE="$SIGNING_DIR/play-publisher.json"
-        [[ -f "$SERVICE_ACCOUNT_FILE" ]] || SERVICE_ACCOUNT_FILE="$(prompt_value "Path to Play service-account JSON")"
+    if [[ "$KEYLESS" != "true" ]]; then
+        if [[ -z "$SERVICE_ACCOUNT_FILE" ]]; then
+            SERVICE_ACCOUNT_FILE="$SIGNING_DIR/play-publisher.json"
+            [[ -f "$SERVICE_ACCOUNT_FILE" ]] || SERVICE_ACCOUNT_FILE="$(prompt_value "Path to Play service-account JSON")"
+        fi
+        [[ -f "$SERVICE_ACCOUNT_FILE" ]] || die "Service-account JSON not found: $SERVICE_ACCOUNT_FILE"
+        grep -q '"type"[[:space:]]*:[[:space:]]*"service_account"' "$SERVICE_ACCOUNT_FILE" \
+            || die "$SERVICE_ACCOUNT_FILE is not a service-account key."
     fi
-    [[ -f "$SERVICE_ACCOUNT_FILE" ]] || die "Service-account JSON not found: $SERVICE_ACCOUNT_FILE"
-    grep -q '"type"[[:space:]]*:[[:space:]]*"service_account"' "$SERVICE_ACCOUNT_FILE" \
-        || die "$SERVICE_ACCOUNT_FILE is not a service-account key."
 
-    local store_password="" key_alias="" key_password=""
+    local store_pass="" key_alias="" key_pass=""
     if [[ -f "$UPLOAD_ENV_FILE" ]]; then
         log_info "Reading upload key settings from $UPLOAD_ENV_FILE"
         [[ -n "$KEYSTORE_FILE" ]] || KEYSTORE_FILE="$(read_env_value "$UPLOAD_ENV_FILE" LOGDATE_RELEASE_STORE_FILE || true)"
-        store_password="$(read_env_value "$UPLOAD_ENV_FILE" LOGDATE_RELEASE_STORE_PASSWORD || true)"
+        store_pass="$(read_env_value "$UPLOAD_ENV_FILE" LOGDATE_RELEASE_STORE_PASSWORD || true)"
         key_alias="$(read_env_value "$UPLOAD_ENV_FILE" LOGDATE_RELEASE_KEY_ALIAS || true)"
-        key_password="$(read_env_value "$UPLOAD_ENV_FILE" LOGDATE_RELEASE_KEY_PASSWORD || true)"
+        key_pass="$(read_env_value "$UPLOAD_ENV_FILE" LOGDATE_RELEASE_KEY_PASSWORD || true)"
     else
         log_warn "No upload env file at $UPLOAD_ENV_FILE; prompting instead."
     fi
 
     [[ -n "$KEYSTORE_FILE" ]] || KEYSTORE_FILE="$(prompt_value "Path to upload keystore")"
     [[ -f "$KEYSTORE_FILE" ]] || die "Upload keystore not found: $KEYSTORE_FILE"
-    [[ -n "$store_password" ]] || store_password="$(prompt_secret "Upload keystore password")"
+    [[ -n "$store_pass" ]] || store_pass="$(prompt_secret "Upload keystore password")"
     [[ -n "$key_alias" ]] || key_alias="$(prompt_value "Upload key alias")"
-    [[ -n "$key_password" ]] || key_password="$(prompt_secret "Upload key password")"
-    [[ -n "$store_password" && -n "$key_alias" && -n "$key_password" ]] \
+    [[ -n "$key_pass" ]] || key_pass="$(prompt_secret "Upload key password")"
+    [[ -n "$store_pass" && -n "$key_alias" && -n "$key_pass" ]] \
         || die "The keystore password, key alias, and key password are all required."
 
     log_phase "Upload secrets to GitHub environment '$GH_ENVIRONMENT'"
-    set_secret_from_stdin ANDROID_PUBLISHER_CREDENTIALS < "$SERVICE_ACCOUNT_FILE"
+    [[ "$KEYLESS" == "true" ]] || set_secret_from_stdin ANDROID_PUBLISHER_CREDENTIALS < "$SERVICE_ACCOUNT_FILE"
     base64 < "$KEYSTORE_FILE" | tr -d '\n' | set_secret_from_stdin LOGDATE_RELEASE_STORE_BASE64
-    printf '%s' "$store_password" | set_secret_from_stdin LOGDATE_RELEASE_STORE_PASSWORD
+    printf '%s' "$store_pass" | set_secret_from_stdin LOGDATE_RELEASE_STORE_PASSWORD
     printf '%s' "$key_alias" | set_secret_from_stdin LOGDATE_RELEASE_KEY_ALIAS
-    printf '%s' "$key_password" | set_secret_from_stdin LOGDATE_RELEASE_KEY_PASSWORD
+    printf '%s' "$key_pass" | set_secret_from_stdin LOGDATE_RELEASE_KEY_PASSWORD
 
     log_info "Firebase google-services.json upload is handled by scripts/sync-firebase-configs.sh"
 

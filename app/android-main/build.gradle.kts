@@ -402,6 +402,9 @@ tasks.configureEach {
 play {
     track.set(resolvedPlayTrack)
     defaultToAppBundles.set(true)
+    // Keyless: CI signs in with Workload Identity Federation as the Play service
+    // account. A service-account JSON in ANDROID_PUBLISHER_CREDENTIALS still wins.
+    useApplicationDefaultCredentials.set(System.getenv("ANDROID_PUBLISHER_CREDENTIALS").isNullOrBlank())
 }
 
 fun registerSpeechBundleVerification(variantName: String) =

@@ -33,8 +33,13 @@ write_env() {
     fi
 }
 
+require_play_credentials() {
+    [[ -n "${ANDROID_PUBLISHER_CREDENTIALS:-}" || -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]] \
+        || die "Authenticate to Google Cloud as the Play service account, or set ANDROID_PUBLISHER_CREDENTIALS."
+}
+
 prepare_internal() {
-    require_env "ANDROID_PUBLISHER_CREDENTIALS"
+    require_play_credentials
     require_env "LOGDATE_RELEASE_STORE_BASE64"
     require_env "LOGDATE_RELEASE_STORE_PASSWORD"
     require_env "LOGDATE_RELEASE_KEY_ALIAS"
@@ -56,7 +61,7 @@ prepare_internal() {
 }
 
 prepare_production() {
-    require_env "ANDROID_PUBLISHER_CREDENTIALS"
+    require_play_credentials
 }
 
 case "$MODE" in
