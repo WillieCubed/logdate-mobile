@@ -18,6 +18,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.currentPlatform
+import app.logdate.ui.streak.CampfireChip
+import app.logdate.ui.streak.CampfirePresentation
 import app.logdate.ui.sync.SyncIndicatorChip
 import app.logdate.ui.sync.SyncPresentation
 import logdate.client.ui.generated.resources.*
@@ -49,6 +51,8 @@ fun TimelineTopAppBar(
     onNewEntry: (() -> Unit)? = null,
     syncPresentation: SyncPresentation = SyncPresentation.Hidden,
     onSyncChipClick: () -> Unit = {},
+    campfire: CampfirePresentation? = null,
+    onCampfireClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val title: @Composable () -> Unit = {
@@ -68,6 +72,8 @@ fun TimelineTopAppBar(
                     onNewEntry = onNewEntry,
                     syncPresentation = syncPresentation,
                     onSyncChipClick = onSyncChipClick,
+                    campfire = campfire,
+                    onCampfireClick = onCampfireClick,
                 )
             },
             scrollBehavior = scrollBehavior,
@@ -84,6 +90,8 @@ fun TimelineTopAppBar(
                     onNewEntry = onNewEntry,
                     syncPresentation = syncPresentation,
                     onSyncChipClick = onSyncChipClick,
+                    campfire = campfire,
+                    onCampfireClick = onCampfireClick,
                 )
             },
             scrollBehavior = scrollBehavior,
@@ -100,6 +108,8 @@ private fun RowScope.TimelineActions(
     onNewEntry: (() -> Unit)?,
     syncPresentation: SyncPresentation,
     onSyncChipClick: () -> Unit,
+    campfire: CampfirePresentation?,
+    onCampfireClick: () -> Unit,
 ) {
     // Sync chip leads the action group when sync has something to say (syncing, pending,
     // network error). Composes nothing for Hidden / banner-promotion states.
@@ -108,6 +118,13 @@ private fun RowScope.TimelineActions(
         onClick = onSyncChipClick,
         modifier = Modifier.padding(end = 4.dp),
     )
+    if (campfire != null) {
+        CampfireChip(
+            presentation = campfire,
+            onClick = onCampfireClick,
+            modifier = Modifier.padding(end = 4.dp),
+        )
+    }
 
     val historyLabel = stringResource(Res.string.location_history)
     val searchLabel = stringResource(Res.string.search)

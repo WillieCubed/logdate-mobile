@@ -40,6 +40,7 @@ import app.logdate.feature.core.settings.ui.StreakSettingsViewModel
 import app.logdate.feature.core.settings.ui.TimelineSettingsViewModel
 import app.logdate.feature.core.settings.ui.VoiceNotesSettingsViewModel
 import app.logdate.feature.core.settings.updates.AppUpdateController
+import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.feature.core.sync.SyncIssuesViewModel
 import app.logdate.feature.core.sync.SyncPresentationViewModel
 import org.koin.android.ext.koin.androidContext
@@ -159,6 +160,7 @@ actual val coreFeatureModule: Module =
         viewModel { PersonDetailViewModel(get(), get()) }
         viewModel { SyncIssuesViewModel(get()) }
         viewModel { SyncPresentationViewModel(syncManager = get(), sessionStorage = get()) }
+        viewModel { CampfireViewModel(observeCampfire = get(), featureFlagStore = get()) }
     }
 
 // TODO: Fix this obvious code smell

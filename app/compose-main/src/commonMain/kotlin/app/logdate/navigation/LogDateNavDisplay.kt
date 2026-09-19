@@ -51,6 +51,7 @@ import app.logdate.feature.core.settings.navigation.BirthdaySettingsRoute
 import app.logdate.feature.core.settings.navigation.ExportSettingsRoute
 import app.logdate.feature.core.settings.navigation.PersonDetailRoute
 import app.logdate.feature.core.settings.navigation.SettingsRoute
+import app.logdate.feature.core.settings.navigation.StreakSettingsRoute
 import app.logdate.feature.core.settings.navigation.SyncSettingsRoute
 import app.logdate.feature.core.settings.navigation.WatchNotificationSettingsRoute
 import app.logdate.feature.core.settings.navigation.WatchSettingsRoute
@@ -235,6 +236,7 @@ fun LogDateNavDisplay(
                                             onOpenMediaDetail = { backStack.add(MediaDetailRoute(it)) },
                                             onOpenSyncIssues = { backStack.add(SyncIssuesRoute) },
                                             onOpenDay = { date -> backStack.add(TimelineDetailRoute(date.toString())) },
+                                            onOpenStreak = { backStack.add(StreakSettingsRoute) },
                                             libraryContent = { modifier ->
                                                 LibraryScreen(
                                                     onOpenMediaDetail = { backStack.add(MediaDetailRoute(it)) },

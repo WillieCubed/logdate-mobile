@@ -164,6 +164,7 @@ enum class SharedScreenshotSceneId(
     LocationAdvanced("location-advanced"),
     DevicesSettings("devices-settings"),
     StreakSettings("streak-settings"),
+    CampfireStates("campfire-states"),
     TimelineSettings("timeline-settings"),
     DayBoundarySettings("day-boundary-settings"),
     LibrarySettings("library-settings"),
@@ -887,6 +888,9 @@ object SharedScreenshotCatalog {
                     onBack = {},
                     onToggleStreakTracking = {},
                 )
+            },
+            sharedScene(SharedScreenshotSceneId.CampfireStates, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                CampfireStatesGallery()
             },
             sharedScene(SharedScreenshotSceneId.TimelineSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
                 TimelineSettingsContent(

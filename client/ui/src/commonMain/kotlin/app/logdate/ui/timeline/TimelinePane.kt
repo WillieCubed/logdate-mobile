@@ -36,6 +36,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.platform.currentPlatform
+import app.logdate.ui.streak.CampfirePresentation
 import app.logdate.ui.sync.SyncAction
 import app.logdate.ui.sync.SyncErrorBanner
 import app.logdate.ui.sync.SyncPresentation
@@ -81,6 +82,8 @@ fun TimelinePane(
     birthday: Instant? = null,
     syncPresentation: SyncPresentation = SyncPresentation.Hidden,
     onSyncAction: (SyncAction) -> Unit = {},
+    campfire: CampfirePresentation? = null,
+    onCampfireClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val scrollBehavior =
@@ -117,6 +120,8 @@ fun TimelinePane(
                 onNewEntry = onNewEntry.takeIf { currentPlatform.isApple },
                 syncPresentation = syncPresentation,
                 onSyncChipClick = { onSyncAction(SyncAction.Retry) },
+                campfire = campfire,
+                onCampfireClick = onCampfireClick,
             )
         },
     ) { paddingValues ->

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="campfire_unlit_headline">Light your fire</string>
+    <string name="campfire_unlit_supporting">Add anything today — words, a photo, a sound.</string>
+    <string name="campfire_burning_headline">Your fire is burning</string>
+    <plurals name="campfire_burning_supporting">
+        <item quantity="one">%1$d day on this fire</item>
+        <item quantity="other">%1$d days on this fire</item>
+    </plurals>
+    <string name="campfire_waiting_headline">Your fire is waiting for today</string>
+    <string name="campfire_waiting_supporting">Add something to keep it going.</string>
+    <string name="campfire_embers_headline">Down to embers</string>
+    <string name="campfire_embers_supporting">Add something today to rekindle your %1$d-day fire.</string>
+    <string name="campfire_out_headline">Your fire went out</string>
+    <plurals name="campfire_out_supporting">
+        <item quantity="one">Your longest fire lasted %1$d day. Light a new one anytime.</item>
+        <item quantity="other">Your longest fire lasted %1$d days. Light a new one anytime.</item>
+    </plurals>
+    <string name="campfire_rekindled">Rekindled</string>
+    <string name="campfire_stat_this_fire">This fire</string>
+    <string name="campfire_stat_longest_fire">Longest fire</string>
+    <string name="campfire_stat_days_kept">Days kept</string>
+    <string name="campfire_rules">Miss a day and your fire burns down to embers. It only goes out after two quiet days in a row.</string>
+    <plurals name="campfire_chip_description">
+        <item quantity="one">Journaling fire, %1$d day</item>
+        <item quantity="other">Journaling fire, %1$d days</item>
+    </plurals>
+    <string name="campfire_chip_description_unlit">Journaling fire, not lit yet</string>
+    <string name="campfire_chip_description_out">Journaling fire, gone out</string>
+</resources>

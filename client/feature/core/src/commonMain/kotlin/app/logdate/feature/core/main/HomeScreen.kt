@@ -60,6 +60,7 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.transcription.TranscriptionData
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.transcription.TranscriptionStatus
+import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.feature.core.sync.SyncPresentationViewModel
 import app.logdate.feature.journals.ui.JournalClickCallback
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
@@ -138,13 +139,16 @@ fun HomeScreen(
     onOpenMediaDetail: (Uuid) -> Unit = {},
     onOpenSyncIssues: () -> Unit = {},
     onOpenDay: (LocalDate) -> Unit = {},
+    onOpenStreak: () -> Unit = {},
     locationContent: @Composable (Modifier) -> Unit = {},
     libraryContent: @Composable (Modifier) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = koinViewModel(),
     syncPresentationViewModel: SyncPresentationViewModel = koinViewModel(),
+    campfireViewModel: CampfireViewModel = koinViewModel(),
 ) {
     val syncPresentation by syncPresentationViewModel.presentation.collectAsStateWithLifecycle()
+    val campfire by campfireViewModel.presentation.collectAsStateWithLifecycle()
     val isLibraryEnabled by viewModel.isLibraryEnabled.collectAsStateWithLifecycle()
     val visibleDestinations = HomeRouteDestination.visibleEntries(isLibraryEnabled)
     var currentDestination: HomeRouteDestination by rememberSaveable {
@@ -321,6 +325,8 @@ fun HomeScreen(
                                                     app.logdate.ui.sync.SyncAction.Retry -> syncPresentationViewModel.retry()
                                                 }
                                             },
+                                            campfire = campfire,
+                                            onCampfireClick = onOpenStreak,
                                         )
                                     }
                                 }
