@@ -23,8 +23,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.zip.ZipInputStream
+import java.util.zip.ZipFile
 
 /**
  * Android-specific [RestoreLauncher] backed by Storage Access Framework and WorkManager.
@@ -47,7 +49,7 @@ import java.util.zip.ZipInputStream
  * ## File selection
  *
  * [onRestoreSourceSelected] extracts `metadata.json` from the chosen archive for preview
- * without a full copy to disk. This I/O is dispatched to [launcherScope] so it never
+ * without copying the archive when the provider allows it. This I/O is dispatched to [launcherScope] so it never
  * blocks the main thread. Any in-flight extraction is cancelled before a new one begins,
  * tracked by [metadataExtractionJob].
  */
@@ -304,26 +306,47 @@ class AndroidRestoreLauncher(
     /**
      * Reads only the `metadata.json` entry from the archive for preview.
      *
-     * Streams through the ZIP sequentially so the full archive is never loaded into
-     * memory. Returns `null` if the entry is missing or the stream cannot be read.
+     * The ZIP is read through its central directory, so the entries stored before
+     * `metadata.json` are never read, and archives whose entries use data descriptors (as the
+     * iOS writer's do) stay readable. Returns `null` if the entry is missing or the archive
+     * cannot be read.
      */
     private fun extractMetadata(uri: Uri): String? =
         try {
-            context.contentResolver.openInputStream(uri)?.use { rawInput ->
-                ZipInputStream(rawInput).use { zipInput ->
-                    var entry = zipInput.nextEntry
-                    while (entry != null) {
-                        if (entry.name == ExportFileStructure.METADATA_FILE) {
-                            return@use zipInput.bufferedReader(Charsets.UTF_8).readText()
-                        }
-                        zipInput.closeEntry()
-                        entry = zipInput.nextEntry
-                    }
-                    null
-                }
+            withRandomAccessZip(uri) { zip ->
+                val entry = zip.getEntry(ExportFileStructure.METADATA_FILE) ?: return@withRandomAccessZip null
+                zip.getInputStream(entry).use { it.bufferedReader(Charsets.UTF_8).readText() }
             }
         } catch (e: Exception) {
             Napier.e("Failed to extract metadata from archive", e)
             null
         }
+
+    /**
+     * Runs [block] on [uri] opened as a [ZipFile], which needs random access.
+     *
+     * Providers backed by local files hand out a seekable descriptor, opened in place through
+     * `/proc/self/fd` so a multi-gigabyte archive is not copied. Streaming providers such as
+     * cloud drives return a pipe that cannot be seeked; the archive is copied to the cache for
+     * the duration of [block] instead.
+     */
+    private fun <T> withRandomAccessZip(
+        uri: Uri,
+        block: (ZipFile) -> T?,
+    ): T? {
+        context.contentResolver.openFileDescriptor(uri, "r")?.use { descriptor ->
+            val inPlace = runCatching { ZipFile(File("/proc/self/fd/${descriptor.fd}")) }.getOrNull()
+            if (inPlace != null) return inPlace.use(block)
+        }
+
+        val cached = File.createTempFile("logdate_preview", ".zip", context.cacheDir)
+        try {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(cached).use { output -> input.copyTo(output) }
+            } ?: return null
+            return ZipFile(cached).use(block)
+        } finally {
+            cached.delete()
+        }
+    }
 }
