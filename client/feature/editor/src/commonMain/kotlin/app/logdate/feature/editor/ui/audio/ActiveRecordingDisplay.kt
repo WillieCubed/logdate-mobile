@@ -41,7 +41,7 @@ import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.finish
 import logdate.client.feature.editor.generated.resources.listening
 import logdate.client.feature.editor.generated.resources.restart
-import logdate.client.feature.editor.generated.resources.we_couldnt_convert_this_recording_to_text
+import logdate.client.feature.editor.generated.resources.transcription_failed_audio_kept
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration
 
@@ -189,7 +189,7 @@ private fun ActiveRecordingTranscriptPane(
             val text = transcriptionText.takeUnless { it.isNullOrBlank() }
             if (text == null && transcriptionHasError) {
                 Text(
-                    text = stringResource(Res.string.we_couldnt_convert_this_recording_to_text),
+                    text = stringResource(Res.string.transcription_failed_audio_kept),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.error,
                 )
