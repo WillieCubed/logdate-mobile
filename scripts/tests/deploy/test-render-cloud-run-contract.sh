@@ -519,6 +519,9 @@ PY
 esac
 EOF
 chmod +x "$FAKE_BIN/terraform"
+# The renderer prefers terraform-bin, which hashicorp/setup-terraform installs
+# beside its wrapper; without this the real binary would bypass the fake.
+ln -s terraform "$FAKE_BIN/terraform-bin"
 
 cat >"$FAKE_BIN/jq" <<'EOF'
 #!/usr/bin/env bash
