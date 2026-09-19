@@ -60,7 +60,6 @@ import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.ui.generated.resources.common_back
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
-import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.Instant
 import logdate.client.ui.generated.resources.Res as UiRes
 
@@ -72,7 +71,7 @@ const val ONBOARDING_BIRTHDAY_CONFIRM_TAG = "onboarding_birthday_confirm"
 fun OnboardingBirthdayScreen(
     onBack: () -> Unit,
     onNext: () -> Unit,
-    viewModel: OnboardingViewModel = koinViewModel(),
+    persistBirthday: suspend (Instant) -> Result<Unit>,
 ) {
     val coroutineScope = rememberCoroutineScope()
     var isSaving by remember { mutableStateOf(false) }
@@ -90,8 +89,7 @@ fun OnboardingBirthdayScreen(
             coroutineScope.launch {
                 isSaving = true
                 errorMessage = null
-                viewModel
-                    .persistBirthday(birthday)
+                persistBirthday(birthday)
                     .onSuccess {
                         isSaving = false
                         onNext()
@@ -100,7 +98,6 @@ fun OnboardingBirthdayScreen(
                     }
             }
         },
-        onSkip = onNext,
         isSaving = isSaving,
         errorMessage = errorMessage,
     )
@@ -111,7 +108,6 @@ fun OnboardingBirthdayScreen(
 fun OnboardingBirthdayContent(
     onBack: () -> Unit,
     onBirthdaySelected: (Instant) -> Unit,
-    onSkip: (() -> Unit)? = null,
     isSaving: Boolean = false,
     errorMessage: String? = null,
 ) {
@@ -119,7 +115,6 @@ fun OnboardingBirthdayContent(
 
     BirthdayAdaptiveContent(
         onBack = onBack,
-        onSkip = onSkip,
         onOpenDatePicker = { showDatePicker = true },
         isSaving = isSaving,
         errorMessage = errorMessage,
@@ -157,7 +152,6 @@ fun OnboardingBirthdayContent(
 @Composable
 private fun BirthdayAdaptiveContent(
     onBack: () -> Unit,
-    onSkip: (() -> Unit)?,
     onOpenDatePicker: () -> Unit,
     isSaving: Boolean,
     errorMessage: String?,
@@ -173,7 +167,6 @@ private fun BirthdayAdaptiveContent(
         },
         bottomPane = {
             BirthdayActionPane(
-                onSkip = onSkip,
                 onOpenDatePicker = onOpenDatePicker,
                 isSaving = isSaving,
                 errorMessage = errorMessage,
@@ -193,7 +186,6 @@ private fun BirthdayAdaptiveContent(
                 endPane = {
                     BirthdayActionPane(
                         onOpenDatePicker = onOpenDatePicker,
-                        onSkip = onSkip,
                         isSaving = isSaving,
                         errorMessage = errorMessage,
                         modifier = Modifier.fillMaxSize(),
@@ -203,7 +195,6 @@ private fun BirthdayAdaptiveContent(
                     BirthdayCompactContent(
                         onBack = onBack,
                         onOpenDatePicker = onOpenDatePicker,
-                        onSkip = onSkip,
                         isSaving = isSaving,
                         errorMessage = errorMessage,
                     )
@@ -296,7 +287,6 @@ private fun BirthdayInfoPane(
 @Composable
 private fun BirthdayActionPane(
     onOpenDatePicker: () -> Unit,
-    onSkip: (() -> Unit)?,
     isSaving: Boolean,
     errorMessage: String?,
     modifier: Modifier = Modifier,
@@ -323,17 +313,6 @@ private fun BirthdayActionPane(
                 Text(stringResource(Res.string.onboarding_birthday_set))
             }
         }
-        // Onboarding cannot be a dead end. Without this the only control is the date picker, so
-        // anyone unwilling to hand over a birthday is stuck before reaching their own entries.
-        if (onSkip != null) {
-            TextButton(
-                onClick = onSkip,
-                enabled = !isSaving,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(Res.string.onboarding_birthday_skip))
-            }
-        }
         errorMessage?.let { message ->
             Text(
                 text = message,
@@ -348,7 +327,6 @@ private fun BirthdayActionPane(
 private fun BirthdayCompactContent(
     onBack: () -> Unit,
     onOpenDatePicker: () -> Unit,
-    onSkip: (() -> Unit)?,
     isSaving: Boolean,
     errorMessage: String?,
 ) {
@@ -446,17 +424,6 @@ private fun BirthdayCompactContent(
                                 )
                             } else {
                                 Text(stringResource(Res.string.onboarding_birthday_set))
-                            }
-                        }
-                        // Onboarding cannot be a dead end. Without this the only control is the date picker, so
-                        // anyone unwilling to hand over a birthday is stuck before reaching their own entries.
-                        if (onSkip != null) {
-                            TextButton(
-                                onClick = onSkip,
-                                enabled = !isSaving,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text(stringResource(Res.string.onboarding_birthday_skip))
                             }
                         }
                         errorMessage?.let { message ->

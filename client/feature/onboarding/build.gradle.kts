@@ -92,6 +92,13 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
         }
 
+        val desktopTest by getting
+        desktopTest.dependencies {
+            // Renders onboarding screens headlessly on the JVM.
+            implementation(libs.compose.ui.test)
+            implementation(compose.desktop.currentOs)
+        }
+
         androidMain.dependencies {
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.koin.android)

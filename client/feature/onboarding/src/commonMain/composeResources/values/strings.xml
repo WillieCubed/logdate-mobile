@@ -85,7 +85,6 @@
     <string name="onboarding_birthday_title">When&apos;s your birthday?</string>
     <string name="onboarding_birthday_body">Your birthday unlocks something special: every year on your birthday, you&apos;ll get a personalized Rewind of your favorite memories. It also marks the very beginning of your story on your timeline.</string>
     <string name="onboarding_birthday_set">Set my birthday</string>
-    <string name="onboarding_birthday_skip">Skip for now</string>
     <string name="onboarding_birthday_set_label">Birthday</string>
     <string name="onboarding_birthday_card_rewind_title">Birthday Rewind</string>
     <string name="onboarding_birthday_card_rewind_description">Every year, relive your best moments in a personalized birthday celebration.</string>
