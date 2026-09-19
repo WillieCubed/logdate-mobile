@@ -1,5 +1,6 @@
 package app.logdate.client.sync.cloud
 
+import app.logdate.client.sync.test.uploadMedia
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.BeginAccountCreationRequest
 import app.logdate.shared.model.CompleteAccountCreationRequest
@@ -27,6 +28,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
@@ -384,6 +386,29 @@ class BasicCloudApiClientTest {
             assertEquals(1, opens)
             assertEquals(size.toLong(), bytesRead)
             assertTrue(bytesSent > size, "The multipart body should carry the whole file")
+        }
+
+    @Test
+    fun `upload media reports an unreadable body as a media read error rather than a network error`() =
+        runTest {
+            val client =
+                createApiClient(
+                    MockEngine { request ->
+                        request.body.toByteArray()
+                        respond(content = "{}", status = HttpStatusCode.Created)
+                    },
+                )
+            val upload =
+                MediaUpload(
+                    contentId = "content-1",
+                    fileName = "recording.m4a",
+                    mimeType = "audio/mp4",
+                    sizeBytes = 16,
+                ) { throw MediaReadException("recording.m4a is gone") }
+
+            val result = client.uploadMedia("jwt-abc", upload)
+
+            assertIs<MediaReadException>(result.exceptionOrNull())
         }
 
     /** Produces [size] bytes on demand without ever holding them all. */

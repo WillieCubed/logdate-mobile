@@ -5,6 +5,7 @@ import app.logdate.client.media.MediaPayload
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.mediaRefOrNull
 import app.logdate.client.sync.cloud.CloudMediaDataSource
+import app.logdate.client.sync.cloud.MediaReadException
 import app.logdate.client.sync.metadata.MediaSyncRef
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import io.github.aakira.napier.Napier
@@ -33,22 +34,15 @@ internal class SyncMediaTransfer(
 
         val media =
             runCatching { mediaManager.openMedia(mediaRef) }
-                .getOrElse { error ->
-                    // Distinguish "the bytes are gone" from "the read happened to fail". Only the
-                    // former is hopeless; an upload that fails for any other reason is still worth
-                    // retrying.
-                    // If the check itself fails we cannot show the file is still there, and the
-                    // read has already failed -- treat it as gone rather than blocking the queue.
-                    val stillOnDisk = runCatching { mediaManager.exists(mediaRef) }.getOrDefault(false)
-                    return if (!stillOnDisk) {
-                        Result.failure(MissingMediaException(mediaRef, error))
-                    } else {
-                        Result.failure(error)
-                    }
-                }
+                .getOrElse { error -> return unreadableMedia(mediaRef, error) }
 
         return runCatching {
-            cloudMediaDataSource.uploadMedia(accessToken, note.uid, media).getOrThrow()
+            val upload = cloudMediaDataSource.uploadMedia(accessToken, note.uid, media)
+            upload.exceptionOrNull()?.let { error ->
+                // The file is read while the request is sent, so it can vanish after it was opened.
+                if (error is MediaReadException) return unreadableMedia(mediaRef, error)
+            }
+            upload.getOrThrow()
         }.map { upload ->
             val remoteUrl = upload.downloadUrl
             mediaSyncRefStore.upsert(
@@ -61,6 +55,24 @@ internal class SyncMediaTransfer(
                 ),
             )
             note.withMediaRef(remoteUrl)
+        }
+    }
+
+    /**
+     * Distinguishes "the bytes are gone" from "the read happened to fail". Only the former is
+     * hopeless; an upload that fails for any other reason is still worth retrying. If the check
+     * itself fails we cannot show the file is still there, and the read has already failed -- treat
+     * it as gone rather than blocking the queue.
+     */
+    private suspend fun unreadableMedia(
+        mediaRef: String,
+        error: Throwable,
+    ): Result<JournalNote> {
+        val stillOnDisk = runCatching { mediaManager.exists(mediaRef) }.getOrDefault(false)
+        return if (!stillOnDisk) {
+            Result.failure(MissingMediaException(mediaRef, error))
+        } else {
+            Result.failure(error)
         }
     }
 

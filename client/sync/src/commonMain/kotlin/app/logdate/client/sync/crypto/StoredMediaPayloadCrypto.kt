@@ -5,8 +5,6 @@ class StoredMediaPayloadCrypto(
 ) : MediaPayloadCrypto {
     private var cachedCrypto: MediaPayloadCrypto? = null
 
-    override suspend fun encrypt(data: ByteArray): ByteArray = getCrypto().encrypt(data)
-
     override suspend fun decrypt(data: ByteArray): ByteArray = getCrypto().decrypt(data)
 
     override suspend fun streamEncryptor(): MediaStreamEncryptor = getCrypto().streamEncryptor()

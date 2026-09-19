@@ -1,6 +1,5 @@
 package app.logdate.client.sync.crypto
 
-import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
@@ -9,7 +8,6 @@ actual class AesGcmMediaPayloadCrypto actual constructor(
     key: ByteArray,
 ) : MediaPayloadCrypto {
     private val keyBytes = key.copyOf()
-    private val secureRandom = SecureRandom()
 
     init {
         require(keyBytes.size in setOf(16, 24, 32)) {
@@ -17,22 +15,11 @@ actual class AesGcmMediaPayloadCrypto actual constructor(
         }
     }
 
-    actual override suspend fun encrypt(data: ByteArray): ByteArray {
-        if (data.isClientEncryptedMedia()) return data
-        val iv = ByteArray(CLIENT_MEDIA_IV_SIZE_BYTES).also { secureRandom.nextBytes(it) }
-        val cipher = cipher(Cipher.ENCRYPT_MODE, iv)
-        val cipherText = cipher.doFinal(data)
-        val output = ByteArray(CLIENT_MEDIA_PREFIX_BYTES.size + iv.size + cipherText.size)
-        System.arraycopy(CLIENT_MEDIA_PREFIX_BYTES, 0, output, 0, CLIENT_MEDIA_PREFIX_BYTES.size)
-        System.arraycopy(iv, 0, output, CLIENT_MEDIA_PREFIX_BYTES.size, iv.size)
-        System.arraycopy(cipherText, 0, output, CLIENT_MEDIA_PREFIX_BYTES.size + iv.size, cipherText.size)
-        return output
-    }
-
     actual override suspend fun streamEncryptor(): MediaStreamEncryptor = ChunkedMediaStreamEncryptor(keyBytes)
 
     actual override suspend fun decrypt(data: ByteArray): ByteArray {
         if (data.hasChunkedMediaPrefix()) return decryptChunkedMedia(keyBytes, data)
+        data.requireKnownClientMediaFormat()
         if (!data.hasClientMediaPrefix()) return data
         require(data.size > CLIENT_MEDIA_PREFIX_BYTES.size + CLIENT_MEDIA_IV_SIZE_BYTES) {
             "Encrypted media payload is too short."

@@ -1278,3 +1278,19 @@ fun mediaFileSource(
     fileName: String = "media.bin",
     mimeType: String = "application/octet-stream",
 ): MediaFileSource = MediaFileSource(fileName, mimeType, data.size.toLong()) { Buffer().apply { write(data) } }
+
+/** Uploads an in-memory payload; the app itself streams uploads from disk. */
+suspend fun CloudApiClient.uploadMedia(
+    accessToken: String,
+    media: MediaUploadRequest,
+): Result<MediaUploadResponse> =
+    uploadMedia(
+        accessToken,
+        MediaUpload(
+            contentId = media.contentId,
+            fileName = media.fileName,
+            mimeType = media.mimeType,
+            sizeBytes = media.sizeBytes,
+            deviceId = media.deviceId,
+        ) { Buffer().apply { write(media.data) } },
+    )

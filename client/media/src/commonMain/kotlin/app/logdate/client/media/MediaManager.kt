@@ -89,7 +89,7 @@ interface MediaManager {
             fileName = payload.fileName,
             mimeType = payload.mimeType,
             sizeBytes = payload.data.size.toLong(),
-        ) { Buffer().apply { write(payload.data) } }
+        ) { ByteArrayRawSource(payload.data) }
     }
 
     /**
@@ -181,4 +181,25 @@ sealed interface MediaObject {
          */
         val duration: Duration,
     ) : MediaObject
+}
+
+/** Reads [data] in place, so reopening an in-memory payload never copies all of it. */
+private class ByteArrayRawSource(
+    private val data: ByteArray,
+) : RawSource {
+    private var position = 0
+
+    override fun readAtMostTo(
+        sink: Buffer,
+        byteCount: Long,
+    ): Long {
+        if (position == data.size) return -1
+        val end = position + minOf(byteCount, (data.size - position).toLong()).toInt()
+        sink.write(data, position, end)
+        val read = end - position
+        position = end
+        return read.toLong()
+    }
+
+    override fun close() = Unit
 }

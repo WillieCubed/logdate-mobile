@@ -10,6 +10,7 @@ import kotlinx.io.readByteArray
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -49,6 +50,28 @@ class CloudMediaUploadStreamingTest {
             assertIs<MediaTooLargeException>(result.exceptionOrNull())
             assertNull(apiClient.captured, "An upload that can never succeed must not be sent")
             assertTrue(oversized.bytesRead <= HEADER_PEEK_BYTES)
+        }
+
+    @Test
+    fun `a file that changed size since the upload started fails as a media read error`() =
+        runTest {
+            val shrunk = CountingMediaFile(ByteArray(1024), declaredSize = 4096)
+            val apiClient = CapturingCloudApiClient()
+
+            DefaultCloudMediaDataSource(apiClient).uploadMedia("token", Uuid.random(), shrunk).getOrThrow()
+            val upload = apiClient.captured ?: error("No upload reached the API client")
+
+            assertFailsWith<MediaReadException> { upload.openBody().buffered().use { it.readByteArray() } }
+        }
+
+    @Test
+    fun `media that cannot be opened fails as a media read error`() =
+        runTest {
+            val unreadable = MediaFileSource("gone.m4a", "audio/mp4", 1024) { throw IllegalStateException("gone") }
+
+            val result = DefaultCloudMediaDataSource(CapturingCloudApiClient()).uploadMedia("token", Uuid.random(), unreadable)
+
+            assertIs<MediaReadException>(result.exceptionOrNull())
         }
 
     private class CapturingCloudApiClient : FakeCloudApiClient() {

@@ -526,16 +526,15 @@ class AndroidMediaManager(
             ) { openSourceInputStream(parsedUri).asSource() }
         }
 
-    /** The byte length of [uri], or null when the provider does not report one. */
+    /**
+     * The byte length of a file-backed [uri], or null for a content URI. A provider's reported
+     * length can disagree with what it streams, so content URIs are read whole instead.
+     */
     private fun resolveSizeBytes(uri: Uri): Long? {
-        if (uri.isFileBacked()) {
-            val file = requireFileFromUri(uri)
-            check(file.isFile) { "Media file does not exist: ${file.absolutePath}" }
-            return file.length()
-        }
-        return contentResolver.openAssetFileDescriptor(uri, "r")?.use { descriptor ->
-            descriptor.length.takeIf { it >= 0 }
-        }
+        if (!uri.isFileBacked()) return null
+        val file = requireFileFromUri(uri)
+        check(file.isFile) { "Media file does not exist: ${file.absolutePath}" }
+        return file.length()
     }
 
     override suspend fun saveMedia(payload: MediaPayload): String {

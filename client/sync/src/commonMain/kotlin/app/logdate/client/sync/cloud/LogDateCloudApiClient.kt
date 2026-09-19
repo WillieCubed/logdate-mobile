@@ -772,7 +772,7 @@ class LogDateCloudApiClient(
                                 // the whole file.
                                 append(
                                     key = "data",
-                                    value = InputProvider(media.bodySizeBytes) { media.openBody().buffered() },
+                                    value = InputProvider(media.sizeBytes) { media.openBody().buffered() },
                                     headers =
                                         Headers.build {
                                             append(HttpHeaders.ContentDisposition, "filename=\"${media.fileName}\"")
@@ -793,8 +793,12 @@ class LogDateCloudApiClient(
             }
         } catch (e: Exception) {
             Napier.e("Failed to upload media", e)
+            // The body is read from disk while the request is written, so a failure there reaches
+            // this catch too. It is the media's fault, not the network's, and retrying it as a
+            // network error would hide that.
+            val mediaFailure = e.mediaReadFailure()
             Result.failure(
-                CloudApiException(
+                mediaFailure ?: CloudApiException(
                     errorCode = "NETWORK_ERROR",
                     message = "Failed to upload media: ${e.message}",
                     cause = e,

@@ -4,6 +4,8 @@ import app.logdate.client.media.MediaFileSource
 import app.logdate.client.sync.crypto.MediaPayloadCrypto
 import app.logdate.client.sync.crypto.NoOpMediaPayloadCrypto
 import app.logdate.client.sync.crypto.isClientEncryptedMedia
+import kotlinx.io.Buffer
+import kotlinx.io.RawSource
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -131,8 +133,14 @@ class DefaultCloudMediaDataSource(
         contentId: Uuid,
         media: MediaFileSource,
     ): MediaUpload {
+        val alreadyEncrypted =
+            try {
+                media.isClientEncryptedMedia()
+            } catch (error: Exception) {
+                throw MediaReadException("Could not read ${media.fileName}: ${error.message}", error)
+            }
         val encryptor =
-            if (media.isClientEncryptedMedia()) {
+            if (alreadyEncrypted) {
                 NoOpMediaPayloadCrypto.streamEncryptor()
             } else {
                 mediaPayloadCrypto.streamEncryptor()
@@ -145,7 +153,7 @@ class DefaultCloudMediaDataSource(
             // larger than the file on disk. The server checks this against the bytes it
             // actually receives and rejects a mismatch, so it has to describe the ciphertext.
             sizeBytes = encryptor.encryptedSizeBytes(media.sizeBytes),
-        ) { encryptor.encrypt(media.open()) }
+        ) { encryptor.encrypt(SizeCheckedSource(media)) }
     }
 
     override suspend fun downloadMedia(
@@ -185,3 +193,45 @@ class MediaTooLargeException(
  * it reaches the server, leaving a little headroom for the multipart envelope.
  */
 private const val MAX_MEDIA_UPLOAD_BYTES = 31 * 1024 * 1024
+
+/**
+ * Reads [media] and fails with [MediaReadException] if it cannot be read or its length differs
+ * from [MediaFileSource.sizeBytes], which the upload declared before reading a byte. A file that
+ * changed or vanished since then must not be sent as a truncated or oversized body.
+ */
+private class SizeCheckedSource(
+    private val media: MediaFileSource,
+) : RawSource {
+    private val source = readingMedia { media.open() }
+    private var bytesRead = 0L
+
+    override fun readAtMostTo(
+        sink: Buffer,
+        byteCount: Long,
+    ): Long {
+        val read = readingMedia { source.readAtMostTo(sink, byteCount) }
+        if (read == -1L) {
+            if (bytesRead != media.sizeBytes) throw sizeChanged()
+            return read
+        }
+        bytesRead += read
+        if (bytesRead > media.sizeBytes) throw sizeChanged()
+        return read
+    }
+
+    override fun close() {
+        source.close()
+    }
+
+    private fun sizeChanged() =
+        MediaReadException("${media.fileName} changed size since the upload started: expected ${media.sizeBytes} bytes")
+
+    private inline fun <T> readingMedia(block: () -> T): T =
+        try {
+            block()
+        } catch (error: MediaReadException) {
+            throw error
+        } catch (error: Exception) {
+            throw MediaReadException("Could not read ${media.fileName}: ${error.message}", error)
+        }
+}

@@ -32,6 +32,9 @@ import kotlinx.io.readByteArray
  */
 
 internal val CHUNKED_MEDIA_PREFIX_BYTES = "LDCE2".encodeToByteArray()
+
+/** Shared by every client media encryption format, LDCE1 onwards. */
+private val CLIENT_MEDIA_FORMAT_FAMILY_BYTES = "LDCE".encodeToByteArray()
 private const val CHUNK_SIZE_BYTES = 64 * 1024
 
 /** Largest chunk size a payload may declare, so a corrupt header cannot demand a huge allocation. */
@@ -48,6 +51,16 @@ internal fun ByteArray.hasChunkedMediaPrefix(): Boolean = startsWith(CHUNKED_MED
 /** Whether [this] is already client-encrypted media in any format, and must not be encrypted again. */
 internal fun ByteArray.isClientEncryptedMedia(): Boolean = hasClientMediaPrefix() || hasChunkedMediaPrefix()
 
+/**
+ * Rejects media in a client-encryption format this build does not know. Treating it as plaintext
+ * would save ciphertext as the user's photo or recording.
+ */
+internal fun ByteArray.requireKnownClientMediaFormat() {
+    require(!startsWith(CLIENT_MEDIA_FORMAT_FAMILY_BYTES) || isClientEncryptedMedia()) {
+        "Encrypted media uses a format this version of LogDate cannot read; update the app."
+    }
+}
+
 internal fun ByteArray.startsWith(prefix: ByteArray): Boolean {
     if (size < prefix.size) return false
     for (index in prefix.indices) {
@@ -60,6 +73,13 @@ internal fun ByteArray.startsWith(prefix: ByteArray): Boolean {
 internal class ChunkedMediaStreamEncryptor(
     private val mediaKey: ByteArray,
 ) : MediaStreamEncryptor {
+    init {
+        // Each upload derives its own key while the request body is written, where a failure
+        // could only surface as a failed request. Deriving one here reports a missing algorithm
+        // or unusable key before any upload starts.
+        fileCipher(mediaKey, ByteArray(SALT_SIZE_BYTES))
+    }
+
     override fun encryptedSizeBytes(plainSizeBytes: Long): Long {
         val chunks = maxOf(1L, (plainSizeBytes + CHUNK_SIZE_BYTES - 1) / CHUNK_SIZE_BYTES)
         return HEADER_SIZE_BYTES + plainSizeBytes + chunks * TAG_SIZE_BYTES
@@ -94,21 +114,24 @@ internal fun decryptChunkedMedia(
     val noncePrefix = data.copyOfRange(offset, offset + NONCE_PREFIX_SIZE_BYTES)
     offset += NONCE_PREFIX_SIZE_BYTES
 
+    val sealedChunkSize = chunkSize + TAG_SIZE_BYTES
+    val chunkCount = maxOf(1, (data.size - offset + sealedChunkSize - 1) / sealedChunkSize)
+    val plaintextSize = data.size - offset - chunkCount * TAG_SIZE_BYTES
+    require(plaintextSize >= 0) { "Encrypted media payload ends mid-chunk." }
+
     val cipher = fileCipher(mediaKey, salt)
-    val plaintext = Buffer()
-    var index = 0
-    while (true) {
-        val remaining = data.size - offset
-        val sealedChunkSize = chunkSize + TAG_SIZE_BYTES
-        val last = remaining <= sealedChunkSize
-        val length = if (last) remaining else sealedChunkSize
-        require(length >= TAG_SIZE_BYTES) { "Encrypted media payload ends mid-chunk." }
+    val plaintext = ByteArray(plaintextSize)
+    var written = 0
+    for (index in 0 until chunkCount) {
+        val last = index == chunkCount - 1
+        val length = if (last) data.size - offset else sealedChunkSize
         val sealed = data.copyOfRange(offset, offset + length)
-        plaintext.write(cipher.decryptChunk(noncePrefix, index, last, sealed, header))
+        val chunk = cipher.decryptChunk(noncePrefix, index, last, sealed, header)
+        chunk.copyInto(plaintext, written)
+        written += chunk.size
         offset += length
-        if (last) return plaintext.readByteArray()
-        index++
     }
+    return plaintext
 }
 
 private class ChunkEncryptingSource(

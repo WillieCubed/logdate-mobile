@@ -101,7 +101,7 @@ class MediaStreamEncryptorTest {
             val crypto = AesGcmMediaPayloadCrypto(key)
             val plaintext = Random(5).nextBytes(10_000)
 
-            val legacy = crypto.encrypt(plaintext)
+            val legacy = legacyLdce1Encrypt(key, plaintext)
 
             assertTrue(legacy.hasClientMediaPrefix())
             assertContentEquals(plaintext, crypto.decrypt(legacy))
@@ -114,7 +114,7 @@ class MediaStreamEncryptorTest {
             val apiClient = RecordingClient()
 
             for (alreadyEncrypted in listOf(
-                crypto.encrypt(Random(6).nextBytes(4096)),
+                legacyLdce1Encrypt(key, Random(6).nextBytes(4096)),
                 crypto.streamEncryptor().encryptAll(Random(7).nextBytes(4096)),
             )) {
                 DefaultCloudMediaDataSource(apiClient, crypto)
