@@ -40,13 +40,20 @@ class MediaReferenceRecoveryTest {
     }
 
     @Test
-    fun `an app-private media file is matched by the whole name the base name or the trailing token`() {
+    fun `an app-private media file is matched by the whole name or the base name only`() {
         val keys = MediaReferenceRecovery.matchKeys("IMG_20260101_abc123.jpg")
 
         assertTrue(MediaReferenceRecovery.matchesAny("IMG_20260101_abc123.jpg", keys))
         assertTrue(MediaReferenceRecovery.matchesAny("IMG_20260101_abc123.jpeg", keys), "the base name matches with another extension")
-        assertTrue(MediaReferenceRecovery.matchesAny("copy_abc123.jpg", keys), "a name that contains the trailing token")
         assertFalse(MediaReferenceRecovery.matchesAny("unrelated.jpg", keys))
+    }
+
+    @Test
+    fun `a name that only shares a trailing token is another file`() {
+        val keys = MediaReferenceRecovery.matchKeys("IMG_20240101_101010.jpg")
+
+        assertFalse(MediaReferenceRecovery.matchesAny("IMG_20240202_101010.jpg", keys), "the same time of day on another date")
+        assertFalse(MediaReferenceRecovery.matchesAny("copy_101010.jpg", keys))
     }
 
     @Test

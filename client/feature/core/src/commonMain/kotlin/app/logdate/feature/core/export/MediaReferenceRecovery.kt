@@ -29,18 +29,20 @@ object MediaReferenceRecovery {
         return if ('.' in normalized) normalized else "$normalized.m4a"
     }
 
-    /** The names an app-private copy of [fileName] may be stored under, best match first. */
+    /**
+     * The names an app-private copy of [fileName] may be stored under: the same name, or the same name
+     * with another extension. A name that only shares a trailing token, such as a time of day, may be a
+     * different file, so it is never matched.
+     */
     fun matchKeys(fileName: String): List<String> {
         val baseName = fileName.substringBeforeLast('.', fileName)
-        val trailingToken = fileName.substringAfterLast('_', "")
-        val trailingStem = trailingToken.substringBeforeLast('.', trailingToken)
-        return listOf(fileName, baseName, trailingToken, trailingStem).filter { it.isNotBlank() }.distinct()
+        return listOf(fileName, baseName).filter { it.isNotBlank() }.distinct()
     }
 
     fun matchesAny(
         candidateName: String,
         keys: List<String>,
-    ): Boolean = keys.any { key -> candidateName == key || candidateName.startsWith("$key.") || candidateName.contains("_$key") }
+    ): Boolean = keys.any { key -> candidateName == key || candidateName.startsWith("$key.") }
 
     /** The media store id an old reference ends with, or null if it does not end in one. */
     fun legacyMediaStoreId(fileName: String): String? = TRAILING_DIGITS.find(fileName)?.groupValues?.get(1)
