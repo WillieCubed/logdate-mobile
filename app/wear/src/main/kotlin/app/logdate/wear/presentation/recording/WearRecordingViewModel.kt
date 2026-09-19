@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.SystemCaptureTimeZone
 import app.logdate.wear.data.storage.StorageSpaceChecker
 import app.logdate.wear.health.NoteHealthAnnotator
 import app.logdate.wear.location.WearLocationCaptureCoordinator
@@ -264,6 +265,7 @@ class WearRecordingViewModel(
                         lastUpdated = now,
                         durationMs = accumulatedDurationMs,
                         location = noteLocation,
+                        timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
                     )
                 notesRepository.create(audioNote)
                 noteHealthAnnotator.annotate(audioNote.uid)

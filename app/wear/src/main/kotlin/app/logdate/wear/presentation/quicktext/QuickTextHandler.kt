@@ -11,6 +11,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.res.stringResource
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.SystemCaptureTimeZone
 import app.logdate.wear.R
 import app.logdate.wear.location.WearLocationCaptureCoordinator
 import io.github.aakira.napier.Napier
@@ -94,6 +95,7 @@ internal suspend fun saveQuickTextAndComplete(
                 creationTimestamp = now,
                 lastUpdated = now,
                 location = noteLocation,
+                timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
             )
         notesRepository.create(note)
         Napier.d("Quick text note saved: ${spokenText.take(30)}...")

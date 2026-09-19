@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.SystemCaptureTimeZone
 import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.presentation.common.SaveFeedback
 import app.logdate.wear.sync.WearDataLayerClient
@@ -92,6 +93,7 @@ class MoodCheckInViewModel(
                         creationTimestamp = now,
                         lastUpdated = now,
                         location = noteLocation,
+                        timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
                     )
                 notesRepository.create(note)
 
