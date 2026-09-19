@@ -21,6 +21,7 @@ events  # Event primitive, event detail, calendar integration
 postcards  # Postcard creation, editing, viewing, and collection
 stickers  # Sticker extraction from photos, personal sticker library
 android-widget  # Home screen widgets (Memories, On This Day)
+streaks  # Journaling streak (campfire) tracking and display
 
 # App scopes
 wear  # Wear OS companion app

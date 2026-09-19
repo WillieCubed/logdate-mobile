@@ -24,6 +24,7 @@ These are the main scopes for user-facing features. **Prefer these scopes** for 
 | `client/feature/search/` | `search` |
 | `client/feature/timeline/` | `timeline` |
 | `client/feature/android-widgets/` | `android-widget` |
+| `client/domain/` (streak), streak UI in any feature | `streaks` |
 
 ## Apps Scopes
 
