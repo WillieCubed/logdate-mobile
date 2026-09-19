@@ -78,7 +78,7 @@ class ArchiveDtoConventionsTest {
     }
 
     @Test
-    fun `no value is a device path, a content uri or a class name`() {
+    fun `no value is a device path or a content uri or a class name`() {
         samples.forEach { (file, json) ->
             val leaks = ArchiveLeakScanner.findInJson(json.toString())
             assertTrue(leaks.isEmpty(), "$file leaks device references: $leaks")
