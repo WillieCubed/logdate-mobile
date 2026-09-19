@@ -1,36 +1,47 @@
 package app.logdate.feature.core.export
 
 import app.logdate.client.domain.export.archive.MediaSourceOpener
-import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okio.Source
 import okio.source
 import java.io.File
 import java.net.URI
-import kotlin.coroutines.cancellation.CancellationException
+import java.net.URISyntaxException
 
 /**
- * Opens the media references the desktop app stores: absolute paths and `file:` URLs. Anything else,
- * including a network address, is treated as missing, since an export never fetches from the network.
+ * Opens the media references the desktop app stores: absolute paths, Windows drive paths and `file:`
+ * URLs. Anything else, including a network address, is treated as missing, since an export never
+ * fetches from the network.
  */
 class DesktopMediaSourceOpener : MediaSourceOpener {
     override suspend fun open(reference: String): Source? =
         withContext(Dispatchers.IO) {
-            val file = fileFor(reference)
-            file?.takeIf { it.isFile }?.source()
+            localFileCandidates(reference).firstOrNull { it.isFile }?.source()
         }
-
-    private fun fileFor(reference: String): File? {
-        if (reference.startsWith("/")) return File(reference)
-        return try {
-            val uri = URI(reference)
-            if (uri.scheme == "file") File(uri) else null
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (failure: Exception) {
-            Napier.w("A media reference could not be read for export", failure)
-            null
-        }
-    }
 }
+
+private val WINDOWS_DRIVE_PATH = Regex("^[A-Za-z]:[\\\\/].*")
+
+/**
+ * The files a stored [reference] can mean, most likely first.
+ *
+ * The app writes `file://` followed by the plain path, without escaping spaces or backslashes, so a
+ * URL is read both as a proper URL and as that plain path.
+ */
+internal fun localFileCandidates(reference: String): List<File> =
+    when {
+        reference.startsWith("file:") ->
+            listOfNotNull(fileFromUrl(reference), File(reference.removePrefix("file://").removePrefix("file:")))
+        reference.startsWith("/") || reference.startsWith("\\\\") || WINDOWS_DRIVE_PATH.matches(reference) -> listOf(File(reference))
+        else -> emptyList()
+    }
+
+private fun fileFromUrl(reference: String): File? =
+    try {
+        File(URI(reference))
+    } catch (malformed: URISyntaxException) {
+        null
+    } catch (unsuitable: IllegalArgumentException) {
+        null
+    }
