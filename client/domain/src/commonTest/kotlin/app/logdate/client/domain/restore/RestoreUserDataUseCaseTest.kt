@@ -637,6 +637,31 @@ class RestoreUserDataUseCaseTest {
             assertEquals(1, result.notesImported)
         }
 
+    @Test
+    fun `overwriting a note with a copy that has no time zone keeps the recorded zone`() =
+        runTest {
+            val noteId = Uuid.random()
+            notesRepo.existingNotes[noteId] =
+                JournalNote.Text(
+                    uid = noteId,
+                    creationTimestamp = now - 14.days,
+                    lastUpdated = now - 7.days,
+                    content = "Old version",
+                    timeZoneId = "Europe/Paris",
+                )
+
+            val bundle =
+                buildBundle(
+                    notes = listOf(testTextNote(noteId, content = "New version", updatedAt = now)),
+                )
+
+            useCase.restore(bundle)
+
+            val stored = notesRepo.existingNotes.getValue(noteId)
+            assertEquals("New version", (stored as JournalNote.Text).content)
+            assertEquals("Europe/Paris", stored.timeZoneId)
+        }
+
     // endregion
 
     // region Error handling

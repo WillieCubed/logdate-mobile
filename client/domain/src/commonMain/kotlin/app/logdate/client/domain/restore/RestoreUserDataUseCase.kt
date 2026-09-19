@@ -20,6 +20,7 @@ import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
+import app.logdate.client.repository.journals.withTimeZoneId
 import app.logdate.client.repository.location.LocationCapturePipeline
 import app.logdate.client.repository.location.LocationCaptureSource
 import app.logdate.client.repository.location.LocationHistoryRepository
@@ -178,7 +179,7 @@ class RestoreUserDataUseCase(
                     notesImported++
                 } else if (shouldWrite) {
                     journalNotesRepository.removeById(parsedId)
-                    journalNotesRepository.create(restored)
+                    journalNotesRepository.create(restored.withTimeZoneId(restored.timeZoneId ?: existing.timeZoneId))
                     notesImported++
                 }
             }
