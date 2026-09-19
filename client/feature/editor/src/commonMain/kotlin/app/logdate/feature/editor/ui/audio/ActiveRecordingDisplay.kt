@@ -187,22 +187,17 @@ private fun ActiveRecordingTranscriptPane(
                     .verticalScroll(scrollState),
         ) {
             val text = transcriptionText.takeUnless { it.isNullOrBlank() }
-            if (text == null && transcriptionHasError) {
-                Text(
-                    text = stringResource(Res.string.transcription_failed_audio_kept),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.error,
+            if (text != null) {
+                LiveTranscriptText(
+                    text = text,
+                    isRefining = transcriptionIsRefining,
                 )
-            } else if (text == null) {
+            } else if (!transcriptionHasError) {
+                // A failed transcription is reported once, in the status row above.
                 Text(
                     text = stringResource(Res.string.listening),
                     style = MaterialTheme.typography.displaySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                )
-            } else {
-                LiveTranscriptText(
-                    text = text,
-                    isRefining = transcriptionIsRefining,
                 )
             }
         }
@@ -317,7 +312,7 @@ private fun RecordingTranscriptStatus(
 ) {
     val label =
         when {
-            hasError -> "Transcription unavailable"
+            hasError -> stringResource(Res.string.transcription_failed_audio_kept)
             isPaused -> "Paused"
             isRefining -> "Improving transcript"
             isFinal -> "Transcript ready"
