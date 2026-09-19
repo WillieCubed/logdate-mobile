@@ -40,8 +40,8 @@ internal fun <T : HttpClientEngineConfig> HttpClientConfig<T>.configureClientDef
             },
         )
     }
-    // Headers only: logging a body reads all of it into memory first, which a media upload cannot
-    // afford.
+    // Headers only: bodies include whole media uploads, and logging one as text allocates
+    // twice its size in a single string.
     install(Logging) {
         logger = NapierLogger
         level = LogLevel.HEADERS

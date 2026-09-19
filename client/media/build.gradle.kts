@@ -51,6 +51,8 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
+            // MediaFileSource exposes kotlinx-io sources so uploads can stream from disk.
+            api(libs.kotlinx.io.core)
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.core)

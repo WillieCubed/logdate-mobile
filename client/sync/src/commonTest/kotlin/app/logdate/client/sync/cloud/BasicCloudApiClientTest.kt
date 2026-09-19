@@ -1,5 +1,6 @@
 package app.logdate.client.sync.cloud
 
+import app.logdate.client.sync.test.uploadMedia
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.BeginAccountCreationRequest
 import app.logdate.shared.model.CompleteAccountCreationRequest
@@ -9,6 +10,7 @@ import app.logdate.util.UuidSerializer
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.toByteArray
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.http.ContentType
@@ -20,10 +22,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.Buffer
+import kotlinx.io.RawSource
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
@@ -342,6 +347,89 @@ class BasicCloudApiClientTest {
             assertTrue(result.isSuccess)
             assertEquals("media-1", result.getOrThrow().mediaId)
         }
+
+    @Test
+    fun `upload media reads the body from its source while the request is written`() =
+        runTest {
+            val size = 4 * 1024 * 1024
+            var opens = 0
+            var bytesRead = 0L
+            var bytesSent = 0
+            val client =
+                createApiClient(
+                    MockEngine { request ->
+                        assertEquals(0L, bytesRead, "The body must not be read before the request is written")
+                        bytesSent = request.body.toByteArray().size
+                        respond(
+                            content =
+                                """
+                                {"contentId":"content-1","mediaId":"media-1","downloadUrl":"https://example.com/media-1","uploadedAt":1}
+                                """.trimIndent(),
+                            status = HttpStatusCode.Created,
+                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        )
+                    },
+                )
+            val upload =
+                MediaUpload(
+                    contentId = "content-1",
+                    fileName = "recording.m4a",
+                    mimeType = "audio/mp4",
+                    sizeBytes = size.toLong(),
+                ) {
+                    opens++
+                    PatternSource(size.toLong()) { read -> bytesRead += read }
+                }
+
+            client.uploadMedia("jwt-abc", upload).getOrThrow()
+
+            assertEquals(1, opens)
+            assertEquals(size.toLong(), bytesRead)
+            assertTrue(bytesSent > size, "The multipart body should carry the whole file")
+        }
+
+    @Test
+    fun `upload media reports an unreadable body as a media read error rather than a network error`() =
+        runTest {
+            val client =
+                createApiClient(
+                    MockEngine { request ->
+                        request.body.toByteArray()
+                        respond(content = "{}", status = HttpStatusCode.Created)
+                    },
+                )
+            val upload =
+                MediaUpload(
+                    contentId = "content-1",
+                    fileName = "recording.m4a",
+                    mimeType = "audio/mp4",
+                    sizeBytes = 16,
+                ) { throw MediaReadException("recording.m4a is gone") }
+
+            val result = client.uploadMedia("jwt-abc", upload)
+
+            assertIs<MediaReadException>(result.exceptionOrNull())
+        }
+
+    /** Produces [size] bytes on demand without ever holding them all. */
+    private class PatternSource(
+        private var remaining: Long,
+        private val onRead: (Long) -> Unit,
+    ) : RawSource {
+        override fun readAtMostTo(
+            sink: Buffer,
+            byteCount: Long,
+        ): Long {
+            if (remaining == 0L) return -1
+            val count = minOf(byteCount, remaining, 8192L)
+            repeat(count.toInt()) { index -> sink.writeByte((index % 251).toByte()) }
+            remaining -= count
+            onRead(count)
+            return count
+        }
+
+        override fun close() = Unit
+    }
 
     private fun createApiClient(mockEngine: MockEngine): LogDateCloudApiClient {
         val httpClient =

@@ -184,11 +184,11 @@ interface CloudApiClient {
     // Media Operations
 
     /**
-     * Uploads media files to the cloud.
+     * Uploads a media file to the cloud, streaming its body from [MediaUpload.openBody].
      */
     suspend fun uploadMedia(
         accessToken: String,
-        media: MediaUploadRequest,
+        media: MediaUpload,
     ): Result<MediaUploadResponse>
 
     /**

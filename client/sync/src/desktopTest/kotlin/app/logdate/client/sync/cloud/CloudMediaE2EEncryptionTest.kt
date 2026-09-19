@@ -1,8 +1,10 @@
 package app.logdate.client.sync.cloud
 
 import app.logdate.client.sync.crypto.AesGcmMediaPayloadCrypto
-import app.logdate.client.sync.crypto.CLIENT_MEDIA_PREFIX_BYTES
+import app.logdate.client.sync.crypto.CHUNKED_MEDIA_PREFIX_BYTES
 import app.logdate.client.sync.test.FakeCloudApiClient
+import app.logdate.client.sync.test.mediaFileSource
+import app.logdate.client.sync.test.readRequest
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,20 +31,13 @@ class CloudMediaE2EEncryptionTest {
             val apiClient = RecordingCloudApiClient()
             val dataSource = DefaultCloudMediaDataSource(apiClient, crypto)
             val plaintext = byteArrayOf(1, 2, 3, 4, 5)
-            val media =
-                MediaFile(
-                    contentId = Uuid.random(),
-                    fileName = "secret.bin",
-                    mimeType = "application/octet-stream",
-                    sizeBytes = plaintext.size.toLong(),
-                    data = plaintext,
-                )
+            val media = mediaFileSource(plaintext, fileName = "secret.bin", mimeType = "application/octet-stream")
 
-            val upload = dataSource.uploadMedia("token", media).getOrElse { throw it }
+            val upload = dataSource.uploadMedia("token", Uuid.random(), media).getOrElse { throw it }
             val uploaded = apiClient.lastUpload ?: fail("Upload request not captured")
             assertFalse(uploaded.data.contentEquals(plaintext))
-            val prefix = uploaded.data.copyOfRange(0, CLIENT_MEDIA_PREFIX_BYTES.size)
-            assertTrue(prefix.contentEquals(CLIENT_MEDIA_PREFIX_BYTES))
+            val prefix = uploaded.data.copyOfRange(0, CHUNKED_MEDIA_PREFIX_BYTES.size)
+            assertTrue(prefix.contentEquals(CHUNKED_MEDIA_PREFIX_BYTES))
 
             val download = dataSource.downloadMedia("token", upload.mediaId).getOrElse { throw it }
             assertTrue(download.data.contentEquals(plaintext))
@@ -58,16 +53,9 @@ class CloudMediaE2EEncryptionTest {
             val apiClient = RecordingCloudApiClient()
             val dataSource = DefaultCloudMediaDataSource(apiClient, crypto)
             val plaintext = ByteArray(64) { index -> index.toByte() }
-            val media =
-                MediaFile(
-                    contentId = Uuid.random(),
-                    fileName = "recording.m4a",
-                    mimeType = "audio/mp4",
-                    sizeBytes = plaintext.size.toLong(),
-                    data = plaintext,
-                )
+            val media = mediaFileSource(plaintext, fileName = "recording.m4a", mimeType = "audio/mp4")
 
-            dataSource.uploadMedia("token", media).getOrElse { throw it }
+            dataSource.uploadMedia("token", Uuid.random(), media).getOrElse { throw it }
 
             val uploaded = apiClient.lastUpload ?: fail("Upload request not captured")
             assertEquals(
@@ -85,16 +73,9 @@ class CloudMediaE2EEncryptionTest {
             val apiClient = RecordingCloudApiClient()
             val dataSource = DefaultCloudMediaDataSource(apiClient, crypto)
             val plaintext = byteArrayOf(9, 8, 7, 6)
-            val media =
-                MediaFile(
-                    contentId = Uuid.random(),
-                    fileName = "secret.bin",
-                    mimeType = "application/octet-stream",
-                    sizeBytes = plaintext.size.toLong(),
-                    data = plaintext,
-                )
+            val media = mediaFileSource(plaintext, fileName = "secret.bin", mimeType = "application/octet-stream")
 
-            val upload = dataSource.uploadMedia("token", media).getOrElse { throw it }
+            val upload = dataSource.uploadMedia("token", Uuid.random(), media).getOrElse { throw it }
             apiClient.tamperStoredData()
 
             val result = dataSource.downloadMedia("token", upload.mediaId)
@@ -113,11 +94,12 @@ private class RecordingCloudApiClient : FakeCloudApiClient() {
 
     override suspend fun uploadMedia(
         accessToken: String,
-        media: MediaUploadRequest,
+        media: MediaUpload,
     ): Result<MediaUploadResponse> {
-        lastUpload = media
-        storedMeta = media
-        storedData = media.data
+        val received = media.readRequest()
+        lastUpload = received
+        storedMeta = received
+        storedData = received.data
         return Result.success(
             MediaUploadResponse(
                 contentId = media.contentId,

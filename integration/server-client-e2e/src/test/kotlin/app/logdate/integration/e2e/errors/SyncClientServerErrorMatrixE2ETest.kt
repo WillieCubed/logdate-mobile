@@ -3,13 +3,17 @@ package app.logdate.integration.e2e.errors
 import app.logdate.client.sync.cloud.ContentUpdateRequest
 import app.logdate.client.sync.cloud.ContentUploadRequest
 import app.logdate.client.sync.cloud.DeviceId
-import app.logdate.client.sync.cloud.MediaUploadRequest
 import app.logdate.integration.e2e.fixtures.assertCloudError
 import app.logdate.integration.e2e.fixtures.createAccountWithSyntheticPasskey
+import app.logdate.integration.e2e.fixtures.uploadMediaDeclaringSize
 import app.logdate.integration.e2e.harness.withServerClientHarness
 import app.logdate.shared.model.sync.VersionConstraint
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpStatusCode
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * Integration test matrix for verifying client-side resilience against server-side sync errors.
@@ -76,19 +80,9 @@ class SyncClientServerErrorMatrixE2ETest {
                 assertCloudError(updateConflict, expectedCode = "CONFLICT", expectedStatus = 409)
 
                 val mediaSizeMismatch =
-                    apiClient.uploadMedia(
-                        accessToken = accessToken,
-                        media =
-                            MediaUploadRequest(
-                                contentId = "content-err",
-                                fileName = "bad.bin",
-                                mimeType = "application/octet-stream",
-                                sizeBytes = 99,
-                                data = byteArrayOf(1, 2, 3),
-                                deviceId = DeviceId("device-a"),
-                            ),
-                    )
-                assertCloudError(mediaSizeMismatch, expectedCode = "VALIDATION_ERROR", expectedStatus = 400)
+                    uploadMediaDeclaringSize(accessToken = accessToken, declaredSizeBytes = 99, data = byteArrayOf(1, 2, 3))
+                assertEquals(HttpStatusCode.BadRequest, mediaSizeMismatch.status)
+                assertTrue(mediaSizeMismatch.bodyAsText().contains("VALIDATION_ERROR"))
 
                 val missingMedia = apiClient.downloadMedia(accessToken = accessToken, mediaId = "missing-media")
                 assertCloudError(missingMedia, expectedCode = "NOT_FOUND", expectedStatus = 404)

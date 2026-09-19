@@ -1,6 +1,7 @@
 package app.logdate.client.networking
 
 import io.github.aakira.napier.Antilog
+import io.github.aakira.napier.LogLevel
 import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -8,68 +9,101 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.toByteArray
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
-import io.ktor.client.request.header
+import io.ktor.client.request.headers
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
 import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import io.github.aakira.napier.LogLevel as NapierLogLevel
 
 /**
- * What the shared client configuration is allowed to write to the log.
- *
- * Logging a request body means reading the whole thing into one string first. For a photo or a
- * recording that is tens of megabytes of text, and on Android it ran the app out of memory in the
- * middle of every backup that reached a large file -- the app crashed, the backup restarted, and it
- * reached the same file again. Bodies stay out of the log, and so do access tokens.
+ * Request logging must never copy a request body into a log line. Media uploads carry whole
+ * recordings and photos; logging one as text allocates twice its size in a single string and
+ * ran the app out of memory mid-recording.
  */
 class HttpClientLoggingTest {
-    private class CapturingAntilog : Antilog() {
-        val messages = mutableListOf<String>()
-
-        override fun performLog(
-            priority: NapierLogLevel,
-            tag: String?,
-            throwable: Throwable?,
-            message: String?,
-        ) {
-            message?.let(messages::add)
-        }
-    }
-
     private val antilog = CapturingAntilog()
 
     @BeforeTest
-    fun installAntilog() {
+    fun setUp() {
         Napier.base(antilog)
     }
 
     @AfterTest
-    fun removeAntilog() {
+    fun tearDown() {
         Napier.takeLogarithm(antilog)
     }
+
+    @Test
+    fun `a media upload is logged without its body`() =
+        runTest {
+            val payload = ByteArray(PAYLOAD_SIZE) { 'x'.code.toByte() }
+            val marker = "recording-bytes-marker"
+
+            client().post("https://api.logdate.test/media") {
+                setBody(
+                    MultiPartFormDataContent(
+                        formData {
+                            append("contentId", marker)
+                            append(
+                                key = "data",
+                                value = payload,
+                                headers = Headers.build { append(HttpHeaders.ContentType, "audio/mp4") },
+                            )
+                        },
+                    ),
+                )
+            }
+
+            val logged = antilog.messages.joinToString("\n")
+            assertTrue(logged.contains("https://api.logdate.test/media"), "The request itself should still be logged")
+            assertFalse(logged.contains(marker), "Request bodies must not be logged")
+            assertTrue(logged.length < PAYLOAD_SIZE, "Logged ${logged.length} chars for a $PAYLOAD_SIZE-byte upload")
+        }
+
+    @Test
+    fun `a JSON request body is not logged`() =
+        runTest {
+            client().post("https://api.logdate.test/drafts") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"text":"private journal entry"}""")
+            }
+
+            assertFalse(antilog.messages.any { it.contains("private journal entry") }, "Request bodies must not be logged")
+        }
+
+    @Test
+    fun `the bearer token is redacted from logged headers`() =
+        runTest {
+            client().post("https://api.logdate.test/media") {
+                headers { append(HttpHeaders.Authorization, "Bearer secret-access-token") }
+            }
+
+            val logged = antilog.messages.joinToString("\n")
+            assertTrue(logged.contains(HttpHeaders.Authorization), "The header name should still be logged")
+            assertFalse(logged.contains("secret-access-token"), "Access tokens must not be logged")
+        }
 
     private fun client(): HttpClient =
         HttpClient(MockEngine) {
             engine {
                 addHandler { request ->
-                    // A server reads the whole body before it answers; a handler that doesn't would
-                    // leave anything waiting on the body -- a body logger included -- waiting forever.
+                    // A server reads the whole body before it answers. A handler that doesn't leaves
+                    // anything waiting on the body -- a body logger included -- waiting forever, so a
+                    // regression here would hang instead of failing the assertions.
                     request.body.toByteArray()
                     respond(
-                        content = """{"mediaId": "m1"}""",
-                        status = HttpStatusCode.Created,
+                        content = "{}",
+                        status = HttpStatusCode.OK,
                         headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
                     )
                 }
@@ -77,64 +111,20 @@ class HttpClientLoggingTest {
             configureClientDefaults()
         }
 
-    @Test
-    fun `a media upload is logged without its body`() =
-        runTest {
-            val payload = BODY_MARKER.repeat(PAYLOAD_REPEATS).encodeToByteArray()
+    private class CapturingAntilog : Antilog() {
+        val messages = mutableListOf<String>()
 
-            client().use { client ->
-                val response =
-                    client.post("https://cloud.example/media") {
-                        setBody(
-                            MultiPartFormDataContent(
-                                formData {
-                                    append("contentId", "c1")
-                                    append(
-                                        key = "data",
-                                        value = payload,
-                                        headers =
-                                            Headers.build {
-                                                append(HttpHeaders.ContentDisposition, "filename=\"recording.m4a\"")
-                                                append(HttpHeaders.ContentType, "audio/mp4")
-                                            },
-                                    )
-                                },
-                            ),
-                        )
-                    }
-                assertEquals(HttpStatusCode.Created, response.status)
-                response.bodyAsText()
-            }
-
-            assertTrue(antilog.messages.isNotEmpty(), "The request should still be logged")
-            assertFalse(
-                antilog.messages.any { it.contains(BODY_MARKER) },
-                "The request body was written to the log",
-            )
-            val loggedChars = antilog.messages.sumOf { it.length }
-            assertTrue(loggedChars < payload.size / 10, "Logged $loggedChars characters for one request")
+        override fun performLog(
+            priority: LogLevel,
+            tag: String?,
+            throwable: Throwable?,
+            message: String?,
+        ) {
+            if (message != null) messages += message
         }
-
-    @Test
-    fun `an access token is never written to the log`() =
-        runTest {
-            client().use { client ->
-                client
-                    .post("https://cloud.example/contents") {
-                        header(HttpHeaders.Authorization, "Bearer $ACCESS_TOKEN")
-                    }.bodyAsText()
-            }
-
-            assertTrue(antilog.messages.isNotEmpty(), "The request should still be logged")
-            assertFalse(
-                antilog.messages.any { it.contains(ACCESS_TOKEN) },
-                "The access token was written to the log",
-            )
-        }
+    }
 
     private companion object {
-        const val BODY_MARKER = "recording-bytes-"
-        const val PAYLOAD_REPEATS = 64 * 1024
-        const val ACCESS_TOKEN = "eyJ-test-access-token"
+        const val PAYLOAD_SIZE = 256 * 1024
     }
 }

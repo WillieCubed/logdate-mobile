@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.io.asSource
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -512,6 +513,29 @@ class AndroidMediaManager(
                 data = data,
             )
         }
+
+    override suspend fun openMedia(uri: String): MediaFileSource =
+        withContext(ioDispatcher) {
+            val parsedUri = Uri.parse(uri)
+            val sizeBytes = resolveSizeBytes(parsedUri) ?: return@withContext super.openMedia(uri)
+            val fileName = resolveFileName(parsedUri)
+            MediaFileSource(
+                fileName = fileName,
+                mimeType = resolveSupportedMimeType(parsedUri, fileName),
+                sizeBytes = sizeBytes,
+            ) { openSourceInputStream(parsedUri).asSource() }
+        }
+
+    /**
+     * The byte length of a file-backed [uri], or null for a content URI. A provider's reported
+     * length can disagree with what it streams, so content URIs are read whole instead.
+     */
+    private fun resolveSizeBytes(uri: Uri): Long? {
+        if (!uri.isFileBacked()) return null
+        val file = requireFileFromUri(uri)
+        check(file.isFile) { "Media file does not exist: ${file.absolutePath}" }
+        return file.length()
+    }
 
     override suspend fun saveMedia(payload: MediaPayload): String {
         val mimeType =

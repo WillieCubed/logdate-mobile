@@ -33,12 +33,12 @@ import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.convert_to_text
 import logdate.client.feature.editor.generated.resources.error
 import logdate.client.feature.editor.generated.resources.transcribing_audio
+import logdate.client.feature.editor.generated.resources.transcription_failed_audio_kept
 import logdate.client.feature.editor.generated.resources.transcription_improving
 import logdate.client.feature.editor.generated.resources.transcription_improving_description
 import logdate.client.feature.editor.generated.resources.transcription_queued
 import logdate.client.feature.editor.generated.resources.transcription_ready
 import logdate.client.feature.editor.generated.resources.transcription_ready_description
-import logdate.client.feature.editor.generated.resources.we_couldnt_convert_this_recording_to_text
 import logdate.client.ui.generated.resources.common_try_again
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
@@ -319,7 +319,7 @@ private fun TranscriptionErrorUi(
             Spacer(modifier = Modifier.width(8.dp))
 
             Text(
-                text = stringResource(Res.string.we_couldnt_convert_this_recording_to_text),
+                text = stringResource(Res.string.transcription_failed_audio_kept),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
             )

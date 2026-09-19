@@ -22,7 +22,7 @@ import java.net.http.HttpClient as JHttpClient
 data class ServerClientE2EHarness(
     val baseUrl: String,
     val apiClient: LogDateCloudApiClient,
-    private val httpClient: HttpClient,
+    internal val httpClient: HttpClient,
     private val engine: EmbeddedServer<*, *>,
 ) : AutoCloseable {
     override fun close() {

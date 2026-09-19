@@ -43,6 +43,7 @@ class EncryptionPolicy(
     private fun detectPayloadType(payload: ByteArray): PayloadType =
         when {
             payload.hasPrefix(PayloadPrefixes.CLIENT_MEDIA) -> PayloadType.CLIENT_CIPHERTEXT
+            payload.hasPrefix(PayloadPrefixes.CLIENT_MEDIA_CHUNKED) -> PayloadType.CLIENT_CIPHERTEXT
             payload.hasPrefix(PayloadPrefixes.SERVER_MEDIA) -> PayloadType.SERVER_CIPHERTEXT
             payload.hasPrefix(PayloadPrefixes.SERVER_BACKUP) -> PayloadType.SERVER_CIPHERTEXT
             else -> PayloadType.PLAINTEXT

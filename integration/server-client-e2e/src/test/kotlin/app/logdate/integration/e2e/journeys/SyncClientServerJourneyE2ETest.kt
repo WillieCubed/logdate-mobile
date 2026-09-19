@@ -11,6 +11,7 @@ import app.logdate.client.sync.cloud.JournalUpdateRequest
 import app.logdate.client.sync.cloud.JournalUploadRequest
 import app.logdate.client.sync.cloud.MediaUploadRequest
 import app.logdate.integration.e2e.fixtures.createAccountWithSyntheticPasskey
+import app.logdate.integration.e2e.fixtures.uploadMedia
 import app.logdate.integration.e2e.harness.withServerClientHarness
 import kotlin.random.Random
 import kotlin.test.Test

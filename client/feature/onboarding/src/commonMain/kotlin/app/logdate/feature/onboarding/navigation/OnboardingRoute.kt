@@ -340,6 +340,7 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
 
         OnboardingBirthdayScreen(
             onBack = onNavigateBack,
+            persistBirthday = flowViewModel::persistBirthday,
             onNext = {
                 onGoToItem(
                     routeForStep(

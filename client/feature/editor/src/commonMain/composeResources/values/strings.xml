@@ -122,7 +122,7 @@
     <string name="we_couldnt_load_your_recent_photos">We couldn&apos;t load your recent photos.</string>
     <string name="we_couldnt_add_selected_photo">We couldn&apos;t add that photo. LogDate did not change the original.</string>
     <string name="we_couldnt_add_selected_video">We couldn&apos;t add that video. LogDate did not change the original.</string>
-    <string name="we_couldnt_convert_this_recording_to_text">We couldn&apos;t convert this recording to text</string>
+    <string name="transcription_failed_audio_kept">Transcription failed. The audio is unaffected.</string>
     <string name="whats_on_your_mind">What&apos;s on your mind?</string>
     <string name="would_you_like_to_save_your_changes_as_a_draft">Would you like to save your changes as a draft?</string>
     <string name="write_something">Write something</string>
