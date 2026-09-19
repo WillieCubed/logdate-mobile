@@ -1,25 +1,10 @@
 package app.logdate.client.domain.export
 
-import app.logdate.shared.model.Journal
 import app.logdate.shared.model.SerializableEntryBlock
 import app.logdate.shared.model.profile.LogDateProfile
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
-
-/**
- * Data structure for the complete user data export that follows the LogDate export specification.
- */
-@Serializable
-data class LogDateExport(
-    val metadata: ExportMetadata,
-    val journals: List<Journal>,
-    val notes: List<ExportNote>,
-    val drafts: List<ExportDraft>,
-    val profile: LogDateProfile? = null,
-    val places: List<ExportPlace> = emptyList(),
-    val locationHistory: List<ExportLocationHistoryItem> = emptyList(),
-)
 
 /**
  * Metadata about the export.

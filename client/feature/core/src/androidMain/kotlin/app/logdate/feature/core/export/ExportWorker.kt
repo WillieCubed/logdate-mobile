@@ -3,32 +3,21 @@ package app.logdate.feature.core.export
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
-import android.provider.MediaStore
 import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import app.logdate.client.domain.export.ExportFileStructure
-import app.logdate.client.domain.export.ExportIssue
-import app.logdate.client.domain.export.ExportIssueCode
-import app.logdate.client.domain.export.ExportMediaFile
 import app.logdate.client.domain.export.ExportProgress
 import app.logdate.client.domain.export.ExportResult
 import app.logdate.client.domain.export.ExportStage
 import app.logdate.client.domain.export.ExportUserDataUseCase
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.catch
-import okio.BufferedSink
-import okio.buffer
-import okio.sink
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.io.File
 import java.io.FileOutputStream
-import java.io.InputStream
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -76,16 +65,6 @@ class ExportWorker(
 
     private data class SavedExport(
         val path: String,
-    )
-
-    private data class ResolvedMediaInput(
-        val openStream: () -> InputStream,
-        val issueCode: ExportIssueCode? = null,
-    )
-
-    private data class MediaWriteResult(
-        val written: Boolean,
-        val issue: ExportIssue? = null,
     )
 
     override suspend fun doWork(): Result {
@@ -257,259 +236,5 @@ class ExportWorker(
         return SavedExport(
             path = file.absolutePath,
         )
-    }
-
-    private fun writeExportToZip(
-        zipOut: ZipOutputStream,
-        exportData: ExportResult,
-    ) {
-        writeStreamedEntry(zipOut, ExportFileStructure.METADATA_FILE) { exportData.writeMetadata(it) }
-        writeStreamedEntry(zipOut, ExportFileStructure.JOURNALS_FILE) { exportData.writeJournals(it) }
-        writeStreamedEntry(zipOut, ExportFileStructure.NOTES_FILE) { exportData.writeNotes(it) }
-        writeStreamedEntry(zipOut, ExportFileStructure.JOURNAL_NOTES_FILE) { exportData.writeJournalNotes(it) }
-        writeStreamedEntry(zipOut, ExportFileStructure.DRAFTS_FILE) { exportData.writeDrafts(it) }
-        if (exportData.hasProfile) {
-            writeStreamedEntry(zipOut, ExportFileStructure.PROFILE_FILE) { exportData.writeProfile(it) }
-        }
-        if (exportData.hasPlaces) {
-            writeStreamedEntry(zipOut, ExportFileStructure.PLACES_FILE) { exportData.writePlaces(it) }
-        }
-        if (exportData.hasLocationHistory) {
-            writeStreamedEntry(zipOut, ExportFileStructure.LOCATION_HISTORY_FILE) { exportData.writeLocationHistory(it) }
-        }
-
-        val exportedMediaFiles = mutableListOf<ExportMediaFile>()
-        val archiveIssues = mutableListOf<ExportIssue>()
-        exportData.mediaFiles.forEach { mediaFile ->
-            val outcome = writeMediaEntry(zipOut, mediaFile)
-            if (outcome.written) {
-                exportedMediaFiles += mediaFile
-            }
-            outcome.issue?.let(archiveIssues::add)
-        }
-
-        if (exportData.hasMediaManifest(exportedMediaFiles)) {
-            writeStreamedEntry(zipOut, ExportFileStructure.MEDIA_MANIFEST_FILE) {
-                exportData.writeMediaManifest(it, exportedMediaFiles)
-            }
-        }
-        exportData.renderIssuesText(archiveIssues)?.let { issuesText ->
-            writeTextEntry(zipOut, ExportFileStructure.EXPORT_ISSUES_FILE, issuesText)
-        }
-    }
-
-    /**
-     * Streams a JSON category directly into a ZIP entry via an okio sink, so the
-     * category is never fully materialized as a String. The buffered sink is flushed
-     * (not closed) so its bytes land in the current entry without closing [zipOut].
-     */
-    private fun writeStreamedEntry(
-        zipOut: ZipOutputStream,
-        entryName: String,
-        write: (BufferedSink) -> Unit,
-    ) {
-        zipOut.putNextEntry(ZipEntry(entryName))
-        val bufferedSink = zipOut.sink().buffer()
-        write(bufferedSink)
-        bufferedSink.flush()
-        zipOut.closeEntry()
-    }
-
-    private fun writeTextEntry(
-        zipOut: ZipOutputStream,
-        entryName: String,
-        content: String,
-    ) {
-        zipOut.putNextEntry(ZipEntry(entryName))
-        zipOut.write(content.toByteArray())
-        zipOut.closeEntry()
-    }
-
-    private fun writeMediaEntry(
-        zipOut: ZipOutputStream,
-        mediaFile: ExportMediaFile,
-    ): MediaWriteResult {
-        val sourceUri = mediaFile.sourceUri
-        var entryOpened = false
-        return try {
-            val resolvedInput =
-                resolveMediaInput(mediaFile)
-                    ?: return MediaWriteResult(
-                        written = false,
-                        issue =
-                            ExportIssue(
-                                code = ExportIssueCode.MEDIA_BYTES_MISSING,
-                                source = sourceUri,
-                            ),
-                    )
-            zipOut.putNextEntry(ZipEntry(mediaFile.exportPath))
-            entryOpened = true
-            resolvedInput.openStream().use { it.copyTo(zipOut) }
-            zipOut.closeEntry()
-            entryOpened = false
-            Napier.d("Added media file to archive: ${mediaFile.exportPath}")
-            MediaWriteResult(
-                written = true,
-                issue =
-                    resolvedInput.issueCode?.let { code ->
-                        ExportIssue(
-                            code = code,
-                            source = sourceUri,
-                        )
-                    },
-            )
-        } catch (e: Exception) {
-            if (entryOpened) {
-                runCatching { zipOut.closeEntry() }
-            }
-            Napier.w("Failed to add media file to ZIP, skipping: $sourceUri", e)
-            MediaWriteResult(
-                written = false,
-                issue =
-                    ExportIssue(
-                        code = ExportIssueCode.MEDIA_BYTES_MISSING,
-                        source = sourceUri,
-                        detail = e.message,
-                    ),
-            )
-        }
-    }
-
-    private fun resolveMediaInput(mediaFile: ExportMediaFile): ResolvedMediaInput? {
-        val sourceUri = mediaFile.sourceUri
-        if (!sourceUri.startsWith("/") && !sourceUri.startsWith("file://")) {
-            val parsed = sourceUri.toUri()
-            return ResolvedMediaInput(
-                openStream = {
-                    context.contentResolver.openInputStream(parsed)
-                        ?: throw IllegalStateException("Media file cannot be opened: $sourceUri")
-                },
-            )
-        }
-
-        val originalFile = File(sourceUri.removePrefix("file://"))
-        if (originalFile.exists()) {
-            return ResolvedMediaInput(openStream = { originalFile.inputStream() })
-        }
-
-        val recovered = recoverMediaInput(originalFile, mediaFile)
-        if (recovered != null) {
-            Napier.w("Recovered stale export media reference: $sourceUri")
-            return recovered
-        }
-
-        Napier.w("Media file not found, skipping: ${originalFile.absolutePath}")
-        return null
-    }
-
-    private fun recoverMediaInput(
-        originalFile: File,
-        mediaFile: ExportMediaFile,
-    ): ResolvedMediaInput? {
-        val normalizedFile = normalizeDuplicateExtension(originalFile)
-        if (normalizedFile != originalFile && normalizedFile.exists()) {
-            return ResolvedMediaInput(
-                openStream = { normalizedFile.inputStream() },
-                issueCode = ExportIssueCode.MEDIA_RECOVERED_NORMALIZED_PATH,
-            )
-        }
-
-        val recordingFileName = extractRecordingFileName(originalFile.name)
-        if (recordingFileName != null) {
-            val audioNotesFile = File(context.filesDir, "audio_notes/$recordingFileName")
-            if (audioNotesFile.exists()) {
-                return ResolvedMediaInput(
-                    openStream = { audioNotesFile.inputStream() },
-                    issueCode = ExportIssueCode.MEDIA_RECOVERED_APP_PRIVATE_AUDIO,
-                )
-            }
-        }
-
-        recoverAppPrivateMedia(originalFile)?.let { recoveredFile ->
-            return ResolvedMediaInput(
-                openStream = { recoveredFile.inputStream() },
-                issueCode = ExportIssueCode.MEDIA_RECOVERED_APP_PRIVATE_MEDIA,
-            )
-        }
-
-        val mediaStoreUri = recoverMediaStoreUri(originalFile.name, mediaFile.exportPath)
-        if (mediaStoreUri != null) {
-            return ResolvedMediaInput(
-                openStream = {
-                    context.contentResolver.openInputStream(mediaStoreUri)
-                        ?: throw IllegalStateException("Recovered media URI cannot be opened: $mediaStoreUri")
-                },
-                issueCode = ExportIssueCode.MEDIA_RECOVERED_MEDIA_STORE,
-            )
-        }
-
-        return null
-    }
-
-    private fun recoverAppPrivateMedia(originalFile: File): File? {
-        val userMediaDir = File(context.filesDir, "user_media")
-        val candidates = userMediaDir.listFiles().orEmpty()
-        if (candidates.isEmpty()) return null
-
-        val fileName = originalFile.name
-        val baseName = fileName.substringBeforeLast('.', fileName)
-        val trailingToken = fileName.substringAfterLast('_', "")
-        val trailingStem = trailingToken.substringBeforeLast('.', trailingToken)
-
-        val matchKeys =
-            listOf(
-                fileName,
-                baseName,
-                trailingToken,
-                trailingStem,
-            ).filter { it.isNotBlank() }
-                .distinct()
-
-        return candidates.firstOrNull { candidate ->
-            val candidateName = candidate.name
-            matchKeys.any { key ->
-                candidateName == key ||
-                    candidateName.startsWith("$key.") ||
-                    candidateName.contains("_$key")
-            }
-        }
-    }
-
-    private fun normalizeDuplicateExtension(file: File): File {
-        val normalizedName =
-            file.name.replace(Regex("(\\.[A-Za-z0-9]+)\\1$")) { match ->
-                match.groupValues[1]
-            }
-        return if (normalizedName == file.name) file else File(file.parentFile, normalizedName)
-    }
-
-    private fun extractRecordingFileName(fileName: String): String? {
-        val match =
-            Regex("(recording_[A-Za-z0-9-]+(?:\\.[A-Za-z0-9]+)?)")
-                .find(fileName)
-                ?: return null
-        val normalized =
-            match.value.replace(Regex("(\\.[A-Za-z0-9]+)\\1$")) { group ->
-                group.groupValues[1]
-            }
-        return if ('.' in normalized) normalized else "$normalized.m4a"
-    }
-
-    private fun recoverMediaStoreUri(
-        fileName: String,
-        exportPath: String,
-    ): Uri? {
-        val legacyId = Regex("(\\d{6,})$").find(fileName)?.groupValues?.get(1) ?: return null
-        val targetCollection =
-            when {
-                exportPath.endsWith(".jpg") || exportPath.endsWith(".jpeg") || exportPath.endsWith(".png") ->
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-                exportPath.endsWith(".mp4") || exportPath.endsWith(".mov") ->
-                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-                exportPath.endsWith(".m4a") || exportPath.endsWith(".aac") || exportPath.endsWith(".wav") ->
-                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-                else -> return null
-            }
-        return Uri.withAppendedPath(targetCollection, legacyId)
     }
 }

@@ -217,7 +217,7 @@ class ArchiveRoundTripTest {
 
         val archiveFile = File.createTempFile("roundtrip_test", ".zip", context.cacheDir)
         try {
-            // Write — same logic as ExportWorker.writeExportToZip
+            // Write — same logic as AndroidExportArchiveWriter.writeExportToZip
             ZipOutputStream(FileOutputStream(archiveFile)).use { zip ->
                 fun entry(name: String, content: String) {
                     zip.putNextEntry(ZipEntry(name))

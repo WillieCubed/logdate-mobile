@@ -400,19 +400,6 @@ class ExportUserDataUseCase(
         return mediaFilesBySource.values.toList()
     }
 
-    private fun String.sanitizePathSegment(maxLength: Int = 48): String =
-        replace(Regex("[^A-Za-z0-9._-]"), "_")
-            .trim('_')
-            .take(maxLength)
-
-    private fun String.stableSuffix(): String {
-        val hash =
-            fold(17) { acc, char ->
-                (acc * 31) + char.code
-            }
-        return hash.toUInt().toString(16)
-    }
-
     private fun NoteLocation.toExportLocation(): ExportLocation? {
         val lat = effectiveLatitude ?: return null
         val lng = effectiveLongitude ?: return null
