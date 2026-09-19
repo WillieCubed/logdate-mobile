@@ -26,6 +26,8 @@ import org.koin.core.component.inject
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.zip.ZipOutputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Instant
@@ -86,7 +88,7 @@ class ExportWorker(
         trySetForeground(getForegroundInfo())
         Napier.i("ExportWorker: Foreground service setup complete")
 
-        if (featureFlags.isEnabled(FeatureFlag.EXPORT_ARCHIVE_V2)) return runArchiveExport()
+        if (archiveFormatEnabled()) return runArchiveExport()
 
         return try {
             var finalResult = Result.success()
@@ -183,10 +185,25 @@ class ExportWorker(
         }
     }
 
-    /** Where a 2.0 archive is written, and how to remove it if the export does not finish. */
+    /** A failed read of the flag runs the unchanged export instead of failing it, since the flag defaults to off. */
+    private suspend fun archiveFormatEnabled(): Boolean =
+        try {
+            featureFlags.isEnabled(FeatureFlag.EXPORT_ARCHIVE_V2)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (failure: Exception) {
+            Napier.w("Could not read the export format flag, using the default export", failure)
+            false
+        }
+
+    /**
+     * Where a 2.0 archive is written. [commit] puts a finished archive in its place and [discard]
+     * removes whatever was written if the export does not finish.
+     */
     private class ArchiveTarget(
         val stream: OutputStream,
         val path: String,
+        val commit: () -> Unit,
         val discard: () -> Unit,
     )
 
@@ -194,21 +211,50 @@ class ExportWorker(
         val destination = destinationUri
         if (destination != null) {
             val stream = context.contentResolver.openOutputStream(destination) ?: return null
-            return ArchiveTarget(stream, destination.toString()) {
-                runCatching { DocumentsContract.deleteDocument(context.contentResolver, destination) }
-            }
+            return ArchiveTarget(stream, destination.toString(), commit = {}, discard = { discardDocument(destination) })
         }
         val file = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), generateExportFileName())
-        return ArchiveTarget(FileOutputStream(file), file.absolutePath) { file.delete() }
+        val partial = File(file.parentFile, "${file.name}.part")
+        return ArchiveTarget(
+            FileOutputStream(partial),
+            file.absolutePath,
+            commit = { Files.move(partial.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING) },
+            discard = { partial.delete() },
+        )
+    }
+
+    /** Deletes a partly written document, or empties it when the provider cannot delete, so it cannot pass for a finished archive. */
+    private fun discardDocument(uri: Uri) {
+        val deleted =
+            try {
+                DocumentsContract.deleteDocument(context.contentResolver, uri)
+            } catch (failure: Exception) {
+                Napier.w("Could not delete the partly written export", failure)
+                false
+            }
+        if (deleted) return
+        try {
+            context.contentResolver.openOutputStream(uri, "wt")?.close()
+        } catch (failure: Exception) {
+            Napier.e("Could not remove or empty the partly written export", failure)
+        }
     }
 
     /**
-     * Writes a 2.0 archive straight into its destination. If the export fails or is cancelled the
-     * partly written file is removed, so a truncated archive never sits where a real one should.
+     * Writes a 2.0 archive to its destination. If the export fails or is cancelled the partly
+     * written file is removed, so a truncated archive never sits where a real one should, and a
+     * file already at the destination is not replaced until the new archive is complete.
      */
     private suspend fun runArchiveExport(): Result {
         val target =
-            openArchiveTarget() ?: run {
+            try {
+                openArchiveTarget()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (failure: Exception) {
+                Napier.e("Could not open the export destination", failure)
+                null
+            } ?: run {
                 trySetForeground(notificationHelper.createErrorInfo(ARCHIVE_WRITE_FAILED_MESSAGE))
                 return failureResult(ARCHIVE_WRITE_FAILED_MESSAGE)
             }
@@ -241,18 +287,9 @@ class ExportWorker(
                 return failureResult(message)
             }
 
+            target.commit()
             finished = true
-            trySetForeground(notificationHelper.createCompletionInfo(target.path))
-            exportLauncher.updateProgress(
-                ExportProgressInfo(
-                    isActive = false,
-                    progressPercent = 100,
-                    message = "Export completed",
-                    completedFilePath = target.path,
-                    stats = completed.counts.toExportStats(),
-                ),
-            )
-            return Result.success(workDataOf(PROGRESS_KEY to 100, MESSAGE_KEY to "Export completed", FILE_PATH_KEY to target.path))
+            return archiveSucceeded(target, completed)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (exception: Throwable) {
@@ -260,8 +297,27 @@ class ExportWorker(
             trySetForeground(notificationHelper.createErrorInfo(ARCHIVE_WRITE_FAILED_MESSAGE))
             return failureResult(ARCHIVE_WRITE_FAILED_MESSAGE)
         } finally {
+            // ZipOutputStream.close() skips closing the stream under it when finishing the zip fails.
+            runCatching { target.stream.close() }
             if (!finished) target.discard()
         }
+    }
+
+    private suspend fun archiveSucceeded(
+        target: ArchiveTarget,
+        summary: ArchiveExportSummary,
+    ): Result {
+        trySetForeground(notificationHelper.createCompletionInfo(target.path))
+        exportLauncher.updateProgress(
+            ExportProgressInfo(
+                isActive = false,
+                progressPercent = 100,
+                message = "Export completed",
+                completedFilePath = target.path,
+                stats = summary.counts.toExportStats(),
+            ),
+        )
+        return Result.success(workDataOf(PROGRESS_KEY to 100, MESSAGE_KEY to "Export completed", FILE_PATH_KEY to target.path))
     }
 
     private fun failureResult(message: String): Result =
