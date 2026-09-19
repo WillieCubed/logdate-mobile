@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
 import platform.AVFoundation.AVURLAsset
 import platform.CoreMedia.CMTimeGetSeconds
 import platform.Foundation.NSCachesDirectory
@@ -185,6 +187,19 @@ class IosMediaManager(
                 data = data.toByteArray(),
             )
         }
+
+    override suspend fun openMedia(uri: String): MediaFileSource {
+        // Photo library assets are only reachable through PhotoKit, which hands back whole
+        // payloads rather than a file to stream.
+        if (uri.isPhotoLibraryUri()) return super.openMedia(uri)
+        val path = Path(resolvePath(uri) ?: error("Invalid media URI: $uri"))
+        val sizeBytes = SystemFileSystem.metadataOrNull(path)?.size ?: error("Unable to read media at $uri")
+        return MediaFileSource(
+            fileName = path.name,
+            mimeType = guessMimeType(path.name),
+            sizeBytes = sizeBytes,
+        ) { SystemFileSystem.source(path) }
+    }
 
     override suspend fun saveMedia(payload: MediaPayload): String =
         withContext(Dispatchers.Default) {

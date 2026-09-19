@@ -4,6 +4,7 @@ import app.logdate.client.sync.cloud.ContentUpdateRequest
 import app.logdate.client.sync.cloud.ContentUploadRequest
 import app.logdate.client.sync.cloud.DeviceId
 import app.logdate.client.sync.cloud.MediaUploadRequest
+import app.logdate.client.sync.cloud.uploadMedia
 import app.logdate.integration.e2e.fixtures.assertCloudError
 import app.logdate.integration.e2e.fixtures.createAccountWithSyntheticPasskey
 import app.logdate.integration.e2e.harness.withServerClientHarness

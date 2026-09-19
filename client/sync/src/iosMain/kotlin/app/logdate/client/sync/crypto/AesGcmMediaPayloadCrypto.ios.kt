@@ -22,7 +22,7 @@ actual class AesGcmMediaPayloadCrypto actual constructor(
     }
 
     actual override suspend fun encrypt(data: ByteArray): ByteArray {
-        if (data.hasClientMediaPrefix()) return data
+        if (data.isClientEncryptedMedia()) return data
         val iv = ByteArray(CLIENT_MEDIA_IV_SIZE_BYTES)
         SecRandomCopyBytes(kSecRandomDefault, iv.size.toULong(), iv.refTo(0))
         val cipherText =
@@ -34,7 +34,10 @@ actual class AesGcmMediaPayloadCrypto actual constructor(
         return CLIENT_MEDIA_PREFIX_BYTES + iv + cipherText
     }
 
+    actual override suspend fun streamEncryptor(): MediaStreamEncryptor = ChunkedMediaStreamEncryptor(keyBytes)
+
     actual override suspend fun decrypt(data: ByteArray): ByteArray {
+        if (data.hasChunkedMediaPrefix()) return decryptChunkedMedia(keyBytes, data)
         if (!data.hasClientMediaPrefix()) return data
         require(data.size > CLIENT_MEDIA_PREFIX_BYTES.size + CLIENT_MEDIA_IV_SIZE_BYTES) {
             "Encrypted media payload is too short."

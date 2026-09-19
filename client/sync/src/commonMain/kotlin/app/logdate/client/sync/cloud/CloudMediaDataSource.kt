@@ -1,7 +1,9 @@
 package app.logdate.client.sync.cloud
 
+import app.logdate.client.media.MediaFileSource
 import app.logdate.client.sync.crypto.MediaPayloadCrypto
 import app.logdate.client.sync.crypto.NoOpMediaPayloadCrypto
+import app.logdate.client.sync.crypto.isClientEncryptedMedia
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -13,11 +15,12 @@ import kotlin.uuid.Uuid
  */
 interface CloudMediaDataSource {
     /**
-     * Uploads a media file to the cloud.
+     * Uploads the media for [contentId], reading and encrypting it from [media] as it is sent.
      */
     suspend fun uploadMedia(
         accessToken: String,
-        media: MediaFile,
+        contentId: Uuid,
+        media: MediaFileSource,
     ): Result<MediaUploadResult>
 
     /**
@@ -87,37 +90,19 @@ class DefaultCloudMediaDataSource(
 ) : CloudMediaDataSource {
     override suspend fun uploadMedia(
         accessToken: String,
-        media: MediaFile,
+        contentId: Uuid,
+        media: MediaFileSource,
     ): Result<MediaUploadResult> {
-        val encrypted =
+        // Encryption only ever adds bytes, so a file already over the limit is refused before
+        // anything is read from it.
+        if (media.sizeBytes > MAX_MEDIA_UPLOAD_BYTES) return Result.failure(tooLarge(contentId, media.sizeBytes))
+        val request =
             try {
-                mediaPayloadCrypto.encrypt(media.data)
+                prepareUpload(contentId, media)
             } catch (error: Exception) {
                 return Result.failure(error)
             }
-        if (encrypted.size > MAX_MEDIA_UPLOAD_BYTES) {
-            // The hosting platform refuses a request this large before the server ever sees it, so
-            // retrying can never succeed. Failing here names the reason instead of leaving the
-            // entry queued forever behind an unexplained rejection.
-            return Result.failure(
-                MediaTooLargeException(
-                    "Media for ${media.contentId} is ${encrypted.size} bytes, over the " +
-                        "$MAX_MEDIA_UPLOAD_BYTES byte upload limit",
-                ),
-            )
-        }
-
-        val request =
-            MediaUploadRequest(
-                contentId = media.contentId.toString(),
-                fileName = media.fileName,
-                mimeType = media.mimeType,
-                // The encrypted payload carries a prefix, an IV and an auth tag, so it is always
-                // larger than the file on disk. The server checks this against the bytes it
-                // actually receives and rejects a mismatch, so it has to describe the ciphertext.
-                sizeBytes = encrypted.size.toLong(),
-                data = encrypted,
-            )
+        if (request.sizeBytes > MAX_MEDIA_UPLOAD_BYTES) return Result.failure(tooLarge(contentId, request.sizeBytes))
 
         return cloudApiClient.uploadMedia(accessToken, request).map { response ->
             MediaUploadResult(
@@ -126,6 +111,41 @@ class DefaultCloudMediaDataSource(
                 uploadedAt = Instant.fromEpochMilliseconds(response.uploadedAt),
             )
         }
+    }
+
+    /**
+     * The hosting platform refuses a request this large before the server ever sees it, so
+     * retrying can never succeed. Failing here names the reason instead of leaving the entry
+     * queued forever behind an unexplained rejection.
+     */
+    private fun tooLarge(
+        contentId: Uuid,
+        sizeBytes: Long,
+    ) = MediaTooLargeException("Media for $contentId is $sizeBytes bytes, over the $MAX_MEDIA_UPLOAD_BYTES byte upload limit")
+
+    /**
+     * Describes the upload without reading the file: its wire size follows from the file size.
+     * A payload that is already client-encrypted is sent as-is rather than encrypted twice.
+     */
+    private suspend fun prepareUpload(
+        contentId: Uuid,
+        media: MediaFileSource,
+    ): MediaUpload {
+        val encryptor =
+            if (media.isClientEncryptedMedia()) {
+                NoOpMediaPayloadCrypto.streamEncryptor()
+            } else {
+                mediaPayloadCrypto.streamEncryptor()
+            }
+        return MediaUpload(
+            contentId = contentId.toString(),
+            fileName = media.fileName,
+            mimeType = media.mimeType,
+            // The encrypted payload carries a header and an auth tag per chunk, so it is always
+            // larger than the file on disk. The server checks this against the bytes it
+            // actually receives and rejects a mismatch, so it has to describe the ciphertext.
+            sizeBytes = encryptor.encryptedSizeBytes(media.sizeBytes),
+        ) { encryptor.encrypt(media.open()) }
     }
 
     override suspend fun downloadMedia(

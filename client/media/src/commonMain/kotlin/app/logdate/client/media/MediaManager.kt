@@ -1,6 +1,8 @@
 package app.logdate.client.media
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.io.Buffer
+import kotlinx.io.RawSource
 import kotlin.time.Duration
 import kotlin.time.Instant
 
@@ -71,6 +73,26 @@ interface MediaManager {
     suspend fun readMedia(uri: String): MediaPayload
 
     /**
+     * Opens a media asset for reading without loading it into memory.
+     *
+     * Prefer this over [readMedia] for uploads: a recording can be tens of megabytes, and
+     * [MediaFileSource.open] reads it from disk in small chunks as it is consumed. The default
+     * implementation falls back to [readMedia] and holds the bytes in memory; platforms that
+     * store media as files override it.
+     *
+     * @param uri The URI of the media asset to open
+     * @return The asset's metadata and a way to read its bytes, as many times as needed
+     */
+    suspend fun openMedia(uri: String): MediaFileSource {
+        val payload = readMedia(uri)
+        return MediaFileSource(
+            fileName = payload.fileName,
+            mimeType = payload.mimeType,
+            sizeBytes = payload.data.size.toLong(),
+        ) { Buffer().apply { write(payload.data) } }
+    }
+
+    /**
      * Saves a media payload to local storage.
      *
      * @param payload The media payload to persist
@@ -105,6 +127,22 @@ data class MediaPayload(
     val sizeBytes: Long,
     val data: ByteArray,
 )
+
+/**
+ * A media asset that is read from storage only as it is consumed.
+ *
+ * [open] returns a fresh source positioned at the first byte on every call, so a caller that
+ * needs to read the asset more than once (for example to peek at a header and then upload it)
+ * opens it again rather than buffering it. The caller closes each source it opens.
+ */
+class MediaFileSource(
+    val fileName: String,
+    val mimeType: String,
+    val sizeBytes: Long,
+    private val openSource: () -> RawSource,
+) {
+    fun open(): RawSource = openSource()
+}
 
 sealed interface MediaObject {
     // TODO: Support multiplatform URI

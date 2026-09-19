@@ -519,7 +519,7 @@ private class MockCloudApiClientForContent : CloudApiClient {
 
     override suspend fun uploadMedia(
         accessToken: String,
-        media: MediaUploadRequest,
+        media: MediaUpload,
     ): Result<MediaUploadResponse> = Result.failure(NotImplementedError())
 
     override suspend fun downloadMedia(

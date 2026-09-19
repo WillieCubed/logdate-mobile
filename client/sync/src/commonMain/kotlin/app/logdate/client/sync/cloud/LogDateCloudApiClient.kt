@@ -17,6 +17,7 @@ import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
+import io.ktor.client.request.forms.InputProvider
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.get
@@ -33,6 +34,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import kotlinx.coroutines.flow.first
+import kotlinx.io.buffered
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.time.Instant
@@ -751,7 +753,7 @@ class LogDateCloudApiClient(
     // Media Operations
     override suspend fun uploadMedia(
         accessToken: String,
-        media: MediaUploadRequest,
+        media: MediaUpload,
     ): Result<MediaUploadResponse> =
         try {
             val baseUrl = getBaseUrl()
@@ -766,9 +768,11 @@ class LogDateCloudApiClient(
                                 append("mimeType", media.mimeType)
                                 append("sizeBytes", media.sizeBytes.toString())
                                 append("deviceId", media.deviceId.value)
+                                // Read from disk as the request is written, so the heap never holds
+                                // the whole file.
                                 append(
                                     key = "data",
-                                    value = media.data,
+                                    value = InputProvider(media.bodySizeBytes) { media.openBody().buffered() },
                                     headers =
                                         Headers.build {
                                             append(HttpHeaders.ContentDisposition, "filename=\"${media.fileName}\"")

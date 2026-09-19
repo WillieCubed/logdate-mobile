@@ -3,6 +3,7 @@ package app.logdate.client.sync.test
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.media.InMemoryMediaManager
+import app.logdate.client.media.MediaFileSource
 import app.logdate.client.media.MediaManager
 import app.logdate.client.networking.DataRestriction
 import app.logdate.client.networking.DataUsageMode
@@ -55,6 +56,7 @@ import app.logdate.client.sync.cloud.JournalUpdateResponse
 import app.logdate.client.sync.cloud.JournalUploadRequest
 import app.logdate.client.sync.cloud.JournalUploadResponse
 import app.logdate.client.sync.cloud.MediaDownloadResponse
+import app.logdate.client.sync.cloud.MediaUpload
 import app.logdate.client.sync.cloud.MediaUploadRequest
 import app.logdate.client.sync.cloud.MediaUploadResponse
 import app.logdate.client.sync.conflict.ConflictResolver
@@ -89,6 +91,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.io.Buffer
+import kotlinx.io.buffered
+import kotlinx.io.readByteArray
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -483,10 +488,10 @@ open class FakeCloudApiClient : CloudApiClient {
     // Media sync methods
     override suspend fun uploadMedia(
         accessToken: String,
-        media: MediaUploadRequest,
+        media: MediaUpload,
     ): Result<MediaUploadResponse> {
         methodCalls.add("uploadMedia")
-        uploadMediaCalls.add(accessToken to media)
+        uploadMediaCalls.add(accessToken to media.readRequest())
         return uploadMediaResponse
     }
 
@@ -1255,3 +1260,21 @@ class InMemorySyncRetryScheduleStore : SyncRetryScheduleStore {
         schedule.remove("${entityType.name}:$entityId")
     }
 }
+
+/** Reads the whole upload body, the way the server would receive it. */
+fun MediaUpload.readRequest(): MediaUploadRequest =
+    MediaUploadRequest(
+        contentId = contentId,
+        fileName = fileName,
+        mimeType = mimeType,
+        sizeBytes = sizeBytes,
+        data = openBody().buffered().use { it.readByteArray() },
+        deviceId = deviceId,
+    )
+
+/** A [MediaFileSource] over [data], reopenable like a file on disk. */
+fun mediaFileSource(
+    data: ByteArray,
+    fileName: String = "media.bin",
+    mimeType: String = "application/octet-stream",
+): MediaFileSource = MediaFileSource(fileName, mimeType, data.size.toLong()) { Buffer().apply { write(data) } }

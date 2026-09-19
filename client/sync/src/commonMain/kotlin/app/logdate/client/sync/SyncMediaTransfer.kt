@@ -5,7 +5,6 @@ import app.logdate.client.media.MediaPayload
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.mediaRefOrNull
 import app.logdate.client.sync.cloud.CloudMediaDataSource
-import app.logdate.client.sync.cloud.MediaFile
 import app.logdate.client.sync.metadata.MediaSyncRef
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import io.github.aakira.napier.Napier
@@ -32,8 +31,8 @@ internal class SyncMediaTransfer(
             return Result.success(note.withMediaRef(cached.remoteUrl))
         }
 
-        val payload =
-            runCatching { mediaManager.readMedia(mediaRef) }
+        val media =
+            runCatching { mediaManager.openMedia(mediaRef) }
                 .getOrElse { error ->
                     // Distinguish "the bytes are gone" from "the read happened to fail". Only the
                     // former is hopeless; an upload that fails for any other reason is still worth
@@ -49,18 +48,7 @@ internal class SyncMediaTransfer(
                 }
 
         return runCatching {
-            val uploadResult =
-                cloudMediaDataSource.uploadMedia(
-                    accessToken,
-                    MediaFile(
-                        contentId = note.uid,
-                        fileName = payload.fileName,
-                        mimeType = payload.mimeType,
-                        sizeBytes = payload.sizeBytes,
-                        data = payload.data,
-                    ),
-                )
-            uploadResult.getOrThrow()
+            cloudMediaDataSource.uploadMedia(accessToken, note.uid, media).getOrThrow()
         }.map { upload ->
             val remoteUrl = upload.downloadUrl
             mediaSyncRefStore.upsert(

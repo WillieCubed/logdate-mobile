@@ -136,4 +136,34 @@ class EncryptionPolicyTest {
         val decision = policy.evaluate(clientCiphertext)
         assertEquals(PolicyDecision.EncryptAtRest, decision)
     }
+
+    @Test
+    fun `E2EE_REQUIRED accepts chunked client ciphertext`() {
+        val policy =
+            EncryptionPolicy(
+                mode = EncryptionMode.E2EE_REQUIRED,
+                serverEncryptionEnabled = true,
+                allowPassthroughClientCiphertext = true,
+            )
+
+        val chunkedCiphertext = "LDCE2".toByteArray() + ByteArray(48)
+        val decision = policy.evaluate(chunkedCiphertext)
+
+        assertEquals(PolicyDecision.AcceptClientCiphertext, decision)
+    }
+
+    @Test
+    fun `AT_REST_ONLY passes chunked client ciphertext through`() {
+        val policy =
+            EncryptionPolicy(
+                mode = EncryptionMode.AT_REST_ONLY,
+                serverEncryptionEnabled = true,
+                allowPassthroughClientCiphertext = true,
+            )
+
+        val chunkedCiphertext = "LDCE2".toByteArray() + ByteArray(48)
+        val decision = policy.evaluate(chunkedCiphertext)
+
+        assertEquals(PolicyDecision.AcceptClientCiphertext, decision)
+    }
 }

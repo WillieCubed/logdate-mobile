@@ -15,7 +15,7 @@ import app.logdate.client.sync.cloud.JournalUpdateResponse
 import app.logdate.client.sync.cloud.JournalUploadRequest
 import app.logdate.client.sync.cloud.JournalUploadResponse
 import app.logdate.client.sync.cloud.MediaDownloadResponse
-import app.logdate.client.sync.cloud.MediaUploadRequest
+import app.logdate.client.sync.cloud.MediaUpload
 import app.logdate.client.sync.cloud.MediaUploadResponse
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.model.BeginAccountCreationRequest
@@ -282,7 +282,7 @@ private class FakeCloudApiClient(
 
     override suspend fun uploadMedia(
         accessToken: String,
-        media: MediaUploadRequest,
+        media: MediaUpload,
     ): Result<MediaUploadResponse> = Result.failure(NotImplementedError())
 
     override suspend fun uploadDraft(

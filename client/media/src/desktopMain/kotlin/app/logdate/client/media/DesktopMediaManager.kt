@@ -2,6 +2,7 @@ package app.logdate.client.media
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.io.asSource
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
@@ -94,6 +95,16 @@ class DesktopMediaManager(
             sizeBytes = data.size.toLong(),
             data = data,
         )
+    }
+
+    override suspend fun openMedia(uri: String): MediaFileSource {
+        val path = resolvePath(uri)
+        val fileName = path.name
+        return MediaFileSource(
+            fileName = fileName,
+            mimeType = Files.probeContentType(path) ?: guessMimeType(fileName),
+            sizeBytes = Files.size(path),
+        ) { Files.newInputStream(path).asSource() }
     }
 
     override suspend fun saveMedia(payload: MediaPayload): String {

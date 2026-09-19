@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.io.asSource
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -512,6 +513,30 @@ class AndroidMediaManager(
                 data = data,
             )
         }
+
+    override suspend fun openMedia(uri: String): MediaFileSource =
+        withContext(ioDispatcher) {
+            val parsedUri = Uri.parse(uri)
+            val sizeBytes = resolveSizeBytes(parsedUri) ?: return@withContext super.openMedia(uri)
+            val fileName = resolveFileName(parsedUri)
+            MediaFileSource(
+                fileName = fileName,
+                mimeType = resolveSupportedMimeType(parsedUri, fileName),
+                sizeBytes = sizeBytes,
+            ) { openSourceInputStream(parsedUri).asSource() }
+        }
+
+    /** The byte length of [uri], or null when the provider does not report one. */
+    private fun resolveSizeBytes(uri: Uri): Long? {
+        if (uri.isFileBacked()) {
+            val file = requireFileFromUri(uri)
+            check(file.isFile) { "Media file does not exist: ${file.absolutePath}" }
+            return file.length()
+        }
+        return contentResolver.openAssetFileDescriptor(uri, "r")?.use { descriptor ->
+            descriptor.length.takeIf { it >= 0 }
+        }
+    }
 
     override suspend fun saveMedia(payload: MediaPayload): String {
         val mimeType =
