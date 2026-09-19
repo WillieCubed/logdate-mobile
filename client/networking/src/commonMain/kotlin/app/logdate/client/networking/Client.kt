@@ -45,7 +45,7 @@ internal fun <T : HttpClientEngineConfig> HttpClientConfig<T>.configureClientDef
     install(Logging) {
         logger = NapierLogger
         level = LogLevel.HEADERS
-        sanitizeHeader { header -> header == HttpHeaders.Authorization }
+        sanitizeHeader { header -> header.equals(HttpHeaders.Authorization, ignoreCase = true) }
     }
 }
 
