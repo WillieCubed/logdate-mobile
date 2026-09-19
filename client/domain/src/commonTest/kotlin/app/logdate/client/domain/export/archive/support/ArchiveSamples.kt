@@ -166,8 +166,21 @@ object ArchiveSamples {
             counts = ArchiveCounts(journals = 1, notes = 2, drafts = 1, media = 1, places = 1, locationSamples = 1, hasProfile = true),
             contents =
                 listOf(
-                    ArchiveContent(ArchiveRole.NOTES, ArchiveLayout.NOTES, ArchiveLayout.JSON_MEDIA_TYPE, ArchiveLayout.SCHEMA_NOTES),
                     ArchiveContent(ArchiveRole.README, ArchiveLayout.README, ArchiveLayout.TEXT_MEDIA_TYPE),
+                    ArchiveContent(
+                        ArchiveRole.JOURNALS,
+                        ArchiveLayout.JOURNALS,
+                        ArchiveLayout.JSON_MEDIA_TYPE,
+                        ArchiveLayout.SCHEMA_JOURNALS,
+                    ),
+                    ArchiveContent(ArchiveRole.NOTES, ArchiveLayout.NOTES, ArchiveLayout.JSON_MEDIA_TYPE, ArchiveLayout.SCHEMA_NOTES),
+                    ArchiveContent(
+                        ArchiveRole.MEDIA_INVENTORY,
+                        ArchiveLayout.MEDIA_INVENTORY,
+                        ArchiveLayout.JSON_MEDIA_TYPE,
+                        ArchiveLayout.SCHEMA_MEDIA,
+                    ),
+                    ArchiveContent(ArchiveRole.CHECKSUMS, ArchiveLayout.CHECKSUMS, ArchiveLayout.TEXT_MEDIA_TYPE),
                 ),
         )
 }

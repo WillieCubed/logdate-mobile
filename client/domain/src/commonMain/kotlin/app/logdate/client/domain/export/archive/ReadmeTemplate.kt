@@ -31,18 +31,43 @@ object ReadmeTemplate {
         readableCopies: List<ReadableCopy>,
     ): String {
         val zone = runCatching { TimeZone.of(manifest.exportTimeZone) }.getOrDefault(TimeZone.UTC)
+        val written = WrittenFiles(manifest)
         val text =
             buildString {
                 introduction(manifest, zone)
                 contents(manifest.counts)
-                whereToLook(readableCopies)
+                whereToLook(readableCopies, written)
                 whatIsMissing(manifest.scope, zone)
-                times(manifest.exportTimeZone)
+                times(manifest.exportTimeZone, readableCopies.isNotEmpty(), written)
                 checkingFiles()
-                movingToAnotherApp(readableCopies.any { it.format == ReadableFormat.MARKDOWN })
+                if (written.data) movingToAnotherApp(readableCopies.any { it.format == ReadableFormat.MARKDOWN })
                 paragraph("This is LogDate export format ${manifest.schemaVersion}.")
             }
         return text.trimEnd() + "\n"
+    }
+
+    /** What the archive holds, read from the manifest so the README never describes a file that was not written. */
+    private class WrittenFiles(
+        manifest: ArchiveManifest,
+    ) {
+        private val roles = manifest.contents.mapTo(mutableSetOf()) { it.role }
+
+        val notes = ArchiveRole.NOTES in roles
+        val data = roles.any { it in DATA_ROLES }
+        val media = manifest.counts.media > 0
+
+        private companion object {
+            val DATA_ROLES =
+                setOf(
+                    ArchiveRole.JOURNALS,
+                    ArchiveRole.NOTES,
+                    ArchiveRole.DRAFTS,
+                    ArchiveRole.PLACES,
+                    ArchiveRole.PROFILE,
+                    ArchiveRole.LOCATION_HISTORY,
+                    ArchiveRole.MEDIA_INVENTORY,
+                )
+        }
     }
 
     private fun StringBuilder.introduction(
@@ -86,7 +111,10 @@ object ReadmeTemplate {
         plural: String,
     ) = "$n ${if (n == 1) singular else plural}"
 
-    private fun StringBuilder.whereToLook(readableCopies: List<ReadableCopy>) {
+    private fun StringBuilder.whereToLook(
+        readableCopies: List<ReadableCopy>,
+        written: WrittenFiles,
+    ) {
         val html = readableCopies.firstOrNull { it.format == ReadableFormat.HTML }
         val markdown = readableCopies.firstOrNull { it.format == ReadableFormat.MARKDOWN }
         heading("WHERE TO LOOK")
@@ -100,19 +128,23 @@ object ReadmeTemplate {
                 "${lead}Your entries as plain text files. They open in any text editor and in apps such as Obsidian.",
             )
         }
-        if (readableCopies.isEmpty()) {
+        if (readableCopies.isEmpty() && written.notes) {
             entry(
                 ArchiveLayout.NOTES.value,
                 "START HERE. Your entries, as text you can open in any text editor. " +
                     "There is no page-by-page reading copy in this export.",
             )
         }
-        entry("media/", "Your photos, videos and voice recordings. Each is named for when it was captured, so they sort in order.")
-        entry(
-            "data/",
-            "The same information in a form other programs can read (JSON). " +
-                "You can ignore this unless you are moving to another app or writing a script.",
-        )
+        if (written.media) {
+            entry("media/", "Your photos, videos and voice recordings. Each is named for when it was captured, so they sort in order.")
+        }
+        if (written.data) {
+            entry(
+                "data/",
+                "The same information in a form other programs can read (JSON). " +
+                    "You can ignore this unless you are moving to another app or writing a script.",
+            )
+        }
         entry("schema/", "Descriptions of the files in data/, for programmers.")
         entry("manifest.json", "A summary of this export: what it contains, what it leaves out and why.")
         entry("SHA256SUMS", "A checklist for confirming that no file was damaged.")
@@ -148,13 +180,26 @@ object ReadmeTemplate {
         }
     }
 
-    private fun StringBuilder.times(exportTimeZone: String) {
+    private fun StringBuilder.times(
+        exportTimeZone: String,
+        hasReadableCopy: Boolean,
+        written: WrittenFiles,
+    ) {
+        val sentences =
+            listOfNotNull(
+                (
+                    "Times in the readable copy are shown in the time zone you were in when you wrote each entry, " +
+                        "where LogDate recorded it, and otherwise in $exportTimeZone."
+                ).takeIf { hasReadableCopy },
+                "The data files store times in UTC, marked by the letter Z at the end.".takeIf { written.data },
+                (
+                    "Entries in notes.json also give their local time, with its offset from UTC, " +
+                        "where LogDate recorded the time zone."
+                ).takeIf { written.notes },
+            )
+        if (sentences.isEmpty()) return
         heading("TIMES")
-        paragraph(
-            "Times in the readable copy are shown in the time zone you were in when you wrote each entry, " +
-                "where LogDate recorded it, and otherwise in $exportTimeZone. " +
-                "The data files store every time in UTC, marked by the letter Z at the end.",
-        )
+        paragraph(sentences.joinToString(" "))
     }
 
     private fun StringBuilder.checkingFiles() {

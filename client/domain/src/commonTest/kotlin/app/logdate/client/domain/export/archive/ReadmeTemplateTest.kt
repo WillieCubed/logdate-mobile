@@ -17,6 +17,9 @@ class ReadmeTemplateTest {
         copies: List<ReadableCopy> = listOf(html, markdown),
     ) = ReadmeTemplate.render(manifest, copies)
 
+    private fun without(vararg roles: ArchiveRole) =
+        ArchiveSamples.manifest.copy(contents = ArchiveSamples.manifest.contents.filter { it.role !in roles })
+
     /** The text with every run of whitespace collapsed, so a sentence can be found across a line break. */
     private fun flat(text: String) = text.split(Regex("\\s+")).joinToString(" ")
 
@@ -45,6 +48,51 @@ class ReadmeTemplateTest {
         assertTrue("data/notes.json" in text)
         assertTrue("There is no page-by-page reading copy" in flat(text))
         assertFalse("journal/" in text)
+    }
+
+    @Test
+    fun `it lists the media folder only when the archive has media`() {
+        val withoutMedia = ArchiveSamples.manifest.copy(counts = ArchiveSamples.manifest.counts.copy(media = 0))
+
+        assertTrue("media/" in render())
+        assertFalse("media/" in render(manifest = withoutMedia))
+    }
+
+    @Test
+    fun `it does not point at the entries file when entries were left out`() {
+        val text = render(manifest = without(ArchiveRole.NOTES), copies = emptyList())
+
+        assertFalse("notes.json" in text, text)
+        assertFalse("START HERE" in text, text)
+    }
+
+    @Test
+    fun `it lists the data folder only when a data file was written`() {
+        val text = render(manifest = without(ArchiveRole.JOURNALS, ArchiveRole.NOTES, ArchiveRole.MEDIA_INVENTORY), copies = emptyList())
+
+        assertFalse("The same information in a form other programs can read" in flat(text), text)
+        assertFalse("MOVING TO ANOTHER APP" in text, text)
+    }
+
+    @Test
+    fun `it describes times only for the files the archive has`() {
+        val withCopies = flat(render())
+        val dataOnly = flat(render(copies = emptyList()))
+        val noData =
+            flat(render(manifest = without(ArchiveRole.JOURNALS, ArchiveRole.NOTES, ArchiveRole.MEDIA_INVENTORY), copies = emptyList()))
+
+        assertTrue("Times in the readable copy" in withCopies)
+        assertFalse("readable copy" in dataOnly, dataOnly)
+        assertTrue("Entries in notes.json also give their local time" in dataOnly, dataOnly)
+        assertFalse("TIMES" in noData, noData)
+    }
+
+    @Test
+    fun `it does not claim that every time in the data files is UTC`() {
+        val text = flat(render())
+
+        assertFalse("every time" in text, text)
+        assertTrue("store times in UTC" in text, text)
     }
 
     @Test
@@ -165,7 +213,9 @@ class ReadmeTemplateTest {
             -----
             Times in the readable copy are shown in the time zone you were in when you
             wrote each entry, where LogDate recorded it, and otherwise in America/Denver.
-            The data files store every time in UTC, marked by the letter Z at the end.
+            The data files store times in UTC, marked by the letter Z at the end. Entries
+            in notes.json also give their local time, with its offset from UTC, where
+            LogDate recorded the time zone.
 
             CHECKING YOUR FILES (OPTIONAL)
             ------------------------------
