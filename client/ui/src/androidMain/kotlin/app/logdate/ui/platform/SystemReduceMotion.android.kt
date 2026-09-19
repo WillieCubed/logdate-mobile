@@ -30,5 +30,11 @@ actual fun rememberSystemReduceMotion(): State<Boolean> {
     return state
 }
 
-private fun isHapticDisabled(context: Context): Boolean =
+/**
+ * Whether the user turned off touch haptics in system settings. The setting is deprecated
+ * because [android.view.View.performHapticFeedback] now honours it itself, but LogDate also
+ * plays raw [android.os.Vibrator] effects, which do not, so it still has to be read.
+ */
+@Suppress("DEPRECATION")
+internal fun isHapticDisabled(context: Context): Boolean =
     Settings.System.getInt(context.contentResolver, Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) == 0
