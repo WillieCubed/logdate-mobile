@@ -32,8 +32,6 @@ allowed_path "docs/runbook/release-secrets.md"
 allowed_path "server/src/main/kotlin/SecretStore.kt"
 allowed_path "scripts/setup/environments/production.conf"
 
-flagged_text 'password = "hunter2hunter2"'
-flagged_text "api_key: 'abcdefgh12345678'"
 flagged_text 'DATABASE_URL=postgresql://logdate:s3cretpass@db.internal/logdate'
 flagged_text 'jdbc:postgresql://host/db?password=abcdef123'
 flagged_text 'AKIAABCDEFGHIJKLMNOP'
@@ -43,6 +41,8 @@ allowed_text 'store_password="$(read_env_value "$FILE" STORE_PASSWORD)"'
 allowed_text 'token="${GOOGLE_API_TOKEN:-}"'
 allowed_text 'val password = "${config.password}"'
 allowed_text 'password = ""'
+allowed_text 'val password = "correct-horse-battery"'
+allowed_text "api_key: 'abcdefgh12345678'"
 allowed_text 'token: ${{ secrets.GITHUB_TOKEN }}'
 
 skips_content_scan "scripts/tests/deploy/test-foo.sh" || fail "scripts/tests fixtures should be skipped"

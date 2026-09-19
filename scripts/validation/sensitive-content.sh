@@ -3,7 +3,12 @@
 #
 #   is_sensitive_path PATH       0 when the file itself is likely a secret
 #   skips_content_scan PATH      0 for files whose literals are test fixtures
-#   text_has_secret TEXT         0 when TEXT contains a likely secret literal
+#   text_has_secret TEXT         0 when TEXT contains a known credential format
+#
+# The content scan matches only formats that are credentials by construction
+# (key prefixes, key blocks, URL credentials). It does not guess from variable
+# names like `password =`, which flagged ordinary code far more often than
+# real secrets.
 
 # Files that are secrets by type, wherever they live.
 SENSITIVE_PATH_PATTERNS=(
@@ -28,9 +33,6 @@ CODE_OR_DOC_EXTENSION='\.(sh|bash|py|kt|kts|java|swift|md)$'
 SECRET_CONTENT_PATTERNS=(
     'AKIA[0-9A-Z]{16}'
     '-----BEGIN (RSA|EC|DSA|OPENSSH|PGP) PRIVATE KEY-----'
-    # A quoted literal assigned to a secret-sounding name. Values starting with
-    # `$` are shell or Kotlin expansions such as "$(read_password)", not literals.
-    '(api[_-]?key|secret|token|password)[[:space:]]*[:=][[:space:]]*["'"'"'][^"'"'"'$][^"'"'"']{7,}["'"'"']'
     # URL-embedded credentials (`scheme://user:pass@host`); user may be empty.
     '://[^/:@[:space:]"'"'"']*:[^/@[:space:]"'"'"']{6,}@'
     # Query-string credentials such as JDBC `?password=...`.
