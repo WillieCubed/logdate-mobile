@@ -157,6 +157,8 @@ enum class PendingMediaType {
  * @property filePath Absolute path on the recording device, when known. May be
  *   null for transient states where the path has not yet been resolved by the
  *   recording side.
+ * @property timeZoneId IANA id of the zone the device was in when the media was
+ *   started, or null for a record written before the zone was stored.
  */
 @Serializable
 data class PendingMediaRecord(
@@ -165,4 +167,5 @@ data class PendingMediaRecord(
     val mediaType: PendingMediaType,
     val createdAt: Instant,
     val filePath: String? = null,
+    val timeZoneId: String? = null,
 )

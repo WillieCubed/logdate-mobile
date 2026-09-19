@@ -206,6 +206,7 @@ private fun AudioBlockUiState.toPendingMediaRecord(now: Instant): PendingMediaRe
         mediaType = PendingMediaType.AUDIO,
         createdAt = now,
         filePath = filePath,
+        timeZoneId = timeZoneId,
     )
 }
 
@@ -223,5 +224,6 @@ private fun PendingMediaRecord.toBlock(): EntryBlockUiState? =
                 id = blockId,
                 timestamp = createdAt,
                 captureState = AudioCaptureState.Stopping(filePath = filePath),
+                timeZoneId = timeZoneId,
             )
     }

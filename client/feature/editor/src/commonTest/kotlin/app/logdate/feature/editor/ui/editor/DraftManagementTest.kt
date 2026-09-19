@@ -20,6 +20,8 @@ import app.logdate.client.domain.notes.drafts.GetAllDraftsUseCase
 import app.logdate.client.domain.notes.drafts.UpdateEntryDraftUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.PendingMediaRecord
+import app.logdate.client.repository.journals.PendingMediaType
 import app.logdate.feature.editor.ui.editor.delegate.ContentLoader
 import app.logdate.feature.editor.ui.editor.delegate.DraftManager
 import app.logdate.feature.editor.ui.editor.fakes.FakeActivityTimelineRepository
@@ -1176,6 +1178,56 @@ class DraftManagementTest {
                 state.canExitWithoutSaving,
                 "Should not be able to exit without saving after loading a draft",
             )
+        }
+
+    @Test
+    fun `a recovered recording keeps the time zone it was started in`() =
+        testScope.runTest {
+            val block =
+                AudioBlockUiState(
+                    captureState = AudioCaptureState.Stopping(filePath = "/audio_notes/recording.m4a"),
+                    timeZoneId = "Pacific/Kiritimati",
+                )
+
+            val draftId = assertNotNull(draftManager.autoSave(EditorState(blocks = listOf(block))))
+            val recovered =
+                draftManager
+                    .loadDraft(draftId)
+                    .getOrThrow()
+                    .blocks
+                    .single()
+
+            assertEquals(block.id, recovered.id)
+            assertEquals("Pacific/Kiritimati", recovered.timeZoneId)
+        }
+
+    @Test
+    fun `a recovered recording from a draft without a zone records none instead of the current one`() =
+        testScope.runTest {
+            val draftId =
+                entryDraftRepository.createDraft(
+                    uid = Uuid.random(),
+                    notes = emptyList(),
+                    pendingMedia =
+                        listOf(
+                            PendingMediaRecord(
+                                blockId = Uuid.random(),
+                                mediaType = PendingMediaType.AUDIO,
+                                createdAt = Clock.System.now(),
+                                filePath = "/audio_notes/older.m4a",
+                            ),
+                        ),
+                    selectedJournalIds = emptyList(),
+                )
+
+            val recovered =
+                draftManager
+                    .loadDraft(draftId)
+                    .getOrThrow()
+                    .blocks
+                    .single()
+
+            assertNull(recovered.timeZoneId)
         }
 
     @Test
