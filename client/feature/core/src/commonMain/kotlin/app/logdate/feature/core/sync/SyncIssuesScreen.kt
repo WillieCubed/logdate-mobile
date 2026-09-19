@@ -43,6 +43,9 @@ import logdate.client.feature.core.generated.resources.sync_issue_count_journal
 import logdate.client.feature.core.generated.resources.sync_issue_count_media
 import logdate.client.feature.core.generated.resources.sync_issue_count_note
 import logdate.client.feature.core.generated.resources.sync_issue_count_other
+import logdate.client.feature.core.generated.resources.sync_issue_explain_app_closed
+import logdate.client.feature.core.generated.resources.sync_issue_explain_failed
+import logdate.client.feature.core.generated.resources.sync_issue_explain_missing_file
 import logdate.client.feature.core.generated.resources.sync_issue_missing_file_association
 import logdate.client.feature.core.generated.resources.sync_issue_missing_file_draft
 import logdate.client.feature.core.generated.resources.sync_issue_missing_file_health
@@ -245,7 +248,7 @@ private fun SyncIssueCard(
                 style = MaterialTheme.typography.titleSmall,
             )
             Text(
-                text = explainIssue(record),
+                text = stringResource(explainIssue(record)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -283,7 +286,7 @@ private fun countPluralFor(entityType: String): PluralStringResource =
     }
 
 private fun issueMessageFor(record: SyncDeadLetterRecord): StringResource =
-    if (record.isMissingFile()) {
+    if (record.issueKind() == SyncIssueKind.MISSING_FILE) {
         when (record.entityType.uppercase()) {
             "NOTE" -> Res.string.sync_issue_missing_file_note
             "JOURNAL" -> Res.string.sync_issue_missing_file_journal
@@ -305,16 +308,28 @@ private fun issueMessageFor(record: SyncDeadLetterRecord): StringResource =
         }
     }
 
-private fun explainIssue(record: SyncDeadLetterRecord): String =
-    if (record.isMissingFile()) {
-        "The file it points to is no longer on this device, so there is nothing left to upload. " +
-            "Discarding it removes it from the queue and leaves the entry itself alone."
-    } else {
-        "It was tried several times without success. Retry if you are back online, " +
-            "or discard it if you no longer need it synced."
+private fun explainIssue(record: SyncDeadLetterRecord): StringResource =
+    when (record.issueKind()) {
+        SyncIssueKind.MISSING_FILE -> Res.string.sync_issue_explain_missing_file
+        SyncIssueKind.APP_CLOSED -> Res.string.sync_issue_explain_app_closed
+        SyncIssueKind.FAILED -> Res.string.sync_issue_explain_failed
     }
 
-private fun SyncDeadLetterRecord.isMissingFile(): Boolean =
-    lastError.contains("no longer exists", ignoreCase = true) ||
-        lastError.contains("ENOENT", ignoreCase = true) ||
-        lastError.contains("No such file", ignoreCase = true)
+/** Why an entry was set aside, which decides how Sync Issues explains it. */
+internal enum class SyncIssueKind {
+    MISSING_FILE,
+
+    /** LogDate closed while uploading it, more than once in a row. */
+    APP_CLOSED,
+    FAILED,
+}
+
+/** Read from [SyncDeadLetterRecord.lastError], the only trace of the cause a record keeps. */
+internal fun SyncDeadLetterRecord.issueKind(): SyncIssueKind =
+    when {
+        lastError.contains("no longer exists", ignoreCase = true) ||
+            lastError.contains("ENOENT", ignoreCase = true) ||
+            lastError.contains("No such file", ignoreCase = true) -> SyncIssueKind.MISSING_FILE
+        lastError.contains("closed while uploading", ignoreCase = true) -> SyncIssueKind.APP_CLOSED
+        else -> SyncIssueKind.FAILED
+    }

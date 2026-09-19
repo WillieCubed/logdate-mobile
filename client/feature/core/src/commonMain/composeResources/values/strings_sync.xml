@@ -83,6 +83,10 @@
     <string name="sync_issue_upload_failed_association">This entry link didn't upload</string>
     <string name="sync_issue_upload_failed_health">This health record didn't upload</string>
     <string name="sync_issue_upload_failed_other">This item didn't upload</string>
+
+    <string name="sync_issue_explain_missing_file">The file it points to is no longer on this device, so there is nothing left to upload. Discarding it removes it from the queue and leaves the entry itself alone.</string>
+    <string name="sync_issue_explain_app_closed">LogDate closed while uploading it twice in a row, so it was set aside to let everything else back up. It is tried again once a day. Retry after updating LogDate, or discard it if you no longer need it synced.</string>
+    <string name="sync_issue_explain_failed">It was tried several times without success. Retry if you are back online, or discard it if you no longer need it synced.</string>
     <string name="sync_paused_background_data_off">Paused — Android is blocking background data for LogDate</string>
     <string name="sync_paused_background_data_off_fix">Turn on background data for LogDate in Android Settings to resume backing up.</string>
     <string name="sync_paused_offline">Paused — waiting for a connection</string>
