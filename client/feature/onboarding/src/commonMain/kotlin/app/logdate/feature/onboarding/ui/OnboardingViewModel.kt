@@ -13,6 +13,7 @@ import app.logdate.client.domain.streak.RefreshStreakUseCase
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.SystemCaptureTimeZone
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.feature.onboarding.flow.OnboardingDeviceState
 import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
@@ -156,6 +157,7 @@ class OnboardingViewModel(
                     content = newEntryData.textContent,
                     creationTimestamp = newEntryData.timestamp,
                     lastUpdated = newEntryData.timestamp,
+                    timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
                 ),
             )
             _uiState.update {

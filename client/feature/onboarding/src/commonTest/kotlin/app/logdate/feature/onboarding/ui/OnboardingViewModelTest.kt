@@ -55,6 +55,8 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -351,6 +353,16 @@ class OnboardingViewModelTest {
     }
 
     @Test
+    fun `an entry added during onboarding records the time zone it was written in`() =
+        runTest {
+            viewModel.addEntry(NewEntryData(timestamp = Instant.fromEpochMilliseconds(1_710_000_000_000), textContent = "Hello"))
+            advanceUntilIdle()
+
+            val note = assertIs<JournalNote.Text>(fakeNotesRepository.created.single())
+            assertNotNull(note.timeZoneId)
+        }
+
+    @Test
     fun `set active entry mode updates state`() =
         runTest {
             viewModel.setActiveEntryMode(OnboardingEntryMode.CONTINUE_SETUP)
@@ -383,7 +395,12 @@ private class FakeJournalNotesRepository : JournalNotesRepository {
 
     override suspend fun getNoteById(noteId: Uuid): JournalNote? = null
 
-    override suspend fun create(note: JournalNote): Uuid = Uuid.random()
+    val created = mutableListOf<JournalNote>()
+
+    override suspend fun create(note: JournalNote): Uuid {
+        created += note
+        return note.uid
+    }
 
     override suspend fun create(
         note: JournalNote,
