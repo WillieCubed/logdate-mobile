@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.streak.StreakData
+import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.MasterFeatureToggle
 import app.logdate.ui.common.MaterialContainer
@@ -47,8 +48,22 @@ fun StreakSettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: StreakSettingsViewModel = koinViewModel(),
+    campfireViewModel: CampfireViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isCampfireEnabled by campfireViewModel.isCampfireEnabled.collectAsState()
+    val campfire by campfireViewModel.presentation.collectAsState()
+
+    if (isCampfireEnabled) {
+        CampfireStreakContent(
+            campfire = campfire,
+            isTrackingEnabled = uiState.streakData.isEnabled,
+            onBack = onBack,
+            onToggleStreakTracking = viewModel::toggleStreakTracking,
+            modifier = modifier,
+        )
+        return
+    }
 
     StreakSettingsContent(
         streakData = uiState.streakData,

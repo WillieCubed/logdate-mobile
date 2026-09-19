@@ -63,11 +63,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.client.domain.streak.StreakData
+import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.DefaultSettingsContentContainer
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.applyScreenStyles
+import app.logdate.ui.streak.Campfire
+import app.logdate.ui.streak.CampfirePresentation
+import app.logdate.ui.streak.campfireHeadline
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.formatDateLocalized
 import kotlinx.datetime.TimeZone
@@ -76,6 +80,7 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_information
 import logdate.client.feature.core.generated.resources.authentication
 import logdate.client.feature.core.generated.resources.birthday
+import logdate.client.feature.core.generated.resources.campfire_profile_summary
 import logdate.client.feature.core.generated.resources.current_streak
 import logdate.client.feature.core.generated.resources.display_name
 import logdate.client.feature.core.generated.resources.edit_display_name
@@ -101,9 +106,11 @@ fun ProfileScreen(
     onNavigateToBirthday: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = koinViewModel(),
+    campfireViewModel: CampfireViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val streakData by viewModel.streakData.collectAsState()
+    val campfire by campfireViewModel.presentation.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val profileUpdatedMessage = stringResource(Res.string.profile_updated_successfully)
 
@@ -124,6 +131,7 @@ fun ProfileScreen(
     ProfileScreenContent(
         uiState = uiState,
         streakData = streakData,
+        campfire = campfire,
         onBack = onBack,
         onNavigateToBirthday = onNavigateToBirthday,
         onStartEditingDisplayName = viewModel::startEditingDisplayName,
@@ -139,6 +147,7 @@ fun ProfileScreen(
 fun ProfileScreenContent(
     uiState: ProfileUiState,
     streakData: StreakData = StreakData(),
+    campfire: CampfirePresentation? = null,
     onBack: () -> Unit,
     onNavigateToBirthday: () -> Unit,
     onStartEditingDisplayName: () -> Unit,
@@ -206,6 +215,7 @@ fun ProfileScreenContent(
                 profile = profile,
                 editState = uiState.editState,
                 streakData = streakData,
+                campfire = campfire,
                 contentPadding = paddingValues,
                 onNavigateToBirthday = onNavigateToBirthday,
                 onStartEditingDisplayName = onStartEditingDisplayName,
@@ -221,6 +231,7 @@ private fun ProfileAdaptiveContent(
     profile: ProfileDisplayModel,
     editState: ProfileEditState,
     streakData: StreakData,
+    campfire: CampfirePresentation?,
     contentPadding: PaddingValues,
     onNavigateToBirthday: () -> Unit,
     onStartEditingDisplayName: () -> Unit,
@@ -236,6 +247,7 @@ private fun ProfileAdaptiveContent(
                 profile = profile,
                 editState = editState,
                 streakData = streakData,
+                campfire = campfire,
                 contentPadding = contentPadding,
                 onNavigateToBirthday = onNavigateToBirthday,
                 onStartEditingDisplayName = onStartEditingDisplayName,
@@ -249,6 +261,7 @@ private fun ProfileAdaptiveContent(
                 profile = profile,
                 editState = editState,
                 streakData = streakData,
+                campfire = campfire,
                 contentPadding = contentPadding,
                 onNavigateToBirthday = onNavigateToBirthday,
                 onStartEditingDisplayName = onStartEditingDisplayName,
@@ -263,6 +276,7 @@ private fun ProfileAdaptiveContent(
                     profile = profile,
                     editState = editState,
                     streakData = streakData,
+                    campfire = campfire,
                     contentPadding = contentPadding,
                     onNavigateToBirthday = onNavigateToBirthday,
                     onStartEditingDisplayName = onStartEditingDisplayName,
@@ -279,6 +293,7 @@ private fun ProfileContentList(
     profile: ProfileDisplayModel,
     editState: ProfileEditState,
     streakData: StreakData,
+    campfire: CampfirePresentation?,
     contentPadding: PaddingValues,
     onNavigateToBirthday: () -> Unit,
     onStartEditingDisplayName: () -> Unit,
@@ -316,7 +331,11 @@ private fun ProfileContentList(
                 )
             }
 
-            if (streakData.isEnabled) {
+            if (campfire != null) {
+                item {
+                    ProfileCampfireSection(campfire = campfire)
+                }
+            } else if (streakData.isEnabled) {
                 item {
                     ProfileJournalingStatsSection(streakData = streakData)
                 }
@@ -374,6 +393,29 @@ private fun ProfileJournalingStatsSection(streakData: StreakData) {
             icon = Icons.Default.LocalFireDepartment,
             label = stringResource(Res.string.current_streak),
             value = stringResource(Res.string.streak_day_count, streakData.currentStreak),
+        )
+    }
+}
+
+@Composable
+private fun ProfileCampfireSection(campfire: CampfirePresentation) {
+    SettingsSection(
+        title = stringResource(Res.string.journaling_stats),
+        modifier = Modifier.padding(horizontal = Spacing.lg),
+    ) {
+        ListItem(
+            leadingContent = {
+                Campfire(
+                    phase = campfire.phase,
+                    size = campfire.size,
+                    waitingForToday = campfire.isWaitingForToday,
+                    modifier = Modifier.size(40.dp),
+                )
+            },
+            headlineContent = { Text(campfireHeadline(campfire)) },
+            supportingContent = {
+                Text(stringResource(Res.string.campfire_profile_summary, campfire.runDays, campfire.totalDaysKept))
+            },
         )
     }
 }

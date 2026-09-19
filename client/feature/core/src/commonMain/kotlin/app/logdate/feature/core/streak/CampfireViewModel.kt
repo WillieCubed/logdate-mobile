@@ -36,6 +36,17 @@ class CampfireViewModel(
         campfireEnabledFlow = featureFlagStore.observe(FeatureFlag.CAMPFIRE_STREAKS),
     )
 
+    /**
+     * Whether the campfire replaces the old streak counter. Surfaces that show the campfire even
+     * while streak tracking is off, such as the streak screen with its tracking toggle, read this.
+     */
+    val isCampfireEnabled: StateFlow<Boolean> =
+        campfireEnabledFlow.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
+            initialValue = false,
+        )
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val presentation: StateFlow<CampfirePresentation?> =
         campfireEnabledFlow

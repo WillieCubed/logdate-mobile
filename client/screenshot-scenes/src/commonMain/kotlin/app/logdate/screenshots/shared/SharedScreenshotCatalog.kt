@@ -113,6 +113,8 @@ import app.logdate.feature.rewind.ui.past.PastRewindsScreen
 import app.logdate.feature.rewind.ui.settings.RewindSettingsContent
 import app.logdate.feature.search.ui.SearchScreenContent
 import app.logdate.feature.search.ui.SearchScreenState
+import app.logdate.ui.streak.CampfirePhase
+import app.logdate.ui.streak.CampfireSize
 import kotlinx.datetime.LocalDate
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -135,6 +137,7 @@ enum class SharedScreenshotSceneId(
     OnboardingLocation("onboarding-location"),
     OnboardingNotifications("onboarding-notifications"),
     OnboardingCompletionStreak("onboarding-completion-streak"),
+    OnboardingCompletionCampfire("onboarding-completion-campfire"),
     OnboardingCompletionFinal("onboarding-completion-final"),
     OnboardingWelcomeBack("onboarding-welcome-back"),
     MemorySelectionEmpty("memory-selection-empty"),
@@ -165,6 +168,13 @@ enum class SharedScreenshotSceneId(
     DevicesSettings("devices-settings"),
     StreakSettings("streak-settings"),
     CampfireStates("campfire-states"),
+    CampfireStreakUnlit("campfire-streak-unlit"),
+    CampfireStreakBurning("campfire-streak-burning"),
+    CampfireStreakWaiting("campfire-streak-waiting"),
+    CampfireStreakEmbers("campfire-streak-embers"),
+    CampfireStreakOut("campfire-streak-out"),
+    CampfireStreakRekindled("campfire-streak-rekindled"),
+    CampfireStreakTrackingOff("campfire-streak-tracking-off"),
     TimelineSettings("timeline-settings"),
     DayBoundarySettings("day-boundary-settings"),
     LibrarySettings("library-settings"),
@@ -396,6 +406,9 @@ object SharedScreenshotCatalog {
                     onContinue = {},
                     onFinish = {},
                 )
+            },
+            sharedScene(SharedScreenshotSceneId.OnboardingCompletionCampfire, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
+                OnboardingCompletionCampfireScene()
             },
             sharedScene(SharedScreenshotSceneId.OnboardingCompletionFinal, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
                 OnboardingCompletionContent(
@@ -891,6 +904,27 @@ object SharedScreenshotCatalog {
             },
             sharedScene(SharedScreenshotSceneId.CampfireStates, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
                 CampfireStatesGallery()
+            },
+            sharedScene(SharedScreenshotSceneId.CampfireStreakUnlit, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                CampfireStreakScene(campfire = campfireSamples.first { it.phase == CampfirePhase.UNLIT })
+            },
+            sharedScene(SharedScreenshotSceneId.CampfireStreakBurning, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                CampfireStreakScene(campfire = campfireSamples.first { it.size == CampfireSize.CAMPFIRE && it.loggedToday })
+            },
+            sharedScene(SharedScreenshotSceneId.CampfireStreakWaiting, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                CampfireStreakScene(campfire = campfireSamples.first { it.isWaitingForToday })
+            },
+            sharedScene(SharedScreenshotSceneId.CampfireStreakEmbers, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                CampfireStreakScene(campfire = campfireSamples.first { it.phase == CampfirePhase.EMBERS })
+            },
+            sharedScene(SharedScreenshotSceneId.CampfireStreakOut, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                CampfireStreakScene(campfire = campfireSamples.first { it.phase == CampfirePhase.OUT })
+            },
+            sharedScene(SharedScreenshotSceneId.CampfireStreakRekindled, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                CampfireStreakScene(campfire = campfireSamples.first { it.showsRekindledLabel })
+            },
+            sharedScene(SharedScreenshotSceneId.CampfireStreakTrackingOff, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                CampfireStreakScene(campfire = null, isTrackingEnabled = false)
             },
             sharedScene(SharedScreenshotSceneId.TimelineSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
                 TimelineSettingsContent(

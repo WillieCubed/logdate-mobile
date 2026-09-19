@@ -21,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.core.settings.ui.CampfireStreakContent
+import app.logdate.feature.onboarding.ui.OnboardingCompletionContent
 import app.logdate.ui.streak.Campfire
 import app.logdate.ui.streak.CampfireChip
 import app.logdate.ui.streak.CampfirePhase
@@ -141,5 +143,38 @@ internal fun CampfireStatesGallery() {
                 }
             }
         }
+    }
+}
+
+/**
+ * The streak screen with the campfire in place of the day counter.
+ */
+@Composable
+internal fun CampfireStreakScene(
+    campfire: CampfirePresentation?,
+    isTrackingEnabled: Boolean = true,
+) {
+    CompositionLocalProvider(LocalCampfireAnimationEnabled provides false) {
+        CampfireStreakContent(
+            campfire = campfire,
+            isTrackingEnabled = isTrackingEnabled,
+            onBack = {},
+            onToggleStreakTracking = {},
+        )
+    }
+}
+
+/**
+ * The last onboarding step with a freshly lit campfire in place of the day counter.
+ */
+@Composable
+internal fun OnboardingCompletionCampfireScene() {
+    CompositionLocalProvider(LocalCampfireAnimationEnabled provides false) {
+        OnboardingCompletionContent(
+            shouldShowFinish = false,
+            onContinue = {},
+            onFinish = {},
+            showCampfire = true,
+        )
     }
 }

@@ -9,6 +9,10 @@
     <string name="streak_day_count">%1$d day streak</string>
     <string name="streak_keep_it_up">Write, photograph, or record something every day to keep your streak alive.</string>
 
+    <!-- Campfire -->
+    <string name="campfire_profile_summary">This fire: %1$d · Days kept: %2$d</string>
+    <string name="campfire_badge">%1$d-day fire</string>
+
     <!-- Stats -->
     <string name="journaling_stats">Journaling stats</string>
 </resources>

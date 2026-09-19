@@ -60,6 +60,19 @@ class CampfireViewModelTest {
         }
 
     @Test
+    fun `the flag state is exposed for surfaces that show the campfire without a fire`() =
+        runTest {
+            flagEnabled.value = false
+            val viewModel = createViewModel()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.isCampfireEnabled.collect {} }
+            assertEquals(false, viewModel.isCampfireEnabled.value)
+
+            flagEnabled.value = true
+
+            assertEquals(true, viewModel.isCampfireEnabled.value)
+        }
+
+    @Test
     fun `the campfire is hidden when there is no fire to show`() =
         runTest {
             val viewModel = createViewModel()

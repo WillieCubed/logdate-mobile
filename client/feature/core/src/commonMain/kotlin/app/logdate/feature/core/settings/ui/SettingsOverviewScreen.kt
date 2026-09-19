@@ -45,10 +45,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsNavigationItem
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
+import app.logdate.ui.streak.Campfire
+import app.logdate.ui.streak.CampfirePresentation
 import app.logdate.ui.theme.Spacing
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -56,6 +59,7 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_and_sign_in
 import logdate.client.feature.core.generated.resources.account_profile_edit_label
 import logdate.client.feature.core.generated.resources.account_settings_description
+import logdate.client.feature.core.generated.resources.campfire_badge
 import logdate.client.feature.core.generated.resources.create_account
 import logdate.client.feature.core.generated.resources.devices
 import logdate.client.feature.core.generated.resources.devices_settings_description
@@ -131,9 +135,11 @@ fun SettingsOverviewScreen(
     onNavigateToSignIn: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: AccountSettingsViewModel = koinViewModel(),
+    campfireViewModel: CampfireViewModel = koinViewModel(),
 ) {
     val identity by viewModel.resolvedIdentity.collectAsState()
     val streakData by viewModel.streakData.collectAsState()
+    val campfire by campfireViewModel.presentation.collectAsState()
 
     SettingsOverviewContent(
         onBack = onBack,
@@ -165,6 +171,7 @@ fun SettingsOverviewScreen(
             ),
         onboardedDate = identity.onboardedDate ?: Instant.DISTANT_PAST,
         streakCount = if (streakData.isEnabled) streakData.currentStreak else null,
+        campfire = campfire,
         modifier = modifier,
     )
 }
@@ -195,6 +202,7 @@ fun SettingsOverviewContent(
     userProfile: UserProfile,
     onboardedDate: Instant = Instant.DISTANT_PAST,
     streakCount: Int? = null,
+    campfire: CampfirePresentation? = null,
     modifier: Modifier = Modifier,
 ) {
     FoldableBookLayout(
@@ -206,6 +214,7 @@ fun SettingsOverviewContent(
                     userProfile = userProfile,
                     onboardedDate = onboardedDate,
                     streakCount = streakCount,
+                    campfire = campfire,
                     onEditProfile = onNavigateToProfile,
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
@@ -365,6 +374,7 @@ fun SettingsOverviewContent(
                         userProfile = userProfile,
                         onboardedDate = onboardedDate,
                         streakCount = streakCount,
+                        campfire = campfire,
                         onEditProfile = onNavigateToProfile,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
@@ -574,6 +584,7 @@ private fun SettingsIdentityCard(
     onboardedDate: Instant,
     onEditProfile: () -> Unit,
     streakCount: Int? = null,
+    campfire: CampfirePresentation? = null,
     modifier: Modifier = Modifier,
 ) {
     val displayName = userProfile.name.ifEmpty { userProfile.username.ifEmpty { "You" } }
@@ -634,7 +645,9 @@ private fun SettingsIdentityCard(
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                     )
                 }
-                if (streakCount != null && streakCount > 0) {
+                if (campfire != null) {
+                    if (campfire.runDays > 0) CampfireBadge(campfire = campfire)
+                } else if (streakCount != null && streakCount > 0) {
                     Row(
                         modifier =
                             Modifier
@@ -663,6 +676,31 @@ private fun SettingsIdentityCard(
         FilledTonalButton(onClick = onEditProfile) {
             Text(stringResource(Res.string.account_profile_edit_label))
         }
+    }
+}
+
+@Composable
+private fun CampfireBadge(campfire: CampfirePresentation) {
+    Row(
+        modifier =
+            Modifier
+                .clip(MaterialTheme.shapes.medium)
+                .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f))
+                .padding(horizontal = Spacing.md, vertical = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        Campfire(
+            phase = campfire.phase,
+            size = campfire.size,
+            waitingForToday = campfire.isWaitingForToday,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            text = stringResource(Res.string.campfire_badge, campfire.runDays),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
     }
 }
 
