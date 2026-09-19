@@ -67,43 +67,49 @@ object ArchiveSchemas {
                     "exportTimeZone" to string(minLength = 1),
                     "generator" to obj(listOf("name", "version"), "name" to string(), "version" to string()),
                     "owner" to obj(emptyList(), "displayName" to string()),
-                    "scope" to
-                        obj(
-                            listOf("complete"),
-                            "complete" to bool(),
-                            "dateRange" to obj(emptyList(), "from" to ref("instant"), "to" to ref("instant")),
-                            "omitted" to
-                                array(
-                                    obj(
-                                        listOf("category", "reason"),
-                                        "category" to enumOf(ArchiveCategory.serializer()),
-                                        "reason" to enumOf(ArchiveOmissionReason.serializer()),
-                                    ),
-                                ),
-                        ),
-                    "counts" to
-                        obj(
-                            listOf("journals", "notes", "drafts", "media", "places", "locationSamples", "hasProfile"),
-                            "journals" to count(),
-                            "notes" to count(),
-                            "drafts" to count(),
-                            "media" to count(),
-                            "places" to count(),
-                            "locationSamples" to count(),
-                            "hasProfile" to bool(),
-                        ),
-                    "contents" to
-                        array(
-                            obj(
-                                listOf("role", "path", "mediaType"),
-                                "role" to enumOf(ArchiveRole.serializer()),
-                                "path" to ref("path"),
-                                "mediaType" to string(minLength = 1),
-                                "schema" to ref("path"),
-                            ),
-                        ),
+                    "scope" to manifestScope(),
+                    "counts" to manifestCounts(),
+                    "contents" to manifestContents(),
                 ),
             defs = defs("instant", "path"),
+        )
+
+    private fun manifestScope() =
+        obj(
+            listOf("complete"),
+            "complete" to bool(),
+            "dateRange" to obj(emptyList(), "from" to ref("instant"), "to" to ref("instant")),
+            "omitted" to
+                array(
+                    obj(
+                        listOf("category", "reason"),
+                        "category" to enumOf(ArchiveCategory.serializer()),
+                        "reason" to enumOf(ArchiveOmissionReason.serializer()),
+                    ),
+                ),
+        )
+
+    private fun manifestCounts() =
+        obj(
+            listOf("journals", "notes", "drafts", "media", "places", "locationSamples", "hasProfile"),
+            "journals" to count(),
+            "notes" to count(),
+            "drafts" to count(),
+            "media" to count(),
+            "places" to count(),
+            "locationSamples" to count(),
+            "hasProfile" to bool(),
+        )
+
+    private fun manifestContents() =
+        array(
+            obj(
+                listOf("role", "path", "mediaType"),
+                "role" to enumOf(ArchiveRole.serializer()),
+                "path" to ref("path"),
+                "mediaType" to string(minLength = 1),
+                "schema" to ref("path"),
+            ),
         )
 
     private fun journals() =
