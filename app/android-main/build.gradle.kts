@@ -277,6 +277,11 @@ extensions.configure<ApplicationExtension> {
                 "proguard-rules.pro",
             )
             isDebuggable = false
+            // Debug-signed release builds (CI's R8 check) never ship, so their
+            // mapping files must not reach Crashlytics.
+            configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
+                mappingFileUploadEnabled = !allowDebugReleaseSigning
+            }
             signingConfig =
                 if (!releaseTaskRequested ||
                     baselineProfileRequested ||
