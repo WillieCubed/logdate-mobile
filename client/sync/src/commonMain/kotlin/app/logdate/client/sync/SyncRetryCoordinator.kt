@@ -9,6 +9,8 @@ import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -45,12 +47,66 @@ internal class SyncRetryCoordinator(
         return Clock.System.now().toEpochMilliseconds() >= nextAttemptAt
     }
 
+    /**
+     * Records that an upload of [pending] is about to start, before anything that could take the app
+     * down with it. Returns `null` to go ahead, or the error to report instead of attempting it.
+     *
+     * An upload that crashes the app never gets as far as [handleRetryFailure], so without this the
+     * same entry is first in the queue every time the app comes back and crashes it again, for ever.
+     * One unfinished attempt is not proof of that -- the system or the user may have closed the app
+     * -- so it is tried again; a second one sets the entry aside in Sync Issues.
+     */
+    suspend fun beginUpload(
+        entityType: EntityType,
+        pending: PendingUpload,
+    ): SyncError? {
+        val unfinished = retryScheduleStore.beginAttempt(entityType, pending.entityId)
+        if (unfinished < MAX_UNFINISHED_ATTEMPTS) {
+            if (unfinished > 0) {
+                Napier.w("The last upload of ${entityType.name} ${pending.entityId} never finished; trying it again")
+            }
+            attemptsInFlight.add(PendingEntityKey(entityType, pending.entityId))
+            return null
+        }
+
+        val error = InterruptedUploadException(unfinished)
+        handleRetryFailure(entityType, pending, error, permanent = true)
+        Napier.e("Set aside ${entityType.name} ${pending.entityId}", error)
+        return SyncError(
+            SyncErrorType.UNKNOWN_ERROR,
+            "Set aside ${entityType.name.lowercase()} ${pending.entityId}: ${error.message}",
+            error,
+            retryable = false,
+        )
+    }
+
+    /**
+     * Lets go of every attempt started by [beginUpload] that has not finished, for a sync that was
+     * stopped rather than crashed. Being stopped says nothing about the entry being uploaded, so it
+     * must not count towards setting that entry aside.
+     */
+    suspend fun abandonAttemptsInFlight() {
+        withContext(NonCancellable) {
+            attemptsInFlight.forEach { retryScheduleStore.endAttempt(it.entityType, it.entityId) }
+            attemptsInFlight.clear()
+        }
+    }
+
+    private suspend fun endAttempt(
+        entityType: EntityType,
+        entityId: String,
+    ) {
+        retryScheduleStore.endAttempt(entityType, entityId)
+        attemptsInFlight.remove(PendingEntityKey(entityType, entityId))
+    }
+
     suspend fun handleRetryFailure(
         entityType: EntityType,
         pending: PendingUpload,
         error: Throwable,
         permanent: Boolean = false,
     ): Boolean {
+        endAttempt(entityType, pending.entityId)
         val nextRetryCount = pending.retryCount + 1
         syncMetadataService.incrementRetryCount(pending.entityId, entityType)
         // Record *after* the caller has already read the prior state to compute [permanent] --
@@ -121,6 +177,9 @@ internal class SyncRetryCoordinator(
      */
     private val entitiesLastFailedOnMissingMedia = mutableSetOf<PendingEntityKey>()
 
+    /** Attempts [beginUpload] started in this process that have not finished yet. */
+    private val attemptsInFlight = mutableSetOf<PendingEntityKey>()
+
     /** Whether the failure immediately preceding this one for [entityId] was [MissingMediaException]. */
     fun previousFailureWasMissingMedia(
         entityType: EntityType,
@@ -164,6 +223,7 @@ internal class SyncRetryCoordinator(
     ) {
         syncMetadataService.markAsSynced(entityId, entityType, syncedAt, version)
         retryScheduleStore.clear(entityType, entityId)
+        attemptsInFlight.remove(PendingEntityKey(entityType, entityId))
         clearFailureKind(entityType, entityId)
     }
 
@@ -252,7 +312,15 @@ internal class SyncRetryCoordinator(
     private companion object {
         const val MAX_RETRY_ATTEMPTS = 9
 
+        /** Consecutive attempts that never finished before an entry is set aside. */
+        const val MAX_UNFINISHED_ATTEMPTS = 2
+
         /** How long a dead-lettered entry waits before it is quietly tried again. */
         const val DEAD_LETTER_RETRY_INTERVAL_MS = 24L * 60 * 60 * 1000
     }
 }
+
+/** Earlier upload attempts at an entry never finished, because the app closed during each one. */
+class InterruptedUploadException(
+    unfinishedAttempts: Int,
+) : Exception("LogDate closed while uploading this entry, $unfinishedAttempts times in a row")

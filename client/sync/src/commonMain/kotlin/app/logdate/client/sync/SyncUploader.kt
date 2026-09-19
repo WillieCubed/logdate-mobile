@@ -24,6 +24,7 @@ import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.shared.model.sync.DeviceId
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.first
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -67,8 +68,28 @@ internal class SyncUploader(
     private suspend fun List<PendingUpload>.dueNow(entityType: EntityType): List<PendingUpload> =
         filter { retryCoordinator.shouldAttempt(entityType, it.entityId) }
 
+    /**
+     * Runs one upload pass, reporting an unexpected failure as a [SyncResult] for [operation]. A pass
+     * that is stopped lets go of the attempts it started, so being stopped never counts against the
+     * entries it was uploading.
+     */
+    private suspend inline fun uploadPass(
+        operation: String,
+        pass: () -> SyncResult,
+    ): SyncResult =
+        try {
+            pass()
+        } catch (e: CancellationException) {
+            retryCoordinator.abandonAttemptsInFlight()
+            throw e
+        } catch (e: CloudApiException) {
+            mapCloudApiError(e)
+        } catch (e: Exception) {
+            mapException(e, operation)
+        }
+
     suspend fun uploadJournals(accessToken: String): SyncResult {
-        return try {
+        return uploadPass("Upload journals") {
             var uploadedCount = 0
             val errors = mutableListOf<SyncError>()
             val pendingUploads = syncMetadataService.getPendingUploads(EntityType.JOURNAL).dueNow(EntityType.JOURNAL)
@@ -91,6 +112,7 @@ internal class SyncUploader(
 
                 when (pending.operation) {
                     PendingOperation.DELETE -> {
+                        if (!retryCoordinator.beginAttempt(EntityType.JOURNAL, pending, errors)) continue
                         val result =
                             tokenRefresher.withFreshToken(
                                 { token -> cloudJournalDataSource.deleteJournal(token, journalId) },
@@ -141,6 +163,7 @@ internal class SyncUploader(
                             continue
                         }
 
+                        if (!retryCoordinator.beginAttempt(EntityType.JOURNAL, pending, errors)) continue
                         val result =
                             if (pending.operation == PendingOperation.CREATE) {
                                 tokenRefresher.withFreshToken(
@@ -205,15 +228,11 @@ internal class SyncUploader(
             }
 
             SyncResult(success = errors.isEmpty(), uploadedItems = uploadedCount, errors = errors)
-        } catch (e: CloudApiException) {
-            mapCloudApiError(e)
-        } catch (e: Exception) {
-            mapException(e, "Upload journals")
         }
     }
 
     suspend fun uploadContent(accessToken: String): SyncResult {
-        return try {
+        return uploadPass("Upload content") {
             var uploadedCount = 0
             val errors = mutableListOf<SyncError>()
             setMediaDeferredForNetwork(false)
@@ -238,6 +257,7 @@ internal class SyncUploader(
 
                 when (pending.operation) {
                     PendingOperation.DELETE -> {
+                        if (!retryCoordinator.beginAttempt(EntityType.NOTE, pending, errors)) continue
                         val result =
                             tokenRefresher.withFreshToken(
                                 { token -> cloudContentDataSource.deleteNote(token, noteId) },
@@ -290,72 +310,73 @@ internal class SyncUploader(
                             continue
                         }
                         val mediaRef = note.mediaRefOrNull()
+                        val needsMediaUpload = mediaRef != null && !mediaTransfer.isRemoteRef(mediaRef)
+                        if (needsMediaUpload && !dataUsagePolicy.currentMode().shouldSyncMedia()) {
+                            setMediaDeferredForNetwork(true)
+                            Napier.d("Deferring media upload for note ${note.uid} — data usage policy restricts media sync")
+                            continue
+                        }
+
+                        if (!retryCoordinator.beginAttempt(EntityType.NOTE, pending, errors)) continue
                         val uploadReadyNote =
-                            if (mediaRef != null && !mediaTransfer.isRemoteRef(mediaRef)) {
-                                if (!dataUsagePolicy.currentMode().shouldSyncMedia()) {
-                                    setMediaDeferredForNetwork(true)
-                                    Napier.d("Deferring media upload for note ${note.uid} — data usage policy restricts media sync")
-                                    continue
-                                } else {
-                                    val mediaUpload = mediaTransfer.uploadIfNeeded(accessToken, note)
-                                    if (mediaUpload.isFailure) {
-                                        val error =
-                                            mediaUpload.exceptionOrNull()
-                                                ?: Exception("Unknown media upload error")
-                                        // This used to `continue` without recording an attempt, so a
-                                        // note whose media file no longer exists on disk retried for
-                                        // ever and held the whole queue behind it - the upload can
-                                        // never succeed, because the bytes are gone. Counting the
-                                        // attempt lets it dead-letter like any other stuck upload,
-                                        // where it dead-letters silently -- there is currently no UI
-                                        // surfacing dead-lettered items for review.
-                                        //
-                                        // A single existence check isn't proof of that, though --
-                                        // MediaManager.exists() answers false for a provider that
-                                        // merely failed to answer, not only for bytes truly gone
-                                        // (see its doc comment). Only treat this as permanent once
-                                        // the *immediately preceding* attempt for this same note was
-                                        // also a missing-media miss -- not merely once its generic,
-                                        // shared retryCount happens to be >= 1, which an unrelated
-                                        // failure (network, server, ...) could have put there -- so
-                                        // one bad read doesn't wrongly bury a file that's still there.
-                                        val movedToDeadLetter =
-                                            retryCoordinator.handleRetryFailure(
-                                                entityType = EntityType.NOTE,
-                                                pending = pending,
-                                                error = error,
-                                                permanent =
-                                                    error is MediaTooLargeException ||
-                                                        (
-                                                            error is MissingMediaException &&
-                                                                retryCoordinator.previousFailureWasMissingMedia(
-                                                                    EntityType.NOTE,
-                                                                    pending.entityId,
-                                                                )
-                                                        ),
-                                            )
-                                        errors.add(
-                                            SyncError(
-                                                // STORAGE_ERROR renders as "Cloud storage is full",
-                                                // which is a lie for a file missing from this device
-                                                // and sends the user to a billing page for a local
-                                                // problem. Only a real server-side storage refusal
-                                                // earns that message.
-                                                if (error is MissingMediaException) {
-                                                    SyncErrorType.UNKNOWN_ERROR
-                                                } else {
-                                                    SyncErrorType.STORAGE_ERROR
-                                                },
-                                                "Failed to upload media for note ${note.uid}: ${error.message}",
-                                                error,
-                                                retryable = !movedToDeadLetter,
-                                            ),
+                            if (needsMediaUpload) {
+                                val mediaUpload = mediaTransfer.uploadIfNeeded(accessToken, note)
+                                if (mediaUpload.isFailure) {
+                                    val error =
+                                        mediaUpload.exceptionOrNull()
+                                            ?: Exception("Unknown media upload error")
+                                    // This used to `continue` without recording an attempt, so a
+                                    // note whose media file no longer exists on disk retried for
+                                    // ever and held the whole queue behind it - the upload can
+                                    // never succeed, because the bytes are gone. Counting the
+                                    // attempt lets it dead-letter into Sync Issues like any other
+                                    // stuck upload.
+                                    //
+                                    // A single existence check isn't proof of that, though --
+                                    // MediaManager.exists() answers false for a provider that
+                                    // merely failed to answer, not only for bytes truly gone
+                                    // (see its doc comment). Only treat this as permanent once
+                                    // the *immediately preceding* attempt for this same note was
+                                    // also a missing-media miss -- not merely once its generic,
+                                    // shared retryCount happens to be >= 1, which an unrelated
+                                    // failure (network, server, ...) could have put there -- so
+                                    // one bad read doesn't wrongly bury a file that's still there.
+                                    val movedToDeadLetter =
+                                        retryCoordinator.handleRetryFailure(
+                                            entityType = EntityType.NOTE,
+                                            pending = pending,
+                                            error = error,
+                                            permanent =
+                                                error is MediaTooLargeException ||
+                                                    (
+                                                        error is MissingMediaException &&
+                                                            retryCoordinator.previousFailureWasMissingMedia(
+                                                                EntityType.NOTE,
+                                                                pending.entityId,
+                                                            )
+                                                    ),
                                         )
-                                        Napier.w("Skipping note ${note.uid} sync; media upload failed", error)
-                                        continue
-                                    }
-                                    mediaUpload.getOrThrow()
+                                    errors.add(
+                                        SyncError(
+                                            // STORAGE_ERROR renders as "Cloud storage is full",
+                                            // which is a lie for a file missing from this device
+                                            // and sends the user to a billing page for a local
+                                            // problem. Only a real server-side storage refusal
+                                            // earns that message.
+                                            if (error is MissingMediaException) {
+                                                SyncErrorType.UNKNOWN_ERROR
+                                            } else {
+                                                SyncErrorType.STORAGE_ERROR
+                                            },
+                                            "Failed to upload media for note ${note.uid}: ${error.message}",
+                                            error,
+                                            retryable = !movedToDeadLetter,
+                                        ),
+                                    )
+                                    Napier.w("Skipping note ${note.uid} sync; media upload failed", error)
+                                    continue
                                 }
+                                mediaUpload.getOrThrow()
                             } else {
                                 note
                             }
@@ -424,15 +445,11 @@ internal class SyncUploader(
             }
 
             SyncResult(success = errors.isEmpty(), uploadedItems = uploadedCount, errors = errors)
-        } catch (e: CloudApiException) {
-            mapCloudApiError(e)
-        } catch (e: Exception) {
-            mapException(e, "Upload content")
         }
     }
 
     suspend fun uploadAssociations(accessToken: String): SyncResult {
-        return try {
+        return uploadPass("Upload associations") {
             var uploadedCount = 0
             val errors = mutableListOf<SyncError>()
 
@@ -456,6 +473,7 @@ internal class SyncUploader(
                     errors.add(retryCoordinator.recordUnparsableOutboxEntry(EntityType.ASSOCIATION, pending.entityId, "association key"))
                     return@forEach
                 }
+                if (!retryCoordinator.beginAttempt(EntityType.ASSOCIATION, pending, errors)) return@forEach
 
                 val association =
                     JournalContentAssociation(
@@ -545,15 +563,11 @@ internal class SyncUploader(
             }
 
             SyncResult(success = errors.isEmpty(), uploadedItems = uploadedCount, errors = errors)
-        } catch (e: CloudApiException) {
-            mapCloudApiError(e)
-        } catch (e: Exception) {
-            mapException(e, "Upload associations")
         }
     }
 
     suspend fun uploadDrafts(accessToken: String): SyncResult {
-        return try {
+        return uploadPass("Upload drafts") {
             var uploadedCount = 0
             val errors = mutableListOf<SyncError>()
             val pendingUploads = syncMetadataService.getPendingUploads(EntityType.DRAFT).dueNow(EntityType.DRAFT)
@@ -573,6 +587,7 @@ internal class SyncUploader(
 
                 when (pending.operation) {
                     PendingOperation.DELETE -> {
+                        if (!retryCoordinator.beginAttempt(EntityType.DRAFT, pending, errors)) continue
                         val result =
                             tokenRefresher.withFreshToken(
                                 { token -> cloudDraftDataSource.deleteDraft(token, draftId) },
@@ -605,6 +620,7 @@ internal class SyncUploader(
                             continue
                         }
 
+                        if (!retryCoordinator.beginAttempt(EntityType.DRAFT, pending, errors)) continue
                         val result =
                             tokenRefresher.withFreshToken(
                                 { token -> cloudDraftDataSource.uploadDraft(token, draft, deviceId) },
@@ -632,10 +648,6 @@ internal class SyncUploader(
             }
 
             SyncResult(success = errors.isEmpty(), uploadedItems = uploadedCount, errors = errors)
-        } catch (e: CloudApiException) {
-            mapCloudApiError(e)
-        } catch (e: Exception) {
-            mapException(e, "Upload drafts")
         }
     }
 
@@ -692,4 +704,19 @@ internal class SyncUploader(
             Napier.w("Could not queue existing entries for the first sync", error)
         }
     }
+}
+
+/**
+ * Records that an upload of [pending] is starting, before anything that could take the app down with
+ * it. Returns false when earlier attempts never finished and the entry has been set aside instead,
+ * with the reason added to [errors].
+ */
+private suspend fun SyncRetryCoordinator.beginAttempt(
+    entityType: EntityType,
+    pending: PendingUpload,
+    errors: MutableList<SyncError>,
+): Boolean {
+    val setAside = beginUpload(entityType, pending) ?: return true
+    errors.add(setAside)
+    return false
 }

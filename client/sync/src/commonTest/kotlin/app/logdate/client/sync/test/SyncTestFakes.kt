@@ -1234,6 +1234,7 @@ class InMemorySyncDeadLetterStore : SyncDeadLetterStore {
 
 class InMemorySyncRetryScheduleStore : SyncRetryScheduleStore {
     private val schedule = mutableMapOf<String, Long>()
+    private val unfinishedAttempts = mutableMapOf<String, Int>()
 
     override suspend fun nextAttemptAt(
         entityType: EntityType,
@@ -1253,5 +1254,23 @@ class InMemorySyncRetryScheduleStore : SyncRetryScheduleStore {
         entityId: String,
     ) {
         schedule.remove("${entityType.name}:$entityId")
+        unfinishedAttempts.remove("${entityType.name}:$entityId")
+    }
+
+    override suspend fun beginAttempt(
+        entityType: EntityType,
+        entityId: String,
+    ): Int {
+        val key = "${entityType.name}:$entityId"
+        val unfinished = unfinishedAttempts[key] ?: 0
+        unfinishedAttempts[key] = unfinished + 1
+        return unfinished
+    }
+
+    override suspend fun endAttempt(
+        entityType: EntityType,
+        entityId: String,
+    ) {
+        unfinishedAttempts.remove("${entityType.name}:$entityId")
     }
 }

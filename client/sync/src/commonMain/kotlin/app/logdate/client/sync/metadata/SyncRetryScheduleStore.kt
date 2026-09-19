@@ -14,7 +14,24 @@ interface SyncRetryScheduleStore {
         timestamp: Long,
     )
 
+    /** Forgets the entity's retry schedule and any attempt still recorded as started. */
     suspend fun clear(
+        entityType: EntityType,
+        entityId: String,
+    )
+
+    /**
+     * Records that an upload attempt at this entity is starting, and returns how many earlier
+     * attempts started and never finished. Stored durably, so an attempt that ends with the
+     * process dying is still counted when the app next runs.
+     */
+    suspend fun beginAttempt(
+        entityType: EntityType,
+        entityId: String,
+    ): Int
+
+    /** Records that the attempt started by [beginAttempt] finished, whatever its outcome. */
+    suspend fun endAttempt(
         entityType: EntityType,
         entityId: String,
     )
@@ -45,10 +62,33 @@ class KeyValueSyncRetryScheduleStore(
         entityId: String,
     ) {
         storage.remove(key(entityType, entityId))
+        storage.remove(inFlightKey(entityType, entityId))
+    }
+
+    override suspend fun beginAttempt(
+        entityType: EntityType,
+        entityId: String,
+    ): Int {
+        val key = inFlightKey(entityType, entityId)
+        val unfinished = storage.getLong(key, 0L).toInt()
+        storage.putLong(key, unfinished + 1L)
+        return unfinished
+    }
+
+    override suspend fun endAttempt(
+        entityType: EntityType,
+        entityId: String,
+    ) {
+        storage.remove(inFlightKey(entityType, entityId))
     }
 
     private fun key(
         entityType: EntityType,
         entityId: String,
     ): String = "sync_retry_${entityType.name}_$entityId"
+
+    private fun inFlightKey(
+        entityType: EntityType,
+        entityId: String,
+    ): String = "sync_inflight_${entityType.name}_$entityId"
 }
