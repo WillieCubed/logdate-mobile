@@ -167,7 +167,7 @@ fun InContext_Pending_12_items_offline_or_backoff() {
 @ScreenshotPreviewMatrix
 @Composable
 fun InContext_NetworkError_with_pending() {
-    // Quiet failure — chip with cloud-off glyph, no banner.
+    // Entries waiting after a failed sync: chip, plus a banner that opens the list of them.
     TimelineWithSync(SyncPresentation.NetworkError(pendingCount = 4))
 }
 

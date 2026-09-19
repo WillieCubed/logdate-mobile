@@ -44,8 +44,9 @@ sealed class SyncPresentation {
     ) : SyncPresentation()
 
     /**
-     * A transient network error. Treated as quiet — surfaced as a chip, never a banner. The
-     * runtime retries automatically; the chip gives the user agency without alarming them.
+     * A network error. The runtime retries automatically, so the error itself is a chip. Once
+     * entries are waiting to back up, a banner also offers the list of them, since that is the
+     * one thing the user can act on.
      */
     data class NetworkError(
         val pendingCount: Int,
