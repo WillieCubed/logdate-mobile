@@ -1,6 +1,7 @@
 package app.logdate.feature.core.restore
 
 import app.logdate.client.domain.export.ExportFileStructure
+import app.logdate.client.domain.restore.ArchiveRoot
 import app.logdate.client.domain.restore.MediaImporter
 import app.logdate.client.domain.restore.RestoreBundle
 import app.logdate.client.domain.restore.RestoreOptions
@@ -134,7 +135,8 @@ class DesktopRestoreLauncher :
     private fun extractMetadata(file: File): String? {
         return try {
             ZipFile(file).use { zip ->
-                val entry = zip.getEntry(ExportFileStructure.METADATA_FILE) ?: return null
+                val root = archiveRoot(zip) ?: return null
+                val entry = zip.getEntry(root + ExportFileStructure.METADATA_FILE) ?: return null
                 zip.getInputStream(entry).use { input ->
                     input.bufferedReader(Charsets.UTF_8).readText()
                 }
@@ -154,24 +156,25 @@ class DesktopRestoreLauncher :
             updateProgress(RestoreStage.OPENING_ARCHIVE.toProgressInfo())
 
             updateProgress(RestoreStage.READING_CONTENTS.toProgressInfo())
+            val root = archiveRoot(zipFile).orEmpty()
             val bundle =
                 RestoreBundle(
-                    metadataJson = readRequiredEntry(zipFile, ExportFileStructure.METADATA_FILE),
-                    journalsJson = readRequiredEntry(zipFile, ExportFileStructure.JOURNALS_FILE),
-                    notesJson = readRequiredEntry(zipFile, ExportFileStructure.NOTES_FILE),
-                    journalNotesJson = readRequiredEntry(zipFile, ExportFileStructure.JOURNAL_NOTES_FILE),
-                    draftsJson = readRequiredEntry(zipFile, ExportFileStructure.DRAFTS_FILE),
-                    profileJson = readOptionalEntry(zipFile, ExportFileStructure.PROFILE_FILE),
-                    placesJson = readOptionalEntry(zipFile, ExportFileStructure.PLACES_FILE),
-                    locationHistoryJson = readOptionalEntry(zipFile, ExportFileStructure.LOCATION_HISTORY_FILE),
-                    mediaManifestJson = readOptionalEntry(zipFile, ExportFileStructure.MEDIA_MANIFEST_FILE),
+                    metadataJson = readRequiredEntry(zipFile, root + ExportFileStructure.METADATA_FILE),
+                    journalsJson = readRequiredEntry(zipFile, root + ExportFileStructure.JOURNALS_FILE),
+                    notesJson = readRequiredEntry(zipFile, root + ExportFileStructure.NOTES_FILE),
+                    journalNotesJson = readRequiredEntry(zipFile, root + ExportFileStructure.JOURNAL_NOTES_FILE),
+                    draftsJson = readRequiredEntry(zipFile, root + ExportFileStructure.DRAFTS_FILE),
+                    profileJson = readOptionalEntry(zipFile, root + ExportFileStructure.PROFILE_FILE),
+                    placesJson = readOptionalEntry(zipFile, root + ExportFileStructure.PLACES_FILE),
+                    locationHistoryJson = readOptionalEntry(zipFile, root + ExportFileStructure.LOCATION_HISTORY_FILE),
+                    mediaManifestJson = readOptionalEntry(zipFile, root + ExportFileStructure.MEDIA_MANIFEST_FILE),
                 )
 
             val mediaImporter =
                 if (options.includeMedia) {
                     object : MediaImporter {
                         override suspend fun importMedia(exportPath: String): String? =
-                            this@DesktopRestoreLauncher.importMedia(zipFile, exportPath)
+                            this@DesktopRestoreLauncher.importMedia(zipFile, root, exportPath)
                     }
                 } else {
                     null
@@ -192,6 +195,11 @@ class DesktopRestoreLauncher :
                 )
             return result.toSummary(source = file.name)
         }
+    }
+
+    private fun archiveRoot(zipFile: ZipFile): String? {
+        val entryNames = zipFile.entries().toList().map { it.name }
+        return ArchiveRoot.find(entryNames, ExportFileStructure.METADATA_FILE)
     }
 
     private fun readRequiredEntry(
@@ -218,10 +226,11 @@ class DesktopRestoreLauncher :
 
     private suspend fun importMedia(
         zipFile: ZipFile,
+        root: String,
         exportPath: String,
     ): String? {
         val normalizedPath = exportPath.trimStart('/')
-        val entry = zipFile.getEntry(normalizedPath)
+        val entry = zipFile.getEntry(root + normalizedPath)
         if (entry == null) {
             Napier.w("Desktop: Media file not found in archive at path: $exportPath")
             return null

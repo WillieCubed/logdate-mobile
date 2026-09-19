@@ -13,6 +13,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.export.ExportFormat
+import app.logdate.client.domain.restore.ArchiveRoot
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -314,7 +315,11 @@ class AndroidRestoreLauncher(
     private fun extractMetadata(uri: Uri): String? =
         try {
             withRandomAccessZip(uri) { zip ->
-                val entry = zip.getEntry(ExportFileStructure.METADATA_FILE) ?: return@withRandomAccessZip null
+                val entryNames = zip.entries().toList().map { it.name }
+                val root =
+                    ArchiveRoot.find(entryNames, ExportFileStructure.METADATA_FILE)
+                        ?: return@withRandomAccessZip null
+                val entry = zip.getEntry(root + ExportFileStructure.METADATA_FILE) ?: return@withRandomAccessZip null
                 zip.getInputStream(entry).use { it.bufferedReader(Charsets.UTF_8).readText() }
             }
         } catch (e: Exception) {

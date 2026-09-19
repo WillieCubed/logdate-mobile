@@ -1,6 +1,7 @@
 package app.logdate.feature.core.restore
 
 import app.logdate.client.domain.export.ExportFileStructure
+import app.logdate.client.domain.restore.ArchiveRoot
 import app.logdate.client.domain.restore.MediaImporter
 import app.logdate.client.domain.restore.RestoreBundle
 import app.logdate.client.domain.restore.RestoreOptions
@@ -167,7 +168,8 @@ class IosRestoreLauncher(
     private fun extractMetadata(path: String): String? =
         try {
             val zipFileSystem = FileSystem.SYSTEM.openZip(path.toPath())
-            readOptionalEntry(zipFileSystem, ExportFileStructure.METADATA_FILE)
+            val root = findArchiveRoot(zipFileSystem) ?: return null
+            readOptionalEntry(zipFileSystem, root + ExportFileStructure.METADATA_FILE)
         } catch (e: Exception) {
             Napier.e("iOS: Failed to extract metadata", e)
             null
@@ -182,24 +184,25 @@ class IosRestoreLauncher(
 
         val zipFileSystem = FileSystem.SYSTEM.openZip(path.toPath())
         updateProgress(RestoreStage.READING_CONTENTS.toProgressInfo())
+        val root = findArchiveRoot(zipFileSystem).orEmpty()
         val bundle =
             RestoreBundle(
-                metadataJson = readRequiredEntry(zipFileSystem, ExportFileStructure.METADATA_FILE),
-                journalsJson = readRequiredEntry(zipFileSystem, ExportFileStructure.JOURNALS_FILE),
-                notesJson = readRequiredEntry(zipFileSystem, ExportFileStructure.NOTES_FILE),
-                journalNotesJson = readRequiredEntry(zipFileSystem, ExportFileStructure.JOURNAL_NOTES_FILE),
-                draftsJson = readRequiredEntry(zipFileSystem, ExportFileStructure.DRAFTS_FILE),
-                profileJson = readOptionalEntry(zipFileSystem, ExportFileStructure.PROFILE_FILE),
-                placesJson = readOptionalEntry(zipFileSystem, ExportFileStructure.PLACES_FILE),
-                locationHistoryJson = readOptionalEntry(zipFileSystem, ExportFileStructure.LOCATION_HISTORY_FILE),
-                mediaManifestJson = readOptionalEntry(zipFileSystem, ExportFileStructure.MEDIA_MANIFEST_FILE),
+                metadataJson = readRequiredEntry(zipFileSystem, root + ExportFileStructure.METADATA_FILE),
+                journalsJson = readRequiredEntry(zipFileSystem, root + ExportFileStructure.JOURNALS_FILE),
+                notesJson = readRequiredEntry(zipFileSystem, root + ExportFileStructure.NOTES_FILE),
+                journalNotesJson = readRequiredEntry(zipFileSystem, root + ExportFileStructure.JOURNAL_NOTES_FILE),
+                draftsJson = readRequiredEntry(zipFileSystem, root + ExportFileStructure.DRAFTS_FILE),
+                profileJson = readOptionalEntry(zipFileSystem, root + ExportFileStructure.PROFILE_FILE),
+                placesJson = readOptionalEntry(zipFileSystem, root + ExportFileStructure.PLACES_FILE),
+                locationHistoryJson = readOptionalEntry(zipFileSystem, root + ExportFileStructure.LOCATION_HISTORY_FILE),
+                mediaManifestJson = readOptionalEntry(zipFileSystem, root + ExportFileStructure.MEDIA_MANIFEST_FILE),
             )
 
         val mediaImporter =
             if (options.includeMedia) {
                 object : MediaImporter {
                     override suspend fun importMedia(exportPath: String): String? =
-                        this@IosRestoreLauncher.importMedia(zipFileSystem, exportPath)
+                        this@IosRestoreLauncher.importMedia(zipFileSystem, root, exportPath)
                 }
             } else {
                 null
@@ -240,12 +243,23 @@ class IosRestoreLauncher(
         return zipFileSystem.source(entryPath).buffer().readUtf8()
     }
 
+    private fun findArchiveRoot(zipFileSystem: FileSystem): String? {
+        val fileNames =
+            zipFileSystem
+                .listRecursively("/".toPath())
+                .filter { zipFileSystem.metadata(it).isRegularFile }
+                .map { it.toString().trimStart('/') }
+                .toList()
+        return ArchiveRoot.find(fileNames, ExportFileStructure.METADATA_FILE)
+    }
+
     private suspend fun importMedia(
         zipFileSystem: FileSystem,
+        root: String,
         exportPath: String,
     ): String? {
         val normalizedPath = exportPath.trimStart('/')
-        val entryPath = normalizedPath.toPath()
+        val entryPath = (root + normalizedPath).toPath()
         val metadata = zipFileSystem.metadataOrNull(entryPath)
         if (metadata == null) {
             Napier.w("iOS: Media file not found in archive at path: $exportPath")

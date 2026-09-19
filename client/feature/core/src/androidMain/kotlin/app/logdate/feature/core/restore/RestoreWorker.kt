@@ -9,6 +9,7 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import app.logdate.client.domain.export.ExportFileStructure
+import app.logdate.client.domain.restore.ArchiveRoot
 import app.logdate.client.domain.restore.MediaImporter
 import app.logdate.client.domain.restore.RestoreBundle
 import app.logdate.client.domain.restore.RestoreOptions
@@ -83,17 +84,18 @@ class RestoreWorker(
         return try {
             emitProgress(RestoreStage.READING_CONTENTS, 20)
 
+            val root = archiveRoot(zipFile).orEmpty()
             val bundle =
                 RestoreBundle(
-                    metadataJson = readRequiredEntry(zipFile, ExportFileStructure.METADATA_FILE),
-                    journalsJson = readRequiredEntry(zipFile, ExportFileStructure.JOURNALS_FILE),
-                    notesJson = readRequiredEntry(zipFile, ExportFileStructure.NOTES_FILE),
-                    journalNotesJson = readRequiredEntry(zipFile, ExportFileStructure.JOURNAL_NOTES_FILE),
-                    draftsJson = readRequiredEntry(zipFile, ExportFileStructure.DRAFTS_FILE),
-                    profileJson = readOptionalEntry(zipFile, ExportFileStructure.PROFILE_FILE),
-                    placesJson = readOptionalEntry(zipFile, ExportFileStructure.PLACES_FILE),
-                    locationHistoryJson = readOptionalEntry(zipFile, ExportFileStructure.LOCATION_HISTORY_FILE),
-                    mediaManifestJson = readOptionalEntry(zipFile, ExportFileStructure.MEDIA_MANIFEST_FILE),
+                    metadataJson = readRequiredEntry(zipFile, root + ExportFileStructure.METADATA_FILE),
+                    journalsJson = readRequiredEntry(zipFile, root + ExportFileStructure.JOURNALS_FILE),
+                    notesJson = readRequiredEntry(zipFile, root + ExportFileStructure.NOTES_FILE),
+                    journalNotesJson = readRequiredEntry(zipFile, root + ExportFileStructure.JOURNAL_NOTES_FILE),
+                    draftsJson = readRequiredEntry(zipFile, root + ExportFileStructure.DRAFTS_FILE),
+                    profileJson = readOptionalEntry(zipFile, root + ExportFileStructure.PROFILE_FILE),
+                    placesJson = readOptionalEntry(zipFile, root + ExportFileStructure.PLACES_FILE),
+                    locationHistoryJson = readOptionalEntry(zipFile, root + ExportFileStructure.LOCATION_HISTORY_FILE),
+                    mediaManifestJson = readOptionalEntry(zipFile, root + ExportFileStructure.MEDIA_MANIFEST_FILE),
                 )
 
             emitProgress(RestoreStage.RESTORING_JOURNALS, 40)
@@ -101,7 +103,8 @@ class RestoreWorker(
             val mediaImporter =
                 if (includeMedia) {
                     object : MediaImporter {
-                        override suspend fun importMedia(exportPath: String): String? = this@RestoreWorker.importMedia(zipFile, exportPath)
+                        override suspend fun importMedia(exportPath: String): String? =
+                            this@RestoreWorker.importMedia(zipFile, root, exportPath)
                     }
                 } else {
                     null
@@ -191,6 +194,11 @@ class RestoreWorker(
         }
     }
 
+    private fun archiveRoot(zipFile: ZipFile): String? {
+        val entryNames = zipFile.entries().toList().map { it.name }
+        return ArchiveRoot.find(entryNames, ExportFileStructure.METADATA_FILE)
+    }
+
     private fun readRequiredEntry(
         zipFile: ZipFile,
         entryName: String,
@@ -215,10 +223,11 @@ class RestoreWorker(
 
     private suspend fun importMedia(
         zipFile: ZipFile,
+        root: String,
         exportPath: String,
     ): String? {
         val normalizedPath = exportPath.trimStart('/')
-        val entry = zipFile.getEntry(normalizedPath)
+        val entry = zipFile.getEntry(root + normalizedPath)
         if (entry == null) {
             Napier.w("Media file not found in archive at path: $exportPath")
             return null
