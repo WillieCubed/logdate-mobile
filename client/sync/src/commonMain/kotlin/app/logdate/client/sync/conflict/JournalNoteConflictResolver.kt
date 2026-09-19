@@ -2,14 +2,41 @@ package app.logdate.client.sync.conflict
 
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.journals.withTimeZoneId
 import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
  * Conflict resolver for notes that attempts content-safe merges before deferring to manual review.
+ *
+ * A note's capture time zone is set once, where the note was captured, and never edited. Whichever
+ * copy wins, the resolved note keeps a zone that either copy carries: a copy from an app version or
+ * server that predates the field must not erase it.
  */
 class JournalNoteConflictResolver : ConflictResolver<JournalNote> {
     override fun resolve(
+        local: JournalNote,
+        remote: JournalNote,
+        localTimestamp: Instant,
+        remoteTimestamp: Instant,
+    ): ConflictResolution<JournalNote> {
+        val zone = local.timeZoneId ?: remote.timeZoneId
+        val resolution = resolveContent(local, remote.withZoneIfMissing(local.timeZoneId), localTimestamp, remoteTimestamp)
+        return resolution.withZoneFallback(zone)
+    }
+
+    private fun JournalNote.withZoneIfMissing(timeZoneId: String?): JournalNote =
+        if (this.timeZoneId == null && timeZoneId != null) withTimeZoneId(timeZoneId) else this
+
+    private fun ConflictResolution<JournalNote>.withZoneFallback(timeZoneId: String?): ConflictResolution<JournalNote> =
+        when (this) {
+            is ConflictResolution.KeepLocal -> ConflictResolution.KeepLocal(value.withZoneIfMissing(timeZoneId))
+            is ConflictResolution.KeepRemote -> ConflictResolution.KeepRemote(value.withZoneIfMissing(timeZoneId))
+            is ConflictResolution.Merge -> ConflictResolution.Merge(merged.withZoneIfMissing(timeZoneId))
+            is ConflictResolution.RequiresManualResolution -> this
+        }
+
+    private fun resolveContent(
         local: JournalNote,
         remote: JournalNote,
         localTimestamp: Instant,

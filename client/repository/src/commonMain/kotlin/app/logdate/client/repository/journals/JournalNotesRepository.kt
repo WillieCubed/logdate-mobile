@@ -302,3 +302,12 @@ fun JournalNote.mediaRefOrNull(): String? =
         is JournalNote.Video -> mediaRef
         is JournalNote.Text -> null
     }
+
+/** A copy of this note with [timeZoneId] as its capture time zone; everything else is unchanged. */
+fun JournalNote.withTimeZoneId(timeZoneId: String?): JournalNote =
+    when (this) {
+        is JournalNote.Text -> copy(timeZoneId = timeZoneId)
+        is JournalNote.Image -> copy(timeZoneId = timeZoneId)
+        is JournalNote.Video -> copy(timeZoneId = timeZoneId)
+        is JournalNote.Audio -> copy(timeZoneId = timeZoneId)
+    }
