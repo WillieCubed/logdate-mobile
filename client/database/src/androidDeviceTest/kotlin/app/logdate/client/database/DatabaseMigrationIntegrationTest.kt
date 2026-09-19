@@ -13,6 +13,7 @@ import app.logdate.client.database.migrations.MIGRATION_26_27
 import app.logdate.client.database.migrations.MIGRATION_39_40
 import app.logdate.client.database.migrations.MIGRATION_40_41
 import app.logdate.client.database.migrations.MIGRATION_45_46
+import app.logdate.client.database.migrations.MIGRATION_46_47
 import app.logdate.client.database.migrations.MIGRATION_5_6
 import app.logdate.client.database.migrations.MIGRATION_6_7
 import app.logdate.client.database.migrations.MIGRATION_7_8
@@ -693,5 +694,21 @@ class DatabaseMigrationIntegrationTest {
         assertTrue(ownerCount.moveToFirst())
         assertEquals(2, ownerCount.getInt(0), "Different owners must not overwrite each other's outbox rows")
         ownerCount.close()
+    }
+
+    @Test
+    fun `migration from46 to47 gives existing notes a null capture time zone`() {
+        val databaseName = "$testDatabaseName-46-47"
+        helper.createDatabase(databaseName, 46).use { db ->
+            db.insertLegacyTextNote(uid = "note-1", content = "Written before time zones were recorded")
+        }
+
+        val db = helper.runMigrationsAndValidate(databaseName, 47, true, MIGRATION_46_47)
+
+        val note = db.query("SELECT content, time_zone_id FROM text_notes WHERE uid = 'note-1'")
+        assertTrue(note.moveToFirst())
+        assertEquals("Written before time zones were recorded", note.getString(note.getColumnIndexOrThrow("content")))
+        assertTrue(note.isNull(note.getColumnIndexOrThrow("time_zone_id")))
+        note.close()
     }
 }

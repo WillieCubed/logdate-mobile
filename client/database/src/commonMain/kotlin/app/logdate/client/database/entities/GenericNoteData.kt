@@ -28,4 +28,11 @@ abstract class GenericNoteData {
     abstract val altitude: Double?
     abstract val locationAccuracy: Float?
     abstract val placeId: Uuid?
+
+    /**
+     * IANA id of the time zone the device was in when the note was captured, or null when it was
+     * not recorded. Stored as written and not validated: an id newer than this device's tz data
+     * is still worth keeping.
+     */
+    abstract val timeZoneId: String?
 }

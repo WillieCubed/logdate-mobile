@@ -39,4 +39,6 @@ data class ImageNoteEntity(
     override val locationAccuracy: Float? = null,
     @ColumnInfo(name = "place_id")
     override val placeId: Uuid? = null,
+    @ColumnInfo(name = "time_zone_id")
+    override val timeZoneId: String? = null,
 ) : GenericNoteData()
