@@ -13,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.SystemCaptureTimeZone
 import app.logdate.client.sync.PhoneWearSyncBridge
 import app.logdate.client.sync.datalayer.RemoteCameraCaptureResult
 import app.logdate.feature.editor.ui.camera.CameraCaptureContent
@@ -147,12 +148,14 @@ private fun String.toRemoteJournalNote(mediaType: CapturedMediaType): JournalNot
                 creationTimestamp = now,
                 lastUpdated = now,
                 mediaRef = this,
+                timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
             )
         CapturedMediaType.VIDEO ->
             JournalNote.Video(
                 creationTimestamp = now,
                 lastUpdated = now,
                 mediaRef = this,
+                timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
             )
     }
 }
