@@ -47,7 +47,7 @@ enum class FeatureFlag(
      * every entry, portable file names and checksums.
      *
      * Off by default until restore can read the new layout. It gates only what an export writes;
-     * cloud backups keep the current layout until an app version that reads 2.0 has shipped.
+     * cloud backups continue to use the current layout until an app version that reads 2.0 has shipped.
      */
     EXPORT_ARCHIVE_V2(key = "export_archive_v2_enabled", defaultEnabled = false),
     ;

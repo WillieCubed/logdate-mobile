@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
 /**
- * `manifest.json`: what this archive is, where everything in it is, and what it does not hold.
+ * `manifest.json`: what this archive is, where everything in it is, and what it does not contain.
  *
  * It is the one file a program needs to read first. [contents] lists every data file with its
  * media type and the schema that describes it, so a consumer never has to guess a file name.
@@ -41,7 +41,7 @@ data class ArchiveOwner(
 )
 
 /**
- * What the archive covers. [complete] is true only when nothing the app holds for the user is left
+ * What the archive covers. [complete] is true only when nothing the app stores for the user is left
  * out; otherwise [omitted] says which categories are missing and why.
  */
 @Serializable

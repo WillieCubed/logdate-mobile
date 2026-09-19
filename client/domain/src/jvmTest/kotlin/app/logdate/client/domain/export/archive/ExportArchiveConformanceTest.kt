@@ -12,7 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Checks a real export against the schemas it carries, using only files from inside the archive, which
+ * Checks a real export against the schemas it includes, using only files from inside the archive, which
  * is the position a person or program that receives it is in.
  */
 class ExportArchiveConformanceTest : ArchiveExportFixture() {
@@ -30,7 +30,7 @@ class ExportArchiveConformanceTest : ArchiveExportFixture() {
     ): List<String> = registry.getSchema(schemaText).validate(instance, InputFormat.JSON).map { it.message }
 
     @Test
-    fun `every data file validates against the schema the archive carries for it`() =
+    fun `every data file validates against the schema the archive includes for it`() =
         runTest {
             val container = exported()
             val manifest = ArchiveJson.document.decodeFromString(ArchiveManifest.serializer(), container.text("manifest.json"))

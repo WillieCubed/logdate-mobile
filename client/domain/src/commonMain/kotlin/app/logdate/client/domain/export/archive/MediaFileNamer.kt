@@ -7,7 +7,7 @@ import kotlin.time.Instant
 
 /**
  * Names media files the way a person would sort them: by when they were captured, in the local time
- * of the zone they were captured in, filed by kind and year. A file never carries an id, a hash or
+ * of the zone they were captured in, filed by kind and year. A file name never includes an id, a hash or
  * the name the device gave it.
  */
 class MediaFileNamer(

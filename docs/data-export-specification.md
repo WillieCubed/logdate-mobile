@@ -1,6 +1,6 @@
 # LogDate Data Export
 
-An export is a single `.zip` file that holds a copy of what LogDate keeps for a person. This document
+An export is a single `.zip` file that contains a copy of what LogDate stores for a person. This document
 explains what is in it, how to read it, and how the app builds it. It describes two layouts:
 
 - **Format 2.0**, the current design, written when the `export_archive_v2` feature flag is on.
@@ -11,7 +11,7 @@ changing what gets exported, read [Adding a new kind of data](#adding-a-new-kind
 
 ## What an export has to be
 
-An export is the person's data leaving the app, so it has to hold up without the app. Format 2.0 is
+An export is the person's data leaving the app, so it has to work without the app. Format 2.0 is
 designed around these promises:
 
 | Promise | What it means in practice |
@@ -30,7 +30,7 @@ zipped again inside one folder, as Finder and Explorer do; restore already does 
 
 ```
 README.txt                  Plain-language guide. Always the first file.
-manifest.json               What this archive is and holds. Programs start here.
+manifest.json               What this archive is and contains. Programs start here.
 schema/                     JSON Schemas (draft 2020-12), one per data file.
 data/
   journals.json             The journals.
@@ -93,7 +93,7 @@ captured. Everything in `data/` is plain text that any editor opens, but it is w
 
 ### Notes
 
-`data/notes.json` holds `{"notes": [...]}`. Each note has an `id`, a `type` (`text`, `image`, `video` or
+`data/notes.json` contains `{"notes": [...]}`. Each note has an `id`, a `type` (`text`, `image`, `video` or
 `audio`), `createdAt` and `updatedAt`, and:
 
 - `text` and `textFormat` for text notes, `caption` for photos and videos, `durationMs` for audio.
@@ -117,14 +117,14 @@ export was made in, which is what the app's timeline shows too.
 
 `manifest.scope` answers whether the archive is everything:
 
-- `complete` is true only when nothing the app holds is left out and no date range was applied.
+- `complete` is true only when nothing the app stores is left out and no date range was applied.
 - `dateRange` is present when the export was limited by date.
 - `omitted` lists each missing category with a reason: `notRequested` (the person left it out),
   `outsideDateRange`, `unreadable` (it could not be read while exporting) or `notYetSupported` (this
   version of the app does not export it yet).
 
 The README shows the same list in words. While a category is `notYetSupported`, `complete` is false,
-so an export never claims more than it holds. The kinds of data not yet exported are transcripts,
+so an export never claims more than it contains. The kinds of data not yet exported are transcripts,
 audio sound labels, people, events, rewinds, postcards, stickers, health readings, favorites, journal
 cover photos, the profile photo, app settings and drafts from the entry editor. The last one matters:
 `drafts.json` comes from the older draft store, so drafts a person has open in the editor are not in
@@ -144,7 +144,7 @@ app without deciding what happens to it in the export.
   supports major `N` refuses major `N + 1` instead of guessing.
 
 Format 2.0 is a major change from 1.x: the files, the field names, the media paths and the way media is
-linked all differ. Restore keeps a reader for 1.x archives.
+linked all differ. Restore can still read 1.x archives.
 
 ## Verifying files
 
@@ -170,12 +170,12 @@ The code is in `client/domain/src/commonMain/kotlin/app/logdate/client/domain/ex
    finishes before anything is written, the manifest, the README and every note can state exactly what
    is and is not in the archive.
 2. **Write.** `ArchiveWriter` writes the files in order into an `ArchiveContainer`. Every byte passes
-   through a hashing sink into a `HashLedger`, so no file is held in memory whole, and `SHA256SUMS` and
+   through a hashing sink into a `HashLedger`, so no whole file is loaded into memory, and `SHA256SUMS` and
    `data/media.json` are both drawn from the same ledger and cannot disagree.
 
-The pieces that keep device internals out:
+The pieces that stop device internals from entering the archive:
 
-- `ArchivePath` is the only way a file is referred to. It cannot hold a URI, an absolute path or `..`.
+- `ArchivePath` is the only way a file is referred to. It cannot contain a URI, an absolute path or `..`.
 - The archive's records (`ArchiveNote`, `ArchiveJournal` and so on) are their own types, never the
   app's domain classes, so a change inside the app cannot leak into the archive.
 - Media is named by `MediaFileNamer` from its capture time, in the zone it was captured in, filed by

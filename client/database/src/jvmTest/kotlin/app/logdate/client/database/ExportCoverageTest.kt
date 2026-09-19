@@ -70,7 +70,7 @@ class ExportCoverageTest {
             "places" to derived("Federation-style places; nothing writes them yet, so note place ids are never set."),
             "indexed_media_images" to derived("Index of the device photo library; specific to this device."),
             "indexed_media_videos" to derived("Index of the device video library; specific to this device."),
-            "media_exif_metadata" to derived("EXIF cache for the device library; exported images keep their own EXIF."),
+            "media_exif_metadata" to derived("EXIF cache for the device library; exported images contain their own EXIF."),
             "inferred_person_clusters" to derived("Name mentions the app inferred and the user has not confirmed."),
             "inferred_person_evidence" to derived("Evidence behind an inferred person cluster."),
             "journal_notes" to bookkeeping("Legacy link table replaced by journal_content_links; nothing reads it."),
@@ -89,8 +89,8 @@ class ExportCoverageTest {
 
         assertTrue(
             unclassified.isEmpty(),
-            "Tables missing from the export coverage list: $unclassified. Decide whether each holds user data the " +
-                "export must carry, then add it to ExportCoverageTest with the matching classification.",
+            "Tables missing from the export coverage list: $unclassified. Decide whether each contains user data the " +
+                "export must include, then add it to ExportCoverageTest with the matching classification.",
         )
     }
 

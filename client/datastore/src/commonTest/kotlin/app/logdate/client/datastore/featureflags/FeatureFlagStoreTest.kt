@@ -49,7 +49,7 @@ class FeatureFlagStoreTest {
         }
 
     @Test
-    fun `the export archive flag keeps the key it shipped under`() {
+    fun `the export archive flag is stored under export_archive_v2_enabled`() {
         assertEquals("export_archive_v2_enabled", FeatureFlag.EXPORT_ARCHIVE_V2.key)
     }
 

@@ -93,7 +93,7 @@ class ChecksumFileTest {
     }
 
     @Test
-    fun `the ledger keeps files in the order they were written`() {
+    fun `the ledger lists files in the order they were written`() {
         val ledger = HashLedger()
         ledger.record(ArchivePath.of("b.txt"), emptySha, 0)
         ledger.record(ArchivePath.of("a.txt"), emptySha, 0)

@@ -11,7 +11,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * Finds device-internal references that must never reach an export: content URIs, absolute device
  * paths, drive letters, the app's package name and stack trace text.
  *
- * Text a person wrote is exempt, since it may hold a link or a path on purpose; only structural
+ * Text a person wrote is exempt, since it may contain a link or a path on purpose; only structural
  * values are checked.
  */
 object ArchiveLeakScanner {

@@ -5,7 +5,7 @@ package app.logdate.client.domain.export.archive
  *
  * macOS and Windows treat `IMG.JPG` and `img.jpg` as one file, so two paths that differ only by case
  * would overwrite each other when the archive is extracted there. A repeated name gets a numeric
- * suffix before its extension, and a stem that is too long is shortened to keep the name within
+ * suffix before its extension, and a stem that is too long is shortened so the name stays within
  * [ArchivePath.MAX_SEGMENT_LENGTH].
  */
 class ArchivePathAllocator {

@@ -80,7 +80,7 @@ object MediaTypeSniffer {
      * @param header the first bytes of the file, at least [HEADER_SIZE] when the file is that long
      * @param hintExtension the extension the file had on the device, used only when [header] is
      *   not recognised
-     * @param kind the kind of note the file belongs to. An MPEG-4 container holding an audio note is
+     * @param kind the kind of note the file belongs to. An MPEG-4 container containing an audio note is
      *   filed as `m4a` rather than `mp4`.
      */
     fun sniff(

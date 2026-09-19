@@ -46,7 +46,7 @@ class MediaResolution(
 }
 
 /**
- * Decides, before anything is written, which media files the archive will hold and what each is
+ * Decides, before anything is written, which media files the archive will contain and what each is
  * called.
  *
  * Resolving first means the manifest, the README and every entry can state exactly what is included

@@ -39,7 +39,7 @@ class HashLedger {
 /**
  * Runs [write] against [sink] and records the SHA-256 and size of the bytes it wrote under [path].
  *
- * The bytes are hashed as they pass through, so a large file is never held in memory. [sink] is
+ * The bytes are hashed as they pass through, so a large file is never loaded into memory. [sink] is
  * flushed but not closed, so it can be an entry inside a larger archive.
  */
 fun hashedWrite(

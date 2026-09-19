@@ -107,7 +107,7 @@ class MediaResolverTest {
         }
 
     @Test
-    fun `an mpeg-4 container that holds an audio note is filed as m4a`() =
+    fun `an mpeg-4 container containing an audio note is filed as m4a`() =
         runTest {
             val resolution = resolver(FakeOpener(mapOf("voice" to isomAudio))).resolve(listOf(request("voice", MediaKind.AUDIO)))
 
@@ -139,7 +139,7 @@ class MediaResolverTest {
         }
 
     @Test
-    fun `an unrecognised file with a known extension keeps that extension`() =
+    fun `an unrecognised file with a known extension uses that extension`() =
         runTest {
             val resolution =
                 resolver(

@@ -13,7 +13,7 @@ import okio.Source
  * Writes the archive's files into a container, hashing each one as it goes.
  *
  * Every file passes through [hashedWrite], so [ledger] ends up holding the size and SHA-256 of
- * everything written and no file is ever held in memory whole.
+ * everything written and no file is ever loaded into memory whole.
  */
 internal class ArchiveWriter(
     private val container: ArchiveContainer,
@@ -34,7 +34,7 @@ internal class ArchiveWriter(
         sink.writeUtf8("\n")
     }
 
-    /** One JSON record per line, written as the sequence is read so a long history is never held whole. */
+    /** One JSON record per line, written as the sequence is read so a long history is never loaded whole. */
     fun <T> lines(
         path: ArchivePath,
         serializer: SerializationStrategy<T>,

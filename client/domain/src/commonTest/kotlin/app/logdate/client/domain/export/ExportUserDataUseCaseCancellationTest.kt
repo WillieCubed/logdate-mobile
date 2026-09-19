@@ -46,7 +46,7 @@ class ExportUserDataUseCaseCancellationTest {
             draftsRequested.await()
             collector.cancelAndJoin()
 
-            assertEquals(0, places.reads, "a cancelled export must not keep reading data sources")
+            assertEquals(0, places.reads, "a cancelled export must not continue reading data sources")
             assertTrue(emissions.none { it is ExportProgress.Failed }, "cancellation is not a failure: $emissions")
         }
 

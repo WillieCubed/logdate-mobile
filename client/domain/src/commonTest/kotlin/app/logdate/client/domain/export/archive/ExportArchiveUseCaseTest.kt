@@ -183,7 +183,7 @@ class ExportArchiveUseCaseTest : ArchiveExportFixture() {
         }
 
     @Test
-    fun `text is kept exactly as written and labelled as markdown`() =
+    fun `text is stored exactly as written and labelled as markdown`() =
         runTest {
             val (container, _) = export()
 
@@ -236,7 +236,7 @@ class ExportArchiveUseCaseTest : ArchiveExportFixture() {
         }
 
     @Test
-    fun `a date range keeps only entries inside it including the end`() =
+    fun `a date range includes only entries inside it and the end is inclusive`() =
         runTest {
             val options = ArchiveExportOptions(from = instantOf("2026-09-19T00:00:00Z"), to = instantOf("2026-09-19T10:00:00Z"))
 
@@ -268,7 +268,7 @@ class ExportArchiveUseCaseTest : ArchiveExportFixture() {
             val samples = container.text("data/location-history.jsonl").lines().filter { it.isNotBlank() }
             assertEquals(1, samples.size)
             listOf("user-1", "device-1", "sample-1", "syncVersion", "deviceId", "userId").forEach { token ->
-                container.textFiles().forEach { (path, text) -> assertTrue(token !in text, "$path holds $token") }
+                container.textFiles().forEach { (path, text) -> assertTrue(token !in text, "$path contains $token") }
             }
         }
 

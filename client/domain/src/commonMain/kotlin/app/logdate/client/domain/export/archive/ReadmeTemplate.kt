@@ -53,14 +53,14 @@ object ReadmeTemplate {
         paragraph("Made on ${manifest.exportedAt.dayAndTime(zone)} (${manifest.exportTimeZone}).")
         val scope =
             if (manifest.scope.complete) {
-                "This folder is a complete, self-contained copy of what LogDate kept for you."
+                "This folder is a complete, self-contained copy of what LogDate stored for you."
             } else {
                 "This folder is a self-contained copy of your LogDate journal. " +
-                    "It does not hold everything LogDate keeps for you; see WHAT IS MISSING below."
+                    "It does not include everything LogDate stores for you; see WHAT IS MISSING below."
             }
         paragraph(
             "$scope You do not need the LogDate app, an account or an internet connection to open anything in it. " +
-                "Nothing in it is encrypted, so keep it somewhere private.",
+                "Nothing in it is encrypted, so store it somewhere private.",
         )
     }
 
@@ -114,7 +114,7 @@ object ReadmeTemplate {
                 "You can ignore this unless you are moving to another app or writing a script.",
         )
         entry("schema/", "Descriptions of the files in data/, for programmers.")
-        entry("manifest.json", "A summary of this export: what it holds, what it leaves out and why.")
+        entry("manifest.json", "A summary of this export: what it contains, what it leaves out and why.")
         entry("SHA256SUMS", "A checklist for confirming that no file was damaged.")
         blank()
     }
@@ -126,7 +126,7 @@ object ReadmeTemplate {
         heading("WHAT IS MISSING")
         dateLimit(scope.dateRange, zone)?.let { paragraph("Entries, drafts and location history are limited to those $it.") }
         if (scope.complete && scope.omitted.isEmpty()) {
-            paragraph("Nothing. This export holds everything LogDate keeps for you.")
+            paragraph("Nothing. This export contains everything LogDate stores for you.")
             return
         }
         paragraph("This export does not include the following. manifest.json records the same list.")

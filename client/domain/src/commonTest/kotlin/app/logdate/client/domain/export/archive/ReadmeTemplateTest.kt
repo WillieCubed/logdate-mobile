@@ -51,7 +51,7 @@ class ReadmeTemplateTest {
     fun `a complete export says nothing is missing`() {
         val text = render(manifest = complete)
 
-        assertTrue("Nothing. This export holds everything LogDate keeps for you." in text)
+        assertTrue("Nothing. This export contains everything LogDate stores for you." in text)
         assertTrue("complete, self-contained copy" in text)
     }
 
@@ -122,9 +122,9 @@ class ReadmeTemplateTest {
 
             Made on 2026-09-17 at 21:30 (America/Denver).
 
-            This folder is a complete, self-contained copy of what LogDate kept for you.
+            This folder is a complete, self-contained copy of what LogDate stored for you.
             You do not need the LogDate app, an account or an internet connection to open
-            anything in it. Nothing in it is encrypted, so keep it somewhere private.
+            anything in it. Nothing in it is encrypted, so store it somewhere private.
 
             WHAT IS IN THIS COPY
             --------------------
@@ -152,14 +152,14 @@ class ReadmeTemplateTest {
                                           script.
               schema/                     Descriptions of the files in data/, for
                                           programmers.
-              manifest.json               A summary of this export: what it holds, what
-                                          it leaves out and why.
+              manifest.json               A summary of this export: what it contains,
+                                          what it leaves out and why.
               SHA256SUMS                  A checklist for confirming that no file was
                                           damaged.
 
             WHAT IS MISSING
             ---------------
-            Nothing. This export holds everything LogDate keeps for you.
+            Nothing. This export contains everything LogDate stores for you.
 
             TIMES
             -----

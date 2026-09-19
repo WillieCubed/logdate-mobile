@@ -10,7 +10,7 @@ import kotlin.time.Instant
  * Conflict resolver for notes that attempts content-safe merges before deferring to manual review.
  *
  * A note's capture time zone is set once, where the note was captured, and never edited. Whichever
- * copy wins, the resolved note keeps a zone that either copy carries: a copy from an app version or
+ * copy wins, the resolved note records a zone taken from either copy: a copy from an app version or
  * server that predates the field must not erase it.
  */
 class JournalNoteConflictResolver : ConflictResolver<JournalNote> {

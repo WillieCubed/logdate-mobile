@@ -56,7 +56,7 @@ class MediaTypeSnifferTest {
     }
 
     @Test
-    fun `an mp4 container holding an audio note is filed as m4a`() {
+    fun `an mp4 container containing an audio note is filed as m4a`() {
         val audioNote = MediaTypeSniffer.sniff(ftyp("isom"), hintExtension = "m4a", kind = MediaKind.AUDIO)
         val video = MediaTypeSniffer.sniff(ftyp("isom"), hintExtension = "mp4", kind = MediaKind.VIDEO)
 
@@ -82,7 +82,7 @@ class MediaTypeSnifferTest {
     }
 
     @Test
-    fun `a header too short to hold a signature does not crash`() {
+    fun `a header too short to contain a signature does not crash`() {
         assertSniffs("application/octet-stream", "bin", bytes(0xFF))
     }
 }

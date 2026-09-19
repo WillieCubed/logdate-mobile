@@ -3,7 +3,7 @@ package app.logdate.client.domain.export.archive
 import app.logdate.shared.model.profile.LogDateProfile
 import kotlin.time.Instant
 
-/** What the app holds that the 2.0 archive does not export yet. It shrinks as each kind of data is added. */
+/** What the app stores that the 2.0 archive does not export yet. It shrinks as each kind of data is added. */
 internal object ArchiveCoverage {
     val notYetSupported: List<ArchiveCategory> =
         listOf(

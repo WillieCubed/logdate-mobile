@@ -20,7 +20,7 @@ sealed interface EntryBlockUiState {
     /**
      * IANA id of the time zone the device was in when the block was created, or null when the
      * block came from a draft or note that did not record one. It is stamped with [timestamp]
-     * so a block reopened later, in another zone, keeps the zone it was written in.
+     * so a block reopened later, in another zone, still records the zone it was written in.
      */
     val timeZoneId: String?
 

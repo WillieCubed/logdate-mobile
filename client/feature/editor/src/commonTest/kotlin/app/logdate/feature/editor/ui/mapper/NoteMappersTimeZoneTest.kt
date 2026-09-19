@@ -15,7 +15,7 @@ import kotlin.test.assertNull
 import kotlin.time.Instant
 
 /**
- * A block records the zone it was created in, and that zone is the one the saved note carries. The
+ * A block records the zone it was created in, and that zone is recorded on the saved note. The
  * zone must survive a draft round trip unchanged: reopening a draft in another zone must not
  * restamp it.
  */

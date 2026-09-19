@@ -17,7 +17,7 @@ import kotlin.coroutines.cancellation.CancellationException
 /**
  * Opens the media references Android stores: content URIs, absolute paths and `file://` URLs.
  *
- * A reference that no longer points at a file is looked up again in the places older builds kept
+ * A reference that no longer points at a file is looked up again in the places older builds stored
  * media (see [MediaReferenceRecovery]); if it is nowhere, the file is reported as missing.
  */
 class AndroidMediaSourceOpener(

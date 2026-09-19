@@ -15,7 +15,7 @@ import kotlin.jvm.JvmInline
  *
  * Every reference to a file in the export uses this type, so a device path or content URI cannot be
  * written into an archive by accident. A path uses `/` as the separator and cannot be absolute,
- * climb out with `..`, name a drive or URI scheme, or hold characters that common file systems
+ * climb out with `..`, name a drive or URI scheme, or contain characters that common file systems
  * reject. Reading an archive validates each path the same way, since an archive is untrusted input.
  */
 @Serializable(with = ArchivePathSerializer::class)
@@ -23,7 +23,7 @@ import kotlin.jvm.JvmInline
 value class ArchivePath private constructor(
     val value: String,
 ) {
-    /** The folder holding this file, or an empty string for a file at the archive root. */
+    /** The folder containing this file, or an empty string for a file at the archive root. */
     val directory: String get() = value.substringBeforeLast('/', "")
 
     val fileName: String get() = value.substringAfterLast('/')

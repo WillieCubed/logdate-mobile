@@ -69,7 +69,7 @@ class ArchivePathTest {
     }
 
     @Test
-    fun `reading json that holds an unsafe path fails`() {
+    fun `reading json that contains an unsafe path fails`() {
         assertFailsWith<SerializationException> {
             Json.decodeFromString(ArchivePath.serializer(), "\"../../etc/passwd\"")
         }

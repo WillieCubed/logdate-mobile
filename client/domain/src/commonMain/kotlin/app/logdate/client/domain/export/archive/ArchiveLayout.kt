@@ -3,7 +3,7 @@ package app.logdate.client.domain.export.archive
 /**
  * Where each file lives in a 2.0 archive.
  *
- * Fixed files keep the same name in every archive so a person or a script can go straight to them.
+ * Fixed files have the same name in every archive so a person or a script can go straight to them.
  * Only media and the readable copies are named per item.
  */
 object ArchiveLayout {
