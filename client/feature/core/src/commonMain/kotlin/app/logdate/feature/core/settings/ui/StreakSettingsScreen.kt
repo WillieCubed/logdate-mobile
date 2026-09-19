@@ -32,7 +32,6 @@ import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.streak_day_count
 import logdate.client.feature.core.generated.resources.streak_keep_it_up
-import logdate.client.feature.core.generated.resources.streak_milestones_info
 import logdate.client.feature.core.generated.resources.streaks
 import logdate.client.feature.core.generated.resources.streaks_detail_description
 import logdate.client.feature.core.generated.resources.track_journaling_streak
@@ -41,7 +40,7 @@ import org.koin.compose.viewmodel.koinViewModel
 
 /**
  * Settings screen where users can enable or disable daily journaling streak tracking
- * and view their current streak count with milestone information.
+ * and view their current streak count.
  */
 @Composable
 fun StreakSettingsScreen(
@@ -139,13 +138,6 @@ fun StreakSettingsContent(
                                 .padding(Spacing.lg),
                     )
                 }
-
-                Text(
-                    text = stringResource(Res.string.streak_milestones_info),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                )
             }
         },
         standardContent = {
@@ -219,17 +211,6 @@ fun StreakSettingsContent(
                                     .padding(Spacing.lg),
                         )
                     }
-                }
-                item {
-                    Text(
-                        text = stringResource(Res.string.streak_milestones_info),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier =
-                            Modifier
-                                .disabledAlpha(streakData.isEnabled)
-                                .padding(horizontal = Spacing.lg),
-                    )
                 }
             }
         },

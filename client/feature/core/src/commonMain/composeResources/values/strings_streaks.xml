@@ -7,7 +7,6 @@
     <string name="track_journaling_streak">Track journaling streak</string>
     <string name="current_streak">Current streak</string>
     <string name="streak_day_count">%1$d day streak</string>
-    <string name="streak_milestones_info">Milestones at 7, 14, 30, 60, and 100 days are celebrated in your Rewinds.</string>
     <string name="streak_keep_it_up">Write, photograph, or record something every day to keep your streak alive.</string>
 
     <!-- Stats -->

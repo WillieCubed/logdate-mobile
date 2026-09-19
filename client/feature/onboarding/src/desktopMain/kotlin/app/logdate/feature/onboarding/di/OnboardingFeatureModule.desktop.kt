@@ -19,6 +19,6 @@ actual val onboardingFeatureModule: Module =
         viewModel { OnboardingViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
         viewModel { MemorySelectionViewModel(get(), get()) }
         viewModel { PersonalIntroViewModel(get(), get()) }
-        viewModel { WelcomeBackViewModel(get()) }
+        viewModel { WelcomeBackViewModel() }
         viewModel { RecoveryPhraseViewModel(get()) }
     }

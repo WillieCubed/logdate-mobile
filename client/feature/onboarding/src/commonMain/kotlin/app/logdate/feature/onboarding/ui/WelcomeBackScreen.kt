@@ -36,7 +36,7 @@ import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
 import logdate.client.feature.onboarding.generated.resources.Res
-import logdate.client.feature.onboarding.generated.resources.onboarding_welcome_back_description_streak_reset
+import logdate.client.feature.onboarding.generated.resources.onboarding_welcome_back_description
 import logdate.client.feature.onboarding.generated.resources.onboarding_welcome_back_title
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -158,7 +158,7 @@ private fun WelcomeBackTitle(name: String) {
 @Composable
 private fun WelcomeBackBody() {
     Text(
-        text = stringResource(Res.string.onboarding_welcome_back_description_streak_reset),
+        text = stringResource(Res.string.onboarding_welcome_back_description),
         modifier = Modifier.widthIn(max = 420.dp),
         style = MaterialTheme.typography.bodyLarge,
         textAlign = TextAlign.Center,
