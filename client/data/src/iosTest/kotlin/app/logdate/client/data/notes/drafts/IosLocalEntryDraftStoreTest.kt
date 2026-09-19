@@ -245,7 +245,7 @@ class IosLocalEntryDraftStoreTest {
         }
 
     @Test
-    fun `every journal note type round trips update version and location fields`() =
+    fun `every journal note type round trips update version location and capture time zone fields`() =
         runTest {
             val store = IosLocalEntryDraftStore()
             val createdAt = Instant.fromEpochMilliseconds(1_725_000_000_000)
@@ -268,6 +268,7 @@ class IosLocalEntryDraftStoreTest {
                         content = "Text fields",
                         syncVersion = 11,
                         location = location(1),
+                        timeZoneId = "Asia/Tokyo",
                     ),
                     JournalNote.Image(
                         creationTimestamp = createdAt,
@@ -276,6 +277,7 @@ class IosLocalEntryDraftStoreTest {
                         caption = "Image fields",
                         syncVersion = 22,
                         location = location(2),
+                        timeZoneId = "Europe/Paris",
                     ),
                     JournalNote.Video(
                         creationTimestamp = createdAt,
@@ -284,6 +286,7 @@ class IosLocalEntryDraftStoreTest {
                         caption = "Video fields",
                         syncVersion = 33,
                         location = location(3),
+                        timeZoneId = "America/Denver",
                     ),
                     JournalNote.Audio(
                         creationTimestamp = createdAt,
@@ -292,6 +295,7 @@ class IosLocalEntryDraftStoreTest {
                         durationMs = 4_004,
                         syncVersion = 44,
                         location = location(4),
+                        timeZoneId = "Pacific/Auckland",
                     ),
                 )
             val draftId = Uuid.random()

@@ -47,6 +47,7 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
         val location: NoteLocation? = null,
         val durationMs: Long = 0,
         val caption: String = "",
+        val timeZoneId: String? = null,
     )
 
     private fun EntryDraft.toSerializable(): SerializableEntryDraft =
@@ -76,6 +77,7 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
             lastUpdated = this.lastUpdated.toEpochMilliseconds(),
             syncVersion = this.syncVersion,
             location = this.location,
+            timeZoneId = this.timeZoneId,
             durationMs = (this as? JournalNote.Audio)?.durationMs ?: 0,
             caption =
                 when (this) {
@@ -115,6 +117,7 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
                     content = content,
                     syncVersion = syncVersion,
                     location = location,
+                    timeZoneId = timeZoneId,
                 )
             NoteType.AUDIO ->
                 JournalNote.Audio(
@@ -125,6 +128,7 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
                     durationMs = durationMs,
                     syncVersion = syncVersion,
                     location = location,
+                    timeZoneId = timeZoneId,
                 )
             NoteType.IMAGE ->
                 JournalNote.Image(
@@ -135,6 +139,7 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
                     caption = caption,
                     syncVersion = syncVersion,
                     location = location,
+                    timeZoneId = timeZoneId,
                 )
             NoteType.VIDEO ->
                 JournalNote.Video(
@@ -145,6 +150,7 @@ class IosLocalEntryDraftStore : LocalEntryDraftStore {
                     caption = caption,
                     syncVersion = syncVersion,
                     location = location,
+                    timeZoneId = timeZoneId,
                 )
             NoteType.LOCATION ->
                 throw IllegalArgumentException("A draft cannot contain a LOCATION journal note")
