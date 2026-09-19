@@ -32,7 +32,7 @@ class CampfireViewModelTest {
             runDays = 12,
             size = FireSize.CAMPFIRE,
             longestRunDays = 40,
-            totalDaysKept = 210,
+            totalDaysJournaled = 210,
             isRekindled = true,
         )
 
@@ -95,7 +95,7 @@ class CampfireViewModelTest {
                     runDays = 12,
                     size = CampfireSize.CAMPFIRE,
                     longestRunDays = 40,
-                    totalDaysKept = 210,
+                    totalDaysJournaled = 210,
                     isRekindled = true,
                 ),
                 viewModel.presentation.value,

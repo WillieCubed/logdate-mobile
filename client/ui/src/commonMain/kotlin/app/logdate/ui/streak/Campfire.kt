@@ -35,8 +35,8 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 /**
- * Whether campfires animate. Screenshot scenes turn this off so the flicker holds still long
- * enough to capture a stable frame.
+ * Whether campfires animate. Screenshot scenes turn this off so the flicker stops long enough to
+ * capture a stable frame.
  */
 val LocalCampfireAnimationEnabled = staticCompositionLocalOf { true }
 
@@ -81,7 +81,7 @@ fun Campfire(
     }
 }
 
-/** A 0..1 loop that drives the flicker, or a constant 0 when the fire should hold still. */
+/** A 0..1 loop that drives the flicker, or a constant 0 when the fire should not move. */
 @Composable
 private fun rememberCampfireProgress(animate: Boolean): State<Float> {
     if (!animate) return remember { mutableFloatStateOf(0f) }

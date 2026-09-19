@@ -30,7 +30,7 @@ class CampfireCalculatorTest {
         assertEquals(0, state.runDays)
         assertNull(state.size)
         assertEquals(0, state.longestRunDays)
-        assertEquals(0, state.totalDaysKept)
+        assertEquals(0, state.totalDaysJournaled)
         assertFalse(state.isRekindled)
     }
 
@@ -45,7 +45,7 @@ class CampfireCalculatorTest {
     }
 
     @Test
-    fun `an entry yesterday keeps the fire burning while today is open`() {
+    fun `an entry yesterday leaves the fire burning while today is open`() {
         val state = calculate(daysAgo(1, 2, 3))
 
         assertEquals(FirePhase.BURNING, state.phase)
@@ -63,7 +63,7 @@ class CampfireCalculatorTest {
     }
 
     @Test
-    fun `embers keep the size of the fire they came from`() {
+    fun `embers have the size of the fire they came from`() {
         val state = calculate(consecutiveDaysEndingAt(today.minus(2, DateTimeUnit.DAY), 10))
 
         assertEquals(FirePhase.EMBERS, state.phase)
@@ -78,7 +78,7 @@ class CampfireCalculatorTest {
         assertEquals(0, state.runDays)
         assertNull(state.size)
         assertEquals(3, state.longestRunDays)
-        assertEquals(3, state.totalDaysKept)
+        assertEquals(3, state.totalDaysJournaled)
     }
 
     @Test
@@ -100,7 +100,7 @@ class CampfireCalculatorTest {
     }
 
     @Test
-    fun `logging every other day keeps one fire going`() {
+    fun `logging every other day is one fire`() {
         val state = calculate(daysAgo(0, 2, 4, 6, 8, 10))
 
         assertEquals(FirePhase.BURNING, state.phase)
@@ -125,10 +125,10 @@ class CampfireCalculatorTest {
     }
 
     @Test
-    fun `days kept counts every distinct logged day across all fires`() {
+    fun `days journaled counts every distinct logged day across all fires`() {
         val state = calculate(daysAgo(0, 1, 10, 11, 12, 50))
 
-        assertEquals(6, state.totalDaysKept)
+        assertEquals(6, state.totalDaysJournaled)
     }
 
     @Test
@@ -163,7 +163,7 @@ class CampfireCalculatorTest {
     }
 
     @Test
-    fun `a fire carries across a month boundary`() {
+    fun `a fire continues across a month boundary`() {
         val state =
             CampfireCalculator.calculate(
                 loggedDays = setOf(LocalDate(2026, 2, 27), LocalDate(2026, 2, 28), LocalDate(2026, 3, 1)),
@@ -174,7 +174,7 @@ class CampfireCalculatorTest {
     }
 
     @Test
-    fun `a fire carries across a leap day`() {
+    fun `a fire continues across a leap day`() {
         val state =
             CampfireCalculator.calculate(
                 loggedDays = setOf(LocalDate(2028, 2, 28), LocalDate(2028, 3, 1)),
@@ -192,7 +192,7 @@ class CampfireCalculatorTest {
 
         assertEquals(500, state.runDays)
         assertEquals(500, state.longestRunDays)
-        assertEquals(500, state.totalDaysKept)
+        assertEquals(500, state.totalDaysJournaled)
     }
 
     @Test
@@ -200,6 +200,6 @@ class CampfireCalculatorTest {
         val state = calculate(daysAgo(3) + setOf(LocalDate(2026, 3, 20)))
 
         assertEquals(FirePhase.OUT, state.phase)
-        assertEquals(1, state.totalDaysKept)
+        assertEquals(1, state.totalDaysJournaled)
     }
 }

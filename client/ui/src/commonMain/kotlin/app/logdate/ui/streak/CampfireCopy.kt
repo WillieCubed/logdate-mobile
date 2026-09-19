@@ -46,7 +46,7 @@ fun campfireSupportingLine(presentation: CampfirePresentation): String =
             if (presentation.loggedToday) {
                 pluralStringResource(Res.plurals.campfire_burning_supporting, presentation.runDays, presentation.runDays)
             } else {
-                stringResource(Res.string.campfire_waiting_supporting)
+                stringResource(Res.string.campfire_waiting_supporting, presentation.runDays + 1)
             }
         CampfirePhase.EMBERS -> stringResource(Res.string.campfire_embers_supporting, presentation.runDays)
         CampfirePhase.OUT ->

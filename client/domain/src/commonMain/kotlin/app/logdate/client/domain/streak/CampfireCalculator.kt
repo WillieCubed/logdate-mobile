@@ -26,7 +26,7 @@ object CampfireCalculator {
                 runDays = 0,
                 size = null,
                 longestRunDays = 0,
-                totalDaysKept = 0,
+                totalDaysJournaled = 0,
                 isRekindled = false,
             )
         }
@@ -47,7 +47,7 @@ object CampfireCalculator {
             runDays = runDays,
             size = FireSize.forRunDays(runDays),
             longestRunDays = fireLengths.max(),
-            totalDaysKept = days.size,
+            totalDaysJournaled = days.size,
             isRekindled = phase != FirePhase.OUT && fireLengths.size > 1,
         )
     }

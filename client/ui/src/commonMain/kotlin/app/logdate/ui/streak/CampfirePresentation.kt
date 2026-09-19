@@ -34,7 +34,7 @@ enum class CampfireSize {
  * @property runDays Days logged on the current fire; 0 when unlit or out.
  * @property size How big the current fire is drawn; `null` when there is no fire.
  * @property longestRunDays Days logged on the longest fire, including the current one.
- * @property totalDaysKept Distinct days with at least one entry, across all history.
+ * @property totalDaysJournaled Distinct days with at least one entry, across all history.
  * @property isRekindled Whether the current fire began after an earlier fire went out.
  */
 data class CampfirePresentation(
@@ -43,7 +43,7 @@ data class CampfirePresentation(
     val runDays: Int = 0,
     val size: CampfireSize? = null,
     val longestRunDays: Int = 0,
-    val totalDaysKept: Int = 0,
+    val totalDaysJournaled: Int = 0,
     val isRekindled: Boolean = false,
 ) {
     /**

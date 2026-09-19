@@ -414,7 +414,7 @@ private fun ProfileCampfireSection(campfire: CampfirePresentation) {
             },
             headlineContent = { Text(campfireHeadline(campfire)) },
             supportingContent = {
-                Text(stringResource(Res.string.campfire_profile_summary, campfire.runDays, campfire.totalDaysKept))
+                Text(stringResource(Res.string.campfire_profile_summary, campfire.runDays, campfire.totalDaysJournaled))
             },
         )
     }

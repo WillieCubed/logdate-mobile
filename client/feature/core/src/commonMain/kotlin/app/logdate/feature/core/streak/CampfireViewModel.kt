@@ -80,6 +80,6 @@ internal fun CampfireState.toPresentation(): CampfirePresentation =
                 FireSize.BEACON -> CampfireSize.BEACON
             },
         longestRunDays = longestRunDays,
-        totalDaysKept = totalDaysKept,
+        totalDaysJournaled = totalDaysJournaled,
         isRekindled = isRekindled,
     )

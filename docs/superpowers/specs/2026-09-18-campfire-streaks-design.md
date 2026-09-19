@@ -2,9 +2,9 @@
 
 ## Goal
 
-A streak in LogDate should feel like something you are building, not something you can lose. The journaling streak becomes a campfire: every day you add something, you put another log on the fire. Miss a day and the fire burns down to embers, still warm, waiting for you. Only two quiet days in a row let it go out, and even then the app remembers how long your best fire burned and how many days you have kept in total.
+A streak in LogDate should feel like something you are building, not something you can lose. The journaling streak becomes a campfire: every day you add something, you put another log on the fire. Miss a day and the fire burns down to embers, still warm, waiting for you. Only two quiet days in a row let it go out, and even then the app remembers how long your best fire burned and how many days you have journaled in total.
 
-This document covers the first slice of that direction: the forgiving streak model and the campfire visual on the surfaces that already show a streak. Later slices, each with their own spec, cover the memory filmstrip and year-in-pixels calendar, milestone Rewinds, and low-effort ways to keep the fire going.
+This document covers the first slice of that direction: the forgiving streak model and the campfire visual on the surfaces that already show a streak. Later slices, each with their own spec, cover the memory filmstrip and year-in-pixels calendar, milestone Rewinds, and low-effort ways to add an entry each day.
 
 ## Problem
 
@@ -31,7 +31,7 @@ The streak uses calendar dates. Someone who writes at 1:30 AM before bed is cred
 - A single missed day never ends a fire. It burns down to embers, and the next entry rekindles it at the size it had.
 - Two missed days in a row put the fire out.
 - The fire grows with its length: spark, small fire, campfire, bonfire, beacon.
-- The longest fire and the total number of days kept are always visible and never go down.
+- The longest fire and the total number of days journaled are always visible and never go down.
 - A new fire after one went out is marked as rekindled.
 - A day ends at the user's explicit day-start hour, or at 4 AM when none is set.
 - The fire updates as soon as an entry is saved and when the day rolls over.
@@ -49,7 +49,7 @@ Sleep-based day boundaries are not used for streaks. Resolving them means a heal
 
 `CampfireCalculator.calculate(loggedDays, today)` is a pure function from the set of streak days that have at least one entry to a `CampfireState`.
 
-A fire is a run of logged days where each logged day is at most two calendar days after the previous one. That is the whole forgiveness rule: one empty day between two logged days keeps them in the same fire.
+A fire is a run of logged days where each logged day is at most two calendar days after the previous one. That is the whole forgiveness rule: one empty day between two logged days leaves them in the same fire.
 
 The phase comes from the most recent logged day, `L`:
 
@@ -61,9 +61,9 @@ The phase comes from the most recent logged day, `L`:
 | two days ago | `EMBERS` | Yesterday was missed; logging today rekindles |
 | three or more days ago | `OUT` | Two days in a row were missed |
 
-`runDays` counts logged days in the current fire, not calendar days, so a fire kept every other day grows at half speed. `size` is derived from `runDays`: 1–2 spark, 3–6 small, 7–29 campfire, 30–99 bonfire, 100+ beacon. `EMBERS` keeps its size so rekindling restores it. `OUT` and `UNLIT` have no size and a `runDays` of 0.
+`runDays` counts logged days in the current fire, not calendar days, so a fire with entries every other day grows at half speed. `size` is derived from `runDays`: 1–2 spark, 3–6 small, 7–29 campfire, 30–99 bonfire, 100+ beacon. `EMBERS` has the same size, so rekindling restores it. `OUT` and `UNLIT` have no size and a `runDays` of 0.
 
-`longestRunDays` is the largest fire across all history. `totalDaysKept` is the number of distinct logged days. `isRekindled` is true when the current fire began after an earlier fire.
+`longestRunDays` is the largest fire across all history. `totalDaysJournaled` is the number of distinct logged days. `isRekindled` is true when the current fire began after an earlier fire.
 
 ### Observing it
 
@@ -83,8 +83,8 @@ The campfire is gated behind `FeatureFlag.CAMPFIRE_STREAKS`, off by default, unt
 
 - **Campfire illustration.** A Canvas composable draws crossed logs and a layered flame whose height follows the fire's size. Embers draw glowing coals with a few rising sparks. A fire that went out draws grey logs and a thin line of smoke. The flame flickers unless the system asks for reduced motion.
 - **Timeline chip.** A small campfire and the day count sit in the timeline's top-bar actions next to the sync indicator. Tapping it opens the streak screen.
-- **Streak screen.** A large campfire, a headline and line of copy for the current phase, the three stats (this fire, longest fire, days kept), the rule in one sentence, and the existing tracking toggle.
-- **Profile.** The "Current streak" stat becomes a small campfire with this fire and days kept.
+- **Streak screen.** A large campfire, a headline and line of copy for the current phase, the three stats (this fire, longest fire, days journaled), the rule in one sentence, and the existing tracking toggle.
+- **Profile.** The "Current streak" stat becomes a small campfire with this fire and days journaled.
 - **Settings overview.** The streak badge shows the current fire's day count.
 - **Onboarding completion.** The hard-coded "1" becomes a small lit campfire: "Your fire is lit."
 - **Wear complication.** Shows the current fire's day count with a flame or ember icon.
@@ -95,7 +95,7 @@ The campfire is gated behind `FeatureFlag.CAMPFIRE_STREAKS`, off by default, unt
 |---|---|---|
 | Unlit | Light your fire | Add anything today — words, a photo, a sound. |
 | Burning, logged today | Your fire is burning | N days on this fire |
-| Burning, not yet today | Your fire is waiting for today | Add something to keep it going. |
+| Burning, not yet today | Your fire is waiting for today | Add an entry today to make it a N-day fire. |
 | Embers | Down to embers | Add something today to rekindle your N-day fire. |
 | Out | Your fire went out | Your longest fire lasted N days. Light a new one anytime. |
 

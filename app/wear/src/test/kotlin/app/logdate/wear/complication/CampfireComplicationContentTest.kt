@@ -16,7 +16,7 @@ class CampfireComplicationContentTest {
             runDays = 12,
             size = FireSize.CAMPFIRE,
             longestRunDays = 30,
-            totalDaysKept = 90,
+            totalDaysJournaled = 90,
             isRekindled = false,
         )
 
@@ -29,7 +29,7 @@ class CampfireComplicationContentTest {
     }
 
     @Test
-    fun `embers keep the day count of the fire they can rekindle`() {
+    fun `embers show the day count of the fire they can rekindle`() {
         val content = fire.copy(phase = FirePhase.EMBERS, loggedToday = false).toComplicationContent()
 
         assertEquals(R.drawable.ic_campfire_embers, content.iconRes)

@@ -42,7 +42,7 @@ internal val campfireSamples: List<CampfirePresentation> =
             runDays = 1,
             size = CampfireSize.SPARK,
             longestRunDays = 1,
-            totalDaysKept = 1,
+            totalDaysJournaled = 1,
         ),
         CampfirePresentation(
             phase = CampfirePhase.BURNING,
@@ -50,7 +50,7 @@ internal val campfireSamples: List<CampfirePresentation> =
             runDays = 4,
             size = CampfireSize.SMALL,
             longestRunDays = 9,
-            totalDaysKept = 30,
+            totalDaysJournaled = 30,
             isRekindled = true,
         ),
         CampfirePresentation(
@@ -59,7 +59,7 @@ internal val campfireSamples: List<CampfirePresentation> =
             runDays = 12,
             size = CampfireSize.CAMPFIRE,
             longestRunDays = 40,
-            totalDaysKept = 210,
+            totalDaysJournaled = 210,
         ),
         CampfirePresentation(
             phase = CampfirePhase.BURNING,
@@ -67,7 +67,7 @@ internal val campfireSamples: List<CampfirePresentation> =
             runDays = 45,
             size = CampfireSize.BONFIRE,
             longestRunDays = 45,
-            totalDaysKept = 260,
+            totalDaysJournaled = 260,
         ),
         CampfirePresentation(
             phase = CampfirePhase.BURNING,
@@ -75,7 +75,7 @@ internal val campfireSamples: List<CampfirePresentation> =
             runDays = 120,
             size = CampfireSize.BEACON,
             longestRunDays = 120,
-            totalDaysKept = 400,
+            totalDaysJournaled = 400,
         ),
         CampfirePresentation(
             phase = CampfirePhase.BURNING,
@@ -83,19 +83,19 @@ internal val campfireSamples: List<CampfirePresentation> =
             runDays = 12,
             size = CampfireSize.CAMPFIRE,
             longestRunDays = 40,
-            totalDaysKept = 210,
+            totalDaysJournaled = 210,
         ),
         CampfirePresentation(
             phase = CampfirePhase.EMBERS,
             runDays = 12,
             size = CampfireSize.CAMPFIRE,
             longestRunDays = 40,
-            totalDaysKept = 210,
+            totalDaysJournaled = 210,
         ),
         CampfirePresentation(
             phase = CampfirePhase.OUT,
             longestRunDays = 23,
-            totalDaysKept = 64,
+            totalDaysJournaled = 64,
         ),
     )
 

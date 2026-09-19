@@ -38,7 +38,7 @@ import logdate.client.feature.core.generated.resources.streaks
 import logdate.client.feature.core.generated.resources.track_journaling_streak
 import logdate.client.ui.generated.resources.campfire_rekindled
 import logdate.client.ui.generated.resources.campfire_rules
-import logdate.client.ui.generated.resources.campfire_stat_days_kept
+import logdate.client.ui.generated.resources.campfire_stat_days_journaled
 import logdate.client.ui.generated.resources.campfire_stat_longest_fire
 import logdate.client.ui.generated.resources.campfire_stat_this_fire
 import org.jetbrains.compose.resources.stringResource
@@ -183,7 +183,7 @@ private fun CampfireStats(
                 label = stringResource(UiRes.string.campfire_stat_this_fire),
             )
             CampfireStat(value = campfire.longestRunDays, label = stringResource(UiRes.string.campfire_stat_longest_fire))
-            CampfireStat(value = campfire.totalDaysKept, label = stringResource(UiRes.string.campfire_stat_days_kept))
+            CampfireStat(value = campfire.totalDaysJournaled, label = stringResource(UiRes.string.campfire_stat_days_journaled))
         }
     }
 }

@@ -56,7 +56,7 @@ enum class FireSize {
  * @property runDays Days logged on the current fire; 0 when [phase] is [FirePhase.UNLIT] or [FirePhase.OUT].
  * @property size How big the current fire is; `null` when there is no fire.
  * @property longestRunDays Days logged on the longest fire, including the current one.
- * @property totalDaysKept Distinct days with at least one entry, across all history.
+ * @property totalDaysJournaled Distinct days with at least one entry, across all history.
  * @property isRekindled Whether the current fire began after an earlier fire went out.
  */
 data class CampfireState(
@@ -65,6 +65,6 @@ data class CampfireState(
     val runDays: Int,
     val size: FireSize?,
     val longestRunDays: Int,
-    val totalDaysKept: Int,
+    val totalDaysJournaled: Int,
     val isRekindled: Boolean,
 )
