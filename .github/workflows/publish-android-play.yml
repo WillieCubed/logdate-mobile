@@ -19,14 +19,15 @@ jobs:
   publish-internal:
     name: Publish Android internal release
     if: ${{ vars.LOGDATE_PLAY_INTERNAL_PUBLISH_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main') }}
+    environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
+      id-token: write
 
     env:
       PLAY_TRACK: internal
-      ANDROID_PUBLISHER_CREDENTIALS: ${{ secrets.ANDROID_PUBLISHER_CREDENTIALS }}
       LOGDATE_RELEASE_STORE_BASE64: ${{ secrets.LOGDATE_RELEASE_STORE_BASE64 }}
       LOGDATE_RELEASE_STORE_PASSWORD: ${{ secrets.LOGDATE_RELEASE_STORE_PASSWORD }}
       LOGDATE_RELEASE_KEY_ALIAS: ${{ secrets.LOGDATE_RELEASE_KEY_ALIAS }}
@@ -37,6 +38,12 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Authenticate as the Play publishing service account
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.LOGDATE_PLAY_SERVICE_ACCOUNT }}
 
       - name: Materialize release Firebase config
         uses: ./.github/actions/setup-firebase-configs
@@ -70,6 +77,7 @@ jobs:
       - name: Publish release bundle to Play internal track
         run: >
           ./gradlew :app:android-main:publishReleaseBundle
+          -Plogdate.backendUrl=https://cloud.logdate.app
           --release-name "${{ steps.version.outputs.internal_release_name }}"
         env:
           LOGDATE_PLAY_TRACK: ${{ env.PLAY_TRACK }}
@@ -97,20 +105,24 @@ jobs:
   publish-production:
     name: Promote Android release to production
     if: ${{ vars.LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/android-v') }}
-    environment: android-production
+    environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: write
-
-    env:
-      ANDROID_PUBLISHER_CREDENTIALS: ${{ secrets.ANDROID_PUBLISHER_CREDENTIALS }}
+      id-token: write
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Authenticate as the Play publishing service account
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.LOGDATE_PLAY_SERVICE_ACCOUNT }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5

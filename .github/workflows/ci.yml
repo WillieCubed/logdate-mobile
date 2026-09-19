@@ -172,6 +172,28 @@ jobs:
       - name: Check function and class size limits
         run: ./gradlew detekt
 
+  scripts:
+    name: Script tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+
+      - name: Install script test dependencies
+        run: ./run setup --only test-deps --non-interactive
+
+      - name: Lint setup scripts
+        run: shellcheck -x -e SC1091 run scripts/lib/*.sh scripts/setup/*.sh scripts/setup/steps/*.sh
+
+      - name: Run script tests
+        run: ./scripts/tests/run-all.sh
+
   android-release:
     name: Android release artifact
     runs-on: ubuntu-latest
