@@ -32,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -55,11 +56,16 @@ import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.todayIn
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.ui.generated.resources.common_back
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Clock
 import kotlin.time.Instant
 import logdate.client.ui.generated.resources.Res as UiRes
 
@@ -121,7 +127,7 @@ fun OnboardingBirthdayContent(
     )
 
     if (showDatePicker) {
-        val datePickerState = rememberDatePickerState()
+        val datePickerState = rememberDatePickerState(selectableDates = remember { BirthdaySelectableDates() })
 
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -438,6 +444,22 @@ private fun BirthdayCompactContent(
             }
         }
     }
+}
+
+/**
+ * Only days before [today] can be a birthday. Age checks rely on this date, so today and later
+ * cannot be picked, typed, or confirmed.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+internal class BirthdaySelectableDates(
+    private val today: LocalDate = Clock.System.todayIn(TimeZone.currentSystemDefault()),
+) : SelectableDates {
+    // The picker reports each calendar day as its UTC midnight, whatever the device's zone.
+    private val todayUtcMillis = today.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
+
+    override fun isSelectableDate(utcTimeMillis: Long): Boolean = utcTimeMillis < todayUtcMillis
+
+    override fun isSelectableYear(year: Int): Boolean = year <= today.year
 }
 
 @Preview
