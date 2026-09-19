@@ -11,6 +11,7 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 source "$REPO_ROOT/scripts/validation/hook-common.sh"
+source "$REPO_ROOT/scripts/validation/sensitive-content.sh"
 
 errors=()
 
@@ -25,32 +26,10 @@ fi
 # 1. Sensitive file guard
 # ============================================================================
 
-sensitive_patterns=(
-    '\.env$'
-    'local\.properties$'
-    '\.keystore$'
-    '\.jks$'
-    'google-services\.json$'
-    'credentials\.json$'
-    'apikey'
-    'secret'
-    '\.pem$'
-    '\.p12$'
-    '\.tfplan$'
-    '/production\.env$'
-    '\.env\.production$'
-    '\.env\.secrets$'
-)
-
 sensitive_found=()
-for pattern in "${sensitive_patterns[@]}"; do
-    matches="$(echo "$staged_files" | grep -iE "$pattern" || true)"
-    if [[ -n "$matches" ]]; then
-        while IFS= read -r match; do
-            sensitive_found+=("$match")
-        done <<< "$matches"
-    fi
-done
+while IFS= read -r file; do
+    [[ -n "$file" ]] && is_sensitive_path "$file" && sensitive_found+=("$file")
+done <<< "$staged_files"
 
 if [[ ${#sensitive_found[@]} -gt 0 ]]; then
     sensitive_found_sorted="$(printf '%s\n' "${sensitive_found[@]}" | uniq_non_empty_lines)"
@@ -72,50 +51,15 @@ fi
 # 2. Sensitive content scan in staged additions
 # ============================================================================
 
-secret_line_patterns=(
-    'AKIA[0-9A-Z]{16}'
-    '-----BEGIN (RSA|EC|DSA|OPENSSH|PGP) PRIVATE KEY-----'
-    '(api[_-]?key|secret|token|password)[[:space:]]*[:=][[:space:]]*["'"'"'][^"'"'"']{8,}["'"'"']'
-    # URL-embedded basic-auth credentials: `…://user:pass@host` — user may
-    # be empty (Redis auth-token form), pass must be 6+ chars to avoid
-    # matching placeholder docs. Anchors on `://` so any scheme matches,
-    # including jdbc:postgresql://, postgresql://, rediss://, redis://.
-    '://[^/:@[:space:]"'"'"']*:[^/@[:space:]"'"'"']{6,}@'
-    # Postgres/JDBC query-string credentials: `?password=<value>` where
-    # value is 6+ safe chars. Catches Neon/Supabase JDBC URLs.
-    '[?&]password=[A-Za-z0-9+/=_.-]{6,}'
-    # Stripe/GitHub style hard-coded tokens
-    'sk_live_[0-9A-Za-z]{16,}'
-    'rk_live_[0-9A-Za-z]{16,}'
-    'whsec_[0-9A-Za-z]{16,}'
-    'ghp_[0-9A-Za-z]{30,}'
-    'gho_[0-9A-Za-z]{30,}'
-    # Google API keys + service account private_key blocks
-    'AIza[0-9A-Za-z_-]{30,}'
-    '"type": "service_account"'
-)
-
 secret_hits=()
 while IFS= read -r file; do
     [[ -z "$file" ]] && continue
-    if echo "$file" | grep -qE '(^|/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock)$'; then
-        continue
-    fi
-
-    # Skip test source sets — test fixtures routinely contain fake credentials
-    if echo "$file" | grep -qE '/src/(test|androidTest|commonTest|iosTest|desktopTest|wasmJsTest|androidDeviceTest|screenshotTest)/'; then
-        continue
-    fi
+    skips_content_scan "$file" && continue
 
     added_lines="$(git diff --cached --no-color -U0 -- "$file" | grep -E '^\+[^+]' | sed 's/^+//' || true)"
     [[ -z "$added_lines" ]] && continue
 
-    for pattern in "${secret_line_patterns[@]}"; do
-        if echo "$added_lines" | grep -qiE -e "$pattern"; then
-            secret_hits+=("$file")
-            break
-        fi
-    done
+    text_has_secret "$added_lines" && secret_hits+=("$file")
 done <<< "$staged_files"
 
 if [[ ${#secret_hits[@]} -gt 0 ]]; then
