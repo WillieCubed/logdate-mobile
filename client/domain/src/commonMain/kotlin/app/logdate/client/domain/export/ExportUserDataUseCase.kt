@@ -32,6 +32,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.okio.encodeToBufferedSink
 import okio.BufferedSink
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -88,7 +89,7 @@ class ExportUserDataUseCase(
                 emit(ExportProgress.InProgress(0.1f, ExportStage.COLLECTING_JOURNALS))
                 val journals =
                     if (includeJournals) {
-                        runCatching { journalRepository.allJournalsObserved.first() }
+                        runCatchingUnlessCancelled { journalRepository.allJournalsObserved.first() }
                             .onFailure { issues.record(ExportIssueCode.JOURNALS_UNAVAILABLE, it) }
                             .getOrDefault(emptyList())
                     } else {
@@ -99,7 +100,7 @@ class ExportUserDataUseCase(
                 val notes =
                     if (includeNotes) {
                         val allNotes =
-                            runCatching { journalNotesRepository.allNotesObserved.first() }
+                            runCatchingUnlessCancelled { journalNotesRepository.allNotesObserved.first() }
                                 .onFailure { issues.record(ExportIssueCode.NOTES_UNAVAILABLE, it) }
                                 .getOrDefault(emptyList())
                         if (dateRangeCutoff != null) {
@@ -115,7 +116,7 @@ class ExportUserDataUseCase(
                 val drafts =
                     if (includeDrafts) {
                         val allDrafts =
-                            runCatching { journalRepository.getAllDrafts() }
+                            runCatchingUnlessCancelled { journalRepository.getAllDrafts() }
                                 .onFailure { issues.record(ExportIssueCode.DRAFTS_UNAVAILABLE, it) }
                                 .getOrDefault(emptyList())
                         if (dateRangeCutoff != null) {
@@ -128,7 +129,7 @@ class ExportUserDataUseCase(
                     }
 
                 val appInfo =
-                    runCatching { appInfoProvider.getAppInfo() }
+                    runCatchingUnlessCancelled { appInfoProvider.getAppInfo() }
                         .onFailure { issues.record(ExportIssueCode.APP_INFO_UNAVAILABLE, it) }
                         .getOrDefault(
                             AppInfo(
@@ -138,11 +139,11 @@ class ExportUserDataUseCase(
                             ),
                         )
                 val deviceId =
-                    runCatching { deviceIdProvider.getDeviceId().value.toString() }
+                    runCatchingUnlessCancelled { deviceIdProvider.getDeviceId().value.toString() }
                         .onFailure { issues.record(ExportIssueCode.DEVICE_ID_UNAVAILABLE, it) }
                         .getOrDefault("unknown-device")
                 val userId =
-                    runCatching {
+                    runCatchingUnlessCancelled {
                         userStateRepository
                             .userData
                             .first()
@@ -152,15 +153,15 @@ class ExportUserDataUseCase(
                     }.onFailure { issues.record(ExportIssueCode.USER_ID_UNAVAILABLE, it) }
                         .getOrDefault("local-user")
                 val profile =
-                    runCatching { profileRepository.getCurrentProfile() }
+                    runCatchingUnlessCancelled { profileRepository.getCurrentProfile() }
                         .onFailure { issues.record(ExportIssueCode.PROFILE_UNAVAILABLE, it) }
                         .getOrDefault(LogDateProfile())
                 val places =
-                    runCatching { userPlacesRepository.getAllPlaces() }
+                    runCatchingUnlessCancelled { userPlacesRepository.getAllPlaces() }
                         .onFailure { issues.record(ExportIssueCode.PLACES_UNAVAILABLE, it) }
                         .getOrDefault(emptyList())
                 val locationHistory =
-                    runCatching {
+                    runCatchingUnlessCancelled {
                         locationHistoryRepository
                             .getAllLocationHistory()
                             .filter { item -> dateRangeCutoff == null || item.timestamp >= dateRangeCutoff }
@@ -225,7 +226,7 @@ class ExportUserDataUseCase(
                     if (includeJournals && includeNotes) {
                         val journalIds = journals.map { it.id }.toSet()
                         val notesByUid = notes.associateBy { it.uid }
-                        runCatching {
+                        runCatchingUnlessCancelled {
                             journalNotesRepository
                                 .getAllJournalNoteLinks()
                                 .filter { (journalId, noteId) ->
@@ -247,7 +248,7 @@ class ExportUserDataUseCase(
 
                 val mediaFiles =
                     if (includeMedia) {
-                        runCatching { getMediaFilesToExport(exportNotes, exportDrafts) }
+                        runCatchingUnlessCancelled { getMediaFilesToExport(exportNotes, exportDrafts) }
                             .onFailure { issues.record(ExportIssueCode.MEDIA_MANIFEST_UNAVAILABLE, it) }
                             .getOrDefault(emptyList())
                     } else {
@@ -301,6 +302,8 @@ class ExportUserDataUseCase(
                         ),
                     ),
                 )
+            } catch (cancellation: CancellationException) {
+                throw cancellation
             } catch (exception: Exception) {
                 Napier.e("Export failed", exception)
                 emit(ExportProgress.Failed(ExportError.UNKNOWN))
