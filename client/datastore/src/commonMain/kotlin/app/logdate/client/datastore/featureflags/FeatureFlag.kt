@@ -41,6 +41,15 @@ enum class FeatureFlag(
      * On by default: intended to ship as a headline capability rather than a hidden lab feature.
      */
     PEOPLE(key = "people_enabled", defaultEnabled = true),
+
+    /**
+     * The 2.0 export archive: a self-describing folder layout with a README, readable copies of
+     * every entry, portable file names and checksums.
+     *
+     * Off by default until restore can read the new layout. It gates only what an export writes;
+     * cloud backups keep the current layout until an app version that reads 2.0 has shipped.
+     */
+    EXPORT_ARCHIVE_V2(key = "export_archive_v2_enabled", defaultEnabled = false),
     ;
 
     companion object {

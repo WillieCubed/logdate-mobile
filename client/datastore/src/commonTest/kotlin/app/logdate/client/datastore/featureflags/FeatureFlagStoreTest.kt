@@ -25,6 +25,7 @@ class FeatureFlagStoreTest {
             assertFalse(store.isEnabled(FeatureFlag.LIBRARY))
             assertTrue(store.isEnabled(FeatureFlag.EVENTS))
             assertTrue(store.isEnabled(FeatureFlag.PEOPLE))
+            assertFalse(store.isEnabled(FeatureFlag.EXPORT_ARCHIVE_V2))
         }
 
     @Test
@@ -46,6 +47,11 @@ class FeatureFlagStoreTest {
 
             assertTrue(store.observe(FeatureFlag.LIBRARY).first())
         }
+
+    @Test
+    fun `the export archive flag keeps the key it shipped under`() {
+        assertEquals("export_archive_v2_enabled", FeatureFlag.EXPORT_ARCHIVE_V2.key)
+    }
 
     @Test
     fun `a flag is stored under its declared key`() =
