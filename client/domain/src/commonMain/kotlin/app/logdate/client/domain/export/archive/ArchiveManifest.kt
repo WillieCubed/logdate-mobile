@@ -74,6 +74,9 @@ enum class ArchiveCategory {
     @SerialName("drafts")
     DRAFTS,
 
+    @SerialName("editorDrafts")
+    EDITOR_DRAFTS,
+
     @SerialName("media")
     MEDIA,
 

@@ -40,6 +40,9 @@ class MediaResolution(
     )
 
     operator fun get(reference: String): ResolvedMedia? = byReference[reference]
+
+    /** True when at least one file the entries refer to could not be included. */
+    val hasOmittedFiles: Boolean get() = byReference.values.any { it is ResolvedMedia.Omitted }
 }
 
 /**
@@ -69,7 +72,7 @@ class MediaResolver(
     private suspend fun resolveOne(request: MediaRequest): ResolvedMedia {
         val header = readHeader(request.reference) ?: return ResolvedMedia.Omitted(ArchiveOmissionReason.UNREADABLE)
         val type = MediaTypeSniffer.sniff(header, extensionOf(request.reference), request.kind)
-        val path = namer.nameFor(request.kind, request.capturedAt, request.zone, type.extension)
+        val path = namer.nameFor(kindOf(type) ?: request.kind, request.capturedAt, request.zone, type.extension)
         return ResolvedMedia.Included(path, type)
     }
 
@@ -97,6 +100,15 @@ class MediaResolver(
             null
         }
     }
+
+    /** The folder follows what the bytes are, so a camera capture that turned out to be a video is filed as one. */
+    private fun kindOf(type: MediaType): MediaKind? =
+        when {
+            type.mimeType.startsWith("image/") -> MediaKind.PHOTO
+            type.mimeType.startsWith("video/") -> MediaKind.VIDEO
+            type.mimeType.startsWith("audio/") -> MediaKind.AUDIO
+            else -> null
+        }
 
     private fun extensionOf(reference: String): String? {
         val name = reference.substringAfterLast('/').substringBefore('?')

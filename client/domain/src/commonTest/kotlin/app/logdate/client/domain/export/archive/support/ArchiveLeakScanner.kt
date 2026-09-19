@@ -18,6 +18,11 @@ object ArchiveLeakScanner {
     private val userText =
         setOf("text", "caption", "title", "description", "bio", "originalBio", "transcription", "displayName", "placeName", "name")
 
+    /** Identifiers that name a standard rather than a place: a JSON Schema dialect is not fetched. */
+    private val standardIdentifiers = setOf("\$schema")
+
+    private val exempt = userText + standardIdentifiers
+
     private val patterns =
         listOf(
             Regex("""^(content|file|ph|assets-library|https?)://"""),
@@ -47,7 +52,7 @@ object ArchiveLeakScanner {
             is JsonArray -> element.flatMap { findIn(it, key) }
             JsonNull -> emptyList()
             is JsonPrimitive ->
-                if (key in userText ||
+                if (key in exempt ||
                     !element.isString
                 ) {
                     emptyList()

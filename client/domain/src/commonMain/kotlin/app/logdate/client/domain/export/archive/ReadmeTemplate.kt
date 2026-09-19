@@ -182,6 +182,7 @@ object ReadmeTemplate {
             ArchiveCategory.JOURNALS -> "journals"
             ArchiveCategory.NOTES -> "entries"
             ArchiveCategory.DRAFTS -> "unfinished drafts"
+            ArchiveCategory.EDITOR_DRAFTS -> "drafts you had open in the entry editor"
             ArchiveCategory.MEDIA -> "photos, videos and voice recordings"
             ArchiveCategory.PROFILE -> "your profile"
             ArchiveCategory.PLACES -> "saved places"

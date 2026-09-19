@@ -30,7 +30,7 @@ import kotlin.uuid.Uuid
 /**
  * In-memory journal repository that supports both export-side reads and import-side writes.
  */
-internal class RoundTripJournalRepository : JournalRepository {
+class RoundTripJournalRepository : JournalRepository {
     private val journalsFlow = MutableStateFlow<List<Journal>>(emptyList())
     private val journals = mutableMapOf<Uuid, Journal>()
     private val drafts = mutableListOf<EditorDraft>()
@@ -90,7 +90,7 @@ internal class RoundTripJournalRepository : JournalRepository {
 /**
  * In-memory notes repository that supports both export-side reads and import-side writes.
  */
-internal class RoundTripJournalNotesRepository : JournalNotesRepository {
+class RoundTripJournalNotesRepository : JournalNotesRepository {
     private val notesFlow = MutableStateFlow<List<JournalNote>>(emptyList())
     private val notes = mutableMapOf<Uuid, JournalNote>()
     var notesByJournal: Map<Uuid, List<JournalNote>> = emptyMap()
@@ -160,7 +160,7 @@ internal class RoundTripJournalNotesRepository : JournalNotesRepository {
 /**
  * In-memory content repository that tracks journal-note links.
  */
-internal class RoundTripJournalContentRepository : JournalContentRepository {
+class RoundTripJournalContentRepository : JournalContentRepository {
     private val links = mutableListOf<Pair<Uuid, Uuid>>()
 
     fun allLinks(): List<Pair<Uuid, Uuid>> = links.toList()
@@ -197,7 +197,7 @@ internal class RoundTripJournalContentRepository : JournalContentRepository {
     override fun observeJournalsForContents(contentIds: Set<Uuid>): Flow<Map<Uuid, List<Journal>>> = flowOf(emptyMap())
 }
 
-internal class StubDeviceIdProvider(
+class StubDeviceIdProvider(
     initialId: Uuid,
 ) : DeviceIdProvider {
     private val deviceId = MutableStateFlow(initialId)
@@ -207,13 +207,13 @@ internal class StubDeviceIdProvider(
     override suspend fun refreshDeviceId() {}
 }
 
-internal class StubAppInfoProvider(
+class StubAppInfoProvider(
     private val appInfo: AppInfo,
 ) : AppInfoProvider {
     override fun getAppInfo(): AppInfo = appInfo
 }
 
-internal class StubUserStateRepository : UserStateRepository {
+class StubUserStateRepository : UserStateRepository {
     override val userData: Flow<UserData> = flowOf(UserData())
 
     override suspend fun setBirthday(birthday: Instant) {}
@@ -225,7 +225,7 @@ internal class StubUserStateRepository : UserStateRepository {
     override suspend fun addFavoriteNote(vararg noteId: String) {}
 }
 
-internal class RoundTripProfileRepository : ProfileRepository {
+class RoundTripProfileRepository : ProfileRepository {
     var profile: LogDateProfile = LogDateProfile()
 
     override val currentProfile: Flow<LogDateProfile> = flowOf(profile)
@@ -261,7 +261,7 @@ internal class RoundTripProfileRepository : ProfileRepository {
     }
 }
 
-internal class RoundTripUserPlacesRepository : UserPlacesRepository {
+class RoundTripUserPlacesRepository : UserPlacesRepository {
     var places: List<Place> = emptyList()
 
     override suspend fun getAllPlaces(): List<Place> = places
@@ -294,7 +294,7 @@ internal class RoundTripUserPlacesRepository : UserPlacesRepository {
     override suspend fun searchPlaces(query: String): List<Place> = places.filter { it.name.contains(query, ignoreCase = true) }
 }
 
-internal class RoundTripLocationHistoryRepository : LocationHistoryRepository {
+class RoundTripLocationHistoryRepository : LocationHistoryRepository {
     var entries: List<LocationHistoryItem> = emptyList()
 
     override suspend fun getAllLocationHistory(): List<LocationHistoryItem> = entries

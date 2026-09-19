@@ -116,6 +116,17 @@ class MediaResolverTest {
         }
 
     @Test
+    fun `a capture requested as a photo that is really a video is filed with the videos`() =
+        runTest {
+            val mp4 = byteArrayOf(0, 0, 0, 0x18) + "ftypmp42".encodeToByteArray() + ByteArray(30)
+
+            val resolution = resolver(FakeOpener(mapOf("capture" to mp4))).resolve(listOf(request("capture", MediaKind.PHOTO)))
+
+            val included = assertIs<ResolvedMedia.Included>(resolution["capture"])
+            assertEquals("media/videos/2026/2026-09-17_21-30-05.mp4", included.path.value)
+        }
+
+    @Test
     fun `no resolved path or type ever contains the device reference`() =
         runTest {
             val reference = "content://media/external/images/media/1000025292"
