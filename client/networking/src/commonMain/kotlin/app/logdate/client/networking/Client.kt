@@ -9,6 +9,7 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.http.HttpHeaders
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
@@ -39,9 +40,12 @@ internal fun <T : HttpClientEngineConfig> HttpClientConfig<T>.configureClientDef
             },
         )
     }
+    // Headers only: bodies include whole media uploads, and logging one as text allocates
+    // twice its size in a single string.
     install(Logging) {
         logger = NapierLogger
         level = LogLevel.HEADERS
+        sanitizeHeader { header -> header == HttpHeaders.Authorization }
     }
 }
 
