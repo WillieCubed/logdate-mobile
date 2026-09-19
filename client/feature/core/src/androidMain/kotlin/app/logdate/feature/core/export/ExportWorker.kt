@@ -3,21 +3,30 @@ package app.logdate.feature.core.export
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
+import android.provider.DocumentsContract
 import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.export.ExportProgress
 import app.logdate.client.domain.export.ExportResult
 import app.logdate.client.domain.export.ExportStage
 import app.logdate.client.domain.export.ExportUserDataUseCase
+import app.logdate.client.domain.export.archive.ArchiveExportOptions
+import app.logdate.client.domain.export.archive.ArchiveExportProgress
+import app.logdate.client.domain.export.archive.ArchiveExportSummary
+import app.logdate.client.domain.export.archive.ExportArchiveUseCase
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.catch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.io.File
 import java.io.FileOutputStream
+import java.io.OutputStream
+import java.util.zip.ZipOutputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -48,6 +57,8 @@ class ExportWorker(
     }
 
     private val exportUserDataUseCase: ExportUserDataUseCase by inject()
+    private val exportArchiveUseCase: ExportArchiveUseCase by inject()
+    private val featureFlags: FeatureFlagStore by inject()
     private val exportLauncher: ExportLauncher by inject()
     private val archiveWriter = AndroidExportArchiveWriter(context)
     private val notificationHelper = ExportNotificationHelper(context, Uuid.parse(id.toString()))
@@ -74,6 +85,8 @@ class ExportWorker(
         // POST_NOTIFICATIONS permission on Android 13+), the export still runs.
         trySetForeground(getForegroundInfo())
         Napier.i("ExportWorker: Foreground service setup complete")
+
+        if (featureFlags.isEnabled(FeatureFlag.EXPORT_ARCHIVE_V2)) return runArchiveExport()
 
         return try {
             var finalResult = Result.success()
@@ -167,6 +180,87 @@ class ExportWorker(
             Napier.e("Worker execution failed", exception)
             trySetForeground(notificationHelper.createErrorInfo(WORKER_FAILED_MESSAGE))
             failureResult(WORKER_FAILED_MESSAGE)
+        }
+    }
+
+    /** Where a 2.0 archive is written, and how to remove it if the export does not finish. */
+    private class ArchiveTarget(
+        val stream: OutputStream,
+        val path: String,
+        val discard: () -> Unit,
+    )
+
+    private fun openArchiveTarget(): ArchiveTarget? {
+        val destination = destinationUri
+        if (destination != null) {
+            val stream = context.contentResolver.openOutputStream(destination) ?: return null
+            return ArchiveTarget(stream, destination.toString()) {
+                runCatching { DocumentsContract.deleteDocument(context.contentResolver, destination) }
+            }
+        }
+        val file = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), generateExportFileName())
+        return ArchiveTarget(FileOutputStream(file), file.absolutePath) { file.delete() }
+    }
+
+    /**
+     * Writes a 2.0 archive straight into its destination. If the export fails or is cancelled the
+     * partly written file is removed, so a truncated archive never sits where a real one should.
+     */
+    private suspend fun runArchiveExport(): Result {
+        val target =
+            openArchiveTarget() ?: run {
+                trySetForeground(notificationHelper.createErrorInfo(ARCHIVE_WRITE_FAILED_MESSAGE))
+                return failureResult(ARCHIVE_WRITE_FAILED_MESSAGE)
+            }
+        var finished = false
+        try {
+            var summary: ArchiveExportSummary? = null
+            var failure: String? = null
+            val options = ArchiveExportOptions(includeJournals, includeNotes, includeDrafts, includeMedia, from = dateRangeCutoff)
+            ZipOutputStream(target.stream.buffered()).use { zip ->
+                exportArchiveUseCase.export(options, ZipStreamArchiveContainer(zip)).collect { progress ->
+                    when (progress) {
+                        ArchiveExportProgress.Starting -> {
+                            trySetForeground(notificationHelper.createForegroundInfo(0, "Starting export..."))
+                            emitProgress(0, "Starting export...")
+                        }
+                        is ArchiveExportProgress.InProgress -> {
+                            val percent = (progress.fraction * 100).toInt()
+                            trySetForeground(notificationHelper.createForegroundInfo(percent, progress.stage.defaultMessage))
+                            emitProgress(percent, progress.stage.defaultMessage)
+                        }
+                        is ArchiveExportProgress.Completed -> summary = progress.summary
+                        is ArchiveExportProgress.Failed -> failure = progress.error.defaultMessage
+                    }
+                }
+            }
+            val completed = summary
+            if (failure != null || completed == null) {
+                val message = failure ?: EXPORT_FAILED_MESSAGE
+                trySetForeground(notificationHelper.createErrorInfo(message))
+                return failureResult(message)
+            }
+
+            finished = true
+            trySetForeground(notificationHelper.createCompletionInfo(target.path))
+            exportLauncher.updateProgress(
+                ExportProgressInfo(
+                    isActive = false,
+                    progressPercent = 100,
+                    message = "Export completed",
+                    completedFilePath = target.path,
+                    stats = completed.counts.toExportStats(),
+                ),
+            )
+            return Result.success(workDataOf(PROGRESS_KEY to 100, MESSAGE_KEY to "Export completed", FILE_PATH_KEY to target.path))
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (exception: Throwable) {
+            Napier.e("Archive export failed", exception)
+            trySetForeground(notificationHelper.createErrorInfo(ARCHIVE_WRITE_FAILED_MESSAGE))
+            return failureResult(ARCHIVE_WRITE_FAILED_MESSAGE)
+        } finally {
+            if (!finished) target.discard()
         }
     }
 

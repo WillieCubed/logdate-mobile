@@ -3,12 +3,14 @@ package app.logdate.feature.core.di
 import android.app.Activity
 import app.logdate.client.domain.di.accountModule
 import app.logdate.client.domain.di.domainModule
+import app.logdate.client.domain.export.archive.MediaSourceOpener
 import app.logdate.client.location.di.locationSettingsModule
 import app.logdate.feature.core.AndroidBiometricGatekeeper
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.BiometricGatekeeper
 import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.feature.core.export.AndroidExportLauncher
+import app.logdate.feature.core.export.AndroidMediaSourceOpener
 import app.logdate.feature.core.export.ExportLauncher
 import app.logdate.feature.core.export.ExportWorker
 import app.logdate.feature.core.export.UserDataExportViewModel
@@ -67,6 +69,7 @@ actual val coreFeatureModule: Module =
         single { ActivityProvider() }
 
         // Single instance exposed as both concrete type and interface
+        single<MediaSourceOpener> { AndroidMediaSourceOpener(androidContext()) }
         single { AndroidExportLauncher(androidContext()) }
         single<ExportLauncher> { get<AndroidExportLauncher>() }
         workerOf(::ExportWorker)

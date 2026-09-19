@@ -2,12 +2,14 @@ package app.logdate.feature.core.di
 
 import app.logdate.client.domain.di.accountModule
 import app.logdate.client.domain.di.domainModule
+import app.logdate.client.domain.export.archive.MediaSourceOpener
 import app.logdate.client.location.di.locationSettingsModule
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.BiometricGatekeeper
 import app.logdate.feature.core.NoOpBiometricGatekeeper
 import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.feature.core.export.DesktopExportLauncher
+import app.logdate.feature.core.export.DesktopMediaSourceOpener
 import app.logdate.feature.core.export.ExportLauncher
 import app.logdate.feature.core.export.UserDataExportViewModel
 import app.logdate.feature.core.main.HomeViewModel
@@ -58,6 +60,7 @@ actual val coreFeatureModule: Module =
         single<MemoriesWidgetInstallController> { HiddenMemoriesWidgetInstallController() }
 
         // Export functionality for desktop
+        single<MediaSourceOpener> { DesktopMediaSourceOpener() }
         single<ExportLauncher> { DesktopExportLauncher() }
         single<RestoreLauncher> { DesktopRestoreLauncher() }
         factory { ServerConfigurationCoordinator(get(), get(), get()) }

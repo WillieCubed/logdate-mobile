@@ -3,6 +3,7 @@ package app.logdate.feature.core.export
 import app.logdate.client.domain.export.ExportError
 import app.logdate.client.domain.export.ExportStage
 import app.logdate.client.domain.export.ExportStats
+import app.logdate.client.domain.export.archive.ArchiveCounts
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -130,3 +131,14 @@ internal fun ExportDateRange.toCutoffInstant(now: Instant = Clock.System.now()):
         is ExportDateRange.LastYear -> now - 365.days
         is ExportDateRange.Custom -> start
     }
+
+internal fun ArchiveCounts.toExportStats() =
+    ExportStats(
+        journalCount = journals,
+        noteCount = notes,
+        draftCount = drafts,
+        mediaCount = media,
+        placeCount = places,
+        locationHistoryCount = locationSamples,
+        hasProfile = hasProfile,
+    )

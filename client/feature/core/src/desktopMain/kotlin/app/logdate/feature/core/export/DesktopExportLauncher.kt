@@ -1,5 +1,7 @@
 package app.logdate.feature.core.export
 
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.export.ExportIssue
 import app.logdate.client.domain.export.ExportIssueCode
@@ -7,6 +9,10 @@ import app.logdate.client.domain.export.ExportMediaFile
 import app.logdate.client.domain.export.ExportProgress
 import app.logdate.client.domain.export.ExportResult
 import app.logdate.client.domain.export.ExportUserDataUseCase
+import app.logdate.client.domain.export.archive.ArchiveExportOptions
+import app.logdate.client.domain.export.archive.ArchiveExportProgress
+import app.logdate.client.domain.export.archive.ArchiveExportSummary
+import app.logdate.client.domain.export.archive.ExportArchiveUseCase
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +48,8 @@ class DesktopExportLauncher :
     )
 
     private val exportUserDataUseCase: ExportUserDataUseCase by inject()
+    private val exportArchiveUseCase: ExportArchiveUseCase by inject()
+    private val featureFlags: FeatureFlagStore by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var currentExportJob: Job? = null
     private var completionCallback: ((ExportOutcome) -> Unit)? = null
@@ -82,6 +90,11 @@ class DesktopExportLauncher :
                     }
 
                     Napier.i("Desktop: Starting export to ${selectedFile.absolutePath}")
+
+                    if (featureFlags.isEnabled(FeatureFlag.EXPORT_ARCHIVE_V2)) {
+                        runArchiveExport(selectedFile, options)
+                        return@launch
+                    }
 
                     // Resolve date range cutoff
                     val dateRangeCutoff = options.dateRange.toCutoffInstant()
@@ -153,6 +166,75 @@ class DesktopExportLauncher :
                     completionCallback?.invoke(ExportOutcome.Failed("Export could not be completed."))
                 }
             }
+    }
+
+    /**
+     * Writes a 2.0 archive straight into the chosen file. A partly written file is removed if the
+     * export fails or is cancelled, so a truncated archive never sits where a real one should.
+     */
+    private suspend fun runArchiveExport(
+        selectedFile: File,
+        options: ExportOptions,
+    ) {
+        val zipFile = if (selectedFile.name.endsWith(".zip")) selectedFile else File(selectedFile.absolutePath + ".zip")
+        var finished = false
+        try {
+            var summary: ArchiveExportSummary? = null
+            var failure: String? = null
+            val archiveOptions =
+                ArchiveExportOptions(
+                    includeJournals = options.includeJournals,
+                    includeNotes = options.includeNotes,
+                    includeDrafts = options.includeDrafts,
+                    includeMedia = options.includeMedia,
+                    from = options.dateRange.toCutoffInstant(),
+                )
+            ZipOutputStream(FileOutputStream(zipFile).buffered()).use { zip ->
+                exportArchiveUseCase.export(archiveOptions, ZipStreamArchiveContainer(zip)).collect { progress ->
+                    when (progress) {
+                        ArchiveExportProgress.Starting -> Napier.i("Desktop: Archive export started")
+                        is ArchiveExportProgress.InProgress ->
+                            updateProgress(
+                                ExportProgressInfo(
+                                    isActive = true,
+                                    progressPercent = (progress.fraction * 100).toInt(),
+                                    message = progress.stage.defaultMessage,
+                                ),
+                            )
+                        is ArchiveExportProgress.Completed -> summary = progress.summary
+                        is ArchiveExportProgress.Failed -> failure = progress.error.defaultMessage
+                    }
+                }
+            }
+            val completed = summary
+            if (failure != null || completed == null) {
+                val message = failure ?: "Export could not be completed."
+                showExportErrorDialog(message)
+                completionCallback?.invoke(ExportOutcome.Failed(message))
+                return
+            }
+
+            finished = true
+            Napier.i("Desktop: Archive export completed to ${zipFile.absolutePath}")
+            showExportSuccessDialog(zipFile.absolutePath)
+            updateProgress(
+                ExportProgressInfo(
+                    isActive = false,
+                    progressPercent = 100,
+                    message = "Export completed",
+                    completedFilePath = zipFile.absolutePath,
+                    stats = completed.counts.toExportStats(),
+                ),
+            )
+        } catch (cancellation: kotlin.coroutines.cancellation.CancellationException) {
+            throw cancellation
+        } catch (e: Exception) {
+            Napier.e("Desktop: Archive export failed", e)
+            showExportErrorDialog("Could not write the export archive.")
+            completionCallback?.invoke(ExportOutcome.Failed("Could not write the export archive."))
+        } finally {
+            if (!finished) zipFile.delete()
+        }
     }
 
     override fun cancelExport() {
