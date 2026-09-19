@@ -11,7 +11,6 @@ import app.logdate.client.domain.export.ExportResult
 import app.logdate.client.domain.export.ExportUserDataUseCase
 import app.logdate.client.domain.export.archive.ArchiveExportOptions
 import app.logdate.client.domain.export.archive.ArchiveExportProgress
-import app.logdate.client.domain.export.archive.ArchiveExportSummary
 import app.logdate.client.domain.export.archive.ExportArchiveUseCase
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +34,7 @@ import java.io.FileOutputStream
 import java.net.URI
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Desktop-specific implementation for launching data export using AWT FileDialog.
@@ -160,6 +160,8 @@ class DesktopExportLauncher :
                                 }
                             }
                         }
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
                 } catch (e: Exception) {
                     Napier.e("Desktop: Export process failed", e)
                     showExportErrorDialog("Export could not be completed.")
@@ -169,73 +171,67 @@ class DesktopExportLauncher :
     }
 
     /**
-     * Writes a 2.0 archive straight into the chosen file. A partly written file is removed if the
-     * export fails or is cancelled, so a truncated archive never sits where a real one should.
+     * Writes a 2.0 archive to the chosen file. The file is only replaced once the archive is complete,
+     * so a failed or cancelled export never damages a file the person chose to overwrite.
      */
     private suspend fun runArchiveExport(
         selectedFile: File,
         options: ExportOptions,
     ) {
         val zipFile = if (selectedFile.name.endsWith(".zip")) selectedFile else File(selectedFile.absolutePath + ".zip")
-        var finished = false
+        val archiveOptions =
+            ArchiveExportOptions(
+                includeJournals = options.includeJournals,
+                includeNotes = options.includeNotes,
+                includeDrafts = options.includeDrafts,
+                includeMedia = options.includeMedia,
+                from = options.dateRange.toCutoffInstant(),
+            )
+        var completed = false
         try {
-            var summary: ArchiveExportSummary? = null
-            var failure: String? = null
-            val archiveOptions =
-                ArchiveExportOptions(
-                    includeJournals = options.includeJournals,
-                    includeNotes = options.includeNotes,
-                    includeDrafts = options.includeDrafts,
-                    includeMedia = options.includeMedia,
-                    from = options.dateRange.toCutoffInstant(),
-                )
-            ZipOutputStream(FileOutputStream(zipFile).buffered()).use { zip ->
-                exportArchiveUseCase.export(archiveOptions, ZipStreamArchiveContainer(zip)).collect { progress ->
-                    when (progress) {
-                        ArchiveExportProgress.Starting -> Napier.i("Desktop: Archive export started")
-                        is ArchiveExportProgress.InProgress ->
-                            updateProgress(
-                                ExportProgressInfo(
-                                    isActive = true,
-                                    progressPercent = (progress.fraction * 100).toInt(),
-                                    message = progress.stage.defaultMessage,
-                                ),
-                            )
-                        is ArchiveExportProgress.Completed -> summary = progress.summary
-                        is ArchiveExportProgress.Failed -> failure = progress.error.defaultMessage
-                    }
+            val outcome =
+                try {
+                    exportArchiveToFile(zipFile, { exportArchiveUseCase.export(archiveOptions, it) }, ::publishArchiveProgress)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (e: Exception) {
+                    Napier.e("Desktop: Archive export failed", e)
+                    ArchiveFileOutcome.Failed("Could not write the export archive.")
+                }
+            when (outcome) {
+                is ArchiveFileOutcome.Failed -> {
+                    updateProgress(ExportProgressInfo())
+                    showExportErrorDialog(outcome.message)
+                    completionCallback?.invoke(ExportOutcome.Failed(outcome.message))
+                }
+                is ArchiveFileOutcome.Completed -> {
+                    completed = true
+                    Napier.i("Desktop: Archive export completed to ${zipFile.absolutePath}")
+                    showExportSuccessDialog(zipFile.absolutePath)
+                    updateProgress(
+                        ExportProgressInfo(
+                            isActive = false,
+                            progressPercent = 100,
+                            message = "Export completed",
+                            completedFilePath = zipFile.absolutePath,
+                            stats = outcome.summary.counts.toExportStats(),
+                        ),
+                    )
                 }
             }
-            val completed = summary
-            if (failure != null || completed == null) {
-                val message = failure ?: "Export could not be completed."
-                showExportErrorDialog(message)
-                completionCallback?.invoke(ExportOutcome.Failed(message))
-                return
-            }
-
-            finished = true
-            Napier.i("Desktop: Archive export completed to ${zipFile.absolutePath}")
-            showExportSuccessDialog(zipFile.absolutePath)
-            updateProgress(
-                ExportProgressInfo(
-                    isActive = false,
-                    progressPercent = 100,
-                    message = "Export completed",
-                    completedFilePath = zipFile.absolutePath,
-                    stats = completed.counts.toExportStats(),
-                ),
-            )
-        } catch (cancellation: kotlin.coroutines.cancellation.CancellationException) {
-            throw cancellation
-        } catch (e: Exception) {
-            Napier.e("Desktop: Archive export failed", e)
-            showExportErrorDialog("Could not write the export archive.")
-            completionCallback?.invoke(ExportOutcome.Failed("Could not write the export archive."))
         } finally {
-            if (!finished) zipFile.delete()
+            if (!completed) updateProgress(ExportProgressInfo())
         }
     }
+
+    private fun publishArchiveProgress(progress: ArchiveExportProgress.InProgress) =
+        updateProgress(
+            ExportProgressInfo(
+                isActive = true,
+                progressPercent = (progress.fraction * 100).toInt(),
+                message = progress.stage.defaultMessage,
+            ),
+        )
 
     override fun cancelExport() {
         currentExportJob?.cancel()
