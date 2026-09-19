@@ -1,5 +1,6 @@
 package app.logdate.feature.editor.ui.editor
 
+import app.logdate.client.repository.journals.SystemCaptureTimeZone
 import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.feature.editor.ui.formatMediaDuration
 import app.logdate.shared.model.Location
@@ -15,6 +16,13 @@ sealed interface EntryBlockUiState {
     val id: Uuid
     val timestamp: Instant
     val location: Location?
+
+    /**
+     * IANA id of the time zone the device was in when the block was created, or null when the
+     * block came from a draft or note that did not record one. It is stamped with [timestamp]
+     * so a block reopened later, in another zone, keeps the zone it was written in.
+     */
+    val timeZoneId: String?
 
     fun hasContent(): Boolean
 
@@ -42,6 +50,7 @@ data class TextBlockUiState(
     override val timestamp: Instant = Clock.System.now(),
     override val location: Location? = null,
     val content: String = "",
+    override val timeZoneId: String? = SystemCaptureTimeZone.currentTimeZoneId(),
 ) : EntryBlockUiState {
     override fun hasContent(): Boolean = content.isNotBlank()
 }
@@ -55,6 +64,7 @@ data class ImageBlockUiState(
     override val location: Location? = null,
     override val uri: String? = null,
     override val caption: String = "",
+    override val timeZoneId: String? = SystemCaptureTimeZone.currentTimeZoneId(),
 ) : MediaBlockUiState {
     override fun hasContent(): Boolean = uri != null
 }
@@ -79,6 +89,7 @@ data class CameraBlockUiState(
     override val caption: String = "",
     val mediaType: CapturedMediaType = CapturedMediaType.PHOTO,
     val durationMs: Long = 0,
+    override val timeZoneId: String? = SystemCaptureTimeZone.currentTimeZoneId(),
 ) : MediaBlockUiState {
     override fun hasContent(): Boolean = uri != null
 
@@ -112,6 +123,7 @@ data class VideoBlockUiState(
     override val uri: String? = null,
     override val caption: String = "",
     val durationMs: Long = 0,
+    override val timeZoneId: String? = SystemCaptureTimeZone.currentTimeZoneId(),
 ) : MediaBlockUiState {
     override fun hasContent(): Boolean = uri != null
 
@@ -140,6 +152,7 @@ data class AudioBlockUiState(
     val captureState: AudioCaptureState = AudioCaptureState.Empty,
     override val caption: String = "",
     val transcription: String = "",
+    override val timeZoneId: String? = SystemCaptureTimeZone.currentTimeZoneId(),
 ) : MediaBlockUiState {
     override val uri: String?
         get() = (captureState as? AudioCaptureState.Ready)?.uri

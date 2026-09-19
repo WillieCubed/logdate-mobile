@@ -24,6 +24,7 @@ fun JournalNote.toDomainBlock(): EntryBlockUiState =
                 timestamp = creationTimestamp,
                 location = null, // We don't have location data from notes
                 content = content,
+                timeZoneId = timeZoneId,
             )
 
         is JournalNote.Image ->
@@ -33,6 +34,7 @@ fun JournalNote.toDomainBlock(): EntryBlockUiState =
                 location = null,
                 uri = mediaRef,
                 caption = caption,
+                timeZoneId = timeZoneId,
             )
 
         is JournalNote.Video ->
@@ -42,6 +44,7 @@ fun JournalNote.toDomainBlock(): EntryBlockUiState =
                 location = null,
                 uri = mediaRef,
                 caption = caption,
+                timeZoneId = timeZoneId,
             )
 
         is JournalNote.Audio ->
@@ -50,6 +53,7 @@ fun JournalNote.toDomainBlock(): EntryBlockUiState =
                 timestamp = creationTimestamp,
                 location = null,
                 captureState = AudioCaptureState.Ready(uri = mediaRef, durationMs = durationMs),
+                timeZoneId = timeZoneId,
             )
     }
 
@@ -68,6 +72,7 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
                 creationTimestamp = timestamp,
                 lastUpdated = now,
                 content = content,
+                timeZoneId = timeZoneId,
             )
         }
 
@@ -79,6 +84,7 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
                 lastUpdated = now,
                 mediaRef = uri ?: return null,
                 caption = caption,
+                timeZoneId = timeZoneId,
             )
         }
 
@@ -93,6 +99,7 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
                         lastUpdated = now,
                         mediaRef = mediaRef,
                         caption = caption,
+                        timeZoneId = timeZoneId,
                     )
                 CapturedMediaType.VIDEO ->
                     JournalNote.Video(
@@ -101,6 +108,7 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
                         lastUpdated = now,
                         mediaRef = mediaRef,
                         caption = caption,
+                        timeZoneId = timeZoneId,
                     )
             }
         }
@@ -113,6 +121,7 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
                 lastUpdated = now,
                 mediaRef = uri ?: return null,
                 caption = caption,
+                timeZoneId = timeZoneId,
             )
         }
 
@@ -124,6 +133,7 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
                 lastUpdated = now,
                 mediaRef = ready.uri,
                 durationMs = ready.durationMs,
+                timeZoneId = timeZoneId,
             )
         }
     }
