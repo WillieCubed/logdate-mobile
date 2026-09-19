@@ -4,11 +4,19 @@ run-name: CI for ${{ github.ref_name }} by ${{ github.actor }}
 on:
   push:
     branches: [main, develop]
+    paths-ignore: ['**/*.md', 'docs/**']
   pull_request:
     branches: [main, develop]
+    paths-ignore: ['**/*.md', 'docs/**']
 
 permissions:
   contents: read
+
+# A newer push to the same pull request makes the older run moot. Runs on
+# main are never cancelled, because staging deploys each successful one.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
@@ -62,6 +70,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Run tests
         # `test` alone reaches only the twelve JVM/Android projects; every multiplatform module
@@ -124,6 +133,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
       - name: Run e2e tests
         env:
           DATABASE_URL: jdbc:postgresql://localhost:5432/logdate
@@ -162,6 +172,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Check hardcoded Compose literals
         run: ./scripts/check_hardcoded_compose_literals.sh
@@ -223,6 +234,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       # The shipped artifact is the shrunk one. Building it here is what catches R8
       # configuration regressions - stripped serializers, renamed JNI classes - which no
@@ -244,7 +256,6 @@ jobs:
     name: Server artifact
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [test]
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -259,6 +270,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Build server
         run: ./gradlew :server:build -x test -x jacocoTestCoverageVerification
