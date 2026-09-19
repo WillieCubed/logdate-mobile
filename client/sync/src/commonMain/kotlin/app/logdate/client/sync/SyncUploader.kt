@@ -70,8 +70,8 @@ internal class SyncUploader(
 
     /**
      * Runs one upload pass, reporting an unexpected failure as a [SyncResult] for [operation]. A pass
-     * that is stopped lets go of the attempts it started, so being stopped never counts against the
-     * entries it was uploading.
+     * that is stopped or fails lets go of the attempts it started: only the app closing may leave
+     * one unfinished, so nothing else counts as that against the entries it was uploading.
      */
     private suspend inline fun uploadPass(
         operation: String,
@@ -79,13 +79,13 @@ internal class SyncUploader(
     ): SyncResult =
         try {
             pass()
-        } catch (e: CancellationException) {
-            retryCoordinator.abandonAttemptsInFlight()
-            throw e
-        } catch (e: CloudApiException) {
-            mapCloudApiError(e)
         } catch (e: Exception) {
-            mapException(e, operation)
+            retryCoordinator.abandonAttemptsInFlight()
+            when (e) {
+                is CancellationException -> throw e
+                is CloudApiException -> mapCloudApiError(e)
+                else -> mapException(e, operation)
+            }
         }
 
     suspend fun uploadJournals(accessToken: String): SyncResult {

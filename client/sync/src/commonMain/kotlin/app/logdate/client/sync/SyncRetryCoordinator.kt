@@ -82,8 +82,8 @@ internal class SyncRetryCoordinator(
 
     /**
      * Lets go of every attempt started by [beginUpload] that has not finished, for a sync that was
-     * stopped rather than crashed. Being stopped says nothing about the entry being uploaded, so it
-     * must not count towards setting that entry aside.
+     * stopped or failed rather than crashed. Neither is the app closing, so neither may count
+     * towards setting the entry aside as one.
      */
     suspend fun abandonAttemptsInFlight() {
         withContext(NonCancellable) {

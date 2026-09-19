@@ -124,6 +124,19 @@ class InterruptedUploadTest {
         }
 
     @Test
+    fun `an upload that fails with an error is not mistaken for the app closing`() =
+        runTest {
+            val entry = queueNote("fails three times, fine after")
+            val apiClient =
+                InterruptingCloudApiClient(entry, times = 3) { IllegalStateException("Could not record the upload") }
+
+            repeat(4) { restartedApp(apiClient).fullSync() }
+
+            assertTrue(deadLetters.list().isEmpty(), "an ordinary failure is not a crash: ${deadLetters.list()}")
+            assertTrue(!isQueued(entry), "the entry should have uploaded once the failure cleared")
+        }
+
+    @Test
     fun `a backup that is stopped part way does not count against the entry`() =
         runTest {
             val entry = queueNote("stopped twice, fine after")
