@@ -22,6 +22,8 @@ import app.logdate.shared.model.LocationAltitude
 import app.logdate.shared.model.Place
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.profile.LogDateProfile
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.datetime.TimeZone
 import okio.Buffer
 import okio.Source
@@ -171,17 +173,20 @@ open class ArchiveExportFixture {
             override fun now(): Instant = Instant.parse("2026-09-21T15:00:00Z")
         }
 
-    fun useCase(opener: MediaSourceOpener = readable) =
-        ExportArchiveUseCase(
-            journalRepository = journalsRepository,
-            journalNotesRepository = notesRepository,
-            profileRepository = profileRepository,
-            userPlacesRepository = placesRepository,
-            locationHistoryRepository = locationRepository,
-            userStateRepository = StubUserStateRepository(),
-            appInfoProvider = StubAppInfoProvider(AppInfo(versionName = "9.9.9", versionCode = 1, packageName = "app.logdate.test")),
-            mediaSourceOpener = opener,
-            clock = fixedClock,
-            exportZone = { denver },
-        )
+    fun useCase(
+        opener: MediaSourceOpener = readable,
+        ioDispatcher: CoroutineDispatcher = Dispatchers.Unconfined,
+    ) = ExportArchiveUseCase(
+        journalRepository = journalsRepository,
+        journalNotesRepository = notesRepository,
+        profileRepository = profileRepository,
+        userPlacesRepository = placesRepository,
+        locationHistoryRepository = locationRepository,
+        userStateRepository = StubUserStateRepository(),
+        appInfoProvider = StubAppInfoProvider(AppInfo(versionName = "9.9.9", versionCode = 1, packageName = "app.logdate.test")),
+        mediaSourceOpener = opener,
+        clock = fixedClock,
+        exportZone = { denver },
+        ioDispatcher = ioDispatcher,
+    )
 }

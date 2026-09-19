@@ -29,7 +29,7 @@ All files sit at the top level of the zip. Readers should also accept an archive
 zipped again inside one folder, as Finder and Explorer do; restore already does this for 1.x.
 
 ```
-README.txt                  Plain-language guide. Always the first file.
+README.txt                  Plain-language guide.
 manifest.json               What this archive is and contains. Programs start here.
 schema/                     JSON Schemas (draft 2020-12), one per data file.
 data/
@@ -54,10 +54,17 @@ are present.
 
 ### Why the files are in this order
 
-The archive is written in the order above: README, manifest, schemas, data, media, the media
-inventory, and `SHA256SUMS` last. Nothing depends on the order to be read, because zip readers use the
-central directory at the end of the file. The order exists so that anyone streaming the file, or
-looking at it in an archive tool, meets the explanation first.
+The media is written first. The README, the manifest, the data files and the media inventory come
+after it, and `SHA256SUMS` is written last. Nothing depends on the order to be read, because zip
+readers use the central directory at the end of the file, and Finder and Explorer list the top-level
+files alphabetically.
+
+The order exists because the README, the manifest and the notes must state exactly which media files
+the archive contains. A media file can become unreadable between the moment the export plans it and the
+moment it is copied, for example when the person deletes a photo or a cloud provider removes its local
+copy. Because the files that describe the archive are written after the copy, that file is reported as
+omitted and the export still finishes. A file that fails halfway through being read cannot be taken
+back out of the zip, so that case ends the export with an error.
 
 ## Reading an archive
 
@@ -169,9 +176,12 @@ The code is in `client/domain/src/commonMain/kotlin/app/logdate/client/domain/ex
    its first bytes, gives it a path, and records whether it is included or why it is not. Because this
    finishes before anything is written, the manifest, the README and every note can state exactly what
    is and is not in the archive.
-2. **Write.** `ArchiveWriter` writes the files in order into an `ArchiveContainer`. Every byte passes
-   through a hashing sink into a `HashLedger`, so no whole file is loaded into memory, and `SHA256SUMS` and
-   `data/media.json` are both drawn from the same ledger and cannot disagree.
+2. **Write.** `ArchiveWriter` copies the media into an `ArchiveContainer`, then writes the README, the
+   manifest, the schemas and the data files. A media file that cannot be opened at this point is dropped
+   from the plan and reported as omitted. Every byte passes through a hashing sink into a `HashLedger`,
+   so no whole file is loaded into memory, and `SHA256SUMS` and `data/media.json` are both drawn from the
+   same ledger and cannot disagree. The work runs on the IO dispatcher because zip writes, hashing and
+   media reads block.
 
 The pieces that stop device internals from entering the archive:
 

@@ -1,6 +1,8 @@
 package app.logdate.client.domain.export.archive
 
+import io.github.aakira.napier.Napier
 import okio.Source
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Opens a media file by the reference the app stored for it.
@@ -13,3 +15,14 @@ fun interface MediaSourceOpener {
     /** A source for [reference] that the caller must close, or null when the file cannot be found. */
     suspend fun open(reference: String): Source?
 }
+
+/** Opens [reference], treating a file that cannot be opened for any reason other than cancellation as absent. */
+internal suspend fun MediaSourceOpener.openOrNull(reference: String): Source? =
+    try {
+        open(reference)
+    } catch (cancellation: CancellationException) {
+        throw cancellation
+    } catch (failure: Exception) {
+        Napier.w("Media file could not be opened for export", failure)
+        null
+    }

@@ -6,7 +6,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.datetime.TimeZone
 import okio.Buffer
 import okio.use
-import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Instant
 
 /** A media file an entry refers to, and the time and zone to name it by. */
@@ -43,6 +42,16 @@ class MediaResolution(
 
     /** True when at least one file the entries refer to could not be included. */
     val hasOmittedFiles: Boolean get() = byReference.values.any { it is ResolvedMedia.Omitted }
+
+    /** This resolution with [references] omitted as unreadable, for files that could not be opened when they were copied. */
+    fun withUnreadable(references: Set<String>): MediaResolution {
+        if (references.isEmpty()) return this
+        val unreadable = ResolvedMedia.Omitted(ArchiveOmissionReason.UNREADABLE)
+        return MediaResolution(
+            byReference.mapValues { (reference, resolved) -> if (reference in references) unreadable else resolved },
+            files.filter { it.reference !in references },
+        )
+    }
 }
 
 /**
@@ -77,15 +86,7 @@ class MediaResolver(
     }
 
     private suspend fun readHeader(reference: String): ByteArray? {
-        val source =
-            try {
-                opener.open(reference)
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (failure: Exception) {
-                Napier.w("Media file could not be opened for export", failure)
-                return null
-            } ?: return null
+        val source = opener.openOrNull(reference) ?: return null
 
         return try {
             source.use {

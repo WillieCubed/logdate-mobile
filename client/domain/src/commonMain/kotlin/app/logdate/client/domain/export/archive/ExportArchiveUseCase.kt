@@ -9,14 +9,18 @@ import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.places.UserPlacesRepository
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.Place
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.datetime.TimeZone
+import okio.use
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 
@@ -24,12 +28,15 @@ import kotlin.time.Clock
  * Builds a 2.0 export archive: a self-describing, checksummed copy of the person's data that needs
  * nothing but a file browser to make sense of.
  *
- * The work happens in two passes. First everything is read and every media file is resolved, so the
- * manifest and README can state exactly what is included and what is not. Then the files are written
- * in a fixed order, README and manifest first and `SHA256SUMS` last, straight into [ArchiveContainer].
- * Nothing the device stored for a file, such as a content URI or a path, is ever written into it.
+ * Everything is read and every media file is resolved first, so each file has its path and type.
+ * The media is then copied into [ArchiveContainer], and only after that are the README, the manifest,
+ * the data files and `SHA256SUMS` (last) written. A file that cannot be opened when its turn comes is
+ * dropped from the plan and reported as omitted, so the files that describe the archive state exactly
+ * what it holds. Nothing the device stored for a file, such as a content URI or a path, is ever written
+ * into it.
  *
- * Cancellation stops the export where it is; the caller owns cleaning up a partly written container.
+ * The work runs on [ioDispatcher], because zip writes, hashing and media reads block. Cancellation stops
+ * the export where it is; the caller owns cleaning up a partly written container.
  */
 class ExportArchiveUseCase(
     journalRepository: JournalRepository,
@@ -42,6 +49,7 @@ class ExportArchiveUseCase(
     private val mediaSourceOpener: MediaSourceOpener,
     private val clock: Clock = Clock.System,
     private val exportZone: () -> TimeZone = { TimeZone.currentSystemDefault() },
+    private val ioDispatcher: CoroutineDispatcher = platformIODispatcher,
 ) {
     private val reader =
         ArchiveSnapshotReader(
@@ -68,7 +76,7 @@ class ExportArchiveUseCase(
                 Napier.e("Archive export failed", failure)
                 emit(ArchiveExportProgress.Failed(ExportError.UNKNOWN))
             }
-        }
+        }.flowOn(ioDispatcher)
 
     private suspend fun FlowCollector<ArchiveExportProgress>.build(
         options: ArchiveExportOptions,
@@ -79,7 +87,7 @@ class ExportArchiveUseCase(
 
         val snapshot = reader.read(options) { stage, fraction -> emit(ArchiveExportProgress.InProgress(fraction, stage)) }
         emit(ArchiveExportProgress.InProgress(0.3f, ExportStage.PREPARING_DATA))
-        val resolution =
+        val planned =
             if (options.includeMedia) {
                 MediaResolver(
                     mediaSourceOpener,
@@ -89,17 +97,17 @@ class ExportArchiveUseCase(
                 null
             }
 
+        val writer = ArchiveWriter(container)
+        emit(ArchiveExportProgress.InProgress(0.4f, ExportStage.WRITING_ARCHIVE))
+        val resolution = planned?.let { copyMedia(writer, it) }
+
         val builder = ArchiveManifestBuilder(options, snapshot, resolution)
         val profile = snapshot.profile.toArchiveProfile()
         val manifest = builder.manifest(exportedAt, zone.id, contents(options, snapshot, profile != null))
-        val writer = ArchiveWriter(container)
-
-        emit(ArchiveExportProgress.InProgress(0.4f, ExportStage.WRITING_ARCHIVE))
         writer.text(ArchiveLayout.README, ReadmeTemplate.render(manifest, readableCopies = emptyList()))
         writer.document(ArchiveLayout.MANIFEST, ArchiveManifest.serializer(), manifest)
         ArchiveSchemas.files.forEach { (path, schema) -> writer.text(path, schema) }
         writeData(writer, options, snapshot, profile, MediaReferences(resolution))
-        if (resolution != null) copyMedia(writer, resolution)
         if (options.includeMedia) writeMediaInventory(writer, resolution)
         writer.text(ArchiveLayout.CHECKSUMS, ChecksumFile.render(writer.ledger.entries))
 
@@ -149,16 +157,19 @@ class ExportArchiveUseCase(
         }
     }
 
+    /** Copies each planned file and returns the plan without the files that could not be opened when their turn came. */
     private suspend fun FlowCollector<ArchiveExportProgress>.copyMedia(
         writer: ArchiveWriter,
-        resolution: MediaResolution,
-    ) {
+        planned: MediaResolution,
+    ): MediaResolution {
         val job: Job? = currentCoroutineContext()[Job]
-        resolution.files.forEachIndexed { index, file ->
-            val source = mediaSourceOpener.open(file.reference) ?: throw MediaVanishedException()
-            writer.media(file.path, source, job)
-            emit(ArchiveExportProgress.InProgress(0.4f + 0.55f * (index + 1) / resolution.files.size, ExportStage.WRITING_ARCHIVE))
+        val unavailable = mutableSetOf<String>()
+        planned.files.forEachIndexed { index, file ->
+            val source = mediaSourceOpener.openOrNull(file.reference)
+            if (source == null) unavailable += file.reference else source.use { writer.media(file.path, it, job) }
+            emit(ArchiveExportProgress.InProgress(0.4f + 0.55f * (index + 1) / planned.files.size, ExportStage.WRITING_ARCHIVE))
         }
+        return planned.withUnreadable(unavailable)
     }
 
     private fun writeMediaInventory(
@@ -208,7 +219,4 @@ class ExportArchiveUseCase(
         path: ArchivePath,
         schema: ArchivePath,
     ) = ArchiveContent(role, path, ArchiveLayout.JSON_MEDIA_TYPE, schema)
-
-    /** A file that was readable while the export was planned could not be opened when its turn came. */
-    private class MediaVanishedException : IllegalStateException("A media file disappeared while exporting")
 }

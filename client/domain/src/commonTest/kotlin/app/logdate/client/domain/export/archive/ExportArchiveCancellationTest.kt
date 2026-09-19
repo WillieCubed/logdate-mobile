@@ -47,11 +47,12 @@ class ExportArchiveCancellationTest : ArchiveExportFixture() {
         runTest {
             lateinit var export: Job
             val opened = mutableMapOf<String, Int>()
+            val interrupted = mutableListOf<CancelsOnFirstRead>()
             val cancellingOnCopy =
                 MediaSourceOpener { reference ->
                     val count = (opened[reference] ?: 0) + 1
                     opened[reference] = count
-                    if (count == 1) Buffer().write(jpeg) else CancelsOnFirstRead { export }
+                    if (count == 1) Buffer().write(jpeg) else CancelsOnFirstRead { export }.also(interrupted::add)
                 }
             val container = InMemoryArchiveContainer()
             val emissions = mutableListOf<ArchiveExportProgress>()
@@ -61,12 +62,16 @@ class ExportArchiveCancellationTest : ArchiveExportFixture() {
 
             assertTrue(!finished(emissions), "cancellation is neither a completion nor a failure: $emissions")
             assertTrue("SHA256SUMS" !in container.paths, "an interrupted export must not look finished")
+            assertTrue(interrupted.isNotEmpty() && interrupted.all { it.closed }, "the interrupted source must be closed")
         }
 
     private class CancelsOnFirstRead(
         private val job: () -> Job,
     ) : Source {
         private var reads = 0
+
+        var closed = false
+            private set
 
         override fun read(
             sink: Buffer,
@@ -79,6 +84,8 @@ class ExportArchiveCancellationTest : ArchiveExportFixture() {
 
         override fun timeout(): Timeout = Timeout.NONE
 
-        override fun close() = Unit
+        override fun close() {
+            closed = true
+        }
     }
 }

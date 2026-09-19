@@ -4,13 +4,21 @@ import app.logdate.client.domain.export.ExportError
 import app.logdate.client.domain.export.archive.support.ArchiveExportFixture
 import app.logdate.client.domain.export.archive.support.ArchiveLeakScanner
 import app.logdate.client.domain.export.archive.support.InMemoryArchiveContainer
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
+import okio.Buffer
 import okio.ByteString.Companion.toByteString
+import okio.IOException
+import okio.Source
+import okio.Timeout
+import kotlin.coroutines.ContinuationInterceptor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ExportArchiveUseCaseTest : ArchiveExportFixture() {
@@ -41,18 +49,16 @@ class ExportArchiveUseCaseTest : ArchiveExportFixture() {
         }
 
     @Test
-    fun `files are written README first manifest second and the checksums last`() =
+    fun `media is written before the files that describe it and the checksums come last`() =
         runTest {
             val (container, _) = export()
 
-            assertEquals("README.txt", container.paths.first())
-            assertEquals("manifest.json", container.paths[1])
-            assertEquals("SHA256SUMS", container.paths.last())
-            assertTrue(container.paths.indexOf("data/media.json") < container.paths.indexOf("SHA256SUMS"))
-            assertTrue(
-                container.paths.indexOf("data/notes.json") <
-                    container.paths.first { it.startsWith("media/") }.let { container.paths.indexOf(it) },
-            )
+            val paths = container.paths
+            val readme = paths.indexOf("README.txt")
+            assertTrue(readme > 0 && paths.take(readme).all { it.startsWith("media/") }, "$paths")
+            assertEquals("manifest.json", paths[readme + 1])
+            assertTrue(paths.indexOf("data/media.json") < paths.indexOf("SHA256SUMS"))
+            assertEquals("SHA256SUMS", paths.last())
         }
 
     @Test
@@ -221,6 +227,71 @@ class ExportArchiveUseCaseTest : ArchiveExportFixture() {
         }
 
     @Test
+    fun `a file that cannot be opened when it is copied is omitted and the export still completes`() =
+        runTest {
+            val (container, progress) = export(opener = UnavailableWhenCopied(readable, imageReference, failure = null))
+
+            assertIs<ArchiveExportProgress.Completed>(progress.last())
+            assertImageOmittedEverywhere(container)
+        }
+
+    @Test
+    fun `a file that fails to open when it is copied is omitted and the export still completes`() =
+        runTest {
+            val (container, progress) =
+                export(opener = UnavailableWhenCopied(readable, imageReference, failure = { IOException("cloud file evicted") }))
+
+            assertIs<ArchiveExportProgress.Completed>(progress.last())
+            assertImageOmittedEverywhere(container)
+        }
+
+    private fun assertImageOmittedEverywhere(container: InMemoryArchiveContainer) {
+        val image = container.notes().first { it.id == imageNote.uid.toString() }
+        assertEquals(ArchiveMediaStatus.OMITTED, image.media?.status)
+        assertEquals(ArchiveOmissionReason.UNREADABLE, image.media?.omittedReason)
+        assertEquals(null, image.media?.path)
+        val written = container.paths.filter { it.startsWith("media/") }
+        assertEquals(2, written.size)
+        val inventory = ArchiveJson.document.decodeFromString(ArchiveMediaFile.serializer(), container.text("data/media.json")).files
+        assertEquals(written.toSet(), inventory.map { it.path.value }.toSet())
+        assertEquals(written.size, container.manifest().counts.media)
+        assertTrue(
+            container.manifest().scope.omitted.any {
+                it.category == ArchiveCategory.MEDIA &&
+                    it.reason == ArchiveOmissionReason.UNREADABLE
+            },
+        )
+        assertEquals((container.paths - "SHA256SUMS").toSet(), assertNotNull(ChecksumFile.parse(container.text("SHA256SUMS"))).keys)
+    }
+
+    @Test
+    fun `every source the export opens is closed`() =
+        runTest {
+            val tracking = ClosureTrackingOpener(readable)
+
+            export(opener = tracking)
+
+            assertTrue(tracking.sources.isNotEmpty())
+            assertEquals(0, tracking.sources.count { !it.closed }, "sources left open")
+        }
+
+    @Test
+    fun `the archive is built on the dispatcher meant for blocking work`() =
+        runTest {
+            val blocking = StandardTestDispatcher(testScheduler, name = "blocking")
+            var openedOn: ContinuationInterceptor? = null
+            val opener =
+                MediaSourceOpener { reference ->
+                    openedOn = currentCoroutineContext()[ContinuationInterceptor]
+                    readable.open(reference)
+                }
+
+            useCase(opener, ioDispatcher = blocking).export(ArchiveExportOptions(), InMemoryArchiveContainer()).toList()
+
+            assertSame(blocking, openedOn)
+        }
+
+    @Test
     fun `leaving media out marks every media reference as not requested and writes no media`() =
         runTest {
             val (container, _) = export(ArchiveExportOptions(includeMedia = false))
@@ -318,4 +389,48 @@ class ExportArchiveUseCaseTest : ArchiveExportFixture() {
 
             assertEquals(ArchiveExportProgress.Failed(ExportError.UNKNOWN), progress.last())
         }
+
+    /** Hands out a file while the export is planned, then reports it gone when the copy comes back for it. */
+    private class UnavailableWhenCopied(
+        private val delegate: MediaSourceOpener,
+        private val target: String,
+        private val failure: (() -> Throwable)?,
+    ) : MediaSourceOpener {
+        private var opens = 0
+
+        override suspend fun open(reference: String): Source? {
+            if (reference == target && ++opens > 1) {
+                failure?.let { throw it() }
+                return null
+            }
+            return delegate.open(reference)
+        }
+    }
+
+    private class ClosureTrackingOpener(
+        private val delegate: MediaSourceOpener,
+    ) : MediaSourceOpener {
+        val sources = mutableListOf<TrackedSource>()
+
+        override suspend fun open(reference: String): Source? = delegate.open(reference)?.let { TrackedSource(it).also(sources::add) }
+    }
+
+    private class TrackedSource(
+        private val delegate: Source,
+    ) : Source {
+        var closed = false
+            private set
+
+        override fun read(
+            sink: Buffer,
+            byteCount: Long,
+        ): Long = delegate.read(sink, byteCount)
+
+        override fun timeout(): Timeout = delegate.timeout()
+
+        override fun close() {
+            closed = true
+            delegate.close()
+        }
+    }
 }
