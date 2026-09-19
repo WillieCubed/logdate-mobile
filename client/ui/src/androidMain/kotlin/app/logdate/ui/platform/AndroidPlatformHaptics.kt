@@ -7,7 +7,6 @@ import android.os.VibrationAttributes
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.provider.Settings
 import androidx.annotation.RequiresApi
 import androidx.core.content.getSystemService
 
@@ -189,6 +188,5 @@ internal class AndroidPlatformHaptics(
      * is consulted by the [LogDateHaptics] reduceMotion bridge — the controller itself does not
      * gate on it (so rare safety-critical signals still vibrate even when touch is off).
      */
-    internal fun isSystemHapticFeedbackDisabled(): Boolean =
-        Settings.System.getInt(context.contentResolver, Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) == 0
+    internal fun isSystemHapticFeedbackDisabled(): Boolean = isHapticDisabled(context)
 }

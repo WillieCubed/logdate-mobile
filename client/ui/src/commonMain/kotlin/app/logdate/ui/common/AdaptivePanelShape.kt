@@ -5,7 +5,7 @@ package app.logdate.ui.common
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -34,7 +34,7 @@ fun adaptivePanelShape(
         if (isInspectionMode) {
             null
         } else {
-            currentWindowAdaptiveInfo().windowSizeClass
+            currentWindowAdaptiveInfoV2().windowSizeClass
         }
     val isWide =
         windowSizeClass?.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND)

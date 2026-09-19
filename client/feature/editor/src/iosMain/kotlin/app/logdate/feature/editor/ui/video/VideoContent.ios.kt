@@ -20,10 +20,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -250,7 +250,7 @@ actual fun VideoPlayerContent(
                             },
                         ) {
                             Icon(
-                                imageVector = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                                imageVector = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
                                 contentDescription = null,
                                 tint = Color.White,
                                 modifier = Modifier.size(28.dp),

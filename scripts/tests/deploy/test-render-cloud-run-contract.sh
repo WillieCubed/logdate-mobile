@@ -519,6 +519,9 @@ PY
 esac
 EOF
 chmod +x "$FAKE_BIN/terraform"
+# The renderer prefers terraform-bin, which hashicorp/setup-terraform installs
+# beside its wrapper; without this the real binary would bypass the fake.
+ln -s terraform "$FAKE_BIN/terraform-bin"
 
 cat >"$FAKE_BIN/jq" <<'EOF'
 #!/usr/bin/env bash
@@ -534,7 +537,10 @@ run_renderer() {
     local environment="$1" release_sha="$2" fixture="$3" stdout_file="$4" stderr_file="$5"
     (
         cd "$SOURCE_REPO"
-        PATH="$FAKE_BIN:$PATH" \
+        # The renderer reads a committed template instead of running terraform
+        # when CI=true; these fixtures exercise the terraform path everywhere.
+        CI=false \
+            PATH="$FAKE_BIN:$PATH" \
             TEST_LOG_DIR="$LOG_DIR" \
             SOURCE_TFVARS_DIR="$SOURCE_REPO/infra/terraform" \
             FIXTURE_DIR="$FIXTURE_DIR" \
@@ -572,7 +578,8 @@ run_real_renderer() {
     local repo="$1" environment="$2" release_sha="$3" stdout_file="$4" stderr_file="$5"
     (
         cd "$repo"
-        PATH="$(dirname "$REAL_TERRAFORM"):$(dirname "$REAL_JQ"):$PATH" \
+        CI=false \
+            PATH="$(dirname "$REAL_TERRAFORM"):$(dirname "$REAL_JQ"):$PATH" \
             TF_WORKSPACE="production" \
             TF_CLI_ARGS="-lock-timeout=1s" \
             TF_CLI_ARGS_init="-backend-config=production.hcl" \

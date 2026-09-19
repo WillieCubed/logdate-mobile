@@ -3,7 +3,7 @@ package app.logdate.wear.presentation.health
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DirectionsWalk
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -76,7 +76,7 @@ fun HealthDashboardScreen(viewModel: HealthDashboardViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(
-                        imageVector = Icons.Default.DirectionsWalk,
+                        imageVector = Icons.AutoMirrored.Filled.DirectionsWalk,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                     )

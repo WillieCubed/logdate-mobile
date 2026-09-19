@@ -71,7 +71,7 @@ revision consume the rendered Neon contract.
 | --- | --- | --- | --- | --- | --- | --- |
 | Workflow | `ci.yml`, `screenshot-test.yml` | `publish-android-play.yml` | `publish-android-play.yml` | `publish-ios-app-store.yml` | `publish-ios-app-store.yml` | Local Gradle tasks |
 | Trigger | PR/push/manual test workflows | `main` push or manual dispatch | `android-v*` tag push | `main` push or manual dispatch | `ios-v*` tag push | Manual |
-| Human gate | None | Disabled unless repo var is true | `android-production` reviewers | Disabled unless repo var is true | `ios-production` reviewers | None |
+| Human gate | None | Disabled unless repo var is true | Pushing the `android-v*` tag; `production` environment accepts only `main` and release tags | Disabled unless repo var is true | `ios-production` reviewers | None |
 | Firebase input | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64` | `LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_RELEASE_BASE64` | None; promotes tested internal artifact | `LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64` | `LOGDATE_IOS_GOOGLE_SERVICE_INFO_PLIST_BASE64` | None |
 | Firebase file on runner | `app/android-main/google-services.json` | `app/android-main/src/release/google-services.json` | Not materialized | `iosApp/iosApp/Firebase/GoogleService-Info-Release.plist` | `iosApp/iosApp/Firebase/GoogleService-Info-Release.plist` | None |
 | Signing | Debug signing | Release keystore from GitHub secrets | No keystore; promotes existing Play artifact | Apple distribution cert/profile | Apple distribution cert/profile | Local unsigned packages |
@@ -122,10 +122,11 @@ Before a production server tag:
 
 Before an Android production tag:
 
-1. Confirm the same commit/version code is already on Play internal.
-2. Confirm `LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED=true` only when reviewers
-   are ready.
-3. Confirm `android-production` has required reviewers.
+1. Confirm the tagged commit is already on Play internal; promotion finds
+   that release by the commit's short SHA and fails if it is missing.
+2. Confirm `LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED=true`, which
+   `./run setup production --enable-play-production` sets.
+3. Confirm `./run setup production --check` reports every step ok.
 
 Before an iOS production tag:
 
