@@ -36,6 +36,9 @@ data class ExportSchemaVersion(
         val V1_1 = ExportSchemaVersion(1, 1)
         val V1_2 = ExportSchemaVersion(1, 2)
 
+        /** The self-describing archive layout; written only behind the export archive flag until restore reads it. */
+        val V2_0 = ExportSchemaVersion(2, 0)
+
         /** The schema version written by the current app. */
         val CURRENT = V1_2
 
