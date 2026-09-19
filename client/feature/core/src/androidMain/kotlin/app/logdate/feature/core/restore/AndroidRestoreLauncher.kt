@@ -14,11 +14,14 @@ import androidx.work.WorkManager
 import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.export.ExportFormat
 import app.logdate.client.domain.restore.ArchiveRoot
+import app.logdate.client.domain.restore.ZipSignature
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,8 +29,10 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStream
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipFile
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Android-specific [RestoreLauncher] backed by Storage Access Framework and WorkManager.
@@ -256,8 +261,9 @@ class AndroidRestoreLauncher(
     /**
      * Called when the user selects a restore archive or dismisses the file picker.
      *
-     * Reads `metadata.json` from the archive on [launcherScope] for preview without a
-     * full archive copy. Any previously in-flight extraction is cancelled first. On
+     * Reads `metadata.json` from the archive on [launcherScope] for preview. A provider that
+     * cannot be opened in place has its archive copied into the cache first; that copy stops
+     * when the extraction is cancelled. Any previously in-flight extraction is cancelled first. On
      * success, delivers an [ArchiveFileInfo] to the file-selected callback. On failure
      * (unparseable archive, missing entry, or permission error), delivers a null file
      * info and an [RestoreOutcome.Failure] to the completion callback.
@@ -287,6 +293,7 @@ class AndroidRestoreLauncher(
         metadataExtractionJob =
             launcherScope.launch {
                 val metadataJson = extractMetadata(uri)
+                ensureActive()
                 if (metadataJson == null) {
                     Napier.w("Could not extract metadata from selected archive")
                     fileSelectedCallback?.invoke(null)
@@ -312,7 +319,7 @@ class AndroidRestoreLauncher(
      * iOS writer's do) stay readable. Returns `null` if the entry is missing or the archive
      * cannot be read.
      */
-    private fun extractMetadata(uri: Uri): String? =
+    private suspend fun extractMetadata(uri: Uri): String? =
         try {
             withRandomAccessZip(uri) { zip ->
                 val entryNames = zip.entries().toList().map { it.name }
@@ -322,6 +329,8 @@ class AndroidRestoreLauncher(
                 val entry = zip.getEntry(root + ExportFileStructure.METADATA_FILE) ?: return@withRandomAccessZip null
                 zip.getInputStream(entry).use { it.bufferedReader(Charsets.UTF_8).readText() }
             }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
         } catch (e: Exception) {
             Napier.e("Failed to extract metadata from archive", e)
             null
@@ -333,9 +342,9 @@ class AndroidRestoreLauncher(
      * Providers backed by local files hand out a seekable descriptor, opened in place through
      * `/proc/self/fd` so a multi-gigabyte archive is not copied. Streaming providers such as
      * cloud drives return a pipe that cannot be seeked; the archive is copied to the cache for
-     * the duration of [block] instead.
+     * the duration of [block] instead, unless it does not start like a zip at all.
      */
-    private fun <T> withRandomAccessZip(
+    private suspend fun <T> withRandomAccessZip(
         uri: Uri,
         block: (ZipFile) -> T?,
     ): T? {
@@ -346,12 +355,42 @@ class AndroidRestoreLauncher(
 
         val cached = File.createTempFile("logdate_preview", ".zip", context.cacheDir)
         try {
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                FileOutputStream(cached).use { output -> input.copyTo(output) }
-            } ?: return null
+            val copied = context.contentResolver.openInputStream(uri)?.use { copyIfZip(it, cached) } ?: return null
+            if (!copied) return null
             return ZipFile(cached).use(block)
         } finally {
             cached.delete()
         }
+    }
+
+    /** Copies [input] to [target] and returns true, or returns false without copying when it does not start like a zip. */
+    private suspend fun copyIfZip(
+        input: InputStream,
+        target: File,
+    ): Boolean {
+        val header = ByteArray(ZipSignature.LENGTH)
+        var filled = 0
+        while (filled < header.size) {
+            val read = input.read(header, filled, header.size - filled)
+            if (read == -1) break
+            filled += read
+        }
+        if (!ZipSignature.isZip(header.copyOf(filled))) return false
+
+        FileOutputStream(target).use { output ->
+            output.write(header, 0, filled)
+            val buffer = ByteArray(COPY_BUFFER_BYTES)
+            while (true) {
+                currentCoroutineContext().ensureActive()
+                val read = input.read(buffer)
+                if (read == -1) break
+                output.write(buffer, 0, read)
+            }
+        }
+        return true
+    }
+
+    private companion object {
+        const val COPY_BUFFER_BYTES = 64 * 1024
     }
 }
