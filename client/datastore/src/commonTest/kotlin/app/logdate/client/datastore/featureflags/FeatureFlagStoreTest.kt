@@ -25,7 +25,7 @@ class FeatureFlagStoreTest {
             assertFalse(store.isEnabled(FeatureFlag.LIBRARY))
             assertTrue(store.isEnabled(FeatureFlag.EVENTS))
             assertTrue(store.isEnabled(FeatureFlag.PEOPLE))
-            assertFalse(store.isEnabled(FeatureFlag.CAMPFIRE_STREAKS))
+            assertTrue(store.isEnabled(FeatureFlag.CAMPFIRE_STREAKS))
         }
 
     @Test

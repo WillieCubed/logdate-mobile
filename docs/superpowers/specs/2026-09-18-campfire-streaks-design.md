@@ -79,7 +79,7 @@ It emits `null` when streak tracking is off, and also when reading the notes fai
 
 ## Surfaces
 
-The campfire is gated behind `FeatureFlag.CAMPFIRE_STREAKS`, off by default, until every surface is in place. The fixes for false claims ship without the flag.
+The campfire is gated behind `FeatureFlag.CAMPFIRE_STREAKS`. It is on by default now that every surface renders it. The fixes for false claims never depended on the flag.
 
 - **Campfire illustration.** A Canvas composable draws the fire as a sticker: flat fills, a chunky dark outline, and a white die-cut border, with no gradients or glow. Two crossed logs sit under a two-layer flame whose height follows the fire's size. Embers are three coals on the logs with a spark rising off them. A fire that went out is grey logs and a curl of smoke. The flame sways unless the system asks for reduced motion.
 - **Timeline chip.** A small campfire and the day count sit in the timeline's top-bar actions next to the sync indicator. Tapping it opens the streak screen.

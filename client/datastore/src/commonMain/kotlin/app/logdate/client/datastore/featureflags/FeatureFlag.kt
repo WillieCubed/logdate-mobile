@@ -45,9 +45,10 @@ enum class FeatureFlag(
     /**
      * The forgiving campfire streak that replaces the consecutive-day counter.
      *
-     * Off by default until every surface that shows a streak renders the campfire.
+     * On by default: every surface that shows a streak renders the campfire. The flag stays as a
+     * switch back to the old counter until that counter's code is deleted, and both go together.
      */
-    CAMPFIRE_STREAKS(key = "campfire_streaks_enabled", defaultEnabled = false),
+    CAMPFIRE_STREAKS(key = "campfire_streaks_enabled", defaultEnabled = true),
     ;
 
     companion object {
