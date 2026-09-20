@@ -1,9 +1,7 @@
 package app.logdate.feature.core.restore
 
-import app.logdate.client.domain.export.ExportFileStructure
-import app.logdate.client.domain.restore.ArchiveRoot
 import app.logdate.client.domain.restore.MediaImporter
-import app.logdate.client.domain.restore.RestoreBundle
+import app.logdate.client.domain.restore.RestoreArchiveReader
 import app.logdate.client.domain.restore.RestoreOptions
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.media.MediaManager
@@ -168,8 +166,8 @@ class IosRestoreLauncher(
     private fun extractMetadata(path: String): String? =
         try {
             val zipFileSystem = FileSystem.SYSTEM.openZip(path.toPath())
-            val root = findArchiveRoot(zipFileSystem) ?: return null
-            readOptionalEntry(zipFileSystem, root + ExportFileStructure.METADATA_FILE)
+            val entryNames = archiveEntryNames(zipFileSystem)
+            RestoreArchiveReader.previewJson(entryNames) { readOptionalEntry(zipFileSystem, it) }
         } catch (e: Exception) {
             Napier.e("iOS: Failed to extract metadata", e)
             null
@@ -184,19 +182,11 @@ class IosRestoreLauncher(
 
         val zipFileSystem = FileSystem.SYSTEM.openZip(path.toPath())
         updateProgress(RestoreStage.READING_CONTENTS.toProgressInfo())
-        val root = findArchiveRoot(zipFileSystem).orEmpty()
-        val bundle =
-            RestoreBundle(
-                metadataJson = readRequiredEntry(zipFileSystem, root + ExportFileStructure.METADATA_FILE),
-                journalsJson = readRequiredEntry(zipFileSystem, root + ExportFileStructure.JOURNALS_FILE),
-                notesJson = readRequiredEntry(zipFileSystem, root + ExportFileStructure.NOTES_FILE),
-                journalNotesJson = readRequiredEntry(zipFileSystem, root + ExportFileStructure.JOURNAL_NOTES_FILE),
-                draftsJson = readRequiredEntry(zipFileSystem, root + ExportFileStructure.DRAFTS_FILE),
-                profileJson = readOptionalEntry(zipFileSystem, root + ExportFileStructure.PROFILE_FILE),
-                placesJson = readOptionalEntry(zipFileSystem, root + ExportFileStructure.PLACES_FILE),
-                locationHistoryJson = readOptionalEntry(zipFileSystem, root + ExportFileStructure.LOCATION_HISTORY_FILE),
-                mediaManifestJson = readOptionalEntry(zipFileSystem, root + ExportFileStructure.MEDIA_MANIFEST_FILE),
-            )
+        val archive =
+            RestoreArchiveReader.read(archiveEntryNames(zipFileSystem)) { entryName ->
+                readOptionalEntry(zipFileSystem, entryName)
+            }
+        val root = archive.root
 
         val mediaImporter =
             if (options.includeMedia) {
@@ -216,20 +206,13 @@ class IosRestoreLauncher(
 
         val result =
             restoreUserDataUseCase.restore(
-                bundle = bundle,
+                archive = archive,
                 options = restoreOptions,
                 mediaImporter = mediaImporter,
                 onProgress = { phase -> updateProgress(phase.toProgressInfo()) },
             )
         return result.toSummary(source = path.substringAfterLast('/'))
     }
-
-    private fun readRequiredEntry(
-        zipFileSystem: FileSystem,
-        entryName: String,
-    ): String =
-        readOptionalEntry(zipFileSystem, entryName)
-            ?: throw IllegalStateException("Missing required file: $entryName")
 
     private fun readOptionalEntry(
         zipFileSystem: FileSystem,
@@ -243,15 +226,12 @@ class IosRestoreLauncher(
         return zipFileSystem.source(entryPath).buffer().readUtf8()
     }
 
-    private fun findArchiveRoot(zipFileSystem: FileSystem): String? {
-        val fileNames =
-            zipFileSystem
-                .listRecursively("/".toPath())
-                .filter { zipFileSystem.metadata(it).isRegularFile }
-                .map { it.toString().trimStart('/') }
-                .toList()
-        return ArchiveRoot.find(fileNames, ExportFileStructure.METADATA_FILE)
-    }
+    private fun archiveEntryNames(zipFileSystem: FileSystem): List<String> =
+        zipFileSystem
+            .listRecursively("/".toPath())
+            .filter { zipFileSystem.metadata(it).isRegularFile }
+            .map { it.toString().trimStart('/') }
+            .toList()
 
     private suspend fun importMedia(
         zipFileSystem: FileSystem,

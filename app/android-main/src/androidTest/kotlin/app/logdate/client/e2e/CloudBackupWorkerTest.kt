@@ -7,8 +7,13 @@ import androidx.work.WorkerParameters
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.identity.DeviceIdProvider
-import app.logdate.client.domain.export.ExportProgress
-import app.logdate.client.domain.export.ExportResult
+import app.logdate.client.domain.export.archive.ArchiveContainer
+import app.logdate.client.domain.export.archive.ArchiveCounts
+import app.logdate.client.domain.export.archive.ArchiveExportProgress
+import app.logdate.client.domain.export.archive.ArchiveExportSummary
+import app.logdate.client.domain.export.archive.ArchivePath
+import app.logdate.client.domain.export.archive.ArchiveScope
+import app.logdate.client.domain.export.archive.ExportArchiveUseCase
 import app.logdate.client.sync.cloud.BackupFile
 import app.logdate.client.sync.cloud.BackupMetadata
 import app.logdate.client.sync.cloud.BackupUploadResult
@@ -17,15 +22,20 @@ import app.logdate.feature.core.export.CloudBackupWorker
 import app.logdate.feature.core.restore.CloudRestoreWorker
 import io.mockk.every
 import io.mockk.mockk
+import java.io.ByteArrayInputStream
+import java.io.File
+import java.util.UUID
+import java.util.zip.ZipInputStream
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flow
+import okio.buffer
 import org.junit.runner.RunWith
 import kotlin.uuid.Uuid
-import java.util.UUID
-import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class CloudBackupWorkerTest {
@@ -33,15 +43,8 @@ class CloudBackupWorkerTest {
 
     @Test
     fun `uploads completed export and deletes private archive only after success`() = runTest {
-        val export = mockk<ExportResult>(relaxed = true)
-        every { export.serializeMetadata() } returns "{\"deviceId\":\"device\"}"
-        every { export.hasProfile } returns false
-        every { export.hasPlaces } returns false
-        every { export.hasLocationHistory } returns false
-        every { export.mediaFiles } returns emptyList()
-        every { export.renderIssuesText(any()) } returns null
-        val useCase = mockk<app.logdate.client.domain.export.ExportUserDataUseCase>()
-        every { useCase.exportUserData(true, true, true, true, null) } returns flowOf(ExportProgress.Completed(export))
+        val manifest = "{\"format\":\"logdate-export\",\"schemaVersion\":\"2.0\"}"
+        val useCase = v2Exporter(manifest)
         val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("backup", 1L, 1L)))
         val session = FakeSessionStorage(UserSession("access", "refresh", "account"))
         val deviceId = FakeDeviceIdProvider()
@@ -51,20 +54,25 @@ class CloudBackupWorkerTest {
 
         worker.doWork()
         assertTrue(cloud.uploadCalls == 1)
+        val uploaded = requireNotNull(cloud.uploadedBackup)
+        val entries =
+            ZipInputStream(ByteArrayInputStream(uploaded.data)).use { zip ->
+                buildMap {
+                    while (true) {
+                        val entry = zip.nextEntry ?: break
+                        put(entry.name, zip.readBytes())
+                    }
+                }
+            }
+        assertEquals(entries.getValue("manifest.json").decodeToString(), uploaded.manifest)
+        assertEquals(manifest, uploaded.manifest)
+        assertFalse("metadata.json" in entries)
         assertTrue(context.filesDir.listFiles().orEmpty().none { it.name.startsWith("cloud-backup-") })
     }
 
     @Test
     fun `retains private archive when upload fails`() = runTest {
-        val export = mockk<ExportResult>(relaxed = true)
-        every { export.serializeMetadata() } returns "manifest"
-        every { export.hasProfile } returns false
-        every { export.hasPlaces } returns false
-        every { export.hasLocationHistory } returns false
-        every { export.mediaFiles } returns emptyList()
-        every { export.renderIssuesText(any()) } returns null
-        val useCase = mockk<app.logdate.client.domain.export.ExportUserDataUseCase>()
-        every { useCase.exportUserData(true, true, true, true, null) } returns flowOf(ExportProgress.Completed(export))
+        val useCase = v2Exporter("{\"schemaVersion\":\"2.0\"}")
         val cloud = FakeCloudBackupDataSource(Result.failure(IllegalStateException("offline")))
         val params = mockk<WorkerParameters>(relaxed = true)
         every { params.id } returns UUID.randomUUID()
@@ -81,6 +89,35 @@ class CloudBackupWorkerTest {
         val archive = context.filesDir.listFiles().orEmpty().firstOrNull { it.name.startsWith("cloud-backup-") }
         assertTrue(archive?.exists() == true)
         archive.delete()
+    }
+
+    private fun v2Exporter(manifest: String): ExportArchiveUseCase =
+        mockk<ExportArchiveUseCase>().also { useCase ->
+            every { useCase.export(any(), any()) } answers {
+                val container = invocation.args[1] as ArchiveContainer
+                flow {
+                    container.write("README.txt", "LogDate export")
+                    container.write("manifest.json", manifest)
+                    container.write("SHA256SUMS", "checksums")
+                    emit(
+                        ArchiveExportProgress.Completed(
+                            ArchiveExportSummary(
+                                ArchiveCounts(0, 0, 0, 0, 0, 0, hasProfile = false),
+                                ArchiveScope(complete = true),
+                            ),
+                        ),
+                    )
+                }
+            }
+        }
+
+    private fun ArchiveContainer.write(
+        path: String,
+        text: String,
+    ) {
+        entry(ArchivePath.of(path)) { sink ->
+            sink.buffer().apply { writeUtf8(text) }.flush()
+        }
     }
 
     @Test
@@ -133,7 +170,7 @@ class CloudBackupWorkerTest {
         assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Success)
         assertTrue(cloud.downloadedBackupId == "newest")
         assertTrue(enqueued?.readBytes()?.contentEquals(byteArrayOf(1, 2, 3)) == true)
-        enqueued?.let(File::delete)
+        enqueued.let(File::delete)
     }
 
     private class FakeSessionStorage(private var session: UserSession?) : SessionStorage {
@@ -157,9 +194,11 @@ class CloudBackupWorkerTest {
         var backups: List<BackupMetadata> = emptyList()
         var downloaded: BackupFile? = null
         var downloadedBackupId: String? = null
+        var uploadedBackup: BackupFile? = null
 
         override suspend fun uploadBackup(accessToken: String, backup: BackupFile): Result<BackupUploadResult> {
             uploadCalls++
+            uploadedBackup = backup
             return uploadResult
         }
 

@@ -3,8 +3,8 @@
 An export is a single `.zip` file that contains a copy of what LogDate stores for a person. This document
 explains what is in it, how to read it, and how the app builds it. It describes two layouts:
 
-- **Format 2.0**, the current design, written when the `export_archive_v2` feature flag is on.
-- **Format 1.x**, the layout written today while that flag is off, and the one restore still reads.
+- **Format 2.0**, the current format written by Android, desktop, iOS and LogDate Cloud backups.
+- **Format 1.x**, the legacy import-only layout. Restore continues to read versions 1.0 through 1.2.
 
 If you only want to open an export, read [Reading an archive](#reading-an-archive). If you are
 changing what gets exported, read [Adding a new kind of data](#adding-a-new-kind-of-data).
@@ -83,6 +83,16 @@ captured. Everything in `data/` is plain text that any editor opens, but it is w
 3. Validate a file against its schema if you want to. The schemas are permissive about extra keys,
    because a minor version only adds fields.
 4. Read `scope` before trusting the data to be everything. See [Completeness](#completeness).
+
+LogDate restore follows the same rule: it detects 2.0 through `manifest.json` and resolves every data
+file by its manifest role, so valid custom paths are supported. If there is no manifest, restore falls
+back to the 1.x `metadata.json` layout. Both formats may be at the ZIP root or inside one wrapper
+directory. Every manifest-listed data file must exist before restore starts writing to repositories.
+
+Restore currently applies journals, notes and their memberships, drafts, profile, saved places,
+location history and portable media references. Included media is copied through the platform media
+importer. A media record that was omitted or is unavailable is reported as a warning and its note or
+draft attachment is skipped; a source-device path is never retained as a fallback.
 
 ### Conventions in every data file
 
@@ -197,13 +207,13 @@ reference that platform stored, and an `ArchiveContainer`, which puts files in a
 and the desktop launcher use `ZipStreamArchiveContainer`. If an export fails or is cancelled, the
 launcher deletes the partly written file.
 
-### Rollout
+### Current writing behavior
 
-Format 2.0 is written only when the `export_archive_v2` flag is on, and the flag is off by default.
-It gates only what an export writes. Cloud backup stays on 1.x so that a device without a 2.0 reader
-can still restore a cloud backup, and iOS stays on 1.x until it has a media opener and a zip writer
-that handles files over 2 GiB. The 2.0 reader in restore must ship for at least one release before the
-flag is turned on.
+Format 2.0 is the only format newly written. Android and desktop stream it into a ZIP. iOS stages
+entries in temporary files before assembling and sharing the ZIP, and removes staging data after
+success, cancellation or failure. LogDate Cloud uploads the same v2 ZIP bytes and stores the exact
+`manifest.json` extracted from that artifact. Cloud restore remains format-neutral, so downloaded
+1.x and 2.0 backups use the shared reader.
 
 ## Adding a new kind of data
 
@@ -220,7 +230,8 @@ flag is turned on.
 
 ## The 1.x layout
 
-Written while the flag is off. All files are at the top level:
+Format 1.x is retained for import compatibility only; the app never creates a new 1.x export. Its
+files are at the top level:
 
 `metadata.json`, `journals.json`, `notes.json`, `journal_notes.json`, `drafts.json`, and when present
 `profile.json`, `places.json`, `location_history.json`, `media_manifest.json` and `export_issues.txt`,

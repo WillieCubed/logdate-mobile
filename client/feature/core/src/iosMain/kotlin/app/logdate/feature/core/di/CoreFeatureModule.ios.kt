@@ -2,6 +2,7 @@ package app.logdate.feature.core.di
 
 import app.logdate.client.domain.di.accountModule
 import app.logdate.client.domain.di.domainModule
+import app.logdate.client.domain.export.archive.MediaSourceOpener
 import app.logdate.client.location.di.locationSettingsModule
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.BiometricGatekeeper
@@ -9,6 +10,7 @@ import app.logdate.feature.core.IosBiometricGatekeeper
 import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.feature.core.export.ExportLauncher
 import app.logdate.feature.core.export.IosExportLauncher
+import app.logdate.feature.core.export.IosMediaSourceOpener
 import app.logdate.feature.core.export.UserDataExportViewModel
 import app.logdate.feature.core.main.HomeViewModel
 import app.logdate.feature.core.people.ui.PeopleDirectoryViewModel
@@ -57,6 +59,7 @@ actual val coreFeatureModule: Module =
         single<BiometricGatekeeper> { IosBiometricGatekeeper() }
         single<AppUpdateController> { UnsupportedAppUpdateController(get()) }
         single<MemoriesWidgetInstallController> { HiddenMemoriesWidgetInstallController() }
+        single<MediaSourceOpener> { IosMediaSourceOpener() }
 
         // TODO: Verify this iOS export implementation works correctly with the root view controller
         // Export functionality for iOS - gets root view controller from the main application window

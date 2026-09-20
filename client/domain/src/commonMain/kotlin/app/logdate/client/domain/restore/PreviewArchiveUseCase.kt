@@ -3,7 +3,9 @@ package app.logdate.client.domain.restore
 import app.logdate.client.domain.export.ExportMetadata
 import app.logdate.client.domain.export.ExportSchemaVersion
 import app.logdate.client.domain.export.ExportStats
+import app.logdate.client.domain.export.archive.ArchiveManifest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import kotlin.time.Instant
 
 /**
@@ -31,6 +33,24 @@ class PreviewArchiveUseCase {
         }
 
     fun preview(metadataJson: String): ArchivePreview {
+        if ("format" in json.parseToJsonElement(metadataJson).jsonObject) {
+            val manifest = json.decodeFromString<ArchiveManifest>(metadataJson)
+            return ArchivePreview(
+                version = manifest.schemaVersion,
+                exportDate = manifest.exportedAt,
+                appVersion = manifest.generator.version,
+                stats =
+                    ExportStats(
+                        journalCount = manifest.counts.journals,
+                        noteCount = manifest.counts.notes,
+                        draftCount = manifest.counts.drafts,
+                        mediaCount = manifest.counts.media,
+                        placeCount = manifest.counts.places,
+                        locationHistoryCount = manifest.counts.locationSamples,
+                        hasProfile = manifest.counts.hasProfile,
+                    ),
+            )
+        }
         val metadata = json.decodeFromString<ExportMetadata>(metadataJson)
         return ArchivePreview(
             version = metadata.version,

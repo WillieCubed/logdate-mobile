@@ -15,6 +15,11 @@ import kotlin.test.assertTrue
  */
 class ExportSchemaVersionTest {
     @Test
+    fun `current export schema is v2`() {
+        assertEquals(ExportSchemaVersion.V2_0, ExportSchemaVersion.CURRENT)
+    }
+
+    @Test
     fun `parse valid version string`() {
         val version = ExportSchemaVersion.parse("1.1")
         assertEquals(1, version.major)

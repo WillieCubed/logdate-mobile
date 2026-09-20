@@ -581,6 +581,7 @@ dependencies {
     androidTestImplementation(libs.androidx.activity.compose)
     androidTestImplementation(libs.compose.material3)
     androidTestImplementation(libs.napier)
+    androidTestImplementation(libs.okio)
     androidTestImplementation(libs.media3.common)
     androidTestImplementation(libs.media3.session)
     androidTestImplementation(project.dependencies.platform(libs.koin.bom))

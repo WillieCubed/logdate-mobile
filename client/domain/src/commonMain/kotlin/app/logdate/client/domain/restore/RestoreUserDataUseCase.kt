@@ -64,6 +64,31 @@ class RestoreUserDataUseCase(
         }
 
     suspend fun restore(
+        bundle: V2RestoreBundle,
+        options: RestoreOptions = RestoreOptions(),
+        mediaImporter: MediaImporter? = null,
+        onProgress: (suspend (RestoreProgressPhase) -> Unit)? = null,
+    ): RestoreResult {
+        val adapted = bundle.adaptForRestore()
+        val restored = restore(adapted.legacy, options, mediaImporter, onProgress)
+        return restored.copy(
+            metadata = adapted.metadata,
+            warnings = adapted.warnings + restored.warnings,
+        )
+    }
+
+    suspend fun restore(
+        archive: RestoreArchiveBundle,
+        options: RestoreOptions = RestoreOptions(),
+        mediaImporter: MediaImporter? = null,
+        onProgress: (suspend (RestoreProgressPhase) -> Unit)? = null,
+    ): RestoreResult =
+        when (archive) {
+            is RestoreArchiveBundle.V1 -> restore(archive.bundle, options, mediaImporter, onProgress)
+            is RestoreArchiveBundle.V2 -> restore(archive.bundle, options, mediaImporter, onProgress)
+        }
+
+    suspend fun restore(
         bundle: RestoreBundle,
         options: RestoreOptions = RestoreOptions(),
         mediaImporter: MediaImporter? = null,
@@ -71,7 +96,7 @@ class RestoreUserDataUseCase(
     ): RestoreResult {
         val metadata = json.decodeFromString<ExportMetadata>(bundle.metadataJson)
 
-        if (metadata.version.major > ExportSchemaVersion.CURRENT.major) {
+        if (metadata.version.major != ExportSchemaVersion.V1_0.major || metadata.version > ExportSchemaVersion.V1_2) {
             throw UnsupportedExportVersionException(metadata.version)
         }
 
@@ -125,6 +150,7 @@ class RestoreUserDataUseCase(
         val createdNoteIds = mutableListOf<Uuid>()
         val createdLinks = mutableListOf<Pair<Uuid, Uuid>>()
         val createdDraftIds = mutableListOf<Uuid>()
+        val availableNoteIds = mutableSetOf<Uuid>()
 
         try {
             onProgress?.invoke(RestoreProgressPhase.RESTORING_JOURNALS)
@@ -146,6 +172,7 @@ class RestoreUserDataUseCase(
             Napier.i("Restore: importing ${migrated.notes.size} notes")
             for (note in migrated.notes) {
                 val parsedId = parseUuid(note.id, warnings) ?: continue
+                val existing = journalNotesRepository.getNoteById(parsedId)
                 val mediaResolution = resolveMediaReference(note.mediaPath, manifestIndex, mediaImporter)
                 if (mediaResolution.imported) {
                     mediaImported++
@@ -168,10 +195,11 @@ class RestoreUserDataUseCase(
                         }
                     Napier.w(message)
                     warnings.add(message)
+                    if (existing != null) availableNoteIds += parsedId
                     continue
                 }
 
-                val existing = journalNotesRepository.getNoteById(parsedId)
+                availableNoteIds += parsedId
                 val shouldWrite = shouldOverwrite(existing?.lastUpdated, restored.lastUpdated, options.strategy)
                 if (existing == null) {
                     journalNotesRepository.create(restored)
@@ -189,6 +217,12 @@ class RestoreUserDataUseCase(
             for (relation in journalNotesPayload.journalNotes) {
                 val journalId = parseUuid(relation.journalId, warnings) ?: continue
                 val noteId = parseUuid(relation.noteId, warnings) ?: continue
+                if (noteId !in availableNoteIds) {
+                    val message = "Skipped journal link for note $noteId because the note was not restored"
+                    Napier.w(message)
+                    warnings.add(message)
+                    continue
+                }
 
                 journalContentRepository.addContentToJournal(noteId, journalId)
                 createdLinks.add(noteId to journalId)
@@ -512,6 +546,7 @@ class RestoreUserDataUseCase(
                     creationTimestamp = createdAt,
                     lastUpdated = updatedAt,
                     content = content.orEmpty(),
+                    timeZoneId = timeZone,
                     syncVersion = syncVersion,
                     location = location,
                 )
@@ -522,6 +557,7 @@ class RestoreUserDataUseCase(
                     lastUpdated = updatedAt,
                     mediaRef = resolvedMediaRef ?: return null,
                     caption = caption.orEmpty(),
+                    timeZoneId = timeZone,
                     syncVersion = syncVersion,
                     location = location,
                 )
@@ -532,6 +568,7 @@ class RestoreUserDataUseCase(
                     lastUpdated = updatedAt,
                     mediaRef = resolvedMediaRef ?: return null,
                     caption = caption.orEmpty(),
+                    timeZoneId = timeZone,
                     syncVersion = syncVersion,
                     location = location,
                 )
@@ -542,6 +579,7 @@ class RestoreUserDataUseCase(
                     lastUpdated = updatedAt,
                     mediaRef = resolvedMediaRef ?: return null,
                     durationMs = this.durationMs ?: 0,
+                    timeZoneId = timeZone,
                     syncVersion = syncVersion,
                     location = location,
                 )

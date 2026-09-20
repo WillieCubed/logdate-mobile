@@ -22,6 +22,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -47,6 +48,8 @@ class ArchiveFileExportTest {
             flow {
                 emit(ArchiveExportProgress.Starting)
                 container.write("README.txt", "new archive")
+                container.write("manifest.json", "{\"schemaVersion\":\"2.0\"}")
+                container.write("SHA256SUMS", "checksums")
                 finish(this)
             }
         }
@@ -60,7 +63,19 @@ class ArchiveFileExportTest {
 
             assertEquals(ArchiveFileOutcome.Completed(summary), outcome)
             assertEquals(listOf(target.name), remainingFiles())
-            ZipFile(target).use { assertEquals("new archive", it.getInputStream(it.getEntry("README.txt")).readBytes().decodeToString()) }
+            ZipFile(target).use { archive ->
+                val names =
+                    archive
+                        .entries()
+                        .asSequence()
+                        .map { it.name }
+                        .toSet()
+                assertTrue("manifest.json" in names)
+                assertTrue("README.txt" in names)
+                assertTrue("SHA256SUMS" in names)
+                assertFalse("metadata.json" in names)
+                assertEquals("new archive", archive.getInputStream(archive.getEntry("README.txt")).readBytes().decodeToString())
+            }
         }
 
     @Test

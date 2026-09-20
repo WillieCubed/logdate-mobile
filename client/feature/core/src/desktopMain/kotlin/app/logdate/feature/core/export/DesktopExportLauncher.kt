@@ -1,14 +1,5 @@
 package app.logdate.feature.core.export
 
-import app.logdate.client.datastore.featureflags.FeatureFlag
-import app.logdate.client.datastore.featureflags.FeatureFlagStore
-import app.logdate.client.domain.export.ExportFileStructure
-import app.logdate.client.domain.export.ExportIssue
-import app.logdate.client.domain.export.ExportIssueCode
-import app.logdate.client.domain.export.ExportMediaFile
-import app.logdate.client.domain.export.ExportProgress
-import app.logdate.client.domain.export.ExportResult
-import app.logdate.client.domain.export.ExportUserDataUseCase
 import app.logdate.client.domain.export.archive.ArchiveExportOptions
 import app.logdate.client.domain.export.archive.ArchiveExportProgress
 import app.logdate.client.domain.export.archive.ExportArchiveUseCase
@@ -20,36 +11,19 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
-import okio.BufferedSink
-import okio.buffer
-import okio.sink
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
-import java.io.FileOutputStream
-import java.net.URI
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 import kotlin.coroutines.cancellation.CancellationException
 
-/**
- * Desktop-specific implementation for launching data export using AWT FileDialog.
- */
+/** Desktop-specific data export using an AWT save dialog. */
 class DesktopExportLauncher :
     ExportLauncher,
     KoinComponent {
-    private data class MediaEntryOutcome(
-        val written: Boolean,
-        val issue: ExportIssue? = null,
-    )
-
-    private val exportUserDataUseCase: ExportUserDataUseCase by inject()
     private val exportArchiveUseCase: ExportArchiveUseCase by inject()
-    private val featureFlags: FeatureFlagStore by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var currentExportJob: Job? = null
     private var completionCallback: ((ExportOutcome) -> Unit)? = null
@@ -66,21 +40,15 @@ class DesktopExportLauncher :
     }
 
     override fun startExport(options: ExportOptions) {
-        // Cancel any existing export job
         currentExportJob?.cancel()
-
-        // Start a new export job
         currentExportJob =
             scope.launch {
                 try {
-                    val defaultFileName = generateExportFileName()
-
-                    // Show file save dialog on the main thread
-                    val fileDialog = createSaveDialog(defaultFileName)
+                    val fileDialog = createSaveDialog(generateExportFileName())
                     val selectedFile =
-                        fileDialog.directory?.let { dir ->
+                        fileDialog.directory?.let { directory ->
                             val fileName = fileDialog.file ?: return@let null
-                            File(dir, fileName)
+                            File(directory, fileName)
                         }
 
                     if (selectedFile == null) {
@@ -90,80 +58,11 @@ class DesktopExportLauncher :
                     }
 
                     Napier.i("Desktop: Starting export to ${selectedFile.absolutePath}")
-
-                    if (featureFlags.isEnabled(FeatureFlag.EXPORT_ARCHIVE_V2)) {
-                        runArchiveExport(selectedFile, options)
-                        return@launch
-                    }
-
-                    // Resolve date range cutoff
-                    val dateRangeCutoff = options.dateRange.toCutoffInstant()
-
-                    // Collect and save the data
-                    exportUserDataUseCase
-                        .exportUserData(
-                            includeJournals = options.includeJournals,
-                            includeNotes = options.includeNotes,
-                            includeDrafts = options.includeDrafts,
-                            includeMedia = options.includeMedia,
-                            dateRangeCutoff = dateRangeCutoff,
-                        ).catch { exception ->
-                            Napier.e("Desktop: Export failed", exception)
-                            showExportErrorDialog("Export could not be completed.")
-                            completionCallback?.invoke(ExportOutcome.Failed("Export could not be completed."))
-                        }.collect { progress ->
-                            when (progress) {
-                                is ExportProgress.Starting -> {
-                                    Napier.i("Desktop: Export started")
-                                }
-
-                                is ExportProgress.InProgress -> {
-                                    val progressInt = (progress.percentage * 100).toInt()
-                                    Napier.d("Desktop: Export progress: $progressInt% - ${progress.stage.defaultMessage}")
-                                }
-
-                                is ExportProgress.Completed -> {
-                                    try {
-                                        // Save the entire export result as a zip file
-                                        saveToFile(selectedFile, progress.result)
-                                        val absolutePath = selectedFile.absolutePath
-                                        val zipPath =
-                                            if (!absolutePath.endsWith(".zip")) {
-                                                "$absolutePath.zip"
-                                            } else {
-                                                absolutePath
-                                            }
-                                        Napier.i("Desktop: Export completed successfully to $zipPath")
-                                        showExportSuccessDialog(zipPath)
-                                        // Success is delivered via the progress flow below.
-                                        updateProgress(
-                                            ExportProgressInfo(
-                                                isActive = false,
-                                                progressPercent = 100,
-                                                message = "Export completed",
-                                                completedFilePath = zipPath,
-                                                stats = progress.result.stats,
-                                            ),
-                                        )
-                                    } catch (e: Exception) {
-                                        Napier.e("Desktop: Failed to save file", e)
-                                        showExportErrorDialog("Could not write the export archive.")
-                                        completionCallback?.invoke(ExportOutcome.Failed("Could not write the export archive."))
-                                    }
-                                }
-
-                                is ExportProgress.Failed -> {
-                                    val errorMessage = progress.error.defaultMessage
-                                    Napier.e("Desktop: Export failed: $errorMessage")
-                                    showExportErrorDialog(errorMessage)
-                                    completionCallback?.invoke(ExportOutcome.Failed(errorMessage))
-                                }
-                            }
-                        }
+                    runArchiveExport(selectedFile, options)
                 } catch (cancellation: CancellationException) {
                     throw cancellation
-                } catch (e: Exception) {
-                    Napier.e("Desktop: Export process failed", e)
+                } catch (failure: Exception) {
+                    Napier.e("Desktop: Export process failed", failure)
                     showExportErrorDialog("Export could not be completed.")
                     completionCallback?.invoke(ExportOutcome.Failed("Export could not be completed."))
                 }
@@ -171,8 +70,8 @@ class DesktopExportLauncher :
     }
 
     /**
-     * Writes a 2.0 archive to the chosen file. The file is only replaced once the archive is complete,
-     * so a failed or cancelled export never damages a file the person chose to overwrite.
+     * Writes a v2 archive to the chosen file. The file is replaced only after the archive is
+     * complete, so a failed or cancelled export never damages an existing file.
      */
     private suspend fun runArchiveExport(
         selectedFile: File,
@@ -194,8 +93,8 @@ class DesktopExportLauncher :
                     exportArchiveToFile(zipFile, { exportArchiveUseCase.export(archiveOptions, it) }, ::publishArchiveProgress)
                 } catch (cancellation: CancellationException) {
                     throw cancellation
-                } catch (e: Exception) {
-                    Napier.e("Desktop: Archive export failed", e)
+                } catch (failure: Exception) {
+                    Napier.e("Desktop: Archive export failed", failure)
                     ArchiveFileOutcome.Failed("Could not write the export archive.")
                 }
             when (outcome) {
@@ -243,167 +142,11 @@ class DesktopExportLauncher :
     private fun createSaveDialog(defaultFileName: String): FileDialog =
         FileDialog(null as Frame?, "Save LogDate Export", FileDialog.SAVE).apply {
             file = defaultFileName
-            isVisible = true // This blocks until user selects a file or cancels
+            isVisible = true
         }
-
-    private fun saveToFile(
-        file: File,
-        exportResult: ExportResult,
-    ) {
-        // Create a zip file
-        val zipFile =
-            if (!file.name.endsWith(".zip")) {
-                File(file.absolutePath + ".zip")
-            } else {
-                file
-            }
-
-        Napier.i("Desktop: Creating zip file at ${zipFile.absolutePath}")
-
-        // Create zip output stream
-        ZipOutputStream(FileOutputStream(zipFile)).use { zipOutputStream ->
-            addStreamedEntry(zipOutputStream, ExportFileStructure.METADATA_FILE) { exportResult.writeMetadata(it) }
-            addStreamedEntry(zipOutputStream, ExportFileStructure.JOURNALS_FILE) { exportResult.writeJournals(it) }
-            addStreamedEntry(zipOutputStream, ExportFileStructure.NOTES_FILE) { exportResult.writeNotes(it) }
-            addStreamedEntry(zipOutputStream, ExportFileStructure.JOURNAL_NOTES_FILE) { exportResult.writeJournalNotes(it) }
-            addStreamedEntry(zipOutputStream, ExportFileStructure.DRAFTS_FILE) { exportResult.writeDrafts(it) }
-            if (exportResult.hasProfile) {
-                addStreamedEntry(zipOutputStream, ExportFileStructure.PROFILE_FILE) { exportResult.writeProfile(it) }
-            }
-            if (exportResult.hasPlaces) {
-                addStreamedEntry(zipOutputStream, ExportFileStructure.PLACES_FILE) { exportResult.writePlaces(it) }
-            }
-            if (exportResult.hasLocationHistory) {
-                addStreamedEntry(zipOutputStream, ExportFileStructure.LOCATION_HISTORY_FILE) { exportResult.writeLocationHistory(it) }
-            }
-
-            val exportedMediaFiles = mutableListOf<ExportMediaFile>()
-            val archiveIssues = mutableListOf<ExportIssue>()
-            exportResult.mediaFiles.forEach { mediaFile ->
-                val outcome = addMediaEntry(zipOutputStream, mediaFile)
-                if (outcome.written) {
-                    exportedMediaFiles += mediaFile
-                }
-                outcome.issue?.let(archiveIssues::add)
-            }
-
-            if (exportResult.hasMediaManifest(exportedMediaFiles)) {
-                addStreamedEntry(zipOutputStream, ExportFileStructure.MEDIA_MANIFEST_FILE) {
-                    exportResult.writeMediaManifest(it, exportedMediaFiles)
-                }
-            }
-            exportResult.renderIssuesText(archiveIssues)?.let { addTextEntry(zipOutputStream, ExportFileStructure.EXPORT_ISSUES_FILE, it) }
-        }
-    }
-
-    /** Streams a JSON category directly into a ZIP entry via an okio sink (no full-String buffering). */
-    private fun addStreamedEntry(
-        zipOutputStream: ZipOutputStream,
-        entryName: String,
-        write: (BufferedSink) -> Unit,
-    ) {
-        zipOutputStream.putNextEntry(ZipEntry(entryName))
-        val bufferedSink = zipOutputStream.sink().buffer()
-        write(bufferedSink)
-        bufferedSink.flush()
-        zipOutputStream.closeEntry()
-    }
-
-    private fun addTextEntry(
-        zipOutputStream: ZipOutputStream,
-        entryName: String,
-        content: String,
-    ) {
-        val entry = ZipEntry(entryName)
-        zipOutputStream.putNextEntry(entry)
-        zipOutputStream.write(content.toByteArray())
-        zipOutputStream.closeEntry()
-    }
-
-    private fun addMediaEntry(
-        zipOutputStream: ZipOutputStream,
-        mediaFile: ExportMediaFile,
-    ): MediaEntryOutcome {
-        var entryOpened = false
-        try {
-            val sourceUri = mediaFile.sourceUri
-            when {
-                sourceUri.startsWith("/") || sourceUri.startsWith("file://") -> {
-                    val requestedFile =
-                        if (sourceUri.startsWith("file://")) {
-                            File(URI(sourceUri))
-                        } else {
-                            File(sourceUri)
-                        }
-                    val file = normalizeDuplicateExtension(requestedFile)
-                    if (!file.exists()) {
-                        Napier.w("Desktop: Media file missing during export, skipping: ${requestedFile.absolutePath}")
-                        return MediaEntryOutcome(
-                            written = false,
-                            issue =
-                                ExportIssue(
-                                    code = ExportIssueCode.MEDIA_BYTES_MISSING,
-                                    source = sourceUri,
-                                ),
-                        )
-                    }
-                    zipOutputStream.putNextEntry(ZipEntry(mediaFile.exportPath))
-                    entryOpened = true
-                    file.inputStream().use { it.copyTo(zipOutputStream) }
-                    zipOutputStream.closeEntry()
-                    entryOpened = false
-                    return MediaEntryOutcome(
-                        written = true,
-                        issue =
-                            if (file.absolutePath != requestedFile.absolutePath) {
-                                ExportIssue(
-                                    code = ExportIssueCode.MEDIA_RECOVERED_NORMALIZED_PATH,
-                                    source = sourceUri,
-                                )
-                            } else {
-                                null
-                            },
-                    )
-                }
-                else -> {
-                    zipOutputStream.putNextEntry(ZipEntry(mediaFile.exportPath))
-                    entryOpened = true
-                    URI(sourceUri).toURL().openStream().use { it.copyTo(zipOutputStream) }
-                    zipOutputStream.closeEntry()
-                    entryOpened = false
-                    return MediaEntryOutcome(written = true)
-                }
-            }
-        } catch (e: Exception) {
-            if (entryOpened) {
-                runCatching { zipOutputStream.closeEntry() }
-            }
-            Napier.w("Desktop: Failed to add media file to ZIP, skipping: ${mediaFile.sourceUri}", e)
-            return MediaEntryOutcome(
-                written = false,
-                issue =
-                    ExportIssue(
-                        code = ExportIssueCode.MEDIA_BYTES_MISSING,
-                        source = mediaFile.sourceUri,
-                    ),
-            )
-        }
-    }
-
-    private fun normalizeDuplicateExtension(file: File): File {
-        val normalizedName =
-            file.name.replace(Regex("(\\.[A-Za-z0-9]+)\\1$")) { match ->
-                match.groupValues[1]
-            }
-        return if (normalizedName == file.name) file else File(file.parentFile, normalizedName)
-    }
 
     private fun showExportSuccessDialog(filePath: String) {
-        // In a real implementation, this would show a desktop notification or dialog
         Napier.i("Desktop: Export completed successfully to $filePath")
-
-        // For a basic implementation we could use a simple dialog
-        // This implementation uses java.awt which might not be available in all contexts
         try {
             val dialog = java.awt.Dialog(null as Frame?, "Export Successful", true)
             dialog.layout = java.awt.BorderLayout()
@@ -416,16 +159,13 @@ class DesktopExportLauncher :
             dialog.add(closeButton, java.awt.BorderLayout.SOUTH)
             dialog.setBounds(100, 100, 400, 100)
             dialog.isVisible = true
-        } catch (e: Exception) {
-            Napier.e("Desktop: Failed to show success dialog", e)
+        } catch (failure: Exception) {
+            Napier.e("Desktop: Failed to show success dialog", failure)
         }
     }
 
     private fun showExportErrorDialog(errorMessage: String) {
-        // In a real implementation, this would show a desktop notification or dialog
         Napier.e("Desktop: Export failed: $errorMessage")
-
-        // For a basic implementation we could use a simple dialog
         try {
             val dialog = java.awt.Dialog(null as Frame?, "Export Failed", true)
             dialog.layout = java.awt.BorderLayout()
@@ -438,8 +178,8 @@ class DesktopExportLauncher :
             dialog.add(closeButton, java.awt.BorderLayout.SOUTH)
             dialog.setBounds(100, 100, 400, 100)
             dialog.isVisible = true
-        } catch (e: Exception) {
-            Napier.e("Desktop: Failed to show error dialog", e)
+        } catch (failure: Exception) {
+            Napier.e("Desktop: Failed to show error dialog", failure)
         }
     }
 }

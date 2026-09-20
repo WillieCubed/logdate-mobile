@@ -268,6 +268,7 @@ class ExportUserDataUseCase(
 
                 val exportMetadata =
                     ExportMetadata(
+                        version = ExportSchemaVersion.V1_2,
                         exportDate = Clock.System.now(),
                         userId = userId,
                         deviceId = deviceId,

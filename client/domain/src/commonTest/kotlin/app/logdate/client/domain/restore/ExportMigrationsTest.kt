@@ -55,7 +55,7 @@ class ExportMigrationsTest {
     }
 
     @Test
-    fun `runner is no-op for current version`() {
+    fun `runner is no-op for latest v1 version`() {
         val draft =
             ExportDraft(
                 id = "draft-1",
@@ -66,7 +66,7 @@ class ExportMigrationsTest {
             )
         val bundle = ParsedExportBundle(journals = emptyList(), notes = emptyList(), drafts = listOf(draft))
 
-        val result = runner.run(ExportSchemaVersion.CURRENT, bundle)
+        val result = runner.run(ExportSchemaVersion.V1_2, bundle)
 
         assertTrue(result.drafts[0].journalIds.isEmpty(), "Should not migrate current version drafts")
     }

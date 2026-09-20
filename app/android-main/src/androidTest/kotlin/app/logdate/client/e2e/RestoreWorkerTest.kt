@@ -111,7 +111,14 @@ class RestoreWorkerTest {
 
                 val mockUseCase =
                     mockk<RestoreUserDataUseCase> {
-                        coEvery { restore(any(), any(), anyNullable(), anyNullable()) } returns restoreResult
+                        coEvery {
+                            restore(
+                                archive = any(),
+                                options = any(),
+                                mediaImporter = anyNullable(),
+                                onProgress = anyNullable(),
+                            )
+                        } returns restoreResult
                     }
                 val recordingLauncher = RecordingRestoreLauncher()
                 setupKoin(mockUseCase, mockk(relaxed = true), recordingLauncher)

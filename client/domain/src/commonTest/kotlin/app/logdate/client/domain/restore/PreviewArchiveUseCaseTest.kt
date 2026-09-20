@@ -1,5 +1,9 @@
 package app.logdate.client.domain.restore
 
+import app.logdate.client.domain.export.ExportSchemaVersion
+import app.logdate.client.domain.export.archive.ArchiveJson
+import app.logdate.client.domain.export.archive.ArchiveManifest
+import app.logdate.client.domain.export.archive.support.ArchiveSamples
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -15,6 +19,25 @@ import kotlin.test.assertTrue
  */
 class PreviewArchiveUseCaseTest {
     private val useCase = PreviewArchiveUseCase()
+
+    @Test
+    fun `v2 manifest produces the same archive preview`() {
+        val manifestJson =
+            ArchiveJson.document.encodeToString(
+                ArchiveManifest.serializer(),
+                ArchiveSamples.manifest,
+            )
+
+        val preview = useCase.preview(manifestJson)
+
+        assertEquals(ExportSchemaVersion.V2_0, preview.version)
+        assertEquals(ArchiveSamples.manifest.exportedAt, preview.exportDate)
+        assertEquals("1.2.3", preview.appVersion)
+        assertEquals(1, preview.stats.journalCount)
+        assertEquals(2, preview.stats.noteCount)
+        assertEquals(1, preview.stats.draftCount)
+        assertEquals(1, preview.stats.mediaCount)
+    }
 
     @Test
     fun `valid metadata produces correct preview`() {

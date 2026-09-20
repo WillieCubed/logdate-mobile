@@ -8,10 +8,13 @@ import androidx.work.Data
 import androidx.work.ListenableWorker
 import androidx.work.testing.TestListenableWorkerBuilder
 import app.logdate.client.domain.export.ExportError
-import app.logdate.client.domain.export.ExportProgress
-import app.logdate.client.domain.export.ExportResult
-import app.logdate.client.domain.export.ExportStats
-import app.logdate.client.domain.export.ExportUserDataUseCase
+import app.logdate.client.domain.export.archive.ArchiveContainer
+import app.logdate.client.domain.export.archive.ArchiveCounts
+import app.logdate.client.domain.export.archive.ArchiveExportProgress
+import app.logdate.client.domain.export.archive.ArchiveExportSummary
+import app.logdate.client.domain.export.archive.ArchivePath
+import app.logdate.client.domain.export.archive.ArchiveScope
+import app.logdate.client.domain.export.archive.ExportArchiveUseCase
 import app.logdate.feature.core.export.ExportLauncher
 import app.logdate.feature.core.export.ExportOptions
 import app.logdate.feature.core.export.ExportOutcome
@@ -25,6 +28,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import okio.Buffer
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -33,8 +37,11 @@ import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module
 import java.io.File
+import java.util.zip.ZipFile
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 /**
  * Instrumented tests for [ExportWorker].
@@ -60,31 +67,16 @@ class ExportWorkerTest {
     @Test
     fun `worker succeeds and emits completed file path when export completes`() =
         runTest {
-            val mockResult =
-                mockk<ExportResult>(relaxUnitFun = true) {
-                    every { serializeMetadata() } returns
-                        """{"version":"1.2","exportDate":"1970-01-01T00:00:00Z","userId":"test","deviceId":"test","appVersion":"1.0","stats":{"journalCount":0,"noteCount":0,"draftCount":0,"mediaCount":0}}"""
-                    every { serializeJournals() } returns """{"journals":[]}"""
-                    every { serializeNotes() } returns """{"notes":[]}"""
-                    every { serializeJournalNotes() } returns """{"journal_notes":[]}"""
-                    every { serializeDrafts() } returns """{"drafts":[]}"""
-                    every { serializeProfile() } returns null
-                    every { serializePlaces() } returns null
-                    every { serializeLocationHistory() } returns null
-                    every { serializeMediaManifest(any()) } returns null
-                    every { renderIssuesText(any()) } returns null
-                    every { hasProfile } returns false
-                    every { hasPlaces } returns false
-                    every { hasLocationHistory } returns false
-                    every { hasMediaManifest(any()) } returns false
-                    every { mediaFiles } returns emptyList()
-                    every { stats } returns ExportStats(0, 0, 0, 0)
-                }
-
             val mockUseCase =
-                mockk<ExportUserDataUseCase> {
-                    every { exportUserData(any(), any(), any(), any(), anyNullable()) } returns
-                        flowOf(ExportProgress.Starting, ExportProgress.Completed(mockResult))
+                mockk<ExportArchiveUseCase> {
+                    every { export(any(), any()) } answers {
+                        secondArg<ArchiveContainer>().apply {
+                            writeText("README.txt", "LogDate export")
+                            writeText("manifest.json", "{}")
+                            writeText("SHA256SUMS", "checksums")
+                        }
+                        flowOf(ArchiveExportProgress.Starting, ArchiveExportProgress.Completed(EMPTY_SUMMARY))
+                    }
                 }
 
             val recordingLauncher = RecordingExportLauncher()
@@ -107,6 +99,13 @@ class ExportWorkerTest {
                 assertIs<ListenableWorker.Result.Success>(result)
                 val completedUpdate = recordingLauncher.progressUpdates.lastOrNull { it.completedFilePath != null }
                 assertNotNull(completedUpdate, "Expected a progress update with a completed file path")
+                ZipFile(destFile).use { zip ->
+                    val names = zip.entries().asSequence().map { it.name }.toSet()
+                    assertTrue("manifest.json" in names)
+                    assertTrue("README.txt" in names)
+                    assertTrue("SHA256SUMS" in names)
+                    assertFalse("metadata.json" in names)
+                }
             } finally {
                 destFile.delete()
             }
@@ -116,9 +115,9 @@ class ExportWorkerTest {
     fun `worker fails when export progress emits failed`() =
         runTest {
             val mockUseCase =
-                mockk<ExportUserDataUseCase> {
-                    every { exportUserData(any(), any(), any(), any(), anyNullable()) } returns
-                        flowOf(ExportProgress.Starting, ExportProgress.Failed(ExportError.UNKNOWN))
+                mockk<ExportArchiveUseCase> {
+                    every { export(any(), any()) } returns
+                        flowOf(ArchiveExportProgress.Starting, ArchiveExportProgress.Failed(ExportError.UNKNOWN))
                 }
 
             setupKoin(mockUseCase, RecordingExportLauncher())
@@ -133,8 +132,8 @@ class ExportWorkerTest {
     fun `worker fails when use case flow throws`() =
         runTest {
             val mockUseCase =
-                mockk<ExportUserDataUseCase> {
-                    every { exportUserData(any(), any(), any(), any(), anyNullable()) } returns
+                mockk<ExportArchiveUseCase> {
+                    every { export(any(), any()) } returns
                         flow { throw RuntimeException("Unexpected use case error") }
                 }
 
@@ -147,7 +146,7 @@ class ExportWorkerTest {
         }
 
     private fun setupKoin(
-        exportUseCase: ExportUserDataUseCase,
+        exportUseCase: ExportArchiveUseCase,
         exportLauncher: ExportLauncher,
     ) {
         startKoin {
@@ -158,6 +157,22 @@ class ExportWorkerTest {
                 },
             )
         }
+    }
+}
+
+private val EMPTY_SUMMARY =
+    ArchiveExportSummary(
+        counts = ArchiveCounts(0, 0, 0, 0, 0, 0, hasProfile = false),
+        scope = ArchiveScope(complete = true),
+    )
+
+private fun ArchiveContainer.writeText(
+    path: String,
+    value: String,
+) {
+    entry(ArchivePath.of(path)) { sink ->
+        val buffer = Buffer().writeUtf8(value)
+        sink.write(buffer, buffer.size)
     }
 }
 

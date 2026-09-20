@@ -1,0 +1,298 @@
+package app.logdate.client.domain.restore
+
+import app.logdate.client.domain.export.ExportDraft
+import app.logdate.client.domain.export.ExportJournalNoteRelation
+import app.logdate.client.domain.export.ExportLocation
+import app.logdate.client.domain.export.ExportLocationHistoryItem
+import app.logdate.client.domain.export.ExportMediaFile
+import app.logdate.client.domain.export.ExportMediaManifest
+import app.logdate.client.domain.export.ExportMetadata
+import app.logdate.client.domain.export.ExportNote
+import app.logdate.client.domain.export.ExportPlace
+import app.logdate.client.domain.export.ExportSchemaVersion
+import app.logdate.client.domain.export.ExportStats
+import app.logdate.client.domain.export.LocationHistoryPayload
+import app.logdate.client.domain.export.PlacesPayload
+import app.logdate.client.domain.export.ProfilePayload
+import app.logdate.client.domain.export.archive.ArchiveBlockType
+import app.logdate.client.domain.export.archive.ArchiveDraftBlock
+import app.logdate.client.domain.export.archive.ArchiveDraftFile
+import app.logdate.client.domain.export.archive.ArchiveJournalFile
+import app.logdate.client.domain.export.archive.ArchiveJson
+import app.logdate.client.domain.export.archive.ArchiveLocation
+import app.logdate.client.domain.export.archive.ArchiveLocationSample
+import app.logdate.client.domain.export.archive.ArchiveManifest
+import app.logdate.client.domain.export.archive.ArchiveMediaFile
+import app.logdate.client.domain.export.archive.ArchiveMediaStatus
+import app.logdate.client.domain.export.archive.ArchiveNoteFile
+import app.logdate.client.domain.export.archive.ArchivePlaceFile
+import app.logdate.client.domain.export.archive.ArchiveProfileFile
+import app.logdate.shared.model.Journal
+import app.logdate.shared.model.SerializableAudioBlock
+import app.logdate.shared.model.SerializableCameraBlock
+import app.logdate.shared.model.SerializableEntryBlock
+import app.logdate.shared.model.SerializableImageBlock
+import app.logdate.shared.model.SerializableTextBlock
+import app.logdate.shared.model.SerializableVideoBlock
+import app.logdate.shared.model.profile.LogDateProfile
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
+
+/** The files from a 2.x archive after the platform ZIP reader resolves their manifest roles. */
+data class V2RestoreBundle(
+    val manifestJson: String,
+    val journalsJson: String? = null,
+    val notesJson: String? = null,
+    val draftsJson: String? = null,
+    val profileJson: String? = null,
+    val placesJson: String? = null,
+    val locationHistoryJsonLines: String? = null,
+    val mediaInventoryJson: String? = null,
+)
+
+internal data class AdaptedV2RestoreBundle(
+    val legacy: RestoreBundle,
+    val metadata: ExportMetadata,
+    val warnings: List<String>,
+)
+
+/** Converts the portable 2.x records into the canonical input already applied by restore. */
+internal fun V2RestoreBundle.adaptForRestore(): AdaptedV2RestoreBundle {
+    val manifest = ArchiveJson.document.decodeFromString(ArchiveManifest.serializer(), manifestJson)
+    require(manifest.format == ArchiveManifest.FORMAT) { "Unsupported archive format: ${manifest.format}" }
+    if (manifest.schemaVersion.major != ExportSchemaVersion.V2_0.major) {
+        throw UnsupportedExportVersionException(manifest.schemaVersion)
+    }
+
+    val journals = journalsJson?.let { ArchiveJson.document.decodeFromString(ArchiveJournalFile.serializer(), it).journals }.orEmpty()
+    val notes = notesJson?.let { ArchiveJson.document.decodeFromString(ArchiveNoteFile.serializer(), it).notes }.orEmpty()
+    val drafts = draftsJson?.let { ArchiveJson.document.decodeFromString(ArchiveDraftFile.serializer(), it).drafts }.orEmpty()
+    val profile = profileJson?.let { ArchiveJson.document.decodeFromString(ArchiveProfileFile.serializer(), it).profile }
+    val places = placesJson?.let { ArchiveJson.document.decodeFromString(ArchivePlaceFile.serializer(), it).places }.orEmpty()
+    val locationSamples = decodeLocationSamples(locationHistoryJsonLines)
+    val media = mediaInventoryJson?.let { ArchiveJson.document.decodeFromString(ArchiveMediaFile.serializer(), it) }
+
+    val exportNotes =
+        notes.map { note ->
+            ExportNote(
+                id = note.id,
+                type = note.type.name.lowercase(),
+                content = note.text,
+                caption = note.caption,
+                mediaPath =
+                    note.media
+                        ?.path
+                        ?.value
+                        .takeIf { note.media?.status == ArchiveMediaStatus.INCLUDED },
+                durationMs = note.durationMs,
+                createdAt = note.createdAt,
+                updatedAt = note.updatedAt,
+                timeZone = note.timeZone,
+                location = note.location?.toExportLocation(),
+            )
+        }
+    val relations = notes.flatMap { note -> note.journalIds.map { ExportJournalNoteRelation(it, note.id, note.createdAt) } }
+    val adapterWarnings = mutableListOf<String>()
+    val exportDrafts =
+        drafts.map { draft ->
+            ExportDraft(
+                id = draft.id,
+                journalIds = draft.journalIds,
+                content = "",
+                createdAt = draft.createdAt,
+                updatedAt = draft.updatedAt,
+                blocks = draft.blocks.mapNotNull { toSerializableBlock(it, adapterWarnings) },
+            )
+        }
+    val exportPlaces =
+        places.map { ExportPlace(it.id, it.name, it.latitude, it.longitude, it.radiusMeters, it.description) }
+    val exportLocationHistory = locationSamples.map(::toExportLocationHistoryItem)
+    val mediaManifest =
+        media?.let { inventory ->
+            ExportMediaManifest(inventory.files.map { ExportMediaFile(exportPath = it.path.value, sourceUri = it.path.value) })
+        }
+    val exportProfile =
+        profile?.let {
+            LogDateProfile(
+                displayName = it.displayName.orEmpty(),
+                birthday = it.birthday,
+                bio = it.bio,
+                originalBio = it.originalBio,
+                createdAt = it.createdAt ?: Instant.DISTANT_PAST,
+                lastUpdatedAt = it.updatedAt ?: Instant.DISTANT_PAST,
+            )
+        }
+    val metadata =
+        ExportMetadata(
+            version = manifest.schemaVersion,
+            exportDate = manifest.exportedAt,
+            userId = "",
+            deviceId = "",
+            appVersion = manifest.generator.version,
+            stats =
+                ExportStats(
+                    journalCount = manifest.counts.journals,
+                    noteCount = manifest.counts.notes,
+                    draftCount = manifest.counts.drafts,
+                    mediaCount = manifest.counts.media,
+                    placeCount = manifest.counts.places,
+                    locationHistoryCount = manifest.counts.locationSamples,
+                    hasProfile = manifest.counts.hasProfile,
+                ),
+        )
+
+    return AdaptedV2RestoreBundle(
+        legacy =
+            RestoreBundle(
+                metadataJson =
+                    ArchiveJson.document.encodeToString(
+                        ExportMetadata.serializer(),
+                        metadata.copy(version = ExportSchemaVersion.V1_2),
+                    ),
+                journalsJson =
+                    ArchiveJson.document.encodeToString(
+                        LegacyJournalsPayload.serializer(),
+                        LegacyJournalsPayload(
+                            journals.map {
+                                Journal(
+                                    id = Uuid.parse(it.id),
+                                    title = it.title,
+                                    description = it.description,
+                                    created = it.createdAt,
+                                    lastUpdated = it.updatedAt,
+                                )
+                            },
+                        ),
+                    ),
+                notesJson = ArchiveJson.document.encodeToString(LegacyNotesPayload.serializer(), LegacyNotesPayload(exportNotes)),
+                journalNotesJson =
+                    ArchiveJson.document.encodeToString(LegacyJournalNotesPayload.serializer(), LegacyJournalNotesPayload(relations)),
+                draftsJson = ArchiveJson.document.encodeToString(LegacyDraftsPayload.serializer(), LegacyDraftsPayload(exportDrafts)),
+                profileJson = exportProfile?.let { ArchiveJson.document.encodeToString(ProfilePayload.serializer(), ProfilePayload(it)) },
+                placesJson =
+                    exportPlaces
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { ArchiveJson.document.encodeToString(PlacesPayload.serializer(), PlacesPayload(it)) },
+                locationHistoryJson =
+                    exportLocationHistory
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { ArchiveJson.document.encodeToString(LocationHistoryPayload.serializer(), LocationHistoryPayload(it)) },
+                mediaManifestJson = mediaManifest?.let { ArchiveJson.document.encodeToString(ExportMediaManifest.serializer(), it) },
+            ),
+        metadata = metadata,
+        warnings = adapterWarnings,
+    )
+}
+
+private fun ArchiveLocation.toExportLocation() = ExportLocation(latitude, longitude, placeName, altitudeMeters, accuracyMeters?.toFloat())
+
+private fun toSerializableBlock(
+    block: ArchiveDraftBlock,
+    warnings: MutableList<String>,
+): SerializableEntryBlock? {
+    val id = Uuid.parse(block.id)
+    val location = block.location
+    val mediaPath =
+        block.media
+            ?.path
+            ?.value
+            .takeIf { block.media?.status == ArchiveMediaStatus.INCLUDED }
+    if (block.type != ArchiveBlockType.TEXT && mediaPath == null) {
+        warnings += "Skipped draft media block (ID: $id) - media was omitted from the archive"
+        return null
+    }
+    return when (block.type) {
+        ArchiveBlockType.TEXT ->
+            SerializableTextBlock(
+                id,
+                block.timestamp,
+                location?.latitude,
+                location?.longitude,
+                location?.altitudeMeters,
+                block.text.orEmpty(),
+            )
+        ArchiveBlockType.IMAGE ->
+            SerializableImageBlock(
+                id,
+                block.timestamp,
+                location?.latitude,
+                location?.longitude,
+                location?.altitudeMeters,
+                mediaPath,
+                block.caption.orEmpty(),
+            )
+        ArchiveBlockType.VIDEO ->
+            SerializableVideoBlock(
+                id,
+                block.timestamp,
+                location?.latitude,
+                location?.longitude,
+                location?.altitudeMeters,
+                mediaPath,
+                caption = block.caption.orEmpty(),
+            )
+        ArchiveBlockType.AUDIO ->
+            SerializableAudioBlock(
+                id,
+                block.timestamp,
+                location?.latitude,
+                location?.longitude,
+                location?.altitudeMeters,
+                mediaPath,
+                block.durationMs ?: 0,
+                block.transcription,
+            )
+        ArchiveBlockType.CAMERA ->
+            SerializableCameraBlock(id, block.timestamp, location?.latitude, location?.longitude, location?.altitudeMeters, mediaPath)
+    }
+}
+
+private fun decodeLocationSamples(jsonLines: String?): List<ArchiveLocationSample> =
+    jsonLines
+        ?.lineSequence()
+        ?.filter { it.isNotBlank() }
+        ?.map { ArchiveJson.line.decodeFromString(ArchiveLocationSample.serializer(), it) }
+        ?.toList()
+        .orEmpty()
+
+private fun toExportLocationHistoryItem(sample: ArchiveLocationSample): ExportLocationHistoryItem =
+    ExportLocationHistoryItem(
+        sampleId = "v2:${sample.timestamp}:${sample.latitude}:${sample.longitude}",
+        userId = "v2-import",
+        deviceId = "v2-import",
+        timestamp = sample.timestamp,
+        loggedAt = sample.loggedAt,
+        latitude = sample.latitude,
+        longitude = sample.longitude,
+        altitudeMeters = sample.altitudeMeters,
+        confidence = sample.confidence.toFloat(),
+        isGenuine = sample.isGenuine,
+        capturePipeline = sample.capturePipeline,
+        captureSource = sample.captureSource,
+        accuracyMeters = sample.accuracyMeters?.toFloat(),
+        speedMetersPerSecond = sample.speedMetersPerSecond?.toFloat(),
+        bearingDegrees = sample.bearingDegrees?.toFloat(),
+        isMock = sample.isMock,
+    )
+
+@Serializable
+private data class LegacyJournalsPayload(
+    val journals: List<Journal>,
+)
+
+@Serializable
+private data class LegacyNotesPayload(
+    val notes: List<ExportNote>,
+)
+
+@Serializable
+private data class LegacyDraftsPayload(
+    val drafts: List<ExportDraft>,
+)
+
+@Serializable
+private data class LegacyJournalNotesPayload(
+    @SerialName("journal_notes") val journalNotes: List<ExportJournalNoteRelation>,
+)

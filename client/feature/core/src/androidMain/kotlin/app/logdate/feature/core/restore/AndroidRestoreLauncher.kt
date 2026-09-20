@@ -11,9 +11,8 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.export.ExportFormat
-import app.logdate.client.domain.restore.ArchiveRoot
+import app.logdate.client.domain.restore.RestoreArchiveReader
 import app.logdate.client.domain.restore.ZipSignature
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
@@ -54,7 +53,7 @@ import kotlin.coroutines.cancellation.CancellationException
  *
  * ## File selection
  *
- * [onRestoreSourceSelected] extracts `metadata.json` from the chosen archive for preview
+ * [onRestoreSourceSelected] extracts the v2 manifest or v1 metadata from the chosen archive for preview
  * without copying the archive when the provider allows it. This I/O is dispatched to [launcherScope] so it never
  * blocks the main thread. Any in-flight extraction is cancelled before a new one begins,
  * tracked by [metadataExtractionJob].
@@ -261,7 +260,7 @@ class AndroidRestoreLauncher(
     /**
      * Called when the user selects a restore archive or dismisses the file picker.
      *
-     * Reads `metadata.json` from the archive on [launcherScope] for preview. A provider that
+     * Reads the v2 manifest or v1 metadata from the archive on [launcherScope] for preview. A provider that
      * cannot be opened in place has its archive copied into the cache first; that copy stops
      * when the extraction is cancelled. Any previously in-flight extraction is cancelled first. On
      * success, delivers an [ArchiveFileInfo] to the file-selected callback. On failure
@@ -312,10 +311,10 @@ class AndroidRestoreLauncher(
     }
 
     /**
-     * Reads only the `metadata.json` entry from the archive for preview.
+     * Reads only the v2 manifest or v1 metadata entry from the archive for preview.
      *
      * The ZIP is read through its central directory, so the entries stored before
-     * `metadata.json` are never read, and archives whose entries use data descriptors (as the
+     * the preview entry are never read, and archives whose entries use data descriptors (as the
      * iOS writer's do) stay readable. Returns `null` if the entry is missing or the archive
      * cannot be read.
      */
@@ -323,11 +322,10 @@ class AndroidRestoreLauncher(
         try {
             withRandomAccessZip(uri) { zip ->
                 val entryNames = zip.entries().toList().map { it.name }
-                val root =
-                    ArchiveRoot.find(entryNames, ExportFileStructure.METADATA_FILE)
-                        ?: return@withRandomAccessZip null
-                val entry = zip.getEntry(root + ExportFileStructure.METADATA_FILE) ?: return@withRandomAccessZip null
-                zip.getInputStream(entry).use { it.bufferedReader(Charsets.UTF_8).readText() }
+                RestoreArchiveReader.previewJson(entryNames) { entryName ->
+                    val entry = zip.getEntry(entryName) ?: return@previewJson null
+                    zip.getInputStream(entry).use { it.bufferedReader(Charsets.UTF_8).readText() }
+                }
             }
         } catch (cancellation: CancellationException) {
             throw cancellation

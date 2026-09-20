@@ -8,10 +8,8 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import app.logdate.client.domain.export.ExportFileStructure
-import app.logdate.client.domain.restore.ArchiveRoot
 import app.logdate.client.domain.restore.MediaImporter
-import app.logdate.client.domain.restore.RestoreBundle
+import app.logdate.client.domain.restore.RestoreArchiveReader
 import app.logdate.client.domain.restore.RestoreOptions
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.media.MediaManager
@@ -84,19 +82,11 @@ class RestoreWorker(
         return try {
             emitProgress(RestoreStage.READING_CONTENTS, 20)
 
-            val root = archiveRoot(zipFile).orEmpty()
-            val bundle =
-                RestoreBundle(
-                    metadataJson = readRequiredEntry(zipFile, root + ExportFileStructure.METADATA_FILE),
-                    journalsJson = readRequiredEntry(zipFile, root + ExportFileStructure.JOURNALS_FILE),
-                    notesJson = readRequiredEntry(zipFile, root + ExportFileStructure.NOTES_FILE),
-                    journalNotesJson = readRequiredEntry(zipFile, root + ExportFileStructure.JOURNAL_NOTES_FILE),
-                    draftsJson = readRequiredEntry(zipFile, root + ExportFileStructure.DRAFTS_FILE),
-                    profileJson = readOptionalEntry(zipFile, root + ExportFileStructure.PROFILE_FILE),
-                    placesJson = readOptionalEntry(zipFile, root + ExportFileStructure.PLACES_FILE),
-                    locationHistoryJson = readOptionalEntry(zipFile, root + ExportFileStructure.LOCATION_HISTORY_FILE),
-                    mediaManifestJson = readOptionalEntry(zipFile, root + ExportFileStructure.MEDIA_MANIFEST_FILE),
-                )
+            val archive =
+                RestoreArchiveReader.read(zipFile.entries().toList().map { it.name }) { entryName ->
+                    readOptionalEntry(zipFile, entryName)
+                }
+            val root = archive.root
 
             emitProgress(RestoreStage.RESTORING_JOURNALS, 40)
 
@@ -118,7 +108,7 @@ class RestoreWorker(
 
             val result =
                 restoreUserDataUseCase.restore(
-                    bundle = bundle,
+                    archive = archive,
                     options = options,
                     mediaImporter = mediaImporter,
                     onProgress = { phase ->
@@ -191,23 +181,6 @@ class RestoreWorker(
             Napier.e("Failed to copy restore archive to cache", e)
             tempFile.delete()
             null
-        }
-    }
-
-    private fun archiveRoot(zipFile: ZipFile): String? {
-        val entryNames = zipFile.entries().toList().map { it.name }
-        return ArchiveRoot.find(entryNames, ExportFileStructure.METADATA_FILE)
-    }
-
-    private fun readRequiredEntry(
-        zipFile: ZipFile,
-        entryName: String,
-    ): String {
-        val entry =
-            zipFile.getEntry(entryName)
-                ?: throw IllegalStateException("Missing required file: $entryName")
-        return zipFile.getInputStream(entry).use { input ->
-            input.bufferedReader(Charsets.UTF_8).readText()
         }
     }
 

@@ -37,7 +37,7 @@ class ExportMigrationRunner(
         sourceVersion: ExportSchemaVersion,
         bundle: ParsedExportBundle,
     ): ParsedExportBundle {
-        if (sourceVersion > ExportSchemaVersion.CURRENT) {
+        if (sourceVersion.major != ExportSchemaVersion.V1_0.major || sourceVersion >= ExportSchemaVersion.V1_2) {
             return bundle
         }
 
@@ -45,10 +45,10 @@ class ExportMigrationRunner(
         var currentVersion = sourceVersion
         var current = bundle
 
-        while (currentVersion < ExportSchemaVersion.CURRENT) {
+        while (currentVersion < ExportSchemaVersion.V1_2) {
             val migration =
                 migrationMap[currentVersion]
-                    ?: error("Missing export migration from $currentVersion to ${ExportSchemaVersion.CURRENT}")
+                    ?: error("Missing export migration from $currentVersion to ${ExportSchemaVersion.V1_2}")
             current = migration.migrate(current)
             currentVersion = migration.to
         }

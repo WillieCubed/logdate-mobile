@@ -49,6 +49,7 @@ data class ExportNote(
     val durationMs: Long? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val timeZone: String? = null,
     val location: ExportLocation? = null,
     val tags: List<String> = emptyList(),
     val people: List<String> = emptyList(),

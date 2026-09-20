@@ -1,18 +1,12 @@
-@file:OptIn(BetaInteropApi::class)
+@file:OptIn(kotlinx.cinterop.BetaInteropApi::class)
 
 package app.logdate.feature.core.export
 
-import app.logdate.client.domain.export.ExportFileStructure
-import app.logdate.client.domain.export.ExportIssue
-import app.logdate.client.domain.export.ExportIssueCode
-import app.logdate.client.domain.export.ExportMediaFile
-import app.logdate.client.domain.export.ExportProgress
-import app.logdate.client.domain.export.ExportResult
-import app.logdate.client.domain.export.ExportUserDataUseCase
-import app.logdate.client.domain.export.ZipArchiveEntry
-import app.logdate.client.domain.export.ZipArchiveWriter
+import app.logdate.client.domain.export.archive.ArchiveExportOptions
+import app.logdate.client.domain.export.archive.ArchiveExportProgress
+import app.logdate.client.domain.export.archive.ExportArchiveUseCase
+import app.logdate.client.domain.export.archive.StagingZipArchiveContainer
 import io.github.aakira.napier.Napier
-import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,37 +15,24 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
-import okio.BufferedSink
 import okio.FileSystem
 import okio.Path.Companion.toPath
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
-import platform.Foundation.NSFileManager
 import platform.Foundation.NSTemporaryDirectory
 import platform.Foundation.NSURL
 import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIViewController
+import kotlin.coroutines.cancellation.CancellationException
 
-/**
- * iOS-specific implementation for launching data export.
- *
- * This implementation creates a temporary ZIP archive and presents the iOS share sheet
- * to let the user save or share it.
- */
+/** Creates a portable v2 archive and presents the finished file through the iOS share sheet. */
 @OptIn(ExperimentalForeignApi::class)
 class IosExportLauncher(
     private val rootViewController: () -> UIViewController,
 ) : ExportLauncher,
     KoinComponent {
-    private data class MediaArchiveEntry(
-        val entry: ZipArchiveEntry.File? = null,
-        val issue: ExportIssue? = null,
-    )
-
-    private val exportUserDataUseCase: ExportUserDataUseCase by inject()
-    private val zipArchiveWriter = ZipArchiveWriter(FileSystem.SYSTEM)
+    private val exportArchiveUseCase: ExportArchiveUseCase by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var currentExportJob: Job? = null
     private var completionCallback: ((ExportOutcome) -> Unit)? = null
@@ -67,90 +48,71 @@ class IosExportLauncher(
         completionCallback = callback
     }
 
-    @OptIn(ExperimentalForeignApi::class)
     override fun startExport(options: ExportOptions) {
-        // Cancel any ongoing export job
         currentExportJob?.cancel()
-
-        // Start a new export job
         currentExportJob =
             scope.launch {
+                val exportFilePath = createExportFilePath()
+                val outputPath = exportFilePath.toPath()
+                val container =
+                    StagingZipArchiveContainer(
+                        fileSystem = FileSystem.SYSTEM,
+                        stagingDirectory = "$exportFilePath.staging".toPath(),
+                    )
+                var archiveFinished = false
                 try {
-                    Napier.i("iOS: Starting export process")
-
-                    // Resolve date range cutoff
-                    val dateRangeCutoff = options.dateRange.toCutoffInstant()
-
-                    exportUserDataUseCase
-                        .exportUserData(
-                            includeJournals = options.includeJournals,
-                            includeNotes = options.includeNotes,
-                            includeDrafts = options.includeDrafts,
-                            includeMedia = options.includeMedia,
-                            dateRangeCutoff = dateRangeCutoff,
-                        ).catch { exception ->
-                            Napier.e("iOS: Export failed", exception)
-                            showAlert(
-                                title = "Export Failed",
-                                message = "Export could not be completed.",
-                            )
-                            completionCallback?.invoke(ExportOutcome.Failed("Export could not be completed."))
-                        }.collect { progress ->
+                    exportArchiveUseCase
+                        .export(options.toArchiveExportOptions(), container)
+                        .collect { progress ->
                             when (progress) {
-                                is ExportProgress.Starting -> {
-                                    Napier.i("iOS: Export started")
+                                ArchiveExportProgress.Starting -> {
+                                    updateProgress(ExportProgressInfo(isActive = true, message = "Preparing export..."))
                                 }
 
-                                is ExportProgress.InProgress -> {
-                                    val progressInt = (progress.percentage * 100).toInt()
-                                    Napier.d("iOS: Export progress: $progressInt% - ${progress.stage.defaultMessage}")
-                                }
-
-                                is ExportProgress.Completed -> {
-                                    try {
-                                        val exportFilePath = createExportFilePath()
-                                        saveExportArchive(exportFilePath, progress.result)
-                                        presentShareSheet(exportFilePath)
-
-                                        Napier.i("iOS: Export completed and share sheet presented")
-                                        updateProgress(
-                                            ExportProgressInfo(
-                                                isActive = false,
-                                                progressPercent = 100,
-                                                message = "Export completed",
-                                                completedFilePath = exportFilePath,
-                                                stats = progress.result.stats,
-                                            ),
-                                        )
-                                        // Success is delivered via the progress flow above.
-                                    } catch (e: Exception) {
-                                        Napier.e("iOS: Failed to save or share export", e)
-                                        showAlert(
-                                            title = "Export Failed",
-                                            message = "Could not write the export archive.",
-                                        )
-                                        completionCallback?.invoke(ExportOutcome.Failed("Could not write the export archive."))
-                                    }
-                                }
-
-                                is ExportProgress.Failed -> {
-                                    val errorMessage = progress.error.defaultMessage
-                                    Napier.e("iOS: Export failed: $errorMessage")
-                                    showAlert(
-                                        title = "Export Failed",
-                                        message = errorMessage,
+                                is ArchiveExportProgress.InProgress -> {
+                                    updateProgress(
+                                        ExportProgressInfo(
+                                            isActive = true,
+                                            progressPercent = (progress.fraction * 100).toInt(),
+                                            message = progress.stage.defaultMessage,
+                                        ),
                                     )
-                                    completionCallback?.invoke(ExportOutcome.Failed(errorMessage))
+                                }
+
+                                is ArchiveExportProgress.Completed -> {
+                                    container.finish(outputPath)
+                                    archiveFinished = true
+                                    presentShareSheet(exportFilePath)
+                                    updateProgress(
+                                        ExportProgressInfo(
+                                            isActive = false,
+                                            progressPercent = 100,
+                                            message = "Export completed",
+                                            completedFilePath = exportFilePath,
+                                            stats = progress.summary.counts.toExportStats(),
+                                        ),
+                                    )
+                                }
+
+                                is ArchiveExportProgress.Failed -> {
+                                    val message = progress.error.defaultMessage
+                                    showAlert("Export Failed", message)
+                                    completionCallback?.invoke(ExportOutcome.Failed(message))
                                 }
                             }
                         }
-                } catch (e: Exception) {
-                    Napier.e("iOS: Export process failed", e)
-                    showAlert(
-                        title = "Export Failed",
-                        message = "Export could not be completed.",
-                    )
-                    completionCallback?.invoke(ExportOutcome.Failed("Export could not be completed."))
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (failure: Exception) {
+                    Napier.e("iOS: Export process failed", failure)
+                    showAlert("Export Failed", "Could not write the export archive.")
+                    completionCallback?.invoke(ExportOutcome.Failed("Could not write the export archive."))
+                } finally {
+                    if (!archiveFinished) {
+                        container.discard()
+                        FileSystem.SYSTEM.delete(outputPath, mustExist = false)
+                        updateProgress(ExportProgressInfo())
+                    }
                 }
             }
     }
@@ -162,144 +124,27 @@ class IosExportLauncher(
         Napier.i("iOS: Export cancelled")
     }
 
-    private fun createExportFilePath(): String {
-        val basePath = NSTemporaryDirectory().trimEnd('/')
-        return "$basePath/${generateExportFileName()}"
-    }
-
-    private fun saveExportArchive(
-        exportFilePath: String,
-        result: ExportResult,
-    ) {
-        val entries =
-            buildList {
-                addStreamedEntry(ExportFileStructure.METADATA_FILE) { result.writeMetadata(it) }
-                addStreamedEntry(ExportFileStructure.JOURNALS_FILE) { result.writeJournals(it) }
-                addStreamedEntry(ExportFileStructure.NOTES_FILE) { result.writeNotes(it) }
-                addStreamedEntry(ExportFileStructure.JOURNAL_NOTES_FILE) { result.writeJournalNotes(it) }
-                addStreamedEntry(ExportFileStructure.DRAFTS_FILE) { result.writeDrafts(it) }
-                if (result.hasProfile) addStreamedEntry(ExportFileStructure.PROFILE_FILE) { result.writeProfile(it) }
-                if (result.hasPlaces) addStreamedEntry(ExportFileStructure.PLACES_FILE) { result.writePlaces(it) }
-                if (result.hasLocationHistory) {
-                    addStreamedEntry(ExportFileStructure.LOCATION_HISTORY_FILE) { result.writeLocationHistory(it) }
-                }
-                val exportedMediaFiles = mutableListOf<ExportMediaFile>()
-                val archiveIssues = mutableListOf<ExportIssue>()
-                result.mediaFiles.forEach { mediaFile ->
-                    val mediaEntry = buildMediaEntry(mediaFile)
-                    mediaEntry.entry?.let {
-                        exportedMediaFiles += mediaFile
-                        add(it)
-                    }
-                    mediaEntry.issue?.let(archiveIssues::add)
-                }
-                if (result.hasMediaManifest(exportedMediaFiles)) {
-                    addStreamedEntry(ExportFileStructure.MEDIA_MANIFEST_FILE) { result.writeMediaManifest(it, exportedMediaFiles) }
-                }
-                result.renderIssuesText(archiveIssues)?.let { addTextEntry(ExportFileStructure.EXPORT_ISSUES_FILE, it) }
-            }
-
-        zipArchiveWriter.write(exportFilePath.toPath(), entries)
-    }
-
-    private fun MutableList<ZipArchiveEntry>.addStreamedEntry(
-        fileName: String,
-        write: (BufferedSink) -> Unit,
-    ) {
-        add(ZipArchiveEntry.Streaming(path = fileName, writeTo = write))
-    }
-
-    private fun MutableList<ZipArchiveEntry>.addTextEntry(
-        fileName: String,
-        contents: String,
-    ) {
-        add(
-            ZipArchiveEntry.Bytes(
-                path = fileName,
-                bytes = contents.encodeToByteArray(),
-            ),
+    private fun ExportOptions.toArchiveExportOptions(): ArchiveExportOptions =
+        ArchiveExportOptions(
+            includeJournals = includeJournals,
+            includeNotes = includeNotes,
+            includeDrafts = includeDrafts,
+            includeMedia = includeMedia,
+            from = dateRange.toCutoffInstant(),
+            to = (dateRange as? ExportDateRange.Custom)?.end,
         )
-    }
 
-    private fun buildMediaEntry(mediaFile: ExportMediaFile): MediaArchiveEntry {
-        val sourceUri = mediaFile.sourceUri
-        val sourcePath =
-            when {
-                sourceUri.startsWith("file://") -> sourceUri.removePrefix("file://")
-                sourceUri.startsWith("/") -> sourceUri
-                else -> {
-                    Napier.w("iOS: Unsupported media URI for export, skipping: $sourceUri")
-                    return MediaArchiveEntry(
-                        issue =
-                            ExportIssue(
-                                code = ExportIssueCode.MEDIA_BYTES_MISSING,
-                                source = sourceUri,
-                            ),
-                    )
-                }
-            }
+    private fun createExportFilePath(): String = "${NSTemporaryDirectory().trimEnd('/')}/${generateExportFileName()}"
 
-        require(sourcePath.isNotBlank()) {
-            "Media source path is empty for export entry ${mediaFile.exportPath}"
-        }
-
-        val normalizedSourcePath = normalizeDuplicateExtensionPath(sourcePath)
-        if (!NSFileManager.defaultManager.fileExistsAtPath(normalizedSourcePath)) {
-            Napier.w("iOS: Media file missing during export, skipping: $sourcePath")
-            return MediaArchiveEntry(
-                issue =
-                    ExportIssue(
-                        code = ExportIssueCode.MEDIA_BYTES_MISSING,
-                        source = sourceUri,
-                    ),
-            )
-        }
-
-        return MediaArchiveEntry(
-            entry =
-                ZipArchiveEntry.File(
-                    path = mediaFile.exportPath,
-                    sourcePath = normalizedSourcePath.toPath(),
-                ),
-            issue =
-                if (normalizedSourcePath != sourcePath) {
-                    ExportIssue(
-                        code = ExportIssueCode.MEDIA_RECOVERED_NORMALIZED_PATH,
-                        source = sourceUri,
-                    )
-                } else {
-                    null
-                },
-        )
-    }
-
-    private fun normalizeDuplicateExtensionPath(path: String): String =
-        path.replace(Regex("(\\.[A-Za-z0-9]+)\\1$")) { match ->
-            match.groupValues[1]
-        }
-
-    /**
-     * Presents the iOS share sheet with the exported ZIP archive.
-     */
     private fun presentShareSheet(path: String) {
-        val fileURL = NSURL.fileURLWithPath(path)
-
         val activityViewController =
             UIActivityViewController(
-                activityItems = listOf(fileURL),
+                activityItems = listOf(NSURL.fileURLWithPath(path)),
                 applicationActivities = null,
             )
-
-        rootViewController().presentViewController(
-            viewControllerToPresent = activityViewController,
-            animated = true,
-            completion = null,
-        )
+        rootViewController().presentViewController(activityViewController, animated = true, completion = null)
     }
 
-    /**
-     * Shows a simple alert dialog.
-     */
     private fun showAlert(
         title: String,
         message: String,
@@ -310,7 +155,6 @@ class IosExportLauncher(
                 message = message,
                 preferredStyle = platform.UIKit.UIAlertControllerStyleAlert,
             )
-
         alertController.addAction(
             platform.UIKit.UIAlertAction.actionWithTitle(
                 title = "OK",
@@ -318,11 +162,6 @@ class IosExportLauncher(
                 handler = null,
             ),
         )
-
-        rootViewController().presentViewController(
-            viewControllerToPresent = alertController,
-            animated = true,
-            completion = null,
-        )
+        rootViewController().presentViewController(alertController, animated = true, completion = null)
     }
 }

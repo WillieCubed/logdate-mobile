@@ -9,18 +9,11 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import app.logdate.client.datastore.featureflags.FeatureFlag
-import app.logdate.client.datastore.featureflags.FeatureFlagStore
-import app.logdate.client.domain.export.ExportProgress
-import app.logdate.client.domain.export.ExportResult
-import app.logdate.client.domain.export.ExportStage
-import app.logdate.client.domain.export.ExportUserDataUseCase
 import app.logdate.client.domain.export.archive.ArchiveExportOptions
 import app.logdate.client.domain.export.archive.ArchiveExportProgress
 import app.logdate.client.domain.export.archive.ArchiveExportSummary
 import app.logdate.client.domain.export.archive.ExportArchiveUseCase
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.flow.catch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.io.File
@@ -49,7 +42,6 @@ class ExportWorker(
         const val ERROR_KEY = "export_error"
         private const val EXPORT_FAILED_MESSAGE = "Export could not be completed."
         private const val ARCHIVE_WRITE_FAILED_MESSAGE = "Could not write the export archive."
-        private const val WORKER_FAILED_MESSAGE = "Export worker failed."
         const val DESTINATION_URI_KEY = "destination_uri"
         const val INCLUDE_JOURNALS_KEY = "include_journals"
         const val INCLUDE_NOTES_KEY = "include_notes"
@@ -58,11 +50,8 @@ class ExportWorker(
         const val DATE_CUTOFF_MILLIS_KEY = "date_cutoff_millis"
     }
 
-    private val exportUserDataUseCase: ExportUserDataUseCase by inject()
     private val exportArchiveUseCase: ExportArchiveUseCase by inject()
-    private val featureFlags: FeatureFlagStore by inject()
     private val exportLauncher: ExportLauncher by inject()
-    private val archiveWriter = AndroidExportArchiveWriter(context)
     private val notificationHelper = ExportNotificationHelper(context, Uuid.parse(id.toString()))
 
     private val destinationUri: Uri? = inputData.getString(DESTINATION_URI_KEY)?.toUri()
@@ -76,10 +65,6 @@ class ExportWorker(
             .takeIf { it >= 0 }
             ?.let { Instant.fromEpochMilliseconds(it) }
 
-    private data class SavedExport(
-        val path: String,
-    )
-
     override suspend fun doWork(): Result {
         Napier.i("ExportWorker.doWork() STARTED - export worker is executing")
 
@@ -88,113 +73,8 @@ class ExportWorker(
         trySetForeground(getForegroundInfo())
         Napier.i("ExportWorker: Foreground service setup complete")
 
-        if (archiveFormatEnabled()) return runArchiveExport()
-
-        return try {
-            var finalResult = Result.success()
-            Napier.i("ExportWorker: About to call exportUserDataUseCase.exportUserData()")
-
-            exportUserDataUseCase
-                .exportUserData(
-                    includeJournals = includeJournals,
-                    includeNotes = includeNotes,
-                    includeDrafts = includeDrafts,
-                    includeMedia = includeMedia,
-                    dateRangeCutoff = dateRangeCutoff,
-                ).catch { exception ->
-                    Napier.e("Export failed", exception)
-                    finalResult = failureResult(EXPORT_FAILED_MESSAGE)
-                }.collect { progress ->
-                    when (progress) {
-                        is ExportProgress.Starting -> {
-                            Napier.i("ExportWorker: Starting")
-                            trySetForeground(notificationHelper.createForegroundInfo(0, "Starting export..."))
-                            emitProgress(0, "Starting export...")
-                        }
-
-                        is ExportProgress.InProgress -> {
-                            val progressInt = (progress.percentage * 100).toInt()
-                            val stageMessage = progress.stage.defaultMessage
-                            Napier.i("ExportWorker: Progress $progressInt% - $stageMessage")
-                            trySetForeground(notificationHelper.createForegroundInfo(progressInt, stageMessage))
-                            emitProgress(progressInt, stageMessage)
-                        }
-
-                        is ExportProgress.Completed -> {
-                            try {
-                                Napier.i("ExportWorker: Completed, saving file...")
-                                val archiveMessage = ExportStage.WRITING_ARCHIVE.defaultMessage
-                                trySetForeground(notificationHelper.createForegroundInfo(90, archiveMessage))
-                                emitProgress(90, archiveMessage)
-
-                                val savedExport =
-                                    if (destinationUri != null) {
-                                        saveToUri(progress.result, destinationUri)
-                                    } else {
-                                        saveToDownloads(progress.result)
-                                    }
-
-                                trySetForeground(notificationHelper.createCompletionInfo(savedExport.path))
-                                exportLauncher.updateProgress(
-                                    ExportProgressInfo(
-                                        isActive = false,
-                                        progressPercent = 100,
-                                        message = "Export completed",
-                                        completedFilePath = savedExport.path,
-                                        stats = progress.result.stats,
-                                    ),
-                                )
-
-                                finalResult =
-                                    Result.success(
-                                        workDataOf(
-                                            PROGRESS_KEY to 100,
-                                            MESSAGE_KEY to "Export completed",
-                                            FILE_PATH_KEY to savedExport.path,
-                                        ),
-                                    )
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: Throwable) {
-                                // Throwable (not just Exception) so an OutOfMemoryError while
-                                // writing the archive fails the export with a real reason instead
-                                // of escaping uncaught as a bare, reasonless failure.
-                                Napier.e("Failed to save file", e)
-                                trySetForeground(notificationHelper.createErrorInfo(ARCHIVE_WRITE_FAILED_MESSAGE))
-                                finalResult = failureResult(ARCHIVE_WRITE_FAILED_MESSAGE)
-                            }
-                        }
-
-                        is ExportProgress.Failed -> {
-                            val errorMessage = progress.error.defaultMessage
-                            Napier.e("ExportWorker: Failed - $errorMessage")
-                            trySetForeground(notificationHelper.createErrorInfo(errorMessage))
-                            finalResult = failureResult(errorMessage)
-                        }
-                    }
-                }
-
-            Napier.i("ExportWorker: doWork() finishing with result: $finalResult")
-            finalResult
-        } catch (exception: CancellationException) {
-            throw exception
-        } catch (exception: Throwable) {
-            Napier.e("Worker execution failed", exception)
-            trySetForeground(notificationHelper.createErrorInfo(WORKER_FAILED_MESSAGE))
-            failureResult(WORKER_FAILED_MESSAGE)
-        }
+        return runArchiveExport()
     }
-
-    /** A failed read of the flag runs the unchanged export instead of failing it, since the flag defaults to off. */
-    private suspend fun archiveFormatEnabled(): Boolean =
-        try {
-            featureFlags.isEnabled(FeatureFlag.EXPORT_ARCHIVE_V2)
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (failure: Exception) {
-            Napier.w("Could not read the export format flag, using the default export", failure)
-            false
-        }
 
     /**
      * Where a 2.0 archive is written. [commit] puts a finished archive in its place and [discard]
@@ -361,30 +241,4 @@ class ExportWorker(
             progress = 0,
             message = "Starting export...",
         )
-
-    private fun saveToUri(
-        exportData: ExportResult,
-        uri: Uri,
-    ): SavedExport {
-        context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-            archiveWriter.write(exportData, outputStream)
-        } ?: throw IllegalStateException("Could not open output stream for URI: $uri")
-
-        return SavedExport(
-            path = uri.toString(),
-        )
-    }
-
-    private fun saveToDownloads(exportData: ExportResult): SavedExport {
-        val fileName = generateExportFileName()
-
-        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        val file = File(downloadsDir, fileName)
-
-        FileOutputStream(file).use { fileOut -> archiveWriter.write(exportData, fileOut) }
-
-        return SavedExport(
-            path = file.absolutePath,
-        )
-    }
 }
