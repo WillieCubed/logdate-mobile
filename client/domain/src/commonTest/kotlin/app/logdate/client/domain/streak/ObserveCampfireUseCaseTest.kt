@@ -7,6 +7,7 @@ import app.logdate.client.repository.streak.StreakSettingsRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
@@ -26,6 +27,8 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -154,6 +157,39 @@ class ObserveCampfireUseCaseTest {
             val states = collectStates(createUseCase(entryTimestamps = failing))
 
             assertNull(states.last())
+        }
+
+    @Test
+    fun `the fire comes back after a failed read`() =
+        runTest {
+            var attempts = 0
+            val flaky =
+                flow {
+                    if (attempts++ == 0) throw IllegalStateException("database locked")
+                    emitAll(timestamps)
+                }
+            timestamps.value = listOf(start)
+            val states = collectStates(createUseCase(entryTimestamps = flaky))
+            assertNull(states.last())
+
+            advanceTimeBy(31.seconds)
+            runCurrent()
+
+            assertEquals(FirePhase.BURNING, states.last()?.phase)
+        }
+
+    @Test
+    fun `a new day start hour applies within minutes`() =
+        runTest {
+            timestamps.value = listOf(LocalDateTime(2026, 3, 15, 2, 0).toInstant(zone))
+            val states = collectStates(createUseCase())
+            assertFalse(states.last()?.loggedToday == true)
+
+            dayStartHour = 0
+            advanceTimeBy(16.minutes)
+            runCurrent()
+
+            assertTrue(states.last()?.loggedToday == true)
         }
 
     private class FakeStreakSettings : StreakSettingsRepository {
