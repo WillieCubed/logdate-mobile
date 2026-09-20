@@ -64,6 +64,7 @@ class CampfireViewModelTest {
         runTest {
             flagEnabled.value = false
             val viewModel = createViewModel()
+            assertNull(viewModel.isCampfireEnabled.value)
             backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.isCampfireEnabled.collect {} }
             assertEquals(false, viewModel.isCampfireEnabled.value)
 

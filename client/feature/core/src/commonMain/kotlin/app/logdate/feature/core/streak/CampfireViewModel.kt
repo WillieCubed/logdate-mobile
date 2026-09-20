@@ -37,14 +37,16 @@ class CampfireViewModel(
     )
 
     /**
-     * Whether the campfire replaces the old streak counter. Surfaces that show the campfire even
-     * while streak tracking is off, such as the streak screen with its tracking toggle, read this.
+     * Whether the campfire replaces the old streak counter, or `null` until the flag has been read.
+     *
+     * Surfaces show neither the campfire nor the old counter while this is `null`, so a flagged
+     * screen never flashes the old streak UI before switching.
      */
-    val isCampfireEnabled: StateFlow<Boolean> =
+    val isCampfireEnabled: StateFlow<Boolean?> =
         campfireEnabledFlow.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
-            initialValue = false,
+            initialValue = null,
         )
 
     @OptIn(ExperimentalCoroutinesApi::class)

@@ -111,6 +111,7 @@ fun ProfileScreen(
     val uiState by viewModel.uiState.collectAsState()
     val streakData by viewModel.streakData.collectAsState()
     val campfire by campfireViewModel.presentation.collectAsState()
+    val isCampfireEnabled by campfireViewModel.isCampfireEnabled.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val profileUpdatedMessage = stringResource(Res.string.profile_updated_successfully)
 
@@ -130,7 +131,8 @@ fun ProfileScreen(
 
     ProfileScreenContent(
         uiState = uiState,
-        streakData = streakData,
+        // The old streak stat only shows once the campfire flag is known to be off.
+        streakData = if (isCampfireEnabled == false) streakData else streakData.copy(isEnabled = false),
         campfire = campfire,
         onBack = onBack,
         onNavigateToBirthday = onNavigateToBirthday,

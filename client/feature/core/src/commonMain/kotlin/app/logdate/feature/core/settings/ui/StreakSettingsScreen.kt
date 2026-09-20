@@ -54,7 +54,8 @@ fun StreakSettingsScreen(
     val isCampfireEnabled by campfireViewModel.isCampfireEnabled.collectAsState()
     val campfire by campfireViewModel.presentation.collectAsState()
 
-    if (isCampfireEnabled) {
+    if (isCampfireEnabled == null) return
+    if (isCampfireEnabled == true) {
         CampfireStreakContent(
             campfire = campfire,
             isTrackingEnabled = uiState.streakData.isEnabled,

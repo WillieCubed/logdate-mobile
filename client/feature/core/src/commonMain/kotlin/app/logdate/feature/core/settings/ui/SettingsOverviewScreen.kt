@@ -140,6 +140,7 @@ fun SettingsOverviewScreen(
     val identity by viewModel.resolvedIdentity.collectAsState()
     val streakData by viewModel.streakData.collectAsState()
     val campfire by campfireViewModel.presentation.collectAsState()
+    val isCampfireEnabled by campfireViewModel.isCampfireEnabled.collectAsState()
 
     SettingsOverviewContent(
         onBack = onBack,
@@ -170,7 +171,8 @@ fun SettingsOverviewScreen(
                 isAuthenticated = identity.isAuthenticated,
             ),
         onboardedDate = identity.onboardedDate ?: Instant.DISTANT_PAST,
-        streakCount = if (streakData.isEnabled) streakData.currentStreak else null,
+        // The old streak badge only shows once the campfire flag is known to be off.
+        streakCount = if (isCampfireEnabled == false && streakData.isEnabled) streakData.currentStreak else null,
         campfire = campfire,
         modifier = modifier,
     )

@@ -80,7 +80,8 @@ fun OnboardingCompletionScreen(
 ) {
     var shouldShowFinish by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
-    val showCampfire by campfireViewModel.isCampfireEnabled.collectAsState()
+    val isCampfireEnabled by campfireViewModel.isCampfireEnabled.collectAsState()
+    val showCampfire = isCampfireEnabled ?: return
 
     OnboardingCompletionContent(
         shouldShowFinish = shouldShowFinish,
