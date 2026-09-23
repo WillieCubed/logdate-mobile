@@ -44,7 +44,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.client.billing.model.LogDateBackupPlanOption
 import app.logdate.feature.core.account.CloudAccountOnboardingScreen
 import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
-import app.logdate.ui.AdaptiveLayout
+import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
@@ -134,10 +134,10 @@ fun CloudAccountSetupContent(
             modifier = modifier,
         )
     } else {
-        // Every sibling onboarding screen responds to an actual half-folded, tabletop-posture
-        // device via FoldableTabletopLayout; this one previously only ever split by width, so a
-        // tabletop posture at this width rendered the same cramped side-by-side split as a wide,
-        // unfolded window. Falls back to the existing wide-window split otherwise.
+        // Every sibling onboarding screen responds to hinge/tabletop posture via
+        // FoldableTabletopLayout{ FoldableBookLayout{ standardContent } }; this one previously
+        // only ever split by width, so a folded posture at this width rendered the same cramped
+        // side-by-side split as a wide, unfolded window.
         FoldableTabletopLayout(
             modifier = modifier.testTag(CLOUD_ACCOUNT_SETUP_ROOT_TAG),
             minPaneHeight = 260.dp,
@@ -154,19 +154,29 @@ fun CloudAccountSetupContent(
                 )
             },
             standardContent = {
-                AdaptiveLayout(
-                    useCompactLayout = false,
+                FoldableBookLayout(
                     modifier = Modifier.fillMaxSize(),
-                    supplementalContent = {
+                    minPaneWidth = 320.dp,
+                    startPane = {
                         CloudAccountInfoPane(onBack = onBack, modifier = Modifier.fillMaxSize())
                     },
-                    mainContent = {
+                    endPane = {
                         CloudAccountActionsPane(
                             onContinue = onContinue,
                             onSignIn = onSignIn,
                             onSkip = onSkip,
                             onPlanSelected = onPlanSelected,
                             modifier = Modifier.fillMaxSize(),
+                        )
+                    },
+                    standardContent = {
+                        BackupSyncCompactContent(
+                            onBack = onBack,
+                            onContinue = onContinue,
+                            onSignIn = onSignIn,
+                            onSkip = onSkip,
+                            onPlanSelected = onPlanSelected,
+                            rootTestTag = null,
                         )
                     },
                 )
@@ -250,6 +260,7 @@ private fun BackupSyncCompactContent(
     onSkip: () -> Unit,
     onPlanSelected: (LogDateBackupPlanOption) -> Unit,
     modifier: Modifier = Modifier,
+    rootTestTag: String? = CLOUD_ACCOUNT_SETUP_ROOT_TAG,
 ) {
     Scaffold(
         modifier = modifier,
@@ -276,7 +287,7 @@ private fun BackupSyncCompactContent(
             Column(
                 modifier =
                     Modifier
-                        .testTag(CLOUD_ACCOUNT_SETUP_ROOT_TAG)
+                        .let { base -> rootTestTag?.let { base.testTag(it) } ?: base }
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = Spacing.lg),
