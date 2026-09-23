@@ -11,7 +11,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
@@ -27,12 +29,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.onboarding.flow.OnboardingStep
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
+import app.logdate.ui.step.StepHero
+import app.logdate.ui.step.StepScaffoldDefaults
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
@@ -80,7 +85,7 @@ fun WelcomeBackScreen(
 
     Surface(
         modifier = modifier.fillMaxSize().testTag(WELCOME_BACK_ROOT_TAG),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = MaterialTheme.colorScheme.background,
     ) {
         AnimatedVisibility(
             visible = contentVisible,
@@ -118,11 +123,14 @@ fun WelcomeBackScreenContent(
                 },
                 standardContent = {
                     Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.xl, Alignment.CenterVertically),
+                        modifier = Modifier.fillMaxSize().padding(Spacing.xl),
+                        verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
+                        WelcomeBackMonogram(name = name)
+                        Spacer(modifier = Modifier.height(Spacing.xl))
                         WelcomeBackTitle(name = name)
+                        Spacer(modifier = Modifier.height(Spacing.md))
                         WelcomeBackBody()
                     }
                 },
@@ -136,10 +144,13 @@ private fun WelcomeBackTitlePane(
     name: String,
     modifier: Modifier = Modifier,
 ) {
-    Box(
+    Column(
         modifier = modifier.padding(Spacing.xl),
-        contentAlignment = Alignment.Center,
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        WelcomeBackMonogram(name = name)
+        Spacer(modifier = Modifier.height(Spacing.xl))
         WelcomeBackTitle(name = name)
     }
 }
@@ -155,11 +166,21 @@ private fun WelcomeBackBodyPane(modifier: Modifier = Modifier) {
 }
 
 @Composable
+private fun WelcomeBackMonogram(name: String) {
+    StepHero {
+        Text(
+            text = name.trim().firstOrNull()?.uppercase() ?: "",
+            style = MaterialTheme.typography.displaySmall,
+        )
+    }
+}
+
+@Composable
 private fun WelcomeBackTitle(name: String) {
     Text(
         text = stringResource(Res.string.onboarding_welcome_back_title, name),
-        modifier = Modifier.widthIn(max = 420.dp),
-        style = MaterialTheme.typography.headlineMedium,
+        modifier = Modifier.widthIn(max = StepScaffoldDefaults.ContentMaxWidth),
+        style = MaterialTheme.typography.headlineLarge.copy(lineBreak = LineBreak.Heading),
         textAlign = TextAlign.Center,
     )
 }
@@ -168,8 +189,9 @@ private fun WelcomeBackTitle(name: String) {
 private fun WelcomeBackBody() {
     Text(
         text = stringResource(Res.string.onboarding_welcome_back_description),
-        modifier = Modifier.widthIn(max = 420.dp),
+        modifier = Modifier.widthIn(max = StepScaffoldDefaults.ContentMaxWidth),
         style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
     )
 }

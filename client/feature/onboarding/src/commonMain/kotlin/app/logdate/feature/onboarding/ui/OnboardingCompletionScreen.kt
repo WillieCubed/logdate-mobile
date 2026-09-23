@@ -14,15 +14,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -34,17 +32,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.feature.onboarding.flow.OnboardingCompletionCoordinator
 import app.logdate.feature.onboarding.flow.OnboardingStep
 import app.logdate.ui.GenericLoadingScreen
-import app.logdate.ui.adaptive.FoldableBookLayout
-import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.platform.rememberLogDateHaptics
+import app.logdate.ui.step.StepScaffold
 import app.logdate.ui.streak.Campfire
 import app.logdate.ui.streak.CampfirePhase
 import app.logdate.ui.streak.CampfireSize
@@ -52,14 +49,8 @@ import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
-import logdate.client.feature.onboarding.generated.resources.action_onboarding_continue
-import logdate.client.feature.onboarding.generated.resources.onboarding_completion_fire_encouragement
-import logdate.client.feature.onboarding.generated.resources.onboarding_completion_fire_lit
-import logdate.client.feature.onboarding.generated.resources.onboarding_completion_happy_logging
-import logdate.client.feature.onboarding.generated.resources.onboarding_completion_streak_begins
-import logdate.client.feature.onboarding.generated.resources.onboarding_completion_streak_encouragement
-import logdate.client.feature.onboarding.generated.resources.one_more_thing
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
@@ -158,190 +149,91 @@ private fun CompletionStreakContent(
     onContinue: () -> Unit,
     showCampfire: Boolean,
 ) {
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) { contentPadding ->
-        FoldableTabletopLayout(
-            modifier =
-                Modifier
-                    .padding(contentPadding)
-                    .fillMaxSize(),
-            minPaneHeight = 220.dp,
-            topPane = {
-                CompletionMessagePane(showCampfire = showCampfire, modifier = Modifier.fillMaxSize())
-            },
-            bottomPane = {
-                CompletionActionPane(
-                    onContinue = onContinue,
-                    modifier = Modifier.fillMaxSize(),
+    val title: String
+    val encouragement: String
+    if (showCampfire) {
+        title = stringResource(Res.string.onboarding_completion_fire_lit)
+        encouragement = stringResource(Res.string.onboarding_completion_fire_encouragement)
+    } else {
+        title = stringResource(Res.string.onboarding_completion_streak_begins)
+        encouragement = stringResource(Res.string.onboarding_completion_streak_encouragement)
+    }
+
+    StepScaffold(
+        title = title,
+        onBack = null,
+        supportingText = encouragement,
+        headerAlignment = Alignment.CenterHorizontally,
+        hero = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (showCampfire) {
+                    Campfire(
+                        phase = CampfirePhase.BURNING,
+                        size = CampfireSize.SPARK,
+                        contentDescription = title,
+                        modifier = Modifier.size(128.dp),
+                    )
+                } else {
+                    StreakCounter(count = 1)
+                }
+                Spacer(modifier = Modifier.height(Spacing.xl))
+                Text(
+                    text = stringResource(Res.string.one_more_thing),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
                 )
-            },
-            standardContent = {
-                FoldableBookLayout(
-                    modifier = Modifier.fillMaxSize(),
-                    minPaneWidth = 320.dp,
-                    startPane = {
-                        CompletionMessagePane(showCampfire = showCampfire, modifier = Modifier.fillMaxSize())
-                    },
-                    endPane = {
-                        CompletionActionPane(
-                            onContinue = onContinue,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    },
-                    standardContent = {
-                        CompletionStreakStandardContent(onContinue = onContinue, showCampfire = showCampfire)
-                    },
-                )
-            },
-        )
-    }
+            }
+        },
+        actions = {
+            Button(
+                onClick = onContinue,
+                modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_COMPLETION_CONTINUE_TAG),
+            ) {
+                Text(stringResource(Res.string.action_onboarding_continue))
+            }
+        },
+    )
 }
 
 @Composable
-private fun CompletionStreakStandardContent(
-    onContinue: () -> Unit,
-    showCampfire: Boolean,
-) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        CompletionMessageContent(showCampfire = showCampfire)
-        Button(
-            onContinue,
-            modifier =
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(Spacing.lg)
-                    .fillMaxWidth()
-                    .testTag(ONBOARDING_COMPLETION_CONTINUE_TAG),
-        ) {
-            Text(stringResource(Res.string.action_onboarding_continue))
-        }
-    }
-}
-
-@Composable
-private fun CompletionMessagePane(
-    showCampfire: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier.padding(Spacing.lg),
-        contentAlignment = Alignment.Center,
-    ) {
-        CompletionMessageContent(showCampfire = showCampfire)
-    }
-}
-
-@Composable
-private fun CompletionActionPane(
-    onContinue: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier.padding(Spacing.lg),
-        contentAlignment = Alignment.Center,
-    ) {
-        Button(
-            onClick = onContinue,
-            modifier =
-                Modifier
-                    .widthIn(max = 444.dp)
-                    .fillMaxWidth()
-                    .testTag(ONBOARDING_COMPLETION_CONTINUE_TAG),
-        ) {
-            Text(stringResource(Res.string.action_onboarding_continue))
-        }
-    }
-}
-
-@Composable
-private fun CompletionMessageContent(showCampfire: Boolean) {
+private fun StreakCounter(count: Int) {
     Column(
         modifier =
             Modifier
-                .padding(Spacing.lg)
-                .widthIn(max = 444.dp),
-        verticalArrangement = Arrangement.spacedBy(48.dp),
+                .size(112.dp)
+                .clip(MaterialTheme.shapes.extraLarge)
+                .background(MaterialTheme.colorScheme.primaryContainer),
         horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(stringResource(Res.string.one_more_thing), style = MaterialTheme.typography.headlineMedium)
-        Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.xl),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            if (showCampfire) {
-                CompletionCampfire()
-            } else {
-                Text(
-                    stringResource(Res.string.onboarding_completion_streak_begins),
-                    style = MaterialTheme.typography.headlineMedium,
-                )
-                StreakCounterBox()
-                Text(
-                    stringResource(Res.string.onboarding_completion_streak_encouragement),
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CompletionCampfire() {
-    val headline = stringResource(Res.string.onboarding_completion_fire_lit)
-    Text(headline, style = MaterialTheme.typography.headlineMedium)
-    Campfire(
-        phase = CampfirePhase.BURNING,
-        size = CampfireSize.SPARK,
-        contentDescription = headline,
-        modifier = Modifier.size(128.dp),
-    )
-    Text(
-        stringResource(Res.string.onboarding_completion_fire_encouragement),
-        style = MaterialTheme.typography.bodyLarge,
-        textAlign = TextAlign.Center,
-    )
-}
-
-@Composable
-private fun StreakCounterBox(count: Int = 1) {
-    Box(
-        modifier =
-            Modifier
-                .size(96.dp)
-                .background(
-                    MaterialTheme.colorScheme.surfaceContainerHighest,
-                    MaterialTheme.shapes.large,
-                ).padding(16.dp),
+        verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            count.toString(),
-            style = MaterialTheme.typography.displayLarge,
-            modifier = Modifier.align(Alignment.Center),
+            text = count.toString(),
+            style = MaterialTheme.typography.displayMedium,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+        Text(
+            text = stringResource(Res.string.onboarding_completion_streak_day_label),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
         )
     }
 }
 
 @Composable
 private fun CompletionFinalContent() {
-    Surface(
-        modifier = Modifier.fillMaxSize().testTag(ONBOARDING_COMPLETION_FINAL_TAG),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .testTag(ONBOARDING_COMPLETION_FINAL_TAG),
+        contentAlignment = Alignment.Center,
     ) {
-        Column(
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                stringResource(Res.string.onboarding_completion_happy_logging),
-                style = MaterialTheme.typography.headlineMedium,
-            )
-        }
+        Text(
+            stringResource(Res.string.onboarding_completion_happy_logging),
+            style = MaterialTheme.typography.headlineLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
     }
 }
 
