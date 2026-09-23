@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -290,7 +291,7 @@ private fun StepHeaderPane(
 ) {
     val scrollState = rememberScrollState()
     Column(modifier = modifier) {
-        StepTopBar(onBack = slots.onBack, progress = slots.progress)
+        StepTopBar(onBack = slots.onBack, progress = slots.progress, contentMaxWidth = slots.contentMaxWidth)
         CenteredScrollColumn(
             contentMaxWidth = slots.contentMaxWidth,
             scrollState = scrollState,
@@ -367,40 +368,57 @@ private fun ScrollingStepContent(
     }
 }
 
+/**
+ * Back affordance at the leading edge, and progress capped to the content column and centered on it,
+ * so on a wide window the bar lines up with the step instead of spanning the whole screen.
+ */
 @Composable
 private fun StepTopBar(
     onBack: (() -> Unit)?,
     progress: StepProgress?,
+    contentMaxWidth: Dp,
 ) {
     if (onBack == null && progress == null) return
 
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.xs, vertical = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        if (onBack != null) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(Res.string.common_back),
-                )
+        Box(modifier = Modifier.size(TopBarSlotSize), contentAlignment = Alignment.Center) {
+            if (onBack != null) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(Res.string.common_back),
+                    )
+                }
             }
         }
-        if (progress != null) {
-            LinearProgressIndicator(
-                progress = { progress.fraction },
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = "${progress.current}/${progress.total}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(end = Spacing.md),
-            )
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            if (progress != null) {
+                Row(
+                    modifier = Modifier.widthIn(max = contentMaxWidth).fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
+                    LinearProgressIndicator(
+                        progress = { progress.fraction },
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = "${progress.current}/${progress.total}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
+        // Mirrors the back slot so the progress stays centered on the content column.
+        Spacer(modifier = Modifier.size(TopBarSlotSize))
     }
 }
+
+private val TopBarSlotSize = 48.dp
 
 @Composable
 private fun StepHeader(slots: StepSlots) {

@@ -15,11 +15,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -172,6 +174,15 @@ class StepScaffoldLayoutTest {
         }
 
     @Test
+    fun `progress stays within the content column on a wide window`() =
+        runDesktopComposeUiTest(width = 1440, height = 900) {
+            setContent { LogDateTheme { SampleStep(contentItems = 1, onBack = {}, withHero = false, progress = StepProgress(1, 2)) } }
+
+            val bar = onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo(0.5f, 0f..1f))).getBoundsInRoot()
+            assertTrue(bar.right - bar.left <= StepScaffoldDefaults.ContentMaxWidth, "progress spans ${bar.right - bar.left}")
+        }
+
+    @Test
     fun `the step is opaque so transitions never show another step through it`() =
         runDesktopComposeUiTest(width = 411, height = 891) {
             // No LogDateTheme here: its root Surface would paint an opaque background of its own.
@@ -234,8 +245,10 @@ private fun SampleStep(
     contentItems: Int,
     onBack: (() -> Unit)?,
     withHero: Boolean,
+    progress: StepProgress? = null,
 ) {
     StepScaffold(
+        progress = progress,
         title = TITLE,
         onBack = onBack,
         modifier = Modifier.testTag(ROOT_TAG),
