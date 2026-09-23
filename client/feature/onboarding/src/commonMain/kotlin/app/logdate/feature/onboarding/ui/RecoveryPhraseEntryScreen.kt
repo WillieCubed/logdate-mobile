@@ -121,7 +121,8 @@ private fun RecoveryPhraseEntryTopPane(
         modifier =
             modifier
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(16.dp)
+                .imePadding(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
@@ -294,7 +295,8 @@ private fun RecoveryPhraseEntryCompactContent(
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(16.dp)
+                .imePadding(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
