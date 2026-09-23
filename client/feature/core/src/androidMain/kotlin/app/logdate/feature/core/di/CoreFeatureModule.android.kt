@@ -43,6 +43,7 @@ import app.logdate.feature.core.settings.updates.AppUpdateController
 import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.feature.core.sync.SyncIssuesViewModel
 import app.logdate.feature.core.sync.SyncPresentationViewModel
+import app.logdate.feature.core.sync.SyncStatusViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.workmanager.dsl.workerOf
 import org.koin.core.module.Module
@@ -160,6 +161,7 @@ actual val coreFeatureModule: Module =
         viewModel { PersonDetailViewModel(get(), get()) }
         viewModel { SyncIssuesViewModel(get()) }
         viewModel { SyncPresentationViewModel(syncManager = get(), sessionStorage = get()) }
+        viewModel { SyncStatusViewModel(syncManager = get(), syncMetadataService = get(), sessionStorage = get()) }
         viewModel { CampfireViewModel(observeCampfire = get(), featureFlagStore = get()) }
     }
 

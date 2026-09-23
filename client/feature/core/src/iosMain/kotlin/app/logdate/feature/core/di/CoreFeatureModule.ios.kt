@@ -40,6 +40,7 @@ import app.logdate.feature.core.settings.updates.UnsupportedAppUpdateController
 import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.feature.core.sync.SyncIssuesViewModel
 import app.logdate.feature.core.sync.SyncPresentationViewModel
+import app.logdate.feature.core.sync.SyncStatusViewModel
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -161,5 +162,6 @@ actual val coreFeatureModule: Module =
         viewModel { PersonDetailViewModel(get(), get()) }
         viewModel { SyncIssuesViewModel(get()) }
         viewModel { SyncPresentationViewModel(syncManager = get(), sessionStorage = get()) }
+        viewModel { SyncStatusViewModel(syncManager = get(), syncMetadataService = get(), sessionStorage = get()) }
         viewModel { CampfireViewModel(observeCampfire = get(), featureFlagStore = get()) }
     }

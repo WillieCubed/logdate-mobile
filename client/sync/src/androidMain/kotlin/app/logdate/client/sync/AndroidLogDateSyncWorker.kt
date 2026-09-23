@@ -309,11 +309,11 @@ class AndroidSyncManager(
             OneTimeWorkRequestBuilder<AndroidLogDateSyncWorker>()
                 .setConstraints(constraints)
                 .setInputData(inputData)
-                // DROP_WORK_REQUEST rather than RUN_AS_NON_EXPEDITED: the latter silently turns
-                // an expedited request into an ordinary one, so asking for expedited did nothing
-                // at all. If there is no expedited quota, this request is better dropped and
-                // picked up by the periodic sync than pretending it was urgent.
-                .setExpedited(OutOfQuotaPolicy.DROP_WORK_REQUEST)
+                // Out of expedited quota, run it as ordinary work rather than drop it. This is what
+                // "Back up now" schedules, and dropping it threw the request away with nothing on
+                // screen changing: the backup waited for the next periodic run, hours later, while
+                // the app showed items waiting and a button that seemed to do nothing.
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .build()
 
         // Unique, and an already-running sync wins. Stacking runs would put several writers on

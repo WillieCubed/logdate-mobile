@@ -66,6 +66,7 @@ import app.logdate.feature.core.sync.SyncAction
 import app.logdate.feature.core.sync.SyncErrorBanner
 import app.logdate.feature.core.sync.SyncPresentationViewModel
 import app.logdate.feature.core.sync.SyncStatusButton
+import app.logdate.feature.core.sync.SyncStatusSheet
 import app.logdate.feature.journals.ui.JournalClickCallback
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
 import app.logdate.feature.rewind.ui.RewindOverviewScreen
@@ -168,13 +169,22 @@ fun HomeScreen(
         }
     }
     val snackbarHostState = remember { SnackbarHostState() }
+    var showSyncStatus by rememberSaveable { mutableStateOf(false) }
+    if (showSyncStatus) {
+        SyncStatusSheet(
+            onDismiss = { showSyncStatus = false },
+            onOpenSyncSettings = onOpenSyncSettings,
+            onOpenSyncIssues = onOpenSyncIssues,
+            onSignIn = onOpenSettings,
+        )
+    }
     val onSyncAction: (SyncAction) -> Unit = { action ->
         when (action) {
             SyncAction.SignIn,
             SyncAction.ManageStorage,
             -> onOpenSettings()
             SyncAction.ReviewConflicts -> onOpenSyncIssues()
-            SyncAction.OpenStatus -> onOpenSyncSettings()
+            SyncAction.OpenStatus -> showSyncStatus = true
         }
     }
     val syncBanner: @Composable () -> Unit = {

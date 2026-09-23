@@ -10,10 +10,14 @@ import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.shared.model.CloudQuotaManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.time.Instant
 
@@ -33,6 +37,7 @@ import kotlin.time.Instant
  *   former is independently useful for a [SyncResult]'s own `lastSyncTime`, and the latter is a
  *   plain field with no reason to move.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 internal class SyncStatusPublisher(
     private val sessionStorage: SessionStorage,
     private val syncMetadataService: SyncMetadataService,
@@ -80,6 +85,17 @@ internal class SyncStatusPublisher(
         // it false, and the UI needs to react without waiting for the next sync transition.
         syncScope.launch {
             sessionStorage.getSessionFlow().collect { publish() }
+        }
+        // Follow the queue itself between those transitions. Entries written while no run is in
+        // flight, or uploads that settle outside a tracked run, otherwise left the published count
+        // stale until the next sync started or stopped. Restarted per session because the queue is
+        // scoped to the signed-in owner.
+        syncScope.launch {
+            sessionStorage
+                .getSessionFlow()
+                .flatMapLatest { syncMetadataService.observePendingCount() }
+                .catch { Napier.e("Could not follow the pending upload count", it) }
+                .collect { count -> _syncStatusFlow.update { it.copy(pendingUploads = count) } }
         }
     }
 

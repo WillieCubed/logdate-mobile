@@ -69,10 +69,12 @@ import logdate.client.feature.core.generated.resources.sync_paused_background_da
 import logdate.client.feature.core.generated.resources.sync_paused_media_waiting_for_wifi
 import logdate.client.feature.core.generated.resources.sync_paused_offline
 import logdate.client.feature.core.generated.resources.sync_paused_signed_out
+import logdate.client.feature.core.generated.resources.sync_status_waiting
 import logdate.client.feature.core.generated.resources.syncing
 import logdate.client.feature.core.generated.resources.syncing_remaining
 import logdate.client.ui.generated.resources.common_loading
 import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import logdate.client.ui.generated.resources.Res as UiRes
@@ -473,6 +475,10 @@ private fun SyncStatusText(syncStatus: app.logdate.client.sync.SyncStatus?) {
             val statusText =
                 if (status.hasErrors) {
                     stringResource(Res.string.last_sync_failed)
+                } else if (status.pendingUploads > 0) {
+                    // "All backed up" with items still in the queue told people there was nothing
+                    // left to wait for.
+                    pluralStringResource(Res.plurals.sync_status_waiting, status.pendingUploads, status.pendingUploads)
                 } else {
                     status.lastSyncTime?.let {
                         stringResource(Res.string.last_synced_time, it.toReadableDateTimeShort())

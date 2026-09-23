@@ -31,6 +31,7 @@ import app.logdate.client.sync.SyncStatus
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
+import app.logdate.client.sync.metadata.QueuedUpload
 import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
@@ -476,6 +477,8 @@ class CloudAccountOnboardingViewModelTest {
         override suspend fun getPendingCount(): Int = 0
 
         override fun observePendingCount(): Flow<Int> = flowOf(0)
+
+        override fun observePendingUploads(): Flow<List<QueuedUpload>> = flowOf(emptyList())
 
         override suspend fun incrementRetryCount(
             entityId: String,

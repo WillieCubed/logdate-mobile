@@ -10,6 +10,19 @@ data class PendingUpload(
 )
 
 /**
+ * One change waiting in the outbox, as the backup status screen lists it.
+ *
+ * [entityType] is null for a row whose type this build doesn't know, such as one written by a
+ * newer version. It is still waiting and still counted, so it is kept rather than dropped.
+ */
+data class QueuedUpload(
+    val entityType: EntityType?,
+    val entityId: String,
+    val operation: PendingOperation,
+    val retryCount: Int,
+)
+
+/**
  * Sync operations queued in the outbox.
  */
 enum class PendingOperation {

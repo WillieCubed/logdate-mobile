@@ -100,6 +100,12 @@ interface SyncMetadataDao {
         serverOrigin: String,
     ): Int
 
+    @Query("SELECT * FROM pending_uploads WHERE ownerId = :ownerId AND serverOrigin = :serverOrigin ORDER BY createdAt ASC")
+    fun observePending(
+        ownerId: String,
+        serverOrigin: String,
+    ): Flow<List<PendingUploadEntity>>
+
     @Query("SELECT COUNT(*) FROM pending_uploads WHERE ownerId = :ownerId AND serverOrigin = :serverOrigin")
     fun observePendingCount(
         ownerId: String,

@@ -7,6 +7,8 @@ import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -73,6 +75,58 @@ class DatabaseSyncMetadataServiceTest {
             assertEquals(0, service.getPendingCount())
         }
 
+    @Test
+    fun `the queue lists what is waiting and follows it as it drains`() =
+        runTest {
+            val ownerId = "2e10a582-197e-48fd-97df-5a1fc1669a9e"
+            val serverOrigin = "https://cloud.logdate.app"
+            val dao = InMemorySyncMetadataDao()
+            val service = service(dao, ownerId, serverOrigin)
+            service.enqueuePending("note-1", EntityType.NOTE, PendingOperation.CREATE)
+            service.enqueuePending("media-1", EntityType.MEDIA, PendingOperation.CREATE)
+            dao.pendingRows +=
+                PendingUploadEntity(
+                    ownerId = ownerId,
+                    serverOrigin = "https://other.example",
+                    entityType = EntityType.NOTE.name,
+                    entityId = "elsewhere",
+                    operation = PendingOperation.CREATE.name,
+                    createdAt = 1L,
+                )
+            dao.publish()
+
+            assertEquals(
+                listOf(EntityType.NOTE to "note-1", EntityType.MEDIA to "media-1"),
+                service.observePendingUploads().first().map { it.entityType to it.entityId },
+            )
+
+            service.markAsSynced("note-1", EntityType.NOTE, Instant.fromEpochMilliseconds(10L), 1L)
+
+            assertEquals(listOf("media-1"), service.observePendingUploads().first().map { it.entityId })
+        }
+
+    @Test
+    fun `a queued row of an unknown type is listed rather than dropped`() =
+        runTest {
+            val ownerId = "2e10a582-197e-48fd-97df-5a1fc1669a9e"
+            val serverOrigin = "https://cloud.logdate.app"
+            val dao = InMemorySyncMetadataDao()
+            dao.pendingRows +=
+                PendingUploadEntity(
+                    ownerId = ownerId,
+                    serverOrigin = serverOrigin,
+                    entityType = "SOMETHING_NEWER",
+                    entityId = "future-1",
+                    operation = PendingOperation.CREATE.name,
+                    createdAt = 1L,
+                )
+            dao.publish()
+
+            val queued = service(dao, ownerId, serverOrigin).observePendingUploads().first()
+
+            assertEquals(listOf<EntityType?>(null), queued.map { it.entityType })
+        }
+
     private fun service(
         dao: SyncMetadataDao,
         ownerId: String,
@@ -93,6 +147,12 @@ class DatabaseSyncMetadataServiceTest {
         val pendingRows = mutableListOf<PendingUploadEntity>()
         val cursors = mutableListOf<SyncCursorEntity>()
         private val pendingCount = MutableStateFlow(0)
+        private val rows = MutableStateFlow<List<PendingUploadEntity>>(emptyList())
+
+        fun publish() {
+            pendingCount.value = pendingRows.size
+            rows.value = pendingRows.toList()
+        }
 
         override suspend fun getCursor(
             ownerId: String,
@@ -159,7 +219,7 @@ class DatabaseSyncMetadataServiceTest {
                     it.entityId == pending.entityId
             }
             pendingRows += pending
-            pendingCount.value = pendingRows.size
+            publish()
         }
 
         override suspend fun deletePending(
@@ -171,7 +231,7 @@ class DatabaseSyncMetadataServiceTest {
             pendingRows.removeAll {
                 it.ownerId == ownerId && it.serverOrigin == serverOrigin && it.entityType == entityType && it.entityId == entityId
             }
-            pendingCount.value = pendingRows.size
+            publish()
         }
 
         override suspend fun deletePendingForOrigin(
@@ -179,7 +239,7 @@ class DatabaseSyncMetadataServiceTest {
             serverOrigin: String,
         ) {
             pendingRows.removeAll { it.ownerId == ownerId && it.serverOrigin == serverOrigin }
-            pendingCount.value = pendingRows.size
+            publish()
         }
 
         override suspend fun getPendingCount(
@@ -191,6 +251,11 @@ class DatabaseSyncMetadataServiceTest {
             ownerId: String,
             serverOrigin: String,
         ): Flow<Int> = pendingCount
+
+        override fun observePending(
+            ownerId: String,
+            serverOrigin: String,
+        ): Flow<List<PendingUploadEntity>> = rows.map { all -> all.filter { it.ownerId == ownerId && it.serverOrigin == serverOrigin } }
 
         override suspend fun incrementRetryCount(
             ownerId: String,
@@ -204,7 +269,7 @@ class DatabaseSyncMetadataServiceTest {
             entityType: String,
         ) {
             pendingRows.removeAll { it.ownerId.isEmpty() && it.serverOrigin == serverOrigin && it.entityType == entityType }
-            pendingCount.value = pendingRows.size
+            publish()
         }
     }
 }

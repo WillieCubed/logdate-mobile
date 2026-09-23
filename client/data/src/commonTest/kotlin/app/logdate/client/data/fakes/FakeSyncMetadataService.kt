@@ -3,9 +3,11 @@ package app.logdate.client.data.fakes
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
+import app.logdate.client.sync.metadata.QueuedUpload
 import app.logdate.client.sync.metadata.SyncMetadataService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlin.time.Instant
 
 class FakeSyncMetadataService : SyncMetadataService {
@@ -64,6 +66,8 @@ class FakeSyncMetadataService : SyncMetadataService {
     override suspend fun getPendingCount(): Int = pendingUploads.values.sumOf { it.size }
 
     override fun observePendingCount(): Flow<Int> = _pendingCount
+
+    override fun observePendingUploads(): Flow<List<QueuedUpload>> = flowOf(emptyList())
 
     override suspend fun incrementRetryCount(
         entityId: String,

@@ -68,6 +68,7 @@ import app.logdate.client.sync.metadata.MediaSyncRef
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
+import app.logdate.client.sync.metadata.QueuedUpload
 import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
@@ -744,6 +745,8 @@ class FakeSyncMetadataService(
     }
 
     override fun observePendingCount(): Flow<Int> = pendingCountFlow
+
+    override fun observePendingUploads(): Flow<List<QueuedUpload>> = flowOf(emptyList())
 
     override suspend fun clearPending() {
         clearPendingCalls += 1

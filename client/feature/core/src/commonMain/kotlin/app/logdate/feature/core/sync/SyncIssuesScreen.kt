@@ -276,7 +276,7 @@ private fun SyncIssueCard(
  * count, and a raw exception message that includes on-disk paths. None of that belongs on screen,
  * so the card is written from the record rather than printing it.
  */
-private fun countPluralFor(entityType: String): PluralStringResource =
+internal fun countPluralFor(entityType: String): PluralStringResource =
     when (entityType.uppercase()) {
         "NOTE" -> Res.plurals.sync_issue_count_note
         "JOURNAL" -> Res.plurals.sync_issue_count_journal

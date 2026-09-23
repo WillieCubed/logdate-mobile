@@ -8,6 +8,7 @@ import app.logdate.shared.config.LogDateConfigRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
@@ -128,6 +129,25 @@ class DatabaseSyncMetadataService(
         flow {
             getPendingCount()
             emitAll(dao.observePendingCount(currentOwnerId(), currentOrigin()))
+        }
+
+    override fun observePendingUploads(): Flow<List<QueuedUpload>> =
+        flow {
+            // Promotes any legacy rows first, the same way observePendingCount does, so the list
+            // and the count agree.
+            getPendingCount()
+            emitAll(
+                dao.observePending(currentOwnerId(), currentOrigin()).map { rows ->
+                    rows.map { row ->
+                        QueuedUpload(
+                            entityType = EntityType.entries.firstOrNull { it.name == row.entityType },
+                            entityId = row.entityId,
+                            operation = PendingOperation.fromStorage(row.operation),
+                            retryCount = row.retryCount,
+                        )
+                    }
+                },
+            )
         }
 
     override suspend fun clearPending() {

@@ -66,6 +66,12 @@ interface SyncMetadataService {
     fun observePendingCount(): Flow<Int>
 
     /**
+     * Observes everything waiting to upload, oldest first, so the UI can say what is waiting and
+     * not just how much.
+     */
+    fun observePendingUploads(): Flow<List<QueuedUpload>>
+
+    /**
      * Increments the retry count for a pending upload.
      */
     suspend fun incrementRetryCount(

@@ -8,6 +8,7 @@
     <string name="syncing">Backing up…</string>
     <string name="syncing_remaining">Backing up · %1$d to go</string>
     <string name="last_synced_time">All backed up · %1$s</string>
+    <string name="last_backed_up_time">Last backed up %1$s</string>
     <string name="last_sync_failed">Couldn't finish backing up</string>
     <string name="never_synced">Nothing backed up yet</string>
 
@@ -15,13 +16,29 @@
     <string name="sync_status_open">Open backup status</string>
     <string name="sync_status_progress_percent">Backing up · %1$d percent done</string>
     <plurals name="sync_status_waiting">
-        <item quantity="one">%1$d item waiting to back up.</item>
-        <item quantity="other">%1$d items waiting to back up.</item>
+        <item quantity="one">%1$d item waiting to back up</item>
+        <item quantity="other">%1$d items waiting to back up</item>
     </plurals>
     <plurals name="sync_status_not_backed_up">
-        <item quantity="one">%1$d item hasn't backed up yet.</item>
-        <item quantity="other">%1$d items haven't backed up yet.</item>
+        <item quantity="one">%1$d item hasn't backed up yet</item>
+        <item quantity="other">%1$d items haven't backed up yet</item>
     </plurals>
+
+    <!-- Backup status sheet -->
+    <string name="sync_status_title">Backup status</string>
+    <string name="sync_status_waiting_heading">Waiting to back up</string>
+    <plurals name="sync_status_retrying">
+        <item quantity="one">%1$d failed once and will retry</item>
+        <item quantity="other">%1$d failed at least once and will retry</item>
+    </plurals>
+    <plurals name="sync_status_failed_items">
+        <item quantity="one">%1$d item stopped retrying and needs you to decide</item>
+        <item quantity="other">%1$d items stopped retrying and need you to decide</item>
+    </plurals>
+    <string name="sync_status_last_attempt_failed">The last attempt didn't finish. LogDate will try again on its own.</string>
+    <string name="sync_status_could_not_start">Couldn't start a backup. Try again, or check Backup settings.</string>
+    <string name="sync_status_queue_unavailable">Couldn't read the list of waiting items. The count above may be out of date.</string>
+    <string name="sync_status_open_settings">Backup settings</string>
 
     <!-- Sync banner: states the user has to act on -->
     <string name="sync_banner_session_expired">Your session expired. Sign in again to keep your data backed up.</string>

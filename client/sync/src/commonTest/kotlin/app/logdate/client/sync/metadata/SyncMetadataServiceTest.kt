@@ -3,6 +3,7 @@ package app.logdate.client.sync.metadata
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -76,6 +77,8 @@ class SyncMetadataServiceTest {
         override suspend fun getPendingCount(): Int = pendingUploads.values.sumOf { it.size }
 
         override fun observePendingCount(): Flow<Int> = _pendingCount
+
+        override fun observePendingUploads(): Flow<List<QueuedUpload>> = flowOf(emptyList())
 
         override suspend fun incrementRetryCount(
             entityId: String,

@@ -1,5 +1,7 @@
 package app.logdate.client.e2e
 
+import kotlinx.coroutines.flow.flowOf
+import app.logdate.client.sync.metadata.QueuedUpload
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -544,6 +546,8 @@ class ExportImportE2ETest {
 
         override suspend fun getPendingCount(): Int = pending.values.sumOf { it.size }
         override fun observePendingCount(): Flow<Int> = pendingCountFlow
+
+        override fun observePendingUploads(): Flow<List<QueuedUpload>> = flowOf(emptyList())
 
         override suspend fun incrementRetryCount(entityId: String, entityType: EntityType) {
             val existing = pending[entityType]?.get(entityId) ?: return
