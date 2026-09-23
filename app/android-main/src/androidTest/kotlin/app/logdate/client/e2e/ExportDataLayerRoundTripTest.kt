@@ -527,6 +527,10 @@ class ExportDataLayerRoundTripTest {
             pendingCountFlow.value = 0
         }
 
+        override suspend fun resetAllCursors() {
+            syncTimes.clear()
+        }
+
         private fun updateCount() { pendingCountFlow.value = pending.values.sumOf { it.size } }
     }
 

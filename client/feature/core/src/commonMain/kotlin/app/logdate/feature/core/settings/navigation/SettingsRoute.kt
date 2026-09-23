@@ -45,6 +45,9 @@ data object TimelineSettingsRoute : NavKey
 data object SyncSettingsRoute : NavKey
 
 @Serializable
+data object RecoveryPhraseEntrySettingsRoute : NavKey
+
+@Serializable
 data object ExportSettingsRoute : NavKey
 
 @Serializable

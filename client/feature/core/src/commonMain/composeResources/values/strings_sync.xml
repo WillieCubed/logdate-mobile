@@ -53,6 +53,8 @@
     </plurals>
     <string name="sync_banner_review">Review</string>
     <string name="sync_banner_manage">Manage</string>
+    <string name="sync_banner_needs_recovery">Backing up is paused. Enter your recovery phrase to continue.</string>
+    <string name="sync_banner_enter_recovery_phrase">Enter phrase</string>
 
     <!-- Manual sync outcome -->
     <string name="sync_feedback_needs_account">Sign in to start backing up</string>
@@ -135,6 +137,15 @@
     <string name="sync_paused_offline">Paused — waiting for a connection</string>
     <string name="sync_paused_signed_out">Sign in to start backing up</string>
     <string name="sync_paused_media_waiting_for_wifi">Photos and videos are waiting for Wi-Fi</string>
+    <string name="sync_paused_needs_recovery_phrase">Paused — this device needs your recovery phrase</string>
+    <string name="sync_paused_needs_recovery_phrase_fix">Enter your recovery phrase to keep backing up.</string>
+
+    <!-- Recovery phrase entry from Settings -->
+    <string name="recovery_phrase_entry_settings_title">Recovery phrase</string>
+    <string name="recovery_phrase_entry_settings_description">Enter the 12-word recovery phrase for this account to keep backing up on this device.</string>
+    <string name="recovery_phrase_entry_settings_submit">Continue</string>
+    <string name="recovery_phrase_entry_settings_error">Couldn\'t recover this identity. Check the phrase and try again.</string>
+    <string name="recovery_phrase_entry_settings_word_count_error">Enter all 12 words.</string>
     <string name="backing_up_progress">Backing up %1$d of %2$d</string>
     <!-- First sync -->
     <string name="first_sync_running">Backing up your journal…</string>

@@ -2,6 +2,7 @@
 
 package app.logdate.feature.core.settings.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -67,6 +68,8 @@ import logdate.client.feature.core.generated.resources.sync_now
 import logdate.client.feature.core.generated.resources.sync_paused_background_data_off
 import logdate.client.feature.core.generated.resources.sync_paused_background_data_off_fix
 import logdate.client.feature.core.generated.resources.sync_paused_media_waiting_for_wifi
+import logdate.client.feature.core.generated.resources.sync_paused_needs_recovery_phrase
+import logdate.client.feature.core.generated.resources.sync_paused_needs_recovery_phrase_fix
 import logdate.client.feature.core.generated.resources.sync_paused_offline
 import logdate.client.feature.core.generated.resources.sync_paused_signed_out
 import logdate.client.feature.core.generated.resources.sync_status_waiting
@@ -90,6 +93,7 @@ fun SyncSettingsScreen(
     onBack: () -> Unit,
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
+    onNavigateToRecoveryPhrase: () -> Unit = {},
     viewModel: DataSettingsViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -157,6 +161,7 @@ fun SyncSettingsScreen(
         onSyncNow = viewModel::syncNow,
         onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
         onNavigateToSignIn = onNavigateToSignIn,
+        onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
         quotaUsage = uiState.quotaState.orDefault().toStorageQuotaUi(),
         isQuotaAvailable = uiState.isQuotaAvailable && uiState.hasAuthoritativeQuota,
         snackbarHostState = snackbarHostState,
@@ -171,6 +176,7 @@ fun SyncSettingsContent(
     onSyncNow: () -> Unit,
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit,
+    onNavigateToRecoveryPhrase: () -> Unit = {},
     quotaUsage: StorageQuotaUi,
     isQuotaAvailable: Boolean,
     snackbarHostState: SnackbarHostState,
@@ -198,6 +204,7 @@ fun SyncSettingsContent(
                     CloudSyncSection(
                         syncStatus = syncStatus,
                         onSyncNow = onSyncNow,
+                        onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
@@ -258,6 +265,7 @@ fun SyncSettingsContent(
                         CloudSyncSection(
                             syncStatus = syncStatus,
                             onSyncNow = onSyncNow,
+                            onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
                             modifier = Modifier.padding(horizontal = Spacing.lg),
                         )
                     }
@@ -371,6 +379,7 @@ private fun SyncFeatureRow(
 private fun CloudSyncSection(
     syncStatus: app.logdate.client.sync.SyncStatus?,
     onSyncNow: () -> Unit,
+    onNavigateToRecoveryPhrase: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     SettingsSection(
@@ -378,7 +387,7 @@ private fun CloudSyncSection(
         modifier = modifier,
     ) {
         Column {
-            SyncStatusItem(syncStatus = syncStatus, onSyncNow = onSyncNow)
+            SyncStatusItem(syncStatus = syncStatus, onSyncNow = onSyncNow, onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase)
         }
     }
 }
@@ -387,12 +396,13 @@ private fun CloudSyncSection(
 private fun SyncStatusItem(
     syncStatus: app.logdate.client.sync.SyncStatus?,
     onSyncNow: () -> Unit,
+    onNavigateToRecoveryPhrase: () -> Unit,
 ) {
     ListItem(
         // The state itself is the headline. There used to be a "Sync Status" label above it,
         // which named the row rather than telling anyone anything, and pushed the one line that
         // matters into the small print.
-        headlineContent = { SyncStatusText(syncStatus) },
+        headlineContent = { SyncStatusText(syncStatus, onNavigateToRecoveryPhrase) },
         leadingContent = {
             // Shown only while something is actually happening, so the row is quiet at rest.
             if (syncStatus?.isSyncing == true) {
@@ -415,7 +425,10 @@ private fun SyncStatusItem(
 }
 
 @Composable
-private fun SyncStatusText(syncStatus: app.logdate.client.sync.SyncStatus?) {
+private fun SyncStatusText(
+    syncStatus: app.logdate.client.sync.SyncStatus?,
+    onNavigateToRecoveryPhrase: () -> Unit,
+) {
     syncStatus?.let { status ->
         val pausedReason = status.pausedReason
         if (status.isSyncing) {
@@ -448,6 +461,8 @@ private fun SyncStatusText(syncStatus: app.logdate.client.sync.SyncStatus?) {
                             SyncPausedReason.MEDIA_WAITING_FOR_WIFI ->
                                 stringResource(Res.string.sync_paused_media_waiting_for_wifi)
                             SyncPausedReason.NOT_SIGNED_IN -> stringResource(Res.string.sync_paused_signed_out)
+                            SyncPausedReason.NEEDS_RECOVERY_PHRASE ->
+                                stringResource(Res.string.sync_paused_needs_recovery_phrase)
                         },
                     // Only the states the user has to do something about are coloured as
                     // problems. Waiting for Wi-Fi resolves itself, and dressing it up as an error
@@ -456,6 +471,7 @@ private fun SyncStatusText(syncStatus: app.logdate.client.sync.SyncStatus?) {
                         when (pausedReason) {
                             SyncPausedReason.BACKGROUND_DATA_OFF,
                             SyncPausedReason.NOT_SIGNED_IN,
+                            SyncPausedReason.NEEDS_RECOVERY_PHRASE,
                             -> MaterialTheme.colorScheme.error
 
                             SyncPausedReason.OFFLINE,
@@ -468,6 +484,14 @@ private fun SyncStatusText(syncStatus: app.logdate.client.sync.SyncStatus?) {
                         text = stringResource(Res.string.sync_paused_background_data_off_fix),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (pausedReason == SyncPausedReason.NEEDS_RECOVERY_PHRASE) {
+                    Text(
+                        text = stringResource(Res.string.sync_paused_needs_recovery_phrase_fix),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable(onClick = onNavigateToRecoveryPhrase),
                     )
                 }
             }

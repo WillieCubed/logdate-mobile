@@ -35,6 +35,7 @@ import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.MemoriesSettingsViewModel
 import app.logdate.feature.core.settings.ui.MemoriesWidgetInstallController
 import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
+import app.logdate.feature.core.settings.ui.RecoveryPhraseEntryViewModel
 import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
 import app.logdate.feature.core.settings.ui.StreakSettingsViewModel
 import app.logdate.feature.core.settings.ui.TimelineSettingsViewModel
@@ -113,6 +114,9 @@ actual val coreFeatureModule: Module =
                 get(),
                 supportsSystemSearchVisibilityToggle = true,
             )
+        }
+        viewModel {
+            RecoveryPhraseEntryViewModel(get())
         }
         viewModel {
             DataSettingsViewModel(

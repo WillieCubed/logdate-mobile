@@ -301,6 +301,8 @@ class SyncStatusViewModelTest {
         ) {}
 
         override suspend fun clearPending() {}
+
+        override suspend fun resetAllCursors() {}
     }
 
     private class FakeSessionStorage(

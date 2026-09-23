@@ -486,6 +486,8 @@ class CloudAccountOnboardingViewModelTest {
         ) {}
 
         override suspend fun clearPending() {}
+
+        override suspend fun resetAllCursors() {}
     }
 
     private class FakeBackfilledAccountTracker : BackfilledAccountTracker {

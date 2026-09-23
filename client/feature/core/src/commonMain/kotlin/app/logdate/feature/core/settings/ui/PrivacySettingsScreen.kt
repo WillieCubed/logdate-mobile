@@ -56,6 +56,7 @@ import logdate.client.feature.core.generated.resources.passkey_removed_successfu
 import logdate.client.feature.core.generated.resources.privacy_and_security
 import logdate.client.feature.core.generated.resources.privacy_security_description
 import logdate.client.feature.core.generated.resources.recovery_phrase_missing
+import logdate.client.feature.core.generated.resources.recovery_phrase_missing_enter_action
 import logdate.client.feature.core.generated.resources.recovery_phrase_settings_description
 import logdate.client.feature.core.generated.resources.recovery_phrase_settings_title
 import logdate.client.feature.core.generated.resources.recovery_phrase_warning
@@ -88,6 +89,7 @@ import logdate.client.ui.generated.resources.Res as UiRes
 fun PrivacySettingsScreen(
     onBack: () -> Unit,
     onNavigateToLocationSettings: () -> Unit = {},
+    onNavigateToRecoveryPhrase: () -> Unit = {},
     viewModel: PrivacySettingsViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -110,6 +112,7 @@ fun PrivacySettingsScreen(
         onRevealRecoveryPhrase = viewModel::revealRecoveryPhrase,
         onHideRecoveryPhrase = viewModel::hideRecoveryPhrase,
         onNavigateToLocationSettings = onNavigateToLocationSettings,
+        onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
         revocationState = revocationState,
         creationState = creationState,
     )
@@ -212,6 +215,7 @@ fun PrivacySettingsContent(
     onRevealRecoveryPhrase: () -> Unit = {},
     onHideRecoveryPhrase: () -> Unit = {},
     onNavigateToLocationSettings: () -> Unit = {},
+    onNavigateToRecoveryPhrase: () -> Unit = {},
     revocationState: PasskeyRevocationState = PasskeyRevocationState.Idle,
     creationState: PasskeyCreationState = PasskeyCreationState.Idle,
 ) {
@@ -273,6 +277,10 @@ fun PrivacySettingsContent(
     RecoveryPhraseDialog(
         state = recoveryPhraseRevealState,
         onDismiss = onHideRecoveryPhrase,
+        onEnterPhrase = {
+            onHideRecoveryPhrase()
+            onNavigateToRecoveryPhrase()
+        },
     )
 
     FoldableBookLayout(
@@ -523,6 +531,7 @@ fun PrivacySettingsContent(
 private fun RecoveryPhraseDialog(
     state: RecoveryPhraseRevealState,
     onDismiss: () -> Unit,
+    onEnterPhrase: () -> Unit,
 ) {
     when (state) {
         RecoveryPhraseRevealState.Hidden -> Unit
@@ -551,8 +560,13 @@ private fun RecoveryPhraseDialog(
                 title = { Text(stringResource(Res.string.recovery_phrase_settings_title)) },
                 text = { Text(stringResource(Res.string.recovery_phrase_missing)) },
                 confirmButton = {
+                    TextButton(onClick = onEnterPhrase) {
+                        Text(stringResource(Res.string.recovery_phrase_missing_enter_action))
+                    }
+                },
+                dismissButton = {
                     TextButton(onClick = onDismiss) {
-                        Text(stringResource(UiRes.string.common_confirm))
+                        Text(stringResource(UiRes.string.common_cancel))
                     }
                 },
             )

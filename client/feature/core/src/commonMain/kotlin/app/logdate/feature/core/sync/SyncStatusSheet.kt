@@ -53,6 +53,8 @@ import logdate.client.feature.core.generated.resources.sync_now
 import logdate.client.feature.core.generated.resources.sync_paused_background_data_off
 import logdate.client.feature.core.generated.resources.sync_paused_background_data_off_fix
 import logdate.client.feature.core.generated.resources.sync_paused_media_waiting_for_wifi
+import logdate.client.feature.core.generated.resources.sync_paused_needs_recovery_phrase
+import logdate.client.feature.core.generated.resources.sync_paused_needs_recovery_phrase_fix
 import logdate.client.feature.core.generated.resources.sync_paused_offline
 import logdate.client.feature.core.generated.resources.sync_paused_signed_out
 import logdate.client.feature.core.generated.resources.sync_status_could_not_start
@@ -335,6 +337,7 @@ private fun PausedReason(
                     SyncPausedReason.OFFLINE -> stringResource(Res.string.sync_paused_offline)
                     SyncPausedReason.MEDIA_WAITING_FOR_WIFI -> stringResource(Res.string.sync_paused_media_waiting_for_wifi)
                     SyncPausedReason.NOT_SIGNED_IN -> stringResource(Res.string.sync_paused_signed_out)
+                    SyncPausedReason.NEEDS_RECOVERY_PHRASE -> stringResource(Res.string.sync_paused_needs_recovery_phrase)
                 },
             style = MaterialTheme.typography.bodyMedium,
             // Only what the user has to fix is coloured as a problem; the rest clears itself.
@@ -342,6 +345,7 @@ private fun PausedReason(
                 when (reason) {
                     SyncPausedReason.BACKGROUND_DATA_OFF,
                     SyncPausedReason.NOT_SIGNED_IN,
+                    SyncPausedReason.NEEDS_RECOVERY_PHRASE,
                     -> MaterialTheme.colorScheme.error
                     SyncPausedReason.OFFLINE,
                     SyncPausedReason.MEDIA_WAITING_FOR_WIFI,
@@ -351,6 +355,13 @@ private fun PausedReason(
         if (reason == SyncPausedReason.BACKGROUND_DATA_OFF) {
             Text(
                 text = stringResource(Res.string.sync_paused_background_data_off_fix),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (reason == SyncPausedReason.NEEDS_RECOVERY_PHRASE) {
+            Text(
+                text = stringResource(Res.string.sync_paused_needs_recovery_phrase_fix),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -23,6 +23,7 @@ import app.logdate.feature.core.settings.ui.LocationTrackingOptionsScreen
 import app.logdate.feature.core.settings.ui.MemoriesSettingsScreen
 import app.logdate.feature.core.settings.ui.PrivacySettingsScreen
 import app.logdate.feature.core.settings.ui.RecommendationSettingsScreen
+import app.logdate.feature.core.settings.ui.RecoveryPhraseEntrySettingsScreen
 import app.logdate.feature.core.settings.ui.ResetAppSettingsScreen
 import app.logdate.feature.core.settings.ui.ResetSettingsScreen
 import app.logdate.feature.core.settings.ui.SettingsOverviewScreen
@@ -106,6 +107,7 @@ fun EntryProviderScope<NavKey>.settingsEntries(
         PrivacySettingsScreen(
             onBack = onBack,
             onNavigateToLocationSettings = { onNavigateTo(LocationSettingsRoute) },
+            onNavigateToRecoveryPhrase = { onNavigateTo(RecoveryPhraseEntrySettingsRoute) },
         )
     }
     taggedEntry<DataSettingsRoute> {
@@ -158,6 +160,13 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             onBack = onBack,
             onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
             onNavigateToSignIn = onNavigateToSignIn,
+            onNavigateToRecoveryPhrase = { onNavigateTo(RecoveryPhraseEntrySettingsRoute) },
+        )
+    }
+    taggedEntry<RecoveryPhraseEntrySettingsRoute> {
+        RecoveryPhraseEntrySettingsScreen(
+            onBack = onBack,
+            onRecovered = onBack,
         )
     }
     taggedEntry<ExportSettingsRoute> {

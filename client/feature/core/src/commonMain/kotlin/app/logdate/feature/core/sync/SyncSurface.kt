@@ -44,7 +44,9 @@ import app.logdate.ui.common.MessageBanner
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.last_sync_failed
 import logdate.client.feature.core.generated.resources.sync_banner_conflicts
+import logdate.client.feature.core.generated.resources.sync_banner_enter_recovery_phrase
 import logdate.client.feature.core.generated.resources.sync_banner_manage
+import logdate.client.feature.core.generated.resources.sync_banner_needs_recovery
 import logdate.client.feature.core.generated.resources.sync_banner_review
 import logdate.client.feature.core.generated.resources.sync_banner_session_expired
 import logdate.client.feature.core.generated.resources.sync_banner_storage_full
@@ -91,6 +93,7 @@ fun SyncStatusButton(
     when (presentation) {
         SyncPresentation.Hidden,
         SyncPresentation.AuthError,
+        SyncPresentation.NeedsRecovery,
         is SyncPresentation.StorageError,
         is SyncPresentation.ConflictError,
         -> return
@@ -240,12 +243,22 @@ private fun SyncPresentation.toBannerVisual(): BannerVisual? {
                     icon = Icons.Filled.SyncProblem,
                     containerColor = scheme.tertiaryContainer,
                     contentColor = scheme.onTertiaryContainer,
-                    action = stringResource(Res.string.sync_banner_review) to SyncAction.ReviewConflicts,
+                    action = stringResource(Res.string.sync_banner_review) to SyncAction.ReviewIssues,
                     dismissible = true,
                 )
             } else {
                 null
             }
+
+        SyncPresentation.NeedsRecovery ->
+            BannerVisual(
+                message = stringResource(Res.string.sync_banner_needs_recovery),
+                icon = Icons.Filled.Lock,
+                containerColor = scheme.errorContainer,
+                contentColor = scheme.onErrorContainer,
+                action = stringResource(Res.string.sync_banner_enter_recovery_phrase) to SyncAction.EnterRecoveryPhrase,
+                dismissible = false,
+            )
 
         SyncPresentation.AuthError ->
             BannerVisual(
