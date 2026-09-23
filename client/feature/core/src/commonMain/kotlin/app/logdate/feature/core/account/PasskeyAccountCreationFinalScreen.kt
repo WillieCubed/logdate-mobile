@@ -3,23 +3,16 @@
 package app.logdate.feature.core.account
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Error
@@ -27,13 +20,10 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,6 +40,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.step.StepBusyButton
+import app.logdate.ui.step.StepHero
+import app.logdate.ui.step.StepProgress
+import app.logdate.ui.step.StepScaffold
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.about_passkeys
@@ -64,12 +58,9 @@ import logdate.client.feature.core.generated.resources.account_passkey_point_mul
 import logdate.client.feature.core.generated.resources.account_passkey_point_no_passwords
 import logdate.client.feature.core.generated.resources.account_passkey_point_phish_resistant
 import logdate.client.feature.core.generated.resources.account_passkey_subhead
-import logdate.client.feature.core.generated.resources.account_step_progress
 import logdate.client.feature.core.generated.resources.account_will_sign_in_to
-import logdate.client.feature.core.generated.resources.creating_account
 import logdate.client.feature.core.generated.resources.passkeys_not_supported
 import logdate.client.ui.generated.resources.common_dismiss
-import logdate.client.ui.generated.resources.common_go_back
 import logdate.client.ui.generated.resources.common_try_again
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
@@ -102,136 +93,70 @@ fun PasskeyAccountCreationFinalContent(
     stepCount: Int,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier =
-            modifier
-                .testTag(CLOUD_ACCOUNT_PASSKEY_ROOT_TAG)
-                .fillMaxSize()
-                .padding(horizontal = Spacing.lg),
-    ) {
-        StepHeader(
-            stepNumber = stepNumber,
-            stepCount = stepCount,
-            onBack = onBack,
-            enabled = !isCreatingAccount,
-        )
-
-        // Scrollable body; the call to action stays pinned so it is reachable without scrolling
-        // on short screens and does not float mid-screen on tall ones.
-        Column(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-        ) {
-            Spacer(Modifier.height(Spacing.lg))
-
-            Text(
-                text = stringResource(Res.string.account_confirm_title),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center,
-            )
-
-            Spacer(Modifier.height(Spacing.xl))
-
-            AccountIdentity(
-                displayName = displayName,
-                username = username,
-                handleDomain = handleDomain,
-                onChange = onBack,
-                changeEnabled = !isCreatingAccount,
-            )
-
-            Spacer(Modifier.height(Spacing.xl))
-
-            PasskeyExplainer()
-
-            if (!isPasskeySupported) {
-                Spacer(Modifier.height(Spacing.lg))
-                NoticeCard(
-                    icon = Icons.Default.Warning,
-                    title = stringResource(Res.string.passkeys_not_supported),
-                    body = stringResource(Res.string.account_passkey_not_supported_description),
+    StepScaffold(
+        title = stringResource(Res.string.account_confirm_title),
+        // Leaving mid-ceremony would abandon a passkey the platform is already creating.
+        onBack = if (isCreatingAccount) null else onBack,
+        modifier = modifier.testTag(CLOUD_ACCOUNT_PASSKEY_ROOT_TAG),
+        progress = if (stepCount > 0) StepProgress(current = stepNumber, total = stepCount) else null,
+        hero = {
+            StepHero {
+                Text(
+                    text =
+                        displayName
+                            .trim()
+                            .firstOrNull()
+                            ?.uppercase()
+                            .orEmpty(),
+                    style = MaterialTheme.typography.displaySmall,
                 )
             }
-
-            errorMessage?.let { error ->
-                Spacer(Modifier.height(Spacing.lg))
-                ErrorBanner(message = error, onDismiss = onClearError)
-            }
-
-            Spacer(Modifier.height(Spacing.xl))
-        }
-
-        Button(
-            onClick = onCreateAccount,
-            enabled = !isCreatingAccount && isPasskeySupported,
-            modifier = Modifier.fillMaxWidth().testTag(CLOUD_ACCOUNT_PASSKEY_CREATE_TAG),
-        ) {
-            when {
-                isCreatingAccount -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                    Spacer(Modifier.width(Spacing.sm))
-                    Text(stringResource(Res.string.creating_account))
-                }
-
-                errorMessage != null -> Text(stringResource(UiRes.string.common_try_again))
-
-                else -> Text(stringResource(Res.string.account_create_cta))
-            }
-        }
-
-        Spacer(Modifier.height(Spacing.md))
-
-        Text(
-            text = stringResource(Res.string.account_will_sign_in_to, serverDisplayName),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
+        },
+        headerAlignment = Alignment.CenterHorizontally,
+        actions = {
+            StepBusyButton(
+                text =
+                    when {
+                        errorMessage != null -> stringResource(UiRes.string.common_try_again)
+                        else -> stringResource(Res.string.account_create_cta)
+                    },
+                onClick = onCreateAccount,
+                busy = isCreatingAccount,
+                enabled = isPasskeySupported,
+                modifier = Modifier.testTag(CLOUD_ACCOUNT_PASSKEY_CREATE_TAG),
+            )
+        },
+        footer = {
+            Text(
+                text = stringResource(Res.string.account_will_sign_in_to, serverDisplayName),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+    ) {
+        AccountIdentity(
+            displayName = displayName,
+            username = username,
+            handleDomain = handleDomain,
+            onChange = onBack,
+            changeEnabled = !isCreatingAccount,
         )
 
-        Spacer(Modifier.height(Spacing.xl))
-    }
-}
+        PasskeyExplainer()
 
-@Composable
-private fun StepHeader(
-    stepNumber: Int,
-    stepCount: Int,
-    onBack: () -> Unit,
-    enabled: Boolean,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconButton(onClick = onBack, enabled = enabled) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = stringResource(UiRes.string.common_go_back),
+        if (!isPasskeySupported) {
+            NoticeCard(
+                icon = Icons.Default.Warning,
+                title = stringResource(Res.string.passkeys_not_supported),
+                body = stringResource(Res.string.account_passkey_not_supported_description),
             )
         }
 
-        LinearProgressIndicator(
-            progress = { if (stepCount <= 0) 1f else stepNumber.toFloat() / stepCount },
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .padding(horizontal = Spacing.md),
-        )
-
-        Text(
-            text = stringResource(Res.string.account_step_progress, stepNumber, stepCount),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        errorMessage?.let { error ->
+            ErrorBanner(message = error, onDismiss = onClearError)
+        }
     }
 }
 
@@ -253,27 +178,6 @@ private fun AccountIdentity(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(88.dp)
-                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text =
-                    displayName
-                        .trim()
-                        .firstOrNull()
-                        ?.uppercase()
-                        .orEmpty(),
-                style = MaterialTheme.typography.displaySmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-        }
-
-        Spacer(Modifier.height(Spacing.md))
-
         Text(
             text = displayName,
             style = MaterialTheme.typography.headlineSmall,

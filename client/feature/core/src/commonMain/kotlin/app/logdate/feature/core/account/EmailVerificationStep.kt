@@ -3,18 +3,20 @@
 package app.logdate.feature.core.account
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MailOutline
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.MailOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -23,6 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import app.logdate.client.permissions.EmailVerificationOutcome
+import app.logdate.ui.step.StepHeroIcon
+import app.logdate.ui.step.StepScaffoldDefaults
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.email_verification_body
@@ -55,67 +59,64 @@ fun EmailVerificationStep(
     onContinue: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .padding(Spacing.lg),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        Spacer(Modifier.height(Spacing.xl))
-        Icon(
-            imageVector = if (outcome is EmailVerificationOutcome.Success) Icons.Filled.CheckCircle else Icons.Filled.MailOutline,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-        )
+    Box(modifier = modifier.fillMaxWidth().padding(Spacing.lg), contentAlignment = Alignment.Center) {
+        Column(
+            modifier = Modifier.widthIn(max = StepScaffoldDefaults.ContentMaxWidth).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            StepHeroIcon(
+                if (outcome is EmailVerificationOutcome.Success) Icons.Rounded.CheckCircle else Icons.Rounded.MailOutline,
+            )
+            Spacer(Modifier.height(Spacing.sm))
 
-        Text(
-            text = headlineFor(outcome),
-            style = MaterialTheme.typography.headlineMedium,
-            textAlign = TextAlign.Center,
-        )
+            Text(
+                text = headlineFor(outcome),
+                style = MaterialTheme.typography.headlineLarge,
+                textAlign = TextAlign.Center,
+            )
 
-        Text(
-            text = bodyFor(outcome),
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+            Text(
+                text = bodyFor(outcome),
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
-        Spacer(Modifier.height(Spacing.lg))
+            Spacer(Modifier.height(Spacing.lg))
 
-        when {
-            isVerifying -> {
-                CircularProgressIndicator()
-                Text(
-                    text = stringResource(Res.string.email_verification_in_progress),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            outcome is EmailVerificationOutcome.Success -> {
-                Button(
-                    onClick = onContinue,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(Res.string.email_verification_continue_button))
+            when {
+                isVerifying -> {
+                    CircularProgressIndicator()
+                    Text(
+                        text = stringResource(Res.string.email_verification_in_progress),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-            }
 
-            else -> {
-                Button(
-                    onClick = onVerifyClick,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(Res.string.email_verification_verify_button))
+                outcome is EmailVerificationOutcome.Success -> {
+                    Button(
+                        onClick = onContinue,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(Res.string.email_verification_continue_button))
+                    }
                 }
-                OutlinedButton(
-                    onClick = onSkip,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(Res.string.email_verification_skip_button))
+
+                else -> {
+                    Button(
+                        onClick = onVerifyClick,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(Res.string.email_verification_verify_button))
+                    }
+                    OutlinedButton(
+                        onClick = onSkip,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(Res.string.email_verification_skip_button))
+                    }
                 }
             }
         }
