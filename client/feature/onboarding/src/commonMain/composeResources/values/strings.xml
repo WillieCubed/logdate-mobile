@@ -154,6 +154,7 @@
     <string name="onboarding_completion_fire_lit">Your fire is lit.</string>
     <string name="onboarding_completion_fire_encouragement">Each day you add an entry, the fire grows. Miss a day and it burns down to embers. Miss two and it goes out.</string>
     <string name="onboarding_completion_happy_logging">Happy logging!</string>
+    <string name="onboarding_completion_streak_day_label">day</string>
 
     <!-- Error messages -->
     <string name="onboarding_error_save_birthday">We couldn&apos;t save your birthday right now.</string>

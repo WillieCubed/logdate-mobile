@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
@@ -76,6 +77,8 @@ import app.logdate.client.media.MediaObject
 import app.logdate.client.permissions.rememberMediaLibraryPermissionState
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
+import app.logdate.ui.step.StepBusyButton
+import app.logdate.ui.step.StepScaffoldDefaults
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import coil3.compose.AsyncImage
@@ -185,7 +188,6 @@ fun MemorySelectionScreen(
                             uiState = uiState,
                             onToggleMemorySelection = onToggleMemorySelection,
                             onLoadMoreMemories = onLoadMoreMemories,
-                            onContinue = onContinue,
                             hasMediaPermission = permissionState.hasPermission,
                             onRequestMediaPermission = permissionState.requestPermission,
                             onRetryLoad = onRefreshMemories,
@@ -229,7 +231,6 @@ private fun SharedTransitionScope.MemorySelectionAdaptiveContent(
     uiState: MemorySelectionUiState,
     onToggleMemorySelection: (String) -> Unit,
     onLoadMoreMemories: () -> Unit,
-    onContinue: () -> Unit,
     hasMediaPermission: Boolean,
     onRequestMediaPermission: () -> Unit,
     onRetryLoad: () -> Unit,
@@ -256,7 +257,6 @@ private fun SharedTransitionScope.MemorySelectionAdaptiveContent(
                 uiState = uiState,
                 onToggleMemorySelection = onToggleMemorySelection,
                 onLoadMoreMemories = onLoadMoreMemories,
-                onContinue = onContinue,
                 onMemoryLongPress = onMemoryLongPress,
                 onMemoryLongPressEnd = onMemoryLongPressEnd,
                 expandedMemory = expandedMemory,
@@ -282,7 +282,6 @@ private fun SharedTransitionScope.MemorySelectionAdaptiveContent(
                         uiState = uiState,
                         onToggleMemorySelection = onToggleMemorySelection,
                         onLoadMoreMemories = onLoadMoreMemories,
-                        onContinue = onContinue,
                         onMemoryLongPress = onMemoryLongPress,
                         onMemoryLongPressEnd = onMemoryLongPressEnd,
                         expandedMemory = expandedMemory,
@@ -295,7 +294,6 @@ private fun SharedTransitionScope.MemorySelectionAdaptiveContent(
                         uiState = uiState,
                         onToggleMemorySelection = onToggleMemorySelection,
                         onLoadMoreMemories = onLoadMoreMemories,
-                        onContinue = onContinue,
                         hasMediaPermission = hasMediaPermission,
                         onRequestMediaPermission = onRequestMediaPermission,
                         onRetryLoad = onRetryLoad,
@@ -385,7 +383,6 @@ private fun SharedTransitionScope.MemorySelectionBottomPane(
     uiState: MemorySelectionUiState,
     onToggleMemorySelection: (String) -> Unit,
     onLoadMoreMemories: () -> Unit,
-    onContinue: () -> Unit,
     onMemoryLongPress: (MediaObject) -> Unit,
     onMemoryLongPressEnd: () -> Unit,
     expandedMemory: MediaObject?,
@@ -452,15 +449,6 @@ private fun SharedTransitionScope.MemorySelectionBottomPane(
                 }
             }
         }
-
-        item {
-            ContinueMemoryImportButton(
-                onContinue = onContinue,
-                selectedCount = uiState.selectedMemoryIds.size,
-                isImporting = uiState.isImporting,
-                importFailed = uiState.importFailed,
-            )
-        }
     }
 }
 
@@ -473,7 +461,6 @@ private fun SharedTransitionScope.MemorySelectionContent(
     uiState: MemorySelectionUiState,
     onToggleMemorySelection: (String) -> Unit,
     onLoadMoreMemories: () -> Unit,
-    onContinue: () -> Unit,
     hasMediaPermission: Boolean,
     onRequestMediaPermission: () -> Unit,
     onRetryLoad: () -> Unit,
@@ -662,39 +649,25 @@ private fun ContinueMemoryImportButton(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Button(
-            onClick = onContinue,
-            enabled = !isImporting,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .testTag(MEMORY_SELECTION_CONTINUE_TAG),
+        Column(
+            modifier = Modifier.widthIn(max = StepScaffoldDefaults.ContentMaxWidth).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            if (isImporting) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                )
-            } else {
-                Text(
+            StepBusyButton(
+                text =
                     if (selectedCount > 0) {
-                        stringResource(
-                            Res.string.continue_with_memories_count,
-                            selectedCount,
-                        )
+                        stringResource(Res.string.continue_with_memories_count, selectedCount)
                     } else {
                         stringResource(Res.string.continue_without_importing_memories)
                     },
-                )
-            }
-        }
-        if (importFailed) {
-            Text(
-                text = stringResource(Res.string.memory_import_failed_body),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
+                onClick = onContinue,
+                busy = isImporting,
+                modifier = Modifier.testTag(MEMORY_SELECTION_CONTINUE_TAG),
+            )
+            OnboardingActionError(
+                if (importFailed) stringResource(Res.string.memory_import_failed_body) else null,
             )
         }
     }
