@@ -7,6 +7,7 @@ import app.logdate.client.domain.account.CheckUsernameAvailabilityUseCase
 import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
 import app.logdate.client.domain.account.CreateRemoteAccountUseCase
 import app.logdate.client.domain.account.EmailVerificationAvailability
+import app.logdate.client.domain.account.EnqueueAllLocalDataUseCase
 import app.logdate.client.domain.account.GetAccountSetupDataUseCase
 import app.logdate.client.domain.account.GetAvailablePlansUseCase
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
@@ -42,13 +43,13 @@ val accountDomainModule: Module =
         factory { TriggerInitialSyncUseCase(syncManager = get()) }
         factory<BackfilledAccountTracker> { PreferencesBackfilledAccountTracker(preferences = get()) }
         factory {
-            BackfillLocalDataUseCase(
+            EnqueueAllLocalDataUseCase(
                 journalRepository = get(),
                 journalNotesRepository = get(),
                 syncMetadataService = get(),
-                tracker = get(),
             )
         }
+        factory { BackfillLocalDataUseCase(enqueueAllLocalData = get(), tracker = get()) }
         factory { GetCurrentEntitlementUseCase(sessionStorage = get(), apiClient = get()) }
         factory { GetAvailablePlansUseCase(planCatalogClient = get()) }
         factory { VerifyEmailUseCase(sessionStorage = get(), manager = get()) }

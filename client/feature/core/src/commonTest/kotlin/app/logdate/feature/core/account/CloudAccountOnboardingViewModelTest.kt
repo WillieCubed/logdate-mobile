@@ -8,6 +8,7 @@ import app.logdate.client.domain.account.BackfilledAccountTracker
 import app.logdate.client.domain.account.CheckUsernameAvailabilityUseCase
 import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
 import app.logdate.client.domain.account.EmailVerificationAvailability
+import app.logdate.client.domain.account.EnqueueAllLocalDataUseCase
 import app.logdate.client.domain.account.GetCurrentEntitlementUseCase
 import app.logdate.client.domain.account.SignInWithGoogleUseCase
 import app.logdate.client.domain.account.TriggerInitialSyncUseCase
@@ -241,9 +242,12 @@ class CloudAccountOnboardingViewModelTest {
             triggerInitialSyncUseCase = TriggerInitialSyncUseCase(FakeSyncManager()),
             backfillLocalDataUseCase =
                 BackfillLocalDataUseCase(
-                    journalRepository = FakeJournalRepository(),
-                    journalNotesRepository = FakeJournalNotesRepository(),
-                    syncMetadataService = FakeSyncMetadataService(),
+                    enqueueAllLocalData =
+                        EnqueueAllLocalDataUseCase(
+                            journalRepository = FakeJournalRepository(),
+                            journalNotesRepository = FakeJournalNotesRepository(),
+                            syncMetadataService = FakeSyncMetadataService(),
+                        ),
                     tracker = FakeBackfilledAccountTracker(),
                 ),
             passkeyManager = FakePasskeyManager(),

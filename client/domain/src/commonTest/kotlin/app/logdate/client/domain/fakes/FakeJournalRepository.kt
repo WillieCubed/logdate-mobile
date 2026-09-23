@@ -12,6 +12,7 @@ import kotlin.uuid.Uuid
  */
 class FakeJournalRepository(
     initialJournals: List<Journal> = emptyList(),
+    private val drafts: List<EditorDraft> = emptyList(),
 ) : JournalRepository {
     private val journalsFlow = MutableStateFlow(initialJournals)
 
@@ -42,7 +43,7 @@ class FakeJournalRepository(
 
     override suspend fun getLatestDraft(): EditorDraft? = null
 
-    override suspend fun getAllDrafts(): List<EditorDraft> = emptyList()
+    override suspend fun getAllDrafts(): List<EditorDraft> = drafts
 
     override suspend fun getDraft(id: Uuid): EditorDraft? = null
 

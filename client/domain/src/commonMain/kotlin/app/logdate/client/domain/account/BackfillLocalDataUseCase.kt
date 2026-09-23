@@ -1,14 +1,7 @@
 package app.logdate.client.domain.account
 
 import app.logdate.client.datastore.LogdatePreferencesDataSource
-import app.logdate.client.repository.journals.JournalNotesRepository
-import app.logdate.client.repository.journals.JournalRepository
-import app.logdate.client.sync.metadata.AssociationPendingKey
-import app.logdate.client.sync.metadata.EntityType
-import app.logdate.client.sync.metadata.PendingOperation
-import app.logdate.client.sync.metadata.SyncMetadataService
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.flow.first
 
 /**
  * Persists "we have already backfilled local data into the sync queue for this account ID."
@@ -46,9 +39,7 @@ class PreferencesBackfilledAccountTracker(
  * pass — same account ID never re-runs.
  */
 class BackfillLocalDataUseCase(
-    private val journalRepository: JournalRepository,
-    private val journalNotesRepository: JournalNotesRepository,
-    private val syncMetadataService: SyncMetadataService,
+    private val enqueueAllLocalData: EnqueueAllLocalDataUseCase,
     private val tracker: BackfilledAccountTracker,
 ) {
     sealed class Result {
@@ -60,6 +51,7 @@ class BackfillLocalDataUseCase(
             val journalCount: Int,
             val noteCount: Int,
             val associationCount: Int,
+            val draftCount: Int,
         ) : Result()
 
         data class Error(
@@ -71,46 +63,21 @@ class BackfillLocalDataUseCase(
         if (accountId in tracker.getBackfilledAccountIds()) {
             return Result.AlreadyBackfilled(accountId)
         }
-        return try {
-            val journals = journalRepository.allJournalsObserved.first()
-            val notes = journalNotesRepository.allNotesObserved.first()
-            val associations = journalNotesRepository.getAllJournalNoteLinks()
-
-            journals.forEach { journal ->
-                syncMetadataService.enqueuePending(
-                    entityId = journal.id.toString(),
-                    entityType = EntityType.JOURNAL,
-                    operation = PendingOperation.CREATE,
-                )
+        val counts =
+            enqueueAllLocalData().getOrElse { error ->
+                Napier.e("Backfill failed for account $accountId", error)
+                return Result.Error(error.message ?: "Unknown backfill failure")
             }
-            notes.forEach { note ->
-                syncMetadataService.enqueuePending(
-                    entityId = note.uid.toString(),
-                    entityType = EntityType.NOTE,
-                    operation = PendingOperation.CREATE,
-                )
-            }
-            associations.forEach { (journalId, contentId) ->
-                syncMetadataService.enqueuePending(
-                    entityId = AssociationPendingKey(journalId, contentId).toPendingId(),
-                    entityType = EntityType.ASSOCIATION,
-                    operation = PendingOperation.CREATE,
-                )
-            }
-
-            tracker.markAccountBackfilled(accountId)
-            Napier.i(
-                "Backfilled local data for account $accountId: " +
-                    "${journals.size} journals, ${notes.size} notes, ${associations.size} associations",
-            )
-            Result.Success(
-                journalCount = journals.size,
-                noteCount = notes.size,
-                associationCount = associations.size,
-            )
-        } catch (e: Exception) {
-            Napier.e("Backfill failed for account $accountId", e)
-            Result.Error(e.message ?: "Unknown backfill failure")
-        }
+        tracker.markAccountBackfilled(accountId)
+        Napier.i(
+            "Backfilled local data for account $accountId: ${counts.journals} journals, ${counts.notes} notes, " +
+                "${counts.associations} associations, ${counts.drafts} drafts",
+        )
+        return Result.Success(
+            journalCount = counts.journals,
+            noteCount = counts.notes,
+            associationCount = counts.associations,
+            draftCount = counts.drafts,
+        )
     }
 }
