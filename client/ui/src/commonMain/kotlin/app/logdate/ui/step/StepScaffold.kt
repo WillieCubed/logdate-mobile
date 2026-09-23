@@ -119,7 +119,7 @@ object StepScaffoldDefaults {
  * - **Compact:** the body is centered in the space above the actions and scrolls when it doesn't
  *   fit; the actions sit below it, never on top of it.
  * - **Wide, book posture, or a phone in landscape:** the header on one side, the content and
- *   actions on the other.
+ *   actions on the other. A wide window with no content keeps the actions under the header.
  * - **Tabletop posture:** the header above the hinge, the content and actions below it. Half a
  *   folded screen is too short for a header and its content together, and splitting them this way
  *   matches book posture.
@@ -238,14 +238,31 @@ private class StepSlots(
 @Composable
 private fun StandardStep(slots: StepSlots) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-        val sideBySide =
+        val wide =
             maxWidth >= StepScaffoldDefaults.SideBySideMinWidth ||
                 (
                     maxWidth >= StepScaffoldDefaults.ShortWindowSideBySideMinWidth &&
                         maxHeight < StepScaffoldDefaults.ShortWindowMaxHeight
                 )
 
-        if (sideBySide) {
+        // With nothing but actions to put beside the header, a split would leave a lone button
+        // floating in an empty half of the window. Keep them together under the header instead.
+        if (wide && slots.content == null) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                StepTopBar(onBack = slots.onBack, progress = slots.progress, contentMaxWidth = slots.contentMaxWidth)
+                CenteredScrollColumn(
+                    contentMaxWidth = slots.contentMaxWidth,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                ) {
+                    StepHeader(slots)
+                    Spacer(modifier = Modifier.height(Spacing.xxl))
+                    StepActionColumn(slots)
+                }
+            }
+            return@BoxWithConstraints
+        }
+
+        if (wide) {
             Row(modifier = Modifier.fillMaxSize()) {
                 StepHeaderPane(
                     slots = slots,
