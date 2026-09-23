@@ -27,6 +27,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.foldable.FoldableHingeBounds
@@ -48,6 +49,10 @@ private const val HERO_TAG = "step_hero"
 private const val LAST_CONTENT_TAG = "step_last_content"
 private const val PRIMARY_ACTION_TAG = "step_primary_action"
 private const val TITLE = "Choose your handle"
+private const val LONG_SUPPORTING_TEXT =
+    "This is how other people find you. You can change it later, but people who already know it " +
+        "will need the new one. Pick something you are happy to be known by in every journal you " +
+        "share, since it shows up next to everything you add."
 
 /**
  * Geometry guarantees [StepScaffold] makes in every posture. Each onboarding step once hand-rolled
@@ -116,6 +121,19 @@ class StepScaffoldLayoutTest {
         }
 
     @Test
+    fun `a short window with no content keeps the actions on screen`() =
+        runDesktopComposeUiTest(width = 891, height = 411) {
+            setContent {
+                LogDateTheme {
+                    SampleStep(contentItems = 0, onBack = {}, withHero = true, supportingText = LONG_SUPPORTING_TEXT)
+                }
+            }
+
+            val bottom = unclippedBottom(PRIMARY_ACTION_TAG)
+            assertTrue(bottom <= 411.dp, "actions (bottom $bottom) are pushed off the screen")
+        }
+
+    @Test
     fun `landscape phone places actions beside the body`() =
         runDesktopComposeUiTest(width = 891, height = 411) {
             setStep(contentItems = 1)
@@ -181,7 +199,8 @@ class StepScaffoldLayoutTest {
             val last = bounds(LAST_CONTENT_TAG)
             val action = bounds(PRIMARY_ACTION_TAG)
             assertTrue(action.left >= last.right, "actions (left ${action.left}) are not beside the content (right ${last.right})")
-            assertTrue(last.bottom <= 900.dp, "content (bottom ${last.bottom}) needs scrolling in a two-column pane")
+            val lastBottom = unclippedBottom(LAST_CONTENT_TAG)
+            assertTrue(lastBottom <= 900.dp, "content (bottom $lastBottom) needs scrolling in a two-column pane")
         }
 
     @Test
@@ -215,6 +234,12 @@ class StepScaffoldLayoutTest {
     }
 
     private fun DesktopComposeUiTest.bounds(tag: String): DpRect = onNodeWithTag(tag).getBoundsInRoot()
+
+    /** Bounds in root are clipped to the enclosing viewport, which hides anything scrolled out of it. */
+    private fun DesktopComposeUiTest.unclippedBottom(tag: String): Dp {
+        val node = onNodeWithTag(tag).fetchSemanticsNode()
+        return with(density) { (node.positionInRoot.y + node.size.height).toDp() }
+    }
 
     private fun assertClear(
         content: DpRect,
@@ -257,13 +282,14 @@ private fun SampleStep(
     onBack: (() -> Unit)?,
     withHero: Boolean,
     progress: StepProgress? = null,
+    supportingText: String = "This is how other people find you. You can change it later.",
 ) {
     StepScaffold(
         progress = progress,
         title = TITLE,
         onBack = onBack,
         modifier = Modifier.testTag(ROOT_TAG),
-        supportingText = "This is how other people find you. You can change it later.",
+        supportingText = supportingText,
         hero =
             if (withHero) {
                 { StepHeroIcon(icon = Icons.Rounded.Star, modifier = Modifier.testTag(HERO_TAG)) }
