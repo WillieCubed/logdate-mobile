@@ -1,5 +1,6 @@
 package app.logdate.client.device.storage
 
+import app.logdate.client.datastore.OriginSessionVault
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.shared.config.LogDateConfigRepository
@@ -21,7 +22,8 @@ class SecureSessionStorage(
     private val secureStorage: SecureStorage,
     private val configRepository: LogDateConfigRepository,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-) : SessionStorage {
+) : SessionStorage,
+    OriginSessionVault {
     private object StorageKeys {
         const val ACCESS_TOKEN = "session_access_token"
         const val REFRESH_TOKEN = "session_refresh_token"
@@ -79,6 +81,25 @@ class SecureSessionStorage(
                 Napier.e("Failed to clear secure session", error)
             }
         }
+    }
+
+    override suspend fun read(origin: String): UserSession? = loadSession(origin)
+
+    override suspend fun write(
+        origin: String,
+        session: UserSession,
+    ) {
+        secureStorage.putString(scopedKey(StorageKeys.ACCESS_TOKEN, origin), session.accessToken)
+        secureStorage.putString(scopedKey(StorageKeys.REFRESH_TOKEN, origin), session.refreshToken)
+        secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_ID, origin), session.accountId)
+        if (origin == configRepository.getCurrentBackendUrl()) sessionState.value = session
+    }
+
+    override suspend fun clear(origin: String) {
+        secureStorage.remove(scopedKey(StorageKeys.ACCESS_TOKEN, origin))
+        secureStorage.remove(scopedKey(StorageKeys.REFRESH_TOKEN, origin))
+        secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_ID, origin))
+        if (origin == configRepository.getCurrentBackendUrl()) sessionState.value = null
     }
 
     private suspend fun loadSession(backendUrl: String): UserSession? =

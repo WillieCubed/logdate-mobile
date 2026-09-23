@@ -1,6 +1,7 @@
 package app.logdate.client.device.di
 
 import app.logdate.client.datastore.KeyValueStorage
+import app.logdate.client.datastore.OriginSessionVault
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.AndroidAccountManager
 import app.logdate.client.device.AndroidAppInfoProvider
@@ -43,13 +44,15 @@ actual val deviceInstanceModule: Module =
 
         single { PostRestoreDetector(androidContext()) }
 
-        single<SessionStorage> {
+        single {
             SecureSessionStorage(
                 secureStorage = get(),
                 configRepository = get<LogDateConfigRepository>(),
                 scope = get<CoroutineScope>(),
             )
         }
+        single<SessionStorage> { get<SecureSessionStorage>() }
+        single<OriginSessionVault> { get<SecureSessionStorage>() }
 
         // New device ID provider using KeyValueStorage
         single(named("modernDeviceIdProvider")) {

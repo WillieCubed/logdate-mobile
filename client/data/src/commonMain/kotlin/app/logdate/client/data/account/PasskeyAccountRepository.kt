@@ -54,6 +54,11 @@ class DefaultPasskeyAccountRepository(
         },
     /** The name of this device, given to passkeys it creates. `null` leaves the server default. */
     private val deviceName: () -> String? = { null },
+    /**
+     * Whether signing up creates the app's restore credential. There is one per app, so an account
+     * opened on a server the app isn't connected to must not replace the connected server's.
+     */
+    private val createsRestoreKey: Boolean = true,
 ) : PasskeyAccountRepository {
     private val sessionState = PasskeyAccountSessionState()
     override val currentAccount: StateFlow<LogDateAccount?> = sessionState.currentAccount
@@ -102,7 +107,7 @@ class DefaultPasskeyAccountRepository(
             bindingGuard = bindingGuard,
             credentialCodec = credentialCodec,
             sessionState = sessionState,
-            createRestoreKey = { createRestoreKey() },
+            createRestoreKey = { if (createsRestoreKey) createRestoreKey() else Result.success(Unit) },
             updateTokensOrRegisterPlatformAccount = sessionRefreshCoordinator::updateTokensOrRegisterPlatformAccount,
             deviceName = deviceName,
         )
@@ -127,7 +132,7 @@ class DefaultPasskeyAccountRepository(
             googleSignInManager = googleSignInManager,
             serverClientId = serverClientId,
             sessionState = sessionState,
-            createRestoreKey = { createRestoreKey() },
+            createRestoreKey = { if (createsRestoreKey) createRestoreKey() else Result.success(Unit) },
         )
 
     init {

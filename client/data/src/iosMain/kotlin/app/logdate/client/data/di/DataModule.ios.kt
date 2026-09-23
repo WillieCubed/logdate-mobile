@@ -2,7 +2,9 @@ package app.logdate.client.data.di
 
 import app.logdate.client.data.account.DefaultAccountIdentityRepository
 import app.logdate.client.data.account.DefaultPasskeyAccountRepository
+import app.logdate.client.data.account.DefaultServerScopedAccounts
 import app.logdate.client.data.account.PasskeyBackedAccountRepository
+import app.logdate.client.data.account.ServerScopedAccounts
 import app.logdate.client.data.audio.OfflineFirstAudioTagRepository
 import app.logdate.client.data.events.OfflineFirstEventRepository
 import app.logdate.client.data.journals.JournalUserDataRepository
@@ -204,6 +206,18 @@ actual val dataModule: Module =
 
         // Account
         single<AccountRepository> { PasskeyBackedAccountRepository(passkeyRepository = get()) }
+        single<ServerScopedAccounts> {
+            DefaultServerScopedAccounts(
+                httpClient = get(),
+                vault = get(),
+                passkeyManager = get(),
+                platformAccountManager = get(),
+                canonicalOwnerProvider = get(),
+                // Only a moving account is opened this way, and it always has this device's entries.
+                hasLocalData = { true },
+                deviceName = { userVisibleDeviceName() },
+            )
+        }
         single<AccountIdentityRepository> {
             DefaultAccountIdentityRepository(
                 apiClient = get(),

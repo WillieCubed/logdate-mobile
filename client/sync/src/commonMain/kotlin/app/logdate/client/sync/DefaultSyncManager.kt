@@ -280,6 +280,8 @@ class DefaultSyncManager(
             }
         }
 
+    override suspend fun <T> whilePaused(block: suspend () -> T): T = syncMutex.withLock { block() }
+
     override suspend fun uploadPendingChanges(): SyncResult =
         runFullSyncPhase(
             operationName = "Upload",

@@ -99,6 +99,13 @@ interface SyncManager {
      * pending change is no longer wanted.
      */
     suspend fun discardDeadLetter(id: String)
+
+    /**
+     * Runs [block] with no sync in progress and none starting until it returns. Syncs asked for in
+     * the meantime run afterwards, against whatever [block] changed -- such as the server the app
+     * is connected to.
+     */
+    suspend fun <T> whilePaused(block: suspend () -> T): T = block()
 }
 
 /**

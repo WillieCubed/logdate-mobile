@@ -4,6 +4,8 @@ import android.content.Context
 import app.logdate.client.data.account.DefaultAccountIdentityRepository
 import app.logdate.client.data.account.DefaultAccountRepository
 import app.logdate.client.data.account.DefaultPasskeyAccountRepository
+import app.logdate.client.data.account.DefaultServerScopedAccounts
+import app.logdate.client.data.account.ServerScopedAccounts
 import app.logdate.client.data.audio.OfflineFirstAudioTagRepository
 import app.logdate.client.data.events.OfflineFirstEventRepository
 import app.logdate.client.data.journals.JournalUserDataRepository
@@ -240,6 +242,19 @@ actual val dataModule: Module =
                 },
                 googleSignInManager = get(),
                 serverClientId = DefaultLogDateConfigRepository.GOOGLE_SERVER_CLIENT_ID,
+                deviceName = { context.userVisibleDeviceName() },
+            )
+        }
+        single<ServerScopedAccounts> {
+            val context = androidContext()
+            DefaultServerScopedAccounts(
+                httpClient = httpClient,
+                vault = get(),
+                passkeyManager = get(),
+                platformAccountManager = get(),
+                canonicalOwnerProvider = get(),
+                // Only a moving account is opened this way, and it always has this device's entries.
+                hasLocalData = { true },
                 deviceName = { context.userVisibleDeviceName() },
             )
         }

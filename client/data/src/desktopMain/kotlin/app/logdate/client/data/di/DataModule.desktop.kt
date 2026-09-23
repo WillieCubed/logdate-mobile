@@ -1,5 +1,7 @@
 package app.logdate.client.data.di
 
+import app.logdate.client.data.account.ServerScopedAccount
+import app.logdate.client.data.account.ServerScopedAccounts
 import app.logdate.client.data.account.UnavailableAccountIdentityRepository
 import app.logdate.client.data.account.UnavailableAccountRepository
 import app.logdate.client.data.account.UnavailablePasskeyAccountRepository
@@ -38,6 +40,7 @@ import app.logdate.client.data.transcription.OfflineFirstTranscriptionRepository
 import app.logdate.client.data.user.LocalUserDeviceRepository
 import app.logdate.client.data.user.OfflineFirstUserStateRepository
 import app.logdate.client.database.databaseModule
+import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.di.datastoreModule
 import app.logdate.client.networking.EmailVerificationApiClient
@@ -212,6 +215,18 @@ actual val dataModule: Module =
         single<AccountRepository> { UnavailableAccountRepository() }
         single<AccountIdentityRepository> { UnavailableAccountIdentityRepository() }
         single<PasskeyAccountRepository> { UnavailablePasskeyAccountRepository() }
+        single<ServerScopedAccounts> {
+            ServerScopedAccounts { origin, _ ->
+                object : ServerScopedAccount {
+                    override val origin: String = origin
+                    override val repository: PasskeyAccountRepository = UnavailablePasskeyAccountRepository()
+
+                    override fun session(): UserSession? = null
+
+                    override fun close() = Unit
+                }
+            }
+        }
 
         // Transcription
         single<TranscriptionRepository> {
