@@ -8,14 +8,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.DesktopComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -35,6 +38,7 @@ import app.logdate.ui.foldable.provideFoldableLayoutInfo
 import app.logdate.ui.theme.LogDateTheme
 import kotlin.math.abs
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 private const val ROOT_TAG = "step_root"
@@ -141,6 +145,17 @@ class StepScaffoldLayoutTest {
 
             val last = bounds(LAST_CONTENT_TAG)
             assertTrue(last.bottom <= 438.dp, "body content (bottom ${last.bottom}) spills past the hinge")
+        }
+
+    @Test
+    fun `the step is opaque so transitions never show another step through it`() =
+        runDesktopComposeUiTest(width = 411, height = 891) {
+            // No LogDateTheme here: its root Surface would paint an opaque background of its own.
+            setContent { MaterialTheme { SampleStep(contentItems = 1, onBack = {}, withHero = false) } }
+
+            val pixels = onNodeWithTag(ROOT_TAG).captureToImage().toPixelMap()
+            val corner = pixels[pixels.width - 1, pixels.height / 2]
+            assertEquals(1f, corner.alpha, "step background is not opaque")
         }
 
     @Test

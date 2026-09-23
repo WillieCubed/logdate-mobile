@@ -3,6 +3,7 @@
 package app.logdate.ui.step
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -35,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -122,6 +124,8 @@ object StepScaffoldDefaults {
  * @param footer Optional low-emphasis element below the actions, such as a server switcher.
  * @param hero Optional visual shown above the title, such as [StepHeroIcon].
  * @param headerAlignment Alignment of the hero, title and supporting text. Content stays full width.
+ * @param containerColor Fill behind the whole step. Opaque by default, like a Scaffold, so steps
+ *   sliding past each other during a transition never show through one another.
  * @param content Optional body content shown between the supporting text and the actions.
  */
 @Composable
@@ -135,6 +139,7 @@ fun StepScaffold(
     footer: (@Composable () -> Unit)? = null,
     hero: (@Composable () -> Unit)? = null,
     headerAlignment: Alignment.Horizontal = Alignment.Start,
+    containerColor: Color = MaterialTheme.colorScheme.background,
     contentMaxWidth: Dp = StepScaffoldDefaults.ContentMaxWidth,
     foldableLayoutInfo: FoldableLayoutInfo = rememberFoldableLayoutInfo(),
     content: (@Composable ColumnScope.() -> Unit)? = null,
@@ -155,7 +160,7 @@ fun StepScaffold(
 
     val safeDrawing = WindowInsets.safeDrawing
     FoldableTabletopLayout(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().background(containerColor),
         foldableLayoutInfo = foldableLayoutInfo,
         minPaneHeight = StepScaffoldDefaults.MinActionPaneHeight,
         topPane = {
