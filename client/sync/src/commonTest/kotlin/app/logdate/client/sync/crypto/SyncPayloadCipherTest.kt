@@ -40,7 +40,7 @@ class SyncPayloadCipherTest {
         }
 
     @Test
-    fun `a value made with a different identity key is unreadable, not silently wrong`() =
+    fun `a value made with a different identity key is unreadable not silently wrong`() =
         runTest {
             val writer = cipherFor("device-a")
             val reader = cipherFor("device-b")

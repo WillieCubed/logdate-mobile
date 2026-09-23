@@ -119,7 +119,7 @@ class IdentityKeyProvisioningTest {
         }
 
     @Test
-    fun `a usable identity backup restores silently, skips the recovery pause, and resets sync state`() =
+    fun `a usable identity backup restores silently and resets sync state`() =
         runTest {
             val recoveryPhrase = (1..12).map { "backup-word-$it" }
             val backupStore = FakeIdentityKeyBackupStore(initialPhrase = recoveryPhrase.joinToString(" "))
