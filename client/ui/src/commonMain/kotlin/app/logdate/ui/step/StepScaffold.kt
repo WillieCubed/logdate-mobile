@@ -238,16 +238,15 @@ private class StepSlots(
 @Composable
 private fun StandardStep(slots: StepSlots) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+        val short = maxHeight < StepScaffoldDefaults.ShortWindowMaxHeight
         val wide =
             maxWidth >= StepScaffoldDefaults.SideBySideMinWidth ||
-                (
-                    maxWidth >= StepScaffoldDefaults.ShortWindowSideBySideMinWidth &&
-                        maxHeight < StepScaffoldDefaults.ShortWindowMaxHeight
-                )
+                (maxWidth >= StepScaffoldDefaults.ShortWindowSideBySideMinWidth && short)
 
         // With nothing but actions to put beside the header, a split would leave a lone button
-        // floating in an empty half of the window. Keep them together under the header instead.
-        if (wide && slots.content == null) {
+        // floating in an empty half of the window. Keep them together under the header instead --
+        // unless the window is too short, where stacking would push the actions off the bottom.
+        if (wide && !short && slots.content == null) {
             Column(modifier = Modifier.fillMaxSize()) {
                 StepTopBar(onBack = slots.onBack, progress = slots.progress, contentMaxWidth = slots.contentMaxWidth)
                 CenteredScrollColumn(
