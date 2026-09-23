@@ -28,16 +28,7 @@ class MemorySelectionViewModel(
     private val aiClient: GenerativeAIChatClient,
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    private val selectedMemoryIds =
-        savedStateHandle.get<List<String>>(SELECTED_MEMORY_IDS_KEY)?.toMutableSet() ?: mutableSetOf()
-    private val _uiState =
-        MutableStateFlow(
-            MemorySelectionUiState(
-                isLoading = false,
-                loadFailed = false,
-                selectedMemoryIds = selectedMemoryIds.toSet(),
-            ),
-        )
+    private val _uiState = MutableStateFlow(savedStateHandle.restoreUiState())
     val uiState: StateFlow<MemorySelectionUiState> = _uiState.asStateFlow()
 
     private var availableMemories: List<MediaObject> = emptyList()
@@ -210,20 +201,14 @@ class MemorySelectionViewModel(
      * Toggles selection state of a memory.
      */
     fun toggleMemorySelection(memoryUri: String) {
-        if (selectedMemoryIds.contains(memoryUri)) {
-            selectedMemoryIds.remove(memoryUri)
-        } else {
-            selectedMemoryIds.add(memoryUri)
-        }
-        savedStateHandle[SELECTED_MEMORY_IDS_KEY] = selectedMemoryIds.toList()
-
-        _uiState.update {
-            it.copy(selectedMemoryIds = selectedMemoryIds.toSet())
-        }
+        val previous = _uiState.value.selectedMemoryIds
+        val selected = if (memoryUri in previous) previous - memoryUri else previous + memoryUri
+        _uiState.update { it.copy(selectedMemoryIds = selected) }
+        savedStateHandle.persistSelectedMemoryIds(selected)
 
         Napier.d(
             tag = "MemorySelectionViewModel",
-            message = "Toggled selection for $memoryUri, now have ${selectedMemoryIds.size} selected",
+            message = "Toggled selection for $memoryUri, now have ${selected.size} selected",
         )
     }
 
@@ -233,7 +218,7 @@ class MemorySelectionViewModel(
     fun getSelectedMemories(): List<MediaObject> {
         val currentState = _uiState.value
         val allMemories = currentState.allMemories + currentState.aiCuratedMemories
-        return allMemories.filter { it.uri in selectedMemoryIds }.distinctBy { it.uri }
+        return allMemories.filter { it.uri in currentState.selectedMemoryIds }.distinctBy { it.uri }
     }
 
     /**
@@ -277,4 +262,15 @@ class MemorySelectionViewModel(
         _uiState.update { it.copy(isImporting = false, importFailed = result.isFailure) }
         return result
     }
+}
+
+private fun SavedStateHandle.restoreUiState(): MemorySelectionUiState =
+    MemorySelectionUiState(
+        isLoading = false,
+        loadFailed = false,
+        selectedMemoryIds = get<List<String>>(SELECTED_MEMORY_IDS_KEY)?.toSet() ?: emptySet(),
+    )
+
+private fun SavedStateHandle.persistSelectedMemoryIds(selectedMemoryIds: Set<String>) {
+    set(SELECTED_MEMORY_IDS_KEY, selectedMemoryIds.toList())
 }
