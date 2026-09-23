@@ -9,6 +9,7 @@ import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.client.repository.user.UserStateRepository
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -37,18 +38,21 @@ class DangerZoneSettingsViewModel(
         viewModelScope.launch {
             Napier.i("DangerZone reset requested")
 
-            clearLocalDataInternal()
-
-            val prefsResult = preferencesDataSource.clearUserData()
-            if (prefsResult.isFailure) {
-                Napier.e("Failed to clear user preferences", prefsResult.exceptionOrNull())
+            coroutineScope {
+                launch { clearLocalDataInternal() }
+                launch {
+                    val prefsResult = preferencesDataSource.clearUserData()
+                    if (prefsResult.isFailure) {
+                        Napier.e("Failed to clear user preferences", prefsResult.exceptionOrNull())
+                    }
+                }
+                launch {
+                    runCatching { onboardingStateResetter.clear() }
+                        .onFailure { error -> Napier.e("Failed to clear onboarding device state", error) }
+                }
+                launch { passkeyAccountRepository.signOut() }
+                launch { userStateRepository.setIsOnboardingComplete(false) }
             }
-
-            runCatching { onboardingStateResetter.clear() }
-                .onFailure { error -> Napier.e("Failed to clear onboarding device state", error) }
-
-            passkeyAccountRepository.signOut()
-            userStateRepository.setIsOnboardingComplete(false)
 
             Napier.i("DangerZone reset completed")
             onComplete?.invoke()
