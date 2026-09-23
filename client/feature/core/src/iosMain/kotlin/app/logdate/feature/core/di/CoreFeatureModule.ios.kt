@@ -96,7 +96,15 @@ actual val coreFeatureModule: Module =
                 },
             )
         }
-        factory { ServerConfigurationCoordinator(get(), get(), get()) }
+        factory {
+            ServerConfigurationCoordinator(
+                serverHealthChecker = get(),
+                serverDiscoveryClient = get(),
+                configRepository = get(),
+                // iOS only creates passkeys for domains in the app's associated domains.
+                passkeysWorkWith = { rpId -> rpId == "logdate.app" || rpId.endsWith(".logdate.app") },
+            )
+        }
 
         viewModel { AppViewModel(get(), get(), get(), get(), get()) }
         factory<ConnectedServer> { DefaultConnectedServer(get(), get(), get()) }

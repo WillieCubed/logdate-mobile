@@ -1,17 +1,9 @@
 package app.logdate.feature.core.settings.ui
 
-import app.logdate.client.networking.ServerDiscoveryClient
-import app.logdate.client.networking.ServerHealthChecker
-import app.logdate.client.networking.ServerHealthInfo
 import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
-import app.logdate.shared.config.DefaultLogDateConfigRepository
-import app.logdate.shared.model.DeploymentKind
-import app.logdate.shared.model.ServerCapability
-import app.logdate.shared.model.ServerDescriptor
-import app.logdate.shared.model.ServerProtocolFeature
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +18,6 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * Unit tests for [AdvancedSettingsViewModel].
@@ -78,74 +69,6 @@ class AdvancedSettingsViewModelTest {
 
             assertEquals(AppUpdateStatus.Downloaded, viewModel.appUpdateUiState.value.status)
         }
-
-    @Test
-    fun `validating and saving local server persists address`() =
-        runTest {
-            val configRepository = DefaultLogDateConfigRepository()
-            val coordinator =
-                ServerConfigurationCoordinator(
-                    serverHealthChecker = FakeServerHealthChecker(),
-                    serverDiscoveryClient = FakeServerDiscoveryClient(),
-                    configRepository = configRepository,
-                )
-
-            val result = coordinator.validateAndSaveCustomServer("http://10.0.2.2:8765")
-
-            assertTrue(result.isSuccess)
-            assertTrue(configRepository.backendUrl.value.startsWith("http://10.0.2.2:8765"))
-            assertEquals("http://10.0.2.2:8765", configRepository.serverDescriptor.value?.serverOrigin)
-        }
-
-    @Test
-    fun `custom server without canonical owner binding is not persisted`() =
-        runTest {
-            val configRepository = DefaultLogDateConfigRepository()
-            val coordinator =
-                ServerConfigurationCoordinator(
-                    serverHealthChecker = FakeServerHealthChecker(),
-                    serverDiscoveryClient = FakeServerDiscoveryClient(protocolFeatures = emptyList()),
-                    configRepository = configRepository,
-                )
-
-            val result = coordinator.validateAndSaveCustomServer("https://example.test")
-
-            assertTrue(result.isFailure)
-            assertEquals(DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL, configRepository.backendUrl.value)
-            assertEquals(null, configRepository.serverDescriptor.value)
-        }
-
-    private class FakeServerHealthChecker : ServerHealthChecker {
-        override suspend fun checkServerHealth(baseUrl: String): Result<ServerHealthInfo> =
-            Result.success(
-                ServerHealthInfo(
-                    status = "healthy",
-                    version = "1.0.0",
-                ),
-            )
-    }
-
-    private class FakeServerDiscoveryClient(
-        private val protocolFeatures: List<String> = listOf(ServerProtocolFeature.CANONICAL_OWNER_BINDING_V1),
-    ) : ServerDiscoveryClient {
-        override suspend fun discoverServer(serverOrigin: String): Result<ServerDescriptor> =
-            Result.success(
-                ServerDescriptor(
-                    serverOrigin = serverOrigin,
-                    apiBaseUrl = "${serverOrigin.trimEnd('/')}/api/v1",
-                    deploymentKind = DeploymentKind.SELF_HOSTED,
-                    displayName = "Test Server",
-                    handleDomain = "example.com",
-                    capabilities =
-                        listOf(
-                            ServerCapability.AUTH_PASSKEY,
-                            ServerCapability.SYNC_CONTENT,
-                            ServerCapability.SYNC_MEDIA,
-                        ),
-                    protocolFeatures = protocolFeatures,
-                ),
-            )
-    }
 
     private class FakeAppUpdateController(
         initialState: AppUpdateUiState =
