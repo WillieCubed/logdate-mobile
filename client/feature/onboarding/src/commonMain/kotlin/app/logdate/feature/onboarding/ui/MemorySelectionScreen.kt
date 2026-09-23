@@ -106,6 +106,8 @@ data class MemorySelectionUiState(
     val hasMoreMemories: Boolean = true,
     val isLoadingMore: Boolean = false,
     val loadFailed: Boolean = false,
+    val isImporting: Boolean = false,
+    val importFailed: Boolean = false,
 )
 
 /**
@@ -166,6 +168,8 @@ fun MemorySelectionScreen(
                     ContinueMemoryImportButton(
                         onContinue = onContinue,
                         selectedCount = uiState.selectedMemoryIds.size,
+                        isImporting = uiState.isImporting,
+                        importFailed = uiState.importFailed,
                         modifier =
                             Modifier
                                 .fillMaxWidth()
@@ -453,6 +457,8 @@ private fun SharedTransitionScope.MemorySelectionBottomPane(
             ContinueMemoryImportButton(
                 onContinue = onContinue,
                 selectedCount = uiState.selectedMemoryIds.size,
+                isImporting = uiState.isImporting,
+                importFailed = uiState.importFailed,
             )
         }
     }
@@ -650,25 +656,47 @@ private fun MemorySelectionStatusCard(
 private fun ContinueMemoryImportButton(
     onContinue: () -> Unit,
     selectedCount: Int = 0,
+    isImporting: Boolean = false,
+    importFailed: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    Button(
-        onClick = onContinue,
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .testTag(MEMORY_SELECTION_CONTINUE_TAG),
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Text(
-            if (selectedCount > 0) {
-                stringResource(
-                    Res.string.continue_with_memories_count,
-                    selectedCount,
+        Button(
+            onClick = onContinue,
+            enabled = !isImporting,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .testTag(MEMORY_SELECTION_CONTINUE_TAG),
+        ) {
+            if (isImporting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
                 )
             } else {
-                stringResource(Res.string.continue_without_importing_memories)
-            },
-        )
+                Text(
+                    if (selectedCount > 0) {
+                        stringResource(
+                            Res.string.continue_with_memories_count,
+                            selectedCount,
+                        )
+                    } else {
+                        stringResource(Res.string.continue_without_importing_memories)
+                    },
+                )
+            }
+        }
+        if (importFailed) {
+            Text(
+                text = stringResource(Res.string.memory_import_failed_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
     }
 }
 

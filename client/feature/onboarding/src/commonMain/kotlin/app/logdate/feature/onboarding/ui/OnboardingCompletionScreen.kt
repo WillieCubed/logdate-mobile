@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -64,6 +65,7 @@ import org.koin.compose.viewmodel.koinViewModel
 const val ONBOARDING_COMPLETION_ROOT_TAG = "onboarding_complete_root"
 const val ONBOARDING_COMPLETION_CONTINUE_TAG = "onboarding_complete_continue"
 const val ONBOARDING_COMPLETION_FINAL_TAG = "onboarding_complete_final"
+const val ONBOARDING_COMPLETION_LOADING_TAG = "onboarding_complete_loading"
 
 /**
  * The last screen of the onboarding flow.
@@ -81,7 +83,17 @@ fun OnboardingCompletionScreen(
     var shouldShowFinish by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val isCampfireEnabled by campfireViewModel.isCampfireEnabled.collectAsState()
-    val showCampfire = isCampfireEnabled ?: return
+    val showCampfire = isCampfireEnabled
+
+    if (showCampfire == null) {
+        Box(
+            modifier = modifier.fillMaxSize().testTag(ONBOARDING_COMPLETION_LOADING_TAG),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator()
+        }
+        return
+    }
 
     OnboardingCompletionContent(
         shouldShowFinish = shouldShowFinish,

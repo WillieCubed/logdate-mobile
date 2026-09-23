@@ -31,6 +31,7 @@
     <string name="moments_that_might_matter_most">Moments that might matter most</string>
     <string name="memory_access_needed">Allow photo and video access</string>
     <string name="memory_access_needed_body">LogDate needs access to your photos and videos before it can suggest memories to import.</string>
+    <string name="memory_import_failed_body">We couldn&apos;t import your selected memories. Please try again.</string>
     <string name="memory_load_failed_body">We couldn&apos;t load your photos and videos right now.</string>
     <string name="memory_no_recent_items_body">We couldn&apos;t find any photos or videos to import on this device.</string>
     <string name="account_passkey_biometric_description">No passwords to remember. Use your device&apos;s biometric authentication (Face ID, Touch ID, or fingerprint) for secure, convenient access.</string>

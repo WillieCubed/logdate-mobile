@@ -225,29 +225,43 @@ class MemorySelectionViewModel(
 
     /**
      * Processes the selected memories for import.
+     *
+     * Guards against a double-tap firing a second concurrent import pass while one is already
+     * in flight.
      */
-    suspend fun processSelectedMemories(): Result<Unit> =
-        runCatching {
-            val selectedMemories = getSelectedMemories()
+    suspend fun processSelectedMemories(): Result<Unit> {
+        if (_uiState.value.isImporting) {
+            return Result.failure(IllegalStateException("Import already in progress"))
+        }
 
-            Napier.i(
-                tag = "MemorySelectionViewModel",
-                message = "Processing ${selectedMemories.size} selected memories for import",
-            )
+        _uiState.update { it.copy(isImporting = true, importFailed = false) }
 
-            selectedMemories.forEach { memory ->
-                mediaManager.addToDefaultCollection(memory.uri)
+        val result =
+            runCatching {
+                val selectedMemories = getSelectedMemories()
+
+                Napier.i(
+                    tag = "MemorySelectionViewModel",
+                    message = "Processing ${selectedMemories.size} selected memories for import",
+                )
+
+                selectedMemories.forEach { memory ->
+                    mediaManager.addToDefaultCollection(memory.uri)
+                }
+
+                Napier.i(
+                    tag = "MemorySelectionViewModel",
+                    message = "Successfully imported ${selectedMemories.size} memories",
+                )
+            }.onFailure { error ->
+                Napier.e(
+                    tag = "MemorySelectionViewModel",
+                    message = "Failed to import selected memories",
+                    throwable = error,
+                )
             }
 
-            Napier.i(
-                tag = "MemorySelectionViewModel",
-                message = "Successfully imported ${selectedMemories.size} memories",
-            )
-        }.onFailure { error ->
-            Napier.e(
-                tag = "MemorySelectionViewModel",
-                message = "Failed to import selected memories",
-                throwable = error,
-            )
-        }
+        _uiState.update { it.copy(isImporting = false, importFailed = result.isFailure) }
+        return result
+    }
 }
