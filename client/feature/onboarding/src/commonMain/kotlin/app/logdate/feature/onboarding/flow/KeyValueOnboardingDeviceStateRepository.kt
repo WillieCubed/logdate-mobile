@@ -21,18 +21,30 @@ class KeyValueOnboardingDeviceStateRepository(
 ) : OnboardingDeviceStateRepository {
     override val deviceState: StateFlow<OnboardingDeviceState> =
         combine(
-            storage.observeBoolean(KEY_RECOMMENDATIONS_HANDLED),
-            storage.observeBoolean(KEY_DAY_BOUNDARIES_HANDLED),
-            storage.observeBoolean(KEY_LOCATION_HANDLED),
-            storage.observeBoolean(KEY_NOTIFICATIONS_HANDLED),
-            storage.observeString(KEY_ACTIVE_ENTRY_MODE),
-        ) { recommendations, dayBoundaries, location, notifications, entryModeName ->
+            combine(
+                storage.observeBoolean(KEY_RECOMMENDATIONS_HANDLED),
+                storage.observeBoolean(KEY_DAY_BOUNDARIES_HANDLED),
+                storage.observeBoolean(KEY_LOCATION_HANDLED),
+                storage.observeBoolean(KEY_NOTIFICATIONS_HANDLED),
+                storage.observeString(KEY_ACTIVE_ENTRY_MODE),
+            ) { recommendations, dayBoundaries, location, notifications, entryModeName ->
+                PartialDeviceState(
+                    recommendationsHandledOnThisDevice = recommendations,
+                    dayBoundariesHandledOnThisDevice = dayBoundaries,
+                    locationHandledOnThisDevice = location,
+                    notificationsHandledOnThisDevice = notifications,
+                    activeEntryMode = entryModeName.toEntryModeOrFresh(),
+                )
+            },
+            storage.observeBoolean(KEY_ACCOUNT_HANDLED),
+        ) { partial, accountHandled ->
             OnboardingDeviceState(
-                recommendationsHandledOnThisDevice = recommendations,
-                dayBoundariesHandledOnThisDevice = dayBoundaries,
-                locationHandledOnThisDevice = location,
-                notificationsHandledOnThisDevice = notifications,
-                activeEntryMode = entryModeName.toEntryModeOrFresh(),
+                recommendationsHandledOnThisDevice = partial.recommendationsHandledOnThisDevice,
+                dayBoundariesHandledOnThisDevice = partial.dayBoundariesHandledOnThisDevice,
+                locationHandledOnThisDevice = partial.locationHandledOnThisDevice,
+                notificationsHandledOnThisDevice = partial.notificationsHandledOnThisDevice,
+                accountHandledOnThisDevice = accountHandled,
+                activeEntryMode = partial.activeEntryMode,
             )
         }.stateIn(
             scope = scope,
@@ -56,6 +68,10 @@ class KeyValueOnboardingDeviceStateRepository(
         storage.putBoolean(KEY_NOTIFICATIONS_HANDLED, true)
     }
 
+    override suspend fun markAccountHandled() {
+        storage.putBoolean(KEY_ACCOUNT_HANDLED, true)
+    }
+
     override suspend fun setActiveEntryMode(entryMode: OnboardingEntryMode) {
         storage.putString(KEY_ACTIVE_ENTRY_MODE, entryMode.name)
     }
@@ -68,17 +84,27 @@ class KeyValueOnboardingDeviceStateRepository(
         storage.remove(KEY_DAY_BOUNDARIES_HANDLED)
         storage.remove(KEY_LOCATION_HANDLED)
         storage.remove(KEY_NOTIFICATIONS_HANDLED)
+        storage.remove(KEY_ACCOUNT_HANDLED)
         storage.remove(KEY_ACTIVE_ENTRY_MODE)
     }
 
     private fun String?.toEntryModeOrFresh(): OnboardingEntryMode =
         this?.let { name -> runCatching { OnboardingEntryMode.valueOf(name) }.getOrNull() } ?: OnboardingEntryMode.FRESH
 
+    private data class PartialDeviceState(
+        val recommendationsHandledOnThisDevice: Boolean,
+        val dayBoundariesHandledOnThisDevice: Boolean,
+        val locationHandledOnThisDevice: Boolean,
+        val notificationsHandledOnThisDevice: Boolean,
+        val activeEntryMode: OnboardingEntryMode,
+    )
+
     private companion object {
         const val KEY_RECOMMENDATIONS_HANDLED = "onboarding_recommendations_handled"
         const val KEY_DAY_BOUNDARIES_HANDLED = "onboarding_day_boundaries_handled"
         const val KEY_LOCATION_HANDLED = "onboarding_location_handled"
         const val KEY_NOTIFICATIONS_HANDLED = "onboarding_notifications_handled"
+        const val KEY_ACCOUNT_HANDLED = "onboarding_account_handled"
         const val KEY_ACTIVE_ENTRY_MODE = "onboarding_active_entry_mode"
     }
 }

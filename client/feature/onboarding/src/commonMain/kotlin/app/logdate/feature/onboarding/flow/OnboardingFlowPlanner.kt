@@ -34,6 +34,7 @@ data class OnboardingProgressSnapshot(
     val hasPersonalIntro: Boolean = false,
     val hasBirthday: Boolean = false,
     val hasCloudAccount: Boolean = false,
+    val accountHandledOnThisDevice: Boolean = false,
     val recommendationsHandledOnThisDevice: Boolean = false,
     val contextualRecommendationsEnabled: Boolean = true,
     val dayBoundariesHandledOnThisDevice: Boolean = false,
@@ -99,7 +100,7 @@ private fun shouldIncludeStep(
 ): Boolean =
     when (step) {
         OnboardingStep.PERSONAL_INTRO -> !snapshot.hasPersonalIntro
-        OnboardingStep.ACCOUNT -> !snapshot.hasCloudAccount
+        OnboardingStep.ACCOUNT -> !snapshot.hasResolvedAccount()
         OnboardingStep.BIRTHDAY -> !snapshot.hasBirthday
         OnboardingStep.RECOMMENDATIONS -> !snapshot.hasResolvedRecommendations()
         OnboardingStep.DAY_BOUNDARIES -> !snapshot.hasResolvedDayBoundaries()
@@ -126,6 +127,10 @@ fun OnboardingProgressSnapshot.firstIncompleteRequiredOnboardingStep(): Onboardi
         !notificationsHandledOnThisDevice -> OnboardingStep.NOTIFICATIONS
         else -> null
     }
+
+private fun OnboardingProgressSnapshot.hasResolvedAccount(): Boolean =
+    hasCloudAccount ||
+        accountHandledOnThisDevice
 
 private fun OnboardingProgressSnapshot.hasResolvedRecommendations(): Boolean =
     recommendationsHandledOnThisDevice || !contextualRecommendationsEnabled
