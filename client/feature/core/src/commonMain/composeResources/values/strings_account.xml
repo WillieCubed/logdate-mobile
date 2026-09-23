@@ -54,7 +54,6 @@
     <string name="sign_in_to_enable_cloud_backup">Sign in to enable cloud backup and sync.</string>
     <string name="not_signed_in_to_logdate_cloud">Not signed in to LogDate Cloud</string>
     <string name="sign_in_to_set_display_name">Sign in to set your display name and username, and sync your journal across devices.</string>
-    <string name="sign_in_to_logdate_cloud_settings_summary">Sync, backup, and access your journal anywhere</string>
 
     <!-- Sign out -->
     <string name="account_sign_out_action">Sign out</string>
@@ -128,20 +127,16 @@
     <string name="account_display_name_description">Your display name is how you&apos;ll appear to others when sharing journal entries. You can always change this later.</string>
     <string name="edit_display_name">Edit display name</string>
     <string name="account_profile_edit_label">Edit profile</string>
-    <string name="account_profile_edit_action">Edit Profile</string>
     <string name="update_profile">Update Profile</string>
     <string name="refresh_profile">Refresh profile</string>
-    <string name="manage_your_display_name_and_username">Manage your display name and username.</string>
     <string name="this_is_how_youll_appear_to_others_you_can_change_this_anytime">This is how you&apos;ll appear to others. You can change this anytime.</string>
     <string name="this_is_how_your_name_will_appear_to_others">This is how your name will appear to others</string>
     <string name="personal_information">Personal Information</string>
     <string name="enter_your_name">Enter your name</string>
-    <string name="your_full_name">Your full name</string>
     <string name="logging_since">logging since %1$s</string>
 
     <!-- Username -->
     <string name="username">Username</string>
-    <string name="username_2">username</string>
     <string name="username_optional">Username (Optional)</string>
     <string name="username_handle">@%1$s</string>
     <string name="username_available">Username available</string>
@@ -160,7 +155,6 @@
     <string name="error_checking_availability">Error checking availability</string>
     <string name="error_checking_username">Error checking username</string>
     <string name="account_username_passkey_hint">Providing your username helps find your passkey faster</string>
-    <string name="profile_username_hint">This will be your @%1$s</string>
     <string name="unique_address_username">Your unique address will be @%1$s@%2$s</string>
     <string name="account_username_network_address_description">Your unique address on the LogDate network. This is how others will find and mention you.</string>
     <string name="this_username_will_identify_you_on_logdate_cloud_you_can_change_it_later">This username will identify you on LogDate Cloud. You can change it later.</string>

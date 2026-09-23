@@ -134,7 +134,7 @@ fun SettingsOverviewScreen(
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
     modifier: Modifier = Modifier,
-    viewModel: AccountSettingsViewModel = koinViewModel(),
+    viewModel: SettingsOverviewViewModel = koinViewModel(),
     campfireViewModel: CampfireViewModel = koinViewModel(),
 ) {
     val identity by viewModel.resolvedIdentity.collectAsState()

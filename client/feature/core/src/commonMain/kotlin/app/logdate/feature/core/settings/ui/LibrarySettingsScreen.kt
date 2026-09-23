@@ -32,7 +32,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun LibrarySettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: AccountSettingsViewModel = koinViewModel(),
+    viewModel: LibrarySettingsViewModel = koinViewModel(),
 ) {
     val isLibraryEnabled by viewModel.isLibraryEnabled.collectAsStateWithLifecycle()
 

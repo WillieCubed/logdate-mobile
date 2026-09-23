@@ -2,24 +2,16 @@ package app.logdate.feature.core.settings.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.domain.account.EmailVerificationAvailability
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
 import app.logdate.client.domain.account.VerifyEmailUseCase
-import app.logdate.client.domain.identity.ObserveUserIdentityUseCase
-import app.logdate.client.domain.identity.ResolvedUserIdentity
-import app.logdate.client.domain.profile.UpdateProfileUseCase
-import app.logdate.client.domain.streak.ObserveStreakUseCase
-import app.logdate.client.domain.streak.RefreshStreakUseCase
-import app.logdate.client.domain.streak.StreakData
 import app.logdate.client.permissions.EmailVerificationOutcome
 import app.logdate.client.repository.account.AccountHostedPlcOperation
 import app.logdate.client.repository.account.AccountIdentityRepository
 import app.logdate.client.repository.account.AccountIdentityStatus
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.client.repository.user.UserStateRepository
-import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.user.UserData
 import io.github.aakira.napier.Napier
@@ -53,18 +45,6 @@ data class AccountIdentityState(
     val derivedRecoveryDidKey: String? = null,
 )
 
-sealed class ProfileUpdateState {
-    data object Idle : ProfileUpdateState()
-
-    data object Updating : ProfileUpdateState()
-
-    data object Success : ProfileUpdateState()
-
-    data class Error(
-        val message: String,
-    ) : ProfileUpdateState()
-}
-
 sealed class IdentityActionState {
     data object Idle : IdentityActionState()
 
@@ -91,21 +71,12 @@ private data class EmailVerificationViewState(
 class AccountSettingsViewModel(
     private val userStateRepository: UserStateRepository,
     private val getCurrentAccountUseCase: GetCurrentAccountUseCase,
-    private val updateProfileUseCase: UpdateProfileUseCase,
     private val accountIdentityRepository: AccountIdentityRepository,
     private val passkeyAccountRepository: PasskeyAccountRepository,
     private val sessionStorage: SessionStorage,
-    private val syncMetadataService: SyncMetadataService,
-    private val preferencesDataSource: LogdatePreferencesDataSource,
-    private val observeUserIdentityUseCase: ObserveUserIdentityUseCase,
-    observeStreakUseCase: ObserveStreakUseCase,
-    private val refreshStreakUseCase: RefreshStreakUseCase,
     private val verifyEmailUseCase: VerifyEmailUseCase,
     private val emailVerificationAvailability: EmailVerificationAvailability,
 ) : ViewModel() {
-    private val _profileUpdateState = MutableStateFlow<ProfileUpdateState>(ProfileUpdateState.Idle)
-    val profileUpdateState: StateFlow<ProfileUpdateState> = _profileUpdateState
-
     private val identityJson =
         Json {
             prettyPrint = true
@@ -153,42 +124,7 @@ class AccountSettingsViewModel(
             ),
         )
 
-    val resolvedIdentity: StateFlow<ResolvedUserIdentity> =
-        observeUserIdentityUseCase()
-            .stateIn(
-                viewModelScope,
-                SharingStarted.WhileSubscribed(5000),
-                ResolvedUserIdentity(
-                    displayName = "",
-                    username = null,
-                    profilePhotoUri = null,
-                    bio = null,
-                    birthday = null,
-                    onboardedDate = null,
-                    isAuthenticated = false,
-                    cloudAccountId = null,
-                ),
-            )
-
-    val isLibraryEnabled: StateFlow<Boolean> =
-        preferencesDataSource
-            .observeLibraryEnabled()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
-
-    val streakData: StateFlow<StreakData> =
-        observeStreakUseCase()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StreakData())
-
-    fun setLibraryEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            preferencesDataSource.setLibraryEnabled(enabled)
-        }
-    }
-
     init {
-        viewModelScope.launch {
-            refreshStreakUseCase()
-        }
         viewModelScope.launch {
             sessionStorage.getSessionFlow().collect { session ->
                 if (session == null) {
@@ -244,46 +180,6 @@ class AccountSettingsViewModel(
                 outcome = null,
                 isVerifying = false,
             )
-    }
-
-    fun updateProfile(
-        displayName: String,
-        username: String,
-    ) {
-        val trimmedDisplayName = displayName.trim()
-        val trimmedUsername = username.trim()
-        val displayNameUpdate = trimmedDisplayName.takeIf { it.isNotEmpty() }
-        val usernameUpdate = trimmedUsername.takeIf { it.isNotEmpty() }
-
-        if (displayNameUpdate == null && usernameUpdate == null) {
-            _profileUpdateState.value = ProfileUpdateState.Error("No profile changes to save")
-            return
-        }
-
-        viewModelScope.launch {
-            _profileUpdateState.value = ProfileUpdateState.Updating
-
-            when (val result = updateProfileUseCase(displayName = displayNameUpdate, username = usernameUpdate)) {
-                is UpdateProfileUseCase.Result.Success -> {
-                    if (displayNameUpdate != null) {
-                        preferencesDataSource.updateDisplayName(displayNameUpdate)
-                    }
-                    getCurrentAccountUseCase(GetCurrentAccountUseCase.AccountRequest.RefreshAccountInfo)
-                    _profileUpdateState.value = ProfileUpdateState.Success
-                }
-                is UpdateProfileUseCase.Result.Error -> {
-                    val error = result.error
-                    val message =
-                        when (error) {
-                            is UpdateProfileUseCase.ProfileUpdateError.InvalidDisplayName -> "Invalid display name"
-                            is UpdateProfileUseCase.ProfileUpdateError.InvalidUsername -> "Invalid username"
-                            is UpdateProfileUseCase.ProfileUpdateError.NetworkError -> "Network error updating profile"
-                            is UpdateProfileUseCase.ProfileUpdateError.Unknown -> error.message
-                        }
-                    _profileUpdateState.value = ProfileUpdateState.Error(message)
-                }
-            }
-        }
     }
 
     /**

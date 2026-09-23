@@ -32,12 +32,14 @@ import app.logdate.feature.core.settings.ui.AdvancedSettingsViewModel
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
 import app.logdate.feature.core.settings.ui.DataSettingsViewModel
 import app.logdate.feature.core.settings.ui.DayBoundarySettingsViewModel
+import app.logdate.feature.core.settings.ui.LibrarySettingsViewModel
 import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.MemoriesSettingsViewModel
 import app.logdate.feature.core.settings.ui.MemoriesWidgetInstallController
 import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
 import app.logdate.feature.core.settings.ui.RecoveryPhraseEntryViewModel
 import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
+import app.logdate.feature.core.settings.ui.SettingsOverviewViewModel
 import app.logdate.feature.core.settings.ui.StreakSettingsViewModel
 import app.logdate.feature.core.settings.ui.TimelineSettingsViewModel
 import app.logdate.feature.core.settings.ui.VoiceNotesSettingsViewModel
@@ -88,21 +90,17 @@ actual val coreFeatureModule: Module =
         viewModel { AppViewModel(get(), get(), get(), get(), get(), get<CloudRestoreScheduler>()::enqueueRestore) }
         viewModel {
             AccountSettingsViewModel(
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
+                userStateRepository = get(),
+                getCurrentAccountUseCase = get(),
+                accountIdentityRepository = get(),
+                passkeyAccountRepository = get(),
+                sessionStorage = get(),
+                verifyEmailUseCase = get(),
+                emailVerificationAvailability = get(),
             )
         }
+        viewModel { SettingsOverviewViewModel(get(), get(), get()) }
+        viewModel { LibrarySettingsViewModel(get()) }
         viewModel {
             PrivacySettingsViewModel(
                 get(),
