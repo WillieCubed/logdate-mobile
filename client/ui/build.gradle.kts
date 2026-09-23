@@ -105,6 +105,12 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
         }
+        val desktopTest by getting
+        desktopTest.dependencies {
+            // Measures shared layouts headlessly on the JVM.
+            implementation(libs.compose.ui.test)
+            implementation(compose.desktop.currentOs)
+        }
     }
 }
 
