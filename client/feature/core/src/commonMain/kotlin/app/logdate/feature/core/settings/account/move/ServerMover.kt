@@ -30,6 +30,11 @@ data class MoveProgress(
     /** Items the new server refused for good since the switch. */
     val failed: Int,
     val isSyncing: Boolean,
+    /**
+     * Whether a sync has finished since the switch. Right after the switch nothing is pending yet
+     * either, so an empty queue only means "done" once a sync has run.
+     */
+    val syncedSinceSwitch: Boolean,
 )
 
 /** What happened when deleting the account on the old server. */
@@ -195,6 +200,7 @@ class DefaultServerMover(
                 remaining = status.pendingUploads,
                 failed = deadLetters.count { it.failedAt >= record.committedAtMillis },
                 isSyncing = status.isSyncing,
+                syncedSinceSwitch = (status.lastSyncTime?.toEpochMilliseconds() ?: 0) >= record.committedAtMillis,
             )
         }
 

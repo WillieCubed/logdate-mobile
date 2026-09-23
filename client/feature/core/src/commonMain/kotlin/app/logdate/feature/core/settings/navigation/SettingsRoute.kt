@@ -27,6 +27,9 @@ data object RecoveryPhraseRoute : NavKey
 data object HostingRoute : NavKey
 
 @Serializable
+data object MoveServerRoute : NavKey
+
+@Serializable
 data object DeleteAccountRoute : NavKey
 
 @Serializable

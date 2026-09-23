@@ -15,25 +15,30 @@ import kotlinx.coroutines.launch
 
 /**
  * @property health `null` while the server is being checked
+ * @property canMoveAccount whether this device can move the account to another server
  */
 data class HostingUiState(
     val server: ConnectedServerInfo? = null,
     val health: ServerHealth? = null,
+    val canMoveAccount: Boolean = false,
 )
 
 /** Shows which server the account lives on and whether it is answering. */
 class HostingViewModel(
     private val connectedServer: ConnectedServer,
+    private val canMoveAccount: suspend () -> Boolean = { false },
 ) : ViewModel() {
     private val health = MutableStateFlow<ServerHealth?>(null)
+    private val movable = MutableStateFlow(false)
     private var checkJob: Job? = null
 
     val state: StateFlow<HostingUiState> =
-        combine(connectedServer.info, health) { server, health -> HostingUiState(server, health) }
+        combine(connectedServer.info, health, movable) { server, health, movable -> HostingUiState(server, health, movable) }
             .stateIn(viewModelScope, SharingStarted.Eagerly, HostingUiState())
 
     init {
         checkAgain()
+        viewModelScope.launch { movable.value = runCatching { canMoveAccount() }.getOrDefault(false) }
     }
 
     /** Asks the server again. A check already under way is left to finish. */

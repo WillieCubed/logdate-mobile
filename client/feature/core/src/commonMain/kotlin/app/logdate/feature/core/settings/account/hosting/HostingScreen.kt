@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -23,6 +24,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.feature.core.settings.account.ConnectedServerInfo
 import app.logdate.feature.core.settings.account.ServerHealth
+import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.SettingsNavigationItem
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
@@ -36,6 +39,8 @@ import logdate.client.feature.core.generated.resources.hosting_intro
 import logdate.client.feature.core.generated.resources.hosting_status
 import logdate.client.feature.core.generated.resources.hosting_title
 import logdate.client.feature.core.generated.resources.hosting_unreachable
+import logdate.client.feature.core.generated.resources.move_hosting_row_description
+import logdate.client.feature.core.generated.resources.move_title
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -43,6 +48,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun HostingScreen(
     onBack: () -> Unit,
+    onMoveAccount: () -> Unit,
     viewModel: HostingViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -50,7 +56,7 @@ fun HostingScreen(
     // The view model outlives this screen, so each visit checks the server again.
     LaunchedEffect(Unit) { viewModel.checkAgain() }
 
-    HostingContent(state = state, onBack = onBack, onCheckAgain = viewModel::checkAgain)
+    HostingContent(state = state, onBack = onBack, onCheckAgain = viewModel::checkAgain, onMoveAccount = onMoveAccount)
 }
 
 @Composable
@@ -58,6 +64,7 @@ fun HostingContent(
     state: HostingUiState,
     onBack: () -> Unit,
     onCheckAgain: () -> Unit,
+    onMoveAccount: () -> Unit = {},
 ) {
     SettingsScaffold(title = stringResource(Res.string.hosting_title), onBack = onBack) {
         item {
@@ -80,6 +87,18 @@ fun HostingContent(
                     headlineContent = { Text(server.host) },
                 )
                 StatusItem(health = state.health, onCheckAgain = onCheckAgain)
+            }
+        }
+        if (state.canMoveAccount) {
+            item {
+                MaterialContainer(modifier = Modifier.padding(horizontal = Spacing.lg)) {
+                    SettingsNavigationItem(
+                        title = stringResource(Res.string.move_title),
+                        description = stringResource(Res.string.move_hosting_row_description),
+                        icon = { Icon(Icons.Outlined.SwapHoriz, contentDescription = null) },
+                        onClick = onMoveAccount,
+                    )
+                }
             }
         }
     }

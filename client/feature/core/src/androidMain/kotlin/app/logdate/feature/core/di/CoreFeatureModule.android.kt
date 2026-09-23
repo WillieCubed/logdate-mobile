@@ -3,12 +3,15 @@ package app.logdate.feature.core.di
 import android.app.Activity
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.domain.account.EmailVerificationAvailability
+import app.logdate.client.domain.account.EnqueueAllLocalDataUseCase
 import app.logdate.client.domain.account.VerifyEmailUseCase
 import app.logdate.client.domain.di.accountModule
 import app.logdate.client.domain.di.domainModule
 import app.logdate.client.domain.export.archive.MediaSourceOpener
 import app.logdate.client.domain.identity.ObserveUserIdentityUseCase
 import app.logdate.client.location.di.locationSettingsModule
+import app.logdate.client.permissions.PasskeyManager
+import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.feature.core.AndroidBiometricGatekeeper
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.BiometricGatekeeper
@@ -35,6 +38,11 @@ import app.logdate.feature.core.settings.account.ConnectedServer
 import app.logdate.feature.core.settings.account.DefaultConnectedServer
 import app.logdate.feature.core.settings.account.delete.DeleteAccountViewModel
 import app.logdate.feature.core.settings.account.hosting.HostingViewModel
+import app.logdate.feature.core.settings.account.move.DefaultServerMover
+import app.logdate.feature.core.settings.account.move.LocalDataSurvey
+import app.logdate.feature.core.settings.account.move.MoveServerViewModel
+import app.logdate.feature.core.settings.account.move.ServerMove
+import app.logdate.feature.core.settings.account.move.ServerMoveStore
 import app.logdate.feature.core.settings.account.recovery.RecoveryPhraseViewModel
 import app.logdate.feature.core.settings.account.signin.SignInMethodsViewModel
 import app.logdate.feature.core.settings.ui.AdvancedSettingsViewModel
@@ -114,7 +122,35 @@ actual val coreFeatureModule: Module =
                 loadPhrase = { get<IdentityKeyManager>().getStoredRecoveryPhrase()?.words },
             )
         }
-        viewModel { HostingViewModel(get()) }
+        viewModel {
+            HostingViewModel(
+                connectedServer = get(),
+                canMoveAccount = { get<PasskeyManager>().getCapabilities().isSupported },
+            )
+        }
+        factory { ServerMoveStore(get()) }
+        factory { LocalDataSurvey(get(), get()) }
+        factory<ServerMove> {
+            DefaultServerMover(
+                configRepository = get(),
+                scopedAccounts = get(),
+                vault = get(),
+                sessionStorage = get(),
+                accountRepository = get(),
+                syncManager = get(),
+                mediaSyncRefStore = get(),
+                enqueueAllLocalData = { get<EnqueueAllLocalDataUseCase>()() },
+                localDataSurvey = { get<LocalDataSurvey>()() },
+                moveStore = get(),
+            )
+        }
+        viewModel {
+            MoveServerViewModel(
+                move = get(),
+                checkServer = { address -> get<ServerConfigurationCoordinator>().check(address) },
+                currentAccount = { get<PasskeyAccountRepository>().currentAccount.value },
+            )
+        }
         viewModel {
             DeleteAccountViewModel(
                 accountRepository = get(),

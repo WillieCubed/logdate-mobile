@@ -136,6 +136,82 @@
     <string name="hosting_unreachable">Can’t reach this server right now</string>
     <string name="hosting_check_again">Check again</string>
 
+    <!-- Move to another server -->
+    <string name="move_title">Move to another server</string>
+    <string name="move_hosting_row_description">Take your journal to a different LogDate server</string>
+    <string name="move_choose_title">Where should your journal go?</string>
+    <string name="move_choose_body">Your journal moves to the new server, still encrypted with your recovery phrase. Afterwards you can delete it from %1$s.</string>
+    <string name="move_choose_address_label">Server address</string>
+    <string name="move_choose_address_placeholder">journal.example.com</string>
+    <string name="move_choose_logdate_cloud">Use LogDate Cloud</string>
+    <string name="move_choose_continue">Continue</string>
+    <string name="move_problem_invalid_address">Enter a web address, like journal.example.com.</string>
+    <string name="move_problem_unreachable">Nothing answered at that address. Check it and try again.</string>
+    <string name="move_problem_not_logdate">That address isn’t a LogDate server.</string>
+    <string name="move_problem_out_of_date">That server needs an update before it can hold your account.</string>
+    <string name="move_problem_passkeys_unavailable">This device can’t create passkeys for that server.</string>
+    <string name="move_problem_same_server">Your journal is already on this server.</string>
+    <string name="move_review_title">Move to %1$s?</string>
+    <string name="move_review_what_moves">What moves</string>
+    <string name="move_review_what_changes">What changes</string>
+    <plurals name="move_review_entries">
+        <item quantity="one">%1$d entry</item>
+        <item quantity="other">%1$d entries</item>
+    </plurals>
+    <plurals name="move_review_journals">
+        <item quantity="one">%1$d journal</item>
+        <item quantity="other">%1$d journals</item>
+    </plurals>
+    <plurals name="move_review_media">
+        <item quantity="one">%1$d photo, video, or voice note</item>
+        <item quantity="other">%1$d photos, videos, and voice notes</item>
+    </plurals>
+    <plurals name="move_review_drafts">
+        <item quantity="one">%1$d draft</item>
+        <item quantity="other">%1$d drafts</item>
+    </plurals>
+    <string name="move_review_passkey">You’ll create a passkey for %1$s.</string>
+    <string name="move_review_recovery_phrase">Your recovery phrase stays the same.</string>
+    <string name="move_review_source_copy">%1$s keeps a copy until you delete it.</string>
+    <plurals name="move_review_remote_only">
+        <item quantity="one">%1$d photo is only on %2$s and never downloaded to this device. It stays there, so keep that account if you want it.</item>
+        <item quantity="other">%1$d photos are only on %2$s and never downloaded to this device. They stay there, so keep that account if you want them.</item>
+    </plurals>
+    <string name="move_review_continue">Move my journal</string>
+    <string name="move_problem_switch_failed">Couldn’t switch to %1$s. You’re still on %2$s and nothing changed.</string>
+    <string name="move_account_title">Create your account on %1$s</string>
+    <string name="move_account_body">Choose a username for %1$s. You’ll create a passkey for it next.</string>
+    <string name="move_account_username">Username</string>
+    <string name="move_account_create">Create account</string>
+    <string name="move_account_sign_in">I already have an account there</string>
+    <string name="move_problem_username_taken">That username is taken on %1$s. Try another.</string>
+    <string name="move_problem_invalid_username">Usernames can use letters, numbers, and underscores.</string>
+    <string name="move_problem_offline">Couldn’t reach %1$s. Check your connection and try again.</string>
+    <string name="move_problem_passkey">This device couldn’t create a passkey.</string>
+    <string name="move_problem_account_server">%1$s couldn’t set up the account. Try again.</string>
+    <string name="move_uploading_title">Moving to %1$s</string>
+    <string name="move_uploading_body">Your journal is uploading. You can leave this screen; the upload keeps going.</string>
+    <string name="move_uploading_starting">Starting the upload…</string>
+    <string name="move_uploading_progress">%1$d of %2$d uploaded</string>
+    <string name="move_uploading_close">Leave it running</string>
+    <string name="move_done_title">Your journal is on %1$s</string>
+    <string name="move_done_body">New entries sync to %1$s from now on.</string>
+    <string name="move_done_delete_body">Everything is on %1$s now. You can delete your account and journal from %2$s, or keep them there.</string>
+    <string name="move_done_delete">Delete from %1$s</string>
+    <string name="move_done_keep">Keep it</string>
+    <string name="move_done_confirm_title">Delete your account on %1$s?</string>
+    <string name="move_done_confirm_message">Your account and the copy of your journal on %1$s are deleted permanently. Your journal on %2$s isn’t affected.</string>
+    <plurals name="move_done_blocked_media">
+        <item quantity="one">Keep your account on %2$s: %1$d photo exists only there.</item>
+        <item quantity="other">Keep your account on %2$s: %1$d photos exist only there.</item>
+    </plurals>
+    <string name="move_done_blocked_uploads">%1$s hasn’t accepted everything yet, so your account on %2$s stays.</string>
+    <string name="move_done_needs_sign_in">Sign in to %1$s to delete your account there.</string>
+    <string name="move_done_sign_in_and_delete">Sign in and delete</string>
+    <string name="move_done_failed_offline">Couldn’t reach %1$s. Try again.</string>
+    <string name="move_done_failed">%1$s couldn’t delete your account. Nothing was removed. Try again.</string>
+    <string name="move_done_close">Done</string>
+
     <!-- Sign-in methods -->
     <string name="sign_in_methods_title">Ways to sign in</string>
     <string name="sign_in_methods_row_description">Passkeys and linked accounts</string>

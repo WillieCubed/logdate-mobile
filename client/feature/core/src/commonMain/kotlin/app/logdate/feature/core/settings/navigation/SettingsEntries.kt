@@ -12,6 +12,7 @@ import app.logdate.feature.core.settings.account.AccountDestinations
 import app.logdate.feature.core.settings.account.AccountScreen
 import app.logdate.feature.core.settings.account.delete.DeleteAccountScreen
 import app.logdate.feature.core.settings.account.hosting.HostingScreen
+import app.logdate.feature.core.settings.account.move.MoveServerScreen
 import app.logdate.feature.core.settings.account.recovery.RecoveryPhraseScreen
 import app.logdate.feature.core.settings.account.signin.SignInMethodsScreen
 import app.logdate.feature.core.settings.ui.AdvancedSettingsScreen
@@ -130,7 +131,10 @@ fun EntryProviderScope<NavKey>.settingsEntries(
         )
     }
     taggedEntry<HostingRoute> {
-        HostingScreen(onBack = onBack)
+        HostingScreen(onBack = onBack, onMoveAccount = { onNavigateTo(MoveServerRoute) })
+    }
+    taggedEntry<MoveServerRoute> {
+        MoveServerScreen(onClose = onBack)
     }
     taggedEntry<DeleteAccountRoute> {
         DeleteAccountScreen(onBack = onBack, onDeviceErased = onResetApp)
