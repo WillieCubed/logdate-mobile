@@ -3,13 +3,10 @@
 package app.logdate.feature.core.account
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,22 +15,19 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import app.logdate.ui.theme.Spacing
+import app.logdate.ui.step.StepHeroIcon
+import app.logdate.ui.step.StepProgress
+import app.logdate.ui.step.StepScaffold
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_display_name_description
 import logdate.client.feature.core.generated.resources.account_username_display_name_prompt
 import logdate.client.feature.core.generated.resources.display_name
 import logdate.client.feature.core.generated.resources.enter_your_name
-import logdate.client.feature.core.generated.resources.examples
-import logdate.client.feature.core.generated.resources.text_1_of_3
 import logdate.client.feature.core.generated.resources.this_is_how_your_name_will_appear_to_others
 import logdate.client.ui.generated.resources.common_continue
-import logdate.client.ui.generated.resources.common_go_back
 import org.jetbrains.compose.resources.stringResource
 import logdate.client.ui.generated.resources.Res as UiRes
 
@@ -78,145 +72,53 @@ private fun DisplayNameSetupContent(
         focusRequester.requestFocus()
     }
 
-    Column(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .padding(Spacing.lg)
-                .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.SpaceBetween,
+    StepScaffold(
+        title = stringResource(Res.string.account_username_display_name_prompt),
+        onBack = onBack,
+        modifier = modifier,
+        supportingText = stringResource(Res.string.account_display_name_description),
+        progress = StepProgress(current = 1, total = 3),
+        hero = { StepHeroIcon(Icons.Rounded.Badge) },
+        headerAlignment = Alignment.CenterHorizontally,
+        actions = {
+            Button(
+                onClick = onContinue,
+                enabled = isValid && displayName.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().testTag(CLOUD_ACCOUNT_DISPLAY_NAME_CONTINUE_TAG),
+            ) {
+                Text(stringResource(UiRes.string.common_continue))
+            }
+        },
     ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.xl),
-        ) {
-            // Header with back button
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(UiRes.string.common_go_back),
-                    )
-                }
-
-                LinearProgressIndicator(
-                    progress = { 0.33f }, // Step 1 of 3
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .padding(horizontal = Spacing.md),
-                )
-
-                Text(
-                    text = stringResource(Res.string.text_1_of_3),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(Spacing.lg))
-
-            // Title and description
-            Column(
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text = stringResource(Res.string.account_username_display_name_prompt),
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                )
-
-                val displayNameInfo =
-                    stringResource(
-                        Res.string
-                            .account_display_name_description,
-                    )
-                Text(
-                    text = displayNameInfo,
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Spacing.md),
-                )
-            }
-
-            // Input field
-            Column(
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                OutlinedTextField(
-                    value = displayName,
-                    onValueChange = onDisplayNameChange,
-                    label = { Text(stringResource(Res.string.display_name)) },
-                    placeholder = { Text(stringResource(Res.string.enter_your_name)) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                        )
+        OutlinedTextField(
+            value = displayName,
+            onValueChange = onDisplayNameChange,
+            label = { Text(stringResource(Res.string.display_name)) },
+            placeholder = { Text(stringResource(Res.string.enter_your_name)) },
+            supportingText = {
+                Text(stringResource(Res.string.this_is_how_your_name_will_appear_to_others))
+            },
+            singleLine = true,
+            keyboardOptions =
+                KeyboardOptions(
+                    imeAction = ImeAction.Done,
+                    capitalization = KeyboardCapitalization.Words,
+                ),
+            keyboardActions =
+                KeyboardActions(
+                    onDone = {
+                        focusManager.clearFocus()
+                        if (isValid && displayName.isNotBlank()) {
+                            onContinue()
+                        }
                     },
-                    supportingText = {
-                        Text(stringResource(Res.string.this_is_how_your_name_will_appear_to_others))
-                    },
-                    keyboardOptions =
-                        KeyboardOptions(
-                            imeAction = ImeAction.Done,
-                            capitalization = KeyboardCapitalization.Words,
-                        ),
-                    keyboardActions =
-                        KeyboardActions(
-                            onDone = {
-                                focusManager.clearFocus()
-                                if (isValid && displayName.isNotBlank()) {
-                                    onContinue()
-                                }
-                            },
-                        ),
-                    modifier =
-                        Modifier
-                            .testTag(CLOUD_ACCOUNT_DISPLAY_NAME_FIELD_TAG)
-                            .fillMaxWidth()
-                            .focusRequester(focusRequester),
-                )
-
-                // Examples card
-                Card(
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        ),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(Spacing.md),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    ) {
-                        Text(
-                            text = stringResource(Res.string.examples),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text = "Alex Johnson, Sarah M., Coffee Lover, The Wanderer",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-        }
-
-        // Continue button
-        Button(
-            onClick = onContinue,
-            enabled = isValid && displayName.isNotBlank(),
-            modifier = Modifier.fillMaxWidth().testTag(CLOUD_ACCOUNT_DISPLAY_NAME_CONTINUE_TAG),
-        ) {
-            Text(stringResource(UiRes.string.common_continue))
-        }
+                ),
+            modifier =
+                Modifier
+                    .testTag(CLOUD_ACCOUNT_DISPLAY_NAME_FIELD_TAG)
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester),
+        )
     }
 }
 
