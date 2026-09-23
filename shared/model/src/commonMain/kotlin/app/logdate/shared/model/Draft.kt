@@ -101,3 +101,15 @@ data class SerializableCameraBlock(
     override val altitude: Double? = null,
     val uri: String? = null,
 ) : SerializableEntryBlock()
+
+/**
+ * This draft's text blocks joined into one string, newline-separated.
+ *
+ * Drafts can hold photo, video, audio, and camera blocks alongside text, but those carry no
+ * readable text of their own -- this is the draft's written content, used for the cloud sync
+ * payload and anywhere else a draft needs a short readable stand-in.
+ */
+fun EditorDraft.textContent(): String =
+    blocks
+        .filterIsInstance<SerializableTextBlock>()
+        .joinToString("\n") { it.content }

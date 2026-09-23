@@ -10,6 +10,7 @@ import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.SerializableVideoBlock
 import app.logdate.shared.model.sync.DeviceId
 import app.logdate.shared.model.sync.DraftUploadRequest
+import app.logdate.shared.model.textContent
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -141,11 +142,6 @@ class DefaultCloudDraftDataSource(
     ): String = syncPayloadCipher?.decryptString(draftFieldId(draftId), content) ?: content
 
     private fun draftFieldId(draftId: Uuid): String = "sync:draft:$draftId:content"
-
-    private fun EditorDraft.textContent(): String =
-        blocks
-            .filterIsInstance<SerializableTextBlock>()
-            .joinToString("\n") { it.content }
 
     private fun SerializableEntryBlock.syncBlockType(): String =
         when (this) {

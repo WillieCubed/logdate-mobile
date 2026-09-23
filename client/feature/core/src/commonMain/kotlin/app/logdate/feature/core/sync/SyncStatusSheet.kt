@@ -33,10 +33,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
+import app.logdate.client.repository.journals.NoteType
 import app.logdate.client.sync.SyncPausedReason
+import app.logdate.client.sync.metadata.EntityType
 import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
@@ -58,11 +61,18 @@ import logdate.client.feature.core.generated.resources.sync_paused_needs_recover
 import logdate.client.feature.core.generated.resources.sync_paused_offline
 import logdate.client.feature.core.generated.resources.sync_paused_signed_out
 import logdate.client.feature.core.generated.resources.sync_status_could_not_start
+import logdate.client.feature.core.generated.resources.sync_status_draft_fallback
 import logdate.client.feature.core.generated.resources.sync_status_failed_items
+import logdate.client.feature.core.generated.resources.sync_status_item_audio_fallback
+import logdate.client.feature.core.generated.resources.sync_status_item_photo_fallback
+import logdate.client.feature.core.generated.resources.sync_status_item_text_fallback
+import logdate.client.feature.core.generated.resources.sync_status_item_video_fallback
+import logdate.client.feature.core.generated.resources.sync_status_journal_fallback
 import logdate.client.feature.core.generated.resources.sync_status_last_attempt_failed
 import logdate.client.feature.core.generated.resources.sync_status_open_settings
 import logdate.client.feature.core.generated.resources.sync_status_queue_unavailable
 import logdate.client.feature.core.generated.resources.sync_status_retrying
+import logdate.client.feature.core.generated.resources.sync_status_showing_three_of_items
 import logdate.client.feature.core.generated.resources.sync_status_title
 import logdate.client.feature.core.generated.resources.sync_status_unreadable_cloud_items
 import logdate.client.feature.core.generated.resources.sync_status_waiting
@@ -425,6 +435,29 @@ private fun QueuedGroupRow(group: QueuedGroup) {
             text = pluralStringResource(countPluralFor(group.kind?.name.orEmpty()), group.count, group.count),
             style = MaterialTheme.typography.bodyLarge,
         )
+        if (group.previews.isNotEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs, start = Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
+                group.previews.forEach { preview ->
+                    Text(
+                        text = preview.label ?: genericPreviewLabel(group.kind, preview.noteType),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (group.previews.size == SYNC_STATUS_PREVIEW_LIMIT && group.count > SYNC_STATUS_PREVIEW_LIMIT) {
+                    Text(
+                        text = stringResource(Res.string.sync_status_showing_three_of_items, group.count),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
         if (group.retrying > 0) {
             Text(
                 text = pluralStringResource(Res.plurals.sync_status_retrying, group.retrying, group.retrying),
@@ -434,3 +467,22 @@ private fun QueuedGroupRow(group: QueuedGroup) {
         }
     }
 }
+
+/** The label for a queued item with nothing of its own to show -- e.g. a voice note has no caption. */
+@Composable
+private fun genericPreviewLabel(
+    kind: EntityType?,
+    noteType: NoteType?,
+): String =
+    when (kind) {
+        EntityType.JOURNAL -> stringResource(Res.string.sync_status_journal_fallback)
+        EntityType.DRAFT -> stringResource(Res.string.sync_status_draft_fallback)
+        EntityType.NOTE ->
+            when (noteType) {
+                NoteType.IMAGE -> stringResource(Res.string.sync_status_item_photo_fallback)
+                NoteType.VIDEO -> stringResource(Res.string.sync_status_item_video_fallback)
+                NoteType.AUDIO -> stringResource(Res.string.sync_status_item_audio_fallback)
+                NoteType.TEXT, NoteType.LOCATION, null -> stringResource(Res.string.sync_status_item_text_fallback)
+            }
+        EntityType.ASSOCIATION, EntityType.MEDIA, EntityType.HEALTH, null -> ""
+    }
