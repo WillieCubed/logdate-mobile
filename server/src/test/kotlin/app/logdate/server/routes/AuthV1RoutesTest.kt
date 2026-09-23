@@ -768,6 +768,34 @@ class AuthV1RoutesTest {
             assertEquals("Galaxy S26", nicknameOf("Y3JlZC1zaWdudXAtbmlja25hbWU", auth.accessToken))
         }
 
+    @Test
+    fun `passkey signup reports an existing owner before a taken username`() =
+        testApplication {
+            configureAuthV1TestApp()
+            val ownerId = Uuid.random().toString()
+            createPasskeyAccount(
+                username = "returning_owner",
+                displayName = "Returning Owner",
+                credentialId = "cred-returning-owner",
+                requestedOwnerId = ownerId,
+            )
+
+            val response =
+                client.post("/api/v1/auth/signup/passkey/begin") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        signupPasskeyBeginBody(
+                            username = "returning_owner",
+                            displayName = "Returning Owner",
+                            requestedOwnerId = ownerId,
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.Conflict, response.status)
+            assertTrue(response.bodyAsText().contains("CANONICAL_OWNER_ID_TAKEN"))
+        }
+
     private suspend fun io.ktor.server.testing.ApplicationTestBuilder.beginAddPasskey(accessToken: String): String {
         val beginAdd =
             client.post("/api/v1/auth/me/passkeys/begin") {
@@ -819,11 +847,18 @@ class AuthV1RoutesTest {
         displayName: String,
         credentialId: String,
         nickname: String? = null,
+        requestedOwnerId: String = Uuid.random().toString(),
     ): AuthTokens {
         val beginResponse =
             client.post("/api/v1/auth/signup/passkey/begin") {
                 contentType(ContentType.Application.Json)
-                setBody(signupPasskeyBeginBody(username = username, displayName = displayName))
+                setBody(
+                    signupPasskeyBeginBody(
+                        username = username,
+                        displayName = displayName,
+                        requestedOwnerId = requestedOwnerId,
+                    ),
+                )
             }
         assertEquals(HttpStatusCode.OK, beginResponse.status)
         val beginPayload = json.parseToJsonElement(beginResponse.bodyAsText()).jsonObject

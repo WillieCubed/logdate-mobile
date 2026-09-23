@@ -13,12 +13,13 @@ fun googleAuthBody(
 fun signupPasskeyBeginBody(
     username: String,
     displayName: String,
+    requestedOwnerId: String = Uuid.random().toString(),
 ): String =
     """
     {
       "username": "$username",
       "displayName": "$displayName",
-      "requestedOwnerId": "${Uuid.random()}"
+      "requestedOwnerId": "$requestedOwnerId"
     }
     """.trimIndent()
 

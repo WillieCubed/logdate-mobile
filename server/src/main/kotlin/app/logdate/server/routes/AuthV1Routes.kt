@@ -361,15 +361,9 @@ fun Route.authV1Routes(
                         if (displayNameError != null) {
                             return@post call.respondApiError(HttpStatusCode.BadRequest, "VALIDATION_ERROR", displayNameError, metrics)
                         }
-                        if (accountRepository.usernameExists(request.username)) {
-                            return@post call.respondApiError(
-                                HttpStatusCode.Conflict,
-                                "USERNAME_TAKEN",
-                                "Username is already taken",
-                                metrics,
-                            )
-                        }
-
+                        // The owner check comes first: a device that already has an account here
+                        // (someone moving back to a server they used before) must be told to sign
+                        // in, not that their own username is taken.
                         val requestedOwnerId =
                             call.parseRequiredCanonicalOwnerId(request.requestedOwnerId, metrics)
                                 ?: return@post
@@ -378,6 +372,14 @@ fun Route.authV1Routes(
                                 HttpStatusCode.Conflict,
                                 "CANONICAL_OWNER_ID_TAKEN",
                                 "This device identity is already associated with an account",
+                                metrics,
+                            )
+                        }
+                        if (accountRepository.usernameExists(request.username)) {
+                            return@post call.respondApiError(
+                                HttpStatusCode.Conflict,
+                                "USERNAME_TAKEN",
+                                "Username is already taken",
                                 metrics,
                             )
                         }
