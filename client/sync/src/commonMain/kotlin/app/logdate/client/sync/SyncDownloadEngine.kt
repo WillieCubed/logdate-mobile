@@ -6,10 +6,13 @@ import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.SyncConflictRecord
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.InMemoryUnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.sync.metadata.UnreadableCloudRecordStore
 import io.github.aakira.napier.Napier
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -74,6 +77,7 @@ internal class SyncDownloadEngine(
     private val conflictStore: SyncConflictStore,
     private val mapCloudApiError: (CloudApiException) -> SyncResult,
     private val mapException: (Exception, String) -> SyncResult,
+    private val unreadableCloudRecordStore: UnreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
 ) {
     /** Consecutive failed pages per entity type, so a poison page cannot pin the feed forever. */
     private val consecutiveBatchFailures = mutableMapOf<EntityType, Int>()
@@ -84,19 +88,27 @@ internal class SyncDownloadEngine(
      * it is queued as a CREATE: that is an upsert on the server, and replaces the unreadable copy
      * with one encrypted under the current key. An entry the device does not hold is left alone on
      * the server; there is nothing here to repair it with, and deleting it would lose it.
+     *
+     * Also called directly by [SyncDownloader.downloadDrafts] -- drafts use a newer-wins
+     * heuristic instead of [DownloadStrategy] and paginate by hand, but repairing an unreadable
+     * record is identical either way.
      */
-    private suspend fun <T : Any> repairUnreadable(
-        strategy: DownloadStrategy<T>,
+    suspend fun repairUnreadable(
+        entityType: EntityType,
+        logLabel: String,
         unreadable: List<Uuid>,
         heldLocally: Set<Uuid>,
     ) {
         if (unreadable.isEmpty()) return
         val (repairable, cloudOnly) = unreadable.partition { it in heldLocally }
         for (id in repairable) {
-            syncMetadataService.enqueuePending(id.toString(), strategy.entityType, PendingOperation.CREATE)
+            syncMetadataService.enqueuePending(id.toString(), entityType, PendingOperation.CREATE)
+        }
+        if (cloudOnly.isNotEmpty()) {
+            unreadableCloudRecordStore.record(entityType, cloudOnly)
         }
         Napier.w(
-            "${repairable.size} unreadable ${strategy.logLabel}(s) queued to re-upload from this device; " +
+            "${repairable.size} unreadable $logLabel(s) queued to re-upload from this device; " +
                 "${cloudOnly.size} exist only in the cloud and were left in place",
         )
     }
@@ -121,7 +133,43 @@ internal class SyncDownloadEngine(
             val errors = mutableListOf<SyncError>()
 
             while (hasMore) {
-                val page = strategy.fetchChanges(accessToken, cursor).getOrThrow()
+                val page =
+                    strategy.fetchChanges(accessToken, cursor).getOrElse { fetchError ->
+                        // Unlike an apply failure, a fetch failure never hands back a page, so
+                        // there is no known-good timestamp to step over to. A transient error
+                        // (a network blip, a 500) should retry from the same cursor and usually
+                        // will. One that keeps failing at the exact same cursor forever -- a
+                        // server bug tied to that specific request -- otherwise pins the feed
+                        // forever, so after a few attempts nudge the cursor forward by the
+                        // smallest possible amount and accept whatever is lost in that instant,
+                        // rather than block every later page behind it indefinitely.
+                        val failures = (consecutiveBatchFailures[strategy.entityType] ?: 0) + 1
+                        consecutiveBatchFailures[strategy.entityType] = failures
+                        errors.add(
+                            SyncError(
+                                SyncErrorType.UNKNOWN_ERROR,
+                                "Failed to fetch ${strategy.logLabel} page at $cursor: ${fetchError.message}",
+                                fetchError,
+                            ),
+                        )
+                        if (failures >= MAX_CONSECUTIVE_BATCH_FAILURES) {
+                            Napier.e(
+                                "${strategy.logLabel} page fetch at $cursor failed $failures times; " +
+                                    "nudging the cursor forward to unblock sync",
+                                fetchError,
+                            )
+                            consecutiveBatchFailures.remove(strategy.entityType)
+                            syncMetadataService.updateLastSyncTime(strategy.entityType, cursor + 1.milliseconds)
+                        } else {
+                            Napier.e("Failed to fetch ${strategy.logLabel} page at $cursor (attempt $failures)", fetchError)
+                        }
+                        return SyncResult(
+                            success = false,
+                            downloadedItems = totalDownloaded,
+                            conflictsResolved = totalConflicts,
+                            errors = errors,
+                        )
+                    }
                 val hydratedChanges = page.changes.map { strategy.hydrate(accessToken, it) }
 
                 val batchResult =
@@ -276,7 +324,7 @@ internal class SyncDownloadEngine(
                 totalDownloaded += batchResult.downloadedCount
                 totalConflicts += batchResult.conflictsResolved
                 errors.addAll(batchResult.errors)
-                repairUnreadable(strategy, page.unreadable, localById.keys)
+                repairUnreadable(strategy.entityType, strategy.logLabel, page.unreadable, localById.keys)
 
                 if (batchResult.errors.isNotEmpty()) {
                     // Holding the cursor is right for a local write that failed and may succeed

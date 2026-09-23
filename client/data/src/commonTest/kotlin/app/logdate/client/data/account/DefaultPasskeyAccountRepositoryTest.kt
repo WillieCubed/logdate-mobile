@@ -414,6 +414,34 @@ class DefaultPasskeyAccountRepositoryTest {
             assertEquals(testAccount.id.toString(), storedSession.accountId)
         }
 
+    /**
+     * Regression test: signing in to an existing LogDate Cloud account on a device that
+     * never registered a platform account locally (fresh install, reinstall, or a device
+     * whose platform account was otherwise lost) must not just log
+     * "Failed to update tokens in platform account manager: Account not found" and drop
+     * the token on the floor -- it must register the platform account instead, since
+     * `updateTokens` alone can never succeed for an account that was never added.
+     */
+    @Test
+    fun `authenticate with passkey registers the platform account when it is missing`() =
+        runTest {
+            val platformAccountManager =
+                FakePlatformAccountManager().apply {
+                    updateTokensResponse = Result.failure(Exception("Account not found"))
+                }
+
+            val repository =
+                createRepository(
+                    platformAccountManager = platformAccountManager,
+                )
+
+            val result = repository.authenticateWithPasskey("testuser")
+
+            assertTrue(result.isSuccess, "authentication must still succeed even though the platform account was missing")
+            assertEquals(1, platformAccountManager.addAccountCalls)
+            assertEquals(testAccount.username, platformAccountManager.lastAddAccountUsername)
+        }
+
     @Test
     fun `authenticate with passkey does not replace the installation owner`() =
         runTest {
@@ -657,6 +685,42 @@ class DefaultPasskeyAccountRepositoryTest {
             assertNotNull(updatedSession)
             assertEquals("new_access_token", updatedSession.accessToken)
             assertEquals(testTokens.refreshToken, updatedSession.refreshToken)
+        }
+
+    /**
+     * Regression test: the same "platform account is missing" case that
+     * [authenticateWithPasskey] can hit also recurs on every token refresh once a device is
+     * signed in without a platform account -- `updateTokens` alone can never succeed for an
+     * account that was never added, so it must self-heal by registering the account instead
+     * of just logging the warning again.
+     */
+    @Test
+    fun `refresh authentication registers the platform account when it is missing`() =
+        runTest {
+            val sessionStorage = FakeSessionStorage()
+            val platformAccountManager = FakePlatformAccountManager()
+            val apiClient =
+                FakePasskeyApiClient().apply {
+                    refreshTokenResponse = Result.success("new_access_token")
+                }
+
+            val repository =
+                createRepository(
+                    sessionStorage = sessionStorage,
+                    platformAccountManager = platformAccountManager,
+                    apiClient = apiClient,
+                )
+
+            // Sign in first so `currentAccount` is populated, matching the state
+            // `refreshAuthentication` expects to find it in.
+            assertTrue(repository.authenticateWithPasskey("testuser").isSuccess)
+
+            platformAccountManager.updateTokensResponse = Result.failure(Exception("Account not found"))
+
+            val result = repository.refreshAuthentication()
+
+            assertTrue(result.isSuccess)
+            assertEquals(1, platformAccountManager.addAccountCalls)
         }
 
     /**
@@ -1105,13 +1169,19 @@ class DefaultPasskeyAccountRepositoryTest {
         var addAccountResponse: Result<Unit> = Result.success(Unit)
         var updateTokensResponse: Result<Unit> = Result.success(Unit)
         var removeAccountCalls = 0
+        var addAccountCalls = 0
+        var lastAddAccountUsername: String? = null
 
         override suspend fun addAccount(
             account: LogDateAccount,
             accessToken: String,
             refreshToken: String,
             backendUrl: String,
-        ): Result<Unit> = addAccountResponse
+        ): Result<Unit> {
+            addAccountCalls++
+            lastAddAccountUsername = account.username
+            return addAccountResponse
+        }
 
         override suspend fun updateAccount(
             account: LogDateAccount,

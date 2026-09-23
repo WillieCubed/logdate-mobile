@@ -3,6 +3,7 @@ package app.logdate.feature.core.sync
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncManager
+import app.logdate.client.sync.SyncPausedReason
 import app.logdate.client.sync.SyncStatus
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -44,12 +45,19 @@ internal fun SyncStatus.toPresentation(): SyncPresentation {
         )
     }
 
+    // A pause means no attempt is even being made, so it takes priority over a stale error from
+    // a previous, different failure -- entering the recovery phrase is the one thing that moves
+    // this forward, and a leftover network-error chip underneath it would say otherwise.
+    if (pausedReason == SyncPausedReason.NEEDS_RECOVERY_PHRASE) {
+        return SyncPresentation.NeedsRecovery
+    }
+
     val error = lastError
     if (error != null) {
         return when (error.type) {
             SyncErrorType.AUTHENTICATION_ERROR -> SyncPresentation.AuthError
             SyncErrorType.STORAGE_ERROR -> SyncPresentation.StorageError(pendingCount = pendingUploads)
-            SyncErrorType.CONFLICT_ERROR -> SyncPresentation.ConflictError(conflictCount = 1)
+            SyncErrorType.CONFLICT_ERROR -> SyncPresentation.ConflictError(conflictCount = conflictCount.coerceAtLeast(1))
             SyncErrorType.NETWORK_ERROR -> SyncPresentation.NetworkError(pendingCount = pendingUploads)
             SyncErrorType.SERVER_ERROR -> SyncPresentation.NetworkError(pendingCount = pendingUploads)
             // An unclassified failure used to collapse into Pending/Hidden -- indistinguishable

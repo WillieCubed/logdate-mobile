@@ -3,8 +3,9 @@
    Backup rules for pre-API 31 devices.
    See https://developer.android.com/guide/topics/data/autobackup
 
-   Cloud backup: DataStore preferences, passphrase backup, and the encrypted
-   database (all require clientSideEncryption so they're encrypted in the cloud).
+   Cloud backup: DataStore preferences, the database-passphrase backup, the
+   identity-recovery-phrase backup, and the encrypted database (all require
+   clientSideEncryption so they're encrypted in the cloud).
    Device-to-device: everything.
    Audio notes are excluded from both since they can be large.
 -->
@@ -12,6 +13,8 @@
     <include domain="file" path="datastore/"
              requireFlags="clientSideEncryption"/>
     <include domain="file" path="db_recovery/"
+             requireFlags="clientSideEncryption"/>
+    <include domain="file" path="identity_recovery/"
              requireFlags="clientSideEncryption"/>
     <include domain="database" path="."
              requireFlags="clientSideEncryption"/>

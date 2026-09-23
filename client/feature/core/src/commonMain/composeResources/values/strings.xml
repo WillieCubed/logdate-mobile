@@ -38,6 +38,7 @@
     <string name="recovery_phrase_settings_description">View the 12 words needed to recover your synced data</string>
     <string name="recovery_phrase_warning">Keep these words private. Anyone with this phrase can recover your encrypted data.</string>
     <string name="recovery_phrase_missing">No recovery phrase is saved on this device. Use your original phrase during recovery to restore access and save it here.</string>
+    <string name="recovery_phrase_missing_enter_action">Enter phrase</string>
     <string name="settings_export_entries_label">Export data</string>
     <string name="settings_export_entries_description">Export all journal entries to a JSON file</string>
     <string name="settings_reset_app_title">Reset app</string>

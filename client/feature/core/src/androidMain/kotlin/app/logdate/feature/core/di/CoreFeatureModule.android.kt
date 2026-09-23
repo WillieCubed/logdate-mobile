@@ -35,6 +35,7 @@ import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.MemoriesSettingsViewModel
 import app.logdate.feature.core.settings.ui.MemoriesWidgetInstallController
 import app.logdate.feature.core.settings.ui.PrivacySettingsViewModel
+import app.logdate.feature.core.settings.ui.RecoveryPhraseEntryViewModel
 import app.logdate.feature.core.settings.ui.ServerConfigurationCoordinator
 import app.logdate.feature.core.settings.ui.StreakSettingsViewModel
 import app.logdate.feature.core.settings.ui.TimelineSettingsViewModel
@@ -115,6 +116,9 @@ actual val coreFeatureModule: Module =
             )
         }
         viewModel {
+            RecoveryPhraseEntryViewModel(get())
+        }
+        viewModel {
             DataSettingsViewModel(
                 get(),
                 get(),
@@ -161,7 +165,15 @@ actual val coreFeatureModule: Module =
         viewModel { PersonDetailViewModel(get(), get()) }
         viewModel { SyncIssuesViewModel(get()) }
         viewModel { SyncPresentationViewModel(syncManager = get(), sessionStorage = get()) }
-        viewModel { SyncStatusViewModel(syncManager = get(), syncMetadataService = get(), sessionStorage = get()) }
+        viewModel {
+            SyncStatusViewModel(
+                syncManager = get(),
+                syncMetadataService = get(),
+                sessionStorage = get(),
+                journalRepository = get(),
+                journalNotesRepository = get(),
+            )
+        }
         viewModel { CampfireViewModel(observeCampfire = get(), featureFlagStore = get()) }
     }
 

@@ -84,6 +84,14 @@ interface SyncMetadataService {
      * This is not a sign-out operation: sign-out always preserves offline work.
      */
     suspend fun clearPending()
+
+    /**
+     * Drops every entity type's download cursor for the current local owner and backend, so the
+     * next download starts from the beginning again. Used after recovering a different identity
+     * key: records the old key could not decrypt were left in place on the server rather than
+     * repaired, and only re-arrive once the cursor that already passed them is reset.
+     */
+    suspend fun resetAllCursors()
 }
 
 /**

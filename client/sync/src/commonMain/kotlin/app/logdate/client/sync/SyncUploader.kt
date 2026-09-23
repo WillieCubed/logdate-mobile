@@ -17,6 +17,7 @@ import app.logdate.client.sync.cloud.JournalContentAssociation
 import app.logdate.client.sync.cloud.MediaTooLargeException
 import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.FirstSyncEnqueueStore
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
@@ -55,6 +56,7 @@ internal class SyncUploader(
     private val tokenRefresher: SyncTokenRefresher,
     private val mediaTransfer: SyncMediaTransfer,
     private val retryCoordinator: SyncRetryCoordinator,
+    private val firstSyncEnqueueStore: FirstSyncEnqueueStore,
     private val mapCloudApiError: (CloudApiException) -> SyncResult,
     private val mapException: (Exception, String) -> SyncResult,
     private val recordProgress: (Int) -> Unit,
@@ -669,10 +671,19 @@ internal class SyncUploader(
      *
      * Only runs while the server has never been synced with, and enqueueing coalesces, so an entry
      * already waiting is not queued twice.
+     *
+     * "Never synced" itself is checked two ways: [firstSyncEnqueueStore] records whether this sweep
+     * has ever completed for the entity type, independent of [syncMetadataService]'s download
+     * cursor. The cursor alone isn't enough -- if downloading keeps failing, the cursor never
+     * advances, and without the store's own flag this whole-table scan would repeat on every full
+     * sync attempt for ever, rather than the one time it is meant to run.
      */
     suspend fun enqueueEverythingOnFirstSync() {
         val entityTypes = listOf(EntityType.JOURNAL, EntityType.NOTE)
-        val neverSynced = entityTypes.filter { syncMetadataService.getLastSyncTime(it) == null }
+        val neverSynced =
+            entityTypes.filter { entityType ->
+                !firstSyncEnqueueStore.hasEnqueued(entityType) && syncMetadataService.getLastSyncTime(entityType) == null
+            }
         if (neverSynced.isEmpty()) {
             return
         }
@@ -687,6 +698,9 @@ internal class SyncUploader(
                         operation = PendingOperation.CREATE,
                     )
                 }
+                // Marked only once the loop above has fully succeeded -- if it throws partway,
+                // this line never runs and the next attempt retries the whole type from scratch.
+                firstSyncEnqueueStore.markEnqueued(EntityType.JOURNAL)
                 Napier.i("First sync: queued ${journals.size} journals already on this device")
             }
             if (EntityType.NOTE in neverSynced) {
@@ -698,6 +712,7 @@ internal class SyncUploader(
                         operation = PendingOperation.CREATE,
                     )
                 }
+                firstSyncEnqueueStore.markEnqueued(EntityType.NOTE)
                 Napier.i("First sync: queued ${notes.size} entries already on this device")
             }
         }.onFailure { error ->

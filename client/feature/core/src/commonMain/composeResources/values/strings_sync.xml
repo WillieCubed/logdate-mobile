@@ -35,6 +35,18 @@
         <item quantity="one">%1$d item stopped retrying and needs you to decide</item>
         <item quantity="other">%1$d items stopped retrying and need you to decide</item>
     </plurals>
+    <plurals name="sync_status_unreadable_cloud_items">
+        <item quantity="one">%1$d item from another setup can\'t be read here</item>
+        <item quantity="other">%1$d items from another setup can\'t be read here</item>
+    </plurals>
+    <!-- Backup status sheet: which items of a group, by title or snippet -->
+    <string name="sync_status_item_text_fallback">Entry</string>
+    <string name="sync_status_item_photo_fallback">Photo</string>
+    <string name="sync_status_item_video_fallback">Video</string>
+    <string name="sync_status_item_audio_fallback">Voice note</string>
+    <string name="sync_status_journal_fallback">Journal</string>
+    <string name="sync_status_draft_fallback">Draft</string>
+    <string name="sync_status_showing_three_of_items">Showing 3 of %1$d</string>
     <string name="sync_status_last_attempt_failed">The last attempt didn't finish. LogDate will try again on its own.</string>
     <string name="sync_status_could_not_start">Couldn't start a backup. Try again, or check Backup settings.</string>
     <string name="sync_status_queue_unavailable">Couldn't read the list of waiting items. The count above may be out of date.</string>
@@ -53,6 +65,8 @@
     </plurals>
     <string name="sync_banner_review">Review</string>
     <string name="sync_banner_manage">Manage</string>
+    <string name="sync_banner_needs_recovery">Backing up is paused. Enter your recovery phrase to continue.</string>
+    <string name="sync_banner_enter_recovery_phrase">Enter phrase</string>
 
     <!-- Manual sync outcome -->
     <string name="sync_feedback_needs_account">Sign in to start backing up</string>
@@ -102,6 +116,16 @@
     <string name="quota_usage_block">Quota Usage Block</string>
     <string name="separator_pipe"> | </string>
 
+    <!-- Sync issues screen -->
+    <string name="sync_issues_title">Sync issues</string>
+    <string name="sync_issue_review_queue_title">Review sync queue</string>
+    <plurals name="sync_issue_items_need_attention">
+        <item quantity="one">%1$d item needs attention.</item>
+        <item quantity="other">%1$d items need attention.</item>
+    </plurals>
+    <string name="sync_issue_review_queue_description">Retry items when the source data should still sync. Discard items only when the local change is no longer useful.</string>
+    <string name="sync_issue_discard">Discard</string>
+
     <!-- Sync issues: what kind of thing failed, and how many -->
     <plurals name="sync_issue_count_note"><item quantity="one">%1$d entry</item><item quantity="other">%1$d entries</item></plurals>
     <plurals name="sync_issue_count_journal"><item quantity="one">%1$d journal</item><item quantity="other">%1$d journals</item></plurals>
@@ -135,6 +159,15 @@
     <string name="sync_paused_offline">Paused — waiting for a connection</string>
     <string name="sync_paused_signed_out">Sign in to start backing up</string>
     <string name="sync_paused_media_waiting_for_wifi">Photos and videos are waiting for Wi-Fi</string>
+    <string name="sync_paused_needs_recovery_phrase">Paused — this device needs your recovery phrase</string>
+    <string name="sync_paused_needs_recovery_phrase_fix">Enter your recovery phrase to keep backing up.</string>
+
+    <!-- Recovery phrase entry from Settings -->
+    <string name="recovery_phrase_entry_settings_title">Recovery phrase</string>
+    <string name="recovery_phrase_entry_settings_description">Enter the 12-word recovery phrase for this account to keep backing up on this device.</string>
+    <string name="recovery_phrase_entry_settings_submit">Continue</string>
+    <string name="recovery_phrase_entry_settings_error">Couldn\'t recover this identity. Check the phrase and try again.</string>
+    <string name="recovery_phrase_entry_settings_word_count_error">Enter all 12 words.</string>
     <string name="backing_up_progress">Backing up %1$d of %2$d</string>
     <!-- First sync -->
     <string name="first_sync_running">Backing up your journal…</string>

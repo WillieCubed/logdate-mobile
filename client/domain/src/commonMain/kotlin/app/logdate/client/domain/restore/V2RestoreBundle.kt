@@ -60,20 +60,81 @@ internal data class AdaptedV2RestoreBundle(
 
 /** Converts the portable 2.x records into the canonical input already applied by restore. */
 internal fun V2RestoreBundle.adaptForRestore(): AdaptedV2RestoreBundle {
+    val manifest = decodeManifest()
+    val metadata = buildExportMetadata(manifest)
+    val adapterWarnings = mutableListOf<String>()
+
+    val journals = decodeAndMapJournals()
+    val (exportNotes, journalNoteRelations) = decodeAndMapNotes()
+    val exportDrafts = decodeAndMapDrafts(adapterWarnings)
+    val exportPlaces = decodeAndMapPlaces()
+    val exportLocationHistory = decodeAndMapLocationHistory()
+    val mediaManifest = decodeAndMapMediaManifest()
+    val exportProfile = decodeAndMapProfile()
+
+    return AdaptedV2RestoreBundle(
+        legacy =
+            buildLegacyRestoreBundle(
+                metadata = metadata,
+                journals = journals,
+                notes = exportNotes,
+                journalNoteRelations = journalNoteRelations,
+                drafts = exportDrafts,
+                profile = exportProfile,
+                places = exportPlaces,
+                locationHistory = exportLocationHistory,
+                mediaManifest = mediaManifest,
+            ),
+        metadata = metadata,
+        warnings = adapterWarnings,
+    )
+}
+
+/** Decodes and validates the archive manifest, rejecting formats/versions restore can't read. */
+private fun V2RestoreBundle.decodeManifest(): ArchiveManifest {
     val manifest = ArchiveJson.document.decodeFromString(ArchiveManifest.serializer(), manifestJson)
     require(manifest.format == ArchiveManifest.FORMAT) { "Unsupported archive format: ${manifest.format}" }
     if (manifest.schemaVersion.major != ExportSchemaVersion.V2_0.major) {
         throw UnsupportedExportVersionException(manifest.schemaVersion)
     }
+    return manifest
+}
 
-    val journals = journalsJson?.let { ArchiveJson.document.decodeFromString(ArchiveJournalFile.serializer(), it).journals }.orEmpty()
+private fun buildExportMetadata(manifest: ArchiveManifest): ExportMetadata =
+    ExportMetadata(
+        version = manifest.schemaVersion,
+        exportDate = manifest.exportedAt,
+        userId = "",
+        deviceId = "",
+        appVersion = manifest.generator.version,
+        stats =
+            ExportStats(
+                journalCount = manifest.counts.journals,
+                noteCount = manifest.counts.notes,
+                draftCount = manifest.counts.drafts,
+                mediaCount = manifest.counts.media,
+                placeCount = manifest.counts.places,
+                locationHistoryCount = manifest.counts.locationSamples,
+                hasProfile = manifest.counts.hasProfile,
+            ),
+    )
+
+private fun V2RestoreBundle.decodeAndMapJournals(): List<Journal> =
+    journalsJson
+        ?.let { ArchiveJson.document.decodeFromString(ArchiveJournalFile.serializer(), it).journals }
+        .orEmpty()
+        .map {
+            Journal(
+                id = Uuid.parse(it.id),
+                title = it.title,
+                description = it.description,
+                created = it.createdAt,
+                lastUpdated = it.updatedAt,
+            )
+        }
+
+private fun V2RestoreBundle.decodeAndMapNotes(): Pair<List<ExportNote>, List<ExportJournalNoteRelation>> {
     val notes = notesJson?.let { ArchiveJson.document.decodeFromString(ArchiveNoteFile.serializer(), it).notes }.orEmpty()
-    val drafts = draftsJson?.let { ArchiveJson.document.decodeFromString(ArchiveDraftFile.serializer(), it).drafts }.orEmpty()
-    val profile = profileJson?.let { ArchiveJson.document.decodeFromString(ArchiveProfileFile.serializer(), it).profile }
-    val places = placesJson?.let { ArchiveJson.document.decodeFromString(ArchivePlaceFile.serializer(), it).places }.orEmpty()
-    val locationSamples = decodeLocationSamples(locationHistoryJsonLines)
-    val media = mediaInventoryJson?.let { ArchiveJson.document.decodeFromString(ArchiveMediaFile.serializer(), it) }
-
     val exportNotes =
         notes.map { note ->
             ExportNote(
@@ -94,27 +155,42 @@ internal fun V2RestoreBundle.adaptForRestore(): AdaptedV2RestoreBundle {
             )
         }
     val relations = notes.flatMap { note -> note.journalIds.map { ExportJournalNoteRelation(it, note.id, note.createdAt) } }
-    val adapterWarnings = mutableListOf<String>()
-    val exportDrafts =
-        drafts.map { draft ->
-            ExportDraft(
-                id = draft.id,
-                journalIds = draft.journalIds,
-                content = "",
-                createdAt = draft.createdAt,
-                updatedAt = draft.updatedAt,
-                blocks = draft.blocks.mapNotNull { toSerializableBlock(it, adapterWarnings) },
-            )
-        }
-    val exportPlaces =
-        places.map { ExportPlace(it.id, it.name, it.latitude, it.longitude, it.radiusMeters, it.description) }
-    val exportLocationHistory = locationSamples.map(::toExportLocationHistoryItem)
-    val mediaManifest =
-        media?.let { inventory ->
+    return exportNotes to relations
+}
+
+private fun V2RestoreBundle.decodeAndMapDrafts(warnings: MutableList<String>): List<ExportDraft> {
+    val drafts = draftsJson?.let { ArchiveJson.document.decodeFromString(ArchiveDraftFile.serializer(), it).drafts }.orEmpty()
+    return drafts.map { draft ->
+        ExportDraft(
+            id = draft.id,
+            journalIds = draft.journalIds,
+            content = "",
+            createdAt = draft.createdAt,
+            updatedAt = draft.updatedAt,
+            blocks = draft.blocks.mapNotNull { toSerializableBlock(it, warnings) },
+        )
+    }
+}
+
+private fun V2RestoreBundle.decodeAndMapPlaces(): List<ExportPlace> {
+    val places = placesJson?.let { ArchiveJson.document.decodeFromString(ArchivePlaceFile.serializer(), it).places }.orEmpty()
+    return places.map { ExportPlace(it.id, it.name, it.latitude, it.longitude, it.radiusMeters, it.description) }
+}
+
+private fun V2RestoreBundle.decodeAndMapLocationHistory(): List<ExportLocationHistoryItem> =
+    decodeLocationSamples(locationHistoryJsonLines).map(::toExportLocationHistoryItem)
+
+private fun V2RestoreBundle.decodeAndMapMediaManifest(): ExportMediaManifest? =
+    mediaInventoryJson
+        ?.let { ArchiveJson.document.decodeFromString(ArchiveMediaFile.serializer(), it) }
+        ?.let { inventory ->
             ExportMediaManifest(inventory.files.map { ExportMediaFile(exportPath = it.path.value, sourceUri = it.path.value) })
         }
-    val exportProfile =
-        profile?.let {
+
+private fun V2RestoreBundle.decodeAndMapProfile(): LogDateProfile? =
+    profileJson
+        ?.let { ArchiveJson.document.decodeFromString(ArchiveProfileFile.serializer(), it).profile }
+        ?.let {
             LogDateProfile(
                 displayName = it.displayName.orEmpty(),
                 birthday = it.birthday,
@@ -124,67 +200,42 @@ internal fun V2RestoreBundle.adaptForRestore(): AdaptedV2RestoreBundle {
                 lastUpdatedAt = it.updatedAt ?: Instant.DISTANT_PAST,
             )
         }
-    val metadata =
-        ExportMetadata(
-            version = manifest.schemaVersion,
-            exportDate = manifest.exportedAt,
-            userId = "",
-            deviceId = "",
-            appVersion = manifest.generator.version,
-            stats =
-                ExportStats(
-                    journalCount = manifest.counts.journals,
-                    noteCount = manifest.counts.notes,
-                    draftCount = manifest.counts.drafts,
-                    mediaCount = manifest.counts.media,
-                    placeCount = manifest.counts.places,
-                    locationHistoryCount = manifest.counts.locationSamples,
-                    hasProfile = manifest.counts.hasProfile,
-                ),
-        )
 
-    return AdaptedV2RestoreBundle(
-        legacy =
-            RestoreBundle(
-                metadataJson =
-                    ArchiveJson.document.encodeToString(
-                        ExportMetadata.serializer(),
-                        metadata.copy(version = ExportSchemaVersion.V1_2),
-                    ),
-                journalsJson =
-                    ArchiveJson.document.encodeToString(
-                        LegacyJournalsPayload.serializer(),
-                        LegacyJournalsPayload(
-                            journals.map {
-                                Journal(
-                                    id = Uuid.parse(it.id),
-                                    title = it.title,
-                                    description = it.description,
-                                    created = it.createdAt,
-                                    lastUpdated = it.updatedAt,
-                                )
-                            },
-                        ),
-                    ),
-                notesJson = ArchiveJson.document.encodeToString(LegacyNotesPayload.serializer(), LegacyNotesPayload(exportNotes)),
-                journalNotesJson =
-                    ArchiveJson.document.encodeToString(LegacyJournalNotesPayload.serializer(), LegacyJournalNotesPayload(relations)),
-                draftsJson = ArchiveJson.document.encodeToString(LegacyDraftsPayload.serializer(), LegacyDraftsPayload(exportDrafts)),
-                profileJson = exportProfile?.let { ArchiveJson.document.encodeToString(ProfilePayload.serializer(), ProfilePayload(it)) },
-                placesJson =
-                    exportPlaces
-                        .takeIf { it.isNotEmpty() }
-                        ?.let { ArchiveJson.document.encodeToString(PlacesPayload.serializer(), PlacesPayload(it)) },
-                locationHistoryJson =
-                    exportLocationHistory
-                        .takeIf { it.isNotEmpty() }
-                        ?.let { ArchiveJson.document.encodeToString(LocationHistoryPayload.serializer(), LocationHistoryPayload(it)) },
-                mediaManifestJson = mediaManifest?.let { ArchiveJson.document.encodeToString(ExportMediaManifest.serializer(), it) },
+/** Assembles the legacy [RestoreBundle] payloads that the existing restore pipeline consumes. */
+private fun buildLegacyRestoreBundle(
+    metadata: ExportMetadata,
+    journals: List<Journal>,
+    notes: List<ExportNote>,
+    journalNoteRelations: List<ExportJournalNoteRelation>,
+    drafts: List<ExportDraft>,
+    profile: LogDateProfile?,
+    places: List<ExportPlace>,
+    locationHistory: List<ExportLocationHistoryItem>,
+    mediaManifest: ExportMediaManifest?,
+): RestoreBundle =
+    RestoreBundle(
+        metadataJson =
+            ArchiveJson.document.encodeToString(
+                ExportMetadata.serializer(),
+                metadata.copy(version = ExportSchemaVersion.V1_2),
             ),
-        metadata = metadata,
-        warnings = adapterWarnings,
+        journalsJson =
+            ArchiveJson.document.encodeToString(LegacyJournalsPayload.serializer(), LegacyJournalsPayload(journals)),
+        notesJson = ArchiveJson.document.encodeToString(LegacyNotesPayload.serializer(), LegacyNotesPayload(notes)),
+        journalNotesJson =
+            ArchiveJson.document.encodeToString(LegacyJournalNotesPayload.serializer(), LegacyJournalNotesPayload(journalNoteRelations)),
+        draftsJson = ArchiveJson.document.encodeToString(LegacyDraftsPayload.serializer(), LegacyDraftsPayload(drafts)),
+        profileJson = profile?.let { ArchiveJson.document.encodeToString(ProfilePayload.serializer(), ProfilePayload(it)) },
+        placesJson =
+            places
+                .takeIf { it.isNotEmpty() }
+                ?.let { ArchiveJson.document.encodeToString(PlacesPayload.serializer(), PlacesPayload(it)) },
+        locationHistoryJson =
+            locationHistory
+                .takeIf { it.isNotEmpty() }
+                ?.let { ArchiveJson.document.encodeToString(LocationHistoryPayload.serializer(), LocationHistoryPayload(it)) },
+        mediaManifestJson = mediaManifest?.let { ArchiveJson.document.encodeToString(ExportMediaManifest.serializer(), it) },
     )
-}
 
 private fun ArchiveLocation.toExportLocation() = ExportLocation(latitude, longitude, placeName, altitudeMeters, accuracyMeters?.toFloat())
 

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.feature.core.sync.SyncErrorBanner
@@ -13,6 +14,7 @@ import app.logdate.screenshots.common.HomeTabRouteFrame
 import app.logdate.screenshots.common.RoutePreviewTab
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
+import app.logdate.screenshots.common.ScreenshotTestData.COMPACT_PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
 import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.streak.CampfireChip
@@ -237,4 +239,47 @@ fun InContext_StorageError_with_pending() {
 fun InContext_ConflictError_review_required() {
     // Conflicts present — tonal-tertiary banner with "Review".
     TimelineWithSync(SyncPresentation.ConflictError(conflictCount = 9))
+}
+
+@PreviewTest
+@Preview(name = "Compact Phone (320dp)", showBackground = true, device = COMPACT_PHONE)
+@Composable
+fun InContext_Pending_with_long_campfire_streak_compact_width() {
+    // Worst realistic case at the narrowest currently-supported phone width (iPhone SE, 320dp):
+    // a three-digit campfire streak (the chip has no digit cap, unlike the sync badge's "99+")
+    // plus a sync badge, together in the same Android bar exercised by
+    // InContext_Pending_with_campfire_fits_phone_width above, but at 320dp instead of 411dp.
+    TimelineWithSync(
+        presentation = SyncPresentation.Pending(pendingCount = 264),
+        campfire =
+            CampfirePresentation(
+                phase = CampfirePhase.BURNING,
+                loggedToday = true,
+                runDays = 104,
+                size = CampfireSize.BEACON,
+                longestRunDays = 104,
+                totalDaysJournaled = 140,
+            ),
+    )
+}
+
+@PreviewTest
+@Preview(name = "Compact Phone (320dp)", showBackground = true, device = COMPACT_PHONE)
+@Composable
+fun InContext_Pending_with_campfire_at_compact_width() {
+    // Same content as InContext_Pending_with_campfire_fits_phone_width above (already verified
+    // to fit at the 411dp "Phone" spec), rendered at 320dp to isolate whether width alone,
+    // not digit count, is enough to break it.
+    TimelineWithSync(
+        presentation = SyncPresentation.Pending(pendingCount = 264),
+        campfire =
+            CampfirePresentation(
+                phase = CampfirePhase.BURNING,
+                loggedToday = true,
+                runDays = 12,
+                size = CampfireSize.CAMPFIRE,
+                longestRunDays = 12,
+                totalDaysJournaled = 40,
+            ),
+    )
 }

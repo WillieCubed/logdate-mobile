@@ -183,8 +183,9 @@ fun HomeScreen(
             SyncAction.SignIn,
             SyncAction.ManageStorage,
             -> onOpenSettings()
-            SyncAction.ReviewConflicts -> onOpenSyncIssues()
+            SyncAction.ReviewConflicts, SyncAction.ReviewIssues -> onOpenSyncIssues()
             SyncAction.OpenStatus -> showSyncStatus = true
+            SyncAction.EnterRecoveryPhrase -> onOpenSyncSettings()
         }
     }
     val syncBanner: @Composable () -> Unit = {

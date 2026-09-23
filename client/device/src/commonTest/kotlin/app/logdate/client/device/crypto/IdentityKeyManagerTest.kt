@@ -21,7 +21,8 @@ import kotlin.test.assertTrue
 class IdentityKeyManagerTest {
     private val mockSecureStorage = InMemorySecureStorage()
     private val cryptoManager = FakeCryptoManager()
-    private val manager = IdentityKeyManager(mockSecureStorage, cryptoManager)
+    private val backupStore = InMemoryIdentityKeyBackupStore()
+    private val manager = IdentityKeyManager(mockSecureStorage, cryptoManager, backupStore)
 
     @Test
     fun `no identity key initially`() =
@@ -131,6 +132,100 @@ class IdentityKeyManagerTest {
             manager.clearIdentityKey()
             assertFalse(manager.hasIdentityKey())
             assertEquals(null, manager.getStoredRecoveryPhrase())
+        }
+
+    @Test
+    fun `setup new identity mirrors the phrase into the backup store`() =
+        runTest {
+            val phrase = manager.setupNewIdentity()
+
+            assertEquals(phrase.toString(), backupStore.readPhrase())
+        }
+
+    @Test
+    fun `recover identity mirrors the phrase into the backup store`() =
+        runTest {
+            val phrase = manager.setupNewIdentity()
+            manager.clearIdentityKey()
+            backupStore.clear()
+
+            manager.recoverIdentity(phrase.words)
+
+            assertEquals(phrase.toString(), backupStore.readPhrase())
+        }
+
+    @Test
+    fun `clear identity key also clears the backup store`() =
+        runTest {
+            manager.setupNewIdentity()
+            assertTrue(backupStore.readPhrase() != null)
+
+            manager.clearIdentityKey()
+
+            assertEquals(null, backupStore.readPhrase())
+        }
+
+    @Test
+    fun `restoring from backup does nothing when a key already exists`() =
+        runTest {
+            manager.setupNewIdentity()
+            val existingKey = manager.getIdentityKey()
+            backupStore.writePhrase((1..12).joinToString(" ") { "backup-$it" })
+
+            val restored = manager.restoreFromBackupIfAvailable()
+
+            assertFalse(restored)
+            assertTrue(existingKey.contentEquals(manager.getIdentityKey()))
+        }
+
+    @Test
+    fun `restoring from backup does nothing when there is no backup`() =
+        runTest {
+            val restored = manager.restoreFromBackupIfAvailable()
+
+            assertFalse(restored)
+            assertFalse(manager.hasIdentityKey())
+        }
+
+    @Test
+    fun `restoring from backup ignores a malformed phrase and does not mint a key`() =
+        runTest {
+            backupStore.writePhrase("not enough words")
+
+            val restored = manager.restoreFromBackupIfAvailable()
+
+            assertFalse(restored)
+            assertFalse(manager.hasIdentityKey())
+        }
+
+    @Test
+    fun `restoring from backup silently derives the same key the phrase would have set up`() =
+        runTest {
+            // Simulate a first device establishing an identity, then losing SecureStorage (a
+            // reinstall) while its backup survives.
+            val original = manager.setupNewIdentity()
+            val originalKey = manager.getIdentityKey()
+            val freshManager = IdentityKeyManager(InMemorySecureStorage(), cryptoManager, backupStore)
+
+            val restored = freshManager.restoreFromBackupIfAvailable()
+
+            assertTrue(restored)
+            assertTrue(freshManager.hasIdentityKey())
+            assertEquals(original, freshManager.getStoredRecoveryPhrase())
+            assertTrue(originalKey.contentEquals(freshManager.getIdentityKey()))
+        }
+
+    @Test
+    fun `ensure identity key restores from backup instead of minting a new identity`() =
+        runTest {
+            val original = manager.setupNewIdentity()
+            val originalKey = manager.getIdentityKey()
+            val freshManager = IdentityKeyManager(InMemorySecureStorage(), cryptoManager, backupStore)
+
+            freshManager.ensureIdentityKey()
+
+            assertEquals(original, freshManager.getStoredRecoveryPhrase())
+            assertTrue(originalKey.contentEquals(freshManager.getIdentityKey()))
         }
 }
 
@@ -248,6 +343,20 @@ class InMemorySecureStorage : SecureStorage {
     override suspend fun encrypt(data: ByteArray): ByteArray = data
 
     override suspend fun decrypt(data: ByteArray): ByteArray? = data
+}
+
+class InMemoryIdentityKeyBackupStore : IdentityKeyBackupStore {
+    private var phrase: String? = null
+
+    override suspend fun readPhrase(): String? = phrase
+
+    override suspend fun writePhrase(phrase: String) {
+        this.phrase = phrase
+    }
+
+    override suspend fun clear() {
+        phrase = null
+    }
 }
 
 class FakeCryptoManager : CryptoManager {

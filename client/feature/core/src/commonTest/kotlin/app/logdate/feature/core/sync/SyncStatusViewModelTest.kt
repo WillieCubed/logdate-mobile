@@ -2,6 +2,10 @@ package app.logdate.feature.core.sync
 
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
+import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.repository.journals.NoteType
 import app.logdate.client.sync.SyncError
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncManager
@@ -14,12 +18,16 @@ import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.QueuedUpload
 import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.shared.model.EditorDraft
+import app.logdate.shared.model.Journal
+import app.logdate.shared.model.SerializableTextBlock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -32,6 +40,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SyncStatusViewModelTest {
@@ -65,11 +74,44 @@ class SyncStatusViewModelTest {
 
         assertEquals(
             listOf(
-                QueuedGroup(EntityType.NOTE, count = 3, retrying = 2),
+                QueuedGroup(EntityType.NOTE, count = 3, retrying = 2, previewIds = listOf("n1", "n2", "n3")),
                 QueuedGroup(EntityType.MEDIA, count = 1, retrying = 0),
             ),
             state.groups,
         )
+    }
+
+    @Test
+    fun `a group past the preview limit only queues the first three ids for lookup`() {
+        val state =
+            buildSyncStatusUiState(
+                status = status(pendingUploads = 0),
+                queue =
+                    listOf(
+                        queued(EntityType.NOTE, "n1"),
+                        queued(EntityType.NOTE, "n2"),
+                        queued(EntityType.NOTE, "n3"),
+                        queued(EntityType.NOTE, "n4"),
+                        queued(EntityType.NOTE, "n5"),
+                    ),
+                failedCount = 0,
+                queueUnavailable = false,
+            )
+
+        assertEquals(listOf("n1", "n2", "n3"), state.groups.single().previewIds)
+    }
+
+    @Test
+    fun `a kind with no title lookup never queues preview ids`() {
+        val state =
+            buildSyncStatusUiState(
+                status = status(pendingUploads = 0),
+                queue = listOf(queued(EntityType.MEDIA, "m1"), queued(EntityType.ASSOCIATION, "a1"), queued(EntityType.HEALTH, "h1")),
+                failedCount = 0,
+                queueUnavailable = false,
+            )
+
+        assertTrue(state.groups.all { it.previewIds.isEmpty() })
     }
 
     @Test
@@ -177,6 +219,8 @@ class SyncStatusViewModelTest {
                     syncManager = RecordingSyncManager(pendingUploads = 5),
                     syncMetadataService = metadata,
                     sessionStorage = FakeSessionStorage(UserSession("a", "r", "account")),
+                    journalRepository = FakeJournalRepository(),
+                    journalNotesRepository = FakeJournalNotesRepository(),
                 )
             viewModel.uiState.launchIn(backgroundScope)
             advanceUntilIdle()
@@ -185,6 +229,157 @@ class SyncStatusViewModelTest {
             assertEquals(5, viewModel.uiState.value.pendingCount)
         }
 
+    @Test
+    fun `a queued note shows its content as a preview`() =
+        runTest {
+            val noteId = Uuid.random()
+            val viewModel =
+                statusViewModel(
+                    queue = listOf(queued(EntityType.NOTE, noteId.toString())),
+                    journalNotesRepository =
+                        FakeJournalNotesRepository(
+                            notes = mapOf(noteId to textNote(noteId, content = "Had a great day at the park")),
+                        ),
+                )
+            viewModel.uiState.launchIn(backgroundScope)
+            advanceUntilIdle()
+
+            val group =
+                viewModel.uiState.value.groups
+                    .single()
+            assertEquals(
+                listOf(QueuedItemPreview(noteId.toString(), "Had a great day at the park", NoteType.TEXT)),
+                group.previews,
+            )
+        }
+
+    @Test
+    fun `a queued journal shows its title as a preview`() =
+        runTest {
+            val journalId = Uuid.random()
+            val viewModel =
+                statusViewModel(
+                    queue = listOf(queued(EntityType.JOURNAL, journalId.toString())),
+                    journalRepository =
+                        FakeJournalRepository(journals = mapOf(journalId to Journal(id = journalId, title = "Travel"))),
+                )
+            viewModel.uiState.launchIn(backgroundScope)
+            advanceUntilIdle()
+
+            val group =
+                viewModel.uiState.value.groups
+                    .single()
+            assertEquals(listOf(QueuedItemPreview(journalId.toString(), "Travel")), group.previews)
+        }
+
+    @Test
+    fun `a queued draft shows its text as a preview`() =
+        runTest {
+            val draftId = Uuid.random()
+            val draft =
+                EditorDraft(
+                    id = draftId,
+                    blocks =
+                        listOf(
+                            SerializableTextBlock(id = Uuid.random(), timestamp = Instant.fromEpochMilliseconds(0), content = "Draft text"),
+                        ),
+                )
+            val viewModel =
+                statusViewModel(
+                    queue = listOf(queued(EntityType.DRAFT, draftId.toString())),
+                    journalRepository = FakeJournalRepository(drafts = mapOf(draftId to draft)),
+                )
+            viewModel.uiState.launchIn(backgroundScope)
+            advanceUntilIdle()
+
+            val group =
+                viewModel.uiState.value.groups
+                    .single()
+            assertEquals(listOf(QueuedItemPreview(draftId.toString(), "Draft text")), group.previews)
+        }
+
+    @Test
+    fun `a queued voice note without a caption falls back to a generic label`() =
+        runTest {
+            val noteId = Uuid.random()
+            val viewModel =
+                statusViewModel(
+                    queue = listOf(queued(EntityType.NOTE, noteId.toString())),
+                    journalNotesRepository =
+                        FakeJournalNotesRepository(
+                            notes =
+                                mapOf(
+                                    noteId to
+                                        JournalNote.Audio(
+                                            mediaRef = "audio.m4a",
+                                            uid = noteId,
+                                            creationTimestamp = Instant.fromEpochMilliseconds(0),
+                                            lastUpdated = Instant.fromEpochMilliseconds(0),
+                                        ),
+                                ),
+                        ),
+                )
+            viewModel.uiState.launchIn(backgroundScope)
+            advanceUntilIdle()
+
+            val group =
+                viewModel.uiState.value.groups
+                    .single()
+            assertEquals(listOf(QueuedItemPreview(noteId.toString(), null, NoteType.AUDIO)), group.previews)
+        }
+
+    @Test
+    fun `a kind without a title stays a count-only row`() =
+        runTest {
+            val viewModel = statusViewModel(queue = listOf(queued(EntityType.MEDIA, "media-1")))
+            viewModel.uiState.launchIn(backgroundScope)
+            advanceUntilIdle()
+
+            val group =
+                viewModel.uiState.value.groups
+                    .single()
+            assertTrue(group.previewIds.isEmpty())
+            assertTrue(group.previews.isEmpty())
+        }
+
+    @Test
+    fun `a journal deleted locally after being queued falls back to a count-only row without crashing`() =
+        runTest {
+            val journalId = Uuid.random()
+            // No journal in the repository -- it was deleted locally after this device queued it.
+            val viewModel = statusViewModel(queue = listOf(queued(EntityType.JOURNAL, journalId.toString())))
+            viewModel.uiState.launchIn(backgroundScope)
+            advanceUntilIdle()
+
+            val group =
+                viewModel.uiState.value.groups
+                    .single()
+            assertEquals(1, group.count)
+            assertTrue(group.previews.isEmpty())
+        }
+
+    private fun statusViewModel(
+        queue: List<QueuedUpload>,
+        journalRepository: JournalRepository = FakeJournalRepository(),
+        journalNotesRepository: JournalNotesRepository = FakeJournalNotesRepository(),
+    ) = SyncStatusViewModel(
+        syncManager = RecordingSyncManager(),
+        syncMetadataService = FakeMetadata(pendingUploads = MutableStateFlow(queue)),
+        sessionStorage = FakeSessionStorage(UserSession("a", "r", "account")),
+        journalRepository = journalRepository,
+        journalNotesRepository = journalNotesRepository,
+    )
+
+    private fun textNote(
+        id: Uuid,
+        content: String,
+    ) = JournalNote.Text(
+        uid = id,
+        creationTimestamp = Instant.fromEpochMilliseconds(0),
+        lastUpdated = Instant.fromEpochMilliseconds(0),
+        content = content,
+    )
+
     private fun viewModel(
         syncManager: SyncManager,
         session: UserSession?,
@@ -192,6 +387,8 @@ class SyncStatusViewModelTest {
         syncManager = syncManager,
         syncMetadataService = FakeMetadata(),
         sessionStorage = FakeSessionStorage(session),
+        journalRepository = FakeJournalRepository(),
+        journalNotesRepository = FakeJournalNotesRepository(),
     )
 
     private fun status(
@@ -301,6 +498,8 @@ class SyncStatusViewModelTest {
         ) {}
 
         override suspend fun clearPending() {}
+
+        override suspend fun resetAllCursors() {}
     }
 
     private class FakeSessionStorage(
@@ -315,5 +514,74 @@ class SyncStatusViewModelTest {
         override fun saveSession(session: UserSession) {}
 
         override fun clearSession() {}
+    }
+
+    private class FakeJournalRepository(
+        private val journals: Map<Uuid, Journal> = emptyMap(),
+        private val drafts: Map<Uuid, EditorDraft> = emptyMap(),
+    ) : JournalRepository {
+        override val allJournalsObserved: Flow<List<Journal>> = MutableStateFlow(journals.values.toList())
+
+        override fun observeJournalById(id: Uuid): Flow<Journal> = flowOf(journals.getValue(id))
+
+        override suspend fun getJournalById(id: Uuid): Journal? = journals[id]
+
+        override suspend fun create(journal: Journal): Uuid = journal.id
+
+        override suspend fun update(journal: Journal) {}
+
+        override suspend fun delete(journalId: Uuid) {}
+
+        override suspend fun saveDraft(draft: EditorDraft) {}
+
+        override suspend fun getLatestDraft(): EditorDraft? = null
+
+        override suspend fun getAllDrafts(): List<EditorDraft> = drafts.values.toList()
+
+        override suspend fun getDraft(id: Uuid): EditorDraft? = drafts[id]
+
+        override suspend fun deleteDraft(id: Uuid) {}
+    }
+
+    private class FakeJournalNotesRepository(
+        private val notes: Map<Uuid, JournalNote> = emptyMap(),
+    ) : JournalNotesRepository {
+        override val allNotesObserved: Flow<List<JournalNote>> = MutableStateFlow(notes.values.toList())
+
+        override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> = flowOf(emptyList())
+
+        override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
+
+        override fun observeNotesInRange(
+            start: Instant,
+            end: Instant,
+        ): Flow<List<JournalNote>> = flowOf(emptyList())
+
+        override fun observeNotesPage(
+            pageSize: Int,
+            offset: Int,
+        ): Flow<List<JournalNote>> = flowOf(emptyList())
+
+        override fun observeNotesStream(pageSize: Int): Flow<List<JournalNote>> = flowOf(emptyList())
+
+        override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = flowOf(emptyList())
+
+        override suspend fun getNoteById(noteId: Uuid): JournalNote? = notes[noteId]
+
+        override suspend fun create(note: JournalNote): Uuid = note.uid
+
+        override suspend fun remove(note: JournalNote) {}
+
+        override suspend fun removeById(noteId: Uuid) {}
+
+        override suspend fun create(
+            note: JournalNote,
+            journalId: Uuid,
+        ) {}
+
+        override suspend fun removeFromJournal(
+            noteId: Uuid,
+            journalId: Uuid,
+        ) {}
     }
 }

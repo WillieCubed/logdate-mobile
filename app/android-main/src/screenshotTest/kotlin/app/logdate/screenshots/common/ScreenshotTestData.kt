@@ -11,6 +11,9 @@ object ScreenshotTestData {
     /** Standard phone device spec for screenshots. */
     const val PHONE = "spec:width=411dp,height=891dp"
 
+    /** Narrowest currently-supported phone width (iPhone SE logical width) for crowding checks. */
+    const val COMPACT_PHONE = "spec:width=320dp,height=568dp"
+
     /** Tablet device spec for adaptive layout screenshots. */
     const val TABLET = "spec:width=1280dp,height=800dp"
 

@@ -7,6 +7,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.InMemoryUnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.test.FakeJournalNotesRepository
 import app.logdate.client.sync.test.fakeCloudApiClient
@@ -92,11 +93,13 @@ class UnreadableRemoteRecordTest {
             )
             val metadata = fakeSyncMetadataService()
             metadata.clearPending()
+            val unreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore()
             val manager: DefaultSyncManager =
                 testDefaultSyncManager(
                     cloudContentDataSource = DefaultCloudContentDataSource(api, currentKey),
                     journalNotesRepository = notes,
                     syncMetadataService = metadata,
+                    unreadableCloudRecordStore = unreadableCloudRecordStore,
                 )
 
             val result = manager.downloadRemoteChanges()
@@ -108,13 +111,18 @@ class UnreadableRemoteRecordTest {
                 metadata.getPendingUploads(EntityType.NOTE).filter { it.operation == PendingOperation.CREATE }.map { it.entityId },
                 "Only the record this phone holds is re-uploaded; nothing is invented for the other",
             )
+            assertEquals(1, unreadableCloudRecordStore.count(), "The cloud-only record is tracked so Backup status can report it")
         }
 
     private suspend fun cipherFor(seed: String): SyncPayloadCipher {
         val cryptoManager = TestCryptoManager()
         val identityKeyManager = IdentityKeyManager(InMemorySecureStorage(), cryptoManager)
         identityKeyManager.recoverIdentity((1..12).map { "$seed-$it" })
-        return SyncPayloadCipher(ContentEncryptionService(identityKeyManager, KeyDerivation(cryptoManager), cryptoManager))
+        return SyncPayloadCipher(
+            ContentEncryptionService(identityKeyManager, KeyDerivation(cryptoManager), cryptoManager),
+            identityKeyManager,
+            cryptoManager,
+        )
     }
 
     private fun textFieldId(id: Uuid) = "sync:note:$id:text"

@@ -10,6 +10,7 @@ import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.SerializableVideoBlock
 import app.logdate.shared.model.sync.DeviceId
 import app.logdate.shared.model.sync.DraftUploadRequest
+import app.logdate.shared.model.textContent
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -43,6 +44,8 @@ data class DraftSyncResult(
     val deletions: List<Uuid>,
     val lastSyncTimestamp: Instant,
     val hasMore: Boolean = false,
+    /** Drafts on the server this device could not decrypt -- see [SyncDownloadEngine.repairUnreadable]. */
+    val unreadable: List<Uuid> = emptyList(),
 )
 
 data class SyncedDraft(
@@ -101,28 +104,30 @@ class DefaultCloudDraftDataSource(
         limit: Int?,
     ): Result<DraftSyncResult> =
         cloudApiClient.getDraftChanges(accessToken, since.toEpochMilliseconds(), limit).mapCatching { response ->
+            val (readable, unreadable) =
+                response.drafts
+                    .filter { !it.isDeleted }
+                    .readEach(idOf = { it.id }) { change ->
+                        SyncedDraft(
+                            id = Uuid.parse(change.id),
+                            content = decryptDraftContent(Uuid.parse(change.id), change.content),
+                            deviceId = change.deviceId,
+                            createdAt = Instant.fromEpochMilliseconds(change.createdAt),
+                            lastUpdated = Instant.fromEpochMilliseconds(change.lastUpdated),
+                            serverVersion = change.serverVersion,
+                            journalIds = change.journalIds.mapNotNull { id -> runCatching { Uuid.parse(id) }.getOrNull() },
+                            blockTypes = change.blockTypes,
+                        )
+                    }
             DraftSyncResult(
-                changes =
-                    response.drafts
-                        .filter { !it.isDeleted }
-                        .readEach(idOf = { it.id }) { change ->
-                            SyncedDraft(
-                                id = Uuid.parse(change.id),
-                                content = decryptDraftContent(Uuid.parse(change.id), change.content),
-                                deviceId = change.deviceId,
-                                createdAt = Instant.fromEpochMilliseconds(change.createdAt),
-                                lastUpdated = Instant.fromEpochMilliseconds(change.lastUpdated),
-                                serverVersion = change.serverVersion,
-                                journalIds = change.journalIds.mapNotNull { id -> runCatching { Uuid.parse(id) }.getOrNull() },
-                                blockTypes = change.blockTypes,
-                            )
-                        }.first,
+                changes = readable,
                 deletions = response.drafts.filter { it.isDeleted }.map { Uuid.parse(it.id) },
                 lastSyncTimestamp =
                     Instant.fromEpochMilliseconds(
                         response.drafts.maxOfOrNull { it.lastUpdated } ?: 0L,
                     ),
                 hasMore = response.cursor != null,
+                unreadable = unreadable,
             )
         }
 
@@ -137,11 +142,6 @@ class DefaultCloudDraftDataSource(
     ): String = syncPayloadCipher?.decryptString(draftFieldId(draftId), content) ?: content
 
     private fun draftFieldId(draftId: Uuid): String = "sync:draft:$draftId:content"
-
-    private fun EditorDraft.textContent(): String =
-        blocks
-            .filterIsInstance<SerializableTextBlock>()
-            .joinToString("\n") { it.content }
 
     private fun SerializableEntryBlock.syncBlockType(): String =
         when (this) {

@@ -6,6 +6,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.Uri
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -97,6 +98,8 @@ class AndroidAmplitudeExtractor(
             decoder.release()
 
             normalizeAmplitudes(amplitudes)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e(e) { "Error extracting amplitudes from $uri" }
             emptyList()

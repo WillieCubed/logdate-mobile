@@ -51,8 +51,8 @@ class AndroidNetworkSaverModeProvider(
 
     init {
         // Register for network changes
-        val request = NetworkRequest.Builder().build()
         try {
+            val request = NetworkRequest.Builder().build()
             connectivityManager.registerNetworkCallback(request, networkCallback)
         } catch (e: Exception) {
             // In case of security exception or other issues
@@ -88,7 +88,7 @@ class AndroidNetworkSaverModeProvider(
     }
 
     private fun getCurrentNetworkSaverStateInternal(): NetworkSaverState {
-        val isDataSaverEnabled =
+        val isGlobalDataSaverEnabled =
             try {
                 connectivityManager.restrictBackgroundStatus ==
                     ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
@@ -96,29 +96,52 @@ class AndroidNetworkSaverModeProvider(
                 false
             }
 
-        val connectionType = getCurrentConnectionType()
+        val activeCapabilities = getActiveNetworkCapabilities()
 
         return NetworkSaverState(
-            isDataSaverEnabled = isDataSaverEnabled,
-            connectionType = connectionType,
+            // Global Data Saver only reports the device-wide toggle. A user can leave that off
+            // and still turn off Background data for LogDate specifically (Settings > Apps >
+            // LogDate > Data usage), which restrictBackgroundStatus alone never sees - sync would
+            // keep getting silently dropped by the platform with no signal anywhere in the app.
+            isDataSaverEnabled = isGlobalDataSaverEnabled || isBackgroundDataRestrictedForThisApp(activeCapabilities),
+            connectionType = activeCapabilities.toConnectionType(),
         )
     }
 
-    private fun getCurrentConnectionType(): NetworkConnectionType {
+    private fun getActiveNetworkCapabilities(): NetworkCapabilities? =
         try {
-            val activeNetwork = connectivityManager.activeNetwork ?: return NetworkConnectionType.NONE
-            val capabilities =
-                connectivityManager.getNetworkCapabilities(activeNetwork)
-                    ?: return NetworkConnectionType.NONE
+            val activeNetwork = connectivityManager.activeNetwork
+            activeNetwork?.let { connectivityManager.getNetworkCapabilities(it) }
+        } catch (e: Exception) {
+            null
+        }
 
-            return when {
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> NetworkConnectionType.WIFI
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> NetworkConnectionType.CELLULAR
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> NetworkConnectionType.ETHERNET
+    /**
+     * [NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED] reflects, for the calling app's UID,
+     * the combined effect of system-wide Data Saver, this app's own per-app background-data
+     * restriction, and Doze/App Standby - exactly the platform-side "can this app use the
+     * network right now" answer that [ConnectivityManager.getRestrictBackgroundStatus] can't
+     * give on its own. Its absence on the active network is treated the same as Data Saver being
+     * on: sync should pause and the user should see why.
+     */
+    private fun isBackgroundDataRestrictedForThisApp(capabilities: NetworkCapabilities?): Boolean =
+        try {
+            capabilities != null && !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
+        } catch (e: Exception) {
+            false
+        }
+
+    private fun NetworkCapabilities?.toConnectionType(): NetworkConnectionType {
+        if (this == null) return NetworkConnectionType.NONE
+        return try {
+            when {
+                hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> NetworkConnectionType.WIFI
+                hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> NetworkConnectionType.CELLULAR
+                hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> NetworkConnectionType.ETHERNET
                 else -> NetworkConnectionType.OTHER
             }
         } catch (e: Exception) {
-            return NetworkConnectionType.OTHER
+            NetworkConnectionType.OTHER
         }
     }
 }

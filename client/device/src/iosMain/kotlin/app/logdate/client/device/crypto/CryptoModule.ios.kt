@@ -7,4 +7,5 @@ actual fun platformCryptoModule(): Module =
     module {
         single<CryptoManager> { IosCryptoManager() }
         single<PlcRecoveryKeyManager> { IosPlcRecoveryKeyManager() }
+        single<IdentityKeyBackupStore> { IosIdentityKeyBackupStore() }
     }

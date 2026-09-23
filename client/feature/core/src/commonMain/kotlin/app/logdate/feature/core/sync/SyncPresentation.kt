@@ -71,6 +71,13 @@ sealed class SyncPresentation {
     data class NetworkError(
         val pendingCount: Int,
     ) : SyncPresentation()
+
+    /**
+     * This device has no identity key, but the account already has data in the cloud. Backing up
+     * is paused rather than risking a new key that could never read what is already there -- the
+     * user needs to enter their recovery phrase again before anything else can happen.
+     */
+    data object NeedsRecovery : SyncPresentation()
 }
 
 /** What the user can do with a [SyncPresentation] surface. */
@@ -81,6 +88,12 @@ sealed class SyncAction {
 
     data object ReviewConflicts : SyncAction()
 
+    /** Open the list of entries that are stuck, separate from [ReviewConflicts]'s edit conflicts. */
+    data object ReviewIssues : SyncAction()
+
     /** Show what is waiting to back up, and why. */
     data object OpenStatus : SyncAction()
+
+    /** Resolve [SyncPresentation.NeedsRecovery] by entering the recovery phrase again. */
+    data object EnterRecoveryPhrase : SyncAction()
 }

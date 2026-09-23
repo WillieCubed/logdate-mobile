@@ -83,6 +83,10 @@ class FakeSyncMetadataService : SyncMetadataService {
         _pendingCount.value = 0
     }
 
+    override suspend fun resetAllCursors() {
+        syncTimes.clear()
+    }
+
     private fun updatePendingCount() {
         _pendingCount.value = pendingUploads.values.sumOf { it.size }
     }

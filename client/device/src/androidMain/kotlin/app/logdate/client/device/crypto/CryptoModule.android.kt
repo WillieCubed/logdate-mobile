@@ -1,5 +1,6 @@
 package app.logdate.client.device.crypto
 
+import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -7,4 +8,5 @@ actual fun platformCryptoModule(): Module =
     module {
         single<CryptoManager> { AndroidCryptoManager() }
         single<PlcRecoveryKeyManager> { DeterministicPlcRecoveryKeyManager(get(), JvmPlcRecoveryKeySupport()) }
+        single<IdentityKeyBackupStore> { AndroidIdentityKeyBackupStore(androidContext()) }
     }
