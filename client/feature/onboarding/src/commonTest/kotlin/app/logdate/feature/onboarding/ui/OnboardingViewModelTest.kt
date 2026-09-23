@@ -331,27 +331,6 @@ class OnboardingViewModelTest {
             assertTrue(viewModel.progressSnapshot.value.locationHandledOnThisDevice)
         }
 
-    private class FakeStreakSettingsRepository : StreakSettingsRepository {
-        private val streakEnabled = MutableStateFlow(true)
-        private val cachedStreak = MutableStateFlow(0)
-
-        override fun observeStreakEnabled(): Flow<Boolean> = streakEnabled
-
-        override suspend fun isStreakEnabled(): Boolean = streakEnabled.value
-
-        override suspend fun setStreakEnabled(enabled: Boolean) {
-            streakEnabled.value = enabled
-        }
-
-        override fun observeCachedStreak(): Flow<Int> = cachedStreak
-
-        override suspend fun getCachedStreak(): Int = cachedStreak.value
-
-        override suspend fun setCachedStreak(value: Int) {
-            cachedStreak.value = value
-        }
-    }
-
     @Test
     fun `an entry added during onboarding records the time zone it was written in`() =
         runTest {
@@ -374,7 +353,7 @@ class OnboardingViewModelTest {
 
 // region Fakes
 
-private class FakeJournalNotesRepository : JournalNotesRepository {
+internal class FakeJournalNotesRepository : JournalNotesRepository {
     override val allNotesObserved: Flow<List<JournalNote>> = flowOf(emptyList())
 
     override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> = flowOf(emptyList())
@@ -419,7 +398,7 @@ private class FakeJournalNotesRepository : JournalNotesRepository {
     override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
 }
 
-private class FakeUserStateRepository : UserStateRepository {
+internal class FakeUserStateRepository : UserStateRepository {
     private val state = MutableStateFlow(UserData())
     override val userData: Flow<UserData> = state
     var lastBirthday: Instant? = null
@@ -442,7 +421,7 @@ private class FakeUserStateRepository : UserStateRepository {
     override suspend fun addFavoriteNote(vararg noteId: String) {}
 }
 
-private class FakeProfileRepository : ProfileRepository {
+internal class FakeProfileRepository : ProfileRepository {
     private val state = MutableStateFlow(LogDateProfile())
     override val currentProfile: Flow<LogDateProfile> = state
 
@@ -481,7 +460,7 @@ private class FakeProfileRepository : ProfileRepository {
     }
 }
 
-private class FakeAccountRepository : AccountRepository {
+internal class FakeAccountRepository : AccountRepository {
     private val state = MutableStateFlow<LogDateAccount?>(null)
     override val currentAccount: Flow<LogDateAccount?> = state
 
@@ -495,7 +474,7 @@ private class FakeAccountRepository : AccountRepository {
     override suspend fun checkUsernameAvailability(username: String): Result<Boolean> = Result.success(true)
 }
 
-private class FakeSessionStorage : SessionStorage {
+internal class FakeSessionStorage : SessionStorage {
     private val state = MutableStateFlow<UserSession?>(null)
 
     override fun getSession(): UserSession? = state.value
@@ -513,7 +492,7 @@ private class FakeSessionStorage : SessionStorage {
     }
 }
 
-private class FakeOnboardingDeviceStateRepository : OnboardingDeviceStateRepository {
+internal class FakeOnboardingDeviceStateRepository : OnboardingDeviceStateRepository {
     private val state = MutableStateFlow(OnboardingDeviceState())
     override val deviceState: StateFlow<OnboardingDeviceState> = state
 
@@ -542,7 +521,7 @@ private class FakeOnboardingDeviceStateRepository : OnboardingDeviceStateReposit
     }
 }
 
-private class FakeMemoriesSettingsRepository : MemoriesSettingsRepository {
+internal class FakeMemoriesSettingsRepository : MemoriesSettingsRepository {
     var contextualRecommendationsEnabled: Boolean = true
         private set
     private val _settings = MutableStateFlow(MemoriesSettings())
@@ -573,7 +552,7 @@ private class FakeMemoriesSettingsRepository : MemoriesSettingsRepository {
     }
 }
 
-private class FakeLocationTrackingSettingsRepository : LocationTrackingSettingsRepository {
+internal class FakeLocationTrackingSettingsRepository : LocationTrackingSettingsRepository {
     var backgroundTrackingEnabled: Boolean = false
         private set
     private val _settings = MutableStateFlow(LocationTrackingSettings())
@@ -592,7 +571,7 @@ private class FakeLocationTrackingSettingsRepository : LocationTrackingSettingsR
     }
 }
 
-private class FakeDayBoundarySettingsRepository : DayBoundarySettingsRepository {
+internal class FakeDayBoundarySettingsRepository : DayBoundarySettingsRepository {
     var sleepBasedBoundariesEnabled: Boolean = false
         private set
     private val _settings = MutableStateFlow(DayBoundarySettings())
@@ -607,7 +586,7 @@ private class FakeDayBoundarySettingsRepository : DayBoundarySettingsRepository 
     }
 }
 
-private class FakeLocalFirstHealthRepository : LocalFirstHealthRepository {
+internal class FakeLocalFirstHealthRepository : LocalFirstHealthRepository {
     var isAvailable: Boolean = true
     var hasPermissions: Boolean = true
 
@@ -648,7 +627,7 @@ private class FakeLocalFirstHealthRepository : LocalFirstHealthRepository {
     ): DayBounds = error("Not used in onboarding tests")
 }
 
-private class InMemorySecureStorage : SecureStorage {
+internal class InMemorySecureStorage : SecureStorage {
     private val storage = MutableStateFlow<Map<String, String>>(emptyMap())
 
     override suspend fun getString(key: String): String? = storage.value[key]
@@ -677,7 +656,7 @@ private class InMemorySecureStorage : SecureStorage {
     override suspend fun decrypt(data: ByteArray): ByteArray? = data
 }
 
-private class FakeCryptoManager : CryptoManager {
+internal class FakeCryptoManager : CryptoManager {
     override suspend fun generateRecoveryPhrase(): List<String> = (1..12).map { "word$it" }
 
     override suspend fun deriveMasterKey(phrase: List<String>): ByteArray {
@@ -719,6 +698,27 @@ private class FakeCryptoManager : CryptoManager {
         aad: ByteArray,
         ciphertext: ByteArray,
     ): ByteArray = ciphertext
+}
+
+internal class FakeStreakSettingsRepository : StreakSettingsRepository {
+    private val streakEnabled = MutableStateFlow(true)
+    private val cachedStreak = MutableStateFlow(0)
+
+    override fun observeStreakEnabled(): Flow<Boolean> = streakEnabled
+
+    override suspend fun isStreakEnabled(): Boolean = streakEnabled.value
+
+    override suspend fun setStreakEnabled(enabled: Boolean) {
+        streakEnabled.value = enabled
+    }
+
+    override fun observeCachedStreak(): Flow<Int> = cachedStreak
+
+    override suspend fun getCachedStreak(): Int = cachedStreak.value
+
+    override suspend fun setCachedStreak(value: Int) {
+        cachedStreak.value = value
+    }
 }
 
 // endregion
