@@ -27,7 +27,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,10 +70,10 @@ fun OnboardingNotificationsScreen(
     var isRequestingPermission by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val hasDecision = permissionState.hasPermission || permissionState.permissionRequested
-
-    LaunchedEffect(hasDecision) {
-        if (hasDecision) isRequestingPermission = false
-    }
+    // isRequestingPermission alone can't tell "never asked" apart from "request in flight" --
+    // both read as !hasDecision -- but once the OS has an answer, the request is no longer in
+    // flight, so no separate reset is needed.
+    val isRequestInFlight = isRequestingPermission && !hasDecision
 
     OnboardingNotificationsContent(
         onBack = onBack,
@@ -116,7 +115,7 @@ fun OnboardingNotificationsScreen(
         recommendationsEnabled = recommendationsEnabled,
         hasDecision = hasDecision,
         hasPermission = permissionState.hasPermission,
-        isSaving = isSaving || isRequestingPermission,
+        isSaving = isSaving || isRequestInFlight,
         errorMessage = errorMessage,
     )
 }

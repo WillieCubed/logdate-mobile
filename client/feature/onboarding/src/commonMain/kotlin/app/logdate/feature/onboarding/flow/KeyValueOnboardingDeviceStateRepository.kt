@@ -7,6 +7,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 
 /**
@@ -28,7 +29,7 @@ class KeyValueOnboardingDeviceStateRepository(
                 storage.observeBoolean(KEY_NOTIFICATIONS_HANDLED),
                 storage.observeString(KEY_ACTIVE_ENTRY_MODE),
             ) { recommendations, dayBoundaries, location, notifications, entryModeName ->
-                PartialDeviceState(
+                OnboardingDeviceState(
                     recommendationsHandledOnThisDevice = recommendations,
                     dayBoundariesHandledOnThisDevice = dayBoundaries,
                     locationHandledOnThisDevice = location,
@@ -38,19 +39,17 @@ class KeyValueOnboardingDeviceStateRepository(
             },
             storage.observeBoolean(KEY_ACCOUNT_HANDLED),
         ) { partial, accountHandled ->
-            OnboardingDeviceState(
-                recommendationsHandledOnThisDevice = partial.recommendationsHandledOnThisDevice,
-                dayBoundariesHandledOnThisDevice = partial.dayBoundariesHandledOnThisDevice,
-                locationHandledOnThisDevice = partial.locationHandledOnThisDevice,
-                notificationsHandledOnThisDevice = partial.notificationsHandledOnThisDevice,
-                accountHandledOnThisDevice = accountHandled,
-                activeEntryMode = partial.activeEntryMode,
+            partial.copy(accountHandledOnThisDevice = accountHandled)
+        }
+            // This KeyValueStorage shares its underlying DataStore with unrelated settings, so
+            // without this, any write anywhere in that store -- not just onboarding's own keys --
+            // would recompute and re-emit here for as long as the app process runs.
+            .distinctUntilChanged()
+            .stateIn(
+                scope = scope,
+                started = SharingStarted.Eagerly,
+                initialValue = OnboardingDeviceState(),
             )
-        }.stateIn(
-            scope = scope,
-            started = SharingStarted.Eagerly,
-            initialValue = OnboardingDeviceState(),
-        )
 
     override suspend fun markRecommendationsHandled() {
         storage.putBoolean(KEY_RECOMMENDATIONS_HANDLED, true)
@@ -90,14 +89,6 @@ class KeyValueOnboardingDeviceStateRepository(
 
     private fun String?.toEntryModeOrFresh(): OnboardingEntryMode =
         this?.let { name -> runCatching { OnboardingEntryMode.valueOf(name) }.getOrNull() } ?: OnboardingEntryMode.FRESH
-
-    private data class PartialDeviceState(
-        val recommendationsHandledOnThisDevice: Boolean,
-        val dayBoundariesHandledOnThisDevice: Boolean,
-        val locationHandledOnThisDevice: Boolean,
-        val notificationsHandledOnThisDevice: Boolean,
-        val activeEntryMode: OnboardingEntryMode,
-    )
 
     private companion object {
         const val KEY_RECOMMENDATIONS_HANDLED = "onboarding_recommendations_handled"

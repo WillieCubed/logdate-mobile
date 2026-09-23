@@ -43,6 +43,7 @@ import app.logdate.feature.onboarding.ui.RecoveryPhraseSetupScreen
 import app.logdate.feature.onboarding.ui.RecoveryPhraseViewModel
 import app.logdate.feature.onboarding.ui.WelcomeBackScreen
 import app.logdate.ui.navigation.taggedEntry
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.koin.compose.viewmodel.koinViewModel
@@ -269,7 +270,9 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
             },
             onSkip = {
                 coroutineScope.launch {
-                    flowViewModel.markAccountHandled()
+                    flowViewModel
+                        .markAccountHandled()
+                        .onFailure { error -> Napier.e("Failed to persist skipped account setup", error) }
                     onGoToItem(
                         routeForStep(
                             nextOnboardingStepAfter(
