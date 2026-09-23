@@ -5,6 +5,7 @@ package app.logdate.ui.step
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -20,14 +21,13 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.DividerDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -37,7 +37,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -116,8 +123,8 @@ object StepScaffoldDefaults {
  *   folded screen is too short for a header and its content together, and splitting them this way
  *   matches book posture.
  *
- * Any region that can scroll further shows a divider at that edge, so content that continues past
- * a pane boundary never looks cut off.
+ * Any region that can scroll further fades out at that edge, so content that continues past a pane
+ * boundary reads as more to scroll to, not as text sliced off mid-line.
  *
  * Window insets are applied per pane, inside the foldable layouts, because hinge bounds are in
  * window coordinates and padding the container would shift the split off the hinge.
@@ -284,7 +291,6 @@ private fun StepHeaderPane(
     val scrollState = rememberScrollState()
     Column(modifier = modifier) {
         StepTopBar(onBack = slots.onBack, progress = slots.progress)
-        ScrollEdge(visible = scrollState.canScrollBackward)
         CenteredScrollColumn(
             contentMaxWidth = slots.contentMaxWidth,
             scrollState = scrollState,
@@ -297,52 +303,68 @@ private fun StepHeaderPane(
                 StepContent(content)
             }
         }
-        ScrollEdge(visible = scrollState.canScrollForward)
     }
 }
 
-/** The content and actions together, centered; the content scrolls and the actions stay put. */
+/**
+ * The content and actions together, centered; the content scrolls and the actions stay put. A pane
+ * wide enough for two columns -- the lower half of a tabletop-posture foldable -- puts them side by
+ * side instead, since stacking them there wastes the width and forces the content to scroll.
+ */
 @Composable
 private fun StepDetailPane(
     slots: StepSlots,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier.padding(Spacing.lg),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
+    BoxWithConstraints(modifier = modifier.padding(Spacing.lg), contentAlignment = Alignment.Center) {
         val content = slots.content
-        if (content != null) {
-            val scrollState = rememberScrollState()
-            ScrollEdge(visible = scrollState.canScrollBackward, modifier = Modifier.widthIn(max = slots.contentMaxWidth))
-            Column(
-                modifier =
-                    Modifier
-                        .weight(1f, fill = false)
-                        .widthIn(max = slots.contentMaxWidth)
-                        .fillMaxWidth()
-                        .verticalScroll(scrollState),
+        val twoColumns = content != null && maxWidth >= slots.contentMaxWidth * 2 + Spacing.xxl
+        if (twoColumns) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xxl, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                StepContent(content)
+                ScrollingStepContent(content = content, modifier = Modifier.width(slots.contentMaxWidth))
+                Box(modifier = Modifier.width(slots.contentMaxWidth)) {
+                    StepActionColumn(slots)
+                }
             }
-            ScrollEdge(visible = scrollState.canScrollForward, modifier = Modifier.widthIn(max = slots.contentMaxWidth))
-            Spacer(modifier = Modifier.height(Spacing.xl))
+            return@BoxWithConstraints
         }
-        StepActionColumn(slots)
+
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            if (content != null) {
+                ScrollingStepContent(
+                    content = content,
+                    modifier = Modifier.weight(1f, fill = false).widthIn(max = slots.contentMaxWidth),
+                )
+                Spacer(modifier = Modifier.height(Spacing.xl))
+            }
+            StepActionColumn(slots)
+        }
     }
 }
 
-/** A hairline marking that content continues past this edge of a scrolling region. */
 @Composable
-private fun ScrollEdge(
-    visible: Boolean,
+private fun ScrollingStepContent(
+    content: @Composable ColumnScope.() -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    HorizontalDivider(
-        modifier = modifier,
-        color = if (visible) DividerDefaults.color else Color.Transparent,
-    )
+    val scrollState = rememberScrollState()
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .fadingEdges(scrollState)
+                .verticalScroll(scrollState),
+    ) {
+        StepContent(content)
+    }
 }
 
 @Composable
@@ -449,6 +471,7 @@ private fun CenteredScrollColumn(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .fadingEdges(scrollState)
                     .verticalScroll(scrollState)
                     .heightIn(min = maxHeight)
                     .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
@@ -462,3 +485,32 @@ private fun CenteredScrollColumn(
         }
     }
 }
+
+private val FadingEdgeLength = 32.dp
+
+/**
+ * Fades content out toward whichever edge it can still scroll past. Drawn over the viewport, before
+ * [verticalScroll] in the chain, so the fade stays put while the content moves under it.
+ */
+private fun Modifier.fadingEdges(scrollState: ScrollState): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            val length = FadingEdgeLength.toPx().coerceAtMost(size.height / 2)
+            if (scrollState.canScrollBackward) {
+                drawRect(
+                    brush = Brush.verticalGradient(0f to Color.Transparent, 1f to Color.Black, startY = 0f, endY = length),
+                    size = Size(size.width, length),
+                    blendMode = BlendMode.DstIn,
+                )
+            }
+            if (scrollState.canScrollForward) {
+                val top = size.height - length
+                drawRect(
+                    brush = Brush.verticalGradient(0f to Color.Black, 1f to Color.Transparent, startY = top, endY = size.height),
+                    topLeft = Offset(0f, top),
+                    size = Size(size.width, length),
+                    blendMode = BlendMode.DstIn,
+                )
+            }
+        }
