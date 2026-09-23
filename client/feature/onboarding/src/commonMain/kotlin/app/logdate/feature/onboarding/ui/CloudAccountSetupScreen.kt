@@ -45,6 +45,7 @@ import app.logdate.client.billing.model.LogDateBackupPlanOption
 import app.logdate.feature.core.account.CloudAccountOnboardingScreen
 import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.ui.AdaptiveLayout
+import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.onboarding.generated.resources.*
@@ -133,65 +134,111 @@ fun CloudAccountSetupContent(
             modifier = modifier,
         )
     } else {
-        AdaptiveLayout(
-            useCompactLayout = false,
+        // Every sibling onboarding screen responds to an actual half-folded, tabletop-posture
+        // device via FoldableTabletopLayout; this one previously only ever split by width, so a
+        // tabletop posture at this width rendered the same cramped side-by-side split as a wide,
+        // unfolded window. Falls back to the existing wide-window split otherwise.
+        FoldableTabletopLayout(
             modifier = modifier.testTag(CLOUD_ACCOUNT_SETUP_ROOT_TAG),
-            supplementalContent = {
-                // Left pane: title + description
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .padding(Spacing.lg),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Default.ArrowBack,
-                            contentDescription = stringResource(UiRes.string.common_back),
-                        )
-                    }
-                    Text(
-                        stringResource(Res.string.backup_and_sync),
-                        style = MaterialTheme.typography.headlineLarge,
-                    )
-                    Text(
-                        stringResource(Res.string.onboarding_cloud_backup_description),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+            minPaneHeight = 260.dp,
+            topPane = {
+                CloudAccountInfoPane(onBack = onBack, modifier = Modifier.fillMaxSize())
             },
-            mainContent = {
-                // Right pane: plan cards + buttons
-                Scaffold(
-                    bottomBar = {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            ActionButtons(
-                                onContinue = onContinue,
-                                onSignIn = onSignIn,
-                                onSkip = onSkip,
-                            )
-                        }
+            bottomPane = {
+                CloudAccountActionsPane(
+                    onContinue = onContinue,
+                    onSignIn = onSignIn,
+                    onSkip = onSkip,
+                    onPlanSelected = onPlanSelected,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            },
+            standardContent = {
+                AdaptiveLayout(
+                    useCompactLayout = false,
+                    modifier = Modifier.fillMaxSize(),
+                    supplementalContent = {
+                        CloudAccountInfoPane(onBack = onBack, modifier = Modifier.fillMaxSize())
                     },
-                ) { contentPadding ->
-                    Column(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                                .padding(contentPadding)
-                                .padding(Spacing.lg),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                    ) {
-                        PlanCards(onPlanSelected = onPlanSelected)
-                    }
-                }
+                    mainContent = {
+                        CloudAccountActionsPane(
+                            onContinue = onContinue,
+                            onSignIn = onSignIn,
+                            onSkip = onSkip,
+                            onPlanSelected = onPlanSelected,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    },
+                )
             },
         )
+    }
+}
+
+@Composable
+private fun CloudAccountInfoPane(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .verticalScroll(rememberScrollState())
+                .padding(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                Icons.AutoMirrored.Default.ArrowBack,
+                contentDescription = stringResource(UiRes.string.common_back),
+            )
+        }
+        Text(
+            stringResource(Res.string.backup_and_sync),
+            style = MaterialTheme.typography.headlineLarge,
+        )
+        Text(
+            stringResource(Res.string.onboarding_cloud_backup_description),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun CloudAccountActionsPane(
+    onContinue: () -> Unit,
+    onSignIn: () -> Unit,
+    onSkip: () -> Unit,
+    onPlanSelected: (LogDateBackupPlanOption) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Scaffold(
+        modifier = modifier,
+        bottomBar = {
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+                contentAlignment = Alignment.Center,
+            ) {
+                ActionButtons(
+                    onContinue = onContinue,
+                    onSignIn = onSignIn,
+                    onSkip = onSkip,
+                )
+            }
+        },
+    ) { contentPadding ->
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(contentPadding)
+                    .padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            PlanCards(onPlanSelected = onPlanSelected)
+        }
     }
 }
 
