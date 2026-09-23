@@ -105,6 +105,17 @@ class StepScaffoldLayoutTest {
         }
 
     @Test
+    fun `wide window with no content keeps the actions under the header`() =
+        runDesktopComposeUiTest(width = 1280, height = 800) {
+            setContent { LogDateTheme { SampleStep(contentItems = 0, onBack = {}, withHero = false) } }
+
+            val title = onNodeWithText(TITLE).getBoundsInRoot()
+            val action = bounds(PRIMARY_ACTION_TAG)
+            assertTrue(action.top >= title.bottom, "actions (top ${action.top}) are not under the header (bottom ${title.bottom})")
+            assertTrue(action.left < title.right && title.left < action.right, "actions are not in the header's column")
+        }
+
+    @Test
     fun `landscape phone places actions beside the body`() =
         runDesktopComposeUiTest(width = 891, height = 411) {
             setStep(contentItems = 1)
@@ -267,12 +278,18 @@ private fun SampleStep(
                 Text("Not now")
             }
         },
-    ) {
-        repeat(contentItems) { index ->
-            val tag = if (index == contentItems - 1) LAST_CONTENT_TAG else "step_content_$index"
-            Box(modifier = Modifier.fillMaxWidth().height(40.dp).testTag(tag))
-        }
-    }
+        content =
+            if (contentItems == 0) {
+                null
+            } else {
+                {
+                    repeat(contentItems) { index ->
+                        val tag = if (index == contentItems - 1) LAST_CONTENT_TAG else "step_content_$index"
+                        Box(modifier = Modifier.fillMaxWidth().height(40.dp).testTag(tag))
+                    }
+                }
+            },
+    )
 }
 
 private val bookPosture =
