@@ -5,28 +5,11 @@
 
 package app.logdate.feature.onboarding.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.History
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -39,19 +22,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import app.logdate.ui.adaptive.FoldableBookLayout
-import app.logdate.ui.adaptive.FoldableTabletopLayout
+import app.logdate.ui.step.StepBusyButton
+import app.logdate.ui.step.StepHeroIcon
+import app.logdate.ui.step.StepScaffold
 import app.logdate.ui.theme.LogDateTheme
-import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
-import logdate.client.ui.generated.resources.common_back
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
-import logdate.client.ui.generated.resources.Res as UiRes
 
 const val ONBOARDING_RECOMMENDATIONS_ROOT_TAG = "onboarding_recommendations_root"
 const val ONBOARDING_RECOMMENDATIONS_KEEP_ON_TAG = "onboarding_recommendations_keep_on"
@@ -126,300 +106,41 @@ fun OnboardingRecommendationsContent(
     isSaving: Boolean = false,
     errorMessage: String? = null,
 ) {
-    RecommendationsAdaptiveContent(
+    StepScaffold(
+        title = stringResource(Res.string.onboarding_recommendations_title),
         onBack = onBack,
-        onKeepOn = onKeepOn,
-        onTurnOff = onTurnOff,
-        isSaving = isSaving,
-        errorMessage = errorMessage,
-    )
-}
-
-@Composable
-private fun RecommendationsAdaptiveContent(
-    onBack: () -> Unit,
-    onKeepOn: () -> Unit,
-    onTurnOff: () -> Unit,
-    isSaving: Boolean,
-    errorMessage: String?,
-) {
-    FoldableTabletopLayout(
-        modifier = Modifier.fillMaxSize().testTag(ONBOARDING_RECOMMENDATIONS_ROOT_TAG),
-        minPaneHeight = 260.dp,
-        topPane = {
-            RecommendationsInfoPane(
-                onBack = onBack,
-                modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.testTag(ONBOARDING_RECOMMENDATIONS_ROOT_TAG),
+        supportingText = stringResource(Res.string.onboarding_recommendations_body),
+        hero = { StepHeroIcon(Icons.Rounded.AutoAwesome) },
+        headerAlignment = Alignment.CenterHorizontally,
+        actions = {
+            StepBusyButton(
+                text = stringResource(Res.string.onboarding_recommendations_keep_on),
+                onClick = onKeepOn,
+                busy = isSaving,
+                modifier = Modifier.testTag(ONBOARDING_RECOMMENDATIONS_KEEP_ON_TAG),
             )
+            TextButton(
+                onClick = onTurnOff,
+                enabled = !isSaving,
+                modifier = Modifier.testTag(ONBOARDING_RECOMMENDATIONS_TURN_OFF_TAG),
+            ) {
+                Text(stringResource(Res.string.onboarding_recommendations_turn_off))
+            }
+            OnboardingActionError(errorMessage)
         },
-        bottomPane = {
-            RecommendationsActionPane(
-                onKeepOn = onKeepOn,
-                onTurnOff = onTurnOff,
-                isSaving = isSaving,
-                errorMessage = errorMessage,
-                modifier = Modifier.fillMaxSize(),
-            )
-        },
-        standardContent = {
-            FoldableBookLayout(
-                modifier = Modifier.fillMaxSize(),
-                minPaneWidth = 320.dp,
-                startPane = {
-                    RecommendationsInfoPane(
-                        onBack = onBack,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                },
-                endPane = {
-                    RecommendationsActionPane(
-                        onKeepOn = onKeepOn,
-                        onTurnOff = onTurnOff,
-                        isSaving = isSaving,
-                        errorMessage = errorMessage,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                },
-                standardContent = {
-                    RecommendationsCompactContent(
-                        onBack = onBack,
-                        onKeepOn = onKeepOn,
-                        onTurnOff = onTurnOff,
-                        isSaving = isSaving,
-                        errorMessage = errorMessage,
-                    )
-                },
-            )
-        },
-    )
-}
-
-@Composable
-private fun RecommendationsInfoPane(
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier =
-            modifier
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
-        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
-            horizontalArrangement = Arrangement.Start,
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
-            }
-        }
-        Column(
-            modifier = Modifier.widthIn(max = 444.dp),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Text(
-                stringResource(Res.string.onboarding_recommendations_title),
-                style = MaterialTheme.typography.headlineLarge,
-                modifier = Modifier.padding(bottom = Spacing.md),
-            )
-            Text(
-                stringResource(Res.string.onboarding_recommendations_body),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            OverviewItem(
-                title = stringResource(Res.string.onboarding_recommendations_card_drafts_title),
-                description = stringResource(Res.string.onboarding_recommendations_card_drafts_description),
-                icon = {
-                    Icon(Icons.Rounded.EditNote, contentDescription = null)
-                },
-            )
-            OverviewItem(
-                title = stringResource(Res.string.onboarding_recommendations_card_recall_title),
-                description = stringResource(Res.string.onboarding_recommendations_card_recall_description),
-                icon = {
-                    Icon(Icons.Rounded.History, contentDescription = null)
-                },
-            )
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(
-                            MaterialTheme.colorScheme.surfaceContainerLow,
-                            MaterialTheme.shapes.medium,
-                        ).padding(Spacing.md),
-            ) {
-                Text(
-                    stringResource(Res.string.onboarding_recommendations_privacy),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun RecommendationsActionPane(
-    onKeepOn: () -> Unit,
-    onTurnOff: () -> Unit,
-    isSaving: Boolean,
-    errorMessage: String?,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier =
-            modifier
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Button(
-            onClick = onKeepOn,
-            modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_RECOMMENDATIONS_KEEP_ON_TAG),
-            enabled = !isSaving,
-        ) {
-            if (isSaving) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                )
-            } else {
-                Text(stringResource(Res.string.onboarding_recommendations_keep_on))
-            }
-        }
-        TextButton(
-            onClick = onTurnOff,
-            modifier = Modifier.testTag(ONBOARDING_RECOMMENDATIONS_TURN_OFF_TAG),
-        ) {
-            Text(stringResource(Res.string.onboarding_recommendations_turn_off))
-        }
-        errorMessage?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-    }
-}
-
-@Composable
-private fun RecommendationsCompactContent(
-    onBack: () -> Unit,
-    onKeepOn: () -> Unit,
-    onTurnOff: () -> Unit,
-    isSaving: Boolean,
-    errorMessage: String?,
-) {
-    Scaffold(
-        bottomBar = {
-            Box(
-                modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Button(
-                        onClick = onKeepOn,
-                        modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_RECOMMENDATIONS_KEEP_ON_TAG),
-                        enabled = !isSaving,
-                    ) {
-                        if (isSaving) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Text(stringResource(Res.string.onboarding_recommendations_keep_on))
-                        }
-                    }
-                    TextButton(
-                        onClick = onTurnOff,
-                        modifier = Modifier.testTag(ONBOARDING_RECOMMENDATIONS_TURN_OFF_TAG),
-                    ) {
-                        Text(stringResource(Res.string.onboarding_recommendations_turn_off))
-                    }
-                    errorMessage?.let { message ->
-                        Text(
-                            text = message,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-            }
-        },
-    ) { contentPadding ->
-        Box(
-            modifier = Modifier.fillMaxSize().padding(contentPadding),
-        ) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = Spacing.lg),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
-                    horizontalArrangement = Arrangement.Start,
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
-                    }
-                }
-                Column(
-                    modifier = Modifier.widthIn(max = 444.dp),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Text(
-                        stringResource(Res.string.onboarding_recommendations_title),
-                        style = MaterialTheme.typography.headlineLarge,
-                        modifier = Modifier.padding(bottom = Spacing.md),
-                    )
-                    Text(
-                        stringResource(Res.string.onboarding_recommendations_body),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    OverviewItem(
-                        title = stringResource(Res.string.onboarding_recommendations_card_drafts_title),
-                        description = stringResource(Res.string.onboarding_recommendations_card_drafts_description),
-                        icon = {
-                            Icon(Icons.Rounded.EditNote, contentDescription = null)
-                        },
-                    )
-                    OverviewItem(
-                        title = stringResource(Res.string.onboarding_recommendations_card_recall_title),
-                        description = stringResource(Res.string.onboarding_recommendations_card_recall_description),
-                        icon = {
-                            Icon(Icons.Rounded.History, contentDescription = null)
-                        },
-                    )
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    MaterialTheme.colorScheme.surfaceContainerLow,
-                                    MaterialTheme.shapes.medium,
-                                ).padding(Spacing.md),
-                    ) {
-                        Text(
-                            stringResource(Res.string.onboarding_recommendations_privacy),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-        }
+        OverviewItem(
+            title = stringResource(Res.string.onboarding_recommendations_card_drafts_title),
+            description = stringResource(Res.string.onboarding_recommendations_card_drafts_description),
+            icon = { Icon(Icons.Rounded.EditNote, contentDescription = null) },
+        )
+        OverviewItem(
+            title = stringResource(Res.string.onboarding_recommendations_card_recall_title),
+            description = stringResource(Res.string.onboarding_recommendations_card_recall_description),
+            icon = { Icon(Icons.Rounded.History, contentDescription = null) },
+        )
+        PrivacyNote(body = stringResource(Res.string.onboarding_recommendations_privacy))
     }
 }
 

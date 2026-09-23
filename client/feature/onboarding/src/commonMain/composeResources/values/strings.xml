@@ -98,9 +98,9 @@
     <string name="onboarding_recommendations_title">Personalized suggestions</string>
     <string name="onboarding_recommendations_body">LogDate learns when and how you like to capture memories, then gives you a gentle nudge at just the right moment.</string>
     <string name="onboarding_recommendations_card_drafts_title">Finish what you started</string>
-    <string name="onboarding_recommendations_card_drafts_description">If you leave a draft unfinished, we&apos;ll remind you so nothing gets lost.</string>
+    <string name="onboarding_recommendations_card_drafts_description">Leave a draft unfinished and LogDate reminds you, so nothing gets lost.</string>
     <string name="onboarding_recommendations_card_recall_title">Remember your past</string>
-    <string name="onboarding_recommendations_card_recall_description">On this day last year, something happened. We&apos;ll help you rediscover it.</string>
+    <string name="onboarding_recommendations_card_recall_description">On this day last year, something happened. LogDate brings it back for you to rediscover.</string>
     <string name="onboarding_recommendations_keep_on">Keep suggestions on</string>
     <string name="onboarding_recommendations_turn_off">Turn off</string>
     <string name="onboarding_recommendations_privacy">Suggestions are generated entirely on your device.</string>
@@ -117,8 +117,7 @@
     <string name="onboarding_day_boundaries_status_setup_required_title">Install or update Health Connect first</string>
     <string name="onboarding_day_boundaries_status_setup_required_description">This device can use sleep-based day boundaries, but Health Connect needs to finish installing or updating before LogDate can request sleep access.</string>
     <string name="onboarding_day_boundaries_status_checking_title">Checking Health Connect</string>
-    <string name="onboarding_day_boundaries_status_checking_description">We&apos;re seeing whether sleep-based day boundaries are available on this device.</string>
-    <string name="onboarding_day_boundaries_privacy_title">Private by default</string>
+    <string name="onboarding_day_boundaries_status_checking_description">Seeing whether sleep-based day boundaries are available on this device.</string>
     <string name="onboarding_day_boundaries_privacy">Sleep data is only used to place your entries on the right day. LogDate isn&apos;t trying to track or coach your sleep.</string>
     <string name="onboarding_day_boundaries_enable">Use sleep for day boundaries</string>
     <string name="onboarding_day_boundaries_grant_access">Grant sleep access</string>
@@ -177,4 +176,13 @@
     <string name="onboarding_notifications_body_without_recommendations">Get progress updates when exporting or restoring your data, so you always know when your memories are ready.</string>
     <string name="onboarding_notifications_enable">Enable</string>
     <string name="onboarding_notifications_not_now">Continue without notifications</string>
+    <string name="onboarding_notifications_preview_app">LogDate</string>
+    <string name="onboarding_notifications_preview_time">now</string>
+    <string name="onboarding_notifications_preview_prompt_title">Time to write</string>
+    <string name="onboarding_notifications_preview_prompt_body">What made today different from yesterday?</string>
+    <string name="onboarding_notifications_preview_update_title">Your export is ready</string>
+    <string name="onboarding_notifications_preview_update_body">Your memories are packed up and ready to save.</string>
+
+    <!-- Shared -->
+    <string name="onboarding_privacy_title">Private by default</string>
 </resources>

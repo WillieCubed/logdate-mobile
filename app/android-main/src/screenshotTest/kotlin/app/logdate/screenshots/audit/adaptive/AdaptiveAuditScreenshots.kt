@@ -1221,7 +1221,6 @@ fun A79_OnboardingNotificationsPrompt() {
             onSkip = {},
             recommendationsEnabled = true,
             hasDecision = false,
-            hasPermission = false,
         )
     }
 }
@@ -1238,7 +1237,6 @@ fun A80_OnboardingNotificationsBookPosture() {
                 onSkip = {},
                 recommendationsEnabled = true,
                 hasDecision = false,
-                hasPermission = false,
             )
         }
     }
@@ -1256,7 +1254,6 @@ fun A81_OnboardingNotificationsTabletopPosture() {
                 onSkip = {},
                 recommendationsEnabled = true,
                 hasDecision = false,
-                hasPermission = false,
             )
         }
     }

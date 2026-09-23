@@ -459,7 +459,6 @@ object SharedScreenshotCatalog {
                     onSkip = {},
                     recommendationsEnabled = true,
                     hasDecision = false,
-                    hasPermission = false,
                 )
             },
             sharedScene(SharedScreenshotSceneId.OnboardingCompletionStreak, ScreenshotSceneGroup.ONBOARDING, onboardingStepVariants) {
@@ -556,7 +555,6 @@ object SharedScreenshotCatalog {
                     onSkip = {},
                     recommendationsEnabled = false,
                     hasDecision = true,
-                    hasPermission = false,
                 )
             },
             sharedScene(SharedScreenshotSceneId.CloudAccountSelectedSignIn, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {

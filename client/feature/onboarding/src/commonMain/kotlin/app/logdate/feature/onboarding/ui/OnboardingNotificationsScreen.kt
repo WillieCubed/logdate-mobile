@@ -5,25 +5,8 @@
 
 package app.logdate.feature.onboarding.ui
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -37,16 +20,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import app.logdate.client.permissions.rememberNotificationPermissionState
-import app.logdate.ui.adaptive.FoldableBookLayout
-import app.logdate.ui.adaptive.FoldableTabletopLayout
+import app.logdate.ui.step.StepBusyButton
+import app.logdate.ui.step.StepHeroIcon
+import app.logdate.ui.step.StepScaffold
 import app.logdate.ui.theme.LogDateTheme
-import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
-import logdate.client.ui.generated.resources.common_back
 import logdate.client.ui.generated.resources.common_continue
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
@@ -108,7 +89,6 @@ fun OnboardingNotificationsScreen(
         },
         recommendationsEnabled = recommendationsEnabled,
         hasDecision = hasDecision,
-        hasPermission = permissionState.hasPermission,
         isSaving = isSaving || permissionState.isRequestInFlight,
         errorMessage = errorMessage,
     )
@@ -121,16 +101,21 @@ fun OnboardingNotificationsContent(
     onSkip: () -> Unit,
     recommendationsEnabled: Boolean,
     hasDecision: Boolean,
-    hasPermission: Boolean,
     isSaving: Boolean = false,
     errorMessage: String? = null,
 ) {
-    val bodyText =
-        if (recommendationsEnabled) {
-            stringResource(Res.string.onboarding_notifications_body_with_recommendations)
-        } else {
-            stringResource(Res.string.onboarding_notifications_body_without_recommendations)
-        }
+    val bodyText: String
+    val previewTitle: String
+    val previewBody: String
+    if (recommendationsEnabled) {
+        bodyText = stringResource(Res.string.onboarding_notifications_body_with_recommendations)
+        previewTitle = stringResource(Res.string.onboarding_notifications_preview_prompt_title)
+        previewBody = stringResource(Res.string.onboarding_notifications_preview_prompt_body)
+    } else {
+        bodyText = stringResource(Res.string.onboarding_notifications_body_without_recommendations)
+        previewTitle = stringResource(Res.string.onboarding_notifications_preview_update_title)
+        previewBody = stringResource(Res.string.onboarding_notifications_preview_update_body)
+    }
     val primaryActionLabel =
         if (hasDecision) {
             stringResource(UiRes.string.common_continue)
@@ -138,180 +123,31 @@ fun OnboardingNotificationsContent(
             stringResource(Res.string.onboarding_notifications_enable)
         }
 
-    Scaffold { contentPadding ->
-        FoldableTabletopLayout(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(contentPadding),
-            minPaneHeight = 220.dp,
-            topPane = {
-                NotificationsBodyPane(
-                    bodyText = bodyText,
-                    onBack = onBack,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            },
-            bottomPane = {
-                NotificationsActionsPane(
-                    primaryActionLabel = primaryActionLabel,
-                    onPrimaryAction = onPrimaryAction,
-                    onSkip = onSkip,
-                    isSaving = isSaving,
-                    errorMessage = errorMessage,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            },
-            standardContent = {
-                FoldableBookLayout(
-                    modifier = Modifier.fillMaxSize(),
-                    minPaneWidth = 320.dp,
-                    startPane = {
-                        NotificationsBodyPane(
-                            bodyText = bodyText,
-                            onBack = onBack,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    },
-                    endPane = {
-                        NotificationsActionsPane(
-                            primaryActionLabel = primaryActionLabel,
-                            onPrimaryAction = onPrimaryAction,
-                            onSkip = onSkip,
-                            isSaving = isSaving,
-                            errorMessage = errorMessage,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    },
-                    standardContent = {
-                        NotificationsStandardContent(
-                            bodyText = bodyText,
-                            primaryActionLabel = primaryActionLabel,
-                            onBack = onBack,
-                            onPrimaryAction = onPrimaryAction,
-                            onSkip = onSkip,
-                            isSaving = isSaving,
-                            errorMessage = errorMessage,
-                        )
-                    },
-                )
-            },
-        )
-    }
-}
-
-@Composable
-private fun NotificationsStandardContent(
-    bodyText: String,
-    primaryActionLabel: String,
-    onBack: () -> Unit,
-    onPrimaryAction: () -> Unit,
-    onSkip: () -> Unit,
-    isSaving: Boolean,
-    errorMessage: String?,
-) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        NotificationsBodyPane(
-            bodyText = bodyText,
-            onBack = onBack,
-            modifier = Modifier.fillMaxSize(),
-        )
-        NotificationsActionsPane(
-            primaryActionLabel = primaryActionLabel,
-            onPrimaryAction = onPrimaryAction,
-            onSkip = onSkip,
-            isSaving = isSaving,
-            errorMessage = errorMessage,
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
-        )
-    }
-}
-
-@Composable
-private fun NotificationsBodyPane(
-    bodyText: String,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(modifier = modifier) {
-        Column(
-            modifier =
-                Modifier
-                    .testTag(ONBOARDING_NOTIFICATIONS_ROOT_TAG)
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = Spacing.lg),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
-                horizontalArrangement = Arrangement.Start,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(UiRes.string.common_back))
-                }
-            }
-            Column(
-                modifier = Modifier.widthIn(max = 444.dp),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Text(
-                    stringResource(Res.string.onboarding_notifications_title),
-                    style = MaterialTheme.typography.headlineLarge,
-                    modifier = Modifier.padding(bottom = Spacing.md),
-                )
-                Text(
-                    bodyText,
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun NotificationsActionsPane(
-    primaryActionLabel: String,
-    onPrimaryAction: () -> Unit,
-    onSkip: () -> Unit,
-    isSaving: Boolean,
-    errorMessage: String?,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier.padding(Spacing.lg),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            modifier = Modifier.widthIn(max = 444.dp).fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Button(
+    StepScaffold(
+        title = stringResource(Res.string.onboarding_notifications_title),
+        onBack = onBack,
+        modifier = Modifier.testTag(ONBOARDING_NOTIFICATIONS_ROOT_TAG),
+        supportingText = bodyText,
+        hero = { StepHeroIcon(Icons.Rounded.NotificationsActive) },
+        headerAlignment = Alignment.CenterHorizontally,
+        actions = {
+            StepBusyButton(
+                text = primaryActionLabel,
                 onClick = onPrimaryAction,
-                modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_NOTIFICATIONS_PRIMARY_TAG),
+                busy = isSaving,
+                modifier = Modifier.testTag(ONBOARDING_NOTIFICATIONS_PRIMARY_TAG),
+            )
+            TextButton(
+                onClick = onSkip,
                 enabled = !isSaving,
+                modifier = Modifier.testTag(ONBOARDING_NOTIFICATIONS_SKIP_TAG),
             ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text(primaryActionLabel)
-                }
-            }
-            TextButton(onClick = onSkip, modifier = Modifier.testTag(ONBOARDING_NOTIFICATIONS_SKIP_TAG)) {
                 Text(stringResource(Res.string.onboarding_notifications_not_now))
             }
-            errorMessage?.let { message ->
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-        }
+            OnboardingActionError(errorMessage)
+        },
+    ) {
+        NotificationPreview(title = previewTitle, body = previewBody)
     }
 }
 
@@ -325,7 +161,6 @@ private fun OnboardingNotificationsScreenPreview_WithRecommendations() {
             onSkip = {},
             recommendationsEnabled = true,
             hasDecision = false,
-            hasPermission = false,
         )
     }
 }
@@ -340,7 +175,6 @@ private fun OnboardingNotificationsScreenPreview_WithoutRecommendations() {
             onSkip = {},
             recommendationsEnabled = false,
             hasDecision = true,
-            hasPermission = false,
         )
     }
 }

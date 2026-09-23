@@ -5,33 +5,14 @@
 
 package app.logdate.feature.onboarding.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Cake
 import androidx.compose.material.icons.rounded.Timeline
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,16 +27,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import app.logdate.ui.adaptive.FoldableBookLayout
-import app.logdate.ui.adaptive.FoldableTabletopLayout
+import app.logdate.ui.step.StepBusyButton
+import app.logdate.ui.step.StepHeroIcon
+import app.logdate.ui.step.StepScaffold
 import app.logdate.ui.theme.LogDateTheme
-import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -63,12 +40,10 @@ import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.todayIn
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
-import logdate.client.ui.generated.resources.common_back
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 import kotlin.time.Instant
-import logdate.client.ui.generated.resources.Res as UiRes
 
 const val ONBOARDING_BIRTHDAY_ROOT_TAG = "onboarding_birthday_root"
 const val ONBOARDING_BIRTHDAY_SET_TAG = "onboarding_birthday_set"
@@ -120,12 +95,34 @@ fun OnboardingBirthdayContent(
 ) {
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
 
-    BirthdayAdaptiveContent(
+    StepScaffold(
+        title = stringResource(Res.string.onboarding_birthday_title),
         onBack = onBack,
-        onOpenDatePicker = { showDatePicker = true },
-        isSaving = isSaving,
-        errorMessage = errorMessage,
-    )
+        modifier = Modifier.testTag(ONBOARDING_BIRTHDAY_ROOT_TAG),
+        supportingText = stringResource(Res.string.onboarding_birthday_body),
+        hero = { StepHeroIcon(Icons.Rounded.Cake) },
+        headerAlignment = Alignment.CenterHorizontally,
+        actions = {
+            StepBusyButton(
+                text = stringResource(Res.string.onboarding_birthday_set),
+                onClick = { showDatePicker = true },
+                busy = isSaving,
+                modifier = Modifier.testTag(ONBOARDING_BIRTHDAY_SET_TAG),
+            )
+            OnboardingActionError(errorMessage)
+        },
+    ) {
+        OverviewItem(
+            title = stringResource(Res.string.onboarding_birthday_card_rewind_title),
+            description = stringResource(Res.string.onboarding_birthday_card_rewind_description),
+            icon = { Icon(Icons.Rounded.AutoAwesome, contentDescription = null) },
+        )
+        OverviewItem(
+            title = stringResource(Res.string.onboarding_birthday_card_origin_title),
+            description = stringResource(Res.string.onboarding_birthday_card_origin_description),
+            icon = { Icon(Icons.Rounded.Timeline, contentDescription = null) },
+        )
+    }
 
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(selectableDates = remember { BirthdaySelectableDates() })
@@ -152,297 +149,6 @@ fun OnboardingBirthdayContent(
             },
         ) {
             DatePicker(state = datePickerState)
-        }
-    }
-}
-
-@Composable
-private fun BirthdayAdaptiveContent(
-    onBack: () -> Unit,
-    onOpenDatePicker: () -> Unit,
-    isSaving: Boolean,
-    errorMessage: String?,
-) {
-    FoldableTabletopLayout(
-        modifier = Modifier.fillMaxSize().testTag(ONBOARDING_BIRTHDAY_ROOT_TAG),
-        minPaneHeight = 260.dp,
-        topPane = {
-            BirthdayInfoPane(
-                onBack = onBack,
-                modifier = Modifier.fillMaxSize(),
-            )
-        },
-        bottomPane = {
-            BirthdayActionPane(
-                onOpenDatePicker = onOpenDatePicker,
-                isSaving = isSaving,
-                errorMessage = errorMessage,
-                modifier = Modifier.fillMaxSize(),
-            )
-        },
-        standardContent = {
-            FoldableBookLayout(
-                modifier = Modifier.fillMaxSize(),
-                minPaneWidth = 320.dp,
-                startPane = {
-                    BirthdayInfoPane(
-                        onBack = onBack,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                },
-                endPane = {
-                    BirthdayActionPane(
-                        onOpenDatePicker = onOpenDatePicker,
-                        isSaving = isSaving,
-                        errorMessage = errorMessage,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                },
-                standardContent = {
-                    BirthdayCompactContent(
-                        onBack = onBack,
-                        onOpenDatePicker = onOpenDatePicker,
-                        isSaving = isSaving,
-                        errorMessage = errorMessage,
-                    )
-                },
-            )
-        },
-    )
-}
-
-@Composable
-private fun BirthdayInfoPane(
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier =
-            modifier
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
-            horizontalArrangement = Arrangement.Start,
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    Icons.AutoMirrored.Default.ArrowBack,
-                    contentDescription = stringResource(UiRes.string.common_back),
-                )
-            }
-        }
-
-        Column(
-            modifier = Modifier.widthIn(max = 444.dp),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Text(
-                stringResource(Res.string.onboarding_birthday_title),
-                style = MaterialTheme.typography.headlineLarge,
-                modifier = Modifier.padding(bottom = Spacing.md),
-            )
-
-            Box(
-                modifier =
-                    Modifier
-                        .padding(vertical = Spacing.md)
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.primary,
-                                    MaterialTheme.colorScheme.tertiary,
-                                ),
-                            ),
-                        ).align(Alignment.CenterHorizontally),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Cake,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(40.dp),
-                )
-            }
-
-            Text(
-                stringResource(Res.string.onboarding_birthday_body),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            OverviewItem(
-                title = stringResource(Res.string.onboarding_birthday_card_rewind_title),
-                description = stringResource(Res.string.onboarding_birthday_card_rewind_description),
-                icon = {
-                    Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
-                },
-            )
-            OverviewItem(
-                title = stringResource(Res.string.onboarding_birthday_card_origin_title),
-                description = stringResource(Res.string.onboarding_birthday_card_origin_description),
-                icon = {
-                    Icon(Icons.Rounded.Timeline, contentDescription = null)
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun BirthdayActionPane(
-    onOpenDatePicker: () -> Unit,
-    isSaving: Boolean,
-    errorMessage: String?,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier =
-            modifier
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Button(
-            onClick = onOpenDatePicker,
-            modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_BIRTHDAY_SET_TAG),
-            enabled = !isSaving,
-        ) {
-            if (isSaving) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                )
-            } else {
-                Text(stringResource(Res.string.onboarding_birthday_set))
-            }
-        }
-        errorMessage?.let { message ->
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-    }
-}
-
-@Composable
-private fun BirthdayCompactContent(
-    onBack: () -> Unit,
-    onOpenDatePicker: () -> Unit,
-    isSaving: Boolean,
-    errorMessage: String?,
-) {
-    Scaffold { contentPadding ->
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(contentPadding),
-        ) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = Spacing.lg),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
-                    horizontalArrangement = Arrangement.Start,
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Default.ArrowBack,
-                            contentDescription = stringResource(UiRes.string.common_back),
-                        )
-                    }
-                }
-
-                Column(
-                    modifier = Modifier.widthIn(max = 444.dp),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Text(
-                        stringResource(Res.string.onboarding_birthday_title),
-                        style = MaterialTheme.typography.headlineLarge,
-                        modifier = Modifier.padding(bottom = Spacing.md),
-                    )
-                    Box(
-                        modifier =
-                            Modifier
-                                .padding(vertical = Spacing.md)
-                                .size(80.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(
-                                            MaterialTheme.colorScheme.primary,
-                                            MaterialTheme.colorScheme.tertiary,
-                                        ),
-                                    ),
-                                ).align(Alignment.CenterHorizontally),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Cake,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(40.dp),
-                        )
-                    }
-                    Text(
-                        stringResource(Res.string.onboarding_birthday_body),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    OverviewItem(
-                        title = stringResource(Res.string.onboarding_birthday_card_rewind_title),
-                        description = stringResource(Res.string.onboarding_birthday_card_rewind_description),
-                        icon = {
-                            Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
-                        },
-                    )
-                    OverviewItem(
-                        title = stringResource(Res.string.onboarding_birthday_card_origin_title),
-                        description = stringResource(Res.string.onboarding_birthday_card_origin_description),
-                        icon = {
-                            Icon(Icons.Rounded.Timeline, contentDescription = null)
-                        },
-                    )
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg, bottom = Spacing.lg),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    ) {
-                        Button(
-                            onClick = onOpenDatePicker,
-                            modifier = Modifier.fillMaxWidth().testTag(ONBOARDING_BIRTHDAY_SET_TAG),
-                            enabled = !isSaving,
-                        ) {
-                            if (isSaving) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                )
-                            } else {
-                                Text(stringResource(Res.string.onboarding_birthday_set))
-                            }
-                        }
-                        errorMessage?.let { message ->
-                            Text(
-                                text = message,
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }
