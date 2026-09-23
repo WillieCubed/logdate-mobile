@@ -6,8 +6,10 @@ import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.SyncConflictRecord
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.InMemoryUnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.sync.metadata.UnreadableCloudRecordStore
 import io.github.aakira.napier.Napier
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
@@ -75,6 +77,7 @@ internal class SyncDownloadEngine(
     private val conflictStore: SyncConflictStore,
     private val mapCloudApiError: (CloudApiException) -> SyncResult,
     private val mapException: (Exception, String) -> SyncResult,
+    private val unreadableCloudRecordStore: UnreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
 ) {
     /** Consecutive failed pages per entity type, so a poison page cannot pin the feed forever. */
     private val consecutiveBatchFailures = mutableMapOf<EntityType, Int>()
@@ -100,6 +103,9 @@ internal class SyncDownloadEngine(
         val (repairable, cloudOnly) = unreadable.partition { it in heldLocally }
         for (id in repairable) {
             syncMetadataService.enqueuePending(id.toString(), entityType, PendingOperation.CREATE)
+        }
+        if (cloudOnly.isNotEmpty()) {
+            unreadableCloudRecordStore.record(entityType, cloudOnly)
         }
         Napier.w(
             "${repairable.size} unreadable $logLabel(s) queued to re-upload from this device; " +

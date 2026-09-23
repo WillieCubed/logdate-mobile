@@ -64,6 +64,7 @@ import logdate.client.feature.core.generated.resources.sync_status_open_settings
 import logdate.client.feature.core.generated.resources.sync_status_queue_unavailable
 import logdate.client.feature.core.generated.resources.sync_status_retrying
 import logdate.client.feature.core.generated.resources.sync_status_title
+import logdate.client.feature.core.generated.resources.sync_status_unreadable_cloud_items
 import logdate.client.feature.core.generated.resources.sync_status_waiting
 import logdate.client.feature.core.generated.resources.sync_status_waiting_heading
 import logdate.client.feature.core.generated.resources.syncing
@@ -268,6 +269,27 @@ private fun ColumnScope.SyncStatusBody(
                 modifier = Modifier.weight(1f),
             )
             TextButton(onClick = onOpenSyncIssues) { Text(stringResource(Res.string.sync_banner_review)) }
+        }
+    }
+
+    if (uiState.unreadableCloudCount > 0) {
+        HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.lg))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Icon(Icons.Filled.CloudOff, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                text =
+                    pluralStringResource(
+                        Res.plurals.sync_status_unreadable_cloud_items,
+                        uiState.unreadableCloudCount,
+                        uiState.unreadableCloudCount,
+                    ),
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onOpenSyncSettings) { Text(stringResource(Res.string.sync_banner_review)) }
         }
     }
 }

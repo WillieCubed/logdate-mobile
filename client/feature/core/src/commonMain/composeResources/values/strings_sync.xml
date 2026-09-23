@@ -35,6 +35,10 @@
         <item quantity="one">%1$d item stopped retrying and needs you to decide</item>
         <item quantity="other">%1$d items stopped retrying and need you to decide</item>
     </plurals>
+    <plurals name="sync_status_unreadable_cloud_items">
+        <item quantity="one">%1$d item from another setup can\'t be read here</item>
+        <item quantity="other">%1$d items from another setup can\'t be read here</item>
+    </plurals>
     <string name="sync_status_last_attempt_failed">The last attempt didn't finish. LogDate will try again on its own.</string>
     <string name="sync_status_could_not_start">Couldn't start a backup. Try again, or check Backup settings.</string>
     <string name="sync_status_queue_unavailable">Couldn't read the list of waiting items. The count above may be out of date.</string>

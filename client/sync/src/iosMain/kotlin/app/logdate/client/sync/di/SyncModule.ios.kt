@@ -17,6 +17,7 @@ import app.logdate.client.sync.metadata.KeyValueLastSyncErrorStore
 import app.logdate.client.sync.metadata.KeyValueMediaSyncRefStore
 import app.logdate.client.sync.metadata.KeyValueSyncDeadLetterStore
 import app.logdate.client.sync.metadata.KeyValueSyncRetryScheduleStore
+import app.logdate.client.sync.metadata.KeyValueUnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
@@ -31,7 +32,7 @@ import org.koin.dsl.module
  */
 actual val syncModule: Module =
     module {
-        single { RecoverIdentityUseCase(get(), get(), get(), get()) }
+        single { RecoverIdentityUseCase(get(), get(), get(), get(), get()) }
         single<SyncConflictStore> { KeyValueSyncConflictStore(get()) }
         single<MediaSyncRefStore> { KeyValueMediaSyncRefStore(get()) }
         single<SyncDeadLetterStore> { KeyValueSyncDeadLetterStore(get()) }
@@ -68,6 +69,7 @@ actual val syncModule: Module =
                 cloudQuotaManager = get(),
                 cloudApiClient = get(),
                 identityRecoveryNeededStore = KeyValueIdentityRecoveryNeededStore(get()),
+                unreadableCloudRecordStore = KeyValueUnreadableCloudRecordStore(get()),
             )
         }
         single<SyncManager> { ForegroundSyncManager(get(), get(), get(), get(), get()) }

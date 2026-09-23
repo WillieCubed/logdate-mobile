@@ -136,6 +136,12 @@ data class SyncStatus(
     val completedInRun: Int = 0,
     /** How many entries have a conflict waiting for the user to resolve in Sync issues. */
     val conflictCount: Int = 0,
+    /**
+     * Records on the server this device cannot read and has no local copy to repair from --
+     * nothing here can fix them; they need either the writing device to come back, or this
+     * device to recover the identity that wrote them.
+     */
+    val unreadableCloudCount: Int = 0,
 )
 
 /**

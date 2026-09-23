@@ -74,6 +74,7 @@ import app.logdate.client.sync.metadata.IdentityRecoveryNeededStore
 import app.logdate.client.sync.metadata.InMemoryFirstSyncEnqueueStore
 import app.logdate.client.sync.metadata.InMemoryIdentityRecoveryNeededStore
 import app.logdate.client.sync.metadata.InMemoryLastSyncErrorStore
+import app.logdate.client.sync.metadata.InMemoryUnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.LastSyncErrorStore
 import app.logdate.client.sync.metadata.MediaSyncRef
 import app.logdate.client.sync.metadata.MediaSyncRefStore
@@ -85,6 +86,7 @@ import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
+import app.logdate.client.sync.metadata.UnreadableCloudRecordStore
 import app.logdate.shared.model.AuthenticationResult
 import app.logdate.shared.model.BeginAccountCreationRequest
 import app.logdate.shared.model.BeginAccountCreationResponse
@@ -218,6 +220,7 @@ fun testDefaultSyncManager(
     identityKeyManager: IdentityKeyManager? = null,
     cloudApiClient: CloudApiClient? = null,
     identityRecoveryNeededStore: IdentityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+    unreadableCloudRecordStore: UnreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
 ): DefaultSyncManager =
     if (syncScope == null) {
         DefaultSyncManager(
@@ -247,6 +250,7 @@ fun testDefaultSyncManager(
             identityKeyManager = identityKeyManager,
             cloudApiClient = cloudApiClient,
             identityRecoveryNeededStore = identityRecoveryNeededStore,
+            unreadableCloudRecordStore = unreadableCloudRecordStore,
         )
     } else {
         DefaultSyncManager(
@@ -276,6 +280,7 @@ fun testDefaultSyncManager(
             identityKeyManager = identityKeyManager,
             cloudApiClient = cloudApiClient,
             identityRecoveryNeededStore = identityRecoveryNeededStore,
+            unreadableCloudRecordStore = unreadableCloudRecordStore,
             syncScope = syncScope,
         )
     }

@@ -10,6 +10,7 @@ import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.IdentityRecoveryNeededStore
 import app.logdate.client.sync.metadata.LastSyncErrorStore
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.sync.metadata.UnreadableCloudRecordStore
 import app.logdate.shared.model.CloudQuotaManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +55,7 @@ internal class SyncStatusPublisher(
     private val isEnabled: () -> Boolean,
     private val conflictStore: SyncConflictStore,
     private val identityRecoveryNeededStore: IdentityRecoveryNeededStore,
+    private val unreadableCloudRecordStore: UnreadableCloudRecordStore,
 ) {
     /**
      * Whether the last upload pass held a photo or video back for want of Wi-Fi.
@@ -142,6 +144,7 @@ internal class SyncStatusPublisher(
                 totalForRun = runTotal,
                 completedInRun = runCompleted,
                 conflictCount = currentConflictCount(),
+                unreadableCloudCount = runCatching { unreadableCloudRecordStore.count() }.getOrDefault(0),
             )
     }
 

@@ -96,6 +96,12 @@ data class SyncStatusUiState(
     val failedCount: Int = 0,
     /** The queue itself could not be read, so [groups] is not a real answer. */
     val queueUnavailable: Boolean = false,
+    /**
+     * Records on the server this device cannot read and has no local copy to repair from. There
+     * is nothing to retry here -- only entering the recovery phrase for the identity that wrote
+     * them can bring them back.
+     */
+    val unreadableCloudCount: Int = 0,
 )
 
 /** Everything of one [kind] waiting to upload. [kind] is null for types this build doesn't know. */
@@ -129,4 +135,5 @@ internal fun buildSyncStatusUiState(
                 .sortedByDescending { it.count },
         failedCount = failedCount,
         queueUnavailable = queueUnavailable,
+        unreadableCloudCount = status.unreadableCloudCount,
     )

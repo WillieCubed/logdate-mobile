@@ -23,6 +23,7 @@ import app.logdate.client.sync.metadata.IdentityRecoveryNeededStore
 import app.logdate.client.sync.metadata.InMemoryFirstSyncEnqueueStore
 import app.logdate.client.sync.metadata.InMemoryIdentityRecoveryNeededStore
 import app.logdate.client.sync.metadata.InMemoryLastSyncErrorStore
+import app.logdate.client.sync.metadata.InMemoryUnreadableCloudRecordStore
 import app.logdate.client.sync.metadata.LastSyncErrorStore
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.SyncBackoff
@@ -30,6 +31,7 @@ import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
+import app.logdate.client.sync.metadata.UnreadableCloudRecordStore
 import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.CloudQuotaManager
@@ -87,6 +89,7 @@ class DefaultSyncManager(
      */
     private val cloudApiClient: CloudApiClient? = null,
     private val identityRecoveryNeededStore: IdentityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
+    private val unreadableCloudRecordStore: UnreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     private val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -109,6 +112,7 @@ class DefaultSyncManager(
             isEnabled = { isEnabled },
             conflictStore = conflictStore,
             identityRecoveryNeededStore = identityRecoveryNeededStore,
+            unreadableCloudRecordStore = unreadableCloudRecordStore,
         )
     override val syncStatusFlow: StateFlow<SyncStatus> = statusPublisher.syncStatusFlow
 
@@ -119,6 +123,7 @@ class DefaultSyncManager(
             conflictStore = conflictStore,
             mapCloudApiError = statusPublisher::handleCloudApiError,
             mapException = statusPublisher::handleSyncException,
+            unreadableCloudRecordStore = unreadableCloudRecordStore,
         )
 
     /**
@@ -505,6 +510,7 @@ class DefaultSyncManager(
             totalForRun = statusPublisher.runTotal,
             completedInRun = statusPublisher.runCompleted,
             conflictCount = runCatching { conflictStore.list().size }.getOrDefault(0),
+            unreadableCloudCount = runCatching { unreadableCloudRecordStore.count() }.getOrDefault(0),
         )
     }
 

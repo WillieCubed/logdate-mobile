@@ -4,6 +4,7 @@ import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
 import app.logdate.client.sync.metadata.IdentityRecoveryNeededStore
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.sync.metadata.UnreadableCloudRecordStore
 
 /**
  * Restores this device's identity from a recovery phrase and puts everything that depends on the
@@ -20,6 +21,7 @@ class RecoverIdentityUseCase(
     private val syncMetadataService: SyncMetadataService,
     private val mediaPayloadKeyProvider: MediaPayloadKeyProvider,
     private val identityRecoveryNeededStore: IdentityRecoveryNeededStore,
+    private val unreadableCloudRecordStore: UnreadableCloudRecordStore,
 ) {
     suspend operator fun invoke(words: List<String>): Result<Unit> =
         runCatching {
@@ -27,5 +29,6 @@ class RecoverIdentityUseCase(
             mediaPayloadKeyProvider.clearCachedKey()
             syncMetadataService.resetAllCursors()
             identityRecoveryNeededStore.setNeeded(false)
+            unreadableCloudRecordStore.clear()
         }
 }

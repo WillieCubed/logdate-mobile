@@ -9,6 +9,7 @@ import app.logdate.client.sync.cloud.TestCryptoManager
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.InMemoryIdentityRecoveryNeededStore
+import app.logdate.client.sync.metadata.InMemoryUnreadableCloudRecordStore
 import app.logdate.client.sync.test.fakeCloudApiClient
 import app.logdate.client.sync.test.fakeSyncMetadataService
 import app.logdate.client.sync.test.testDefaultSyncManager
@@ -104,7 +105,8 @@ class IdentityKeyProvisioningTest {
             val cryptoManager = TestCryptoManager()
             val mediaKeyProvider =
                 MediaPayloadKeyProvider(InMemorySecureStorage(), cryptoManager, identityKeyManager, KeyDerivation(cryptoManager))
-            val useCase = RecoverIdentityUseCase(identityKeyManager, metadata, mediaKeyProvider, recoveryStore)
+            val unreadableStore = InMemoryUnreadableCloudRecordStore()
+            val useCase = RecoverIdentityUseCase(identityKeyManager, metadata, mediaKeyProvider, recoveryStore, unreadableStore)
 
             val result = useCase((1..12).map { "recovered-$it" })
 
