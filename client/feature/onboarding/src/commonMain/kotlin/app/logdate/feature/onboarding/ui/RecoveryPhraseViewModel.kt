@@ -56,7 +56,7 @@ class RecoveryPhraseViewModel(
                     Napier.e("Failed to prepare recovery phrase", error)
                     RecoveryPhraseSetupUiState(
                         isLoading = false,
-                        errorMessage = "We could not prepare your recovery phrase. Try again.",
+                        errorMessage = "Your recovery phrase couldn't be prepared. Try again.",
                     )
                 }
         }

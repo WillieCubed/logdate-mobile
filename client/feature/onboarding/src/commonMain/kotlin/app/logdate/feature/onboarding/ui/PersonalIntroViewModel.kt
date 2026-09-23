@@ -54,7 +54,7 @@ class PersonalIntroViewModel(
         val currentState = _uiState.value
 
         if (currentState.name.trim().isEmpty()) {
-            updateUiState { currentState.copy(nameError = "Please enter your name") }
+            updateUiState { currentState.copy(nameError = "Enter a name to continue") }
             return
         }
 
@@ -86,7 +86,7 @@ class PersonalIntroViewModel(
         val currentState = _uiState.value
 
         if (currentState.bio.trim().isEmpty()) {
-            updateUiState { currentState.copy(bioError = "Please tell us a bit about yourself") }
+            updateUiState { currentState.copy(bioError = "Write a little about yourself to continue") }
             return
         }
 
@@ -160,13 +160,13 @@ class PersonalIntroViewModel(
     private fun errorMessageFor(reason: ProcessPersonalIntroductionUseCase.ErrorReason): String =
         when (reason) {
             ProcessPersonalIntroductionUseCase.ErrorReason.SaveDisplayNameFailed ->
-                "We couldn't save your name right now."
+                "Your name couldn't be saved. Try again."
             ProcessPersonalIntroductionUseCase.ErrorReason.SaveBioFailed ->
-                "We couldn't save your bio right now."
+                "Your bio couldn't be saved. Try again."
             ProcessPersonalIntroductionUseCase.ErrorReason.ProfileUpdateFailed ->
-                "We couldn't finish setting up your profile."
+                "Your profile couldn't be set up. Try again."
             ProcessPersonalIntroductionUseCase.ErrorReason.UnexpectedFailure ->
-                "Something went wrong. Please try again."
+                "Your introduction couldn't be saved. Try again."
         }
 
     private fun updateUiState(update: (PersonalIntroUiState) -> PersonalIntroUiState) {
