@@ -107,26 +107,18 @@ class OnboardingViewModelTest {
     }
 
     private fun createViewModel(): OnboardingViewModel =
-        OnboardingViewModel(
-            journalNotesRepository = fakeNotesRepository,
+        buildOnboardingViewModel(
+            notesRepository = fakeNotesRepository,
             userStateRepository = fakeUserStateRepository,
             memoriesSettingsRepository = fakeMemoriesSettingsRepository,
-            locationTrackingSettingsRepository = fakeLocationSettingsRepository,
+            locationSettingsRepository = fakeLocationSettingsRepository,
             dayBoundarySettingsRepository = fakeDayBoundarySettingsRepository,
-            observeHealthConnectStatus = ObserveHealthConnectStatusUseCase(fakeHealthRepository),
-            observeUserIdentity =
-                ObserveUserIdentityUseCase(
-                    profileRepository = fakeProfileRepository,
-                    userStateRepository = fakeUserStateRepository,
-                    accountRepository = fakeAccountRepository,
-                    sessionStorage = fakeSessionStorage,
-                ),
+            healthRepository = fakeHealthRepository,
+            profileRepository = fakeProfileRepository,
+            accountRepository = fakeAccountRepository,
+            sessionStorage = fakeSessionStorage,
+            streakSettingsRepository = fakeStreakSettingsRepository,
             onboardingDeviceStateRepository = fakeOnboardingDeviceStateRepository,
-            refreshStreakUseCase =
-                RefreshStreakUseCase(
-                    calculateStreakUseCase = CalculateStreakUseCase(fakeNotesRepository),
-                    streakSettingsRepository = fakeStreakSettingsRepository,
-                ),
             identityKeyManager = identityKeyManager,
         )
 
@@ -352,6 +344,47 @@ class OnboardingViewModelTest {
 }
 
 // region Fakes
+
+/**
+ * Shared across [OnboardingViewModelTest] and `WelcomeBackScreenTest` (in `desktopTest`) so a
+ * change to [OnboardingViewModel]'s constructor only needs updating here.
+ */
+internal fun buildOnboardingViewModel(
+    notesRepository: FakeJournalNotesRepository,
+    userStateRepository: FakeUserStateRepository,
+    memoriesSettingsRepository: FakeMemoriesSettingsRepository,
+    locationSettingsRepository: FakeLocationTrackingSettingsRepository,
+    dayBoundarySettingsRepository: FakeDayBoundarySettingsRepository,
+    healthRepository: FakeLocalFirstHealthRepository,
+    profileRepository: FakeProfileRepository,
+    accountRepository: FakeAccountRepository,
+    sessionStorage: FakeSessionStorage,
+    streakSettingsRepository: FakeStreakSettingsRepository,
+    onboardingDeviceStateRepository: FakeOnboardingDeviceStateRepository,
+    identityKeyManager: IdentityKeyManager,
+): OnboardingViewModel =
+    OnboardingViewModel(
+        journalNotesRepository = notesRepository,
+        userStateRepository = userStateRepository,
+        memoriesSettingsRepository = memoriesSettingsRepository,
+        locationTrackingSettingsRepository = locationSettingsRepository,
+        dayBoundarySettingsRepository = dayBoundarySettingsRepository,
+        observeHealthConnectStatus = ObserveHealthConnectStatusUseCase(healthRepository),
+        observeUserIdentity =
+            ObserveUserIdentityUseCase(
+                profileRepository = profileRepository,
+                userStateRepository = userStateRepository,
+                accountRepository = accountRepository,
+                sessionStorage = sessionStorage,
+            ),
+        onboardingDeviceStateRepository = onboardingDeviceStateRepository,
+        refreshStreakUseCase =
+            RefreshStreakUseCase(
+                calculateStreakUseCase = CalculateStreakUseCase(notesRepository),
+                streakSettingsRepository = streakSettingsRepository,
+            ),
+        identityKeyManager = identityKeyManager,
+    )
 
 internal class FakeJournalNotesRepository : JournalNotesRepository {
     override val allNotesObserved: Flow<List<JournalNote>> = flowOf(emptyList())

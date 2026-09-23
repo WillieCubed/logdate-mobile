@@ -89,15 +89,10 @@ fun OnboardingCompletionScreen(
         onContinue = { shouldShowFinish = true },
         onFinish = {
             coroutineScope.launch {
-                viewModel
-                    .completeOnboardingIfEligible()
-                    .onSuccess {
-                        onFinish()
-                    }.onFailure {
-                        viewModel
-                            .firstIncompleteRequiredOnboardingStep()
-                            ?.let(onRequirementsIncomplete)
-                    }
+                viewModel.finishOnboardingOrReportIncompleteStep(
+                    onFinish = onFinish,
+                    onIncompleteStep = onRequirementsIncomplete,
+                )
             }
         },
         modifier = modifier,

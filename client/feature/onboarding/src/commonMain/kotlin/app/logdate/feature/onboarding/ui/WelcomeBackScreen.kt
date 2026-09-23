@@ -73,14 +73,10 @@ fun WelcomeBackScreen(
         // required onboarding screen, but nothing had marked onboarding complete for this
         // entry mode -- so the flag stayed false and the app sent them right back here on
         // every subsequent launch despite a valid, authenticated session.
-        onboardingViewModel
-            .completeOnboardingIfEligible()
-            .onSuccess { onFinish() }
-            .onFailure {
-                onboardingViewModel
-                    .firstIncompleteRequiredOnboardingStep()
-                    ?.let(onRequirementsIncomplete)
-            }
+        onboardingViewModel.finishOnboardingOrReportIncompleteStep(
+            onFinish = onFinish,
+            onIncompleteStep = onRequirementsIncomplete,
+        )
     }
 
     Surface(
