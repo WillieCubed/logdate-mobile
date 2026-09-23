@@ -17,6 +17,7 @@ class DangerZoneSettingsViewModel(
     private val preferencesDataSource: LogdatePreferencesDataSource,
     private val passkeyAccountRepository: PasskeyAccountRepository,
     private val userStateRepository: UserStateRepository,
+    private val onboardingStateResetter: OnboardingStateResetter,
 ) : ViewModel() {
     fun clearLocalData(
         onSuccess: () -> Unit = {},
@@ -42,6 +43,9 @@ class DangerZoneSettingsViewModel(
             if (prefsResult.isFailure) {
                 Napier.e("Failed to clear user preferences", prefsResult.exceptionOrNull())
             }
+
+            runCatching { onboardingStateResetter.clear() }
+                .onFailure { error -> Napier.e("Failed to clear onboarding device state", error) }
 
             passkeyAccountRepository.signOut()
             userStateRepository.setIsOnboardingComplete(false)
