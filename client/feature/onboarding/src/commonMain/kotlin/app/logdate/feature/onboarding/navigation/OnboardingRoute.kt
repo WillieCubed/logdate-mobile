@@ -527,7 +527,12 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
         )
     }
     taggedEntry<WelcomeBack> {
-        OnboardingInsets { WelcomeBackScreen(onFinish = onWelcomeBack) }
+        OnboardingInsets {
+            WelcomeBackScreen(
+                onFinish = onWelcomeBack,
+                onRequirementsIncomplete = { step -> onGoToItem(routeForStep(step)) },
+            )
+        }
     }
 }
 

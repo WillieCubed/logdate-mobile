@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.onboarding.flow.OnboardingStep
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.theme.LogDateTheme
@@ -54,7 +55,9 @@ private const val WELCOME_BACK_FADE_MILLIS = 360
 @Composable
 fun WelcomeBackScreen(
     onFinish: () -> Unit,
+    onRequirementsIncomplete: (OnboardingStep) -> Unit = {},
     viewModel: WelcomeBackViewModel = koinViewModel(),
+    onboardingViewModel: OnboardingViewModel = koinViewModel(),
     modifier: Modifier = Modifier,
 ) {
     // I can't believe we have to use a view model for this
@@ -66,7 +69,18 @@ fun WelcomeBackScreen(
         delay(WELCOME_BACK_HOLD_MILLIS)
         contentVisible = false
         delay(WELCOME_BACK_FADE_MILLIS.toLong())
-        onFinish()
+        // A returning user reaches this screen only after already stepping through every
+        // required onboarding screen, but nothing had marked onboarding complete for this
+        // entry mode -- so the flag stayed false and the app sent them right back here on
+        // every subsequent launch despite a valid, authenticated session.
+        onboardingViewModel
+            .completeOnboardingIfEligible()
+            .onSuccess { onFinish() }
+            .onFailure {
+                onboardingViewModel
+                    .firstIncompleteRequiredOnboardingStep()
+                    ?.let(onRequirementsIncomplete)
+            }
     }
 
     Surface(
