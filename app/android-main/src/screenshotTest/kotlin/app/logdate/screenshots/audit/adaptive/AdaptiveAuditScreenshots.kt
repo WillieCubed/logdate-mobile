@@ -1940,6 +1940,96 @@ fun A117_AppUpdatePromptBookPosture() {
     }
 }
 
+// A74/A75 cover the personal intro flow's Bio step in both postures, but the flow's actual
+// text-entry step -- the one a keyboard can cover -- had no posture coverage at all.
+@PreviewTest
+@Preview(name = "Personal intro name step book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A118_PersonalIntroNameStepBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            PersonalIntroContent(
+                uiState =
+                    PersonalIntroUiState(
+                        currentStep = PersonalIntroStep.Name,
+                        name = "",
+                    ),
+                onNameChanged = {},
+                onBioChanged = {},
+                onProceedToBio = {},
+                onGoBackToName = {},
+                onProcessWithLlm = {},
+                onBack = {},
+                modifier = Modifier.fillMaxSize(),
+                autoFocusInputs = false,
+                animateStepTransitions = false,
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Personal intro name step tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A119_PersonalIntroNameStepTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            PersonalIntroContent(
+                uiState =
+                    PersonalIntroUiState(
+                        currentStep = PersonalIntroStep.Name,
+                        name = "",
+                    ),
+                onNameChanged = {},
+                onBioChanged = {},
+                onProceedToBio = {},
+                onGoBackToName = {},
+                onProcessWithLlm = {},
+                onBack = {},
+                modifier = Modifier.fillMaxSize(),
+                autoFocusInputs = false,
+                animateStepTransitions = false,
+            )
+        }
+    }
+}
+
+// CloudAccountSetupContent previously only ever split by window width (A03 covers that), never
+// by an actual half-folded, tabletop posture.
+@PreviewTest
+@Preview(name = "Cloud account setup book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Composable
+fun A120_CloudAccountSetupBookPosture() {
+    provideFoldableLayoutInfo(bookPostureLayoutInfo) {
+        ScreenshotTheme {
+            CloudAccountSetupContent(
+                useCompactLayout = false,
+                onBack = {},
+                onContinue = {},
+                onSkip = {},
+                onPlanSelected = {},
+            )
+        }
+    }
+}
+
+@PreviewTest
+@Preview(name = "Cloud account setup tabletop posture", showBackground = true, device = TABLETOP_FOLDABLE)
+@Composable
+fun A121_CloudAccountSetupTabletopPosture() {
+    provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
+        ScreenshotTheme {
+            CloudAccountSetupContent(
+                useCompactLayout = false,
+                onBack = {},
+                onContinue = {},
+                onSkip = {},
+                onPlanSelected = {},
+            )
+        }
+    }
+}
+
 @Composable
 private fun FoldableMediaDetailScene(
     foldableLayoutInfo: FoldableLayoutInfo,
