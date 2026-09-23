@@ -98,6 +98,10 @@ class SyncMetadataServiceTest {
             _pendingCount.value = 0
         }
 
+        override suspend fun resetAllCursors() {
+            syncTimes.clear()
+        }
+
         // Test helper
         fun addPending(
             entityId: String,

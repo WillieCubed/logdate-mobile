@@ -9,6 +9,7 @@ import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.sync.cloud.CloudApiClient
 import app.logdate.client.sync.cloud.CloudAssociationDataSource
 import app.logdate.client.sync.cloud.CloudContentDataSource
 import app.logdate.client.sync.cloud.CloudDraftDataSource
@@ -18,7 +19,9 @@ import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.FirstSyncEnqueueStore
+import app.logdate.client.sync.metadata.IdentityRecoveryNeededStore
 import app.logdate.client.sync.metadata.InMemoryFirstSyncEnqueueStore
+import app.logdate.client.sync.metadata.InMemoryIdentityRecoveryNeededStore
 import app.logdate.client.sync.metadata.InMemoryLastSyncErrorStore
 import app.logdate.client.sync.metadata.LastSyncErrorStore
 import app.logdate.client.sync.metadata.MediaSyncRefStore
@@ -76,6 +79,14 @@ class DefaultSyncManager(
     private val syncScope: CoroutineScope = CoroutineScope(platformIODispatcher),
     private val lastErrorStore: LastSyncErrorStore = InMemoryLastSyncErrorStore(),
     private val firstSyncEnqueueStore: FirstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+    /**
+     * Wired on every platform; optional so tests that never exercise identity provisioning can
+     * omit it. Without it, [provisionIdentityKey] cannot check whether the account already has
+     * cloud data and falls back to minting a key on absence, matching behavior before that check
+     * existed.
+     */
+    private val cloudApiClient: CloudApiClient? = null,
+    private val identityRecoveryNeededStore: IdentityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     private val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -96,6 +107,8 @@ class DefaultSyncManager(
             lastErrorStore = lastErrorStore,
             latestSyncTime = ::latestSyncTime,
             isEnabled = { isEnabled },
+            conflictStore = conflictStore,
+            identityRecoveryNeededStore = identityRecoveryNeededStore,
         )
     override val syncStatusFlow: StateFlow<SyncStatus> = statusPublisher.syncStatusFlow
 
@@ -128,11 +141,64 @@ class DefaultSyncManager(
      * Every note, journal, and draft is encrypted with a key derived from this device's identity
      * key, so a device without one fails every upload. Onboarding provisions it for new devices;
      * this covers the ones that finished onboarding back when nothing did.
+     *
+     * A device can also have no key because it *lost* one -- a reinstall, a restore onto a
+     * different device -- while the account it signs back into already has data in the cloud
+     * encrypted under the old key. Minting a fresh key in that case would look identical to
+     * onboarding a new device, but it silently starts a second, unrelated identity: nothing
+     * already in the cloud can ever be read again, and uploads from now on quietly diverge from
+     * everything before them. So this only mints when the account can be confirmed empty; when it
+     * already has data, sync pauses with [SyncPausedReason.NEEDS_RECOVERY_PHRASE] instead and
+     * waits for the phrase to be entered again, and when it cannot be determined (offline, a
+     * server error), nothing happens this pass and the next sync attempt tries again.
      */
-    private suspend fun provisionIdentityKey() {
-        runCatching { identityKeyManager?.ensureIdentityKey() }
-            .onFailure { Napier.e("Could not provision an identity key; uploads will fail", it) }
+    private suspend fun provisionIdentityKey(accessToken: String) {
+        val manager = identityKeyManager ?: return
+        if (manager.hasIdentityKey()) {
+            if (identityRecoveryNeededStore.isNeeded()) identityRecoveryNeededStore.setNeeded(false)
+            return
+        }
+
+        val client = cloudApiClient
+        if (client == null) {
+            runCatching { manager.setupNewIdentity() }
+                .onFailure { Napier.e("Could not provision an identity key; uploads will fail", it) }
+            return
+        }
+
+        when (accountAlreadyHasCloudData(client, accessToken)) {
+            true -> {
+                Napier.w(
+                    "This device has no identity key but the account already has cloud data -- " +
+                        "pausing sync instead of minting a key that could never decrypt it",
+                )
+                identityRecoveryNeededStore.setNeeded(true)
+            }
+            false -> {
+                runCatching { manager.setupNewIdentity() }
+                    .onFailure { Napier.e("Could not provision an identity key; uploads will fail", it) }
+            }
+            null -> {
+                // Could not tell (offline, a server error). Leave things as they are; the next
+                // sync attempt checks again rather than guessing now.
+            }
+        }
     }
+
+    /** Null when it could not be determined -- offline, a server error -- rather than assumed either way. */
+    private suspend fun accountAlreadyHasCloudData(
+        client: CloudApiClient,
+        accessToken: String,
+    ): Boolean? =
+        runCatching {
+            val journals = client.getJournalChanges(accessToken, since = 0L, limit = 1).getOrThrow()
+            if (journals.changes.isNotEmpty() || journals.deletions.isNotEmpty()) return@runCatching true
+            val content = client.getContentChanges(accessToken, since = 0L, limit = 1).getOrThrow()
+            content.changes.isNotEmpty() || content.deletions.isNotEmpty()
+        }.getOrElse {
+            Napier.w("Could not check whether the account already has cloud data", it)
+            null
+        }
 
     /**
      * Shared shape behind [uploadPendingChanges] and [downloadRemoteChanges]: the same
@@ -168,11 +234,14 @@ class DefaultSyncManager(
             }
 
             syncStateFlow.value = SyncState.Syncing
-            provisionIdentityKey()
             beforeAccessToken()
 
             try {
                 val accessToken = tokenRefresher.getAccessToken() ?: return authError()
+                provisionIdentityKey(accessToken)
+                if (identityRecoveryNeededStore.isNeeded()) {
+                    return SyncResult(success = false)
+                }
                 body(accessToken)
             } catch (e: Exception) {
                 statusPublisher.handleSyncException(e, exceptionLabel)
@@ -218,7 +287,7 @@ class DefaultSyncManager(
                 lastErrorFlow.value = null
                 statusPublisher.refreshObservedQuotaFromServer("pending upload")
             } else {
-                lastErrorFlow.value = errors.firstOrNull()
+                lastErrorFlow.value = errors.mostSevere()
             }
 
             SyncResult(
@@ -262,7 +331,7 @@ class DefaultSyncManager(
                 lastErrorFlow.value = null
                 statusPublisher.refreshObservedQuotaFromServer("remote download")
             } else {
-                lastErrorFlow.value = errors.firstOrNull()
+                lastErrorFlow.value = errors.mostSevere()
             }
 
             SyncResult(
@@ -308,9 +377,12 @@ class DefaultSyncManager(
             disabledOrUnauthenticated()?.let { return@withLock it }
 
             syncStateFlow.value = SyncState.Syncing
-            provisionIdentityKey()
             try {
                 val accessToken = tokenRefresher.getAccessToken() ?: return@withLock authError()
+                provisionIdentityKey(accessToken)
+                if (identityRecoveryNeededStore.isNeeded()) {
+                    return@withLock SyncResult(success = false)
+                }
 
                 val since = cursorFor(entityType)
                 val downloadResult = download(accessToken, since)
@@ -324,7 +396,7 @@ class DefaultSyncManager(
                         lastErrorFlow.value = null
                         statusPublisher.refreshObservedQuotaFromServer(quotaContext)
                     } else {
-                        lastErrorFlow.value = (downloadResult.errors + uploadResult.errors).firstOrNull()
+                        lastErrorFlow.value = (downloadResult.errors + uploadResult.errors).mostSevere()
                     }
                 }
 
@@ -432,6 +504,7 @@ class DefaultSyncManager(
             pausedReason = statusPublisher.currentPausedReason(authenticated),
             totalForRun = statusPublisher.runTotal,
             completedInRun = statusPublisher.runCompleted,
+            conflictCount = runCatching { conflictStore.list().size }.getOrDefault(0),
         )
     }
 
@@ -537,6 +610,26 @@ class DefaultSyncManager(
             setMediaDeferredForNetwork = statusPublisher::setMediaDeferredForNetwork,
         )
 }
+
+/**
+ * The most actionable error in a run that may have failed several ways at once, rather than
+ * whichever happened to run first in the fixed upload/download order (journal, then content, then
+ * association, then draft) -- code order is not a severity order, and a network hiccup on the
+ * first of those must not hide an auth lapse or a full quota discovered on the second. Every error
+ * is still returned to the caller either way; this only decides which one is surfaced as *the*
+ * status.
+ */
+private fun List<SyncError>.mostSevere(): SyncError? = SEVERITY_ORDER.firstNotNullOfOrNull { type -> firstOrNull { it.type == type } }
+
+private val SEVERITY_ORDER =
+    listOf(
+        SyncErrorType.AUTHENTICATION_ERROR,
+        SyncErrorType.STORAGE_ERROR,
+        SyncErrorType.CONFLICT_ERROR,
+        SyncErrorType.SERVER_ERROR,
+        SyncErrorType.NETWORK_ERROR,
+        SyncErrorType.UNKNOWN_ERROR,
+    )
 
 /**
  * The media a note points at is no longer on disk, so no number of retries can upload it.

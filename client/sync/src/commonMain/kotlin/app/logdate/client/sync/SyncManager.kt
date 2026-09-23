@@ -134,6 +134,8 @@ data class SyncStatus(
     val totalForRun: Int? = null,
     /** How many of [totalForRun] this run has finished. */
     val completedInRun: Int = 0,
+    /** How many entries have a conflict waiting for the user to resolve in Sync issues. */
+    val conflictCount: Int = 0,
 )
 
 /**
@@ -162,6 +164,15 @@ enum class SyncPausedReason {
      * standing warning about being on cellular.
      */
     MEDIA_WAITING_FOR_WIFI,
+
+    /**
+     * This device has no identity key, but the account already has data in the cloud -- almost
+     * always because the key was lost (a reinstall, a restore onto a different device) rather
+     * than this being a genuinely new account. Minting a new key here would encrypt everything
+     * from now on under a key that can never read what came before, so sync stops instead and
+     * waits for the recovery phrase to be entered again.
+     */
+    NEEDS_RECOVERY_PHRASE,
 }
 
 /**

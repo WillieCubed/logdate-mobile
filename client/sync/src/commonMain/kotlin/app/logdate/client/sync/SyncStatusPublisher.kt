@@ -5,7 +5,9 @@ import app.logdate.client.networking.DataRestriction
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.shouldSyncMedia
 import app.logdate.client.sync.cloud.CloudApiException
+import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.IdentityRecoveryNeededStore
 import app.logdate.client.sync.metadata.LastSyncErrorStore
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.shared.model.CloudQuotaManager
@@ -50,6 +52,8 @@ internal class SyncStatusPublisher(
     private val lastErrorStore: LastSyncErrorStore,
     private val latestSyncTime: suspend () -> Instant?,
     private val isEnabled: () -> Boolean,
+    private val conflictStore: SyncConflictStore,
+    private val identityRecoveryNeededStore: IdentityRecoveryNeededStore,
 ) {
     /**
      * Whether the last upload pass held a photo or video back for want of Wi-Fi.
@@ -137,8 +141,14 @@ internal class SyncStatusPublisher(
                 pausedReason = currentPausedReason(authenticated),
                 totalForRun = runTotal,
                 completedInRun = runCompleted,
+                conflictCount = currentConflictCount(),
             )
     }
+
+    private suspend fun currentConflictCount(): Int =
+        runCatching { conflictStore.list().size }
+            .onFailure { Napier.e("Could not read the conflict count", it) }
+            .getOrDefault(0)
 
     /**
      * Starts a new top-level upload run: forgets whatever the previous run's counters said and
@@ -207,6 +217,7 @@ internal class SyncStatusPublisher(
      */
     suspend fun currentPausedReason(authenticated: Boolean): SyncPausedReason? {
         if (!authenticated) return SyncPausedReason.NOT_SIGNED_IN
+        if (identityRecoveryNeededStore.isNeeded()) return SyncPausedReason.NEEDS_RECOVERY_PHRASE
         val restriction = runCatching { dataUsagePolicy.currentRestriction() }.getOrNull()
         return when (restriction) {
             DataRestriction.OFFLINE -> SyncPausedReason.OFFLINE

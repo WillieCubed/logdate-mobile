@@ -188,10 +188,12 @@ class DatabaseSyncMetadataService(
      * Clears all sync metadata (for logout/reset).
      */
     suspend fun clearAll() {
-        val ownerId = currentOwnerId()
-        val serverOrigin = currentOrigin()
-        dao.deletePendingForOrigin(ownerId, serverOrigin)
-        dao.deleteCursorsForOrigin(ownerId, serverOrigin)
+        dao.deletePendingForOrigin(currentOwnerId(), currentOrigin())
+        resetAllCursors()
+    }
+
+    override suspend fun resetAllCursors() {
+        dao.deleteCursorsForOrigin(currentOwnerId(), currentOrigin())
     }
 
     private suspend fun updateCursorIfNewer(

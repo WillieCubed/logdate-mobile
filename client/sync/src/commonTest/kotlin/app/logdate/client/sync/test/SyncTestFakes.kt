@@ -2,6 +2,7 @@ package app.logdate.client.sync.test
 
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
+import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.media.InMemoryMediaManager
 import app.logdate.client.media.MediaFileSource
 import app.logdate.client.media.MediaManager
@@ -69,7 +70,9 @@ import app.logdate.client.sync.conflict.SyncConflictRecord
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.FirstSyncEnqueueStore
+import app.logdate.client.sync.metadata.IdentityRecoveryNeededStore
 import app.logdate.client.sync.metadata.InMemoryFirstSyncEnqueueStore
+import app.logdate.client.sync.metadata.InMemoryIdentityRecoveryNeededStore
 import app.logdate.client.sync.metadata.InMemoryLastSyncErrorStore
 import app.logdate.client.sync.metadata.LastSyncErrorStore
 import app.logdate.client.sync.metadata.MediaSyncRef
@@ -212,6 +215,9 @@ fun testDefaultSyncManager(
     syncScope: CoroutineScope? = null,
     lastErrorStore: LastSyncErrorStore = InMemoryLastSyncErrorStore(),
     firstSyncEnqueueStore: FirstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+    identityKeyManager: IdentityKeyManager? = null,
+    cloudApiClient: CloudApiClient? = null,
+    identityRecoveryNeededStore: IdentityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
 ): DefaultSyncManager =
     if (syncScope == null) {
         DefaultSyncManager(
@@ -238,6 +244,9 @@ fun testDefaultSyncManager(
             cloudQuotaManager = cloudQuotaManager,
             lastErrorStore = lastErrorStore,
             firstSyncEnqueueStore = firstSyncEnqueueStore,
+            identityKeyManager = identityKeyManager,
+            cloudApiClient = cloudApiClient,
+            identityRecoveryNeededStore = identityRecoveryNeededStore,
         )
     } else {
         DefaultSyncManager(
@@ -264,6 +273,9 @@ fun testDefaultSyncManager(
             cloudQuotaManager = cloudQuotaManager,
             lastErrorStore = lastErrorStore,
             firstSyncEnqueueStore = firstSyncEnqueueStore,
+            identityKeyManager = identityKeyManager,
+            cloudApiClient = cloudApiClient,
+            identityRecoveryNeededStore = identityRecoveryNeededStore,
             syncScope = syncScope,
         )
     }
@@ -825,6 +837,10 @@ class FakeSyncMetadataService(
         pendingUploads.clear()
         retryCounts.clear()
         pendingCountFlow.value = 0
+    }
+
+    override suspend fun resetAllCursors() {
+        syncTimes.clear()
     }
 
     override suspend fun incrementRetryCount(

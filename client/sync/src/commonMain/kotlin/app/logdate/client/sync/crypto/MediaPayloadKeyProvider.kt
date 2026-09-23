@@ -46,6 +46,16 @@ class MediaPayloadKeyProvider(
         return derived
     }
 
+    /**
+     * Forgets the cached media key so the next [getOrCreateKey] re-derives it from the current
+     * identity key. Call after recovering a different identity: the cache otherwise keeps serving
+     * a key derived from whatever identity minted it, silently wrong for media encrypted under
+     * the newly-recovered one.
+     */
+    suspend fun clearCachedKey() {
+        secureStorage.remove(KEY_STORAGE_KEY)
+    }
+
     private companion object {
         const val KEY_STORAGE_KEY = "media_payload_key_v1"
         const val KEY_LENGTH_BYTES = 32
