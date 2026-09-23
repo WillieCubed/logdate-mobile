@@ -112,9 +112,7 @@ internal class SyncStatusPublisher(
     }
 
     /**
-     * Snapshot the combined state into [syncStatusFlow]. Reads pending-uploads from metadata
-     * on every publish; falls back to zero if metadata is unavailable (shouldn't happen in
-     * practice, but we'd rather show an over-optimistic banner than crash the collector).
+     * Snapshot the combined state into [syncStatusFlow].
      *
      * `isEnabled` here is the *effective* state the UI cares about: a queue can only matter
      * when there's a session to drain it to. Without a session, we report disabled regardless
