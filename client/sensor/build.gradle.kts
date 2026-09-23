@@ -24,6 +24,7 @@ kotlin {
             libs.versions.android.minSdk
                 .get()
                 .toInt()
+        withHostTestBuilder {}
         withDeviceTestBuilder {}.configure {
             instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         }
@@ -63,6 +64,12 @@ kotlin {
                 implementation(libs.kotlin.test)
                 implementation(libs.kotlinx.coroutines.test)
             }
+        }
+        findByName("androidHostTest")?.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlin.test.junit)
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.mockk)
         }
         findByName("androidDeviceTest")?.dependencies {
             implementation(libs.kotlin.test.junit)
