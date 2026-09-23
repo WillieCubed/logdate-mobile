@@ -9,12 +9,15 @@ import app.logdate.client.media.MediaObject
 import app.logdate.client.media.MediaPayload
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlin.test.AfterTest
@@ -103,6 +106,68 @@ class MemorySelectionViewModelTest {
             assertEquals(false, viewModel.uiState.value.isLoading)
         }
 
+    @Test
+    fun `continuing with selected memories imports them and clears importing state`() =
+        runTest {
+            val memories = listOf(sampleImage("keep-1"))
+            fakeMediaManager.queryMediaByDateFlow = { flowOf(memories) }
+
+            val viewModel = createViewModel()
+            viewModel.refreshMemories()
+            advanceUntilIdle()
+            viewModel.toggleMemorySelection(memories.single().uri)
+
+            val result = viewModel.processSelectedMemories()
+
+            assertTrue(result.isSuccess)
+            assertFalse(viewModel.uiState.value.isImporting)
+            assertFalse(viewModel.uiState.value.importFailed)
+            assertEquals(listOf(memories.single().uri), fakeMediaManager.addedToCollection)
+        }
+
+    @Test
+    fun `a failed import surfaces importFailed instead of failing silently`() =
+        runTest {
+            val memories = listOf(sampleImage("broken-1"))
+            fakeMediaManager.queryMediaByDateFlow = { flowOf(memories) }
+            fakeMediaManager.addToDefaultCollectionError = IllegalStateException("Import failed")
+
+            val viewModel = createViewModel()
+            viewModel.refreshMemories()
+            advanceUntilIdle()
+            viewModel.toggleMemorySelection(memories.single().uri)
+
+            val result = viewModel.processSelectedMemories()
+
+            assertTrue(result.isFailure)
+            assertFalse(viewModel.uiState.value.isImporting)
+            assertTrue(viewModel.uiState.value.importFailed)
+        }
+
+    @Test
+    fun `a second concurrent import attempt is rejected instead of double importing`() =
+        runTest {
+            val memories = listOf(sampleImage("slow-1"))
+            fakeMediaManager.queryMediaByDateFlow = { flowOf(memories) }
+            fakeMediaManager.addToDefaultCollectionDelay = { delay(1_000) }
+
+            val viewModel = createViewModel()
+            viewModel.refreshMemories()
+            advanceUntilIdle()
+            viewModel.toggleMemorySelection(memories.single().uri)
+
+            val firstImport = async { viewModel.processSelectedMemories() }
+            runCurrent()
+            assertTrue(viewModel.uiState.value.isImporting)
+
+            val secondImport = viewModel.processSelectedMemories()
+            assertTrue(secondImport.isFailure)
+
+            advanceUntilIdle()
+            assertTrue(firstImport.await().isSuccess)
+            assertEquals(1, fakeMediaManager.addedToCollection.size)
+        }
+
     private fun createViewModel(): MemorySelectionViewModel =
         MemorySelectionViewModel(
             mediaManager = fakeMediaManager,
@@ -130,6 +195,9 @@ class MemorySelectionViewModelTest {
 private class FakeMediaManager : MediaManager {
     var queryMediaByDateFlow: () -> Flow<List<MediaObject>> = { flowOf(emptyList()) }
     var recentMediaFlow: () -> Flow<List<MediaObject>> = { flowOf(emptyList()) }
+    var addToDefaultCollectionError: Throwable? = null
+    var addToDefaultCollectionDelay: suspend () -> Unit = {}
+    val addedToCollection = mutableListOf<String>()
 
     override suspend fun getMedia(uri: String): MediaObject = error("Not used in test")
 
@@ -144,7 +212,11 @@ private class FakeMediaManager : MediaManager {
         end: Instant,
     ): Flow<List<MediaObject>> = queryMediaByDateFlow()
 
-    override suspend fun addToDefaultCollection(uri: String) = Unit
+    override suspend fun addToDefaultCollection(uri: String) {
+        addToDefaultCollectionDelay()
+        addToDefaultCollectionError?.let { throw it }
+        addedToCollection += uri
+    }
 
     override suspend fun readMedia(uri: String): MediaPayload = error("Not used in test")
 
