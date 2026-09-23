@@ -4,6 +4,7 @@ import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
 import app.logdate.client.health.LocalFirstHealthRepository
 import app.logdate.client.health.model.DayBounds
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 
@@ -31,6 +32,8 @@ class GetDayBoundsUseCase(
                     sleepBasedBoundariesEnabled = settings.sleepBasedBoundariesEnabled,
                 )
             Result.success(bounds)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Error getting day bounds", e)
             Result.failure(e)

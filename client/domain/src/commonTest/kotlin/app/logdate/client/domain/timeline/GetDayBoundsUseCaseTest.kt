@@ -1,11 +1,13 @@
 package app.logdate.client.domain.timeline
 
 import app.logdate.client.health.model.DayBounds
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
@@ -48,6 +50,16 @@ class GetDayBoundsUseCaseTest {
 
             assertTrue(result.isFailure)
             assertEquals(expectedException, result.exceptionOrNull())
+        }
+
+    @Test
+    fun `invoke rethrows CancellationException instead of wrapping it as a failure`() =
+        runTest {
+            repository.throwable = CancellationException("Coroutine scope left the composition")
+
+            assertFailsWith<CancellationException> {
+                useCase(testDate, testTimeZone)
+            }
         }
 
     @Test
