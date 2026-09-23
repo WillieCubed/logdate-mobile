@@ -1,5 +1,6 @@
 package app.logdate.feature.onboarding.ui
 
+import androidx.lifecycle.SavedStateHandle
 import app.logdate.client.intelligence.AIResult
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.intelligence.generativeai.GenerativeAIRequest
@@ -107,6 +108,25 @@ class MemorySelectionViewModelTest {
         }
 
     @Test
+    fun `selections survive a fresh view model over the same saved state, as after process death`() =
+        runTest {
+            val memories = listOf(sampleImage("keep-1"), sampleImage("keep-2"))
+            fakeMediaManager.queryMediaByDateFlow = { flowOf(memories) }
+            val savedStateHandle = SavedStateHandle()
+
+            val firstViewModel = createViewModel(savedStateHandle)
+            firstViewModel.refreshMemories()
+            advanceUntilIdle()
+            firstViewModel.toggleMemorySelection(memories[0].uri)
+
+            // Simulates the process dying and a fresh view model being created over the same
+            // saved state, rather than a fresh, empty one.
+            val secondViewModel = createViewModel(savedStateHandle)
+
+            assertEquals(setOf(memories[0].uri), secondViewModel.uiState.value.selectedMemoryIds)
+        }
+
+    @Test
     fun `continuing with selected memories imports them and clears importing state`() =
         runTest {
             val memories = listOf(sampleImage("keep-1"))
@@ -168,10 +188,11 @@ class MemorySelectionViewModelTest {
             assertEquals(1, fakeMediaManager.addedToCollection.size)
         }
 
-    private fun createViewModel(): MemorySelectionViewModel =
+    private fun createViewModel(savedStateHandle: SavedStateHandle = SavedStateHandle()): MemorySelectionViewModel =
         MemorySelectionViewModel(
             mediaManager = fakeMediaManager,
             aiClient = FakeGenerativeAIChatClient(),
+            savedStateHandle = savedStateHandle,
         )
 
     private fun sampleImage(id: String): MediaObject.Image =
