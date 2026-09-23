@@ -56,6 +56,8 @@ data class JournalSyncResult(
     val deletions: List<Uuid>,
     val lastSyncTimestamp: Instant,
     val hasMore: Boolean = false,
+    /** Records on this page this device cannot read. See [UnreadablePayloadException]. */
+    val unreadable: List<Uuid> = emptyList(),
 )
 
 /**
@@ -139,13 +141,16 @@ class DefaultCloudJournalDataSource(
                 },
         )
 
-    private suspend fun JournalChangesResponse.toJournalSyncResult(): JournalSyncResult =
-        JournalSyncResult(
-            changes = changes.map { it.toJournal() },
+    private suspend fun JournalChangesResponse.toJournalSyncResult(): JournalSyncResult {
+        val (readable, unreadable) = changes.readEach(idOf = { it.id }) { it.toJournal() }
+        return JournalSyncResult(
+            changes = readable,
             deletions = deletions.map { Uuid.parse(it.id) },
             lastSyncTimestamp = Instant.fromEpochMilliseconds(lastTimestamp),
             hasMore = hasMore,
+            unreadable = unreadable,
         )
+    }
 
     private suspend fun JournalChange.toJournal(): Journal =
         Journal(

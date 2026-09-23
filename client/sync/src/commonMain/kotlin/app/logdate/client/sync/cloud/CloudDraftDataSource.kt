@@ -103,18 +103,20 @@ class DefaultCloudDraftDataSource(
         cloudApiClient.getDraftChanges(accessToken, since.toEpochMilliseconds(), limit).mapCatching { response ->
             DraftSyncResult(
                 changes =
-                    response.drafts.filter { !it.isDeleted }.map { change ->
-                        SyncedDraft(
-                            id = Uuid.parse(change.id),
-                            content = decryptDraftContent(Uuid.parse(change.id), change.content),
-                            deviceId = change.deviceId,
-                            createdAt = Instant.fromEpochMilliseconds(change.createdAt),
-                            lastUpdated = Instant.fromEpochMilliseconds(change.lastUpdated),
-                            serverVersion = change.serverVersion,
-                            journalIds = change.journalIds.mapNotNull { id -> runCatching { Uuid.parse(id) }.getOrNull() },
-                            blockTypes = change.blockTypes,
-                        )
-                    },
+                    response.drafts
+                        .filter { !it.isDeleted }
+                        .readEach(idOf = { it.id }) { change ->
+                            SyncedDraft(
+                                id = Uuid.parse(change.id),
+                                content = decryptDraftContent(Uuid.parse(change.id), change.content),
+                                deviceId = change.deviceId,
+                                createdAt = Instant.fromEpochMilliseconds(change.createdAt),
+                                lastUpdated = Instant.fromEpochMilliseconds(change.lastUpdated),
+                                serverVersion = change.serverVersion,
+                                journalIds = change.journalIds.mapNotNull { id -> runCatching { Uuid.parse(id) }.getOrNull() },
+                                blockTypes = change.blockTypes,
+                            )
+                        }.first,
                 deletions = response.drafts.filter { it.isDeleted }.map { Uuid.parse(it.id) },
                 lastSyncTimestamp =
                     Instant.fromEpochMilliseconds(

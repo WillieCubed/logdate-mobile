@@ -71,7 +71,7 @@ internal class SyncDownloader(
                             .withFreshToken(
                                 { t -> cloudJournalDataSource.getJournalChanges(t, cursor, SYNC_PAGE_SIZE) },
                                 "getJournalChanges",
-                            ).map { ChangesPage(it.changes, it.deletions, it.lastSyncTimestamp, it.hasMore) }
+                            ).map { ChangesPage(it.changes, it.deletions, it.lastSyncTimestamp, it.hasMore, it.unreadable) }
                     },
                     localItems = { journalRepository.allJournalsObserved.first().associateBy { it.id } },
                     idOf = { it.id },
@@ -112,7 +112,7 @@ internal class SyncDownloader(
                             .withFreshToken(
                                 { t -> cloudContentDataSource.getContentChanges(t, cursor, SYNC_PAGE_SIZE) },
                                 "getContentChanges",
-                            ).map { ChangesPage(it.changes, it.deletions, it.lastSyncTimestamp, it.hasMore) }
+                            ).map { ChangesPage(it.changes, it.deletions, it.lastSyncTimestamp, it.hasMore, it.unreadable) }
                     },
                     localItems = { journalNotesRepository.allNotesObserved.first().associateBy { it.uid } },
                     idOf = { it.uid },

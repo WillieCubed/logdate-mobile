@@ -58,6 +58,8 @@ data class ContentSyncResult(
     val deletions: List<Uuid>,
     val lastSyncTimestamp: Instant,
     val hasMore: Boolean = false,
+    /** Records on this page this device cannot read. See [UnreadablePayloadException]. */
+    val unreadable: List<Uuid> = emptyList(),
 )
 
 /**
@@ -192,13 +194,16 @@ class DefaultCloudContentDataSource(
             location = encryptNoteLocation(uid, location),
         )
 
-    private suspend fun ContentChangesResponse.toContentSyncResult(): ContentSyncResult =
-        ContentSyncResult(
-            changes = changes.map { it.toJournalNote() },
+    private suspend fun ContentChangesResponse.toContentSyncResult(): ContentSyncResult {
+        val (readable, unreadable) = changes.readEach(idOf = { it.id }) { it.toJournalNote() }
+        return ContentSyncResult(
+            changes = readable,
             deletions = deletions.map { Uuid.parse(it.id) },
             lastSyncTimestamp = Instant.fromEpochMilliseconds(lastTimestamp),
             hasMore = hasMore,
+            unreadable = unreadable,
         )
+    }
 
     private suspend fun ContentChange.toJournalNote(): JournalNote {
         val uid = Uuid.parse(id)

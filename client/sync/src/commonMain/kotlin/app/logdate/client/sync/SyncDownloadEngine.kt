@@ -30,6 +30,7 @@ internal data class ChangesPage<T>(
     val deletions: List<Uuid>,
     val lastSyncTimestamp: Instant,
     val hasMore: Boolean,
+    val unreadable: List<Uuid> = emptyList(),
 )
 
 /**
@@ -76,6 +77,29 @@ internal class SyncDownloadEngine(
 ) {
     /** Consecutive failed pages per entity type, so a poison page cannot pin the feed forever. */
     private val consecutiveBatchFailures = mutableMapOf<EntityType, Int>()
+
+    /**
+     * Records on the server this device cannot read were almost always encrypted with a key this
+     * device has since lost. Where the device still holds the entry, its copy is the original, so
+     * it is queued as a CREATE: that is an upsert on the server, and replaces the unreadable copy
+     * with one encrypted under the current key. An entry the device does not hold is left alone on
+     * the server; there is nothing here to repair it with, and deleting it would lose it.
+     */
+    private suspend fun <T : Any> repairUnreadable(
+        strategy: DownloadStrategy<T>,
+        unreadable: List<Uuid>,
+        heldLocally: Set<Uuid>,
+    ) {
+        if (unreadable.isEmpty()) return
+        val (repairable, cloudOnly) = unreadable.partition { it in heldLocally }
+        for (id in repairable) {
+            syncMetadataService.enqueuePending(id.toString(), strategy.entityType, PendingOperation.CREATE)
+        }
+        Napier.w(
+            "${repairable.size} unreadable ${strategy.logLabel}(s) queued to re-upload from this device; " +
+                "${cloudOnly.size} exist only in the cloud and were left in place",
+        )
+    }
 
     suspend fun <T : Any> download(
         strategy: DownloadStrategy<T>,
@@ -252,6 +276,7 @@ internal class SyncDownloadEngine(
                 totalDownloaded += batchResult.downloadedCount
                 totalConflicts += batchResult.conflictsResolved
                 errors.addAll(batchResult.errors)
+                repairUnreadable(strategy, page.unreadable, localById.keys)
 
                 if (batchResult.errors.isNotEmpty()) {
                     // Holding the cursor is right for a local write that failed and may succeed
