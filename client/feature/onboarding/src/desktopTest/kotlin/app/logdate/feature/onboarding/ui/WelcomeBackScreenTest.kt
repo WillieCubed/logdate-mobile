@@ -4,6 +4,7 @@ import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.runComposeUiTest
 import app.logdate.client.device.crypto.IdentityKeyManager
+import app.logdate.client.domain.identity.ObserveUserIdentityUseCase
 import app.logdate.client.domain.streak.CalculateStreakUseCase
 import app.logdate.client.domain.streak.RefreshStreakUseCase
 import app.logdate.feature.onboarding.flow.OnboardingStep
@@ -73,10 +74,18 @@ class WelcomeBackScreenTest {
             )
         welcomeBackViewModel =
             WelcomeBackViewModel(
-                RefreshStreakUseCase(
-                    calculateStreakUseCase = CalculateStreakUseCase(fakeNotesRepository),
-                    streakSettingsRepository = fakeStreakSettingsRepository,
-                ),
+                refreshStreakUseCase =
+                    RefreshStreakUseCase(
+                        calculateStreakUseCase = CalculateStreakUseCase(fakeNotesRepository),
+                        streakSettingsRepository = fakeStreakSettingsRepository,
+                    ),
+                observeUserIdentity =
+                    ObserveUserIdentityUseCase(
+                        profileRepository = fakeProfileRepository,
+                        userStateRepository = fakeUserStateRepository,
+                        accountRepository = fakeAccountRepository,
+                        sessionStorage = fakeSessionStorage,
+                    ),
             )
     }
 
