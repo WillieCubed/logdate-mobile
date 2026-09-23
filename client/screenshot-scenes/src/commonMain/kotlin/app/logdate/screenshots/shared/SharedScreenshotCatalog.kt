@@ -113,6 +113,13 @@ import app.logdate.feature.rewind.ui.past.PastRewindsScreen
 import app.logdate.feature.rewind.ui.settings.RewindSettingsContent
 import app.logdate.feature.search.ui.SearchScreenContent
 import app.logdate.feature.search.ui.SearchScreenState
+import app.logdate.ui.foldable.FoldableHingeBounds
+import app.logdate.ui.foldable.FoldableHingeInfo
+import app.logdate.ui.foldable.FoldableHingeOrientation
+import app.logdate.ui.foldable.FoldableHingeState
+import app.logdate.ui.foldable.FoldableLayoutInfo
+import app.logdate.ui.foldable.FoldableOcclusionType
+import app.logdate.ui.foldable.FoldablePosture
 import app.logdate.ui.streak.CampfirePhase
 import app.logdate.ui.streak.CampfireSize
 import kotlinx.datetime.LocalDate
@@ -216,6 +223,7 @@ enum class ScreenshotViewportId(
     val widthDp: Int,
     val heightDp: Int,
     val darkTheme: Boolean = false,
+    val foldablePosture: FoldablePosture? = null,
 ) {
     PHONE_LIGHT("phone", 411, 891),
     PHONE_DARK("phone-dark", 411, 891, darkTheme = true),
@@ -227,6 +235,52 @@ enum class ScreenshotViewportId(
     DESKTOP("desktop", 1280, 800),
     DESKTOP_TALL("desktop-tall", 1280, 900),
     DESKTOP_WIDE("desktop-wide", 1366, 900),
+    FOLDABLE_BOOK("foldable-book", 1440, 900, foldablePosture = FoldablePosture.Book),
+    FOLDABLE_TABLETOP("foldable-tabletop", 1440, 900, foldablePosture = FoldablePosture.Tabletop),
+    ;
+
+    /** A half-opened foldable of this viewport's size, with its hinge centered across the fold. */
+    val foldableLayoutInfo: FoldableLayoutInfo?
+        get() = foldablePosture?.let { posture -> halfOpenedFoldable(posture, widthDp, heightDp) }
+}
+
+private val HingeThickness = 24.dp
+
+private fun halfOpenedFoldable(
+    posture: FoldablePosture,
+    widthDp: Int,
+    heightDp: Int,
+): FoldableLayoutInfo {
+    val width = widthDp.dp
+    val height = heightDp.dp
+    val bounds =
+        when (posture) {
+            FoldablePosture.Tabletop -> {
+                val top = (height - HingeThickness) / 2
+                FoldableHingeBounds(0.dp, top, width, top + HingeThickness, width, HingeThickness)
+            }
+            else -> {
+                val left = (width - HingeThickness) / 2
+                FoldableHingeBounds(left, 0.dp, left + HingeThickness, height, HingeThickness, height)
+            }
+        }
+    return FoldableLayoutInfo(
+        isFoldable = true,
+        posture = posture,
+        hinge =
+            FoldableHingeInfo(
+                orientation =
+                    if (posture == FoldablePosture.Tabletop) {
+                        FoldableHingeOrientation.Horizontal
+                    } else {
+                        FoldableHingeOrientation.Vertical
+                    },
+                state = FoldableHingeState.HalfOpened,
+                occlusionType = FoldableOcclusionType.Full,
+                bounds = bounds,
+                isSeparating = true,
+            ),
+    )
 }
 
 data class ScreenshotSceneVariant(
@@ -247,6 +301,14 @@ private val standardMatrixVariants =
         ScreenshotSceneVariant(ScreenshotViewportId.PHONE_LANDSCAPE),
         ScreenshotSceneVariant(ScreenshotViewportId.TABLET),
     )
+
+/** Onboarding steps must hold up on a half-folded device as well as the standard matrix. */
+private val onboardingStepVariants =
+    standardMatrixVariants +
+        listOf(
+            ScreenshotSceneVariant(ScreenshotViewportId.FOLDABLE_BOOK),
+            ScreenshotSceneVariant(ScreenshotViewportId.FOLDABLE_TABLETOP),
+        )
 
 private val largeScreenAuditVariants =
     listOf(
@@ -289,7 +351,7 @@ object SharedScreenshotCatalog {
                     animateContent = false,
                 )
             },
-            sharedScene(SharedScreenshotSceneId.PersonalIntroName, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
+            sharedScene(SharedScreenshotSceneId.PersonalIntroName, ScreenshotSceneGroup.ONBOARDING, onboardingStepVariants) {
                 PersonalIntroContent(
                     uiState =
                         PersonalIntroUiState(
@@ -306,7 +368,7 @@ object SharedScreenshotCatalog {
                     animateStepTransitions = false,
                 )
             },
-            sharedScene(SharedScreenshotSceneId.PersonalIntroBio, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
+            sharedScene(SharedScreenshotSceneId.PersonalIntroBio, ScreenshotSceneGroup.ONBOARDING, onboardingStepVariants) {
                 PersonalIntroContent(
                     uiState =
                         PersonalIntroUiState(
@@ -324,10 +386,10 @@ object SharedScreenshotCatalog {
                     animateStepTransitions = false,
                 )
             },
-            sharedScene(SharedScreenshotSceneId.OnboardingOverview, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
+            sharedScene(SharedScreenshotSceneId.OnboardingOverview, ScreenshotSceneGroup.ONBOARDING, onboardingStepVariants) {
                 OnboardingOverviewScreen(onBack = {}, onNext = {})
             },
-            sharedScene(SharedScreenshotSceneId.MemoriesImportInfo, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
+            sharedScene(SharedScreenshotSceneId.MemoriesImportInfo, ScreenshotSceneGroup.ONBOARDING, onboardingStepVariants) {
                 MemoriesImportInfoScreen(onBack = {}, onContinue = {})
             },
             sharedScene(SharedScreenshotSceneId.MemorySelectionPopulated, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
@@ -348,7 +410,7 @@ object SharedScreenshotCatalog {
                     onRefreshMemories = {},
                 )
             },
-            sharedScene(SharedScreenshotSceneId.CloudAccountSetupCompact, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
+            sharedScene(SharedScreenshotSceneId.CloudAccountSetupCompact, ScreenshotSceneGroup.ONBOARDING, onboardingStepVariants) {
                 CloudAccountSetupContent(
                     useCompactLayout = true,
                     onBack = {},
@@ -358,13 +420,13 @@ object SharedScreenshotCatalog {
                     onPlanSelected = {},
                 )
             },
-            sharedScene(SharedScreenshotSceneId.OnboardingBirthday, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
+            sharedScene(SharedScreenshotSceneId.OnboardingBirthday, ScreenshotSceneGroup.ONBOARDING, onboardingStepVariants) {
                 OnboardingBirthdayContent(
                     onBack = {},
                     onBirthdaySelected = {},
                 )
             },
-            sharedScene(SharedScreenshotSceneId.OnboardingRecommendations, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
+            sharedScene(SharedScreenshotSceneId.OnboardingRecommendations, ScreenshotSceneGroup.ONBOARDING, onboardingStepVariants) {
                 OnboardingRecommendationsContent(
                     onBack = {},
                     onKeepOn = {},
@@ -374,7 +436,7 @@ object SharedScreenshotCatalog {
             sharedScene(
                 SharedScreenshotSceneId.OnboardingDayBoundariesConnected,
                 ScreenshotSceneGroup.ONBOARDING,
-                standardMatrixVariants,
+                onboardingStepVariants,
             ) {
                 OnboardingDayBoundariesContent(
                     gateState = HealthConnectGateState(HealthConnectGateKind.READY),
@@ -383,14 +445,14 @@ object SharedScreenshotCatalog {
                     onSkip = {},
                 )
             },
-            sharedScene(SharedScreenshotSceneId.OnboardingLocation, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
+            sharedScene(SharedScreenshotSceneId.OnboardingLocation, ScreenshotSceneGroup.ONBOARDING, onboardingStepVariants) {
                 OnboardingLocationContent(
                     onBack = {},
                     onEnable = {},
                     onSkip = {},
                 )
             },
-            sharedScene(SharedScreenshotSceneId.OnboardingNotifications, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
+            sharedScene(SharedScreenshotSceneId.OnboardingNotifications, ScreenshotSceneGroup.ONBOARDING, onboardingStepVariants) {
                 OnboardingNotificationsContent(
                     onBack = {},
                     onPrimaryAction = {},
@@ -400,7 +462,7 @@ object SharedScreenshotCatalog {
                     hasPermission = false,
                 )
             },
-            sharedScene(SharedScreenshotSceneId.OnboardingCompletionStreak, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
+            sharedScene(SharedScreenshotSceneId.OnboardingCompletionStreak, ScreenshotSceneGroup.ONBOARDING, onboardingStepVariants) {
                 OnboardingCompletionContent(
                     shouldShowFinish = false,
                     onContinue = {},
@@ -417,7 +479,7 @@ object SharedScreenshotCatalog {
                     onFinish = {},
                 )
             },
-            sharedScene(SharedScreenshotSceneId.OnboardingWelcomeBack, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
+            sharedScene(SharedScreenshotSceneId.OnboardingWelcomeBack, ScreenshotSceneGroup.ONBOARDING, onboardingStepVariants) {
                 WelcomeBackScreenContent(name = "Alex")
             },
         )
@@ -459,7 +521,7 @@ object SharedScreenshotCatalog {
                     onRefreshMemories = {},
                 )
             },
-            sharedScene(SharedScreenshotSceneId.RecommendationsSaving, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
+            sharedScene(SharedScreenshotSceneId.RecommendationsSaving, ScreenshotSceneGroup.ONBOARDING, onboardingStepVariants) {
                 OnboardingRecommendationsContent(
                     onBack = {},
                     onKeepOn = {},
@@ -467,7 +529,7 @@ object SharedScreenshotCatalog {
                     isSaving = true,
                 )
             },
-            sharedScene(SharedScreenshotSceneId.DayBoundariesPermissionsNeeded, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
+            sharedScene(SharedScreenshotSceneId.DayBoundariesPermissionsNeeded, ScreenshotSceneGroup.ONBOARDING, onboardingStepVariants) {
                 OnboardingDayBoundariesContent(
                     gateState =
                         HealthConnectGateState(
@@ -487,7 +549,7 @@ object SharedScreenshotCatalog {
                     onSkip = {},
                 )
             },
-            sharedScene(SharedScreenshotSceneId.NotificationsDecisionHandled, ScreenshotSceneGroup.ONBOARDING, standardMatrixVariants) {
+            sharedScene(SharedScreenshotSceneId.NotificationsDecisionHandled, ScreenshotSceneGroup.ONBOARDING, onboardingStepVariants) {
                 OnboardingNotificationsContent(
                     onBack = {},
                     onPrimaryAction = {},
