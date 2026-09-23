@@ -10,6 +10,7 @@ import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.cloud.di.cloudAccountModule
 import app.logdate.client.sync.conflict.KeyValueSyncConflictStore
 import app.logdate.client.sync.conflict.SyncConflictStore
+import app.logdate.client.sync.metadata.KeyValueFirstSyncEnqueueStore
 import app.logdate.client.sync.metadata.KeyValueLastSyncErrorStore
 import app.logdate.client.sync.metadata.KeyValueMediaSyncRefStore
 import app.logdate.client.sync.metadata.KeyValueSyncDeadLetterStore
@@ -55,6 +56,7 @@ actual val syncModule: Module =
                 deadLetterStore = get(),
                 retryScheduleStore = get(),
                 lastErrorStore = KeyValueLastSyncErrorStore(get()),
+                firstSyncEnqueueStore = KeyValueFirstSyncEnqueueStore(get()),
                 syncMetadataService = get(),
                 transactionManager = get(),
                 dataUsagePolicy = get(),

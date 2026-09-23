@@ -17,6 +17,8 @@ import app.logdate.client.sync.cloud.CloudMediaDataSource
 import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.FirstSyncEnqueueStore
+import app.logdate.client.sync.metadata.InMemoryFirstSyncEnqueueStore
 import app.logdate.client.sync.metadata.InMemoryLastSyncErrorStore
 import app.logdate.client.sync.metadata.LastSyncErrorStore
 import app.logdate.client.sync.metadata.MediaSyncRefStore
@@ -73,6 +75,7 @@ class DefaultSyncManager(
     private val backoff: SyncBackoff = SyncBackoff(),
     private val syncScope: CoroutineScope = CoroutineScope(platformIODispatcher),
     private val lastErrorStore: LastSyncErrorStore = InMemoryLastSyncErrorStore(),
+    private val firstSyncEnqueueStore: FirstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     private val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -527,6 +530,7 @@ class DefaultSyncManager(
             tokenRefresher = tokenRefresher,
             mediaTransfer = mediaTransfer,
             retryCoordinator = retryCoordinator,
+            firstSyncEnqueueStore = firstSyncEnqueueStore,
             mapCloudApiError = statusPublisher::handleCloudApiError,
             mapException = statusPublisher::handleSyncException,
             recordProgress = statusPublisher::recordProgress,

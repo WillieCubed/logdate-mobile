@@ -18,9 +18,13 @@ import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.SyncError
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncManager
+import app.logdate.client.sync.SyncMediaTransfer
 import app.logdate.client.sync.SyncResult
+import app.logdate.client.sync.SyncRetryCoordinator
 import app.logdate.client.sync.SyncStatus
+import app.logdate.client.sync.SyncTokenRefresher
 import app.logdate.client.sync.SyncTransactionManager
+import app.logdate.client.sync.SyncUploader
 import app.logdate.client.sync.cloud.AssociationChangesResponse
 import app.logdate.client.sync.cloud.AssociationDeleteRequest
 import app.logdate.client.sync.cloud.AssociationUploadRequest
@@ -64,6 +68,8 @@ import app.logdate.client.sync.conflict.LastWriteWinsResolver
 import app.logdate.client.sync.conflict.SyncConflictRecord
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.FirstSyncEnqueueStore
+import app.logdate.client.sync.metadata.InMemoryFirstSyncEnqueueStore
 import app.logdate.client.sync.metadata.InMemoryLastSyncErrorStore
 import app.logdate.client.sync.metadata.LastSyncErrorStore
 import app.logdate.client.sync.metadata.MediaSyncRef
@@ -71,6 +77,7 @@ import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.QueuedUpload
+import app.logdate.client.sync.metadata.SyncBackoff
 import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
@@ -125,6 +132,8 @@ fun fakeSyncMetadataService(): FakeSyncMetadataService = FakeSyncMetadataService
 
 /** Variant using an explicit session for tests which need to pause and resume sync transport. */
 fun fakeSyncMetadataService(sessionStorage: SessionStorage): FakeSyncMetadataService = FakeSyncMetadataService(sessionStorage)
+
+fun fakeFirstSyncEnqueueStore(): InMemoryFirstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore()
 
 /**
  * SessionStorage that always reports an active session. Default for fakes that don't care
@@ -202,6 +211,7 @@ fun testDefaultSyncManager(
     cloudQuotaManager: CloudQuotaManager? = null,
     syncScope: CoroutineScope? = null,
     lastErrorStore: LastSyncErrorStore = InMemoryLastSyncErrorStore(),
+    firstSyncEnqueueStore: FirstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
 ): DefaultSyncManager =
     if (syncScope == null) {
         DefaultSyncManager(
@@ -227,6 +237,7 @@ fun testDefaultSyncManager(
             dataUsagePolicy = dataUsagePolicy,
             cloudQuotaManager = cloudQuotaManager,
             lastErrorStore = lastErrorStore,
+            firstSyncEnqueueStore = firstSyncEnqueueStore,
         )
     } else {
         DefaultSyncManager(
@@ -252,9 +263,61 @@ fun testDefaultSyncManager(
             dataUsagePolicy = dataUsagePolicy,
             cloudQuotaManager = cloudQuotaManager,
             lastErrorStore = lastErrorStore,
+            firstSyncEnqueueStore = firstSyncEnqueueStore,
             syncScope = syncScope,
         )
     }
+
+/**
+ * Builds a [SyncUploader] directly, with every dependency it doesn't use for
+ * [SyncUploader.enqueueEverythingOnFirstSync] left at an inert default -- lets tests of that
+ * method alone skip constructing a full [DefaultSyncManager] and its download/upload machinery.
+ */
+internal fun testSyncUploader(
+    journalRepository: JournalRepository = FakeJournalRepository(),
+    journalNotesRepository: JournalNotesRepository = FakeJournalNotesRepository(),
+    syncMetadataService: SyncMetadataService = fakeSyncMetadataService(),
+    firstSyncEnqueueStore: FirstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+): SyncUploader {
+    val cloudApiClient = fakeCloudApiClient()
+    val mediaSyncRefStore: MediaSyncRefStore = InMemoryMediaSyncRefStore()
+    val mediaTransfer =
+        SyncMediaTransfer(
+            mediaManager = InMemoryMediaManager(),
+            mediaSyncRefStore = mediaSyncRefStore,
+            cloudMediaDataSource = DefaultCloudMediaDataSource(cloudApiClient),
+        )
+    val retryCoordinator =
+        SyncRetryCoordinator(
+            retryScheduleStore = InMemorySyncRetryScheduleStore(),
+            syncMetadataService = syncMetadataService,
+            deadLetterStore = InMemorySyncDeadLetterStore(),
+            backoff = SyncBackoff(),
+            recordConflict = { _, _, _, _, _, _, _ -> },
+        )
+    val tokenRefresher = SyncTokenRefresher(fakeSessionStorage(), fakeAccountRepository())
+
+    return SyncUploader(
+        journalRepository = journalRepository,
+        journalNotesRepository = journalNotesRepository,
+        cloudJournalDataSource = DefaultCloudJournalDataSource(cloudApiClient),
+        cloudContentDataSource = DefaultCloudContentDataSource(cloudApiClient),
+        cloudAssociationDataSource = DefaultCloudAssociationDataSource(cloudApiClient),
+        cloudDraftDataSource = DefaultCloudDraftDataSource(cloudApiClient),
+        mediaSyncRefStore = mediaSyncRefStore,
+        syncMetadataService = syncMetadataService,
+        dataUsagePolicy = fakeDataUsagePolicy(),
+        deviceIdProvider = null,
+        tokenRefresher = tokenRefresher,
+        mediaTransfer = mediaTransfer,
+        retryCoordinator = retryCoordinator,
+        firstSyncEnqueueStore = firstSyncEnqueueStore,
+        mapCloudApiError = { SyncResult(success = false) },
+        mapException = { _, _ -> SyncResult(success = false) },
+        recordProgress = {},
+        setMediaDeferredForNetwork = {},
+    )
+}
 
 // =============================================================================
 // Fake implementations
@@ -688,6 +751,9 @@ class FakeSyncMetadataService(
     var getPendingCountCalls: Int = 0
         private set
 
+    /** Every [enqueuePending] invocation, in order -- lets a test prove a re-scan did or didn't happen. */
+    val enqueuePendingCalls = mutableListOf<Pair<EntityType, String>>()
+
     override suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload> =
         pendingUploads[entityType]
             ?.map { (entityId, operation) ->
@@ -721,6 +787,7 @@ class FakeSyncMetadataService(
         entityType: EntityType,
         operation: PendingOperation,
     ) {
+        enqueuePendingCalls += entityType to entityId
         val existing = pendingUploads[entityType]?.get(entityId)
         val resolved = PendingOperation.coalesce(existing, operation)
         if (resolved == null) {
