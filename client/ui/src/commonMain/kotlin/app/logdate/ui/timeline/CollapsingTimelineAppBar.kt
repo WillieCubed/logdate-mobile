@@ -14,6 +14,7 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.currentPlatform
 import logdate.client.ui.generated.resources.Res
@@ -55,6 +56,8 @@ fun TimelineTopAppBar(
         Text(
             text = stringResource(Res.string.timeline),
             style = MaterialTheme.typography.titleLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
     if (currentPlatform.isApple) {
