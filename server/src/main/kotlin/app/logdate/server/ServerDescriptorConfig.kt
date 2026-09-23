@@ -42,7 +42,13 @@ data class ServerDescriptorConfig(
             handleDomain = identityConfig.normalizedHandleDomain,
             passkey = ServerPasskeyConfig(rpId = webAuthnRpId, rpName = webAuthnRpName),
             capabilities = capabilities,
-            protocolFeatures = listOf(ServerProtocolFeature.CANONICAL_OWNER_BINDING_V1),
+            protocolFeatures =
+                buildList {
+                    add(ServerProtocolFeature.CANONICAL_OWNER_BINDING_V1)
+                    if (identityConfig.publishesPlcOperations) {
+                        add(ServerProtocolFeature.ATPROTO_PLC_PUBLISHING_V1)
+                    }
+                },
             privacyPolicyUrl = privacyPolicyUrl,
             termsOfServiceUrl = termsOfServiceUrl,
         )

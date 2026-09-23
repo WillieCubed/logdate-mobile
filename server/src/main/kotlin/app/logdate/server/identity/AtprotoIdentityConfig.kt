@@ -35,6 +35,10 @@ data class AtprotoIdentityConfig(
     val serverDid: String = "did:web:$normalizedHandleDomain"
     val normalizedPlcDirectoryUrl: String = plcDirectoryUrl.trim().removeSuffix("/")
 
+    /** Whether hosted accounts get `did:plc` identities whose operations reach the PLC directory. */
+    val publishesPlcOperations: Boolean =
+        hostedAccountDidMethod == HostedAccountDidMethod.PLC && publishHostedPlcOperations
+
     companion object {
         fun fromEnvironment(
             handleDomain: String? = System.getenv("ATPROTO_HANDLE_DOMAIN"),

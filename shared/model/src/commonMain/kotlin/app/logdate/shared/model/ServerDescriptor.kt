@@ -23,6 +23,14 @@ enum class ServerCapability {
 /** Additive protocol flags that old clients can safely ignore. */
 object ServerProtocolFeature {
     const val CANONICAL_OWNER_BINDING_V1 = "canonicalOwnerBindingV1"
+
+    /**
+     * The server publishes hosted `did:plc` operations to the PLC directory, so identity changes
+     * that need a published operation -- rotating the signing key, registering a recovery key,
+     * recovering with one -- can succeed. Without it those requests are refused, and clients must
+     * not offer them.
+     */
+    const val ATPROTO_PLC_PUBLISHING_V1 = "atprotoPlcPublishingV1"
 }
 
 @Serializable
