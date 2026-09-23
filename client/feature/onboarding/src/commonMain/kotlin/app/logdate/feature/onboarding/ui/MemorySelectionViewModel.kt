@@ -1,5 +1,6 @@
 package app.logdate.feature.onboarding.ui
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
@@ -17,18 +18,29 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlin.time.Clock
 
+private const val SELECTED_MEMORY_IDS_KEY = "memory_selection_selected_ids"
+
 /**
  * ViewModel for the memory selection screen during onboarding.
  */
 class MemorySelectionViewModel(
     private val mediaManager: MediaManager,
     private val aiClient: GenerativeAIChatClient,
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(MemorySelectionUiState(isLoading = false, loadFailed = false))
+    private val selectedMemoryIds =
+        savedStateHandle.get<List<String>>(SELECTED_MEMORY_IDS_KEY)?.toMutableSet() ?: mutableSetOf()
+    private val _uiState =
+        MutableStateFlow(
+            MemorySelectionUiState(
+                isLoading = false,
+                loadFailed = false,
+                selectedMemoryIds = selectedMemoryIds.toSet(),
+            ),
+        )
     val uiState: StateFlow<MemorySelectionUiState> = _uiState.asStateFlow()
 
     private var availableMemories: List<MediaObject> = emptyList()
-    private val selectedMemoryIds = mutableSetOf<String>()
     private var currentPage = 0
     private val pageSize = 20
 
@@ -203,6 +215,7 @@ class MemorySelectionViewModel(
         } else {
             selectedMemoryIds.add(memoryUri)
         }
+        savedStateHandle[SELECTED_MEMORY_IDS_KEY] = selectedMemoryIds.toList()
 
         _uiState.update {
             it.copy(selectedMemoryIds = selectedMemoryIds.toSet())

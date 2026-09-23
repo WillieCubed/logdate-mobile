@@ -26,7 +26,7 @@ actual val onboardingFeatureModule: Module =
         }
         single<OnboardingStateResetter> { OnboardingStateResetter { get<OnboardingDeviceStateRepository>().clear() } }
         viewModel { OnboardingViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
-        viewModel { MemorySelectionViewModel(get(), get()) }
+        viewModel { MemorySelectionViewModel(get(), get(), get()) }
         viewModel { PersonalIntroViewModel(get(), get()) }
         viewModel { WelcomeBackViewModel(get(), get()) }
         viewModel { RecoveryPhraseViewModel(get()) }
