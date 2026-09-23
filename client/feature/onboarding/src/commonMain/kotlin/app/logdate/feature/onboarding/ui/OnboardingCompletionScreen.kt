@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.core.streak.CampfireViewModel
+import app.logdate.feature.onboarding.flow.OnboardingCompletionCoordinator
 import app.logdate.feature.onboarding.flow.OnboardingStep
 import app.logdate.ui.GenericLoadingScreen
 import app.logdate.ui.adaptive.FoldableBookLayout
@@ -60,6 +61,7 @@ import logdate.client.feature.onboarding.generated.resources.onboarding_completi
 import logdate.client.feature.onboarding.generated.resources.onboarding_completion_streak_encouragement
 import logdate.client.feature.onboarding.generated.resources.one_more_thing
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 const val ONBOARDING_COMPLETION_ROOT_TAG = "onboarding_complete_root"
@@ -76,8 +78,8 @@ const val ONBOARDING_COMPLETION_LOADING_TAG = "onboarding_complete_loading"
 fun OnboardingCompletionScreen(
     onFinish: () -> Unit,
     onRequirementsIncomplete: (OnboardingStep) -> Unit = {},
-    viewModel: OnboardingViewModel = koinViewModel(),
     campfireViewModel: CampfireViewModel = koinViewModel(),
+    completionCoordinator: OnboardingCompletionCoordinator = koinInject(),
     modifier: Modifier = Modifier,
 ) {
     var shouldShowFinish by remember { mutableStateOf(false) }
@@ -96,7 +98,7 @@ fun OnboardingCompletionScreen(
         onContinue = { shouldShowFinish = true },
         onFinish = {
             coroutineScope.launch {
-                viewModel.finishOnboardingOrReportIncompleteStep(
+                completionCoordinator.finishOnboardingOrReportIncompleteStep(
                     onFinish = onFinish,
                     onIncompleteStep = onRequirementsIncomplete,
                 )
