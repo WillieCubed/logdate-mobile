@@ -65,45 +65,49 @@ internal class AccountSessionRefreshCoordinator(
         }
     }
 
+    /** Deletes the account on the server, then clears this device's credentials for it. */
+    suspend fun deleteAccount(): Result<Unit> =
+        authorized { accessToken -> apiClient.deleteAccount(accessToken) }
+            .onSuccess {
+                Napier.i("Account deleted on the server; clearing local credentials")
+                clearLocalCredentials()
+            }
+
     suspend fun signOut(): Result<Unit> =
         try {
-            val currentAccountValue = sessionState.account
-            val session = sessionStorage.getSession()
-
-            session?.let {
+            sessionStorage.getSession()?.let {
                 apiClient.logout(it.refreshToken).onFailure { error ->
                     Napier.w("Remote logout failed; local credentials will still be cleared", error)
                 }
             }
-
-            sessionStorage.clearSession()
-
-            // A LogDate installation has one canonical identity. Remove the platform account
-            // rather than leaving an origin-scoped blank account that can later be mistaken for
-            // another selectable identity.
-            if (currentAccountValue != null) {
-                val platformResult =
-                    platformAccountManager.removeAccount(
-                        username = currentAccountValue.username,
-                        backendUrl = configRepository.getCurrentBackendUrl(),
-                    )
-
-                if (platformResult.isFailure) {
-                    Napier.w("Failed to remove platform account on sign-out", platformResult.exceptionOrNull())
-                }
-            }
-
-            sessionState.clear()
-
-            // Clear restore credential on sign-out — best effort, non-fatal.
-            deleteRestoreKey()
-
+            clearLocalCredentials()
             Napier.i("User signed out successfully")
             Result.success(Unit)
         } catch (e: Exception) {
             Napier.w("Failed to sign out", e)
             Result.failure(e)
         }
+
+    private suspend fun clearLocalCredentials() {
+        val currentAccountValue = sessionState.account
+        sessionStorage.clearSession()
+
+        // A LogDate installation has one canonical identity. Remove the platform account
+        // rather than leaving an origin-scoped blank account that can later be mistaken for
+        // another selectable identity.
+        if (currentAccountValue != null) {
+            platformAccountManager
+                .removeAccount(
+                    username = currentAccountValue.username,
+                    backendUrl = configRepository.getCurrentBackendUrl(),
+                ).onFailure { Napier.w("Failed to remove platform account on sign-out", it) }
+        }
+
+        sessionState.clear()
+
+        // Clear restore credential on sign-out — best effort, non-fatal.
+        deleteRestoreKey()
+    }
 
     suspend fun refreshAuthentication(): Result<Unit> {
         return try {

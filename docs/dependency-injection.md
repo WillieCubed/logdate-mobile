@@ -129,11 +129,11 @@ actual val coreFeatureModule: Module = module {
     
     // ViewModels depend only on use cases and interfaces
     viewModel { AppViewModel(get(), get(), get()) }
-    viewModel { AccountSettingsViewModel(get(), get(), get(), get(), get(), get()) }
+    viewModel { SettingsOverviewViewModel(get(), get(), get()) }
     viewModel { PrivacySettingsViewModel(get(), get(), get(), get(), get()) }
     viewModel { DataSettingsViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
-    viewModel { AdvancedSettingsViewModel(get(), get()) }
-    viewModel { DangerZoneSettingsViewModel(get(), get(), get(), get()) }
+    viewModel { AdvancedSettingsViewModel(get()) }
+    viewModel { DangerZoneSettingsViewModel(get()) }
     viewModel { HomeViewModel(get(), get(), get()) }  // Injects GetStreamingTimelineUseCase and other dependencies
 }
 ```
@@ -148,11 +148,11 @@ actual val coreFeatureModule: Module = module {
     single<ExportLauncher> { StubExportLauncher() }
     
     viewModel { AppViewModel(get(), get(), get()) }
-    viewModel { AccountSettingsViewModel(get(), get(), get(), get(), get(), get()) }
+    viewModel { SettingsOverviewViewModel(get(), get(), get()) }
     viewModel { PrivacySettingsViewModel(get(), get(), get(), get(), get()) }
     viewModel { DataSettingsViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
-    viewModel { AdvancedSettingsViewModel(get(), get()) }
-    viewModel { DangerZoneSettingsViewModel(get(), get(), get(), get()) }
+    viewModel { AdvancedSettingsViewModel(get()) }
+    viewModel { DangerZoneSettingsViewModel(get()) }
     viewModel { HomeViewModel() }  // No location dependency on desktop
 }
 ```

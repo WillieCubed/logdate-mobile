@@ -35,12 +35,12 @@ import app.logdate.ui.step.StepHeroIcon
 import app.logdate.ui.step.StepScaffold
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.account_recovery
 import logdate.client.feature.core.generated.resources.at
 import logdate.client.feature.core.generated.resources.continue_with_google
 import logdate.client.feature.core.generated.resources.privacy_policy
 import logdate.client.feature.core.generated.resources.server_domain_sign_in_hint
 import logdate.client.feature.core.generated.resources.server_sign_in_title
+import logdate.client.feature.core.generated.resources.sign_in_help_action
 import logdate.client.feature.core.generated.resources.sign_in_with_passkey
 import logdate.client.feature.core.generated.resources.terms_of_service
 import logdate.client.feature.core.generated.resources.text_4
@@ -137,7 +137,7 @@ fun CloudAccountSignInContent(
                 }
             }
             TextButton(onClick = onAccountRecovery) {
-                Text(stringResource(Res.string.account_recovery))
+                Text(stringResource(Res.string.sign_in_help_action))
             }
         },
         footer =

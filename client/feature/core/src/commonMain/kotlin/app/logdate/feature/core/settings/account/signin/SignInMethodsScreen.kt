@@ -101,6 +101,8 @@ fun SignInMethodsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // View models outlive a visit to this screen, so each visit reloads what may have changed.
+    LaunchedEffect(Unit) { viewModel.refresh() }
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event -> snackbarHostState.showSnackbar(event.message()) }
     }

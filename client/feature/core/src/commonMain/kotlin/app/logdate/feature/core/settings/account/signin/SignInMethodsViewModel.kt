@@ -12,6 +12,7 @@ import app.logdate.client.repository.account.NotSignedInException
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.shared.model.PasskeyInfo
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -124,17 +125,22 @@ class SignInMethodsViewModel(
     private val _events = Channel<SignInMethodsEvent>(Channel.BUFFERED)
     val events: Flow<SignInMethodsEvent> = _events.receiveAsFlow()
 
+    private var loadJob: Job? = null
+
     init {
         refresh()
     }
 
+    /** Reloads the list. A reload already under way is left to finish. */
     fun refresh() {
-        viewModelScope.launch {
-            if (_state.value !is SignInMethodsUiState.Loaded) {
-                _state.value = SignInMethodsUiState.Loading
+        if (loadJob?.isActive == true) return
+        loadJob =
+            viewModelScope.launch {
+                if (_state.value !is SignInMethodsUiState.Loaded) {
+                    _state.value = SignInMethodsUiState.Loading
+                }
+                _state.value = load()
             }
-            _state.value = load()
-        }
     }
 
     fun addPasskey() {

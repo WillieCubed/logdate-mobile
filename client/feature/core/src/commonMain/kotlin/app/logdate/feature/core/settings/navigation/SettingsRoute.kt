@@ -21,6 +21,15 @@ data object AccountSettingsRoute : NavKey
 data object SignInMethodsRoute : NavKey
 
 @Serializable
+data object RecoveryPhraseRoute : NavKey
+
+@Serializable
+data object HostingRoute : NavKey
+
+@Serializable
+data object DeleteAccountRoute : NavKey
+
+@Serializable
 data object PrivacySettingsRoute : NavKey
 
 @Serializable

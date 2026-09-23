@@ -29,19 +29,17 @@ Core Feature Module
 ### Account & Authentication
 
 - `CloudAccountOnboardingScreen.kt` - Cloud account setup
-- `PasskeyAccountCreationScreen.kt` - Passkey creation flow
-- `PasskeyAuthenticationScreen.kt` - Login with passkeys
 - `BiometricGatekeeper.kt` - Device biometric security
 
 ### Settings System
 
-- `AccountSettingsViewModel.kt` - Account & profile settings
+- `SettingsOverviewScreen.kt` - Main settings screen
+- `settings/account/` - Account: who is signed in, ways to sign in, recovery phrase, hosting,
+  sign-out, and account deletion, one screen and view model each
 - `PrivacySettingsViewModel.kt` - Privacy and security settings
 - `DataSettingsViewModel.kt` - Data, sync, export/restore
-- `AdvancedSettingsViewModel.kt` - Server configuration
+- `AdvancedSettingsViewModel.kt` - Manual app update checks
 - `DangerZoneSettingsViewModel.kt` - Destructive actions
-- `SettingsOverviewScreen.kt` - Main settings screen
-- `AccountSettingsScreen.kt` - Account management
 - `PrivacySettingsScreen.kt` - Privacy controls
 - `DataSettingsScreen.kt` - Data management
 - `DevicesScreen.kt` - Connected device management
@@ -124,21 +122,21 @@ fun HomeScreen(
 
 ### Settings Integration
 
+Settings screens take navigation callbacks and resolve their own view models:
+
 ```kotlin
-val accountViewModel: AccountSettingsViewModel = koinViewModel()
-val privacyViewModel: PrivacySettingsViewModel = koinViewModel()
-val dataViewModel: DataSettingsViewModel = koinViewModel()
-
-val accountState by accountViewModel.state.collectAsStateWithLifecycle()
-val privacyState by privacyViewModel.state.collectAsStateWithLifecycle()
-val dataState by dataViewModel.uiState.collectAsStateWithLifecycle()
-
-AccountSettingsScreen(
-    onBack = { /* ... */ },
-    onNavigateToCloudAccountCreation = { /* ... */ },
-    onNavigateToBirthdaySettings = { /* ... */ },
-    accountViewModel = accountViewModel,
-    privacyViewModel = privacyViewModel
+AccountScreen(
+    destinations =
+        AccountDestinations(
+            onBack = { /* ... */ },
+            onProfile = { /* ... */ },
+            onSignInMethods = { /* ... */ },
+            onRecoveryPhrase = { /* ... */ },
+            onHosting = { /* ... */ },
+            onDeleteAccount = { /* ... */ },
+            onSignIn = { /* ... */ },
+            onCreateAccount = { /* ... */ },
+        ),
 )
 ```
 
@@ -155,11 +153,11 @@ actual val coreFeatureModule: Module = module {
     single<RestoreLauncher> { AndroidRestoreLauncher(androidContext()) }
     
     viewModel { AppViewModel(get(), get(), get()) }
-    viewModel { AccountSettingsViewModel(get(), get(), get(), get(), get(), get()) }
+    viewModel { SettingsOverviewViewModel(get(), get(), get()) }
     viewModel { PrivacySettingsViewModel(get(), get(), get(), get(), get()) }
     viewModel { DataSettingsViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
-    viewModel { AdvancedSettingsViewModel(get(), get()) }
-    viewModel { DangerZoneSettingsViewModel(get(), get(), get(), get()) }
+    viewModel { AdvancedSettingsViewModel(get()) }
+    viewModel { DangerZoneSettingsViewModel(get()) }
     viewModel { HomeViewModel(get(), get(), get()) }  // GetStreamingTimelineUseCase + dependencies
     viewModel { CloudAccountOnboardingViewModel(get(), get(), get()) }
 }

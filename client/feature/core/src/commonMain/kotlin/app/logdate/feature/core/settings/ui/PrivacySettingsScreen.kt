@@ -6,16 +6,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -28,7 +25,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -47,11 +43,6 @@ import logdate.client.feature.core.generated.resources.manage_location_tracking_
 import logdate.client.feature.core.generated.resources.navigate_to_location_settings
 import logdate.client.feature.core.generated.resources.privacy_and_security
 import logdate.client.feature.core.generated.resources.privacy_security_description
-import logdate.client.feature.core.generated.resources.recovery_phrase_missing
-import logdate.client.feature.core.generated.resources.recovery_phrase_missing_enter_action
-import logdate.client.feature.core.generated.resources.recovery_phrase_settings_description
-import logdate.client.feature.core.generated.resources.recovery_phrase_settings_title
-import logdate.client.feature.core.generated.resources.recovery_phrase_warning
 import logdate.client.feature.core.generated.resources.settings_biometric_description
 import logdate.client.feature.core.generated.resources.settings_biometric_label
 import logdate.client.feature.core.generated.resources.system_search_visibility_description
@@ -78,11 +69,9 @@ import logdate.client.ui.generated.resources.Res as UiRes
 fun PrivacySettingsScreen(
     onBack: () -> Unit,
     onNavigateToLocationSettings: () -> Unit = {},
-    onNavigateToRecoveryPhrase: () -> Unit = {},
     viewModel: PrivacySettingsViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
-    val recoveryPhraseRevealState by viewModel.recoveryPhraseRevealState.collectAsState()
 
     PrivacySettingsContent(
         onBack = onBack,
@@ -91,11 +80,7 @@ fun PrivacySettingsScreen(
         isBiometricsEnabled = state.isBiometricsEnabled,
         isSystemSearchVisibilityEnabled = state.isSystemSearchVisibilityEnabled,
         showSystemSearchVisibilityToggle = state.showSystemSearchVisibilityToggle,
-        recoveryPhraseRevealState = recoveryPhraseRevealState,
-        onRevealRecoveryPhrase = viewModel::revealRecoveryPhrase,
-        onHideRecoveryPhrase = viewModel::hideRecoveryPhrase,
         onNavigateToLocationSettings = onNavigateToLocationSettings,
-        onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
     )
 }
 
@@ -107,23 +92,10 @@ fun PrivacySettingsContent(
     isBiometricsEnabled: Boolean,
     isSystemSearchVisibilityEnabled: Boolean = false,
     showSystemSearchVisibilityToggle: Boolean = false,
-    recoveryPhraseRevealState: RecoveryPhraseRevealState = RecoveryPhraseRevealState.Hidden,
-    onRevealRecoveryPhrase: () -> Unit = {},
-    onHideRecoveryPhrase: () -> Unit = {},
     onNavigateToLocationSettings: () -> Unit = {},
-    onNavigateToRecoveryPhrase: () -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var showDisableBiometricsDialog by remember { mutableStateOf(false) }
-
-    RecoveryPhraseDialog(
-        state = recoveryPhraseRevealState,
-        onDismiss = onHideRecoveryPhrase,
-        onEnterPhrase = {
-            onHideRecoveryPhrase()
-            onNavigateToRecoveryPhrase()
-        },
-    )
 
     FoldableBookLayout(
         modifier = Modifier.fillMaxSize(),
@@ -159,18 +131,6 @@ fun PrivacySettingsContent(
                                 showDisableBiometricsDialog = true
                             }
                         },
-                    )
-                    ListItem(
-                        headlineContent = { Text(stringResource(Res.string.recovery_phrase_settings_title)) },
-                        supportingContent = { Text(stringResource(Res.string.recovery_phrase_settings_description)) },
-                        leadingContent = {
-                            Icon(
-                                imageVector = Icons.Rounded.Key,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        },
-                        modifier = Modifier.clickable(onClick = onRevealRecoveryPhrase),
                     )
                 }
 
@@ -259,18 +219,6 @@ fun PrivacySettingsContent(
                                 }
                             },
                         )
-                        ListItem(
-                            headlineContent = { Text(stringResource(Res.string.recovery_phrase_settings_title)) },
-                            supportingContent = { Text(stringResource(Res.string.recovery_phrase_settings_description)) },
-                            leadingContent = {
-                                Icon(
-                                    imageVector = Icons.Rounded.Key,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            },
-                            modifier = Modifier.clickable(onClick = onRevealRecoveryPhrase),
-                        )
                     }
                 }
 
@@ -344,88 +292,6 @@ fun PrivacySettingsContent(
                 }
             },
         )
-    }
-}
-
-@Composable
-private fun RecoveryPhraseDialog(
-    state: RecoveryPhraseRevealState,
-    onDismiss: () -> Unit,
-    onEnterPhrase: () -> Unit,
-) {
-    when (state) {
-        RecoveryPhraseRevealState.Hidden -> Unit
-        RecoveryPhraseRevealState.Loading -> {
-            AlertDialog(
-                onDismissRequest = onDismiss,
-                title = { Text(stringResource(Res.string.recovery_phrase_settings_title)) },
-                text = {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = onDismiss) {
-                        Text(stringResource(UiRes.string.common_cancel))
-                    }
-                },
-            )
-        }
-        RecoveryPhraseRevealState.Missing -> {
-            AlertDialog(
-                onDismissRequest = onDismiss,
-                title = { Text(stringResource(Res.string.recovery_phrase_settings_title)) },
-                text = { Text(stringResource(Res.string.recovery_phrase_missing)) },
-                confirmButton = {
-                    TextButton(onClick = onEnterPhrase) {
-                        Text(stringResource(Res.string.recovery_phrase_missing_enter_action))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = onDismiss) {
-                        Text(stringResource(UiRes.string.common_cancel))
-                    }
-                },
-            )
-        }
-        is RecoveryPhraseRevealState.Error -> {
-            AlertDialog(
-                onDismissRequest = onDismiss,
-                title = { Text(stringResource(Res.string.recovery_phrase_settings_title)) },
-                text = { Text(state.message) },
-                confirmButton = {
-                    TextButton(onClick = onDismiss) {
-                        Text(stringResource(UiRes.string.common_confirm))
-                    }
-                },
-            )
-        }
-        is RecoveryPhraseRevealState.Revealed -> {
-            AlertDialog(
-                onDismissRequest = onDismiss,
-                title = { Text(stringResource(Res.string.recovery_phrase_settings_title)) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        Text(
-                            text = stringResource(Res.string.recovery_phrase_warning),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        state.words.forEachIndexed { index, word ->
-                            Text("${index + 1}. $word")
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = onDismiss) {
-                        Text(stringResource(UiRes.string.common_confirm))
-                    }
-                },
-            )
-        }
     }
 }
 

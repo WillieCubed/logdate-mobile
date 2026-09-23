@@ -36,12 +36,25 @@ import app.logdate.feature.core.account.CloudAccountWelcomeContent
 import app.logdate.feature.core.account.PasskeyAccountCreationFinalContent
 import app.logdate.feature.core.export.ExportState
 import app.logdate.feature.core.restore.RestoreState
+import app.logdate.feature.core.settings.account.AccountContent
+import app.logdate.feature.core.settings.account.AccountDestinations
+import app.logdate.feature.core.settings.account.AccountHeader
+import app.logdate.feature.core.settings.account.AccountUiState
+import app.logdate.feature.core.settings.account.ConnectedServerInfo
+import app.logdate.feature.core.settings.account.EmailRow
+import app.logdate.feature.core.settings.account.ServerHealth
+import app.logdate.feature.core.settings.account.ServerRow
+import app.logdate.feature.core.settings.account.SignInSummary
+import app.logdate.feature.core.settings.account.delete.DeleteAccountContent
+import app.logdate.feature.core.settings.account.delete.DeleteAccountUiState
+import app.logdate.feature.core.settings.account.hosting.HostingContent
+import app.logdate.feature.core.settings.account.hosting.HostingUiState
+import app.logdate.feature.core.settings.account.recovery.RecoveryPhraseContent
+import app.logdate.feature.core.settings.account.recovery.RecoveryPhraseUiState
 import app.logdate.feature.core.settings.account.signin.LinkedProviderRow
 import app.logdate.feature.core.settings.account.signin.PasskeyRow
 import app.logdate.feature.core.settings.account.signin.SignInMethodsContent
 import app.logdate.feature.core.settings.account.signin.SignInMethodsUiState
-import app.logdate.feature.core.settings.ui.AccountIdentityState
-import app.logdate.feature.core.settings.ui.AccountSettingsContent
 import app.logdate.feature.core.settings.ui.AdvancedSettingsContent
 import app.logdate.feature.core.settings.ui.BirthdaySettingsContent
 import app.logdate.feature.core.settings.ui.DataSettingsContent
@@ -168,6 +181,9 @@ enum class SharedScreenshotSceneId(
     AccountSettings("account-settings"),
     PrivacySettings("privacy-settings"),
     SignInMethods("sign-in-methods"),
+    RecoveryPhrase("recovery-phrase"),
+    Hosting("hosting"),
+    DeleteAccount("delete-account"),
     DataSettings("data-settings"),
     MemoriesSettings("memories-settings"),
     VoiceNotesSettings("voice-notes-settings"),
@@ -685,27 +701,19 @@ object SharedScreenshotCatalog {
                 )
             },
             sharedScene(SharedScreenshotSceneId.AccountSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
-                AccountSettingsContent(
-                    onBack = {},
-                    onNavigateToSignInMethods = {},
-                    userProfile = UserProfile(name = "Alex Rivera", username = "alex", isAuthenticated = true),
+                AccountContent(
+                    state =
+                        AccountUiState.SignedIn(
+                            header = AccountHeader(displayName = "Alex Rivera", username = "alex"),
+                            signIn = SignInSummary.Known(passkeyCount = 2, linkedProviders = listOf(LinkedSignInProvider.Kind.GOOGLE)),
+                            hasRecoveryPhrase = true,
+                            email = EmailRow(address = "alex@example.com", isVerified = true, canVerify = false),
+                            server = ServerRow(name = "LogDate Cloud", host = "cloud.logdate.app", isLogDateCloud = true),
+                            isSigningOut = false,
+                        ),
+                    destinations = AccountDestinations({}, {}, {}, {}, {}, {}, {}, {}),
+                    onOpenEmailVerification = {},
                     onSignOut = {},
-                    identityState = AccountIdentityState(),
-                    onRefreshIdentity = {},
-                    onExportSigningKey = {},
-                    onRotateSigningKey = {},
-                    onImportSigningKey = { _, _ -> },
-                    onImportSigningKeyWithRecovery = { _, _, _ -> },
-                    onDerivePlcRecoveryKey = {},
-                    onRegisterPlcRecoveryKey = {},
-                    onRegisterDerivedPlcRecoveryKey = {},
-                    onClearIdentityActionState = {},
-                    onClearExportedKeyJson = {},
-                    onClearDerivedRecoveryDidKey = {},
-                    serverSelectionState = ServerSelectionState(),
-                    onSelectServerPreset = {},
-                    onUpdateCustomServerUrl = {},
-                    onValidateAndSaveServer = {},
                 )
             },
             sharedScene(SharedScreenshotSceneId.PrivacySettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
@@ -717,6 +725,56 @@ object SharedScreenshotCatalog {
                     isSystemSearchVisibilityEnabled = true,
                     showSystemSearchVisibilityToggle = true,
                     onNavigateToLocationSettings = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.RecoveryPhrase, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                RecoveryPhraseContent(
+                    state =
+                        RecoveryPhraseUiState.Revealed(
+                            listOf(
+                                "orbit",
+                                "canvas",
+                                "meadow",
+                                "lantern",
+                                "harbor",
+                                "velvet",
+                                "summit",
+                                "pepper",
+                                "gravel",
+                                "whisper",
+                                "copper",
+                                "tundra",
+                            ),
+                        ),
+                    onBack = {},
+                    onReveal = {},
+                    onHide = {},
+                    onEnterPhrase = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.Hosting, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                HostingContent(
+                    state =
+                        HostingUiState(
+                            server =
+                                ConnectedServerInfo(
+                                    origin = "https://cloud.logdate.app",
+                                    displayName = "LogDate Cloud",
+                                    isLogDateCloud = true,
+                                    publishesIdentityChanges = false,
+                                ),
+                            health = ServerHealth.Reachable("1.4.0"),
+                        ),
+                    onBack = {},
+                    onCheckAgain = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.DeleteAccount, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                DeleteAccountContent(
+                    state = DeleteAccountUiState(serverName = "LogDate Cloud"),
+                    onBack = {},
+                    onEraseThisDeviceChange = {},
+                    onDelete = {},
                 )
             },
             sharedScene(SharedScreenshotSceneId.SignInMethods, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {

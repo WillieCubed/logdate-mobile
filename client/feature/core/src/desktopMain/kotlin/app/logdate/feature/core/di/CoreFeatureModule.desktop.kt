@@ -1,8 +1,12 @@
 package app.logdate.feature.core.di
 
+import app.logdate.client.device.crypto.IdentityKeyManager
+import app.logdate.client.domain.account.EmailVerificationAvailability
+import app.logdate.client.domain.account.VerifyEmailUseCase
 import app.logdate.client.domain.di.accountModule
 import app.logdate.client.domain.di.domainModule
 import app.logdate.client.domain.export.archive.MediaSourceOpener
+import app.logdate.client.domain.identity.ObserveUserIdentityUseCase
 import app.logdate.client.location.di.locationSettingsModule
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.BiometricGatekeeper
@@ -21,12 +25,18 @@ import app.logdate.feature.core.profile.ui.ProfileViewModel
 import app.logdate.feature.core.restore.DesktopRestoreLauncher
 import app.logdate.feature.core.restore.RestoreLauncher
 import app.logdate.feature.core.restore.UserDataRestoreViewModel
+import app.logdate.feature.core.settings.account.AccountViewModel
+import app.logdate.feature.core.settings.account.ConnectedServer
+import app.logdate.feature.core.settings.account.DefaultConnectedServer
+import app.logdate.feature.core.settings.account.delete.DeleteAccountViewModel
+import app.logdate.feature.core.settings.account.hosting.HostingViewModel
+import app.logdate.feature.core.settings.account.recovery.RecoveryPhraseViewModel
 import app.logdate.feature.core.settings.account.signin.SignInMethodsViewModel
-import app.logdate.feature.core.settings.ui.AccountSettingsViewModel
 import app.logdate.feature.core.settings.ui.AdvancedSettingsViewModel
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
 import app.logdate.feature.core.settings.ui.DataSettingsViewModel
 import app.logdate.feature.core.settings.ui.DayBoundarySettingsViewModel
+import app.logdate.feature.core.settings.ui.DeviceEraser
 import app.logdate.feature.core.settings.ui.HiddenMemoriesWidgetInstallController
 import app.logdate.feature.core.settings.ui.LibrarySettingsViewModel
 import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
@@ -73,22 +83,35 @@ actual val coreFeatureModule: Module =
         factory { ServerConfigurationCoordinator(get(), get(), get()) }
 
         viewModel { AppViewModel(get(), get(), get(), get(), get()) }
+        factory<ConnectedServer> { DefaultConnectedServer(get(), get(), get()) }
         viewModel {
-            AccountSettingsViewModel(
-                userStateRepository = get(),
-                getCurrentAccountUseCase = get(),
-                accountIdentityRepository = get(),
-                passkeyAccountRepository = get(),
-                sessionStorage = get(),
-                verifyEmailUseCase = get(),
-                emailVerificationAvailability = get(),
+            AccountViewModel(
+                accountRepository = get(),
+                userIdentity = get<ObserveUserIdentityUseCase>()(),
+                connectedServer = get(),
+                hasRecoveryPhrase = { get<IdentityKeyManager>().hasIdentityKey() },
+                isEmailVerificationAvailable = { get<EmailVerificationAvailability>().isAvailable() },
+                verifyEmail = { get<VerifyEmailUseCase>()() },
+            )
+        }
+        viewModel {
+            RecoveryPhraseViewModel(
+                gatekeeper = get(),
+                loadPhrase = { get<IdentityKeyManager>().getStoredRecoveryPhrase()?.words },
+            )
+        }
+        viewModel { HostingViewModel(get()) }
+        viewModel {
+            DeleteAccountViewModel(
+                accountRepository = get(),
+                connectedServer = get(),
+                eraseThisDevice = { get<DeviceEraser>().eraseEverything() },
             )
         }
         viewModel { SettingsOverviewViewModel(get(), get(), get()) }
         viewModel { LibrarySettingsViewModel(get()) }
         viewModel {
             PrivacySettingsViewModel(
-                get(),
                 get(),
                 get(),
                 get(),
@@ -117,16 +140,9 @@ actual val coreFeatureModule: Module =
         }
         viewModel { UserDataExportViewModel(get(), get()) }
         viewModel { UserDataRestoreViewModel(get(), get()) }
-        viewModel { AdvancedSettingsViewModel(get(), get()) }
-        viewModel {
-            DangerZoneSettingsViewModel(
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
-            )
-        }
+        viewModel { AdvancedSettingsViewModel(appUpdateController = get()) }
+        factory { DeviceEraser(get(), get(), get(), get(), get()) }
+        viewModel { DangerZoneSettingsViewModel(get()) }
         viewModel {
             HomeViewModel(
                 getStreamingTimelineUseCase = get(),

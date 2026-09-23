@@ -8,8 +8,12 @@ import app.logdate.feature.core.people.ui.PeopleDirectoryScreen
 import app.logdate.feature.core.people.ui.PeopleInboxScreen
 import app.logdate.feature.core.people.ui.PeopleSettingsScreen
 import app.logdate.feature.core.people.ui.PersonDetailScreen
+import app.logdate.feature.core.settings.account.AccountDestinations
+import app.logdate.feature.core.settings.account.AccountScreen
+import app.logdate.feature.core.settings.account.delete.DeleteAccountScreen
+import app.logdate.feature.core.settings.account.hosting.HostingScreen
+import app.logdate.feature.core.settings.account.recovery.RecoveryPhraseScreen
 import app.logdate.feature.core.settings.account.signin.SignInMethodsScreen
-import app.logdate.feature.core.settings.ui.AccountSettingsScreen
 import app.logdate.feature.core.settings.ui.AdvancedSettingsScreen
 import app.logdate.feature.core.settings.ui.BirthdaySettingsScreen
 import app.logdate.feature.core.settings.ui.ClearDataSettingsScreen
@@ -102,19 +106,39 @@ fun EntryProviderScope<NavKey>.settingsEntries(
         )
     }
     taggedEntry<AccountSettingsRoute> {
-        AccountSettingsScreen(
-            onBack = onBack,
-            onNavigateToSignInMethods = { onNavigateTo(SignInMethodsRoute) },
+        AccountScreen(
+            destinations =
+                AccountDestinations(
+                    onBack = onBack,
+                    onProfile = onNavigateToProfile,
+                    onSignInMethods = { onNavigateTo(SignInMethodsRoute) },
+                    onRecoveryPhrase = { onNavigateTo(RecoveryPhraseRoute) },
+                    onHosting = { onNavigateTo(HostingRoute) },
+                    onDeleteAccount = { onNavigateTo(DeleteAccountRoute) },
+                    onSignIn = onNavigateToSignIn,
+                    onCreateAccount = onNavigateToCloudAccountCreation,
+                ),
         )
     }
     taggedEntry<SignInMethodsRoute> {
         SignInMethodsScreen(onBack = onBack)
     }
+    taggedEntry<RecoveryPhraseRoute> {
+        RecoveryPhraseScreen(
+            onBack = onBack,
+            onEnterPhrase = { onNavigateTo(RecoveryPhraseEntrySettingsRoute) },
+        )
+    }
+    taggedEntry<HostingRoute> {
+        HostingScreen(onBack = onBack)
+    }
+    taggedEntry<DeleteAccountRoute> {
+        DeleteAccountScreen(onBack = onBack, onDeviceErased = onResetApp)
+    }
     taggedEntry<PrivacySettingsRoute> {
         PrivacySettingsScreen(
             onBack = onBack,
             onNavigateToLocationSettings = { onNavigateTo(LocationSettingsRoute) },
-            onNavigateToRecoveryPhrase = { onNavigateTo(RecoveryPhraseEntrySettingsRoute) },
         )
     }
     taggedEntry<DataSettingsRoute> {

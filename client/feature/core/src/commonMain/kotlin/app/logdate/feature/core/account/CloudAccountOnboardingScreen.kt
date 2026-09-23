@@ -34,8 +34,6 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_adopt_local_data_body
 import logdate.client.feature.core.generated.resources.account_adopt_local_data_confirm
 import logdate.client.feature.core.generated.resources.account_adopt_local_data_title
-import logdate.client.feature.core.generated.resources.atproto_recovery_guidance_body
-import logdate.client.feature.core.generated.resources.atproto_recovery_guidance_title
 import logdate.client.feature.core.generated.resources.first_sync_failed
 import logdate.client.feature.core.generated.resources.first_sync_partial
 import logdate.client.feature.core.generated.resources.first_sync_progress
@@ -51,6 +49,8 @@ import logdate.client.feature.core.generated.resources.google_sign_in_no_account
 import logdate.client.feature.core.generated.resources.google_sign_in_rate_limited
 import logdate.client.feature.core.generated.resources.google_sign_in_server_error
 import logdate.client.feature.core.generated.resources.google_sign_in_unavailable
+import logdate.client.feature.core.generated.resources.sign_in_help_body
+import logdate.client.feature.core.generated.resources.sign_in_help_title
 import logdate.client.ui.generated.resources.common_cancel
 import logdate.client.ui.generated.resources.common_dismiss
 import org.jetbrains.compose.resources.stringResource
@@ -127,8 +127,8 @@ fun CloudAccountOnboardingScreen(
     if (showRecoveryInfo.value) {
         AlertDialog(
             onDismissRequest = { showRecoveryInfo.value = false },
-            title = { Text(stringResource(Res.string.atproto_recovery_guidance_title)) },
-            text = { Text(stringResource(Res.string.atproto_recovery_guidance_body)) },
+            title = { Text(stringResource(Res.string.sign_in_help_title)) },
+            text = { Text(stringResource(Res.string.sign_in_help_body)) },
             confirmButton = {
                 TextButton(onClick = { showRecoveryInfo.value = false }) {
                     Text(stringResource(UiRes.string.common_dismiss))

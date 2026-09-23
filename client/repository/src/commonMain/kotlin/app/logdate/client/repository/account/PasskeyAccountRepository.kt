@@ -111,6 +111,13 @@ interface PasskeyAccountRepository {
         Result.failure(UnsupportedOperationException("Listing sign-in methods is not supported"))
 
     /**
+     * Permanently deletes the signed-in account and everything synced to it on the server, then
+     * signs this device out. The journal on this device is left alone. A refusal leaves the
+     * device signed in.
+     */
+    suspend fun deleteAccount(): Result<Unit> = Result.failure(UnsupportedOperationException("Deleting accounts is not supported"))
+
+    /**
      * Create a restore key backed up to the device's encrypted cloud backup.
      * Should be called after successful account creation.
      * Non-fatal — returns success even if the device does not support E2EE backup.

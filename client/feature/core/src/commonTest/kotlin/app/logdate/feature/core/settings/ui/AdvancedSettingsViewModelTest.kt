@@ -54,15 +54,7 @@ class AdvancedSettingsViewModelTest {
         runTest {
             val updateController = FakeAppUpdateController()
             val viewModel =
-                AdvancedSettingsViewModel(
-                    serverConfigurationCoordinator =
-                        ServerConfigurationCoordinator(
-                            serverHealthChecker = FakeServerHealthChecker(),
-                            serverDiscoveryClient = FakeServerDiscoveryClient(),
-                            configRepository = DefaultLogDateConfigRepository(),
-                        ),
-                    appUpdateController = updateController,
-                )
+                AdvancedSettingsViewModel(appUpdateController = updateController)
 
             viewModel.checkForAppUpdates()
             advanceUntilIdle()
@@ -82,15 +74,7 @@ class AdvancedSettingsViewModelTest {
                         ),
                 )
             val viewModel =
-                AdvancedSettingsViewModel(
-                    serverConfigurationCoordinator =
-                        ServerConfigurationCoordinator(
-                            serverHealthChecker = FakeServerHealthChecker(),
-                            serverDiscoveryClient = FakeServerDiscoveryClient(),
-                            configRepository = DefaultLogDateConfigRepository(),
-                        ),
-                    appUpdateController = updateController,
-                )
+                AdvancedSettingsViewModel(appUpdateController = updateController)
 
             assertEquals(AppUpdateStatus.Downloaded, viewModel.appUpdateUiState.value.status)
         }
@@ -99,22 +83,16 @@ class AdvancedSettingsViewModelTest {
     fun `validating and saving local server persists address`() =
         runTest {
             val configRepository = DefaultLogDateConfigRepository()
-            val viewModel =
-                AdvancedSettingsViewModel(
-                    serverConfigurationCoordinator =
-                        ServerConfigurationCoordinator(
-                            serverHealthChecker = FakeServerHealthChecker(),
-                            serverDiscoveryClient = FakeServerDiscoveryClient(),
-                            configRepository = configRepository,
-                        ),
-                    appUpdateController = FakeAppUpdateController(),
+            val coordinator =
+                ServerConfigurationCoordinator(
+                    serverHealthChecker = FakeServerHealthChecker(),
+                    serverDiscoveryClient = FakeServerDiscoveryClient(),
+                    configRepository = configRepository,
                 )
 
-            viewModel.selectServerPreset(ServerPreset.CUSTOM)
-            viewModel.updateCustomServerUrl("http://10.0.2.2:8765")
-            viewModel.validateAndSaveServer()
-            advanceUntilIdle()
+            val result = coordinator.validateAndSaveCustomServer("http://10.0.2.2:8765")
 
+            assertTrue(result.isSuccess)
             assertTrue(configRepository.backendUrl.value.startsWith("http://10.0.2.2:8765"))
             assertEquals("http://10.0.2.2:8765", configRepository.serverDescriptor.value?.serverOrigin)
         }

@@ -181,6 +181,8 @@ class DefaultPasskeyAccountRepository(
 
     override suspend fun signOut(): Result<Unit> = sessionRefreshCoordinator.signOut()
 
+    override suspend fun deleteAccount(): Result<Unit> = sessionRefreshCoordinator.deleteAccount()
+
     override suspend fun refreshAuthentication(): Result<Unit> = sessionRefreshCoordinator.refreshAuthentication()
 
     override suspend fun getAccountInfo(): Result<LogDateAccount> = sessionRefreshCoordinator.getAccountInfo()

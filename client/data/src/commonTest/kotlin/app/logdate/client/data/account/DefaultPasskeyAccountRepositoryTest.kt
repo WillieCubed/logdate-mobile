@@ -1019,6 +1019,38 @@ class DefaultPasskeyAccountRepositoryTest {
             assertEquals(kotlin.time.Instant.parse("2026-09-20T08:30:00Z"), google.lastSignInAt)
         }
 
+    @Test
+    fun `deleting the account removes it on the server and signs this device out`() =
+        runTest {
+            val sessionStorage = FakeSessionStorage().apply { saveSession(testSession) }
+            val apiClient = FakePasskeyApiClient()
+            val repository = createRepository(sessionStorage = sessionStorage, apiClient = apiClient)
+
+            val result = repository.deleteAccount()
+
+            assertTrue(result.isSuccess)
+            assertEquals(testSession.accessToken, apiClient.deletedAccountAccessToken)
+            assertNull(sessionStorage.getSession())
+            assertFalse(repository.isAuthenticated.value)
+        }
+
+    @Test
+    fun `a refused deletion leaves this device signed in`() =
+        runTest {
+            val sessionStorage = FakeSessionStorage().apply { saveSession(testSession) }
+            val apiClient =
+                FakePasskeyApiClient().apply {
+                    deleteAccountResponse = Result.failure(PasskeyApiException("DELETION_FAILED", "Failed"))
+                    refreshTokenResponse = Result.success("fresh_access_token")
+                }
+            val repository = createRepository(sessionStorage = sessionStorage, apiClient = apiClient)
+
+            val error = repository.deleteAccount().exceptionOrNull()
+
+            assertEquals("DELETION_FAILED", (error as? PasskeyApiException)?.errorCode)
+            assertNotNull(sessionStorage.getSession())
+        }
+
     // Fake implementations for testing
 
     /**
@@ -1099,6 +1131,7 @@ class DefaultPasskeyAccountRepositoryTest {
         var getAccountInfoResponses: List<Result<LogDateAccount>>? = null
         var deletePasskeyResponses: List<Result<Unit>>? = null
         var lastCompleteAccountCreationRequest: CompleteAccountCreationRequest? = null
+        var deletedAccountAccessToken: String? = null
         var beginAddPasskeyResponse: Result<PasskeyRegistrationOptions> =
             Result.success(beginAccountCreationResponse.getOrThrow().registrationOptions)
         var beginAddPasskeyResponses: List<Result<PasskeyRegistrationOptions>>? = null
@@ -1209,7 +1242,10 @@ class DefaultPasskeyAccountRepositoryTest {
         override suspend fun completeRestoreSignIn(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData> =
             completeAuthenticationResponse
 
-        override suspend fun deleteAccount(accessToken: String): Result<Unit> = deleteAccountResponse
+        override suspend fun deleteAccount(accessToken: String): Result<Unit> {
+            deletedAccountAccessToken = accessToken
+            return deleteAccountResponse
+        }
 
         override suspend fun getEntitlement(accessToken: String): Result<EntitlementResponse> =
             Result.failure(NotImplementedError("getEntitlement not exercised by these tests"))

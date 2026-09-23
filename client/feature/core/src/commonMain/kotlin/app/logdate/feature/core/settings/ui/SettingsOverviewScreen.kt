@@ -56,9 +56,9 @@ import app.logdate.ui.theme.Spacing
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.account_and_sign_in
 import logdate.client.feature.core.generated.resources.account_profile_edit_label
 import logdate.client.feature.core.generated.resources.account_settings_description
+import logdate.client.feature.core.generated.resources.account_title
 import logdate.client.feature.core.generated.resources.campfire_badge
 import logdate.client.feature.core.generated.resources.create_account
 import logdate.client.feature.core.generated.resources.devices
@@ -296,7 +296,7 @@ fun SettingsOverviewContent(
                     )
                     if (userProfile.isAuthenticated) {
                         SettingsNavigationItem(
-                            title = stringResource(Res.string.account_and_sign_in),
+                            title = stringResource(Res.string.account_title),
                             description = stringResource(Res.string.account_settings_description),
                             icon = { Icon(Icons.Default.Cloud, contentDescription = null) },
                             onClick = onNavigateToAccount,
@@ -459,7 +459,7 @@ fun SettingsOverviewContent(
                         )
                         if (userProfile.isAuthenticated) {
                             SettingsNavigationItem(
-                                title = stringResource(Res.string.account_and_sign_in),
+                                title = stringResource(Res.string.account_title),
                                 description = stringResource(Res.string.account_settings_description),
                                 icon = { Icon(Icons.Default.Cloud, contentDescription = null) },
                                 onClick = onNavigateToAccount,
