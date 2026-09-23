@@ -4,8 +4,17 @@ package app.logdate.ui.foldable
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 
 /**
@@ -119,6 +128,46 @@ fun provideFoldableLayoutInfo(
     CompositionLocalProvider(LocalFoldableLayoutInfoOverride provides foldableLayoutInfo) {
         content()
     }
+}
+
+/**
+ * This layout info as seen from a container whose top-left corner sits at [origin] in the window.
+ * Hinge bounds are reported in window coordinates, so a container that isn't at the window origin
+ * -- under a top app bar, beside a navigation rail -- has to shift them into its own coordinates
+ * before splitting, or its panes land off the hinge.
+ */
+fun FoldableLayoutInfo.relativeTo(origin: DpOffset): FoldableLayoutInfo {
+    val hinge = hinge ?: return this
+    if (origin == DpOffset.Zero) return this
+    val bounds = hinge.bounds
+    return copy(
+        hinge =
+            hinge.copy(
+                bounds =
+                    bounds.copy(
+                        left = bounds.left - origin.x,
+                        top = bounds.top - origin.y,
+                        right = bounds.right - origin.x,
+                        bottom = bounds.bottom - origin.y,
+                    ),
+            ),
+    )
+}
+
+/**
+ * Remembers where the modified element's top-left corner sits in the window, in dp. Pair with
+ * [relativeTo] so a foldable split lines up with the physical hinge wherever the layout is placed.
+ */
+@Composable
+fun rememberWindowOrigin(): Pair<DpOffset, Modifier> {
+    val density = LocalDensity.current
+    var origin by remember { mutableStateOf(DpOffset.Zero) }
+    val modifier =
+        Modifier.onGloballyPositioned { coordinates ->
+            val position = coordinates.positionInWindow()
+            origin = with(density) { DpOffset(position.x.toDp(), position.y.toDp()) }
+        }
+    return origin to modifier
 }
 
 fun calculateFoldableSplitLayout(
