@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import okio.FileSystem
+import okio.Path
 import okio.Path.Companion.toPath
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -64,42 +65,8 @@ class IosExportLauncher(
                     exportArchiveUseCase
                         .export(options.toArchiveExportOptions(), container)
                         .collect { progress ->
-                            when (progress) {
-                                ArchiveExportProgress.Starting -> {
-                                    updateProgress(ExportProgressInfo(isActive = true, message = "Preparing export..."))
-                                }
-
-                                is ArchiveExportProgress.InProgress -> {
-                                    updateProgress(
-                                        ExportProgressInfo(
-                                            isActive = true,
-                                            progressPercent = (progress.fraction * 100).toInt(),
-                                            message = progress.stage.defaultMessage,
-                                        ),
-                                    )
-                                }
-
-                                is ArchiveExportProgress.Completed -> {
-                                    container.finish(outputPath)
-                                    archiveFinished = true
-                                    presentShareSheet(exportFilePath)
-                                    updateProgress(
-                                        ExportProgressInfo(
-                                            isActive = false,
-                                            progressPercent = 100,
-                                            message = "Export completed",
-                                            completedFilePath = exportFilePath,
-                                            stats = progress.summary.counts.toExportStats(),
-                                        ),
-                                    )
-                                }
-
-                                is ArchiveExportProgress.Failed -> {
-                                    val message = progress.error.defaultMessage
-                                    showAlert("Export Failed", message)
-                                    completionCallback?.invoke(ExportOutcome.Failed(message))
-                                }
-                            }
+                            archiveFinished =
+                                handleExportProgress(progress, exportFilePath, outputPath, container, archiveFinished)
                         }
                 } catch (cancellation: CancellationException) {
                     throw cancellation
@@ -115,6 +82,53 @@ class IosExportLauncher(
                     }
                 }
             }
+    }
+
+    /** Applies one [ArchiveExportProgress] update and returns whether the archive has finished writing. */
+    private fun handleExportProgress(
+        progress: ArchiveExportProgress,
+        exportFilePath: String,
+        outputPath: Path,
+        container: StagingZipArchiveContainer,
+        archiveFinished: Boolean,
+    ): Boolean {
+        when (progress) {
+            ArchiveExportProgress.Starting -> {
+                updateProgress(ExportProgressInfo(isActive = true, message = "Preparing export..."))
+            }
+
+            is ArchiveExportProgress.InProgress -> {
+                updateProgress(
+                    ExportProgressInfo(
+                        isActive = true,
+                        progressPercent = (progress.fraction * 100).toInt(),
+                        message = progress.stage.defaultMessage,
+                    ),
+                )
+            }
+
+            is ArchiveExportProgress.Completed -> {
+                container.finish(outputPath)
+                presentShareSheet(exportFilePath)
+                updateProgress(
+                    ExportProgressInfo(
+                        isActive = false,
+                        progressPercent = 100,
+                        message = "Export completed",
+                        completedFilePath = exportFilePath,
+                        stats = progress.summary.counts.toExportStats(),
+                    ),
+                )
+                return true
+            }
+
+            is ArchiveExportProgress.Failed -> {
+                val message = progress.error.defaultMessage
+                showAlert("Export Failed", message)
+                completionCallback?.invoke(ExportOutcome.Failed(message))
+            }
+        }
+        return archiveFinished
     }
 
     override fun cancelExport() {
