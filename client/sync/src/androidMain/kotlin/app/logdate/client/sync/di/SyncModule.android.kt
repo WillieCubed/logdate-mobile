@@ -24,6 +24,7 @@ import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.client.sync.migration.di.migrationCoreModule
 import app.logdate.client.sync.migration.di.migrationModule
+import app.logdate.shared.config.LogDateConfigRepository
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
 import org.koin.core.qualifier.named
@@ -36,7 +37,10 @@ actual val syncModule: Module =
     module {
         single { RecoverIdentityUseCase(get(), get(), get(), get(), get()) }
         single<SyncConflictStore> { KeyValueSyncConflictStore(get()) }
-        single<MediaSyncRefStore> { KeyValueMediaSyncRefStore(get()) }
+        single<MediaSyncRefStore> {
+            val configRepository = get<LogDateConfigRepository>()
+            KeyValueMediaSyncRefStore(get(), currentOrigin = { configRepository.getCurrentBackendUrl() })
+        }
         single<SyncDeadLetterStore> { KeyValueSyncDeadLetterStore(get()) }
         single<SyncRetryScheduleStore> { KeyValueSyncRetryScheduleStore(get()) }
         single<SyncTransactionManager> {
