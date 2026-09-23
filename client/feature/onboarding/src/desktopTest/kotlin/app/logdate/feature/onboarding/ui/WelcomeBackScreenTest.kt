@@ -1,10 +1,9 @@
 package app.logdate.feature.onboarding.ui
 
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.runComposeUiTest
 import app.logdate.client.device.crypto.IdentityKeyManager
-import app.logdate.client.domain.dayboundary.ObserveHealthConnectStatusUseCase
-import app.logdate.client.domain.identity.ObserveUserIdentityUseCase
 import app.logdate.client.domain.streak.CalculateStreakUseCase
 import app.logdate.client.domain.streak.RefreshStreakUseCase
 import app.logdate.feature.onboarding.flow.OnboardingStep
@@ -57,32 +56,28 @@ class WelcomeBackScreenTest {
         identityKeyManager = IdentityKeyManager(InMemorySecureStorage(), FakeCryptoManager())
         runBlocking { identityKeyManager.setupNewIdentity() }
 
-        val refreshStreakUseCase =
-            RefreshStreakUseCase(
-                calculateStreakUseCase = CalculateStreakUseCase(fakeNotesRepository),
-                streakSettingsRepository = fakeStreakSettingsRepository,
-            )
-
         onboardingViewModel =
-            OnboardingViewModel(
-                journalNotesRepository = fakeNotesRepository,
+            buildOnboardingViewModel(
+                notesRepository = fakeNotesRepository,
                 userStateRepository = fakeUserStateRepository,
                 memoriesSettingsRepository = fakeMemoriesSettingsRepository,
-                locationTrackingSettingsRepository = fakeLocationSettingsRepository,
+                locationSettingsRepository = fakeLocationSettingsRepository,
                 dayBoundarySettingsRepository = fakeDayBoundarySettingsRepository,
-                observeHealthConnectStatus = ObserveHealthConnectStatusUseCase(fakeHealthRepository),
-                observeUserIdentity =
-                    ObserveUserIdentityUseCase(
-                        profileRepository = fakeProfileRepository,
-                        userStateRepository = fakeUserStateRepository,
-                        accountRepository = fakeAccountRepository,
-                        sessionStorage = fakeSessionStorage,
-                    ),
+                healthRepository = fakeHealthRepository,
+                profileRepository = fakeProfileRepository,
+                accountRepository = fakeAccountRepository,
+                sessionStorage = fakeSessionStorage,
+                streakSettingsRepository = fakeStreakSettingsRepository,
                 onboardingDeviceStateRepository = fakeOnboardingDeviceStateRepository,
-                refreshStreakUseCase = refreshStreakUseCase,
                 identityKeyManager = identityKeyManager,
             )
-        welcomeBackViewModel = WelcomeBackViewModel(refreshStreakUseCase)
+        welcomeBackViewModel =
+            WelcomeBackViewModel(
+                RefreshStreakUseCase(
+                    calculateStreakUseCase = CalculateStreakUseCase(fakeNotesRepository),
+                    streakSettingsRepository = fakeStreakSettingsRepository,
+                ),
+            )
     }
 
     @AfterTest
@@ -96,30 +91,16 @@ class WelcomeBackScreenTest {
             fakeProfileRepository.setProfile(LogDateProfile(displayName = "Alex", bio = "Bio"))
             runBlocking {
                 fakeUserStateRepository.setBirthday(Instant.fromEpochMilliseconds(946684800000))
-            }
-            runBlocking {
                 fakeOnboardingDeviceStateRepository.markRecommendationsHandled()
                 fakeOnboardingDeviceStateRepository.markLocationHandled()
                 fakeOnboardingDeviceStateRepository.markDayBoundariesHandled()
                 fakeOnboardingDeviceStateRepository.markNotificationsHandled()
             }
 
-            var finished = false
-            var incompleteStep: OnboardingStep? = null
+            val outcome = runWelcomeBack()
 
-            setContent {
-                WelcomeBackScreen(
-                    onFinish = { finished = true },
-                    onRequirementsIncomplete = { incompleteStep = it },
-                    viewModel = welcomeBackViewModel,
-                    onboardingViewModel = onboardingViewModel,
-                )
-            }
-
-            waitUntil(timeoutMillis = 10_000) { finished || incompleteStep != null }
-
-            assertTrue(finished, "expected onFinish to be called")
-            assertNull(incompleteStep)
+            assertTrue(outcome.finished, "expected onFinish to be called")
+            assertNull(outcome.incompleteStep)
             assertTrue(fakeUserStateRepository.isOnboardingComplete)
         }
 
@@ -135,22 +116,32 @@ class WelcomeBackScreenTest {
                 fakeOnboardingDeviceStateRepository.markNotificationsHandled()
             }
 
-            var finished = false
-            var incompleteStep: OnboardingStep? = null
+            val outcome = runWelcomeBack()
 
-            setContent {
-                WelcomeBackScreen(
-                    onFinish = { finished = true },
-                    onRequirementsIncomplete = { incompleteStep = it },
-                    viewModel = welcomeBackViewModel,
-                    onboardingViewModel = onboardingViewModel,
-                )
-            }
-
-            waitUntil(timeoutMillis = 10_000) { finished || incompleteStep != null }
-
-            assertEquals(OnboardingStep.BIRTHDAY, incompleteStep)
-            assertTrue(!finished, "onFinish must not be called when required steps are incomplete")
+            assertEquals(OnboardingStep.BIRTHDAY, outcome.incompleteStep)
+            assertTrue(!outcome.finished, "onFinish must not be called when required steps are incomplete")
             assertTrue(!fakeUserStateRepository.isOnboardingComplete)
         }
+
+    private data class WelcomeBackOutcome(
+        val finished: Boolean,
+        val incompleteStep: OnboardingStep?,
+    )
+
+    private fun ComposeUiTest.runWelcomeBack(): WelcomeBackOutcome {
+        var finished = false
+        var incompleteStep: OnboardingStep? = null
+
+        setContent {
+            WelcomeBackScreen(
+                onFinish = { finished = true },
+                onRequirementsIncomplete = { incompleteStep = it },
+                viewModel = welcomeBackViewModel,
+                onboardingViewModel = onboardingViewModel,
+            )
+        }
+
+        waitUntil(timeoutMillis = 10_000) { finished || incompleteStep != null }
+        return WelcomeBackOutcome(finished, incompleteStep)
+    }
 }
