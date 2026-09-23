@@ -11,7 +11,7 @@
     <string name="choose_your_storage_plan">Choose Your Storage Plan:</string>
     <string name="continue_with_memories_count">Continue with %1$d memories</string>
     <string name="continue_without_importing_memories">Continue without importing</string>
-    <string name="continue_without_cloud_sync">Continue Without Cloud Sync</string>
+    <string name="continue_without_cloud_sync">Continue without cloud sync</string>
     <string name="continue_without_notifications">Continue without notifications</string>
     <string name="create_account">Create Account</string>
     <string name="deriving_encryption_keys">Deriving encryption keys...</string>

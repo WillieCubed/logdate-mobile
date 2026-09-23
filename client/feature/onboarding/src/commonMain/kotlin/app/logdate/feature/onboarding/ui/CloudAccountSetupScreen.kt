@@ -1,31 +1,22 @@
 @file:Suppress(
     "ktlint:standard:function-naming",
     "ktlint:standard:no-wildcard-imports",
-    "ktlint:standard:max-line-length",
 )
 
 package app.logdate.feature.onboarding.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,21 +27,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import app.logdate.client.billing.model.LogDateBackupPlanOption
 import app.logdate.feature.core.account.CloudAccountOnboardingScreen
 import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
-import app.logdate.ui.adaptive.FoldableBookLayout
-import app.logdate.ui.adaptive.FoldableTabletopLayout
+import app.logdate.ui.step.StepHeroIcon
+import app.logdate.ui.step.StepScaffold
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
-import logdate.client.ui.generated.resources.common_back
 import logdate.client.ui.generated.resources.common_continue
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -67,356 +55,138 @@ fun CloudAccountSetupScreen(
     onBack: () -> Unit,
     onContinue: () -> Unit,
     onSkip: () -> Unit,
-    useCompactLayout: Boolean? = null,
     modifier: Modifier = Modifier,
-    onboardingViewModel: OnboardingViewModel = koinViewModel(),
 ) {
-    BoxWithConstraints(modifier = modifier) {
-        val resolvedUseCompactLayout = useCompactLayout ?: (maxWidth < 700.dp)
-        // Null until the person chooses; otherwise the step the account flow opens on. Creating an
-        // account and signing in are separate entry points into the same flow, so someone
-        // reinstalling the app can get back to their journals without creating a second account.
-        var entryStep by remember { mutableStateOf<CloudAccountOnboardingStep?>(null) }
-        val cloudAccountViewModel = koinViewModel<CloudAccountOnboardingViewModel>()
+    // Null until the person chooses; otherwise the step the account flow opens on. Creating an
+    // account and signing in are separate entry points into the same flow, so someone
+    // reinstalling the app can get back to their journals without creating a second account.
+    var entryStep by remember { mutableStateOf<CloudAccountOnboardingStep?>(null) }
+    val cloudAccountViewModel = koinViewModel<CloudAccountOnboardingViewModel>()
 
-        LaunchedEffect(entryStep) {
-            entryStep?.let { step ->
-                cloudAccountViewModel.resetFlow()
-                cloudAccountViewModel.setInitialStep(step)
-            }
+    LaunchedEffect(entryStep) {
+        entryStep?.let { step ->
+            cloudAccountViewModel.resetFlow()
+            cloudAccountViewModel.setInitialStep(step)
         }
-
-        if (entryStep != null) {
-            CloudAccountOnboardingScreen(
-                viewModel = cloudAccountViewModel,
-                onAccountCreated = onContinue,
-                onSkipOnboarding = onSkip,
-                onBack = {
-                    cloudAccountViewModel.resetFlow()
-                    entryStep = null
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
-            return@BoxWithConstraints
-        }
-
-        CloudAccountSetupContent(
-            useCompactLayout = resolvedUseCompactLayout,
-            onBack = onBack,
-            onContinue = { entryStep = CloudAccountOnboardingStep.DisplayName },
-            onSignIn = { entryStep = CloudAccountOnboardingStep.SignIn },
-            onSkip = onSkip,
-            onPlanSelected = onboardingViewModel::selectPlan,
-            modifier = Modifier.fillMaxSize(),
-        )
     }
+
+    if (entryStep != null) {
+        CloudAccountOnboardingScreen(
+            viewModel = cloudAccountViewModel,
+            onAccountCreated = onContinue,
+            onSkipOnboarding = onSkip,
+            onBack = {
+                cloudAccountViewModel.resetFlow()
+                entryStep = null
+            },
+            modifier = modifier.fillMaxSize(),
+        )
+        return
+    }
+
+    CloudAccountSetupContent(
+        onBack = onBack,
+        onContinue = { entryStep = CloudAccountOnboardingStep.DisplayName },
+        onSignIn = { entryStep = CloudAccountOnboardingStep.SignIn },
+        onSkip = onSkip,
+        modifier = modifier,
+    )
 }
 
+/**
+ * The plans are shown as information, not as choices: nothing downstream reads a selection here,
+ * so presenting them as tappable cards promised a choice that did nothing.
+ */
 @Composable
 fun CloudAccountSetupContent(
-    useCompactLayout: Boolean,
     onBack: () -> Unit,
     onContinue: () -> Unit,
     onSkip: () -> Unit,
-    onPlanSelected: (LogDateBackupPlanOption) -> Unit,
     modifier: Modifier = Modifier,
     onSignIn: () -> Unit = {},
-    selectedOption: LogDateBackupPlanOption? = null,
-    onOptionSelected: (LogDateBackupPlanOption) -> Unit = {},
 ) {
-    if (useCompactLayout) {
-        BackupSyncCompactContent(
-            onBack = onBack,
-            onContinue = onContinue,
-            onSignIn = onSignIn,
-            onSkip = onSkip,
-            onPlanSelected = onPlanSelected,
-            modifier = modifier,
+    StepScaffold(
+        title = stringResource(Res.string.backup_and_sync),
+        onBack = onBack,
+        modifier = modifier.testTag(CLOUD_ACCOUNT_SETUP_ROOT_TAG),
+        supportingText = stringResource(Res.string.onboarding_cloud_backup_description),
+        hero = { StepHeroIcon(Icons.Rounded.CloudSync) },
+        headerAlignment = Alignment.CenterHorizontally,
+        actions = {
+            Button(
+                onClick = onContinue,
+                modifier = Modifier.fillMaxWidth().testTag(CLOUD_ACCOUNT_SETUP_PRIMARY_ACTION_TAG),
+            ) {
+                Text(stringResource(UiRes.string.common_continue))
+            }
+            OutlinedButton(
+                onClick = onSignIn,
+                modifier = Modifier.fillMaxWidth().testTag(CLOUD_ACCOUNT_SETUP_SIGN_IN_ACTION_TAG),
+            ) {
+                Text(stringResource(Res.string.onboarding_account_existing_action))
+            }
+            TextButton(
+                onClick = onSkip,
+                modifier = Modifier.testTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG),
+            ) {
+                Text(stringResource(Res.string.continue_without_cloud_sync))
+            }
+        },
+        footer = {
+            Text(
+                text = stringResource(Res.string.onboarding_sync_later_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+    ) {
+        PlanSummary(
+            title = stringResource(Res.string.onboarding_plan_basic_title),
+            price = stringResource(Res.string.onboarding_plan_basic_price),
+            description = stringResource(Res.string.onboarding_plan_basic_description),
         )
-    } else {
-        // Every sibling onboarding screen responds to hinge/tabletop posture via
-        // FoldableTabletopLayout{ FoldableBookLayout{ standardContent } }; this one previously
-        // only ever split by width, so a folded posture at this width rendered the same cramped
-        // side-by-side split as a wide, unfolded window.
-        FoldableTabletopLayout(
-            modifier = modifier.testTag(CLOUD_ACCOUNT_SETUP_ROOT_TAG),
-            minPaneHeight = 260.dp,
-            topPane = {
-                CloudAccountInfoPane(onBack = onBack, modifier = Modifier.fillMaxSize())
-            },
-            bottomPane = {
-                CloudAccountActionsPane(
-                    onContinue = onContinue,
-                    onSignIn = onSignIn,
-                    onSkip = onSkip,
-                    onPlanSelected = onPlanSelected,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            },
-            standardContent = {
-                FoldableBookLayout(
-                    modifier = Modifier.fillMaxSize(),
-                    minPaneWidth = 320.dp,
-                    startPane = {
-                        CloudAccountInfoPane(onBack = onBack, modifier = Modifier.fillMaxSize())
-                    },
-                    endPane = {
-                        CloudAccountActionsPane(
-                            onContinue = onContinue,
-                            onSignIn = onSignIn,
-                            onSkip = onSkip,
-                            onPlanSelected = onPlanSelected,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    },
-                    standardContent = {
-                        BackupSyncCompactContent(
-                            onBack = onBack,
-                            onContinue = onContinue,
-                            onSignIn = onSignIn,
-                            onSkip = onSkip,
-                            onPlanSelected = onPlanSelected,
-                            rootTestTag = null,
-                        )
-                    },
-                )
-            },
+        PlanSummary(
+            title = stringResource(Res.string.onboarding_plan_standard_title),
+            price = stringResource(Res.string.onboarding_plan_standard_price),
+            description = stringResource(Res.string.onboarding_plan_standard_description),
         )
     }
 }
 
 @Composable
-private fun CloudAccountInfoPane(
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
+private fun PlanSummary(
+    title: String,
+    price: String,
+    description: String,
 ) {
     Column(
         modifier =
-            modifier
-                .verticalScroll(rememberScrollState())
+            Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.large)
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
                 .padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
-        IconButton(onClick = onBack) {
-            Icon(
-                Icons.AutoMirrored.Default.ArrowBack,
-                contentDescription = stringResource(UiRes.string.common_back),
-            )
-        }
-        Text(
-            stringResource(Res.string.backup_and_sync),
-            style = MaterialTheme.typography.headlineLarge,
-        )
-        Text(
-            stringResource(Res.string.onboarding_cloud_backup_description),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun CloudAccountActionsPane(
-    onContinue: () -> Unit,
-    onSignIn: () -> Unit,
-    onSkip: () -> Unit,
-    onPlanSelected: (LogDateBackupPlanOption) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Scaffold(
-        modifier = modifier,
-        bottomBar = {
-            Box(
-                modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
-                contentAlignment = Alignment.Center,
-            ) {
-                ActionButtons(
-                    onContinue = onContinue,
-                    onSignIn = onSignIn,
-                    onSkip = onSkip,
-                )
-            }
-        },
-    ) { contentPadding ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(contentPadding)
-                    .padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            PlanCards(onPlanSelected = onPlanSelected)
-        }
-    }
-}
-
-@Composable
-private fun BackupSyncCompactContent(
-    onBack: () -> Unit,
-    onContinue: () -> Unit,
-    onSignIn: () -> Unit,
-    onSkip: () -> Unit,
-    onPlanSelected: (LogDateBackupPlanOption) -> Unit,
-    modifier: Modifier = Modifier,
-    rootTestTag: String? = CLOUD_ACCOUNT_SETUP_ROOT_TAG,
-) {
-    Scaffold(
-        modifier = modifier,
-        bottomBar = {
-            Box(
-                modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
-                contentAlignment = Alignment.Center,
-            ) {
-                ActionButtons(
-                    onContinue = onContinue,
-                    onSignIn = onSignIn,
-                    onSkip = onSkip,
-                    modifier = Modifier.widthIn(max = 444.dp),
-                )
-            }
-        },
-    ) { contentPadding ->
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(contentPadding),
-        ) {
-            Column(
-                modifier =
-                    Modifier
-                        .let { base -> rootTestTag?.let { base.testTag(it) } ?: base }
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = Spacing.lg),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().widthIn(max = 444.dp),
-                    horizontalArrangement = Arrangement.Start,
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Default.ArrowBack,
-                            contentDescription = stringResource(UiRes.string.common_back),
-                        )
-                    }
-                }
-
-                Column(
-                    modifier = Modifier.widthIn(max = 444.dp),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                ) {
-                    Text(
-                        stringResource(Res.string.backup_and_sync),
-                        style = MaterialTheme.typography.headlineLarge,
-                        modifier = Modifier.padding(bottom = Spacing.md),
-                    )
-                    Text(
-                        stringResource(Res.string.onboarding_cloud_backup_description),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    PlanCards(onPlanSelected = onPlanSelected)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ActionButtons(
-    onContinue: () -> Unit,
-    onSignIn: () -> Unit,
-    onSkip: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Button(
-            onClick = onContinue,
-            modifier = Modifier.fillMaxWidth().testTag(CLOUD_ACCOUNT_SETUP_PRIMARY_ACTION_TAG),
-        ) {
-            Text(stringResource(UiRes.string.common_continue))
-        }
-        TextButton(
-            onClick = onSignIn,
-            modifier = Modifier.testTag(CLOUD_ACCOUNT_SETUP_SIGN_IN_ACTION_TAG),
-        ) {
-            Text(stringResource(Res.string.onboarding_account_existing_action))
-        }
-        TextButton(
-            onClick = onSkip,
-            modifier = Modifier.testTag(CLOUD_ACCOUNT_SETUP_SKIP_ACTION_TAG),
-        ) {
-            Text(stringResource(Res.string.continue_without_cloud_sync))
-        }
-        Text(
-            text = stringResource(Res.string.onboarding_sync_later_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
+        Row(
             modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
-
-@Composable
-private fun PlanCards(onPlanSelected: (LogDateBackupPlanOption) -> Unit) {
-    PlanCard(
-        title = stringResource(Res.string.onboarding_plan_basic_title),
-        description = stringResource(Res.string.onboarding_plan_basic_description),
-        price = stringResource(Res.string.onboarding_plan_basic_price),
-        onClick = { onPlanSelected(LogDateBackupPlanOption.BASIC) },
-    )
-    PlanCard(
-        title = stringResource(Res.string.onboarding_plan_standard_title),
-        description = stringResource(Res.string.onboarding_plan_standard_description),
-        price = stringResource(Res.string.onboarding_plan_standard_price),
-        onClick = { onPlanSelected(LogDateBackupPlanOption.STANDARD) },
-    )
-}
-
-@Composable
-private fun PlanCard(
-    title: String,
-    description: String,
-    price: String,
-    onClick: () -> Unit,
-) {
-    Card(
-        onClick = onClick,
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-            ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
             Text(
                 text = price,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
             )
         }
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -425,25 +195,9 @@ private fun PlanCard(
 private fun CloudAccountSetupScreenPreview() {
     LogDateTheme {
         CloudAccountSetupContent(
-            useCompactLayout = true,
             onBack = {},
             onContinue = {},
             onSkip = {},
-            onPlanSelected = {},
-        )
-    }
-}
-
-@Preview(device = "spec:width=1280dp,height=800dp,dpi=240")
-@Composable
-private fun CloudAccountSetupScreenPreview_Split() {
-    LogDateTheme {
-        CloudAccountSetupContent(
-            useCompactLayout = false,
-            onBack = {},
-            onContinue = {},
-            onSkip = {},
-            onPlanSelected = {},
         )
     }
 }

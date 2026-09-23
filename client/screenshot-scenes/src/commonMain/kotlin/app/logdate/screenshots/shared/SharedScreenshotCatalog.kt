@@ -412,12 +412,10 @@ object SharedScreenshotCatalog {
             },
             sharedScene(SharedScreenshotSceneId.CloudAccountSetupCompact, ScreenshotSceneGroup.ONBOARDING, onboardingStepVariants) {
                 CloudAccountSetupContent(
-                    useCompactLayout = true,
                     onBack = {},
                     onContinue = {},
                     onSignIn = {},
                     onSkip = {},
-                    onPlanSelected = {},
                 )
             },
             sharedScene(SharedScreenshotSceneId.OnboardingBirthday, ScreenshotSceneGroup.ONBOARDING, onboardingStepVariants) {
