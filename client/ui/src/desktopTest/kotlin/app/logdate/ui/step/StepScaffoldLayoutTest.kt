@@ -143,9 +143,8 @@ class StepScaffoldLayoutTest {
 
             val first = bounds("step_content_0")
             val last = bounds(LAST_CONTENT_TAG)
-            val action = bounds(PRIMARY_ACTION_TAG)
             assertTrue(first.top >= 462.dp, "content (top ${first.top}) sits above the hinge")
-            assertTrue(last.bottom <= action.top, "content (bottom ${last.bottom}) runs under the actions (top ${action.top})")
+            assertClear(last, bounds(PRIMARY_ACTION_TAG))
         }
 
     @Test
@@ -156,9 +155,20 @@ class StepScaffoldLayoutTest {
             onNodeWithTag(LAST_CONTENT_TAG).performScrollTo()
 
             val last = bounds(LAST_CONTENT_TAG)
-            val action = bounds(PRIMARY_ACTION_TAG)
             assertTrue(last.top >= 462.dp, "content (top ${last.top}) scrolled across the hinge")
-            assertTrue(last.bottom <= action.top, "content (bottom ${last.bottom}) runs under the actions (top ${action.top})")
+            assertTrue(last.bottom <= 900.dp, "content (bottom ${last.bottom}) runs off the screen")
+            assertClear(last, bounds(PRIMARY_ACTION_TAG))
+        }
+
+    @Test
+    fun `a wide tabletop pane puts content beside the actions instead of scrolling it`() =
+        runDesktopComposeUiTest(width = 1440, height = 900) {
+            setStep(contentItems = 6, foldable = tabletopPosture)
+
+            val last = bounds(LAST_CONTENT_TAG)
+            val action = bounds(PRIMARY_ACTION_TAG)
+            assertTrue(action.left >= last.right, "actions (left ${action.left}) are not beside the content (right ${last.right})")
+            assertTrue(last.bottom <= 900.dp, "content (bottom ${last.bottom}) needs scrolling in a two-column pane")
         }
 
     @Test
@@ -183,6 +193,18 @@ class StepScaffoldLayoutTest {
     }
 
     private fun DesktopComposeUiTest.bounds(tag: String): DpRect = onNodeWithTag(tag).getBoundsInRoot()
+
+    private fun assertClear(
+        content: DpRect,
+        action: DpRect,
+    ) {
+        val overlaps =
+            content.left < action.right &&
+                action.left < content.right &&
+                content.top < action.bottom &&
+                action.top < content.bottom
+        assertTrue(!overlaps, "content $content overlaps the actions $action")
+    }
 
     private fun assertCapped(action: DpRect) {
         val width = action.right - action.left
