@@ -1,6 +1,6 @@
 @file:Suppress("ktlint:standard:function-naming")
 
-package app.logdate.ui.sync
+package app.logdate.feature.core.sync
 
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator

@@ -14,7 +14,6 @@
     <string name="timeline">Timeline</string>
     <string name="navigate_to_home_screen">Navigate to home screen</string>
     <string name="manage_your_profile_settings">Manage your profile settings</string>
-    <string name="location_history">Location History</string>
 
     <!-- Global actions -->
     <string name="share_link">Share link</string>

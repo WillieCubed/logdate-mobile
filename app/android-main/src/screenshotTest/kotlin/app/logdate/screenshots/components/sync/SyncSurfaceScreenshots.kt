@@ -22,13 +22,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTheme
-import app.logdate.ui.sync.SyncErrorBanner
-import app.logdate.ui.sync.SyncIndicatorChip
-import app.logdate.ui.sync.SyncPresentation
+import app.logdate.feature.core.sync.SyncErrorBanner
+import app.logdate.feature.core.sync.SyncStatusButton
+import app.logdate.feature.core.sync.SyncPresentation
 import com.android.tools.screenshot.PreviewTest
 
 /**
- * Screenshot coverage for the new sync surface (chip + banner). Two responsibilities:
+ * Screenshot coverage for the sync surface (status button + banner). Two responsibilities:
  *
  * 1. **Taste**: every emitted state renders across phone / phone-landscape / phone-dark / tablet,
  *    so a reviewer can scan the visual matrix and confirm the MD3-Expressive treatment holds at
@@ -43,34 +43,34 @@ import com.android.tools.screenshot.PreviewTest
  * a pure-UI snapshot. Mirrors the convention in `SettingsComponentScreenshots.kt`.
  */
 
-// ─── Chip states ────────────────────────────────────────────────────────────────
+// ─── Status button states ────────────────────────────────────────────────────────────────
 
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
 fun Chip_Hidden_renders_nothing() {
-    ChipHarness(SyncPresentation.Hidden)
+    StatusButtonHarness(SyncPresentation.Hidden)
 }
 
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun Chip_Syncing_with_pending_count() {
-    ChipHarness(SyncPresentation.Syncing(pendingCount = 12))
+fun Chip_Syncing_size_unknown() {
+    StatusButtonHarness(SyncPresentation.Syncing())
 }
 
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun Chip_Syncing_no_count() {
-    ChipHarness(SyncPresentation.Syncing(pendingCount = 0))
+fun Chip_Syncing_with_run_progress() {
+    StatusButtonHarness(SyncPresentation.Syncing(progressPercent = 35))
 }
 
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
 fun Chip_Pending_small_count() {
-    ChipHarness(SyncPresentation.Pending(pendingCount = 3))
+    StatusButtonHarness(SyncPresentation.Pending(pendingCount = 3))
 }
 
 @PreviewTest
@@ -78,22 +78,23 @@ fun Chip_Pending_small_count() {
 @Composable
 fun Chip_Pending_large_count_truncation_check() {
     // The "264" the original Pixel 8 screenshot showed. Locked in to catch any future regression
-    // where a banner re-enters the picture for queued-but-no-account cases.
-    ChipHarness(SyncPresentation.Pending(pendingCount = 264))
+    // where a banner re-enters the picture for queued-but-no-account cases, and to check the
+    // badge caps at "99+" instead of widening the button.
+    StatusButtonHarness(SyncPresentation.Pending(pendingCount = 264))
 }
 
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
 fun Chip_NetworkError_with_pending() {
-    ChipHarness(SyncPresentation.NetworkError(pendingCount = 5))
+    StatusButtonHarness(SyncPresentation.NetworkError(pendingCount = 5))
 }
 
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
 fun Chip_NetworkError_no_pending() {
-    ChipHarness(SyncPresentation.NetworkError(pendingCount = 0))
+    StatusButtonHarness(SyncPresentation.NetworkError(pendingCount = 0))
 }
 
 // ─── Banner states ──────────────────────────────────────────────────────────────
@@ -150,8 +151,8 @@ fun Banner_respects_status_bar_inset_under_top_app_bar() {
                 TopAppBar(
                     title = { Text("Timeline") },
                     actions = {
-                        SyncIndicatorChip(
-                            presentation = SyncPresentation.Syncing(pendingCount = 3),
+                        SyncStatusButton(
+                            presentation = SyncPresentation.Syncing(progressPercent = 60),
                         )
                     },
                 )
@@ -180,7 +181,7 @@ fun Banner_respects_status_bar_inset_under_top_app_bar() {
 // ─── Harnesses ──────────────────────────────────────────────────────────────────
 
 @Composable
-private fun ChipHarness(presentation: SyncPresentation) {
+private fun StatusButtonHarness(presentation: SyncPresentation) {
     ScreenshotTheme {
         Box(
             modifier = Modifier
@@ -190,7 +191,7 @@ private fun ChipHarness(presentation: SyncPresentation) {
                 .padding(16.dp),
             contentAlignment = Alignment.TopStart,
         ) {
-            SyncIndicatorChip(presentation = presentation)
+            SyncStatusButton(presentation = presentation)
         }
     }
 }

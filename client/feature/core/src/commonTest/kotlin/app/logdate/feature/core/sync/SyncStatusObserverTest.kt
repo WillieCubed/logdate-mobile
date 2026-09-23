@@ -3,8 +3,8 @@ package app.logdate.feature.core.sync
 import app.logdate.client.sync.SyncError
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncStatus
-import app.logdate.ui.sync.SyncPresentation
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 /**
@@ -41,5 +41,36 @@ class SyncStatusObserverTest {
             )
 
         assertIs<SyncPresentation.NetworkError>(status.toPresentation())
+    }
+
+    @Test
+    fun `a run in flight reports its progress in steps rather than per item`() {
+        val status =
+            SyncStatus(
+                isEnabled = true,
+                lastSyncTime = null,
+                pendingUploads = 12,
+                isSyncing = true,
+                hasErrors = false,
+                totalForRun = 19,
+                completedInRun = 7,
+            )
+
+        // 7 of 19 is 36%, stepped down to 35.
+        assertEquals(SyncPresentation.Syncing(progressPercent = 35), status.toPresentation())
+    }
+
+    @Test
+    fun `a run of unknown size has no progress`() {
+        val status =
+            SyncStatus(
+                isEnabled = true,
+                lastSyncTime = null,
+                pendingUploads = 12,
+                isSyncing = true,
+                hasErrors = false,
+            )
+
+        assertEquals(SyncPresentation.Syncing(progressPercent = null), status.toPresentation())
     }
 }

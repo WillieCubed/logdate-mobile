@@ -1,14 +1,25 @@
 package app.logdate.screenshots.components.sync
 
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import app.logdate.client.awareness.daylight.DaylightPeriod
+import app.logdate.feature.core.sync.SyncErrorBanner
+import app.logdate.feature.core.sync.SyncStatusButton
 import app.logdate.screenshots.common.HomeTabRouteFrame
 import app.logdate.screenshots.common.RoutePreviewTab
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTheme
 import app.logdate.ui.location.PlaceUiState
-import app.logdate.ui.sync.SyncPresentation
+import app.logdate.ui.streak.CampfireChip
+import app.logdate.ui.streak.CampfirePhase
+import app.logdate.ui.streak.CampfirePresentation
+import app.logdate.ui.streak.CampfireSize
+import app.logdate.feature.core.sync.SyncPresentation
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.ImageNoteUiState
 import app.logdate.ui.timeline.MomentAudioUiState
@@ -122,7 +133,10 @@ private val sampleTimelineDays =
     )
 
 @Composable
-private fun TimelineWithSync(presentation: SyncPresentation) {
+private fun TimelineWithSync(
+    presentation: SyncPresentation,
+    campfire: CampfirePresentation? = null,
+) {
     ScreenshotTheme {
         HomeTabRouteFrame(selectedTab = RoutePreviewTab.TIMELINE) {
             TimelinePane(
@@ -132,8 +146,17 @@ private fun TimelineWithSync(presentation: SyncPresentation) {
                 onOpenDay = {},
                 onSearchClick = {},
                 onProfileClick = {},
-                onHistoryClick = {},
-                syncPresentation = presentation,
+                // Mirrors what HomeScreen puts in these slots.
+                statusActions = {
+                    SyncStatusButton(presentation = presentation, modifier = Modifier.padding(end = 4.dp))
+                    campfire?.let { CampfireChip(presentation = it, onClick = {}, modifier = Modifier.padding(end = 4.dp)) }
+                },
+                banner = {
+                    SyncErrorBanner(
+                        presentation = presentation,
+                        modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp),
+                    )
+                },
             )
         }
     }
@@ -150,17 +173,38 @@ fun InContext_NoSyncActivity_SignedOut_or_Healthy() {
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun InContext_Syncing_3_items() {
-    // Active sync run. Chip in the TopAppBar shows "Syncing 3" with the rotating glyph.
-    TimelineWithSync(SyncPresentation.Syncing(pendingCount = 3))
+fun InContext_Syncing_with_progress() {
+    // Active sync run. The status button shows the rotating glyph.
+    TimelineWithSync(SyncPresentation.Syncing(progressPercent = 60))
 }
 
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
 fun InContext_Pending_12_items_offline_or_backoff() {
-    // Items queued but not currently syncing. Tonal "12 waiting" pill in the TopAppBar.
+    // Items queued but not currently syncing. Cloud glyph with a "12" badge in the TopAppBar.
     TimelineWithSync(SyncPresentation.Pending(pendingCount = 12))
+}
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun InContext_Pending_with_campfire_fits_phone_width() {
+    // Every action the bar carries at once on Android: backup status, campfire, search, settings.
+    // The text pill this replaced squeezed the title on a phone-width bar. iOS adds a new-entry
+    // action that this Android-only matrix doesn't render.
+    TimelineWithSync(
+        presentation = SyncPresentation.Pending(pendingCount = 264),
+        campfire =
+            CampfirePresentation(
+                phase = CampfirePhase.BURNING,
+                loggedToday = true,
+                runDays = 12,
+                size = CampfireSize.CAMPFIRE,
+                longestRunDays = 12,
+                totalDaysJournaled = 40,
+            ),
+    )
 }
 
 @PreviewTest

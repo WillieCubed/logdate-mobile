@@ -235,6 +235,7 @@ fun LogDateNavDisplay(
                                             onImportBackup = { backStack.add(ExportSettingsRoute) },
                                             onOpenMediaDetail = { backStack.add(MediaDetailRoute(it)) },
                                             onOpenSyncIssues = { backStack.add(SyncIssuesRoute) },
+                                            onOpenSyncSettings = { backStack.add(SyncSettingsRoute) },
                                             onOpenDay = { date -> backStack.add(TimelineDetailRoute(date.toString())) },
                                             onOpenStreak = { backStack.add(StreakSettingsRoute) },
                                             libraryContent = { modifier ->

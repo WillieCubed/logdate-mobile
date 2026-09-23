@@ -216,7 +216,6 @@ fun S01_TimelineSuggestionCompleteYourDraft() {
                 onOpenDay = {},
                 onSearchClick = {},
                 onProfileClick = {},
-                onHistoryClick = {},
                 timelineSuggestion =
                     TimelineSuggestionBlock.CompleteDraft(
                         draftId = "draft-1",
@@ -239,7 +238,6 @@ fun S02_TimelineEmpty() {
                 onOpenDay = {},
                 onSearchClick = {},
                 onProfileClick = {},
-                onHistoryClick = {},
             )
         }
     }
@@ -258,7 +256,6 @@ fun S03_TimelineScrollToTopVisible() {
                 onOpenDay = {},
                 onSearchClick = {},
                 onProfileClick = {},
-                onHistoryClick = {},
                 listState = LazyListState(firstVisibleItemIndex = 2, firstVisibleItemScrollOffset = 0),
             )
         }
@@ -278,7 +275,6 @@ fun S03a_TimelineSuggestionEmptyDayWithLocation() {
                 onOpenDay = {},
                 onSearchClick = {},
                 onProfileClick = {},
-                onHistoryClick = {},
                 timelineSuggestion =
                     TimelineSuggestionBlock.EmptyDay(
                         message = "What's going on?",
@@ -302,7 +298,6 @@ fun S03b_TimelineSuggestionOnThisDayMemoryRecall() {
                 onOpenDay = {},
                 onSearchClick = {},
                 onProfileClick = {},
-                onHistoryClick = {},
                 timelineSuggestion =
                     TimelineSuggestionBlock.MemoryRecall(
                         memoryDate = LocalDate(2024, 2, 20),
@@ -328,7 +323,6 @@ fun S04_TimelineDetailEmptyState() {
                     onOpenDay = {},
                     onSearchClick = {},
                     onProfileClick = {},
-                    onHistoryClick = {},
                 )
             },
             detailContent = { TimelineDetailsEmptyPlaceholder() },
@@ -351,7 +345,6 @@ fun S05_TimelineDetailPopulated() {
                     onOpenDay = {},
                     onSearchClick = {},
                     onProfileClick = {},
-                    onHistoryClick = {},
                 )
             },
             detailContent = {
@@ -380,7 +373,6 @@ fun S06_TimelineDetailNoPeople() {
                     onOpenDay = {},
                     onSearchClick = {},
                     onProfileClick = {},
-                    onHistoryClick = {},
                 )
             },
             detailContent = {

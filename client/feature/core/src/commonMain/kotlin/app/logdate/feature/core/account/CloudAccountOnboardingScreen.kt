@@ -28,8 +28,8 @@ import app.logdate.client.domain.account.GoogleAuthError
 import app.logdate.client.sync.SyncStatus
 import app.logdate.feature.core.settings.ui.CustomServerInfoBottomSheet
 import app.logdate.feature.core.settings.ui.ServerPreset
+import app.logdate.feature.core.sync.SyncProgressIndicator
 import app.logdate.shared.model.ServerDescriptor
-import app.logdate.ui.sync.SyncProgressIndicator
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_adopt_local_data_body
 import logdate.client.feature.core.generated.resources.account_adopt_local_data_confirm

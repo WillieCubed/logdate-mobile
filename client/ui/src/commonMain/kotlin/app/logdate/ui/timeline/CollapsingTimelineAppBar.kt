@@ -1,9 +1,8 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+@file:Suppress("ktlint:standard:function-naming")
 
 package app.logdate.ui.timeline
 
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -15,17 +14,15 @@ import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.currentPlatform
-import app.logdate.ui.streak.CampfireChip
-import app.logdate.ui.streak.CampfirePresentation
-import app.logdate.ui.sync.SyncIndicatorChip
-import app.logdate.ui.sync.SyncPresentation
-import logdate.client.ui.generated.resources.*
+import logdate.client.ui.generated.resources.Res
+import logdate.client.ui.generated.resources.create_new_entry
+import logdate.client.ui.generated.resources.search
+import logdate.client.ui.generated.resources.settings
+import logdate.client.ui.generated.resources.timeline
 import org.jetbrains.compose.resources.stringResource
 
-private const val BENCHMARK_TAG_HISTORY = "logdate_home_history"
 private const val BENCHMARK_TAG_SEARCH = "logdate_home_search"
 private const val BENCHMARK_TAG_SETTINGS = "logdate_home_settings"
 private const val BENCHMARK_TAG_NEW_ENTRY = "logdate_home_new_entry"
@@ -40,6 +37,9 @@ private const val BENCHMARK_TAG_NEW_ENTRY = "logdate_home_new_entry"
  * On hosts where the floating create button is hidden (currently iOS / iPadOS), pass a
  * non-null [onNewEntry] so the bar renders a trailing "new entry" action as the replacement
  * affordance. Other hosts keep [onNewEntry] null and rely on their own create paths.
+ *
+ * [statusActions] leads the trailing actions, for status the host feature owns (backup, streak).
+ * Keep what goes there icon-sized: a phone-width bar has no room for text.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,12 +47,8 @@ fun TimelineTopAppBar(
     scrollBehavior: TopAppBarScrollBehavior,
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit = {},
-    onHistoryClick: () -> Unit = {},
     onNewEntry: (() -> Unit)? = null,
-    syncPresentation: SyncPresentation = SyncPresentation.Hidden,
-    onSyncChipClick: () -> Unit = {},
-    campfire: CampfirePresentation? = null,
-    onCampfireClick: () -> Unit = {},
+    statusActions: @Composable RowScope.() -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val title: @Composable () -> Unit = {
@@ -68,12 +64,8 @@ fun TimelineTopAppBar(
                 TimelineActions(
                     onSearchClick = onSearchClick,
                     onSettingsClick = onSettingsClick,
-                    onHistoryClick = onHistoryClick,
                     onNewEntry = onNewEntry,
-                    syncPresentation = syncPresentation,
-                    onSyncChipClick = onSyncChipClick,
-                    campfire = campfire,
-                    onCampfireClick = onCampfireClick,
+                    statusActions = statusActions,
                 )
             },
             scrollBehavior = scrollBehavior,
@@ -86,12 +78,8 @@ fun TimelineTopAppBar(
                 TimelineActions(
                     onSearchClick = onSearchClick,
                     onSettingsClick = onSettingsClick,
-                    onHistoryClick = onHistoryClick,
                     onNewEntry = onNewEntry,
-                    syncPresentation = syncPresentation,
-                    onSyncChipClick = onSyncChipClick,
-                    campfire = campfire,
-                    onCampfireClick = onCampfireClick,
+                    statusActions = statusActions,
                 )
             },
             scrollBehavior = scrollBehavior,
@@ -104,42 +92,15 @@ fun TimelineTopAppBar(
 private fun RowScope.TimelineActions(
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onHistoryClick: () -> Unit,
     onNewEntry: (() -> Unit)?,
-    syncPresentation: SyncPresentation,
-    onSyncChipClick: () -> Unit,
-    campfire: CampfirePresentation?,
-    onCampfireClick: () -> Unit,
+    statusActions: @Composable RowScope.() -> Unit,
 ) {
-    // Sync chip leads the action group when sync has something to say (syncing, pending,
-    // network error). Composes nothing for Hidden / banner-promotion states.
-    SyncIndicatorChip(
-        presentation = syncPresentation,
-        onClick = onSyncChipClick,
-        modifier = Modifier.padding(end = 4.dp),
-    )
-    if (campfire != null) {
-        CampfireChip(
-            presentation = campfire,
-            onClick = onCampfireClick,
-            modifier = Modifier.padding(end = 4.dp),
-        )
-    }
+    statusActions()
 
-    val historyLabel = stringResource(Res.string.location_history)
     val searchLabel = stringResource(Res.string.search)
     val settingsLabel = stringResource(Res.string.settings)
     val newEntryLabel = stringResource(Res.string.create_new_entry)
 
-    IconButton(
-        onClick = onHistoryClick,
-        modifier = Modifier.testTag(BENCHMARK_TAG_HISTORY),
-    ) {
-        Icon(
-            painter = PlatformIcons.history(),
-            contentDescription = historyLabel,
-        )
-    }
     IconButton(
         onClick = onSearchClick,
         modifier = Modifier.testTag(BENCHMARK_TAG_SEARCH),

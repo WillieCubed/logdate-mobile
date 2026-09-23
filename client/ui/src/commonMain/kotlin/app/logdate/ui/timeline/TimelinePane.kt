@@ -9,11 +9,11 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -34,12 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import app.logdate.ui.platform.currentPlatform
-import app.logdate.ui.streak.CampfirePresentation
-import app.logdate.ui.sync.SyncAction
-import app.logdate.ui.sync.SyncErrorBanner
-import app.logdate.ui.sync.SyncPresentation
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.newstuff.EndOfTimelineUiState
 import app.logdate.ui.timeline.newstuff.TimelineList
@@ -78,12 +73,9 @@ fun TimelinePane(
     onOpenDraft: (draftId: String) -> Unit = {},
     onShareMemory: (TimelineSuggestionBlockUiState) -> Unit = {},
     onImportBackup: () -> Unit = {},
-    onHistoryClick: () -> Unit = {},
     birthday: Instant? = null,
-    syncPresentation: SyncPresentation = SyncPresentation.Hidden,
-    onSyncAction: (SyncAction) -> Unit = {},
-    campfire: CampfirePresentation? = null,
-    onCampfireClick: () -> Unit = {},
+    statusActions: @Composable RowScope.() -> Unit = {},
+    banner: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val scrollBehavior =
@@ -113,15 +105,11 @@ fun TimelinePane(
                 scrollBehavior = scrollBehavior,
                 onSearchClick = onSearchClick,
                 onSettingsClick = onProfileClick,
-                onHistoryClick = onHistoryClick,
                 // On iPhone and iPad the floating create button is hidden, so the new-entry
                 // affordance moves into the top bar as a trailing action. Other hosts keep
                 // the FAB and don't need the duplicate.
                 onNewEntry = onNewEntry.takeIf { currentPlatform.isApple },
-                syncPresentation = syncPresentation,
-                onSyncChipClick = { onSyncAction(SyncAction.Retry) },
-                campfire = campfire,
-                onCampfireClick = onCampfireClick,
+                statusActions = statusActions,
             )
         },
     ) { paddingValues ->
@@ -131,19 +119,9 @@ fun TimelinePane(
                     .fillMaxWidth()
                     .padding(paddingValues),
         ) {
-            // Error-tier sync banner sits *inside* the Scaffold body, below the TopAppBar.
-            // It inherits content insets and never collides with the system status bar — the
-            // load-bearing fix for the original Pixel 8 collision bug. On medium/expanded
-            // windows the banner caps at 560dp wide so it doesn't span the entire content
-            // pane; on compact phones it fills width minus margins.
-            SyncErrorBanner(
-                presentation = syncPresentation,
-                onAction = onSyncAction,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 560.dp),
-            )
+            // Banners sit *inside* the Scaffold body, below the TopAppBar, so they inherit content
+            // insets and never collide with the system status bar.
+            banner()
             Box(modifier = Modifier.fillMaxWidth()) {
                 TimelineList(
                     uiState.items,

@@ -1,4 +1,4 @@
-package app.logdate.ui.sync
+package app.logdate.feature.core.sync
 
 /**
  * UI-only projection of the sync pipeline state. Composables in this package render against
@@ -15,14 +15,34 @@ sealed class SyncPresentation {
      */
     data object Hidden : SyncPresentation()
 
-    /** A sync run is in flight. Show a quiet shape-morphing progress affordance. */
+    /**
+     * A sync run is in flight. [progressPercent] is how far through the run it is, in
+     * [PROGRESS_STEP_PERCENT] steps, or null before the run's size is known.
+     *
+     * Stepped rather than exact so a long backup changes this value a few dozen times instead of
+     * once per uploaded item: every change recomposes the home screen around the status button.
+     */
     data class Syncing(
-        val pendingCount: Int = 0,
-    ) : SyncPresentation()
+        val progressPercent: Int? = null,
+    ) : SyncPresentation() {
+        companion object {
+            const val PROGRESS_STEP_PERCENT = 5
+
+            /** [progressPercent] for [completed] of [total], or null when [total] is unknown or zero. */
+            fun progressPercent(
+                completed: Int,
+                total: Int?,
+            ): Int? {
+                if (total == null || total <= 0) return null
+                val percent = (completed.coerceIn(0, total) * 100) / total
+                return percent - percent % PROGRESS_STEP_PERCENT
+            }
+        }
+    }
 
     /**
      * Items waiting to upload but no run currently in flight (e.g. offline, backoff, debounce).
-     * Shown as a tonal pill in the TopAppBar.
+     * Shown as a count badge on the backup status button.
      */
     data class Pending(
         val pendingCount: Int,
@@ -57,9 +77,10 @@ sealed class SyncPresentation {
 sealed class SyncAction {
     data object SignIn : SyncAction()
 
-    data object Retry : SyncAction()
-
     data object ManageStorage : SyncAction()
 
     data object ReviewConflicts : SyncAction()
+
+    /** Show what is waiting to back up, and why. */
+    data object OpenStatus : SyncAction()
 }

@@ -45,8 +45,8 @@ data class BannerContent(
 
 /**
  * Tonal, animated banner for surfacing something that needs the user's attention. Shared shell
- * behind [app.logdate.ui.sync.SyncErrorBanner] and other feature-specific banners so they share
- * one visual and motion language instead of each hand-rolling their own.
+ * behind feature-specific banners (such as the sync banner) so they share one visual and motion
+ * language instead of each hand-rolling their own.
  */
 @Composable
 fun MessageBanner(

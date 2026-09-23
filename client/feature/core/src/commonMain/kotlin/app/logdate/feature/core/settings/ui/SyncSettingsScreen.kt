@@ -38,10 +38,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.client.sync.SyncPausedReason
+import app.logdate.feature.core.sync.SyncProgressIndicator
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
-import app.logdate.ui.sync.SyncProgressIndicator
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import logdate.client.feature.core.generated.resources.Res

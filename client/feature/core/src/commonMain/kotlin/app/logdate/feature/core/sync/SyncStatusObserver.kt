@@ -4,7 +4,6 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncStatus
-import app.logdate.ui.sync.SyncPresentation
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -39,7 +38,11 @@ fun observeSyncPresentation(
     }
 
 internal fun SyncStatus.toPresentation(): SyncPresentation {
-    if (isSyncing) return SyncPresentation.Syncing(pendingCount = pendingUploads)
+    if (isSyncing) {
+        return SyncPresentation.Syncing(
+            progressPercent = SyncPresentation.Syncing.progressPercent(completedInRun, totalForRun),
+        )
+    }
 
     val error = lastError
     if (error != null) {

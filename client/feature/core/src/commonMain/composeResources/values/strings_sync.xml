@@ -11,6 +11,32 @@
     <string name="last_sync_failed">Couldn't finish backing up</string>
     <string name="never_synced">Nothing backed up yet</string>
 
+    <!-- Backup status, shared by the timeline's status button, the sync banner, and Sync issues -->
+    <string name="sync_status_open">Open backup status</string>
+    <string name="sync_status_progress_percent">Backing up · %1$d percent done</string>
+    <plurals name="sync_status_waiting">
+        <item quantity="one">%1$d item waiting to back up.</item>
+        <item quantity="other">%1$d items waiting to back up.</item>
+    </plurals>
+    <plurals name="sync_status_not_backed_up">
+        <item quantity="one">%1$d item hasn't backed up yet.</item>
+        <item quantity="other">%1$d items haven't backed up yet.</item>
+    </plurals>
+
+    <!-- Sync banner: states the user has to act on -->
+    <string name="sync_banner_session_expired">Your session expired. Sign in again to keep your data backed up.</string>
+    <string name="sync_banner_storage_full">Cloud storage is full. Manage your plan to keep syncing.</string>
+    <plurals name="sync_banner_storage_full_items">
+        <item quantity="one">Cloud storage is full. %1$d item can't upload.</item>
+        <item quantity="other">Cloud storage is full. %1$d items can't upload.</item>
+    </plurals>
+    <plurals name="sync_banner_conflicts">
+        <item quantity="one">An edit conflict needs your review.</item>
+        <item quantity="other">%1$d edit conflicts need your review.</item>
+    </plurals>
+    <string name="sync_banner_review">Review</string>
+    <string name="sync_banner_manage">Manage</string>
+
     <!-- Manual sync outcome -->
     <string name="sync_feedback_needs_account">Sign in to start backing up</string>
     <string name="sync_feedback_sign_in_action">Sign in</string>

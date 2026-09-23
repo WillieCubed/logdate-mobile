@@ -36,6 +36,7 @@ import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.sync_feedback_up_to_date
 import logdate.client.feature.core.generated.resources.sync_issue_count_association
 import logdate.client.feature.core.generated.resources.sync_issue_count_draft
 import logdate.client.feature.core.generated.resources.sync_issue_count_health
@@ -60,6 +61,7 @@ import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_
 import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_media
 import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_note
 import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_other
+import logdate.client.feature.core.generated.resources.sync_status_waiting
 import org.jetbrains.compose.resources.PluralStringResource
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
@@ -149,10 +151,10 @@ private fun EmptyState(
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
             text =
-                when {
-                    pendingCount == 1 -> "An entry is still waiting to back up."
-                    pendingCount > 1 -> "$pendingCount entries are still waiting to back up."
-                    else -> "Everything is synced."
+                if (pendingCount > 0) {
+                    pluralStringResource(Res.plurals.sync_status_waiting, pendingCount, pendingCount)
+                } else {
+                    stringResource(Res.string.sync_feedback_up_to_date)
                 },
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

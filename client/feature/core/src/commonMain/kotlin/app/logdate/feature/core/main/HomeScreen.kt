@@ -9,6 +9,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -61,7 +62,10 @@ import app.logdate.client.repository.transcription.TranscriptionData
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.transcription.TranscriptionStatus
 import app.logdate.feature.core.streak.CampfireViewModel
+import app.logdate.feature.core.sync.SyncAction
+import app.logdate.feature.core.sync.SyncErrorBanner
 import app.logdate.feature.core.sync.SyncPresentationViewModel
+import app.logdate.feature.core.sync.SyncStatusButton
 import app.logdate.feature.journals.ui.JournalClickCallback
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
 import app.logdate.feature.rewind.ui.RewindOverviewScreen
@@ -78,8 +82,7 @@ import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.currentPlatform
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.profiles.toUiState
-import app.logdate.ui.sync.SyncAction
-import app.logdate.ui.sync.SyncErrorBanner
+import app.logdate.ui.streak.CampfireChip
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.HomeTimelineUiState
 import app.logdate.ui.timeline.ImageNoteUiState
@@ -138,6 +141,7 @@ fun HomeScreen(
     onImportBackup: () -> Unit = {},
     onOpenMediaDetail: (Uuid) -> Unit = {},
     onOpenSyncIssues: () -> Unit = {},
+    onOpenSyncSettings: () -> Unit = {},
     onOpenDay: (LocalDate) -> Unit = {},
     onOpenStreak: () -> Unit = {},
     locationContent: @Composable (Modifier) -> Unit = {},
@@ -147,8 +151,10 @@ fun HomeScreen(
     syncPresentationViewModel: SyncPresentationViewModel = koinViewModel(),
     campfireViewModel: CampfireViewModel = koinViewModel(),
 ) {
-    val syncPresentation by syncPresentationViewModel.presentation.collectAsStateWithLifecycle()
-    val campfire by campfireViewModel.presentation.collectAsStateWithLifecycle()
+    // Held as State and read only inside the slots below, so a sync or streak update recomposes
+    // the status button and banner rather than the whole home shell.
+    val syncPresentation = syncPresentationViewModel.presentation.collectAsStateWithLifecycle()
+    val campfire = campfireViewModel.presentation.collectAsStateWithLifecycle()
     val isLibraryEnabled by viewModel.isLibraryEnabled.collectAsStateWithLifecycle()
     val visibleDestinations = HomeRouteDestination.visibleEntries(isLibraryEnabled)
     var currentDestination: HomeRouteDestination by rememberSaveable {
@@ -162,6 +168,39 @@ fun HomeScreen(
         }
     }
     val snackbarHostState = remember { SnackbarHostState() }
+    val onSyncAction: (SyncAction) -> Unit = { action ->
+        when (action) {
+            SyncAction.SignIn,
+            SyncAction.ManageStorage,
+            -> onOpenSettings()
+            SyncAction.ReviewConflicts -> onOpenSyncIssues()
+            SyncAction.OpenStatus -> onOpenSyncSettings()
+        }
+    }
+    val syncBanner: @Composable () -> Unit = {
+        SyncErrorBanner(
+            presentation = syncPresentation.value,
+            onAction = onSyncAction,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 560.dp),
+        )
+    }
+    val timelineStatusActions: @Composable RowScope.() -> Unit = {
+        SyncStatusButton(
+            presentation = syncPresentation.value,
+            onClick = { onSyncAction(SyncAction.OpenStatus) },
+            modifier = Modifier.padding(end = 4.dp),
+        )
+        campfire.value?.let { presentation ->
+            CampfireChip(
+                presentation = presentation,
+                onClick = onOpenStreak,
+                modifier = Modifier.padding(end = 4.dp),
+            )
+        }
+    }
     val adaptiveInfo = currentWindowAdaptiveInfoV2()
     val navLayoutType =
         when {
@@ -189,22 +228,7 @@ fun HomeScreen(
         val showHomeLevelSyncBanner = currentDestination != HomeRouteDestination.Timeline
         Column(modifier = Modifier.padding(innerPadding)) {
             if (showHomeLevelSyncBanner) {
-                SyncErrorBanner(
-                    presentation = syncPresentation,
-                    onAction = { action ->
-                        when (action) {
-                            SyncAction.SignIn,
-                            SyncAction.ManageStorage,
-                            -> onOpenSettings()
-                            SyncAction.ReviewConflicts -> onOpenSyncIssues()
-                            SyncAction.Retry -> syncPresentationViewModel.retry()
-                        }
-                    },
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = 560.dp),
-                )
+                syncBanner()
             }
             NavigationSuiteScaffold(
                 layoutType = navLayoutType,
@@ -315,18 +339,8 @@ fun HomeScreen(
                                             onOpenDraft = onOpenDraft,
                                             onImportBackup = onImportBackup,
                                             timelineSuggestion = uiState.timelineSuggestion,
-                                            syncPresentation = syncPresentation,
-                                            onSyncAction = { action ->
-                                                when (action) {
-                                                    app.logdate.ui.sync.SyncAction.SignIn,
-                                                    app.logdate.ui.sync.SyncAction.ManageStorage,
-                                                    -> onOpenSettings()
-                                                    app.logdate.ui.sync.SyncAction.ReviewConflicts -> onOpenSyncIssues()
-                                                    app.logdate.ui.sync.SyncAction.Retry -> syncPresentationViewModel.retry()
-                                                }
-                                            },
-                                            campfire = campfire,
-                                            onCampfireClick = onOpenStreak,
+                                            statusActions = timelineStatusActions,
+                                            banner = syncBanner,
                                         )
                                     }
                                 }

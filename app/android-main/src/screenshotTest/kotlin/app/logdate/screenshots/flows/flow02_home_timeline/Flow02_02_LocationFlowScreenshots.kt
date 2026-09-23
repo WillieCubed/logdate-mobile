@@ -297,7 +297,6 @@ fun S04_TimelineLocationQuickPeek() {
                     onOpenDay = {},
                     onSearchClick = {},
                     onProfileClick = {},
-                    onHistoryClick = {},
                 )
             }
 

@@ -44,10 +44,10 @@ import app.logdate.feature.core.restore.ImportOptions
 import app.logdate.feature.core.restore.RestoreBottomSheet
 import app.logdate.feature.core.restore.RestoreState
 import app.logdate.feature.core.restore.UserDataRestoreViewModel
+import app.logdate.feature.core.sync.SyncProgressIndicator
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
-import app.logdate.ui.sync.SyncProgressIndicator
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import logdate.client.feature.core.generated.resources.Res
