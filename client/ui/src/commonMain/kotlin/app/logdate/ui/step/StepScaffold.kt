@@ -26,6 +26,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,6 +38,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -110,7 +112,12 @@ object StepScaffoldDefaults {
  *   fit; the actions sit below it, never on top of it.
  * - **Wide, book posture, or a phone in landscape:** the header on one side, the content and
  *   actions on the other.
- * - **Tabletop posture:** the header and content above the hinge, the actions below.
+ * - **Tabletop posture:** the header above the hinge, the content and actions below it. Half a
+ *   folded screen is too short for a header and its content together, and splitting them this way
+ *   matches book posture.
+ *
+ * Any region that can scroll further shows a divider at that edge, so content that continues past
+ * a pane boundary never looks cut off.
  *
  * Window insets are applied per pane, inside the foldable layouts, because hinge bounds are in
  * window coordinates and padding the container would shift the split off the hinge.
@@ -166,17 +173,15 @@ fun StepScaffold(
         topPane = {
             StepHeaderPane(
                 slots = slots,
-                includeContent = true,
+                includeContent = false,
                 modifier = Modifier.fillMaxSize().windowInsetsPadding(safeDrawing.only(TabletopTopPaneSides)),
             )
         },
         bottomPane = {
-            CenteredScrollColumn(
-                contentMaxWidth = contentMaxWidth,
+            StepDetailPane(
+                slots = slots,
                 modifier = Modifier.fillMaxSize().windowInsetsPadding(safeDrawing.only(TabletopBottomPaneSides)),
-            ) {
-                StepActionColumn(slots)
-            }
+            )
         },
         standardContent = {
             FoldableBookLayout(
@@ -247,17 +252,12 @@ private fun StandardStep(slots: StepSlots) {
             return@BoxWithConstraints
         }
 
-        val bodyScrollState = rememberScrollState()
         Column(modifier = Modifier.fillMaxSize()) {
             StepHeaderPane(
                 slots = slots,
                 includeContent = true,
-                scrollState = bodyScrollState,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             )
-            if (bodyScrollState.canScrollForward) {
-                HorizontalDivider()
-            }
             Column(
                 modifier =
                     Modifier
@@ -280,10 +280,11 @@ private fun StepHeaderPane(
     slots: StepSlots,
     includeContent: Boolean,
     modifier: Modifier = Modifier,
-    scrollState: ScrollState = rememberScrollState(),
 ) {
+    val scrollState = rememberScrollState()
     Column(modifier = modifier) {
         StepTopBar(onBack = slots.onBack, progress = slots.progress)
+        ScrollEdge(visible = scrollState.canScrollBackward)
         CenteredScrollColumn(
             contentMaxWidth = slots.contentMaxWidth,
             scrollState = scrollState,
@@ -296,6 +297,7 @@ private fun StepHeaderPane(
                 StepContent(content)
             }
         }
+        ScrollEdge(visible = scrollState.canScrollForward)
     }
 }
 
@@ -312,20 +314,35 @@ private fun StepDetailPane(
     ) {
         val content = slots.content
         if (content != null) {
+            val scrollState = rememberScrollState()
+            ScrollEdge(visible = scrollState.canScrollBackward, modifier = Modifier.widthIn(max = slots.contentMaxWidth))
             Column(
                 modifier =
                     Modifier
                         .weight(1f, fill = false)
                         .widthIn(max = slots.contentMaxWidth)
                         .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
+                        .verticalScroll(scrollState),
             ) {
                 StepContent(content)
             }
+            ScrollEdge(visible = scrollState.canScrollForward, modifier = Modifier.widthIn(max = slots.contentMaxWidth))
             Spacer(modifier = Modifier.height(Spacing.xl))
         }
         StepActionColumn(slots)
     }
+}
+
+/** A hairline marking that content continues past this edge of a scrolling region. */
+@Composable
+private fun ScrollEdge(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    HorizontalDivider(
+        modifier = modifier,
+        color = if (visible) DividerDefaults.color else Color.Transparent,
+    )
 }
 
 @Composable
@@ -377,7 +394,7 @@ private fun StepHeader(slots: StepSlots) {
         }
         Text(
             text = slots.title,
-            style = MaterialTheme.typography.headlineLarge,
+            style = MaterialTheme.typography.headlineLarge.copy(lineBreak = LineBreak.Heading),
             textAlign = textAlign,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -386,7 +403,7 @@ private fun StepHeader(slots: StepSlots) {
             Spacer(modifier = Modifier.height(Spacing.md))
             Text(
                 text = supportingText,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyLarge.copy(lineBreak = LineBreak.Paragraph),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = textAlign,
                 modifier = Modifier.fillMaxWidth(),

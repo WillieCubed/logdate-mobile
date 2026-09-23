@@ -137,14 +137,28 @@ class StepScaffoldLayoutTest {
         }
 
     @Test
-    fun `overflowing tabletop body scrolls within its own pane`() =
+    fun `tabletop posture puts content below the hinge, not cut off above it`() =
+        runDesktopComposeUiTest(width = 1440, height = 900) {
+            setStep(contentItems = 3, foldable = tabletopPosture)
+
+            val first = bounds("step_content_0")
+            val last = bounds(LAST_CONTENT_TAG)
+            val action = bounds(PRIMARY_ACTION_TAG)
+            assertTrue(first.top >= 462.dp, "content (top ${first.top}) sits above the hinge")
+            assertTrue(last.bottom <= action.top, "content (bottom ${last.bottom}) runs under the actions (top ${action.top})")
+        }
+
+    @Test
+    fun `overflowing tabletop content scrolls between the hinge and the actions`() =
         runDesktopComposeUiTest(width = 1440, height = 900) {
             setStep(contentItems = 30, foldable = tabletopPosture)
 
             onNodeWithTag(LAST_CONTENT_TAG).performScrollTo()
 
             val last = bounds(LAST_CONTENT_TAG)
-            assertTrue(last.bottom <= 438.dp, "body content (bottom ${last.bottom}) spills past the hinge")
+            val action = bounds(PRIMARY_ACTION_TAG)
+            assertTrue(last.top >= 462.dp, "content (top ${last.top}) scrolled across the hinge")
+            assertTrue(last.bottom <= action.top, "content (bottom ${last.bottom}) runs under the actions (top ${action.top})")
         }
 
     @Test
