@@ -71,6 +71,7 @@ fun OnboardingLocationScreen(
     val permissionState = rememberLocationPermissionState()
     val coroutineScope = rememberCoroutineScope()
     var isSaving by remember { mutableStateOf(false) }
+    var isRequestingPermission by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     // Auto-advance when permission is granted
@@ -99,9 +100,18 @@ fun OnboardingLocationScreen(
         }
     }
 
+    LaunchedEffect(permissionState.hasPermission, permissionState.permissionRequested) {
+        if (permissionState.hasPermission || permissionState.permissionRequested) {
+            isRequestingPermission = false
+        }
+    }
+
     OnboardingLocationContent(
         onBack = onBack,
-        onEnable = permissionState.requestPermission,
+        onEnable = {
+            isRequestingPermission = true
+            permissionState.requestPermission()
+        },
         onSkip = {
             coroutineScope.launch {
                 isSaving = true
@@ -117,7 +127,7 @@ fun OnboardingLocationScreen(
                     }
             }
         },
-        isSaving = isSaving,
+        isSaving = isSaving || isRequestingPermission,
         errorMessage = errorMessage,
     )
 }

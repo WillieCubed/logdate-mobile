@@ -27,6 +27,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,8 +68,13 @@ fun OnboardingNotificationsScreen(
     val permissionState = rememberNotificationPermissionState()
     val coroutineScope = rememberCoroutineScope()
     var isSaving by remember { mutableStateOf(false) }
+    var isRequestingPermission by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val hasDecision = permissionState.hasPermission || permissionState.permissionRequested
+
+    LaunchedEffect(hasDecision) {
+        if (hasDecision) isRequestingPermission = false
+    }
 
     OnboardingNotificationsContent(
         onBack = onBack,
@@ -88,6 +94,7 @@ fun OnboardingNotificationsScreen(
                         }
                 }
             } else {
+                isRequestingPermission = true
                 permissionState.requestPermission()
             }
         },
@@ -109,7 +116,7 @@ fun OnboardingNotificationsScreen(
         recommendationsEnabled = recommendationsEnabled,
         hasDecision = hasDecision,
         hasPermission = permissionState.hasPermission,
-        isSaving = isSaving,
+        isSaving = isSaving || isRequestingPermission,
         errorMessage = errorMessage,
     )
 }
