@@ -161,6 +161,9 @@ internal object AuthSchemaDocs {
                         "sessionToken" to "The token from **Begin passkey sign-up**.",
                         "credential" to "The credential the platform returned, unchanged.",
                         "emailBinding" to "Optional proof of an email address to attach, currently a Google ID token.",
+                        "nickname" to
+                            "Optional name of the device the passkey was created on, shown in the passkey " +
+                            "list. Trimmed and cut to 100 characters; blank keeps the server's default name.",
                     ),
                 ),
             "EmailBindingRequest" to
@@ -311,6 +314,9 @@ internal object AuthSchemaDocs {
                     mapOf(
                         "challenge" to "The challenge from **Begin adding a passkey**.",
                         "credential" to "The credential the platform returned, unchanged.",
+                        "nickname" to
+                            "Optional name of the device the passkey was created on, shown in the passkey " +
+                            "list. Trimmed and cut to 100 characters; blank keeps the server's default name.",
                     ),
                 ),
             // ---- Email verification ----------------------------------------------------------

@@ -26,6 +26,7 @@ fun signupPasskeyCompleteBody(
     sessionToken: String,
     credentialId: String,
     emailBindingToken: String? = null,
+    nickname: String? = null,
 ): String {
     val emailBinding =
         if (emailBindingToken == null) {
@@ -52,7 +53,7 @@ fun signupPasskeyCompleteBody(
               "attestationObject": "test-attestation"
             },
             "type": "public-key"
-          }$emailBinding
+          }${nicknameField(nickname)}$emailBinding
         }
         """.trimIndent()
     )
@@ -89,6 +90,7 @@ fun signinPasskeyCompleteBody(
 fun addPasskeyCompleteBody(
     challenge: String,
     credentialId: String,
+    nickname: String? = null,
 ): String =
     """
     {
@@ -101,9 +103,11 @@ fun addPasskeyCompleteBody(
           "attestationObject": "test-attestation"
         },
         "type": "public-key"
-      }
+      }${nicknameField(nickname)}
     }
     """.trimIndent()
+
+private fun nicknameField(nickname: String?): String = nickname?.let { """, "nickname": "$it"""" }.orEmpty()
 
 fun signupPasskeyCompleteBodyWithBindingSource(
     sessionToken: String,

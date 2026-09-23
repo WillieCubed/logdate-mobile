@@ -31,6 +31,9 @@ import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+/** Matches the `passkeys.nickname` column width. */
+private const val MAX_NICKNAME_LENGTH = 100
+
 /**
  * WebAuthn passkey service with optional strict cryptographic verification.
  *
@@ -87,7 +90,22 @@ class WebAuthnPasskeyService(
         val publicKey: ByteArray,
         val signCount: Long,
         val passkey: PasskeyInfo,
-    )
+    ) {
+        /**
+         * Labels the passkey with the device name the client registered it from, so a person
+         * looking at their list can tell which credential is which. A blank name keeps the default.
+         */
+        fun withNickname(nickname: String?): VerifiedRegistration {
+            val cleaned =
+                nickname
+                    ?.filterNot { it.isISOControl() }
+                    ?.trim()
+                    ?.take(MAX_NICKNAME_LENGTH)
+                    ?.trim()
+            if (cleaned.isNullOrEmpty()) return this
+            return copy(passkey = passkey.copy(nickname = cleaned))
+        }
+    }
 
     data class AuthenticationResult(
         val success: Boolean,

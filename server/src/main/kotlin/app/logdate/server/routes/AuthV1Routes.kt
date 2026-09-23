@@ -142,6 +142,8 @@ data class SignupPasskeyCompleteRequest(
     val sessionToken: String,
     val credential: PasskeyCredentialResponse,
     val emailBinding: EmailBindingRequest? = null,
+    /** The name of the device the passkey was created on, shown in the passkey list. */
+    val nickname: String? = null,
 )
 
 @Serializable
@@ -275,6 +277,8 @@ data class RestoreRegisterCompleteRequest(
 data class AddPasskeyCompleteRequest(
     val challenge: String,
     val credential: PasskeyCredentialResponse,
+    /** The name of the device the passkey was created on, shown in the passkey list. */
+    val nickname: String? = null,
 )
 
 @Serializable
@@ -447,7 +451,8 @@ fun Route.authV1Routes(
                                         verifiedOutcome.error,
                                         metrics,
                                     )
-                                is WebAuthnPasskeyService.VerificationOutcome.Success -> verifiedOutcome.data
+                                is WebAuthnPasskeyService.VerificationOutcome.Success ->
+                                    verifiedOutcome.data.withNickname(request.nickname)
                             }
 
                         if (
@@ -1270,7 +1275,7 @@ fun Route.authV1Routes(
                                 outcome.error,
                                 metrics,
                             )
-                        is WebAuthnPasskeyService.VerificationOutcome.Success -> outcome.data
+                        is WebAuthnPasskeyService.VerificationOutcome.Success -> outcome.data.withNickname(request.nickname)
                     }
 
                 if (!webAuthnService.storeVerifiedPasskey(account.id, verified)) {

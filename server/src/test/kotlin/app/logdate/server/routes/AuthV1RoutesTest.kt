@@ -713,6 +713,102 @@ class AuthV1RoutesTest {
             assertTrue(finalList.bodyAsText().contains(secondaryCredentialId))
         }
 
+    @Test
+    fun `an added passkey is listed under the device name it was registered with`() =
+        testApplication {
+            configureAuthV1TestApp()
+            val auth = createPasskeyAccount("nickname_add_user", "Nickname Add User", "Y3JlZC1uaWNrbmFtZS1wcmltYXJ5")
+            val challenge = beginAddPasskey(auth.accessToken)
+
+            val completeAdd =
+                client.post("/api/v1/auth/me/passkeys/complete") {
+                    header("Authorization", "Bearer ${auth.accessToken}")
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        addPasskeyCompleteBody(
+                            challenge = challenge,
+                            credentialId = "Y3JlZC1uaWNrbmFtZQ",
+                            nickname = "  Pixel 9  ",
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.Created, completeAdd.status)
+
+            assertEquals("Pixel 9", nicknameOf("Y3JlZC1uaWNrbmFtZQ", auth.accessToken))
+        }
+
+    @Test
+    fun `a passkey registered without a device name falls back to the server name`() =
+        testApplication {
+            configureAuthV1TestApp()
+            val auth = createPasskeyAccount("nickname_blank_user", "Nickname Blank User", "Y3JlZC1ibGFuay1wcmltYXJ5")
+            val challenge = beginAddPasskey(auth.accessToken)
+
+            client.post("/api/v1/auth/me/passkeys/complete") {
+                header("Authorization", "Bearer ${auth.accessToken}")
+                contentType(ContentType.Application.Json)
+                setBody(addPasskeyCompleteBody(challenge = challenge, credentialId = "Y3JlZC1ibGFuaw", nickname = "   "))
+            }
+
+            assertEquals(nicknameOf("Y3JlZC1ibGFuay1wcmltYXJ5", auth.accessToken), nicknameOf("Y3JlZC1ibGFuaw", auth.accessToken))
+        }
+
+    @Test
+    fun `the passkey created at signup is listed under its device name`() =
+        testApplication {
+            configureAuthV1TestApp()
+            val auth =
+                createPasskeyAccount(
+                    username = "nickname_signup_user",
+                    displayName = "Nickname Signup User",
+                    credentialId = "Y3JlZC1zaWdudXAtbmlja25hbWU",
+                    nickname = "Galaxy S26",
+                )
+
+            assertEquals("Galaxy S26", nicknameOf("Y3JlZC1zaWdudXAtbmlja25hbWU", auth.accessToken))
+        }
+
+    private suspend fun io.ktor.server.testing.ApplicationTestBuilder.beginAddPasskey(accessToken: String): String {
+        val beginAdd =
+            client.post("/api/v1/auth/me/passkeys/begin") {
+                header("Authorization", "Bearer $accessToken")
+            }
+        assertEquals(HttpStatusCode.OK, beginAdd.status)
+        val challenge =
+            json
+                .parseToJsonElement(beginAdd.bodyAsText())
+                .jsonObject["data"]
+                ?.jsonObject
+                ?.get("challenge")
+                ?.jsonPrimitive
+                ?.content
+        assertNotNull(challenge)
+        return challenge
+    }
+
+    private suspend fun io.ktor.server.testing.ApplicationTestBuilder.nicknameOf(
+        credentialId: String,
+        accessToken: String,
+    ): String? {
+        val list =
+            client.get("/api/v1/auth/me/passkeys") {
+                header("Authorization", "Bearer $accessToken")
+            }
+        assertEquals(HttpStatusCode.OK, list.status)
+        val passkeys =
+            json
+                .parseToJsonElement(list.bodyAsText())
+                .jsonObject["data"]
+                ?.jsonArray
+        assertNotNull(passkeys)
+        val passkey =
+            passkeys
+                .map { it.jsonObject }
+                .firstOrNull { it["credentialId"]?.jsonPrimitive?.content == credentialId }
+        assertNotNull(passkey, "No passkey listed with credential $credentialId")
+        return passkey["nickname"]?.jsonPrimitive?.content
+    }
+
     private data class AuthTokens(
         val accessToken: String,
         val refreshToken: String,
@@ -722,6 +818,7 @@ class AuthV1RoutesTest {
         username: String,
         displayName: String,
         credentialId: String,
+        nickname: String? = null,
     ): AuthTokens {
         val beginResponse =
             client.post("/api/v1/auth/signup/passkey/begin") {
@@ -741,7 +838,13 @@ class AuthV1RoutesTest {
         val completeResponse =
             client.post("/api/v1/auth/signup/passkey/complete") {
                 contentType(ContentType.Application.Json)
-                setBody(signupPasskeyCompleteBody(sessionToken = sessionToken, credentialId = credentialId))
+                setBody(
+                    signupPasskeyCompleteBody(
+                        sessionToken = sessionToken,
+                        credentialId = credentialId,
+                        nickname = nickname,
+                    ),
+                )
             }
         assertEquals(HttpStatusCode.Created, completeResponse.status)
         val completePayload = json.parseToJsonElement(completeResponse.bodyAsText()).jsonObject
