@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -235,6 +236,7 @@ private fun PersonalIntroStandardContent(
                     .fillMaxWidth()
                     .padding(horizontal = Spacing.lg)
                     .verticalScroll(rememberScrollState())
+                    .imePadding()
                     .semantics {
                         contentDescription = PERSONAL_INTRO_ROOT_TAG
                     },
@@ -303,7 +305,8 @@ private fun PersonalIntroStepPane(
                 Modifier
                     .widthIn(max = 444.dp)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
+                    .imePadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(modifier = Modifier.height(Spacing.xl))
