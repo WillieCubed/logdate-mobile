@@ -29,6 +29,7 @@ actual fun rememberLocationPermissionState(): LocationPermissionState {
     }
     var shouldShowRationale by remember { mutableStateOf(false) }
     var permissionRequested by remember { mutableStateOf(false) }
+    var isRequestInFlight by remember { mutableStateOf(false) }
 
     val permissionLauncher =
         rememberLauncherForActivityResult(
@@ -37,6 +38,7 @@ actual fun rememberLocationPermissionState(): LocationPermissionState {
             permissionGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
                 permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
             permissionRequested = true
+            isRequestInFlight = false
 
             if (!permissionGranted) {
                 // Check if we should show rationale for future requests
@@ -48,7 +50,9 @@ actual fun rememberLocationPermissionState(): LocationPermissionState {
         hasPermission = permissionGranted,
         shouldShowRationale = shouldShowRationale,
         permissionRequested = permissionRequested,
+        isRequestInFlight = isRequestInFlight,
         requestPermission = {
+            isRequestInFlight = true
             permissionLauncher.launch(
                 arrayOf(
                     Manifest.permission.ACCESS_FINE_LOCATION,

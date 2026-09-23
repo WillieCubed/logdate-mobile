@@ -25,12 +25,16 @@ actual fun rememberLocationPermissionState(): LocationPermissionState {
     val locationManager = remember { CLLocationManager() }
     var status by remember { mutableStateOf(locationManager.authorizationStatus) }
     var permissionRequested by remember { mutableStateOf(false) }
+    var isRequestInFlight by remember { mutableStateOf(false) }
 
     val delegate =
         remember {
             object : NSObject(), CLLocationManagerDelegateProtocol {
                 override fun locationManagerDidChangeAuthorization(manager: CLLocationManager) {
-                    scope.launch { status = manager.authorizationStatus }
+                    scope.launch {
+                        status = manager.authorizationStatus
+                        isRequestInFlight = false
+                    }
                 }
             }
         }
@@ -51,9 +55,11 @@ actual fun rememberLocationPermissionState(): LocationPermissionState {
         hasPermission = granted,
         shouldShowRationale = rationale,
         permissionRequested = permissionRequested,
+        isRequestInFlight = isRequestInFlight,
         requestPermission = {
             permissionRequested = true
             if (status == kCLAuthorizationStatusNotDetermined) {
+                isRequestInFlight = true
                 locationManager.requestWhenInUseAuthorization()
             }
         },

@@ -71,7 +71,6 @@ fun OnboardingLocationScreen(
     val permissionState = rememberLocationPermissionState()
     val coroutineScope = rememberCoroutineScope()
     var isSaving by remember { mutableStateOf(false) }
-    var isRequestingPermission by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     // Auto-advance when permission is granted
@@ -100,17 +99,9 @@ fun OnboardingLocationScreen(
         }
     }
 
-    // isRequestingPermission alone can't tell "never asked" apart from "request in flight" --
-    // both read as hasPermission=false, permissionRequested=false -- but once the OS has an
-    // answer (either flips), the request is no longer in flight, so no separate reset is needed.
-    val isRequestInFlight = isRequestingPermission && !permissionState.hasPermission && !permissionState.permissionRequested
-
     OnboardingLocationContent(
         onBack = onBack,
-        onEnable = {
-            isRequestingPermission = true
-            permissionState.requestPermission()
-        },
+        onEnable = permissionState.requestPermission,
         onSkip = {
             coroutineScope.launch {
                 isSaving = true
@@ -126,7 +117,7 @@ fun OnboardingLocationScreen(
                     }
             }
         },
-        isSaving = isSaving || isRequestInFlight,
+        isSaving = isSaving || permissionState.isRequestInFlight,
         errorMessage = errorMessage,
     )
 }

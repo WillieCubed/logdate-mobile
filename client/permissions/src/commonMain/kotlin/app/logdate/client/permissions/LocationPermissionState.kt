@@ -9,6 +9,7 @@ data class LocationPermissionState(
     val hasPermission: Boolean,
     val shouldShowRationale: Boolean,
     val permissionRequested: Boolean,
+    val isRequestInFlight: Boolean,
     val requestPermission: () -> Unit,
 )
 

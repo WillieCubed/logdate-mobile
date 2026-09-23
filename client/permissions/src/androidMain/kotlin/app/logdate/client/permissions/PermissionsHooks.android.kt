@@ -29,6 +29,7 @@ actual fun rememberNotificationPermissionState(): NotificationPermissionState {
             hasPermission = true,
             shouldShowRationale = false,
             permissionRequested = false,
+            isRequestInFlight = false,
             requestPermission = {},
         )
     }
@@ -44,6 +45,7 @@ actual fun rememberNotificationPermissionState(): NotificationPermissionState {
     }
     var shouldShowRationale by remember { mutableStateOf(false) }
     var permissionRequested by remember { mutableStateOf(false) }
+    var isRequestInFlight by remember { mutableStateOf(false) }
 
     val permissionLauncher =
         rememberLauncherForActivityResult(
@@ -51,6 +53,7 @@ actual fun rememberNotificationPermissionState(): NotificationPermissionState {
         ) { granted ->
             permissionGranted = granted
             permissionRequested = true
+            isRequestInFlight = false
             if (!granted) {
                 shouldShowRationale = true
             }
@@ -60,7 +63,9 @@ actual fun rememberNotificationPermissionState(): NotificationPermissionState {
         hasPermission = permissionGranted,
         shouldShowRationale = shouldShowRationale,
         permissionRequested = permissionRequested,
+        isRequestInFlight = isRequestInFlight,
         requestPermission = {
+            isRequestInFlight = true
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         },
     )
