@@ -8,6 +8,7 @@ actual fun rememberNotificationPermissionState(): NotificationPermissionState =
         hasPermission = true,
         shouldShowRationale = false,
         permissionRequested = false,
+        isRequestInFlight = false,
         requestPermission = {},
     )
 

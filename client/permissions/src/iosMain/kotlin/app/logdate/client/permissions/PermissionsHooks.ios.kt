@@ -30,6 +30,7 @@ import platform.UserNotifications.UNUserNotificationCenter
 actual fun rememberNotificationPermissionState(): NotificationPermissionState {
     var status by remember { mutableStateOf(PermissionStatus.UNKNOWN) }
     var permissionRequested by remember { mutableStateOf(false) }
+    var isRequestInFlight by remember { mutableStateOf(false) }
     var refreshNonce by remember { mutableStateOf(0) }
     val center = remember { UNUserNotificationCenter.currentNotificationCenter() }
 
@@ -44,13 +45,16 @@ actual fun rememberNotificationPermissionState(): NotificationPermissionState {
         hasPermission = status == PermissionStatus.GRANTED,
         shouldShowRationale = status == PermissionStatus.PERMANENTLY_DENIED,
         permissionRequested = permissionRequested,
+        isRequestInFlight = isRequestInFlight,
         requestPermission = {
+            isRequestInFlight = true
             val options = UNAuthorizationOptionAlert or UNAuthorizationOptionBadge or UNAuthorizationOptionSound
             center.requestAuthorizationWithOptions(options) { _, error ->
                 if (error != null) {
                     Napier.w("UNUserNotificationCenter authorization failed: ${error.localizedDescription}")
                 }
                 permissionRequested = true
+                isRequestInFlight = false
                 refreshNonce += 1
             }
         },

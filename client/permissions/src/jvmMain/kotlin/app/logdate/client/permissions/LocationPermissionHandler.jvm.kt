@@ -10,6 +10,7 @@ actual fun rememberLocationPermissionState(): LocationPermissionState {
         hasPermission = true,
         shouldShowRationale = false,
         permissionRequested = false,
+        isRequestInFlight = false,
         requestPermission = { /* No-op on desktop */ },
     )
 }

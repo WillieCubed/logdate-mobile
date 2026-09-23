@@ -67,13 +67,8 @@ fun OnboardingNotificationsScreen(
     val permissionState = rememberNotificationPermissionState()
     val coroutineScope = rememberCoroutineScope()
     var isSaving by remember { mutableStateOf(false) }
-    var isRequestingPermission by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val hasDecision = permissionState.hasPermission || permissionState.permissionRequested
-    // isRequestingPermission alone can't tell "never asked" apart from "request in flight" --
-    // both read as !hasDecision -- but once the OS has an answer, the request is no longer in
-    // flight, so no separate reset is needed.
-    val isRequestInFlight = isRequestingPermission && !hasDecision
 
     OnboardingNotificationsContent(
         onBack = onBack,
@@ -93,7 +88,6 @@ fun OnboardingNotificationsScreen(
                         }
                 }
             } else {
-                isRequestingPermission = true
                 permissionState.requestPermission()
             }
         },
@@ -115,7 +109,7 @@ fun OnboardingNotificationsScreen(
         recommendationsEnabled = recommendationsEnabled,
         hasDecision = hasDecision,
         hasPermission = permissionState.hasPermission,
-        isSaving = isSaving || isRequestInFlight,
+        isSaving = isSaving || permissionState.isRequestInFlight,
         errorMessage = errorMessage,
     )
 }
