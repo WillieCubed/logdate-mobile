@@ -17,6 +17,7 @@ import app.logdate.screenshots.shared.SharedScreenshotCatalog
 import app.logdate.screenshots.shared.SharedScreenshotSceneId
 import app.logdate.screenshots.shared.SharedScreenshotSceneSpec
 import app.logdate.screenshots.shared.screenshotBaselineName
+import app.logdate.ui.foldable.provideFoldableLayoutInfo
 import app.logdate.ui.theme.LogDateTheme
 import java.awt.Dimension
 import java.awt.GraphicsEnvironment
@@ -137,14 +138,20 @@ private fun assertMatchesBaseline(
     variant: ScreenshotSceneVariant,
 ) {
     val baselineName = screenshotBaselineName(scene, variant)
+    val foldableLayoutInfo = variant.viewport.foldableLayoutInfo
     assertMatchesBaseline(
         baselineName = baselineName,
         width = variant.viewport.widthDp,
         height = variant.viewport.heightDp,
         darkTheme = variant.viewport.darkTheme,
         contentPadding = sceneContentPadding(scene),
-        content = scene.content,
-    )
+    ) {
+        if (foldableLayoutInfo != null) {
+            provideFoldableLayoutInfo(foldableLayoutInfo) { scene.content() }
+        } else {
+            scene.content()
+        }
+    }
 }
 
 private fun assertMatchesBaseline(
