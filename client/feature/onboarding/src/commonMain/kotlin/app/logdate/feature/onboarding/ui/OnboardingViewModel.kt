@@ -104,6 +104,7 @@ class OnboardingViewModel(
                     identity.isAuthenticated ||
                         identity.cloudAccountId != null ||
                         !identity.username.isNullOrBlank(),
+                accountHandledOnThisDevice = inputs.deviceState.accountHandledOnThisDevice,
                 recommendationsHandledOnThisDevice = inputs.deviceState.recommendationsHandledOnThisDevice,
                 contextualRecommendationsEnabled = inputs.recommendationsEnabled,
                 dayBoundariesHandledOnThisDevice = inputs.deviceState.dayBoundariesHandledOnThisDevice,
@@ -118,6 +119,8 @@ class OnboardingViewModel(
             started = SharingStarted.Eagerly,
             initialValue =
                 OnboardingProgressSnapshot(
+                    accountHandledOnThisDevice =
+                        onboardingDeviceStateRepository.deviceState.value.accountHandledOnThisDevice,
                     recommendationsHandledOnThisDevice =
                         onboardingDeviceStateRepository.deviceState.value.recommendationsHandledOnThisDevice,
                     dayBoundariesHandledOnThisDevice =
@@ -306,6 +309,11 @@ class OnboardingViewModel(
     suspend fun markLocationHandled(): Result<Unit> =
         runCatching {
             onboardingDeviceStateRepository.markLocationHandled()
+        }
+
+    suspend fun markAccountHandled(): Result<Unit> =
+        runCatching {
+            onboardingDeviceStateRepository.markAccountHandled()
         }
 
     suspend fun setActiveEntryMode(entryMode: OnboardingEntryMode): Result<Unit> =

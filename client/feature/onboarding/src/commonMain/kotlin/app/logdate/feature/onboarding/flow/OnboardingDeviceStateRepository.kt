@@ -7,6 +7,7 @@ data class OnboardingDeviceState(
     val dayBoundariesHandledOnThisDevice: Boolean = false,
     val locationHandledOnThisDevice: Boolean = false,
     val notificationsHandledOnThisDevice: Boolean = false,
+    val accountHandledOnThisDevice: Boolean = false,
     val activeEntryMode: OnboardingEntryMode = OnboardingEntryMode.FRESH,
 )
 
@@ -20,6 +21,8 @@ interface OnboardingDeviceStateRepository {
     suspend fun markLocationHandled()
 
     suspend fun markNotificationsHandled()
+
+    suspend fun markAccountHandled()
 
     suspend fun setActiveEntryMode(entryMode: OnboardingEntryMode)
 

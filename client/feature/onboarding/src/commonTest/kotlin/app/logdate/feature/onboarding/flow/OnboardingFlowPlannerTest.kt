@@ -219,6 +219,34 @@ class OnboardingFlowPlannerTest {
     }
 
     @Test
+    fun `skipping account setup is remembered, unlike a never-visited step`() {
+        // Every other optional step has a *HandledOnThisDevice flag so skipping it is
+        // remembered; account setup used to be the exception, reappearing every re-entry.
+        val skipped =
+            OnboardingProgressSnapshot(
+                hasPersonalIntro = true,
+                accountHandledOnThisDevice = true,
+            )
+        val neverVisited =
+            OnboardingProgressSnapshot(
+                hasPersonalIntro = true,
+            )
+
+        assertFalse(
+            onboardingStepsFor(
+                entryMode = OnboardingEntryMode.CONTINUE_SETUP,
+                snapshot = skipped,
+            ).contains(OnboardingStep.ACCOUNT),
+        )
+        assertTrue(
+            onboardingStepsFor(
+                entryMode = OnboardingEntryMode.CONTINUE_SETUP,
+                snapshot = neverVisited,
+            ).contains(OnboardingStep.ACCOUNT),
+        )
+    }
+
+    @Test
     fun `completion guard redirects to recommendations before notifications when unresolved`() {
         assertEquals(
             OnboardingStep.RECOMMENDATIONS,

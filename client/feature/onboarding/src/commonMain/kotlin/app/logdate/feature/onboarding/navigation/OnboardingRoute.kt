@@ -252,6 +252,7 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
         val flowViewModel = koinViewModel<OnboardingViewModel>()
         val progressSnapshot by flowViewModel.progressSnapshot.collectAsState()
         val entryMode by flowViewModel.activeEntryMode.collectAsState()
+        val coroutineScope = rememberCoroutineScope()
 
         CloudAccountSetupScreen(
             onBack = onNavigateBack,
@@ -267,15 +268,18 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
                 )
             },
             onSkip = {
-                onGoToItem(
-                    routeForStep(
-                        nextOnboardingStepAfter(
-                            currentStep = OnboardingStep.ACCOUNT,
-                            entryMode = entryMode,
-                            snapshot = progressSnapshot,
-                        ) ?: terminalStepFor(entryMode),
-                    ),
-                )
+                coroutineScope.launch {
+                    flowViewModel.markAccountHandled()
+                    onGoToItem(
+                        routeForStep(
+                            nextOnboardingStepAfter(
+                                currentStep = OnboardingStep.ACCOUNT,
+                                entryMode = entryMode,
+                                snapshot = progressSnapshot.copy(accountHandledOnThisDevice = true),
+                            ) ?: terminalStepFor(entryMode),
+                        ),
+                    )
+                }
             },
         )
     }

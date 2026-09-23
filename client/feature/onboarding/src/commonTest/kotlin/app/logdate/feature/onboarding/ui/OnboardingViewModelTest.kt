@@ -545,6 +545,10 @@ internal class FakeOnboardingDeviceStateRepository : OnboardingDeviceStateReposi
         state.value = state.value.copy(notificationsHandledOnThisDevice = true)
     }
 
+    override suspend fun markAccountHandled() {
+        state.value = state.value.copy(accountHandledOnThisDevice = true)
+    }
+
     override suspend fun setActiveEntryMode(entryMode: OnboardingEntryMode) {
         state.value = state.value.copy(activeEntryMode = entryMode)
     }
