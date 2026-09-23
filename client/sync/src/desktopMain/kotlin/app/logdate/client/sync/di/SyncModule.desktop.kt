@@ -4,6 +4,7 @@ import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.ForegroundSyncManager
+import app.logdate.client.sync.RecoverIdentityUseCase
 import app.logdate.client.sync.RoomSyncTransactionManager
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncTransactionManager
@@ -11,6 +12,7 @@ import app.logdate.client.sync.cloud.di.cloudAccountModule
 import app.logdate.client.sync.conflict.KeyValueSyncConflictStore
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.metadata.KeyValueFirstSyncEnqueueStore
+import app.logdate.client.sync.metadata.KeyValueIdentityRecoveryNeededStore
 import app.logdate.client.sync.metadata.KeyValueLastSyncErrorStore
 import app.logdate.client.sync.metadata.KeyValueMediaSyncRefStore
 import app.logdate.client.sync.metadata.KeyValueSyncDeadLetterStore
@@ -29,6 +31,7 @@ import org.koin.dsl.module
  */
 actual val syncModule: Module =
     module {
+        single { RecoverIdentityUseCase(get(), get(), get(), get()) }
         single<SyncConflictStore> { KeyValueSyncConflictStore(get()) }
         single<MediaSyncRefStore> { KeyValueMediaSyncRefStore(get()) }
         single<SyncDeadLetterStore> { KeyValueSyncDeadLetterStore(get()) }
@@ -63,6 +66,8 @@ actual val syncModule: Module =
                 deviceIdProvider = get(),
                 identityKeyManager = get(),
                 cloudQuotaManager = get(),
+                cloudApiClient = get(),
+                identityRecoveryNeededStore = KeyValueIdentityRecoveryNeededStore(get()),
             )
         }
         single<SyncManager> { ForegroundSyncManager(get(), get(), get(), get(), get()) }
