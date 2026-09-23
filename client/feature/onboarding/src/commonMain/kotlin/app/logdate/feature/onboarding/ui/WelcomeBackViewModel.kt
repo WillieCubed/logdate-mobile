@@ -5,7 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.identity.ObserveUserIdentityUseCase
 import app.logdate.client.domain.streak.RefreshStreakUseCase
 import app.logdate.feature.onboarding.flow.OnboardingCompletionCoordinator
-import app.logdate.feature.onboarding.flow.OnboardingStep
+import app.logdate.feature.onboarding.flow.OnboardingFinishResult
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -39,8 +39,5 @@ class WelcomeBackViewModel(
         }
     }
 
-    suspend fun finishOnboardingOrReportIncompleteStep(
-        onFinish: () -> Unit,
-        onIncompleteStep: (OnboardingStep) -> Unit,
-    ) = completionCoordinator.finishOnboardingOrReportIncompleteStep(onFinish, onIncompleteStep)
+    suspend fun finishOnboarding(): OnboardingFinishResult = completionCoordinator.finishOnboarding()
 }

@@ -2,6 +2,9 @@ package app.logdate.feature.onboarding.ui
 
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.domain.identity.ObserveUserIdentityUseCase
@@ -14,6 +17,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
@@ -129,6 +133,44 @@ class WelcomeBackScreenTest {
             assertTrue(!outcome.finished, "onFinish must not be called when required steps are incomplete")
             assertTrue(!fakeUserStateRepository.isOnboardingComplete)
         }
+
+    @Test
+    fun `a failed save stays on screen with a retry that finishes once saving works`() =
+        runComposeUiTest {
+            completeRequiredSteps()
+            fakeUserStateRepository.setOnboardingCompleteFailure = IllegalStateException("disk full")
+            var finished = false
+
+            setContent {
+                WelcomeBackScreen(
+                    onFinish = { finished = true },
+                    viewModel = welcomeBackViewModel,
+                )
+            }
+
+            waitUntil(timeoutMillis = 10_000) {
+                onAllNodesWithTag(ONBOARDING_SAVE_FAILED_TAG).fetchSemanticsNodes().isNotEmpty()
+            }
+            assertFalse(finished, "onFinish must not be called when saving fails")
+            assertFalse(fakeUserStateRepository.isOnboardingComplete)
+
+            fakeUserStateRepository.setOnboardingCompleteFailure = null
+            onNodeWithTag(ONBOARDING_SAVE_RETRY_TAG).performClick()
+
+            waitUntil(timeoutMillis = 10_000) { finished }
+            assertTrue(fakeUserStateRepository.isOnboardingComplete)
+        }
+
+    private fun completeRequiredSteps() {
+        fakeProfileRepository.setProfile(LogDateProfile(displayName = "Alex", bio = "Bio"))
+        runBlocking {
+            fakeUserStateRepository.setBirthday(Instant.fromEpochMilliseconds(946684800000))
+            fakeOnboardingDeviceStateRepository.markRecommendationsHandled()
+            fakeOnboardingDeviceStateRepository.markLocationHandled()
+            fakeOnboardingDeviceStateRepository.markDayBoundariesHandled()
+            fakeOnboardingDeviceStateRepository.markNotificationsHandled()
+        }
+    }
 
     private data class WelcomeBackOutcome(
         val finished: Boolean,

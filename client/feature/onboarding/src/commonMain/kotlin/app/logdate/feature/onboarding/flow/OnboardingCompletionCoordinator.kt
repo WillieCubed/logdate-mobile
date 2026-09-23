@@ -28,28 +28,25 @@ class OnboardingCompletionCoordinator(
     private val refreshStreakUseCase: RefreshStreakUseCase,
 ) {
     /**
-     * Routes to the first incomplete step when one exists; otherwise persists completion and
-     * finishes. A persistence failure at that point is logged rather than left to strand the
-     * caller -- required steps are already satisfied, so [onFinish] still runs.
+     * Saves that onboarding is complete, unless a required step is still incomplete.
+     *
+     * Callers leave onboarding only on [OnboardingFinishResult.Finished]. Leaving after a failed
+     * save would put the user on Home with the onboarded flag still false, and the next activity
+     * recreation would send them back into onboarding.
      */
-    suspend fun finishOnboardingOrReportIncompleteStep(
-        onFinish: () -> Unit,
-        onIncompleteStep: (OnboardingStep) -> Unit,
-    ) {
-        val snapshot = currentProgressSnapshot()
-        val incompleteStep = snapshot.firstIncompleteRequiredOnboardingStep()
-        if (incompleteStep != null) {
-            onIncompleteStep(incompleteStep)
-            return
+    suspend fun finishOnboarding(): OnboardingFinishResult {
+        currentProgressSnapshot().firstIncompleteRequiredOnboardingStep()?.let { step ->
+            return OnboardingFinishResult.IncompleteStep(step)
         }
 
-        runCatching {
-            require(snapshot.canCompleteOnboarding()) { "Required onboarding steps are still incomplete" }
-            userStateRepository.setIsOnboardingComplete(true)
-            refreshStreakUseCase()
-        }.onFailure { error -> Napier.e("Failed to persist onboarding completion", error) }
+        runCatching { userStateRepository.setIsOnboardingComplete(true) }
+            .onFailure { error ->
+                Napier.e("Failed to save onboarding completion", error)
+                return OnboardingFinishResult.SaveFailed(error)
+            }
 
-        onFinish()
+        refreshStreakUseCase()
+        return OnboardingFinishResult.Finished
     }
 
     private suspend fun currentProgressSnapshot(): OnboardingProgressSnapshot {
@@ -80,4 +77,20 @@ class OnboardingCompletionCoordinator(
             healthConnectStatus = healthStatus,
         )
     }
+}
+
+/** The outcome of [OnboardingCompletionCoordinator.finishOnboarding]. */
+sealed interface OnboardingFinishResult {
+    /** The onboarded flag is saved; the caller can leave onboarding. */
+    data object Finished : OnboardingFinishResult
+
+    /** A required [step] is still incomplete; the caller routes there instead. */
+    data class IncompleteStep(
+        val step: OnboardingStep,
+    ) : OnboardingFinishResult
+
+    /** Saving the onboarded flag failed; the caller stays put and offers a retry. */
+    data class SaveFailed(
+        val error: Throwable,
+    ) : OnboardingFinishResult
 }

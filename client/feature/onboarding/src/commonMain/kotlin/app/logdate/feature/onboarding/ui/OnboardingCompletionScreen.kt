@@ -38,6 +38,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.feature.onboarding.flow.OnboardingCompletionCoordinator
+import app.logdate.feature.onboarding.flow.OnboardingFinishResult
 import app.logdate.feature.onboarding.flow.OnboardingStep
 import app.logdate.ui.GenericLoadingScreen
 import app.logdate.ui.platform.rememberLogDateHaptics
@@ -74,6 +75,7 @@ fun OnboardingCompletionScreen(
     modifier: Modifier = Modifier,
 ) {
     var shouldShowFinish by remember { mutableStateOf(false) }
+    var saveFailed by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val isCampfireEnabled by campfireViewModel.isCampfireEnabled.collectAsState()
     val showCampfire = isCampfireEnabled
@@ -83,18 +85,32 @@ fun OnboardingCompletionScreen(
         return
     }
 
+    val finishOnboarding: () -> Unit = {
+        coroutineScope.launch {
+            when (val result = completionCoordinator.finishOnboarding()) {
+                OnboardingFinishResult.Finished -> onFinish()
+                is OnboardingFinishResult.IncompleteStep -> onRequirementsIncomplete(result.step)
+                is OnboardingFinishResult.SaveFailed -> saveFailed = true
+            }
+        }
+    }
+
+    if (saveFailed) {
+        OnboardingSaveFailedContent(
+            onRetry = {
+                saveFailed = false
+                finishOnboarding()
+            },
+            modifier = modifier,
+        )
+        return
+    }
+
     OnboardingCompletionContent(
         shouldShowFinish = shouldShowFinish,
         showCampfire = showCampfire,
         onContinue = { shouldShowFinish = true },
-        onFinish = {
-            coroutineScope.launch {
-                completionCoordinator.finishOnboardingOrReportIncompleteStep(
-                    onFinish = onFinish,
-                    onIncompleteStep = onRequirementsIncomplete,
-                )
-            }
-        },
+        onFinish = finishOnboarding,
         modifier = modifier,
     )
 }

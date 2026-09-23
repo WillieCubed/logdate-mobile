@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.onboarding.flow.OnboardingFinishResult
 import app.logdate.feature.onboarding.flow.OnboardingStep
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
@@ -67,26 +69,36 @@ fun WelcomeBackScreen(
     // I can't believe we have to use a view model for this
     val name by viewModel.nameState.collectAsState()
     var contentVisible by remember { mutableStateOf(false) }
+    var finishAttempt by remember { mutableIntStateOf(0) }
+    var saveFailed by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        contentVisible = true
-        delay(WELCOME_BACK_HOLD_MILLIS)
-        contentVisible = false
-        delay(WELCOME_BACK_FADE_MILLIS.toLong())
-        // A returning user reaches this screen only after already stepping through every
-        // required onboarding screen, but nothing had marked onboarding complete for this
-        // entry mode -- so the flag stayed false and the app sent them right back here on
-        // every subsequent launch despite a valid, authenticated session.
-        viewModel.finishOnboardingOrReportIncompleteStep(
-            onFinish = onFinish,
-            onIncompleteStep = onRequirementsIncomplete,
-        )
+    LaunchedEffect(finishAttempt) {
+        if (finishAttempt == 0) {
+            contentVisible = true
+            delay(WELCOME_BACK_HOLD_MILLIS)
+            contentVisible = false
+            delay(WELCOME_BACK_FADE_MILLIS.toLong())
+        }
+        when (val result = viewModel.finishOnboarding()) {
+            OnboardingFinishResult.Finished -> onFinish()
+            is OnboardingFinishResult.IncompleteStep -> onRequirementsIncomplete(result.step)
+            is OnboardingFinishResult.SaveFailed -> saveFailed = true
+        }
     }
 
     Surface(
         modifier = modifier.fillMaxSize().testTag(WELCOME_BACK_ROOT_TAG),
         color = MaterialTheme.colorScheme.background,
     ) {
+        if (saveFailed) {
+            OnboardingSaveFailedContent(
+                onRetry = {
+                    saveFailed = false
+                    finishAttempt++
+                },
+            )
+            return@Surface
+        }
         AnimatedVisibility(
             visible = contentVisible,
             enter = fadeIn(animationSpec = tween(durationMillis = WELCOME_BACK_FADE_MILLIS)),

@@ -75,6 +75,7 @@ import app.logdate.feature.library.navigation.MediaDetailRoute
 import app.logdate.feature.library.navigation.libraryEntries
 import app.logdate.feature.library.ui.LibraryScreen
 import app.logdate.feature.location.timeline.ui.LocationTimelineScreen
+import app.logdate.feature.onboarding.navigation.OnboardingStart
 import app.logdate.feature.onboarding.navigation.onboardingEntries
 import app.logdate.feature.postcards.navigation.PostcardEditorRoute
 import app.logdate.feature.postcards.navigation.PostcardViewerRoute
@@ -99,6 +100,7 @@ import app.logdate.ui.platform.iosEdgeSwipeBack
 import app.logdate.ui.platform.rememberPlatformHapticsController
 import app.logdate.ui.platform.rememberSystemReduceMotion
 import app.logdate.ui.theme.LogDateTheme
+import io.github.aakira.napier.Napier
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -138,6 +140,10 @@ fun LogDateNavDisplay(
                 requiresUnlock = appUiState.requiresUnlock,
             )
         if (action is NavBootstrapAction.ResetTo) {
+            val top = backStack.lastOrNull()
+            if (action.key == OnboardingStart && top != null && top != BaseRoute) {
+                Napier.w("Not onboarded; replacing restored back stack (top=$top) with onboarding")
+            }
             backStack.clear()
             backStack.add(action.key)
         }

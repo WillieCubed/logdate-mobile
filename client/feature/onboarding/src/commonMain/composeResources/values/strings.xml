@@ -162,6 +162,9 @@
     <string name="onboarding_error_save_notifications">Your notification choice couldn&apos;t be saved. Try again.</string>
     <string name="onboarding_error_save_recommendations">Your suggestions setting couldn&apos;t be saved. Try again.</string>
     <string name="onboarding_error_save_day_boundaries">Your day boundary preference couldn&apos;t be saved. Try again.</string>
+    <string name="onboarding_error_save_completion_title">Setup couldn&apos;t be saved</string>
+    <string name="onboarding_error_save_completion">Everything you entered is still here. Try again to finish setup.</string>
+    <string name="action_onboarding_retry">Try again</string>
 
     <!-- Backup plan options (per Figma) -->
     <string name="onboarding_plan_basic_title">Basic</string>

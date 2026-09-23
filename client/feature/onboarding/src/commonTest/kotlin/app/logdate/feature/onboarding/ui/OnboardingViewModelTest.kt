@@ -473,6 +473,7 @@ internal class FakeUserStateRepository : UserStateRepository {
         private set
     var isOnboardingComplete: Boolean = false
         private set
+    var setOnboardingCompleteFailure: Throwable? = null
 
     override suspend fun setBirthday(birthday: Instant) {
         lastBirthday = birthday
@@ -480,6 +481,7 @@ internal class FakeUserStateRepository : UserStateRepository {
     }
 
     override suspend fun setIsOnboardingComplete(isComplete: Boolean) {
+        setOnboardingCompleteFailure?.let { throw it }
         isOnboardingComplete = isComplete
         state.value = state.value.copy(isOnboarded = isComplete)
     }

@@ -332,26 +332,6 @@ class OnboardingViewModel(
 
     fun firstIncompleteRequiredOnboardingStep(): OnboardingStep? = progressSnapshot.value.firstIncompleteRequiredOnboardingStep()
 
-    /**
-     * The single exit point every terminal onboarding screen should call instead of hand-rolling
-     * its own completion check. Routes to the first incomplete step when one exists; otherwise
-     * persists completion and finishes. A persistence failure at that point is logged rather than
-     * left to strand the caller -- required steps are already satisfied, so [onFinish] still runs.
-     */
-    suspend fun finishOnboardingOrReportIncompleteStep(
-        onFinish: () -> Unit,
-        onIncompleteStep: (OnboardingStep) -> Unit,
-    ) {
-        val incompleteStep = firstIncompleteRequiredOnboardingStep()
-        if (incompleteStep != null) {
-            onIncompleteStep(incompleteStep)
-            return
-        }
-        completeOnboardingIfEligible()
-            .onFailure { error -> Napier.e("Failed to persist onboarding completion", error) }
-        onFinish()
-    }
-
     override fun onCleared() {
         healthStatusJob?.cancel()
         super.onCleared()
