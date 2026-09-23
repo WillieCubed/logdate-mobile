@@ -7,7 +7,7 @@
     <string name="account_created">Account Created!</string>
     <string name="account_created_signed_in_as">Your account has been successfully created. You are now signed in as %1$s.</string>
     <string name="account_information">Account Information</string>
-    <string name="account_recovery">Account Recovery</string>
+    <string name="account_recovery">Account recovery</string>
     <string name="account_settings_description">Sign-in, server, passkeys, and AT Protocol identity</string>
     <string name="authentication">Authentication</string>
     <string name="app_security">App Security</string>
@@ -20,9 +20,9 @@
     <string name="create_account_with_passkey">Create Account with Passkey</string>
     <string name="account_cloud_create_description">Create an account to sync your journals across devices and unlock additional features.</string>
     <string name="create_logdate_cloud_account">Create LogDate Cloud Account</string>
-    <string name="create_new_account">Create New Account</string>
+    <string name="create_new_account">Create new account</string>
     <string name="account_passkey_create_screen_description">Create your account with a passkey for secure, password-free access to LogDate Cloud.</string>
-    <string name="creating_account">Creating Account...</string>
+    <string name="creating_account">Creating account…</string>
     <string name="creating_your_logdate_cloud_account">Creating your LogDate Cloud account...</string>
     <string name="account_passkey_create_review_description">Review your details and create your secure passkey to complete your %1$s account.</string>
     <string name="secure_your_account">Secure Your Account</string>
@@ -34,12 +34,12 @@
     <string name="dont_have_an_account">Don&apos;t have an account?</string>
 
     <!-- Sign in -->
-    <string name="sign_in">Sign In</string>
+    <string name="sign_in">Sign in</string>
     <string name="sign_in_required">Sign in required</string>
     <string name="sign_in_to_logdate_cloud">Sign In to LogDate Cloud</string>
     <string name="account_sign_in_to_enable_sync">Sign in to your LogDate Cloud account to enable sync</string>
     <string name="account_sign_in_with_passkey_description">Sign in to your LogDate Cloud account using your passkey.</string>
-    <string name="sign_in_with_passkey">Sign In with Passkey</string>
+    <string name="sign_in_with_passkey">Sign in with passkey</string>
     <string name="continue_with_google">Continue with Google</string>
     <string name="google_sign_in_cancelled">Google sign-in was cancelled. Please try again.</string>
     <string name="google_sign_in_no_account">No Google account is available on this device.</string>
@@ -138,7 +138,7 @@
     <string name="account_username_choose_title">Choose a Username</string>
     <string name="account_username_choose_label">Choose a username</string>
     <string name="account_username_choose_screen_title">Choose your username</string>
-    <string name="account_username_display_name_prompt">What should we call you?</string>
+    <string name="account_username_display_name_prompt">What should people call you?</string>
     <string name="check_availability">Check Availability</string>
     <string name="error_checking_availability">Error checking availability</string>
     <string name="error_checking_username">Error checking username</string>
