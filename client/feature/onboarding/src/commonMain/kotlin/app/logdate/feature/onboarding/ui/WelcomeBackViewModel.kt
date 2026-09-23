@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.identity.ObserveUserIdentityUseCase
 import app.logdate.client.domain.streak.RefreshStreakUseCase
+import app.logdate.feature.onboarding.flow.OnboardingCompletionCoordinator
+import app.logdate.feature.onboarding.flow.OnboardingStep
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -18,6 +20,7 @@ private const val DEFAULT_WELCOME_BACK_NAME = "user"
 class WelcomeBackViewModel(
     private val refreshStreakUseCase: RefreshStreakUseCase,
     observeUserIdentity: ObserveUserIdentityUseCase,
+    private val completionCoordinator: OnboardingCompletionCoordinator,
 ) : ViewModel() {
     val nameState: StateFlow<String> =
         observeUserIdentity()
@@ -35,4 +38,9 @@ class WelcomeBackViewModel(
             refreshStreakUseCase()
         }
     }
+
+    suspend fun finishOnboardingOrReportIncompleteStep(
+        onFinish: () -> Unit,
+        onIncompleteStep: (OnboardingStep) -> Unit,
+    ) = completionCoordinator.finishOnboardingOrReportIncompleteStep(onFinish, onIncompleteStep)
 }

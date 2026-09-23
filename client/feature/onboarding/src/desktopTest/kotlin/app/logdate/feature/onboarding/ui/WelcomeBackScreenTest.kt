@@ -38,7 +38,6 @@ class WelcomeBackScreenTest {
     private lateinit var fakeStreakSettingsRepository: FakeStreakSettingsRepository
     private lateinit var fakeOnboardingDeviceStateRepository: FakeOnboardingDeviceStateRepository
     private lateinit var identityKeyManager: IdentityKeyManager
-    private lateinit var onboardingViewModel: OnboardingViewModel
     private lateinit var welcomeBackViewModel: WelcomeBackViewModel
 
     @BeforeTest
@@ -57,21 +56,6 @@ class WelcomeBackScreenTest {
         identityKeyManager = IdentityKeyManager(InMemorySecureStorage(), FakeCryptoManager())
         runBlocking { identityKeyManager.setupNewIdentity() }
 
-        onboardingViewModel =
-            buildOnboardingViewModel(
-                notesRepository = fakeNotesRepository,
-                userStateRepository = fakeUserStateRepository,
-                memoriesSettingsRepository = fakeMemoriesSettingsRepository,
-                locationSettingsRepository = fakeLocationSettingsRepository,
-                dayBoundarySettingsRepository = fakeDayBoundarySettingsRepository,
-                healthRepository = fakeHealthRepository,
-                profileRepository = fakeProfileRepository,
-                accountRepository = fakeAccountRepository,
-                sessionStorage = fakeSessionStorage,
-                streakSettingsRepository = fakeStreakSettingsRepository,
-                onboardingDeviceStateRepository = fakeOnboardingDeviceStateRepository,
-                identityKeyManager = identityKeyManager,
-            )
         welcomeBackViewModel =
             WelcomeBackViewModel(
                 refreshStreakUseCase =
@@ -85,6 +69,20 @@ class WelcomeBackScreenTest {
                         userStateRepository = fakeUserStateRepository,
                         accountRepository = fakeAccountRepository,
                         sessionStorage = fakeSessionStorage,
+                    ),
+                completionCoordinator =
+                    buildOnboardingCompletionCoordinator(
+                        notesRepository = fakeNotesRepository,
+                        userStateRepository = fakeUserStateRepository,
+                        memoriesSettingsRepository = fakeMemoriesSettingsRepository,
+                        locationSettingsRepository = fakeLocationSettingsRepository,
+                        dayBoundarySettingsRepository = fakeDayBoundarySettingsRepository,
+                        healthRepository = fakeHealthRepository,
+                        profileRepository = fakeProfileRepository,
+                        accountRepository = fakeAccountRepository,
+                        sessionStorage = fakeSessionStorage,
+                        streakSettingsRepository = fakeStreakSettingsRepository,
+                        onboardingDeviceStateRepository = fakeOnboardingDeviceStateRepository,
                     ),
             )
     }
@@ -146,7 +144,6 @@ class WelcomeBackScreenTest {
                 onFinish = { finished = true },
                 onRequirementsIncomplete = { incompleteStep = it },
                 viewModel = welcomeBackViewModel,
-                onboardingViewModel = onboardingViewModel,
             )
         }
 

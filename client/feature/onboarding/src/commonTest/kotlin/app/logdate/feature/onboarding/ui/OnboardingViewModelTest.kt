@@ -29,6 +29,7 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.streak.StreakSettingsRepository
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.feature.onboarding.flow.OnboardingCompletionCoordinator
 import app.logdate.feature.onboarding.flow.OnboardingDeviceState
 import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
 import app.logdate.feature.onboarding.flow.OnboardingEntryMode
@@ -384,6 +385,40 @@ internal fun buildOnboardingViewModel(
                 streakSettingsRepository = streakSettingsRepository,
             ),
         identityKeyManager = identityKeyManager,
+    )
+
+internal fun buildOnboardingCompletionCoordinator(
+    notesRepository: FakeJournalNotesRepository,
+    userStateRepository: FakeUserStateRepository,
+    memoriesSettingsRepository: FakeMemoriesSettingsRepository,
+    locationSettingsRepository: FakeLocationTrackingSettingsRepository,
+    dayBoundarySettingsRepository: FakeDayBoundarySettingsRepository,
+    healthRepository: FakeLocalFirstHealthRepository,
+    profileRepository: FakeProfileRepository,
+    accountRepository: FakeAccountRepository,
+    sessionStorage: FakeSessionStorage,
+    streakSettingsRepository: FakeStreakSettingsRepository,
+    onboardingDeviceStateRepository: FakeOnboardingDeviceStateRepository,
+): OnboardingCompletionCoordinator =
+    OnboardingCompletionCoordinator(
+        observeUserIdentity =
+            ObserveUserIdentityUseCase(
+                profileRepository = profileRepository,
+                userStateRepository = userStateRepository,
+                accountRepository = accountRepository,
+                sessionStorage = sessionStorage,
+            ),
+        onboardingDeviceStateRepository = onboardingDeviceStateRepository,
+        memoriesSettingsRepository = memoriesSettingsRepository,
+        locationTrackingSettingsRepository = locationSettingsRepository,
+        dayBoundarySettingsRepository = dayBoundarySettingsRepository,
+        observeHealthConnectStatus = ObserveHealthConnectStatusUseCase(healthRepository),
+        userStateRepository = userStateRepository,
+        refreshStreakUseCase =
+            RefreshStreakUseCase(
+                calculateStreakUseCase = CalculateStreakUseCase(notesRepository),
+                streakSettingsRepository = streakSettingsRepository,
+            ),
     )
 
 internal class FakeJournalNotesRepository : JournalNotesRepository {

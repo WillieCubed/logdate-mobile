@@ -25,20 +25,30 @@ class WelcomeBackViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var fakeNotesRepository: FakeJournalNotesRepository
     private lateinit var fakeUserStateRepository: FakeUserStateRepository
+    private lateinit var fakeMemoriesSettingsRepository: FakeMemoriesSettingsRepository
+    private lateinit var fakeLocationSettingsRepository: FakeLocationTrackingSettingsRepository
+    private lateinit var fakeDayBoundarySettingsRepository: FakeDayBoundarySettingsRepository
+    private lateinit var fakeHealthRepository: FakeLocalFirstHealthRepository
     private lateinit var fakeProfileRepository: FakeProfileRepository
     private lateinit var fakeAccountRepository: FakeAccountRepository
     private lateinit var fakeSessionStorage: FakeSessionStorage
     private lateinit var fakeStreakSettingsRepository: FakeStreakSettingsRepository
+    private lateinit var fakeOnboardingDeviceStateRepository: FakeOnboardingDeviceStateRepository
 
     @BeforeTest
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         fakeNotesRepository = FakeJournalNotesRepository()
         fakeUserStateRepository = FakeUserStateRepository()
+        fakeMemoriesSettingsRepository = FakeMemoriesSettingsRepository()
+        fakeLocationSettingsRepository = FakeLocationTrackingSettingsRepository()
+        fakeDayBoundarySettingsRepository = FakeDayBoundarySettingsRepository()
+        fakeHealthRepository = FakeLocalFirstHealthRepository()
         fakeProfileRepository = FakeProfileRepository()
         fakeAccountRepository = FakeAccountRepository()
         fakeSessionStorage = FakeSessionStorage()
         fakeStreakSettingsRepository = FakeStreakSettingsRepository()
+        fakeOnboardingDeviceStateRepository = FakeOnboardingDeviceStateRepository()
     }
 
     @AfterTest
@@ -79,6 +89,20 @@ class WelcomeBackViewModelTest {
                     userStateRepository = fakeUserStateRepository,
                     accountRepository = fakeAccountRepository,
                     sessionStorage = fakeSessionStorage,
+                ),
+            completionCoordinator =
+                buildOnboardingCompletionCoordinator(
+                    notesRepository = fakeNotesRepository,
+                    userStateRepository = fakeUserStateRepository,
+                    memoriesSettingsRepository = fakeMemoriesSettingsRepository,
+                    locationSettingsRepository = fakeLocationSettingsRepository,
+                    dayBoundarySettingsRepository = fakeDayBoundarySettingsRepository,
+                    healthRepository = fakeHealthRepository,
+                    profileRepository = fakeProfileRepository,
+                    accountRepository = fakeAccountRepository,
+                    sessionStorage = fakeSessionStorage,
+                    streakSettingsRepository = fakeStreakSettingsRepository,
+                    onboardingDeviceStateRepository = fakeOnboardingDeviceStateRepository,
                 ),
         )
 }

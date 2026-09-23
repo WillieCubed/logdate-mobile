@@ -5,6 +5,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.runComposeUiTest
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.feature.core.streak.CampfireViewModel
+import app.logdate.feature.onboarding.flow.OnboardingCompletionCoordinator
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
@@ -18,7 +19,7 @@ import kotlin.test.Test
  */
 @OptIn(ExperimentalTestApi::class)
 class OnboardingCompletionScreenTest {
-    private lateinit var onboardingViewModel: OnboardingViewModel
+    private lateinit var completionCoordinator: OnboardingCompletionCoordinator
 
     @BeforeTest
     fun setup() {
@@ -27,8 +28,8 @@ class OnboardingCompletionScreenTest {
         val identityKeyManager = IdentityKeyManager(InMemorySecureStorage(), FakeCryptoManager())
         runBlocking { identityKeyManager.setupNewIdentity() }
 
-        onboardingViewModel =
-            buildOnboardingViewModel(
+        completionCoordinator =
+            buildOnboardingCompletionCoordinator(
                 notesRepository = fakeNotesRepository,
                 userStateRepository = FakeUserStateRepository(),
                 memoriesSettingsRepository = FakeMemoriesSettingsRepository(),
@@ -40,7 +41,6 @@ class OnboardingCompletionScreenTest {
                 sessionStorage = FakeSessionStorage(),
                 streakSettingsRepository = fakeStreakSettingsRepository,
                 onboardingDeviceStateRepository = FakeOnboardingDeviceStateRepository(),
-                identityKeyManager = identityKeyManager,
             )
     }
 
@@ -53,7 +53,7 @@ class OnboardingCompletionScreenTest {
             setContent {
                 OnboardingCompletionScreen(
                     onFinish = {},
-                    viewModel = onboardingViewModel,
+                    completionCoordinator = completionCoordinator,
                     campfireViewModel = campfireViewModel,
                 )
             }
@@ -74,7 +74,7 @@ class OnboardingCompletionScreenTest {
             setContent {
                 OnboardingCompletionScreen(
                     onFinish = {},
-                    viewModel = onboardingViewModel,
+                    completionCoordinator = completionCoordinator,
                     campfireViewModel = campfireViewModel,
                 )
             }

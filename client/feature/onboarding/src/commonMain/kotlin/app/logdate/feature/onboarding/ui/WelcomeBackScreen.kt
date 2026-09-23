@@ -57,7 +57,6 @@ fun WelcomeBackScreen(
     onFinish: () -> Unit,
     onRequirementsIncomplete: (OnboardingStep) -> Unit = {},
     viewModel: WelcomeBackViewModel = koinViewModel(),
-    onboardingViewModel: OnboardingViewModel = koinViewModel(),
     modifier: Modifier = Modifier,
 ) {
     // I can't believe we have to use a view model for this
@@ -73,7 +72,7 @@ fun WelcomeBackScreen(
         // required onboarding screen, but nothing had marked onboarding complete for this
         // entry mode -- so the flag stayed false and the app sent them right back here on
         // every subsequent launch despite a valid, authenticated session.
-        onboardingViewModel.finishOnboardingOrReportIncompleteStep(
+        viewModel.finishOnboardingOrReportIncompleteStep(
             onFinish = onFinish,
             onIncompleteStep = onRequirementsIncomplete,
         )
