@@ -259,19 +259,16 @@ class DefaultPasskeyAccountRepository(
                 ),
             )
 
-            // Step 6: Update tokens in platform account manager
-            val platformTokenResult =
-                platformAccountManager.updateTokens(
-                    username = completeData.account.username,
-                    backendUrl = configRepository.getCurrentBackendUrl(),
-                    accessToken = completeData.tokens.accessToken,
-                    refreshToken = completeData.tokens.refreshToken,
-                )
-
-            if (platformTokenResult.isFailure) {
-                Napier.w("Failed to update tokens in platform account manager", platformTokenResult.exceptionOrNull())
-                // Don't fail the entire operation since authentication was successful
-            }
+            // Step 6: Update tokens in platform account manager (or register it, if this
+            // device signed in to an existing LogDate Cloud account without ever running
+            // the account-creation flow locally). Don't fail the entire operation since
+            // authentication was already successful.
+            updateTokensOrRegisterPlatformAccount(
+                account = completeData.account,
+                accessToken = completeData.tokens.accessToken,
+                refreshToken = completeData.tokens.refreshToken,
+                backendUrl = configRepository.getCurrentBackendUrl(),
+            )
 
             _currentAccount.value = completeData.account
             _isAuthenticated.value = true
@@ -349,6 +346,45 @@ class DefaultPasskeyAccountRepository(
         } catch (e: Exception) {
             Napier.w("Failed to sign in with Google", e)
             Result.failure(e)
+        }
+    }
+
+    /**
+     * Updates tokens for an existing platform account, falling back to registering the
+     * account when the platform account manager reports it doesn't exist yet.
+     *
+     * A platform account can be missing even after a successful LogDate Cloud
+     * authentication: e.g. signing in to an already-existing account on a device that
+     * never ran [createAccountWithPasskey] locally (a fresh install, or a reinstall). In
+     * that case `updateTokens` alone can never succeed, so it needs to be created instead.
+     * Platform-account-manager failures are non-fatal to the caller either way.
+     */
+    private suspend fun updateTokensOrRegisterPlatformAccount(
+        account: LogDateAccount,
+        accessToken: String,
+        refreshToken: String,
+        backendUrl: String,
+    ) {
+        val updateResult =
+            platformAccountManager.updateTokens(
+                username = account.username,
+                backendUrl = backendUrl,
+                accessToken = accessToken,
+                refreshToken = refreshToken,
+            )
+
+        if (updateResult.isSuccess) return
+
+        val addResult =
+            platformAccountManager.addAccount(
+                account = account,
+                accessToken = accessToken,
+                refreshToken = refreshToken,
+                backendUrl = backendUrl,
+            )
+
+        if (addResult.isFailure) {
+            Napier.w("Failed to update tokens in platform account manager", updateResult.exceptionOrNull())
         }
     }
 
@@ -490,20 +526,17 @@ class DefaultPasskeyAccountRepository(
             val updatedSession = session.copy(accessToken = newAccessToken)
             sessionStorage.saveSession(updatedSession)
 
-            // Update access token in platform account manager
+            // Update access token in platform account manager (or register it, if this
+            // device signed in to an existing LogDate Cloud account without ever running
+            // the account-creation flow locally).
             val currentAccountValue = _currentAccount.value
             if (currentAccountValue != null) {
-                val platformResult =
-                    platformAccountManager.updateTokens(
-                        username = currentAccountValue.username,
-                        backendUrl = configRepository.getCurrentBackendUrl(),
-                        accessToken = newAccessToken,
-                        refreshToken = session.refreshToken,
-                    )
-
-                if (platformResult.isFailure) {
-                    Napier.w("Failed to update tokens in platform account manager", platformResult.exceptionOrNull())
-                }
+                updateTokensOrRegisterPlatformAccount(
+                    account = currentAccountValue,
+                    accessToken = newAccessToken,
+                    refreshToken = session.refreshToken,
+                    backendUrl = configRepository.getCurrentBackendUrl(),
+                )
             }
 
             Napier.i("Authentication refreshed successfully")
