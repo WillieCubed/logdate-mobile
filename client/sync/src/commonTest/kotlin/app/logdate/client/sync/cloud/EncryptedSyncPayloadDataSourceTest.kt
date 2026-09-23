@@ -49,7 +49,7 @@ class EncryptedSyncPayloadDataSourceTest {
             assertTrue(upload.isSuccess)
             val uploaded = apiClient.uploadContentCalls.single().second
             assertFalse(uploaded.content == note.content, "Cloud API must not receive plaintext note content")
-            assertTrue(uploaded.content.orEmpty().startsWith("LDSE1:"), "Cloud payload should use the sync E2EE envelope")
+            assertTrue(uploaded.content.orEmpty().startsWith("LDSE2:"), "Cloud payload should use the sync E2EE envelope")
 
             apiClient.getContentChangesResponse =
                 Result.success(
@@ -101,7 +101,7 @@ class EncryptedSyncPayloadDataSourceTest {
             assertTrue(upload.isSuccess)
             val uploaded = apiClient.uploadContentCalls.single().second
             val payload = uploaded.location.orEmpty()
-            assertTrue(payload.startsWith("LDSE1:"), "Location must use the sync E2EE envelope")
+            assertTrue(payload.startsWith("LDSE2:"), "Location must use the sync E2EE envelope")
             assertFalse(payload.contains("37.8199"), "Cloud API must not receive plaintext coordinates")
             assertFalse(payload.contains("Golden Gate"), "Cloud API must not receive plaintext place names")
 
@@ -152,8 +152,8 @@ class EncryptedSyncPayloadDataSourceTest {
             val uploaded = apiClient.uploadJournalCalls.single().second
             assertFalse(uploaded.title == journal.title, "Cloud API must not receive plaintext journal title")
             assertFalse(uploaded.description == journal.description, "Cloud API must not receive plaintext journal description")
-            assertTrue(uploaded.title.startsWith("LDSE1:"))
-            assertTrue(uploaded.description.startsWith("LDSE1:"))
+            assertTrue(uploaded.title.startsWith("LDSE2:"))
+            assertTrue(uploaded.description.startsWith("LDSE2:"))
 
             apiClient.getJournalChangesResponse =
                 Result.success(
@@ -224,7 +224,7 @@ class EncryptedSyncPayloadDataSourceTest {
             val uploaded = apiClient.uploadDraftCalls.single().second
             val plaintext = "draft body"
             assertFalse(uploaded.content == plaintext, "Cloud API must not receive plaintext draft content")
-            assertTrue(uploaded.content.startsWith("LDSE1:"))
+            assertTrue(uploaded.content.startsWith("LDSE2:"))
 
             apiClient.getDraftChangesResponse =
                 Result.success(
@@ -285,14 +285,22 @@ class EncryptedSyncPayloadDataSourceTest {
         val cryptoManager = TestCryptoManager()
         val identityKeyManager = IdentityKeyManager(storage, cryptoManager)
         identityKeyManager.setupNewIdentity()
-        return SyncPayloadCipher(ContentEncryptionService(identityKeyManager, KeyDerivation(cryptoManager), cryptoManager))
+        return SyncPayloadCipher(
+            ContentEncryptionService(identityKeyManager, KeyDerivation(cryptoManager), cryptoManager),
+            identityKeyManager,
+            cryptoManager,
+        )
     }
 
     private fun unconfiguredCipher(): SyncPayloadCipher {
         val storage = InMemorySecureStorage()
         val cryptoManager = TestCryptoManager()
         val identityKeyManager = IdentityKeyManager(storage, cryptoManager)
-        return SyncPayloadCipher(ContentEncryptionService(identityKeyManager, KeyDerivation(cryptoManager), cryptoManager))
+        return SyncPayloadCipher(
+            ContentEncryptionService(identityKeyManager, KeyDerivation(cryptoManager), cryptoManager),
+            identityKeyManager,
+            cryptoManager,
+        )
     }
 }
 

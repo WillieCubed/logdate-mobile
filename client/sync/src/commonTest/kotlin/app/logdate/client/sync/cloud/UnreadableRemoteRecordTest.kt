@@ -114,7 +114,11 @@ class UnreadableRemoteRecordTest {
         val cryptoManager = TestCryptoManager()
         val identityKeyManager = IdentityKeyManager(InMemorySecureStorage(), cryptoManager)
         identityKeyManager.recoverIdentity((1..12).map { "$seed-$it" })
-        return SyncPayloadCipher(ContentEncryptionService(identityKeyManager, KeyDerivation(cryptoManager), cryptoManager))
+        return SyncPayloadCipher(
+            ContentEncryptionService(identityKeyManager, KeyDerivation(cryptoManager), cryptoManager),
+            identityKeyManager,
+            cryptoManager,
+        )
     }
 
     private fun textFieldId(id: Uuid) = "sync:note:$id:text"

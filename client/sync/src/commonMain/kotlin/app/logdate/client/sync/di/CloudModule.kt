@@ -37,7 +37,7 @@ val cloudModule =
         }
 
         // Cloud Data Sources
-        single { SyncPayloadCipher(get()) }
+        single { SyncPayloadCipher(get(), get(), get()) }
         single<CloudContentDataSource> { DefaultCloudContentDataSource(get(), get()) }
         single<CloudJournalDataSource> { DefaultCloudJournalDataSource(get(), get()) }
         single<CloudAssociationDataSource> { DefaultCloudAssociationDataSource(get()) }
