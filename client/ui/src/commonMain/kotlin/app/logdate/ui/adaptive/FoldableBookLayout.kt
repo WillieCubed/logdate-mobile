@@ -18,7 +18,9 @@ import androidx.compose.ui.unit.dp
 import app.logdate.ui.foldable.FoldableLayoutInfo
 import app.logdate.ui.foldable.FoldableSplitLayout
 import app.logdate.ui.foldable.calculateFoldableSplitLayout
+import app.logdate.ui.foldable.relativeTo
 import app.logdate.ui.foldable.rememberFoldableLayoutInfo
+import app.logdate.ui.foldable.rememberWindowOrigin
 
 @Immutable
 data class FoldableBookPaneInfo(
@@ -35,12 +37,13 @@ fun FoldableBookLayout(
     endPane: @Composable BoxScope.(FoldableBookPaneInfo) -> Unit,
     standardContent: @Composable BoxScope.() -> Unit,
 ) {
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+    val (windowOrigin, trackWindowOrigin) = rememberWindowOrigin()
+    BoxWithConstraints(modifier = modifier.fillMaxSize().then(trackWindowOrigin)) {
         val splitLayout =
             calculateFoldableSplitLayout(
                 containerWidth = maxWidth,
                 containerHeight = maxHeight,
-                layoutInfo = foldableLayoutInfo,
+                layoutInfo = foldableLayoutInfo.relativeTo(windowOrigin),
                 minPaneWidth = minPaneWidth,
             )
 
