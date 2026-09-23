@@ -1,6 +1,7 @@
 package app.logdate.feature.onboarding.di
 
 import app.logdate.client.di.billingModule
+import app.logdate.feature.core.settings.ui.OnboardingStateResetter
 import app.logdate.feature.onboarding.flow.InMemoryOnboardingDeviceStateRepository
 import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
 import app.logdate.feature.onboarding.ui.MemorySelectionViewModel
@@ -16,6 +17,7 @@ actual val onboardingFeatureModule: Module =
     module {
         includes(billingModule)
         single<OnboardingDeviceStateRepository> { InMemoryOnboardingDeviceStateRepository() }
+        single<OnboardingStateResetter> { OnboardingStateResetter { get<OnboardingDeviceStateRepository>().clear() } }
         viewModel { OnboardingViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
         viewModel { MemorySelectionViewModel(get(), get()) }
         viewModel { PersonalIntroViewModel(get(), get()) }
