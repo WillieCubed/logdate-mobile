@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -41,6 +40,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.feature.onboarding.flow.OnboardingStep
+import app.logdate.ui.GenericLoadingScreen
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.platform.rememberLogDateHaptics
@@ -86,12 +86,7 @@ fun OnboardingCompletionScreen(
     val showCampfire = isCampfireEnabled
 
     if (showCampfire == null) {
-        Box(
-            modifier = modifier.fillMaxSize().testTag(ONBOARDING_COMPLETION_LOADING_TAG),
-            contentAlignment = Alignment.Center,
-        ) {
-            CircularProgressIndicator()
-        }
+        GenericLoadingScreen(modifier = modifier.testTag(ONBOARDING_COMPLETION_LOADING_TAG))
         return
     }
 

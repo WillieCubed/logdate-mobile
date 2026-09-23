@@ -100,11 +100,10 @@ fun OnboardingLocationScreen(
         }
     }
 
-    LaunchedEffect(permissionState.hasPermission, permissionState.permissionRequested) {
-        if (permissionState.hasPermission || permissionState.permissionRequested) {
-            isRequestingPermission = false
-        }
-    }
+    // isRequestingPermission alone can't tell "never asked" apart from "request in flight" --
+    // both read as hasPermission=false, permissionRequested=false -- but once the OS has an
+    // answer (either flips), the request is no longer in flight, so no separate reset is needed.
+    val isRequestInFlight = isRequestingPermission && !permissionState.hasPermission && !permissionState.permissionRequested
 
     OnboardingLocationContent(
         onBack = onBack,
@@ -127,7 +126,7 @@ fun OnboardingLocationScreen(
                     }
             }
         },
-        isSaving = isSaving || isRequestingPermission,
+        isSaving = isSaving || isRequestInFlight,
         errorMessage = errorMessage,
     )
 }
