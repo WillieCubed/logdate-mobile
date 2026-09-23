@@ -1085,7 +1085,6 @@ fun A72_OnboardingOverviewBookPosture() {
             OnboardingOverviewScreen(
                 onBack = {},
                 onNext = {},
-                useSplitScreen = true,
             )
         }
     }
@@ -1100,7 +1099,6 @@ fun A73_OnboardingOverviewTabletopPosture() {
             OnboardingOverviewScreen(
                 onBack = {},
                 onNext = {},
-                useSplitScreen = true,
             )
         }
     }
