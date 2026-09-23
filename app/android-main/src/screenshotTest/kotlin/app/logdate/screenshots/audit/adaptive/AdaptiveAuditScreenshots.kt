@@ -484,13 +484,9 @@ fun A02_PersonalIntroBioStep() {
 fun A03_CloudAccountSetup() {
     ScreenshotTheme {
         CloudAccountSetupContent(
-            useCompactLayout = false,
             onBack = {},
             onContinue = {},
             onSkip = {},
-            onPlanSelected = {},
-            selectedOption = null,
-            onOptionSelected = {},
         )
     }
 }
@@ -2000,11 +1996,9 @@ fun A120_CloudAccountSetupBookPosture() {
     provideFoldableLayoutInfo(bookPostureLayoutInfo) {
         ScreenshotTheme {
             CloudAccountSetupContent(
-                useCompactLayout = false,
                 onBack = {},
                 onContinue = {},
                 onSkip = {},
-                onPlanSelected = {},
             )
         }
     }
@@ -2017,11 +2011,9 @@ fun A121_CloudAccountSetupTabletopPosture() {
     provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
         ScreenshotTheme {
             CloudAccountSetupContent(
-                useCompactLayout = false,
                 onBack = {},
                 onContinue = {},
                 onSkip = {},
-                onPlanSelected = {},
             )
         }
     }
