@@ -279,12 +279,13 @@ internal class SyncDownloader(
                 totalDownloaded += batchResult.downloadedCount
                 totalConflicts += batchResult.conflictsResolved
                 errors.addAll(batchResult.errors)
+                downloadEngine.repairUnreadable(EntityType.DRAFT, "draft", result.unreadable, localDrafts.keys)
 
                 if (batchResult.errors.isNotEmpty()) {
                     break
                 }
 
-                if (result.changes.isEmpty() && result.deletions.isEmpty()) {
+                if (result.changes.isEmpty() && result.deletions.isEmpty() && result.unreadable.isEmpty()) {
                     break
                 }
 
