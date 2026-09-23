@@ -44,9 +44,11 @@ import logdate.client.feature.core.generated.resources.sync_issue_count_journal
 import logdate.client.feature.core.generated.resources.sync_issue_count_media
 import logdate.client.feature.core.generated.resources.sync_issue_count_note
 import logdate.client.feature.core.generated.resources.sync_issue_count_other
+import logdate.client.feature.core.generated.resources.sync_issue_discard
 import logdate.client.feature.core.generated.resources.sync_issue_explain_app_closed
 import logdate.client.feature.core.generated.resources.sync_issue_explain_failed
 import logdate.client.feature.core.generated.resources.sync_issue_explain_missing_file
+import logdate.client.feature.core.generated.resources.sync_issue_items_need_attention
 import logdate.client.feature.core.generated.resources.sync_issue_missing_file_association
 import logdate.client.feature.core.generated.resources.sync_issue_missing_file_draft
 import logdate.client.feature.core.generated.resources.sync_issue_missing_file_health
@@ -54,6 +56,8 @@ import logdate.client.feature.core.generated.resources.sync_issue_missing_file_j
 import logdate.client.feature.core.generated.resources.sync_issue_missing_file_media
 import logdate.client.feature.core.generated.resources.sync_issue_missing_file_note
 import logdate.client.feature.core.generated.resources.sync_issue_missing_file_other
+import logdate.client.feature.core.generated.resources.sync_issue_review_queue_description
+import logdate.client.feature.core.generated.resources.sync_issue_review_queue_title
 import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_association
 import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_draft
 import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_health
@@ -61,12 +65,16 @@ import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_
 import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_media
 import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_note
 import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_other
+import logdate.client.feature.core.generated.resources.sync_issues_title
 import logdate.client.feature.core.generated.resources.sync_status_waiting
+import logdate.client.ui.generated.resources.common_back
+import logdate.client.ui.generated.resources.common_retry
 import org.jetbrains.compose.resources.PluralStringResource
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import logdate.client.ui.generated.resources.Res as UiRes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,10 +109,10 @@ fun SyncIssuesContent(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("Sync issues") },
+                title = { Text(stringResource(Res.string.sync_issues_title)) },
                 navigationIcon = {
                     IconButton(onClick = onGoBack) {
-                        Icon(painter = PlatformIcons.back(), contentDescription = "Back")
+                        Icon(painter = PlatformIcons.back(), contentDescription = stringResource(UiRes.string.common_back))
                     }
                 },
             )
@@ -180,18 +188,16 @@ private fun SyncIssuesSummaryPane(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "Review sync queue",
+                    text = stringResource(Res.string.sync_issue_review_queue_title),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
-                    text = "${records.size} item${if (records.size == 1) "" else "s"} need attention.",
+                    text = pluralStringResource(Res.plurals.sync_issue_items_need_attention, records.size, records.size),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text =
-                        "Retry items when the source data should still sync. " +
-                            "Discard items only when the local change is no longer useful.",
+                    text = stringResource(Res.string.sync_issue_review_queue_description),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -260,11 +266,11 @@ private fun SyncIssueCard(
                 horizontalArrangement = Arrangement.End,
             ) {
                 TextButton(onClick = onDiscard) {
-                    Text("Discard")
+                    Text(stringResource(Res.string.sync_issue_discard))
                 }
                 Spacer(Modifier.size(8.dp))
                 OutlinedButton(onClick = onRetry) {
-                    Text("Retry")
+                    Text(stringResource(UiRes.string.common_retry))
                 }
             }
         }

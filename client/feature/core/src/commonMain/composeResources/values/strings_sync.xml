@@ -39,6 +39,14 @@
         <item quantity="one">%1$d item from another setup can\'t be read here</item>
         <item quantity="other">%1$d items from another setup can\'t be read here</item>
     </plurals>
+    <!-- Backup status sheet: which items of a group, by title or snippet -->
+    <string name="sync_status_item_text_fallback">Entry</string>
+    <string name="sync_status_item_photo_fallback">Photo</string>
+    <string name="sync_status_item_video_fallback">Video</string>
+    <string name="sync_status_item_audio_fallback">Voice note</string>
+    <string name="sync_status_journal_fallback">Journal</string>
+    <string name="sync_status_draft_fallback">Draft</string>
+    <string name="sync_status_showing_three_of_items">Showing 3 of %1$d</string>
     <string name="sync_status_last_attempt_failed">The last attempt didn't finish. LogDate will try again on its own.</string>
     <string name="sync_status_could_not_start">Couldn't start a backup. Try again, or check Backup settings.</string>
     <string name="sync_status_queue_unavailable">Couldn't read the list of waiting items. The count above may be out of date.</string>
@@ -107,6 +115,16 @@
     <string name="total_usage">Total Usage</string>
     <string name="quota_usage_block">Quota Usage Block</string>
     <string name="separator_pipe"> | </string>
+
+    <!-- Sync issues screen -->
+    <string name="sync_issues_title">Sync issues</string>
+    <string name="sync_issue_review_queue_title">Review sync queue</string>
+    <plurals name="sync_issue_items_need_attention">
+        <item quantity="one">%1$d item needs attention.</item>
+        <item quantity="other">%1$d items need attention.</item>
+    </plurals>
+    <string name="sync_issue_review_queue_description">Retry items when the source data should still sync. Discard items only when the local change is no longer useful.</string>
+    <string name="sync_issue_discard">Discard</string>
 
     <!-- Sync issues: what kind of thing failed, and how many -->
     <plurals name="sync_issue_count_note"><item quantity="one">%1$d entry</item><item quantity="other">%1$d entries</item></plurals>
