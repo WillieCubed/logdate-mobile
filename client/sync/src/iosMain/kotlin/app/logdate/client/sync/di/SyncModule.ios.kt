@@ -66,6 +66,7 @@ actual val syncModule: Module =
                 dataUsagePolicy = get(),
                 deviceIdProvider = get(),
                 identityKeyManager = get(),
+                mediaPayloadKeyProvider = get(),
                 cloudQuotaManager = get(),
                 cloudApiClient = get(),
                 identityRecoveryNeededStore = KeyValueIdentityRecoveryNeededStore(get()),

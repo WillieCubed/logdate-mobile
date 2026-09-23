@@ -4,10 +4,11 @@
    See https://developer.android.com/about/versions/12/backup-restore#xml-changes
 
    Cloud backup (Google Drive, 25 MB limit):
-     Includes the encrypted database and the recoverable passphrase backup so
-     small databases survive cloud restore. Android silently drops files that
-     push the total over 25 MB, so large databases will be skipped gracefully.
-     EncryptedSharedPreferences are excluded (KeyStore-bound, useless after restore).
+     Includes the encrypted database and the recoverable database-passphrase and
+     identity-recovery-phrase backups so small databases and the user's identity key
+     survive cloud restore. Android silently drops files that push the total over
+     25 MB, so large databases will be skipped gracefully. EncryptedSharedPreferences
+     are excluded (KeyStore-bound, useless after restore).
 
    Device-to-device transfer (direct local transfer, 2 GB limit):
      Transfers everything so the app works on the new device with zero friction.
@@ -16,6 +17,7 @@
     <cloud-backup>
         <include domain="file" path="datastore/"/>
         <include domain="file" path="db_recovery/"/>
+        <include domain="file" path="identity_recovery/"/>
         <include domain="database" path="."/>
     </cloud-backup>
     <device-transfer>

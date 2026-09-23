@@ -9,17 +9,18 @@ import org.koin.dsl.module
  *
  * Provides:
  * - CryptoManager (platform-specific)
+ * - IdentityKeyBackupStore (platform-specific)
  * - IdentityKeyManager (manage recovery phrases and identity keys)
  * - KeyDerivation (HKDF for per-content keys)
  * - ContentEncryptionService (high-level encryption API)
  */
 val cryptoModule: Module =
     module {
-        // Platform-specific CryptoManager (one of the following)
+        // Platform-specific CryptoManager and IdentityKeyBackupStore (one of the following)
         // These must be provided by platform-specific modules
 
         // Common crypto services
-        singleOf(::IdentityKeyManager)
+        single { IdentityKeyManager(secureStorage = get(), cryptoManager = get(), backupStore = get()) }
         singleOf(::KeyDerivation)
         singleOf(::ContentEncryptionService)
     }

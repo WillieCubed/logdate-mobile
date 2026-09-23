@@ -17,6 +17,7 @@ import app.logdate.client.sync.cloud.CloudJournalDataSource
 import app.logdate.client.sync.cloud.CloudMediaDataSource
 import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.SyncConflictStore
+import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.FirstSyncEnqueueStore
 import app.logdate.client.sync.metadata.IdentityRecoveryNeededStore
@@ -76,6 +77,13 @@ class DefaultSyncManager(
     private val deviceIdProvider: DeviceIdProvider? = null,
     /** Wired on every platform; optional only so tests that never encrypt can omit it. */
     private val identityKeyManager: IdentityKeyManager? = null,
+    /**
+     * Wired on every platform; optional so tests that never exercise identity provisioning can
+     * omit it. Used only to forget the cached media key when [provisionIdentityKey] silently
+     * restores an identity from an [app.logdate.client.device.crypto.IdentityKeyBackupStore] --
+     * the cache otherwise keeps serving a key derived from whatever identity minted it.
+     */
+    private val mediaPayloadKeyProvider: MediaPayloadKeyProvider? = null,
     private val cloudQuotaManager: CloudQuotaManager? = null,
     private val backoff: SyncBackoff = SyncBackoff(),
     private val syncScope: CoroutineScope = CoroutineScope(platformIODispatcher),
@@ -152,15 +160,32 @@ class DefaultSyncManager(
      * encrypted under the old key. Minting a fresh key in that case would look identical to
      * onboarding a new device, but it silently starts a second, unrelated identity: nothing
      * already in the cloud can ever be read again, and uploads from now on quietly diverge from
-     * everything before them. So this only mints when the account can be confirmed empty; when it
-     * already has data, sync pauses with [SyncPausedReason.NEEDS_RECOVERY_PHRASE] instead and
-     * waits for the phrase to be entered again, and when it cannot be determined (offline, a
+     * everything before them. So before minting anything, this first checks whether the identity
+     * key manager can silently restore the key from its own device-transfer/cloud backup (see
+     * [app.logdate.client.device.crypto.IdentityKeyBackupStore]) -- the common case for exactly
+     * this scenario, needing no user interaction at all. Only when that backup is also empty does
+     * this fall back to the mint-or-pause decision: mints when the account can be confirmed empty;
+     * when it already has data, sync pauses with [SyncPausedReason.NEEDS_RECOVERY_PHRASE] instead
+     * and waits for the phrase to be entered again, and when it cannot be determined (offline, a
      * server error), nothing happens this pass and the next sync attempt tries again.
      */
     private suspend fun provisionIdentityKey(accessToken: String) {
         val manager = identityKeyManager ?: return
         if (manager.hasIdentityKey()) {
             if (identityRecoveryNeededStore.isNeeded()) identityRecoveryNeededStore.setNeeded(false)
+            return
+        }
+
+        if (manager.restoreFromBackupIfAvailable()) {
+            Napier.i(
+                "Identity key silently restored from its backup store -- resetting sync state so " +
+                    "records the old, now-replaced identity could not read re-arrive and get " +
+                    "another chance",
+            )
+            mediaPayloadKeyProvider?.clearCachedKey()
+            syncMetadataService.resetAllCursors()
+            identityRecoveryNeededStore.setNeeded(false)
+            unreadableCloudRecordStore.clear()
             return
         }
 

@@ -1,7 +1,10 @@
 package app.logdate.client.sync
 
+import app.logdate.client.device.crypto.IdentityKeyBackupStore
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.KeyDerivation
+import app.logdate.client.device.storage.getBytes
+import app.logdate.client.device.storage.putBytes
 import app.logdate.client.sync.cloud.ContentChangesResponse
 import app.logdate.client.sync.cloud.InMemorySecureStorage
 import app.logdate.client.sync.cloud.JournalChangesResponse
@@ -114,4 +117,94 @@ class IdentityKeyProvisioningTest {
             assertFalse(recoveryStore.isNeeded())
             assertNull(metadata.getLastSyncTime(EntityType.JOURNAL))
         }
+
+    @Test
+    fun `a usable identity backup restores silently, skips the recovery pause, and resets sync state`() =
+        runTest {
+            val recoveryPhrase = (1..12).map { "backup-word-$it" }
+            val backupStore = FakeIdentityKeyBackupStore(initialPhrase = recoveryPhrase.joinToString(" "))
+            val identityKeyManager = IdentityKeyManager(InMemorySecureStorage(), TestCryptoManager(), backupStore)
+            // Deliberately shaped exactly like the "account already has cloud data" scenario that
+            // would otherwise pause sync with NEEDS_RECOVERY_PHRASE -- the backup restore must be
+            // checked, and must win, before that decision is ever made.
+            val api =
+                fakeCloudApiClient {
+                    getJournalChangesResponse =
+                        Result.success(
+                            JournalChangesResponse(
+                                changes =
+                                    listOf(
+                                        JournalChange(
+                                            id = "existing-journal",
+                                            title = "already-there",
+                                            description = "",
+                                            createdAt = 1L,
+                                            lastUpdated = 1L,
+                                            serverVersion = 1L,
+                                        ),
+                                    ),
+                                deletions = listOf(),
+                                lastTimestamp = 1L,
+                            ),
+                        )
+                }
+            val recoveryStore = InMemoryIdentityRecoveryNeededStore()
+            val metadata = fakeSyncMetadataService()
+            metadata.updateLastSyncTime(EntityType.JOURNAL, Instant.fromEpochMilliseconds(500))
+            val mediaSecureStorage = InMemorySecureStorage()
+            val cryptoManager = TestCryptoManager()
+            val mediaKeyProvider =
+                MediaPayloadKeyProvider(mediaSecureStorage, cryptoManager, identityKeyManager, KeyDerivation(cryptoManager))
+            // Seed a stale cached media key, the way a real device would have one before its local
+            // state (and thus this cache) was wiped by the reinstall that also emptied SecureStorage.
+            mediaSecureStorage.putBytes(MEDIA_PAYLOAD_KEY_STORAGE_KEY, ByteArray(32) { it.toByte() })
+            val manager =
+                testDefaultSyncManager(
+                    identityKeyManager = identityKeyManager,
+                    mediaPayloadKeyProvider = mediaKeyProvider,
+                    cloudApiClient = api,
+                    identityRecoveryNeededStore = recoveryStore,
+                    syncMetadataService = metadata,
+                )
+
+            // uploadPendingChanges alone -- not fullSync -- so a real download phase never runs
+            // and re-stamps the JOURNAL cursor afterwards; this isolates provisionIdentityKey's
+            // own reset from that unrelated, expected side effect of a normal download completing.
+            manager.uploadPendingChanges()
+
+            assertTrue(identityKeyManager.hasIdentityKey(), "The backed-up phrase should have restored a key")
+            assertEquals(
+                recoveryPhrase,
+                identityKeyManager.getStoredRecoveryPhrase()?.words,
+                "The restored key must come from the backup phrase, not a freshly minted one",
+            )
+            assertFalse(
+                recoveryStore.isNeeded(),
+                "A usable backup must win over pausing for NEEDS_RECOVERY_PHRASE, even though the account has cloud data",
+            )
+            assertNull(metadata.getLastSyncTime(EntityType.JOURNAL), "Download cursors must reset after a silent restore")
+            assertNull(
+                mediaSecureStorage.getBytes(MEDIA_PAYLOAD_KEY_STORAGE_KEY),
+                "The stale cached media key must be forgotten after a silent restore",
+            )
+        }
+}
+
+/** Mirrors the private key [MediaPayloadKeyProvider] stores its cached key under. */
+private const val MEDIA_PAYLOAD_KEY_STORAGE_KEY = "media_payload_key_v1"
+
+private class FakeIdentityKeyBackupStore(
+    initialPhrase: String? = null,
+) : IdentityKeyBackupStore {
+    private var phrase: String? = initialPhrase
+
+    override suspend fun readPhrase(): String? = phrase
+
+    override suspend fun writePhrase(phrase: String) {
+        this.phrase = phrase
+    }
+
+    override suspend fun clear() {
+        phrase = null
+    }
 }

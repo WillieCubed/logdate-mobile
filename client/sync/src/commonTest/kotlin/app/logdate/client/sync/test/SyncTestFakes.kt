@@ -68,6 +68,7 @@ import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.LastWriteWinsResolver
 import app.logdate.client.sync.conflict.SyncConflictRecord
 import app.logdate.client.sync.conflict.SyncConflictStore
+import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.FirstSyncEnqueueStore
 import app.logdate.client.sync.metadata.IdentityRecoveryNeededStore
@@ -218,6 +219,7 @@ fun testDefaultSyncManager(
     lastErrorStore: LastSyncErrorStore = InMemoryLastSyncErrorStore(),
     firstSyncEnqueueStore: FirstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
     identityKeyManager: IdentityKeyManager? = null,
+    mediaPayloadKeyProvider: MediaPayloadKeyProvider? = null,
     cloudApiClient: CloudApiClient? = null,
     identityRecoveryNeededStore: IdentityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
     unreadableCloudRecordStore: UnreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
@@ -248,6 +250,7 @@ fun testDefaultSyncManager(
             lastErrorStore = lastErrorStore,
             firstSyncEnqueueStore = firstSyncEnqueueStore,
             identityKeyManager = identityKeyManager,
+            mediaPayloadKeyProvider = mediaPayloadKeyProvider,
             cloudApiClient = cloudApiClient,
             identityRecoveryNeededStore = identityRecoveryNeededStore,
             unreadableCloudRecordStore = unreadableCloudRecordStore,
@@ -278,6 +281,7 @@ fun testDefaultSyncManager(
             lastErrorStore = lastErrorStore,
             firstSyncEnqueueStore = firstSyncEnqueueStore,
             identityKeyManager = identityKeyManager,
+            mediaPayloadKeyProvider = mediaPayloadKeyProvider,
             cloudApiClient = cloudApiClient,
             identityRecoveryNeededStore = identityRecoveryNeededStore,
             unreadableCloudRecordStore = unreadableCloudRecordStore,

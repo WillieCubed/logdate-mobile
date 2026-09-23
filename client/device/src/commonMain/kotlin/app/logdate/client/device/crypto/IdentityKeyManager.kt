@@ -17,6 +17,7 @@ import kotlinx.serialization.Serializable
 class IdentityKeyManager(
     private val secureStorage: SecureStorage,
     private val cryptoManager: CryptoManager,
+    private val backupStore: IdentityKeyBackupStore = NoOpIdentityKeyBackupStore,
 ) {
     /**
      * Checks if this device has already been set up with an identity key.
@@ -33,14 +34,20 @@ class IdentityKeyManager(
      * regardless of whether the user has been shown their recovery phrase yet. Showing the phrase
      * is a separate concern, handled from settings.
      *
+     * If [SecureStorage] has no key but [backupStore] holds a recoverable phrase -- the usual
+     * shape of a reinstall or a restore onto a new device -- that phrase is used to silently
+     * restore the key rather than minting a new, unrelated identity. Callers that need to tell
+     * "restored" apart from "already had a key" (to reset sync state that depends on the
+     * identity, for example) should use [restoreFromBackupIfAvailable] directly instead.
+     *
      * Idempotent, and safe to call concurrently: callers racing here would otherwise each derive a
      * different key and the later write would orphan content encrypted under the earlier one.
      */
     suspend fun ensureIdentityKey() {
         identityMutex.withLock {
-            if (!hasIdentityKey()) {
-                setupNewIdentity()
-            }
+            if (hasIdentityKey()) return@withLock
+            if (restoreFromBackupLocked()) return@withLock
+            setupNewIdentity()
         }
     }
 
@@ -49,7 +56,9 @@ class IdentityKeyManager(
      *
      * This generates a new recovery phrase and derives the identity key from it.
      * The recovery phrase is stored in [SecureStorage] so the user can reference it later from
-     * app settings without sending it to LogDate servers or regular app preferences.
+     * app settings without sending it to LogDate servers or regular app preferences. It is also
+     * mirrored into [backupStore] so it survives a device transfer or cloud restore that
+     * [SecureStorage]'s KeyStore/Keychain binding does not.
      *
      * @return The recovery phrase the user must store safely
      */
@@ -58,9 +67,11 @@ class IdentityKeyManager(
 
         val phrase = cryptoManager.generateRecoveryPhrase()
         val identityKey = cryptoManager.deriveMasterKey(phrase)
+        val phraseText = phrase.joinToString(" ")
 
         secureStorage.putBytes(KEY_IDENTITY_KEY, identityKey)
-        secureStorage.putString(KEY_RECOVERY_PHRASE, phrase.joinToString(" "))
+        secureStorage.putString(KEY_RECOVERY_PHRASE, phraseText)
+        backupStore.writePhrase(phraseText)
         Napier.d("New identity established")
 
         return RecoveryPhrase(phrase)
@@ -80,9 +91,45 @@ class IdentityKeyManager(
         }
 
         val identityKey = cryptoManager.deriveMasterKey(phrase)
+        val phraseText = phrase.joinToString(" ")
         secureStorage.putBytes(KEY_IDENTITY_KEY, identityKey)
-        secureStorage.putString(KEY_RECOVERY_PHRASE, phrase.joinToString(" "))
+        secureStorage.putString(KEY_RECOVERY_PHRASE, phraseText)
+        backupStore.writePhrase(phraseText)
         Napier.d("Identity recovered from recovery phrase")
+    }
+
+    /**
+     * Attempts to silently restore the identity key from [backupStore] when [SecureStorage] has
+     * none -- the same outcome as a successful [recoverIdentity] call, but driven by a phrase this
+     * device already had a backup copy of rather than one the user re-typed.
+     *
+     * Returns `true` only when a key was actually restored. Returns `false` both when a key
+     * already exists (nothing to do) and when there was nothing usable to restore, so callers can
+     * tell "just restored" apart from "already had a key" and react accordingly -- e.g. resetting
+     * download cursors and cached keys that were derived from a since-replaced identity.
+     */
+    suspend fun restoreFromBackupIfAvailable(): Boolean = identityMutex.withLock { restoreFromBackupLocked() }
+
+    /** Must only be called while holding [identityMutex]. */
+    private suspend fun restoreFromBackupLocked(): Boolean {
+        if (hasIdentityKey()) return false
+
+        val phraseText = backupStore.readPhrase() ?: return false
+        val words =
+            phraseText
+                .trim()
+                .split(Regex("\\s+"))
+                .filter { it.isNotBlank() }
+        if (words.size != RECOVERY_PHRASE_WORD_COUNT || !cryptoManager.validateRecoveryPhrase(words)) {
+            Napier.w("Identity key backup held an unusable recovery phrase; ignoring it")
+            return false
+        }
+
+        val identityKey = cryptoManager.deriveMasterKey(words)
+        secureStorage.putBytes(KEY_IDENTITY_KEY, identityKey)
+        secureStorage.putString(KEY_RECOVERY_PHRASE, phraseText)
+        Napier.i("Identity key silently restored from backup store")
+        return true
     }
 
     /**
@@ -130,6 +177,7 @@ class IdentityKeyManager(
     suspend fun clearIdentityKey() {
         secureStorage.remove(KEY_IDENTITY_KEY)
         secureStorage.remove(KEY_RECOVERY_PHRASE)
+        backupStore.clear()
         Napier.d("Identity key cleared from device")
     }
 
