@@ -21,6 +21,7 @@ import app.logdate.feature.core.profile.ui.ProfileViewModel
 import app.logdate.feature.core.restore.DesktopRestoreLauncher
 import app.logdate.feature.core.restore.RestoreLauncher
 import app.logdate.feature.core.restore.UserDataRestoreViewModel
+import app.logdate.feature.core.settings.account.signin.SignInMethodsViewModel
 import app.logdate.feature.core.settings.ui.AccountSettingsViewModel
 import app.logdate.feature.core.settings.ui.AdvancedSettingsViewModel
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
@@ -42,6 +43,7 @@ import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.feature.core.sync.SyncIssuesViewModel
 import app.logdate.feature.core.sync.SyncPresentationViewModel
 import app.logdate.feature.core.sync.SyncStatusViewModel
+import app.logdate.shared.config.LogDateConfigRepository
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -92,12 +94,14 @@ actual val coreFeatureModule: Module =
                 get(),
                 get(),
                 get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
                 supportsSystemSearchVisibilityToggle = false,
+            )
+        }
+        viewModel {
+            SignInMethodsViewModel(
+                accountRepository = get(),
+                passkeyManager = get(),
+                defaultPasskeyName = { get<LogDateConfigRepository>().getCurrentServerDescriptor()?.passkey?.rpName },
             )
         }
         viewModel {

@@ -11,6 +11,7 @@ import app.logdate.client.permissions.NoOpGoogleSignInManager
 import app.logdate.client.permissions.PasskeyManager
 import app.logdate.client.permissions.RestoreCredentialManager
 import app.logdate.client.repository.account.AccountCreationRequest
+import app.logdate.client.repository.account.LinkedSignInProvider
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.LogDateAccount
@@ -51,6 +52,8 @@ class DefaultPasskeyAccountRepository(
             ignoreUnknownKeys = true
             encodeDefaults = false
         },
+    /** The name of this device, given to passkeys it creates. `null` leaves the server default. */
+    private val deviceName: () -> String? = { null },
 ) : PasskeyAccountRepository {
     private val sessionState = PasskeyAccountSessionState()
     override val currentAccount: StateFlow<LogDateAccount?> = sessionState.currentAccount
@@ -101,6 +104,16 @@ class DefaultPasskeyAccountRepository(
             sessionState = sessionState,
             createRestoreKey = { createRestoreKey() },
             updateTokensOrRegisterPlatformAccount = sessionRefreshCoordinator::updateTokensOrRegisterPlatformAccount,
+            deviceName = deviceName,
+        )
+
+    private val enrollmentCoordinator =
+        PasskeyEnrollmentCoordinator(
+            apiClient = apiClient,
+            passkeyManager = passkeyManager,
+            credentialCodec = credentialCodec,
+            sessionRefreshCoordinator = sessionRefreshCoordinator,
+            deviceName = deviceName,
         )
 
     private val googleSignInCoordinator =
@@ -177,6 +190,10 @@ class DefaultPasskeyAccountRepository(
     override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = sessionRefreshCoordinator.listPasskeys()
 
     override suspend fun deletePasskey(credentialId: String): Result<Unit> = sessionRefreshCoordinator.deletePasskey(credentialId)
+
+    override suspend fun addPasskey(): Result<PasskeyInfo> = enrollmentCoordinator.addPasskey()
+
+    override suspend fun listLinkedSignInProviders(): Result<List<LinkedSignInProvider>> = enrollmentCoordinator.listLinkedSignInProviders()
 
     override suspend fun createRestoreKey(): Result<Unit> = restoreCredentialCoordinator.createRestoreKey()
 

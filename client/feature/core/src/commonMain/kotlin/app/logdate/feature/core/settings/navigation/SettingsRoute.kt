@@ -18,6 +18,9 @@ data class DevicesRoute(
 data object AccountSettingsRoute : NavKey
 
 @Serializable
+data object SignInMethodsRoute : NavKey
+
+@Serializable
 data object PrivacySettingsRoute : NavKey
 
 @Serializable

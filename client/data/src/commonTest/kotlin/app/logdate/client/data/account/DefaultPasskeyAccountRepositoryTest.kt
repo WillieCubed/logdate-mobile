@@ -6,10 +6,16 @@ import app.logdate.client.device.PlatformAccountInfo
 import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.device.TokenPair
 import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.networking.AccountSignInIdentity
+import app.logdate.client.networking.AddPasskeyRequest
 import app.logdate.client.networking.PasskeyApiClientContract
+import app.logdate.client.networking.PasskeyApiException
+import app.logdate.client.permissions.PasskeyErrorCodes
+import app.logdate.client.permissions.PasskeyException
 import app.logdate.client.permissions.PasskeyManager
 import app.logdate.client.permissions.RestoreCredentialManager
 import app.logdate.client.repository.account.AccountCreationRequest
+import app.logdate.client.repository.account.LinkedSignInProvider
 import app.logdate.client.repository.account.LocalDataAdoptionRequiredException
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
@@ -110,6 +116,7 @@ class DefaultPasskeyAccountRepositoryTest {
         canonicalOwnerProvider: CanonicalOwnerProvider = FakeCanonicalOwnerProvider(testAccount.id.toString()),
         hasLocalData: suspend () -> Boolean = { false },
         repositoryScope: CoroutineScope = backgroundScope,
+        deviceName: () -> String? = { "Pixel 9" },
     ): DefaultPasskeyAccountRepository =
         DefaultPasskeyAccountRepository(
             apiClient = apiClient,
@@ -122,6 +129,7 @@ class DefaultPasskeyAccountRepositoryTest {
             hasLocalData = hasLocalData,
             repositoryScope = repositoryScope,
             json = Json { ignoreUnknownKeys = true },
+            deviceName = deviceName,
         )
 
     /**
@@ -890,6 +898,127 @@ class DefaultPasskeyAccountRepositoryTest {
             assertEquals(testAccount, repository.getCurrentAccount())
         }
 
+    @Test
+    fun `account creation names its passkey after this device`() =
+        runTest {
+            val apiClient = FakePasskeyApiClient()
+            val repository = createRepository(apiClient = apiClient, deviceName = { "Pixel 9" })
+
+            repository.createAccountWithPasskey(AccountCreationRequest("newuser", "New User"))
+
+            assertEquals("Pixel 9", apiClient.lastCompleteAccountCreationRequest?.nickname)
+        }
+
+    @Test
+    fun `adding a passkey registers a credential named after this device`() =
+        runTest {
+            val sessionStorage = FakeSessionStorage().apply { saveSession(testSession) }
+            val apiClient = FakePasskeyApiClient()
+            val repository =
+                createRepository(
+                    sessionStorage = sessionStorage,
+                    apiClient = apiClient,
+                    deviceName = { "Galaxy S26" },
+                )
+
+            val result = repository.addPasskey()
+
+            assertTrue(result.isSuccess)
+            val request = assertNotNull(apiClient.lastCompleteAddPasskeyRequest)
+            assertEquals("challenge123", request.challenge)
+            assertEquals("credential123", request.credential.id)
+            assertEquals("Galaxy S26", request.nickname)
+            assertEquals(testSession.accessToken, apiClient.lastAddPasskeyAccessToken)
+        }
+
+    @Test
+    fun `adding a passkey passes on the platform's cancellation`() =
+        runTest {
+            val sessionStorage = FakeSessionStorage().apply { saveSession(testSession) }
+            val apiClient = FakePasskeyApiClient()
+            val passkeyManager =
+                FakePasskeyManager().apply {
+                    registerPasskeyResponse =
+                        Result.failure(PasskeyException("Cancelled", PasskeyErrorCodes.USER_CANCELLED))
+                }
+            val repository =
+                createRepository(
+                    sessionStorage = sessionStorage,
+                    apiClient = apiClient,
+                    passkeyManager = passkeyManager,
+                )
+
+            val error = repository.addPasskey().exceptionOrNull()
+
+            assertEquals(PasskeyErrorCodes.USER_CANCELLED, (error as? PasskeyException)?.errorCode)
+            assertNull(apiClient.lastCompleteAddPasskeyRequest)
+        }
+
+    @Test
+    fun `adding a passkey refreshes an expired session and retries`() =
+        runTest {
+            val sessionStorage = FakeSessionStorage().apply { saveSession(testSession) }
+            val apiClient =
+                FakePasskeyApiClient().apply {
+                    refreshTokenResponse = Result.success("fresh_access_token")
+                    beginAddPasskeyResponses =
+                        listOf(
+                            Result.failure(PasskeyApiException("INVALID_TOKEN", "Expired")),
+                            beginAddPasskeyResponse,
+                        )
+                }
+            val repository = createRepository(sessionStorage = sessionStorage, apiClient = apiClient)
+
+            val result = repository.addPasskey()
+
+            assertTrue(result.isSuccess)
+            assertEquals("fresh_access_token", apiClient.lastAddPasskeyAccessToken)
+        }
+
+    @Test
+    fun `adding a passkey without a session fails without touching the platform`() =
+        runTest {
+            val passkeyManager = FakePasskeyManager()
+            val repository = createRepository(passkeyManager = passkeyManager)
+
+            assertTrue(repository.addPasskey().isFailure)
+            assertEquals(0, passkeyManager.registerCalls)
+        }
+
+    @Test
+    fun `linked sign-in providers leave out passkeys`() =
+        runTest {
+            val sessionStorage = FakeSessionStorage().apply { saveSession(testSession) }
+            val apiClient =
+                FakePasskeyApiClient().apply {
+                    signInIdentitiesResponse =
+                        Result.success(
+                            listOf(
+                                AccountSignInIdentity(
+                                    provider = "passkey",
+                                    email = null,
+                                    createdAt = "2026-09-01T10:00:00Z",
+                                ),
+                                AccountSignInIdentity(
+                                    provider = "google",
+                                    email = "alice@example.com",
+                                    createdAt = "2026-09-02T10:00:00Z",
+                                    lastSignInAt = "2026-09-20T08:30:00Z",
+                                ),
+                            ),
+                        )
+                }
+            val repository = createRepository(sessionStorage = sessionStorage, apiClient = apiClient)
+
+            val providers = repository.listLinkedSignInProviders().getOrThrow()
+
+            assertEquals(1, providers.size)
+            val google = providers.single()
+            assertEquals(LinkedSignInProvider.Kind.GOOGLE, google.kind)
+            assertEquals("alice@example.com", google.email)
+            assertEquals(kotlin.time.Instant.parse("2026-09-20T08:30:00Z"), google.lastSignInAt)
+        }
+
     // Fake implementations for testing
 
     /**
@@ -969,6 +1098,26 @@ class DefaultPasskeyAccountRepositoryTest {
         var getAccountInfoResponse: Result<LogDateAccount> = Result.success(testAccount)
         var getAccountInfoResponses: List<Result<LogDateAccount>>? = null
         var deletePasskeyResponses: List<Result<Unit>>? = null
+        var lastCompleteAccountCreationRequest: CompleteAccountCreationRequest? = null
+        var beginAddPasskeyResponse: Result<PasskeyRegistrationOptions> =
+            Result.success(beginAccountCreationResponse.getOrThrow().registrationOptions)
+        var beginAddPasskeyResponses: List<Result<PasskeyRegistrationOptions>>? = null
+        var completeAddPasskeyResponse: Result<PasskeyInfo> =
+            Result.success(
+                PasskeyInfo(
+                    id = Uuid.random(),
+                    credentialId = "credential123",
+                    nickname = "Pixel 9",
+                    deviceType = "platform",
+                    createdAt = Clock.System.now(),
+                    lastUsedAt = null,
+                    isActive = true,
+                ),
+            )
+        var lastAddPasskeyAccessToken: String? = null
+        var lastCompleteAddPasskeyRequest: AddPasskeyRequest? = null
+        var signInIdentitiesResponse: Result<List<AccountSignInIdentity>> = Result.success(emptyList())
+        private var beginAddPasskeyCallCount = 0
 
         private var getAccountInfoCallCount = 0
         private var deletePasskeyCallCount = 0
@@ -979,8 +1128,28 @@ class DefaultPasskeyAccountRepositoryTest {
         override suspend fun beginAccountCreation(request: BeginAccountCreationRequest): Result<BeginAccountCreationData> =
             beginAccountCreationResponse
 
-        override suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationData> =
-            completeAccountCreationResponse
+        override suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationData> {
+            lastCompleteAccountCreationRequest = request
+            return completeAccountCreationResponse
+        }
+
+        override suspend fun beginAddPasskey(accessToken: String): Result<PasskeyRegistrationOptions> {
+            lastAddPasskeyAccessToken = accessToken
+            return beginAddPasskeyResponses?.let { responses ->
+                responses[beginAddPasskeyCallCount++.coerceAtMost(responses.size - 1)]
+            } ?: beginAddPasskeyResponse
+        }
+
+        override suspend fun completeAddPasskey(
+            accessToken: String,
+            request: AddPasskeyRequest,
+        ): Result<PasskeyInfo> {
+            lastAddPasskeyAccessToken = accessToken
+            lastCompleteAddPasskeyRequest = request
+            return completeAddPasskeyResponse
+        }
+
+        override suspend fun listSignInIdentities(accessToken: String): Result<List<AccountSignInIdentity>> = signInIdentitiesResponse
 
         override suspend fun beginAuthentication(request: BeginAuthenticationRequest): Result<BeginAuthenticationData> {
             beginAuthenticationCalls++
@@ -1090,7 +1259,12 @@ class DefaultPasskeyAccountRepositoryTest {
 
         override suspend fun isPlatformAuthenticatorAvailable(): Boolean = true
 
-        override suspend fun registerPasskey(options: PasskeyRegistrationOptions): Result<String> = registerPasskeyResponse
+        var registerCalls = 0
+
+        override suspend fun registerPasskey(options: PasskeyRegistrationOptions): Result<String> {
+            registerCalls++
+            return registerPasskeyResponse
+        }
 
         override suspend fun authenticateWithPasskey(options: PasskeyAuthenticationOptions): Result<String> =
             authenticateWithPasskeyResponse

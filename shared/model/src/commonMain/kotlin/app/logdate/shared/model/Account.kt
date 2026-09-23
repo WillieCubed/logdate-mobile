@@ -55,6 +55,8 @@ data class BeginAccountCreationData(
 data class CompleteAccountCreationRequest(
     val sessionToken: String,
     val credential: PasskeyCredentialResponse,
+    /** The name of the device creating the passkey, shown in the account's passkey list. */
+    val nickname: String? = null,
 )
 
 @Serializable

@@ -26,6 +26,7 @@ import app.logdate.feature.core.restore.CloudRestoreWorker
 import app.logdate.feature.core.restore.RestoreLauncher
 import app.logdate.feature.core.restore.RestoreWorker
 import app.logdate.feature.core.restore.UserDataRestoreViewModel
+import app.logdate.feature.core.settings.account.signin.SignInMethodsViewModel
 import app.logdate.feature.core.settings.ui.AccountSettingsViewModel
 import app.logdate.feature.core.settings.ui.AdvancedSettingsViewModel
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
@@ -45,6 +46,7 @@ import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.feature.core.sync.SyncIssuesViewModel
 import app.logdate.feature.core.sync.SyncPresentationViewModel
 import app.logdate.feature.core.sync.SyncStatusViewModel
+import app.logdate.shared.config.LogDateConfigRepository
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.workmanager.dsl.workerOf
 import org.koin.core.module.Module
@@ -107,12 +109,14 @@ actual val coreFeatureModule: Module =
                 get(),
                 get(),
                 get(),
-                get(),
-                get(),
-                get(),
-                get(),
-                get(),
                 supportsSystemSearchVisibilityToggle = true,
+            )
+        }
+        viewModel {
+            SignInMethodsViewModel(
+                accountRepository = get(),
+                passkeyManager = get(),
+                defaultPasskeyName = { get<LogDateConfigRepository>().getCurrentServerDescriptor()?.passkey?.rpName },
             )
         }
         viewModel {

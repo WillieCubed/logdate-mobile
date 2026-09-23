@@ -1,7 +1,5 @@
 package app.logdate.client.device.identity.di
 
-import android.os.Build
-import android.provider.Settings
 import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.device.AppInfoProvider
 import app.logdate.client.device.identity.CanonicalOwnerProvider
@@ -11,6 +9,7 @@ import app.logdate.client.device.identity.DefaultDeviceManager
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.device.identity.DeviceRepository
 import app.logdate.client.device.identity.data.InMemoryDeviceRepository
+import app.logdate.client.device.identity.userVisibleDeviceName
 import app.logdate.client.device.models.DevicePlatform
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.Module
@@ -39,13 +38,7 @@ actual val deviceIdentityModule: Module =
             val context = androidContext()
             val appInfoProvider = get<AppInfoProvider>()
 
-            val deviceName =
-                try {
-                    Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
-                        ?: "${Build.MANUFACTURER} ${Build.MODEL}"
-                } catch (e: Exception) {
-                    "${Build.MANUFACTURER} ${Build.MODEL}"
-                }
+            val deviceName = context.userVisibleDeviceName()
 
             DefaultDeviceManager(
                 deviceIdProvider = get(),

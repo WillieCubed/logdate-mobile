@@ -3,6 +3,7 @@ package app.logdate.client.repository.account
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyInfo
 import kotlinx.coroutines.flow.StateFlow
+import kotlin.time.Instant
 
 /**
  * Repository interface for passkey-based account management operations.
@@ -94,6 +95,22 @@ interface PasskeyAccountRepository {
     suspend fun listPasskeys(): Result<List<PasskeyInfo>>
 
     /**
+     * Creates a passkey on this device and adds it to the signed-in account, named after the
+     * device so the passkey list can tell the person which one it is.
+     *
+     * A platform failure -- including the person cancelling -- is passed on as the platform's
+     * `PasskeyException`, so the caller can tell a cancellation from an error.
+     */
+    suspend fun addPasskey(): Result<PasskeyInfo> = Result.failure(UnsupportedOperationException("Adding passkeys is not supported"))
+
+    /**
+     * Lists the non-passkey ways this account can sign in, such as a linked Google account.
+     * Passkeys come from [listPasskeys].
+     */
+    suspend fun listLinkedSignInProviders(): Result<List<LinkedSignInProvider>> =
+        Result.failure(UnsupportedOperationException("Listing sign-in methods is not supported"))
+
+    /**
      * Create a restore key backed up to the device's encrypted cloud backup.
      * Should be called after successful account creation.
      * Non-fatal — returns success even if the device does not support E2EE backup.
@@ -146,3 +163,27 @@ data class AccountCreationRequest(
  * behind their back.
  */
 class LocalDataAdoptionRequiredException : IllegalStateException("Signing in would add this device's existing entries to the account")
+
+/**
+ * A way to sign in to the account other than a passkey.
+ *
+ * @property email the address the provider vouched for, when it shared one
+ * @property linkedAt when the provider was connected to the account
+ * @property lastSignInAt the last time the account was signed in to through this provider
+ */
+data class LinkedSignInProvider(
+    val kind: Kind,
+    val email: String?,
+    val linkedAt: Instant,
+    val lastSignInAt: Instant?,
+) {
+    enum class Kind {
+        GOOGLE,
+
+        /** A provider this version of the app has no name for. */
+        OTHER,
+    }
+}
+
+/** An account call that needs a signed-in session was made without one. */
+class NotSignedInException : IllegalStateException("No active session")

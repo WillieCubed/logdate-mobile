@@ -39,6 +39,7 @@ import app.logdate.client.data.user.IosUserDeviceRepository
 import app.logdate.client.data.user.OfflineFirstUserStateRepository
 import app.logdate.client.database.databaseModule
 import app.logdate.client.device.di.deviceInstanceModule
+import app.logdate.client.device.identity.userVisibleDeviceName
 import app.logdate.client.di.datastoreModule
 import app.logdate.client.networking.IdentityApiClient
 import app.logdate.client.networking.IdentityApiClientContract
@@ -227,6 +228,7 @@ actual val dataModule: Module =
                         journals.getAllDrafts().isNotEmpty() ||
                         notes.getAllJournalNoteLinks().isNotEmpty()
                 },
+                deviceName = { userVisibleDeviceName() },
             )
         }
 

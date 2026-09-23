@@ -43,6 +43,7 @@ import app.logdate.client.data.user.OfflineFirstUserStateRepository
 import app.logdate.client.database.databaseModule
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.di.deviceInstanceModule
+import app.logdate.client.device.identity.userVisibleDeviceName
 import app.logdate.client.di.datastoreModule
 import app.logdate.client.networking.EmailVerificationApiClient
 import app.logdate.client.networking.EmailVerificationApiClientContract
@@ -220,6 +221,7 @@ actual val dataModule: Module =
             }
         }
         single<PasskeyAccountRepository> {
+            val context = androidContext()
             DefaultPasskeyAccountRepository(
                 get(),
                 get(),
@@ -238,6 +240,7 @@ actual val dataModule: Module =
                 },
                 googleSignInManager = get(),
                 serverClientId = DefaultLogDateConfigRepository.GOOGLE_SERVER_CLIENT_ID,
+                deviceName = { context.userVisibleDeviceName() },
             )
         }
         single<AccountIdentityRepository> { DefaultAccountIdentityRepository(get(), get(), get(), get()) }

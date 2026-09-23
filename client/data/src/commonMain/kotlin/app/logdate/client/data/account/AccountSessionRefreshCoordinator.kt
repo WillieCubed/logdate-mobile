@@ -3,6 +3,7 @@ package app.logdate.client.data.account
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.networking.PasskeyApiClientContract
+import app.logdate.client.repository.account.NotSignedInException
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyInfo
@@ -174,6 +175,19 @@ internal class AccountSessionRefreshCoordinator(
             Napier.w("Failed to get account info", e)
             Result.failure(e)
         }
+    }
+
+    /**
+     * Runs an authenticated call with the stored access token. If it fails, the session is
+     * refreshed and the call retried once with the new token. Without a session the call never runs.
+     */
+    suspend fun <T> authorized(call: suspend (accessToken: String) -> Result<T>): Result<T> {
+        val session = sessionStorage.getSession() ?: return Result.failure(NotSignedInException())
+        val result = call(session.accessToken)
+        if (result.isSuccess) return result
+        if (refreshAuthentication().isFailure) return result
+        val refreshed = sessionStorage.getSession() ?: return result
+        return call(refreshed.accessToken)
     }
 
     suspend fun listPasskeys(): Result<List<PasskeyInfo>> {

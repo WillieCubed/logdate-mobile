@@ -15,6 +15,7 @@ import app.logdate.shared.model.CompleteAuthenticationRequest
 import app.logdate.shared.model.EntitlementResponse
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyAllowCredential
+import app.logdate.shared.model.PasskeyCredentialResponse
 import app.logdate.shared.model.PasskeyInfo
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.RefreshTokenRequest
@@ -85,6 +86,22 @@ interface PasskeyApiClientContract {
      * devices a credential belongs to.
      */
     suspend fun listPasskeys(accessToken: String): Result<List<PasskeyInfo>>
+
+    /** Starts adding a passkey to the signed-in account; returns the options for the platform. */
+    suspend fun beginAddPasskey(accessToken: String): Result<PasskeyRegistrationOptions> =
+        Result.failure(PasskeyApiException("NOT_SUPPORTED", "Adding passkeys is not supported by this client"))
+
+    /** Finishes adding a passkey with the credential the platform created. */
+    suspend fun completeAddPasskey(
+        accessToken: String,
+        request: AddPasskeyRequest,
+    ): Result<PasskeyInfo> = Result.failure(PasskeyApiException("NOT_SUPPORTED", "Adding passkeys is not supported by this client"))
+
+    /**
+     * Lists every way the account can sign in, passkeys included, as recorded by the server.
+     */
+    suspend fun listSignInIdentities(accessToken: String): Result<List<AccountSignInIdentity>> =
+        Result.failure(PasskeyApiException("NOT_SUPPORTED", "Listing sign-in methods is not supported by this client"))
 
     /**
      * Begin restore key registration. Returns WebAuthn registration options for creating a restore key.
@@ -430,6 +447,68 @@ class PasskeyApiClient(
             Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to list passkeys", e))
         }
 
+    override suspend fun beginAddPasskey(accessToken: String): Result<PasskeyRegistrationOptions> =
+        try {
+            val baseUrl = getBaseUrl()
+            val response =
+                httpClient.post("$baseUrl$AUTH_PATH/me/passkeys/begin") {
+                    header("Authorization", "Bearer $accessToken")
+                }
+
+            if (response.status.value in 200..299) {
+                Result.success(json.decodeFromString<RestoreRegisterBeginResponseDto>(response.bodyAsText()).data)
+            } else {
+                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+            }
+        } catch (e: Exception) {
+            Napier.w("Failed to begin adding a passkey", e)
+            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to begin adding a passkey", e))
+        }
+
+    override suspend fun completeAddPasskey(
+        accessToken: String,
+        request: AddPasskeyRequest,
+    ): Result<PasskeyInfo> =
+        try {
+            val baseUrl = getBaseUrl()
+            val response =
+                httpClient.post("$baseUrl$AUTH_PATH/me/passkeys/complete") {
+                    contentType(ContentType.Application.Json)
+                    header("Authorization", "Bearer $accessToken")
+                    setBody(request)
+                }
+
+            if (response.status.value in 200..299) {
+                Result.success(json.decodeFromString<PasskeyApiResponse>(response.bodyAsText()).data)
+            } else {
+                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+            }
+        } catch (e: Exception) {
+            Napier.w("Failed to complete adding a passkey", e)
+            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to complete adding a passkey", e))
+        }
+
+    override suspend fun listSignInIdentities(accessToken: String): Result<List<AccountSignInIdentity>> =
+        try {
+            val baseUrl = getBaseUrl()
+            val response =
+                httpClient.get("$baseUrl$AUTH_PATH/me/identities") {
+                    header("Authorization", "Bearer $accessToken")
+                }
+
+            if (response.status.value in 200..299) {
+                Result.success(json.decodeFromString<SignInIdentityListApiResponse>(response.bodyAsText()).data)
+            } else {
+                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
+                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+            }
+        } catch (e: Exception) {
+            Napier.w("Failed to list sign-in methods", e)
+            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to list sign-in methods", e))
+        }
+
     override suspend fun deletePasskey(
         accessToken: String,
         credentialId: String,
@@ -673,6 +752,8 @@ object PasskeyApiErrorCodes {
     const val GOOGLE_AUTH_NOT_CONFIGURED = "GOOGLE_AUTH_NOT_CONFIGURED"
     const val GOOGLE_TOKEN_INVALID = "GOOGLE_TOKEN_INVALID"
     const val DELETION_UNAVAILABLE = "DELETION_UNAVAILABLE"
+    const val LAST_SIGNIN_FACTOR = "LAST_SIGNIN_FACTOR"
+    const val CANONICAL_OWNER_ID_TAKEN = "CANONICAL_OWNER_ID_TAKEN"
     const val SERVER_ERROR = "SERVER_ERROR"
 }
 
@@ -797,4 +878,40 @@ private fun AuthAccountDto.toLogDateAccount(): LogDateAccount =
 internal data class PasskeyListApiResponse(
     val success: Boolean,
     val data: List<PasskeyInfo>,
+)
+
+/** The wrapped shape `POST /auth/me/passkeys/complete` replies with. */
+@Serializable
+internal data class PasskeyApiResponse(
+    val success: Boolean,
+    val data: PasskeyInfo,
+)
+
+/** A passkey the platform created, sent to be added to the signed-in account. */
+@Serializable
+data class AddPasskeyRequest(
+    val challenge: String,
+    val credential: PasskeyCredentialResponse,
+    /** The name of this device, so the passkey list can tell the person which one it is. */
+    val nickname: String? = null,
+)
+
+/**
+ * One way an account can sign in, as `GET /auth/me/identities` reports it.
+ *
+ * @property provider `passkey` or `google`; other values may appear as the server grows.
+ */
+@Serializable
+data class AccountSignInIdentity(
+    val provider: String,
+    val email: String? = null,
+    val emailVerified: Boolean = false,
+    val createdAt: String,
+    val lastSignInAt: String? = null,
+)
+
+@Serializable
+internal data class SignInIdentityListApiResponse(
+    val success: Boolean,
+    val data: List<AccountSignInIdentity>,
 )

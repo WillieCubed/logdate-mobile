@@ -41,6 +41,7 @@ internal class PasskeyRegistrationCoordinator(
         refreshToken: String,
         backendUrl: String,
     ) -> Unit,
+    private val deviceName: () -> String?,
 ) {
     suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> {
         return try {
@@ -76,6 +77,7 @@ internal class PasskeyRegistrationCoordinator(
                 CompleteAccountCreationRequest(
                     sessionToken = beginData.sessionToken,
                     credential = credential,
+                    nickname = deviceName(),
                 )
 
             val completeResult = apiClient.completeAccountCreation(completeRequest)

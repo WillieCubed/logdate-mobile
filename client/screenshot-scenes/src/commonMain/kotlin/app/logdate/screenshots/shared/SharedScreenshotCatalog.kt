@@ -26,6 +26,7 @@ import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.audio.download.ModelDownloadStatus
+import app.logdate.client.repository.account.LinkedSignInProvider
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.sync.SyncStatus
@@ -35,6 +36,10 @@ import app.logdate.feature.core.account.CloudAccountWelcomeContent
 import app.logdate.feature.core.account.PasskeyAccountCreationFinalContent
 import app.logdate.feature.core.export.ExportState
 import app.logdate.feature.core.restore.RestoreState
+import app.logdate.feature.core.settings.account.signin.LinkedProviderRow
+import app.logdate.feature.core.settings.account.signin.PasskeyRow
+import app.logdate.feature.core.settings.account.signin.SignInMethodsContent
+import app.logdate.feature.core.settings.account.signin.SignInMethodsUiState
 import app.logdate.feature.core.settings.ui.AccountIdentityState
 import app.logdate.feature.core.settings.ui.AccountSettingsContent
 import app.logdate.feature.core.settings.ui.AdvancedSettingsContent
@@ -49,7 +54,6 @@ import app.logdate.feature.core.settings.ui.LocationSettingsContent
 import app.logdate.feature.core.settings.ui.LocationTrackingOptionsContent
 import app.logdate.feature.core.settings.ui.MemoriesSettingsContent
 import app.logdate.feature.core.settings.ui.MemoriesWidgetInstallUiState
-import app.logdate.feature.core.settings.ui.PasskeyInfo
 import app.logdate.feature.core.settings.ui.PrivacySettingsContent
 import app.logdate.feature.core.settings.ui.RecommendationSettingsContent
 import app.logdate.feature.core.settings.ui.ServerSelectionState
@@ -163,6 +167,7 @@ enum class SharedScreenshotSceneId(
     SettingsOverview("settings-overview"),
     AccountSettings("account-settings"),
     PrivacySettings("privacy-settings"),
+    SignInMethods("sign-in-methods"),
     DataSettings("data-settings"),
     MemoriesSettings("memories-settings"),
     VoiceNotesSettings("voice-notes-settings"),
@@ -682,17 +687,8 @@ object SharedScreenshotCatalog {
             sharedScene(SharedScreenshotSceneId.AccountSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
                 AccountSettingsContent(
                     onBack = {},
-                    onCreatePasskey = {},
+                    onNavigateToSignInMethods = {},
                     userProfile = UserProfile(name = "Alex Rivera", username = "alex", isAuthenticated = true),
-                    passkeys =
-                        listOf(
-                            PasskeyInfo(
-                                id = "passkey-ios",
-                                device = "iPhone 16 Pro",
-                                lastUsed = baseInstant,
-                            ),
-                        ),
-                    onRevokePasskey = {},
                     onSignOut = {},
                     identityState = AccountIdentityState(),
                     onRefreshIdentity = {},
@@ -718,20 +714,46 @@ object SharedScreenshotCatalog {
                     onSetBiometricsEnabled = {},
                     onSetSystemSearchVisibilityEnabled = {},
                     isBiometricsEnabled = true,
-                    isAuthenticated = true,
                     isSystemSearchVisibilityEnabled = true,
                     showSystemSearchVisibilityToggle = true,
-                    passkeys =
-                        listOf(
-                            PasskeyInfo(
-                                id = "passkey-mac",
-                                device = "MacBook Pro",
-                                lastUsed = baseInstant,
-                            ),
-                        ),
-                    onCreatePasskey = {},
-                    onRevokePasskey = {},
                     onNavigateToLocationSettings = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.SignInMethods, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                SignInMethodsContent(
+                    state =
+                        SignInMethodsUiState.Loaded(
+                            passkeys =
+                                listOf(
+                                    PasskeyRow(
+                                        credentialId = "passkey-ios",
+                                        deviceName = "iPhone 16 Pro",
+                                        addedOn = LocalDate(2026, 3, 12),
+                                        lastUsedOn = LocalDate(2026, 9, 22),
+                                        canRemove = true,
+                                    ),
+                                    PasskeyRow(
+                                        credentialId = "passkey-mac",
+                                        deviceName = "MacBook Pro",
+                                        addedOn = LocalDate(2026, 5, 2),
+                                        lastUsedOn = null,
+                                        canRemove = true,
+                                    ),
+                                ),
+                            linkedProviders =
+                                listOf(
+                                    LinkedProviderRow(
+                                        kind = LinkedSignInProvider.Kind.GOOGLE,
+                                        email = "alex@example.com",
+                                        lastSignInOn = LocalDate(2026, 9, 1),
+                                    ),
+                                ),
+                            canAddPasskey = true,
+                        ),
+                    onBack = {},
+                    onRetry = {},
+                    onAddPasskey = {},
+                    onRemovePasskey = {},
                 )
             },
             sharedScene(SharedScreenshotSceneId.DataSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {

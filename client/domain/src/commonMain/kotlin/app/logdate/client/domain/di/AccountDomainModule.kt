@@ -5,15 +5,12 @@ import app.logdate.client.domain.account.BackfillLocalDataUseCase
 import app.logdate.client.domain.account.BackfilledAccountTracker
 import app.logdate.client.domain.account.CheckUsernameAvailabilityUseCase
 import app.logdate.client.domain.account.CreatePasskeyAccountUseCase
-import app.logdate.client.domain.account.CreatePasskeyUseCase
 import app.logdate.client.domain.account.CreateRemoteAccountUseCase
-import app.logdate.client.domain.account.DeletePasskeyUseCase
 import app.logdate.client.domain.account.EmailVerificationAvailability
 import app.logdate.client.domain.account.GetAccountSetupDataUseCase
 import app.logdate.client.domain.account.GetAvailablePlansUseCase
 import app.logdate.client.domain.account.GetCurrentAccountUseCase
 import app.logdate.client.domain.account.GetCurrentEntitlementUseCase
-import app.logdate.client.domain.account.GetPasskeysUseCase
 import app.logdate.client.domain.account.HasLogDateCloudAccountUseCase
 import app.logdate.client.domain.account.PreferencesBackfilledAccountTracker
 import app.logdate.client.domain.account.SignInWithGoogleUseCase
@@ -33,11 +30,8 @@ val accountDomainModule: Module =
     module {
         // Account
         factory { CreatePasskeyAccountUseCase(get()) }
-        factory { CreatePasskeyUseCase(get()) }
         factory { GetCurrentAccountUseCase(get()) }
         factory { HasLogDateCloudAccountUseCase(get()) }
-        factory { DeletePasskeyUseCase(get()) }
-        factory { GetPasskeysUseCase(get()) }
         factory { GetAccountSetupDataUseCase(get()) }
         factory { CreateRemoteAccountUseCase(get()) }
         factory { CheckUsernameAvailabilityUseCase(get()) }

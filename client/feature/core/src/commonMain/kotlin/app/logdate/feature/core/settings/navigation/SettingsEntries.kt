@@ -8,6 +8,7 @@ import app.logdate.feature.core.people.ui.PeopleDirectoryScreen
 import app.logdate.feature.core.people.ui.PeopleInboxScreen
 import app.logdate.feature.core.people.ui.PeopleSettingsScreen
 import app.logdate.feature.core.people.ui.PersonDetailScreen
+import app.logdate.feature.core.settings.account.signin.SignInMethodsScreen
 import app.logdate.feature.core.settings.ui.AccountSettingsScreen
 import app.logdate.feature.core.settings.ui.AdvancedSettingsScreen
 import app.logdate.feature.core.settings.ui.BirthdaySettingsScreen
@@ -101,7 +102,13 @@ fun EntryProviderScope<NavKey>.settingsEntries(
         )
     }
     taggedEntry<AccountSettingsRoute> {
-        AccountSettingsScreen(onBack = onBack)
+        AccountSettingsScreen(
+            onBack = onBack,
+            onNavigateToSignInMethods = { onNavigateTo(SignInMethodsRoute) },
+        )
+    }
+    taggedEntry<SignInMethodsRoute> {
+        SignInMethodsScreen(onBack = onBack)
     }
     taggedEntry<PrivacySettingsRoute> {
         PrivacySettingsScreen(

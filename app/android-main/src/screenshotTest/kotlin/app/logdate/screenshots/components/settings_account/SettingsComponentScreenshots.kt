@@ -118,10 +118,8 @@ fun AccountSettings_Default() {
     ScreenshotTheme {
         AccountSettingsContent(
             onBack = {},
-            onCreatePasskey = {},
+            onNavigateToSignInMethods = {},
             userProfile = sampleUserProfile,
-            passkeys = emptyList(),
-            onRevokePasskey = {},
             onSignOut = { _ -> },
             identityState = sampleIdentityState,
             onRefreshIdentity = {},
@@ -150,7 +148,6 @@ fun PrivacySettings() {
             onBack = {},
             onSetBiometricsEnabled = {},
             isBiometricsEnabled = false,
-            isAuthenticated = true,
         )
     }
 }
@@ -333,10 +330,8 @@ fun SettingsListDetail_Landscape_Account() {
             Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
                 AccountSettingsContent(
                     onBack = {},
-                    onCreatePasskey = {},
+                    onNavigateToSignInMethods = {},
                     userProfile = sampleUserProfile,
-                    passkeys = emptyList(),
-                    onRevokePasskey = {},
                     onSignOut = { _ -> },
                     identityState = sampleIdentityState,
                     onRefreshIdentity = {},
@@ -380,10 +375,8 @@ fun SettingsListDetail_Tablet_Account() {
             Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
                 AccountSettingsContent(
                     onBack = {},
-                    onCreatePasskey = {},
+                    onNavigateToSignInMethods = {},
                     userProfile = sampleUserProfile,
-                    passkeys = emptyList(),
-                    onRevokePasskey = {},
                     onSignOut = { _ -> },
                     identityState = sampleIdentityState,
                     onRefreshIdentity = {},

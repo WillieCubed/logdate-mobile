@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -32,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.common.SettingsNavigationItem
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
@@ -40,6 +42,7 @@ import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_actions
 import logdate.client.feature.core.generated.resources.account_and_sign_in
 import logdate.client.feature.core.generated.resources.account_information
+import logdate.client.feature.core.generated.resources.account_section_sign_in
 import logdate.client.feature.core.generated.resources.account_sign_out_action
 import logdate.client.feature.core.generated.resources.account_sign_out_description
 import logdate.client.feature.core.generated.resources.account_sign_out_dialog_title
@@ -48,6 +51,8 @@ import logdate.client.feature.core.generated.resources.email_verification_settin
 import logdate.client.feature.core.generated.resources.email_verification_settings_row_unverified
 import logdate.client.feature.core.generated.resources.email_verification_settings_row_verified
 import logdate.client.feature.core.generated.resources.email_verification_settings_row_verified_subtitle
+import logdate.client.feature.core.generated.resources.sign_in_methods_row_description
+import logdate.client.feature.core.generated.resources.sign_in_methods_title
 import logdate.client.feature.core.generated.resources.sign_out_failed
 import logdate.client.feature.core.generated.resources.username_handle
 import logdate.client.ui.generated.resources.common_cancel
@@ -65,25 +70,22 @@ import logdate.client.ui.generated.resources.Res as UiRes
 @Composable
 fun AccountSettingsScreen(
     onBack: () -> Unit,
+    onNavigateToSignInMethods: () -> Unit,
     accountViewModel: AccountSettingsViewModel = koinViewModel(),
-    privacyViewModel: PrivacySettingsViewModel = koinViewModel(),
     advancedViewModel: AdvancedSettingsViewModel = koinViewModel(),
 ) {
     val accountState by accountViewModel.state.collectAsState()
     val identityState by accountViewModel.identityState.collectAsState()
-    val privacyState by privacyViewModel.state.collectAsState()
     val serverSelectionState by advancedViewModel.serverSelectionState.collectAsState()
     AccountSettingsContent(
         onBack = onBack,
-        onCreatePasskey = privacyViewModel::createPasskey,
+        onNavigateToSignInMethods = onNavigateToSignInMethods,
         userProfile = accountState.currentAccount.toUserProfile(),
         isEmailVerificationAvailable = accountState.isEmailVerificationAvailable,
         isVerifyingEmail = accountState.isVerifyingEmail,
         emailVerificationOutcome = accountState.emailVerificationOutcome,
         onVerifyEmailClicked = accountViewModel::onVerifyEmailClicked,
         onDismissEmailVerificationSheet = accountViewModel::dismissEmailVerificationSheet,
-        passkeys = privacyState.passkeys,
-        onRevokePasskey = { passkey -> privacyViewModel.revokePasskey(passkey.id) },
         onSignOut = { onError -> accountViewModel.signOut(onError) },
         identityState = identityState,
         onRefreshIdentity = accountViewModel::refreshIdentityState,
@@ -107,10 +109,8 @@ fun AccountSettingsScreen(
 @Composable
 fun AccountSettingsContent(
     onBack: () -> Unit,
-    onCreatePasskey: () -> Unit,
+    onNavigateToSignInMethods: () -> Unit,
     userProfile: UserProfile,
-    passkeys: List<PasskeyInfo>,
-    onRevokePasskey: (PasskeyInfo) -> Unit,
     onSignOut: (onError: (String) -> Unit) -> Unit,
     identityState: AccountIdentityState,
     onRefreshIdentity: () -> Unit,
@@ -252,11 +252,8 @@ fun AccountSettingsContent(
                         .padding(vertical = Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                PasskeysInfoSection(
-                    passkeys = passkeys,
-                    onCreatePasskey = onCreatePasskey,
-                    onRevokePasskey = onRevokePasskey,
-                    showCreatePasskeyAction = true,
+                SignInMethodsSection(
+                    onNavigateToSignInMethods = onNavigateToSignInMethods,
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
 
@@ -376,11 +373,8 @@ fun AccountSettingsContent(
                 }
 
                 item {
-                    PasskeysInfoSection(
-                        passkeys = passkeys,
-                        onCreatePasskey = onCreatePasskey,
-                        onRevokePasskey = onRevokePasskey,
-                        showCreatePasskeyAction = true,
+                    SignInMethodsSection(
+                        onNavigateToSignInMethods = onNavigateToSignInMethods,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
@@ -460,20 +454,36 @@ fun AccountSettingsContent(
     }
 }
 
+@Composable
+private fun SignInMethodsSection(
+    onNavigateToSignInMethods: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SettingsSection(
+        title = stringResource(Res.string.account_section_sign_in),
+        modifier = modifier,
+    ) {
+        SettingsNavigationItem(
+            title = stringResource(Res.string.sign_in_methods_title),
+            description = stringResource(Res.string.sign_in_methods_row_description),
+            icon = { Icon(Icons.Outlined.Key, contentDescription = null) },
+            onClick = onNavigateToSignInMethods,
+        )
+    }
+}
+
 @Preview
 @Composable
 private fun AccountSettingsScreenPreview() {
     AccountSettingsContent(
         onBack = {},
-        onCreatePasskey = {},
+        onNavigateToSignInMethods = {},
         userProfile =
             UserProfile(
                 name = "John Doe",
                 username = "johndoe",
                 isAuthenticated = true,
             ),
-        passkeys = emptyList(),
-        onRevokePasskey = {},
         onSignOut = { _ -> },
         identityState = AccountIdentityState(),
         onRefreshIdentity = {},
