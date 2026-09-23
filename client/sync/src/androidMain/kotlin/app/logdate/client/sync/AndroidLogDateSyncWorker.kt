@@ -12,6 +12,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import app.logdate.client.datastore.LogdatePreferencesDataSource
@@ -29,6 +30,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
@@ -282,7 +284,7 @@ class AndroidSyncManager(
 
     override fun sync(startNow: Boolean) {
         if (startNow) {
-            scheduleImmediateSync(AndroidLogDateSyncWorker.SYNC_TYPE_FULL)
+            scope.launch { backUpNow() }
         } else {
             // For non-immediate sync, ensure periodic sync is running
             setupPeriodicSync()
@@ -290,9 +292,36 @@ class AndroidSyncManager(
     }
 
     /**
+     * What "Back up now" does. A request that failed before sits in WorkManager's retry backoff,
+     * which reaches five hours, and a new request queued with [ExistingWorkPolicy.KEEP] was thrown
+     * away behind it -- so tapping the button did nothing for hours. Replace a queued request
+     * instead, unless one is actually running (two writers on one account is what KEEP is there to
+     * prevent). Entries waiting out their own retry backoff are released too, so the run the user
+     * asked for attempts them.
+     */
+    private suspend fun backUpNow() {
+        runCatching { defaultSyncManager.releaseUploadBackoff() }
+            .onFailure { Napier.e("Could not release upload backoff for a manual backup", it) }
+        val running =
+            runCatching {
+                workManager
+                    .getWorkInfosForUniqueWorkFlow(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC)
+                    .first()
+                    .any { it.state == WorkInfo.State.RUNNING }
+            }.getOrDefault(false)
+        scheduleImmediateSync(
+            AndroidLogDateSyncWorker.SYNC_TYPE_FULL,
+            policy = if (running) ExistingWorkPolicy.KEEP else ExistingWorkPolicy.REPLACE,
+        )
+    }
+
+    /**
      * Schedules immediate sync work with high priority.
      */
-    fun scheduleImmediateSync(syncType: String = AndroidLogDateSyncWorker.SYNC_TYPE_FULL) {
+    fun scheduleImmediateSync(
+        syncType: String = AndroidLogDateSyncWorker.SYNC_TYPE_FULL,
+        policy: ExistingWorkPolicy = ExistingWorkPolicy.KEEP,
+    ) {
         val constraints =
             Constraints
                 .Builder()
@@ -321,7 +350,7 @@ class AndroidSyncManager(
         // records and starve the server of request threads.
         workManager.enqueueUniqueWork(
             AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC,
-            ExistingWorkPolicy.KEEP,
+            policy,
             request,
         )
         Napier.d("Scheduled immediate sync: $syncType")
@@ -345,7 +374,9 @@ class AndroidSyncManager(
             Constraints
                 .Builder()
                 .setRequiredNetworkType(networkType)
-                .setRequiresBatteryNotLow(true)
+                // No battery-not-low constraint. Backing up a journal is a few small requests, and
+                // at low battery -- exactly when a phone is likeliest to die -- holding entries back
+                // is the worse trade.
                 .build()
 
         // A download-only schedule meant nothing ever retried an upload on its own: an entry that

@@ -6,6 +6,7 @@ import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.shouldSyncMedia
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.LastSyncErrorStore
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.shared.model.CloudQuotaManager
 import io.github.aakira.napier.Napier
@@ -46,6 +47,7 @@ internal class SyncStatusPublisher(
     private val syncStateFlow: StateFlow<SyncState>,
     private val lastErrorFlow: MutableStateFlow<SyncError?>,
     private val syncScope: CoroutineScope,
+    private val lastErrorStore: LastSyncErrorStore,
     private val latestSyncTime: suspend () -> Instant?,
     private val isEnabled: () -> Boolean,
 ) {
@@ -76,6 +78,16 @@ internal class SyncStatusPublisher(
     val syncStatusFlow: StateFlow<SyncStatus> = _syncStatusFlow.asStateFlow()
 
     init {
+        // The last error survives a restart. It used to live only in memory, and Android restarts
+        // a backgrounded app freely -- so after each restart a sync that kept failing looked like
+        // a calm backlog. Restore it unless this run already has one, then save every change.
+        syncScope.launch {
+            val saved = runCatching { lastErrorStore.load() }.onFailure { Napier.e("Could not read the last sync error", it) }.getOrNull()
+            if (saved != null) lastErrorFlow.compareAndSet(null, saved)
+            lastErrorFlow.collect { error ->
+                runCatching { lastErrorStore.save(error) }.onFailure { Napier.e("Could not save the last sync error", it) }
+            }
+        }
         // Republish status on each internal state/error transition so observers don't have to poll.
         syncScope.launch {
             combine(syncStateFlow, lastErrorFlow) { state, error -> state to error }

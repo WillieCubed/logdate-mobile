@@ -17,6 +17,8 @@ import app.logdate.client.sync.cloud.CloudMediaDataSource
 import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.InMemoryLastSyncErrorStore
+import app.logdate.client.sync.metadata.LastSyncErrorStore
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.SyncBackoff
 import app.logdate.client.sync.metadata.SyncDeadLetterRecord
@@ -70,6 +72,7 @@ class DefaultSyncManager(
     private val cloudQuotaManager: CloudQuotaManager? = null,
     private val backoff: SyncBackoff = SyncBackoff(),
     private val syncScope: CoroutineScope = CoroutineScope(platformIODispatcher),
+    private val lastErrorStore: LastSyncErrorStore = InMemoryLastSyncErrorStore(),
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     private val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -87,6 +90,7 @@ class DefaultSyncManager(
             syncStateFlow = syncStateFlow,
             lastErrorFlow = lastErrorFlow,
             syncScope = syncScope,
+            lastErrorStore = lastErrorStore,
             latestSyncTime = ::latestSyncTime,
             isEnabled = { isEnabled },
         )
@@ -111,6 +115,7 @@ class DefaultSyncManager(
     override fun sync(startNow: Boolean) {
         if (startNow) {
             syncScope.launch {
+                releaseUploadBackoff()
                 fullSync()
             }
         }
@@ -428,6 +433,9 @@ class DefaultSyncManager(
     }
 
     override fun observeDeadLetters(): Flow<List<SyncDeadLetterRecord>> = deadLetterStore.observe()
+
+    /** See [SyncRetryCoordinator.releaseBackoff]. Called when the user asks to back up now. */
+    suspend fun releaseUploadBackoff() = retryCoordinator.releaseBackoff()
 
     override suspend fun retryDeadLetter(id: String) = retryCoordinator.retryDeadLetter(id)
 

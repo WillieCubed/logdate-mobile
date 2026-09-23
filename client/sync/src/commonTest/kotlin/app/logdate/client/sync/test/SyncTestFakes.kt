@@ -64,6 +64,8 @@ import app.logdate.client.sync.conflict.LastWriteWinsResolver
 import app.logdate.client.sync.conflict.SyncConflictRecord
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.InMemoryLastSyncErrorStore
+import app.logdate.client.sync.metadata.LastSyncErrorStore
 import app.logdate.client.sync.metadata.MediaSyncRef
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.PendingOperation
@@ -199,6 +201,7 @@ fun testDefaultSyncManager(
     dataUsagePolicy: DataUsagePolicy = fakeDataUsagePolicy(),
     cloudQuotaManager: CloudQuotaManager? = null,
     syncScope: CoroutineScope? = null,
+    lastErrorStore: LastSyncErrorStore = InMemoryLastSyncErrorStore(),
 ): DefaultSyncManager =
     if (syncScope == null) {
         DefaultSyncManager(
@@ -223,6 +226,7 @@ fun testDefaultSyncManager(
             transactionManager = transactionManager,
             dataUsagePolicy = dataUsagePolicy,
             cloudQuotaManager = cloudQuotaManager,
+            lastErrorStore = lastErrorStore,
         )
     } else {
         DefaultSyncManager(
@@ -247,6 +251,7 @@ fun testDefaultSyncManager(
             transactionManager = transactionManager,
             dataUsagePolicy = dataUsagePolicy,
             cloudQuotaManager = cloudQuotaManager,
+            lastErrorStore = lastErrorStore,
             syncScope = syncScope,
         )
     }

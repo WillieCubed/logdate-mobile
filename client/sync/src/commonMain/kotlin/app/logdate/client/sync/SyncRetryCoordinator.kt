@@ -39,6 +39,23 @@ internal class SyncRetryCoordinator(
         remoteUpdatedAt: Instant?,
     ) -> Unit,
 ) {
+    /**
+     * Lets every waiting entry be attempted on the next pass, for when the user asks to back up
+     * now. Entries already set aside in Sync issues keep their schedule: they failed for a reason
+     * the user has been shown, and retrying them there is the user's call.
+     */
+    suspend fun releaseBackoff() {
+        val setAside = deadLetterStore.list().map { it.id }.toSet()
+        for (entityType in EntityType.entries) {
+            for (pending in syncMetadataService.getPendingUploads(entityType)) {
+                if ("${entityType.name}:${pending.entityId}" in setAside) continue
+                if (retryScheduleStore.nextAttemptAt(entityType, pending.entityId) != null) {
+                    retryScheduleStore.setNextAttemptAt(entityType, pending.entityId, 0L)
+                }
+            }
+        }
+    }
+
     suspend fun shouldAttempt(
         entityType: EntityType,
         entityId: String,

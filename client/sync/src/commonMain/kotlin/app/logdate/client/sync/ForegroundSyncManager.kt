@@ -72,7 +72,8 @@ class ForegroundSyncManager(
 
     override fun sync(startNow: Boolean) {
         if (startNow) {
-            syncScope.launch { defaultSyncManager.fullSync() }
+            // Delegates, so "Back up now" releases waiting entries the same way everywhere.
+            defaultSyncManager.sync(startNow = true)
         } else {
             startPeriodicSync()
         }
