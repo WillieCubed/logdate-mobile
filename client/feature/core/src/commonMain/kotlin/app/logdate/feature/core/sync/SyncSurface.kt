@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import app.logdate.client.sync.BackupRequestState
 import app.logdate.ui.common.BannerContent
 import app.logdate.ui.common.MessageBanner
 import logdate.client.feature.core.generated.resources.Res
@@ -55,6 +56,9 @@ import logdate.client.feature.core.generated.resources.sync_feedback_sign_in_act
 import logdate.client.feature.core.generated.resources.sync_status_not_backed_up
 import logdate.client.feature.core.generated.resources.sync_status_open
 import logdate.client.feature.core.generated.resources.sync_status_progress_percent
+import logdate.client.feature.core.generated.resources.sync_status_queued
+import logdate.client.feature.core.generated.resources.sync_status_retry_scheduled
+import logdate.client.feature.core.generated.resources.sync_status_unavailable
 import logdate.client.feature.core.generated.resources.sync_status_waiting
 import logdate.client.feature.core.generated.resources.syncing
 import org.jetbrains.compose.resources.pluralStringResource
@@ -110,9 +114,19 @@ fun SyncStatusButton(
         }
 
         is SyncPresentation.Pending -> {
-            description = pluralStringResource(Res.plurals.sync_status_waiting, presentation.pendingCount, presentation.pendingCount)
+            description =
+                when (presentation.requestState) {
+                    BackupRequestState.QUEUED -> stringResource(Res.string.sync_status_queued)
+                    BackupRequestState.RETRYING -> stringResource(Res.string.sync_status_retry_scheduled)
+                    else -> pluralStringResource(Res.plurals.sync_status_waiting, presentation.pendingCount, presentation.pendingCount)
+                }
             glyph = { Icon(Icons.Filled.CloudUpload, contentDescription = null, tint = scheme.onSurfaceVariant) }
             badgeCount = presentation.pendingCount
+        }
+
+        SyncPresentation.StatusUnavailable -> {
+            description = stringResource(Res.string.sync_status_unavailable)
+            glyph = { Icon(Icons.Filled.SyncProblem, contentDescription = null, tint = scheme.tertiary) }
         }
 
         is SyncPresentation.NetworkError -> {
@@ -229,6 +243,7 @@ private fun SyncPresentation.toBannerVisual(): BannerVisual? {
     val scheme = MaterialTheme.colorScheme
     return when (this) {
         SyncPresentation.Hidden,
+        SyncPresentation.StatusUnavailable,
         is SyncPresentation.Syncing,
         is SyncPresentation.Pending,
         -> null

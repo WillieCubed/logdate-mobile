@@ -82,6 +82,10 @@ kotlin {
             implementation(projects.client.util)
             implementation(libs.okio)
         }
+        findByName("androidHostTest")?.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlin.test.junit)
+        }
         androidMain.dependencies {
             implementation(projects.client.database)
             implementation(projects.client.notifications)

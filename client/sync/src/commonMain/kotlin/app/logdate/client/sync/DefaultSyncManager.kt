@@ -524,12 +524,16 @@ class DefaultSyncManager(
     }
 
     override suspend fun getSyncStatus(): SyncStatus {
-        val pendingCount = syncMetadataService.getPendingCount()
+        val pendingCountResult =
+            runCatching { syncMetadataService.getPendingCount() }
+                .onFailure { Napier.e("Could not read the pending upload count", it) }
         val authenticated = sessionStorage.getSession() != null
         return SyncStatus(
             isEnabled = authenticated && isEnabled,
             lastSyncTime = latestSyncTime(),
-            pendingUploads = pendingCount,
+            pendingUploads = pendingCountResult.getOrDefault(0),
+            queueReadable = pendingCountResult.isSuccess && statusPublisher.isQueueObservationHealthy(),
+            backgroundWorkLimited = statusPublisher.backgroundWorkLimited(),
             isSyncing = syncStateFlow.value is SyncState.Syncing,
             hasErrors = lastErrorFlow.value != null,
             lastError = lastErrorFlow.value,

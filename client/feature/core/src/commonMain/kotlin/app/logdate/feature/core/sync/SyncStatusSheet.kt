@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import app.logdate.client.repository.journals.NoteType
+import app.logdate.client.sync.BackupRequestState
 import app.logdate.client.sync.SyncPausedReason
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.ui.platform.PlatformSheet
@@ -46,7 +47,9 @@ import app.logdate.util.toReadableDateTimeShort
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.backing_up_progress
 import logdate.client.feature.core.generated.resources.last_backed_up_time
+import logdate.client.feature.core.generated.resources.last_sync_failed
 import logdate.client.feature.core.generated.resources.never_synced
+import logdate.client.feature.core.generated.resources.sync_background_limited
 import logdate.client.feature.core.generated.resources.sync_banner_review
 import logdate.client.feature.core.generated.resources.sync_feedback_needs_account
 import logdate.client.feature.core.generated.resources.sync_feedback_sign_in_action
@@ -71,9 +74,12 @@ import logdate.client.feature.core.generated.resources.sync_status_journal_fallb
 import logdate.client.feature.core.generated.resources.sync_status_last_attempt_failed
 import logdate.client.feature.core.generated.resources.sync_status_open_settings
 import logdate.client.feature.core.generated.resources.sync_status_queue_unavailable
+import logdate.client.feature.core.generated.resources.sync_status_queued
+import logdate.client.feature.core.generated.resources.sync_status_retry_scheduled
 import logdate.client.feature.core.generated.resources.sync_status_retrying
 import logdate.client.feature.core.generated.resources.sync_status_showing_three_of_items
 import logdate.client.feature.core.generated.resources.sync_status_title
+import logdate.client.feature.core.generated.resources.sync_status_unavailable
 import logdate.client.feature.core.generated.resources.sync_status_unreadable_cloud_items
 import logdate.client.feature.core.generated.resources.sync_status_waiting
 import logdate.client.feature.core.generated.resources.sync_status_waiting_heading
@@ -230,6 +236,14 @@ private fun ColumnScope.SyncStatusBody(
             modifier = Modifier.padding(top = Spacing.sm),
         )
     }
+    if (uiState.backgroundWorkLimited && uiState.pendingCount > 0 && !uiState.isSyncing) {
+        Text(
+            text = stringResource(Res.string.sync_background_limited),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = Spacing.sm),
+        )
+    }
 
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg),
@@ -247,7 +261,9 @@ private fun ColumnScope.SyncStatusBody(
             Text(stringResource(Res.string.sync_status_open_settings))
         }
     }
-    feedback?.let { SyncNowFeedback(it, pausedReason) }
+    feedback
+        ?.takeIf { !uiState.isSyncing && uiState.requestState == BackupRequestState.NONE }
+        ?.let { SyncNowFeedback(it, pausedReason) }
 
     if (uiState.queueUnavailable) {
         Text(
@@ -320,8 +336,11 @@ private fun StatusHeadline(uiState: SyncStatusUiState) {
             Icon(
                 imageVector =
                     when {
-                        uiState.pendingCount == 0 -> Icons.Filled.CloudDone
+                        uiState.queueUnavailable -> Icons.Filled.SyncProblem
+                        uiState.lastAttemptFailed -> Icons.Filled.SyncProblem
                         uiState.pausedReason != null -> Icons.Filled.CloudOff
+                        uiState.pendingCount == 0 && uiState.requestState == BackupRequestState.COMPLETED -> Icons.Filled.CloudDone
+                        uiState.pendingCount == 0 && uiState.lastSyncTime != null -> Icons.Filled.CloudDone
                         else -> Icons.Filled.CloudUpload
                     },
                 contentDescription = null,
@@ -333,25 +352,32 @@ private fun StatusHeadline(uiState: SyncStatusUiState) {
             Text(
                 text =
                     when {
+                        uiState.queueUnavailable -> stringResource(Res.string.sync_status_unavailable)
                         uiState.isSyncing && uiState.totalForRun != null ->
                             stringResource(Res.string.backing_up_progress, uiState.completedInRun, uiState.totalForRun)
                         uiState.isSyncing && uiState.pendingCount > 0 ->
                             stringResource(Res.string.syncing_remaining, uiState.pendingCount)
                         uiState.isSyncing -> stringResource(Res.string.syncing)
+                        uiState.requestState == BackupRequestState.QUEUED -> stringResource(Res.string.sync_status_queued)
+                        uiState.requestState == BackupRequestState.RETRYING -> stringResource(Res.string.sync_status_retry_scheduled)
+                        uiState.lastAttemptFailed -> stringResource(Res.string.last_sync_failed)
                         uiState.pendingCount > 0 ->
                             pluralStringResource(Res.plurals.sync_status_waiting, uiState.pendingCount, uiState.pendingCount)
-                        else -> stringResource(Res.string.sync_feedback_up_to_date)
+                        uiState.lastSyncTime != null -> stringResource(Res.string.sync_feedback_up_to_date)
+                        else -> stringResource(Res.string.never_synced)
                     },
                 style = MaterialTheme.typography.titleMedium,
             )
-            Text(
-                text =
-                    uiState.lastSyncTime?.let {
-                        stringResource(Res.string.last_backed_up_time, it.toReadableDateTimeShort())
-                    } ?: stringResource(Res.string.never_synced),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (uiState.lastSyncTime != null || (uiState.pendingCount > 0 && !uiState.queueUnavailable)) {
+                Text(
+                    text =
+                        uiState.lastSyncTime?.let {
+                            stringResource(Res.string.last_backed_up_time, it.toReadableDateTimeShort())
+                        } ?: stringResource(Res.string.never_synced),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

@@ -3,7 +3,7 @@
     <!-- Cloud sync -->
     <string name="cloud_sync">Your journal</string>
     <string name="sync_and_backup">Backup</string>
-    <string name="sync_and_backup_description">Keep every entry safe and on all your devices</string>
+    <string name="sync_and_backup_description">Back up your entries and keep them available on your devices</string>
     <string name="sync_now">Back up now</string>
     <string name="syncing">Backing up…</string>
     <string name="syncing_remaining">Backing up · %1$d to go</string>
@@ -49,7 +49,11 @@
     <string name="sync_status_showing_three_of_items">Showing 3 of %1$d</string>
     <string name="sync_status_last_attempt_failed">The last attempt didn't finish. LogDate will try again on its own.</string>
     <string name="sync_status_could_not_start">Couldn't start a backup. Try again, or check Backup settings.</string>
-    <string name="sync_status_queue_unavailable">Couldn't read the list of waiting items. The count above may be out of date.</string>
+    <string name="sync_status_queue_unavailable">Couldn't read the list of waiting items. Backup status may be incomplete.</string>
+    <string name="sync_status_unavailable">Can't check backup status right now</string>
+    <string name="sync_status_queued">Backup requested · waiting to start</string>
+    <string name="sync_status_retry_scheduled">Backup will retry automatically</string>
+    <string name="sync_background_limited">Android may delay automatic backup on mobile data. Back up now while LogDate is open, or connect to Wi-Fi.</string>
     <string name="sync_status_open_settings">Backup settings</string>
 
     <!-- Sync banner: states the user has to act on -->
@@ -74,14 +78,14 @@
     <string name="sync_feedback_up_to_date">Everything is backed up</string>
     <string name="sync_feedback_succeeded">Backed up %1$d · received %2$d</string>
     <string name="sync_feedback_failed">Couldn't back up: %1$s</string>
-    <string name="sync_feedback_started">Backing up in the background</string>
+    <string name="sync_feedback_started">Backup requested. Waiting to start.</string>
 
     <!-- Sync promotion -->
     <string name="sync_promotion_title">Keep your journal safe</string>
-    <string name="sync_promotion_description">Sign in and every entry is backed up and waiting on your other devices</string>
+    <string name="sync_promotion_description">Sign in to back up your entries and sync them with your other devices</string>
     <string name="sync_feature_backup">Your signed-in devices stay in sync</string>
     <string name="sync_feature_access">Access your journals from any device</string>
-    <string name="sync_feature_sync">Changes sync seamlessly in the background</string>
+    <string name="sync_feature_sync">Changes back up automatically when you’re connected</string>
     <string name="account_cloud_sync_promotion_description">Connect your account to sync your journals and access them from any signed-in device.</string>
     <string name="sync_devices_subtitle">Keep your journals, notes, and memories in sync across all your devices.</string>
 
@@ -154,8 +158,8 @@
     <string name="sync_issue_explain_missing_file">The file it points to is no longer on this device, so there is nothing left to upload. Discarding it removes it from the queue and leaves the entry itself alone.</string>
     <string name="sync_issue_explain_app_closed">LogDate closed while uploading it twice in a row, so it was set aside to let everything else back up. It is tried again once a day. Retry after updating LogDate, or discard it if you no longer need it synced.</string>
     <string name="sync_issue_explain_failed">It was tried several times without success. Retry if you are back online, or discard it if you no longer need it synced.</string>
-    <string name="sync_paused_background_data_off">Paused — Android is blocking background data for LogDate</string>
-    <string name="sync_paused_background_data_off_fix">Turn on background data for LogDate in Android Settings to resume backing up.</string>
+    <string name="sync_paused_background_data_off">Automatic backup may wait on mobile data</string>
+    <string name="sync_paused_background_data_off_fix">You can still back up while LogDate is open, or connect to Wi-Fi.</string>
     <string name="sync_paused_offline">Paused — waiting for a connection</string>
     <string name="sync_paused_signed_out">Sign in to start backing up</string>
     <string name="sync_paused_media_waiting_for_wifi">Photos and videos are waiting for Wi-Fi</string>
@@ -174,7 +178,7 @@
     <string name="first_sync_progress">Backing up %1$d of %2$d</string>
     <string name="first_sync_success">Everything is backed up</string>
     <string name="first_sync_partial">Signed in. Some entries are still going up.</string>
-    <string name="first_sync_timed_out">Signed in. Your journal keeps backing up in the background.</string>
-    <string name="first_sync_timed_out_progress">Signed in. %1$d of %2$d backed up so far — the rest is continuing in the background.</string>
-    <string name="first_sync_failed">Signed in. We'll pick the backup up again shortly.</string>
+    <string name="first_sync_timed_out">Signed in. Backup hasn't finished yet. Check Backup status for progress.</string>
+    <string name="first_sync_timed_out_progress">Signed in. %1$d of %2$d backed up so far. Check Backup status for the rest.</string>
+    <string name="first_sync_failed">Signed in, but the first backup didn't finish. LogDate will try again.</string>
 </resources>

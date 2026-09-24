@@ -16,18 +16,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * On a real device, LogDate could have global Data Saver off yet still have its own
- * "Background data" toggle turned off per-app (Settings > Apps > LogDate > Data usage). That
- * combination silently killed background sync over cellular with no UI signal, because the old
- * detection only read [ConnectivityManager.getRestrictBackgroundStatus], which only reports the
- * device-wide toggle.
- *
- * These tests run on the JVM via `androidHostTest` - no emulator, no Robolectric. Android
- * framework types ([Context], [ConnectivityManager], [NetworkCapabilities]) are mocked directly,
- * matching the pattern already used for local unit tests elsewhere in this codebase (e.g.
- * `AndroidAudioPlaybackManagerTest`).
- */
+/** Android host tests for network-wide capabilities and this app's background restriction status. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AndroidNetworkSaverModeProviderTest {
     private val context = mockk<Context>(relaxed = true)
@@ -40,7 +29,7 @@ class AndroidNetworkSaverModeProviderTest {
         return AndroidNetworkSaverModeProvider(context)
     }
 
-    private fun stubGlobalDataSaver(enabled: Boolean) {
+    private fun stubBackgroundRestriction(enabled: Boolean) {
         every { connectivityManager.restrictBackgroundStatus } returns
             if (enabled) {
                 ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
@@ -61,35 +50,34 @@ class AndroidNetworkSaverModeProviderTest {
     }
 
     @Test
-    fun `per-app background data restriction is detected when global Data Saver is off`() =
+    fun `restricted network capability does not imply background data is disabled`() =
         runTest {
-            stubGlobalDataSaver(enabled = false)
-            // NET_CAPABILITY_NOT_RESTRICTED absent: this app is background-restricted even
-            // though the system-wide Data Saver toggle is off.
+            stubBackgroundRestriction(enabled = false)
+            // A restricted network capability says nothing about this app's background setting.
             stubActiveNetwork(notRestricted = false)
             val provider = buildProvider()
 
             val state = provider.getCurrentDataSaverState()
 
-            assertTrue(state.isDataSaverEnabled, "per-app background data restriction should read as data saver enabled")
+            assertFalse(state.isDataSaverEnabled, "a network capability does not describe this app's background data setting")
             assertEquals(NetworkConnectionType.CELLULAR, state.connectionType)
         }
 
     @Test
-    fun `per-app background data restriction maps to BACKGROUND_DATA_BLOCKED downstream`() =
+    fun `restricted network capability does not pause backup`() =
         runTest {
-            stubGlobalDataSaver(enabled = false)
+            stubBackgroundRestriction(enabled = false)
             stubActiveNetwork(notRestricted = false)
             val provider = buildProvider()
             val policy = DefaultDataUsagePolicy(provider)
 
-            assertEquals(DataRestriction.BACKGROUND_DATA_BLOCKED, policy.currentRestriction())
+            assertEquals(DataRestriction.NONE, policy.currentRestriction())
         }
 
     @Test
     fun `unrestricted network with Data Saver off reports no restriction`() =
         runTest {
-            stubGlobalDataSaver(enabled = false)
+            stubBackgroundRestriction(enabled = false)
             stubActiveNetwork(notRestricted = true)
             val provider = buildProvider()
 
@@ -100,10 +88,10 @@ class AndroidNetworkSaverModeProviderTest {
         }
 
     @Test
-    fun `global Data Saver enabled still reports data saver enabled regardless of per-app capability`() =
+    fun `background restriction status remains authoritative regardless of network capability`() =
         runTest {
-            stubGlobalDataSaver(enabled = true)
-            // Not restricted per-app, but the device-wide toggle is still authoritative.
+            stubBackgroundRestriction(enabled = true)
+            // This network-wide capability does not override Android's background status.
             stubActiveNetwork(notRestricted = true)
             val provider = buildProvider()
 
@@ -115,7 +103,7 @@ class AndroidNetworkSaverModeProviderTest {
     @Test
     fun `no active network is not treated as a per-app restriction`() =
         runTest {
-            stubGlobalDataSaver(enabled = false)
+            stubBackgroundRestriction(enabled = false)
             every { connectivityManager.activeNetwork } returns null
             val provider = buildProvider()
 
@@ -123,5 +111,17 @@ class AndroidNetworkSaverModeProviderTest {
 
             assertFalse(state.isDataSaverEnabled)
             assertEquals(NetworkConnectionType.NONE, state.connectionType)
+        }
+
+    @Test
+    fun `current state reads a newly connected network even if a callback was missed`() =
+        runTest {
+            stubBackgroundRestriction(enabled = false)
+            every { connectivityManager.activeNetwork } returns null
+            val provider = buildProvider()
+            assertEquals(NetworkConnectionType.NONE, provider.getCurrentDataSaverState().connectionType)
+
+            stubActiveNetwork(notRestricted = true, transport = NetworkCapabilities.TRANSPORT_WIFI)
+            assertEquals(NetworkConnectionType.WIFI, provider.getCurrentDataSaverState().connectionType)
         }
 }

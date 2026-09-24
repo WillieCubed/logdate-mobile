@@ -83,6 +83,9 @@ import logdate.client.feature.core.generated.resources.sync_feedback_started
 import logdate.client.feature.core.generated.resources.sync_feedback_succeeded
 import logdate.client.feature.core.generated.resources.sync_feedback_up_to_date
 import logdate.client.feature.core.generated.resources.sync_now
+import logdate.client.feature.core.generated.resources.sync_status_queued
+import logdate.client.feature.core.generated.resources.sync_status_retry_scheduled
+import logdate.client.feature.core.generated.resources.sync_status_unavailable
 import logdate.client.feature.core.generated.resources.sync_status_waiting
 import logdate.client.feature.core.generated.resources.syncing
 import logdate.client.ui.generated.resources.common_loading
@@ -599,7 +602,15 @@ private fun SyncStatusText(syncStatus: app.logdate.client.sync.SyncStatus?) {
             Text(stringResource(Res.string.syncing), color = MaterialTheme.colorScheme.primary)
         } else {
             val statusText =
-                if (status.hasErrors) {
+                if (!status.queueReadable) {
+                    stringResource(Res.string.sync_status_unavailable)
+                } else if (status.requestState == app.logdate.client.sync.BackupRequestState.QUEUED) {
+                    stringResource(Res.string.sync_status_queued)
+                } else if (status.requestState == app.logdate.client.sync.BackupRequestState.RETRYING) {
+                    stringResource(Res.string.sync_status_retry_scheduled)
+                } else if (status.requestState == app.logdate.client.sync.BackupRequestState.FAILED) {
+                    stringResource(Res.string.last_sync_failed)
+                } else if (status.hasErrors) {
                     stringResource(Res.string.last_sync_failed)
                 } else if (status.pendingUploads > 0) {
                     // "All backed up" with items still in the queue told people there was nothing

@@ -1,11 +1,12 @@
 package app.logdate.client.networking.saver
 
 /**
- * Represents the current state of the device's data saver mode.
+ * Represents Android's background-data status and the active network's transport and cost.
  */
 data class NetworkSaverState(
     val isDataSaverEnabled: Boolean,
     val connectionType: NetworkConnectionType,
+    val isMetered: Boolean = connectionType == NetworkConnectionType.CELLULAR,
 )
 
 /**

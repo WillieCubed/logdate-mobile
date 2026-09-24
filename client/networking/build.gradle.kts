@@ -71,6 +71,11 @@ kotlin {
             implementation(libs.ktor.client.mock)
             implementation(libs.koin.test)
         }
+        findByName("androidHostTest")?.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlin.test.junit)
+            implementation(libs.mockk)
+        }
         androidMain.dependencies {
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.ktor.client.android)

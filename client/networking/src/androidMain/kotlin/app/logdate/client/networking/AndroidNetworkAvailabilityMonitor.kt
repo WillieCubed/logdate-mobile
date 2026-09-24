@@ -63,8 +63,9 @@ class AndroidNetworkAvailabilityMonitor(
         val manager = connectivityManager ?: return false
         val activeNetwork = manager.activeNetwork ?: return false
         val capabilities = manager.getNetworkCapabilities(activeNetwork) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        // Validation is Android's last probe result, not proof that LogDate's server cannot be
+        // reached. Let the request report a real failure instead of suppressing its retry.
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
     /**

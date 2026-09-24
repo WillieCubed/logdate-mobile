@@ -12,9 +12,9 @@ import kotlinx.coroutines.flow.map
  *
  * The mapping is:
  * - No connection → [DataUsageMode.Restricted]
- * - Data Saver enabled → [DataUsageMode.Restricted]
- * - Cellular, Data Saver off → [DataUsageMode.Conservative]
- * - WiFi/Ethernet, Data Saver off → [DataUsageMode.Unrestricted]
+ * - Background data restricted on a metered network → [DataUsageMode.Restricted]
+ * - Metered network without a background restriction → [DataUsageMode.Conservative]
+ * - Unmetered network → [DataUsageMode.Unrestricted]
  */
 class DefaultDataUsagePolicy(
     private val networkSaverModeProvider: NetworkSaverModeProvider,
@@ -30,14 +30,14 @@ class DefaultDataUsagePolicy(
 internal fun NetworkSaverState.toDataRestriction(): DataRestriction =
     when {
         connectionType == NetworkConnectionType.NONE -> DataRestriction.OFFLINE
-        isDataSaverEnabled -> DataRestriction.BACKGROUND_DATA_BLOCKED
+        isDataSaverEnabled && isMetered -> DataRestriction.BACKGROUND_DATA_BLOCKED
         else -> DataRestriction.NONE
     }
 
 internal fun NetworkSaverState.toDataUsageMode(): DataUsageMode =
     when {
         connectionType == NetworkConnectionType.NONE -> DataUsageMode.Restricted
-        isDataSaverEnabled -> DataUsageMode.Restricted
-        connectionType == NetworkConnectionType.CELLULAR -> DataUsageMode.Conservative
+        isDataSaverEnabled && isMetered -> DataUsageMode.Restricted
+        isMetered -> DataUsageMode.Conservative
         else -> DataUsageMode.Unrestricted
     }

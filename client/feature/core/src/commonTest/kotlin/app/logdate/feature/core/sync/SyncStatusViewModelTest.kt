@@ -6,6 +6,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.NoteType
+import app.logdate.client.sync.BackupRequestState
 import app.logdate.client.sync.SyncError
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncManager
@@ -143,6 +144,19 @@ class SyncStatusViewModelTest {
     }
 
     @Test
+    fun `a failed snapshot count cannot show everything backed up`() {
+        val state =
+            buildSyncStatusUiState(
+                status = status(pendingUploads = 0).copy(queueReadable = false),
+                queue = emptyList(),
+                failedCount = 0,
+                queueUnavailable = false,
+            )
+
+        assertTrue(state.queueUnavailable)
+    }
+
+    @Test
     fun `an item of an unknown kind is still listed`() {
         val state =
             buildSyncStatusUiState(
@@ -208,6 +222,17 @@ class SyncStatusViewModelTest {
             viewModel.syncNow()
 
             assertEquals(SyncStatusFeedback.CouldNotStart, viewModel.feedback.value)
+        }
+
+    @Test
+    fun `an already observed queued request does not leave stale confirmation feedback`() =
+        runTest {
+            val syncManager = RecordingSyncManager(queueOnSync = true)
+            val viewModel = viewModel(syncManager, session = UserSession("a", "r", "account"))
+
+            viewModel.syncNow()
+
+            assertEquals(null, viewModel.feedback.value)
         }
 
     @Test
@@ -413,6 +438,7 @@ class SyncStatusViewModelTest {
 
     private class RecordingSyncManager(
         private val failOnSync: Boolean = false,
+        private val queueOnSync: Boolean = false,
         pendingUploads: Int = 0,
     ) : SyncManager {
         val syncRequests = mutableListOf<Boolean>()
@@ -431,6 +457,10 @@ class SyncStatusViewModelTest {
         override fun sync(startNow: Boolean) {
             if (failOnSync) throw IllegalStateException("WorkManager unavailable")
             syncRequests += startNow
+            if (queueOnSync) {
+                (syncStatusFlow as MutableStateFlow<SyncStatus>).value =
+                    syncStatusFlow.value.copy(requestState = BackupRequestState.QUEUED)
+            }
         }
 
         override suspend fun uploadPendingChanges(): SyncResult = SyncResult(success = true)

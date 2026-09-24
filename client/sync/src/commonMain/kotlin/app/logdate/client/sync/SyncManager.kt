@@ -32,6 +32,11 @@ interface SyncManager {
      */
     fun sync(startNow: Boolean = false)
 
+    /** Requests a manual backup; Android waits for its scheduler to accept the request. */
+    suspend fun requestBackup() {
+        sync(startNow = true)
+    }
+
     /**
      * Uploads all pending local changes to the cloud.
      * This includes journals, notes, associations, and media.
@@ -149,7 +154,22 @@ data class SyncStatus(
      * device to recover the identity that wrote them.
      */
     val unreadableCloudCount: Int = 0,
+    /** Whether the local pending queue could be read for this status snapshot. */
+    val queueReadable: Boolean = true,
+    /** State of a requested Android backup before the sync engine itself starts. */
+    val requestState: BackupRequestState = BackupRequestState.NONE,
+    /** Automatic background work may wait on metered data; manual backup remains available. */
+    val backgroundWorkLimited: Boolean = false,
 )
+
+enum class BackupRequestState {
+    NONE,
+    QUEUED,
+    RETRYING,
+    RUNNING,
+    FAILED,
+    COMPLETED,
+}
 
 /**
  * Why the backup is not making progress right now.

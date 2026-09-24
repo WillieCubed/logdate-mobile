@@ -10,6 +10,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.Operation
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
@@ -27,14 +28,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
+import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.util.concurrent.TimeUnit
@@ -204,27 +209,29 @@ class AndroidSyncManager(
     private val workManager = WorkManager.getInstance(applicationContext)
     private val supervisorJob = SupervisorJob()
     private val scope = CoroutineScope(supervisorJob + Dispatchers.IO)
+    private val periodicScheduleDecider = PeriodicSyncScheduleDecider()
+    private val requestedBackupState =
+        workManager
+            .getWorkInfosForUniqueWorkFlow(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC)
+            .map { work -> backupRequestState(work.map { BackupWorkSnapshot(it.state, it.runAttemptCount) }) }
+            .stateIn(scope, SharingStarted.Eagerly, BackupRequestState.NONE)
 
     init {
-        // Observe authentication state and automatically enable/disable background sync
+        // Keep one owner for periodic scheduling. Separate auth and policy collectors used to
+        // replace the same work twice at startup and could schedule again after sign-out.
         scope.launch {
-            // Being signed in is the whole condition; see ForegroundSyncManager for why the
-            // stored preference that used to be ANDed in here had to go.
-            sessionStorage
-                .getSessionFlow()
-                .map { it != null }
-                .distinctUntilChanged()
-                .collect { shouldEnable ->
-                    if (shouldEnable) {
-                        Napier.i("Background sync enabled")
-                        enableBackgroundSync()
-                    } else {
-                        Napier.i("Background sync disabled")
-                        disableBackgroundSync()
+            combine(
+                sessionStorage.getSessionFlow().map { it != null },
+                dataUsagePolicy.policy,
+            ) { authenticated, mode -> periodicScheduleDecider.next(authenticated, mode) }
+                .collect { change ->
+                    when (change) {
+                        is PeriodicSyncScheduleChange.Enable -> setupPeriodicSync(change.requirement)
+                        PeriodicSyncScheduleChange.Disable -> disableBackgroundSync()
+                        PeriodicSyncScheduleChange.Unchanged -> Unit
                     }
                 }
         }
-
         // Observe network state and trigger sync retry on network restoration
         scope.launch {
             var lastNetworkState: NetworkState? = null
@@ -240,16 +247,6 @@ class AndroidSyncManager(
                         handleNetworkRestored()
                     }
                     lastNetworkState = currentState
-                }
-        }
-
-        // Observe data usage policy changes and re-enqueue periodic sync with updated constraints
-        scope.launch {
-            dataUsagePolicy.policy
-                .distinctUntilChanged()
-                .collect { mode ->
-                    Napier.d("Data usage policy changed to $mode, updating periodic sync constraints")
-                    setupPeriodicSync(mode)
                 }
         }
     }
@@ -284,11 +281,18 @@ class AndroidSyncManager(
 
     override fun sync(startNow: Boolean) {
         if (startNow) {
-            scope.launch { backUpNow() }
+            scope.launch {
+                runCatching { requestBackup() }
+                    .onFailure { Napier.e("Could not request a manual backup", it) }
+            }
         } else {
-            // For non-immediate sync, ensure periodic sync is running
-            setupPeriodicSync()
+            // The auth/policy observer above owns the periodic schedule.
         }
+    }
+
+    override suspend fun requestBackup() {
+        val operation = backUpNow()
+        withContext(Dispatchers.IO) { operation.result.get() }
     }
 
     /**
@@ -299,7 +303,7 @@ class AndroidSyncManager(
      * prevent). Entries waiting out their own retry backoff are released too, so the run the user
      * asked for attempts them.
      */
-    private suspend fun backUpNow() {
+    private suspend fun backUpNow(): Operation {
         runCatching { defaultSyncManager.releaseUploadBackoff() }
             .onFailure { Napier.e("Could not release upload backoff for a manual backup", it) }
         val running =
@@ -309,7 +313,7 @@ class AndroidSyncManager(
                     .first()
                     .any { it.state == WorkInfo.State.RUNNING }
             }.getOrDefault(false)
-        scheduleImmediateSync(
+        return scheduleImmediateSync(
             AndroidLogDateSyncWorker.SYNC_TYPE_FULL,
             policy = if (running) ExistingWorkPolicy.KEEP else ExistingWorkPolicy.REPLACE,
         )
@@ -321,7 +325,7 @@ class AndroidSyncManager(
     fun scheduleImmediateSync(
         syncType: String = AndroidLogDateSyncWorker.SYNC_TYPE_FULL,
         policy: ExistingWorkPolicy = ExistingWorkPolicy.KEEP,
-    ) {
+    ): Operation {
         val constraints =
             Constraints
                 .Builder()
@@ -348,12 +352,14 @@ class AndroidSyncManager(
         // Unique, and an already-running sync wins. Stacking runs would put several writers on
         // the same account's repo at once, which is exactly the contention that used to drop
         // records and starve the server of request threads.
-        workManager.enqueueUniqueWork(
-            AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC,
-            policy,
-            request,
-        )
+        val operation =
+            workManager.enqueueUniqueWork(
+                AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC,
+                policy,
+                request,
+            )
         Napier.d("Scheduled immediate sync: $syncType")
+        return operation
     }
 
     /**
@@ -363,11 +369,11 @@ class AndroidSyncManager(
      * - [DataUsageMode.Restricted]: Require unmetered network (WiFi only)
      * - [DataUsageMode.Conservative] / [DataUsageMode.Unrestricted]: Any connected network
      */
-    private fun setupPeriodicSync(mode: DataUsageMode = DataUsageMode.Unrestricted) {
+    private fun setupPeriodicSync(requirement: PeriodicNetworkRequirement) {
         val networkType =
-            when (mode) {
-                is DataUsageMode.Restricted -> NetworkType.UNMETERED
-                else -> NetworkType.CONNECTED
+            when (requirement) {
+                PeriodicNetworkRequirement.UNMETERED -> NetworkType.UNMETERED
+                PeriodicNetworkRequirement.CONNECTED -> NetworkType.CONNECTED
             }
 
         val constraints =
@@ -400,23 +406,14 @@ class AndroidSyncManager(
                     TimeUnit.MINUTES,
                 ).build()
 
-        // Use REPLACE so constraint changes take effect immediately
+        // UPDATE applies changed constraints without resetting the periodic clock on startup.
         workManager.enqueueUniquePeriodicWork(
             AndroidLogDateSyncWorker.WORK_NAME_PERIODIC_SYNC,
-            ExistingPeriodicWorkPolicy.REPLACE,
+            ExistingPeriodicWorkPolicy.UPDATE,
             periodicRequest,
         )
 
         Napier.d("Setup periodic sync work (networkType=$networkType)")
-    }
-
-    /**
-     * Enables periodic background sync.
-     * Called automatically when authentication state changes to authenticated.
-     */
-    private fun enableBackgroundSync() {
-        setupPeriodicSync()
-        Napier.i("Enabled background sync")
     }
 
     /**
@@ -456,9 +453,12 @@ class AndroidSyncManager(
 
     override suspend fun fullSync(): SyncResult = defaultSyncManager.fullSync()
 
-    override val syncStatusFlow = defaultSyncManager.syncStatusFlow
+    override val syncStatusFlow =
+        combine(defaultSyncManager.syncStatusFlow, requestedBackupState) { status, requestState ->
+            status.copy(requestState = requestState)
+        }.stateIn(scope, SharingStarted.Eagerly, defaultSyncManager.syncStatusFlow.value)
 
-    override suspend fun getSyncStatus(): SyncStatus = defaultSyncManager.getSyncStatus()
+    override suspend fun getSyncStatus(): SyncStatus = defaultSyncManager.getSyncStatus().copy(requestState = requestedBackupState.value)
 
     override fun observeDeadLetters(): kotlinx.coroutines.flow.Flow<List<app.logdate.client.sync.metadata.SyncDeadLetterRecord>> =
         defaultSyncManager.observeDeadLetters()

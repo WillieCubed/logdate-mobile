@@ -68,11 +68,11 @@ fun StatusSheet_Backing_up_with_progress() {
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun StatusSheet_Background_data_blocked() {
+fun StatusSheet_Background_work_limited() {
     StatusHarness(
         SyncStatusUiState(
             pendingCount = 19,
-            pausedReason = SyncPausedReason.BACKGROUND_DATA_OFF,
+            backgroundWorkLimited = true,
             groups = waitingGroups,
         ),
     )

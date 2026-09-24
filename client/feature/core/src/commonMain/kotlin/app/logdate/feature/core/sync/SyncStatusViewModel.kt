@@ -7,6 +7,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.NoteType
+import app.logdate.client.sync.BackupRequestState
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncPausedReason
 import app.logdate.client.sync.SyncStatus
@@ -73,6 +74,18 @@ class SyncStatusViewModel(
     private val _feedback = MutableStateFlow<SyncStatusFeedback?>(null)
     val feedback: StateFlow<SyncStatusFeedback?> = _feedback.asStateFlow()
 
+    init {
+        viewModelScope.launch {
+            syncManager.syncStatusFlow.collect { status ->
+                if ((status.requestState != BackupRequestState.NONE || status.isSyncing) &&
+                    _feedback.value == SyncStatusFeedback.Requested
+                ) {
+                    _feedback.value = null
+                }
+            }
+        }
+    }
+
     /**
      * Asks the platform to back up now, and says so. Before this, tapping the timeline's backup
      * indicator queued a sync with nothing on screen changing, which read as the tap being ignored.
@@ -83,12 +96,17 @@ class SyncStatusViewModel(
                 _feedback.value = SyncStatusFeedback.NeedsAccount
                 return@launch
             }
-            runCatching { syncManager.sync(startNow = true) }
-                .onSuccess { _feedback.value = SyncStatusFeedback.Requested }
-                .onFailure { error ->
-                    Napier.e("Could not start a backup", error)
-                    _feedback.value = SyncStatusFeedback.CouldNotStart
-                }
+            val request = runCatching { syncManager.requestBackup() }
+            if (request.isSuccess) {
+                _feedback.value =
+                    SyncStatusFeedback.Requested.takeIf {
+                        syncManager.syncStatusFlow.value.requestState == BackupRequestState.NONE &&
+                            !syncManager.syncStatusFlow.value.isSyncing
+                    }
+            } else {
+                Napier.e("Could not start a backup", request.exceptionOrNull())
+                _feedback.value = SyncStatusFeedback.CouldNotStart
+            }
         }
     }
 
@@ -143,6 +161,8 @@ enum class SyncStatusFeedback {
 
 data class SyncStatusUiState(
     val isSyncing: Boolean = false,
+    val requestState: BackupRequestState = BackupRequestState.NONE,
+    val backgroundWorkLimited: Boolean = false,
     val completedInRun: Int = 0,
     val totalForRun: Int? = null,
     val pendingCount: Int = 0,
@@ -202,6 +222,8 @@ internal fun buildSyncStatusUiState(
 ): SyncStatusUiState =
     SyncStatusUiState(
         isSyncing = status.isSyncing,
+        requestState = status.requestState,
+        backgroundWorkLimited = status.backgroundWorkLimited,
         completedInRun = status.completedInRun,
         totalForRun = status.totalForRun,
         // The live queue is the source of truth for what is waiting; the status snapshot's count
@@ -209,7 +231,7 @@ internal fun buildSyncStatusUiState(
         pendingCount = if (queueUnavailable) status.pendingUploads else queue.size,
         pausedReason = status.pausedReason,
         lastSyncTime = status.lastSyncTime,
-        lastAttemptFailed = status.lastError != null,
+        lastAttemptFailed = status.lastError != null || status.requestState == BackupRequestState.FAILED,
         groups =
             queue
                 .groupBy { it.entityType }
@@ -227,7 +249,7 @@ internal fun buildSyncStatusUiState(
                     )
                 }.sortedByDescending { it.count },
         failedCount = failedCount,
-        queueUnavailable = queueUnavailable,
+        queueUnavailable = queueUnavailable || !status.queueReadable,
         unreadableCloudCount = status.unreadableCloudCount,
     )
 

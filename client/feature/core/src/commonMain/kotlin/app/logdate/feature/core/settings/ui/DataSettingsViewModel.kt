@@ -199,8 +199,8 @@ class DataSettingsViewModel(
      *
      * Running it in this ViewModel tied it to the screen that started it: switching apps cancelled
      * the coroutine mid-run ("Job was cancelled") and hundreds of entries stopped uploading. The
-     * worker survives the app going away, and progress is visible from the sync status either way,
-     * so there is nothing to report back here beyond needing an account.
+     * worker survives the app going away. Report whether WorkManager accepted the request;
+     * progress and completion come from the live backup status.
      */
     fun syncNow() {
         viewModelScope.launch {
@@ -209,8 +209,7 @@ class DataSettingsViewModel(
                     _syncFeedback.value = SyncFeedback.NeedsAccount
                     return@launch
                 }
-                Napier.d("Handing a manual sync to background sync")
-                syncManager.sync(startNow = true)
+                syncManager.requestBackup()
                 _syncFeedback.value = SyncFeedback.Started
             } catch (e: Exception) {
                 Napier.e("Could not start sync", e)

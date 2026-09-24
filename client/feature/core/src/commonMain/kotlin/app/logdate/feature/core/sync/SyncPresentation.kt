@@ -1,5 +1,7 @@
 package app.logdate.feature.core.sync
 
+import app.logdate.client.sync.BackupRequestState
+
 /**
  * UI-only projection of the sync pipeline state. Composables in this package render against
  * [SyncPresentation] directly and never see business types — so the same surface works on
@@ -46,7 +48,11 @@ sealed class SyncPresentation {
      */
     data class Pending(
         val pendingCount: Int,
+        val requestState: BackupRequestState = BackupRequestState.NONE,
     ) : SyncPresentation()
+
+    /** The local queue could not be read, so a healthy count cannot be claimed. */
+    data object StatusUnavailable : SyncPresentation()
 
     /**
      * Auth lapsed. The most user-visible failure mode — the banner asks for re-sign-in.

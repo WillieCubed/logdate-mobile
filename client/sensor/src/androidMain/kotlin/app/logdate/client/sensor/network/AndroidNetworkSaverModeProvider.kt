@@ -27,6 +27,10 @@ class AndroidNetworkSaverModeProvider(
 
     private val networkCallback =
         object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                networkSaverStateFlow.value = getCurrentNetworkSaverStateInternal()
+            }
+
             override fun onCapabilitiesChanged(
                 network: Network,
                 capabilities: NetworkCapabilities,
@@ -69,9 +73,10 @@ class AndroidNetworkSaverModeProvider(
 
     override val dataSaverModeState: Flow<NetworkSaverState> = networkSaverStateFlow.asStateFlow()
 
-    override suspend fun getCurrentDataSaverState(): NetworkSaverState = networkSaverStateFlow.value
+    override suspend fun getCurrentDataSaverState(): NetworkSaverState =
+        getCurrentNetworkSaverStateInternal().also { networkSaverStateFlow.value = it }
 
-    override suspend fun isDataSaverModeActive(): Boolean = networkSaverStateFlow.value.isDataSaverEnabled
+    override suspend fun isDataSaverModeActive(): Boolean = getCurrentDataSaverState().isDataSaverEnabled
 
     override fun cleanup() {
         try {
@@ -88,7 +93,7 @@ class AndroidNetworkSaverModeProvider(
     }
 
     private fun getCurrentNetworkSaverStateInternal(): NetworkSaverState {
-        val isGlobalDataSaverEnabled =
+        val isBackgroundDataRestricted =
             try {
                 connectivityManager.restrictBackgroundStatus ==
                     ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED
@@ -99,12 +104,9 @@ class AndroidNetworkSaverModeProvider(
         val activeCapabilities = getActiveNetworkCapabilities()
 
         return NetworkSaverState(
-            // Global Data Saver only reports the device-wide toggle. A user can leave that off
-            // and still turn off Background data for LogDate specifically (Settings > Apps >
-            // LogDate > Data usage), which restrictBackgroundStatus alone never sees - sync would
-            // keep getting silently dropped by the platform with no signal anywhere in the app.
-            isDataSaverEnabled = isGlobalDataSaverEnabled || isBackgroundDataRestrictedForThisApp(activeCapabilities),
+            isDataSaverEnabled = isBackgroundDataRestricted,
             connectionType = activeCapabilities.toConnectionType(),
+            isMetered = runCatching { connectivityManager.isActiveNetworkMetered }.getOrDefault(false),
         )
     }
 
@@ -114,21 +116,6 @@ class AndroidNetworkSaverModeProvider(
             activeNetwork?.let { connectivityManager.getNetworkCapabilities(it) }
         } catch (e: Exception) {
             null
-        }
-
-    /**
-     * [NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED] reflects, for the calling app's UID,
-     * the combined effect of system-wide Data Saver, this app's own per-app background-data
-     * restriction, and Doze/App Standby - exactly the platform-side "can this app use the
-     * network right now" answer that [ConnectivityManager.getRestrictBackgroundStatus] can't
-     * give on its own. Its absence on the active network is treated the same as Data Saver being
-     * on: sync should pause and the user should see why.
-     */
-    private fun isBackgroundDataRestrictedForThisApp(capabilities: NetworkCapabilities?): Boolean =
-        try {
-            capabilities != null && !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
-        } catch (e: Exception) {
-            false
         }
 
     private fun NetworkCapabilities?.toConnectionType(): NetworkConnectionType {

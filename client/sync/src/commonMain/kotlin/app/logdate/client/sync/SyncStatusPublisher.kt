@@ -64,6 +64,7 @@ internal class SyncStatusPublisher(
      * a deferral the device has long since worked through.
      */
     private var mediaDeferredForNetwork = false
+    private val queueObservationFailed = MutableStateFlow(false)
 
     /** What the current upload run set out to do, and how far through it is. See [SyncStatus]. */
     var runTotal: Int? = null
@@ -99,6 +100,9 @@ internal class SyncStatusPublisher(
             combine(syncStateFlow, lastErrorFlow) { state, error -> state to error }
                 .collect { publish() }
         }
+        syncScope.launch {
+            dataUsagePolicy.policy.collect { publish() }
+        }
         // Republish whenever the session changes — sign-in flips isEnabled true, sign-out flips
         // it false, and the UI needs to react without waiting for the next sync transition.
         syncScope.launch {
@@ -112,8 +116,14 @@ internal class SyncStatusPublisher(
             sessionStorage
                 .getSessionFlow()
                 .flatMapLatest { syncMetadataService.observePendingCount() }
-                .catch { Napier.e("Could not follow the pending upload count", it) }
-                .collect { count -> _syncStatusFlow.update { it.copy(pendingUploads = count) } }
+                .catch { error ->
+                    Napier.e("Could not follow the pending upload count", error)
+                    queueObservationFailed.value = true
+                    _syncStatusFlow.update { it.copy(queueReadable = false) }
+                }.collect { count ->
+                    queueObservationFailed.value = false
+                    _syncStatusFlow.update { it.copy(pendingUploads = count) }
+                }
         }
     }
 
@@ -126,17 +136,16 @@ internal class SyncStatusPublisher(
      */
     suspend fun publish() {
         val authenticated = sessionStorage.getSession() != null
-        val pendingCount =
+        val pendingCountResult =
             runCatching { syncMetadataService.getPendingCount() }
-                // Falling back to zero renders as "everything is backed up", which is exactly the
-                // healthy state -- so a metadata failure would otherwise look like success.
                 .onFailure { Napier.e("Could not read the pending upload count", it) }
-                .getOrDefault(0)
         _syncStatusFlow.value =
             SyncStatus(
                 isEnabled = authenticated && isEnabled(),
                 lastSyncTime = latestSyncTime(),
-                pendingUploads = pendingCount,
+                pendingUploads = pendingCountResult.getOrDefault(0),
+                queueReadable = pendingCountResult.isSuccess && !queueObservationFailed.value,
+                backgroundWorkLimited = backgroundWorkLimited(),
                 isSyncing = syncStateFlow.value is SyncState.Syncing,
                 hasErrors = lastErrorFlow.value != null,
                 lastError = lastErrorFlow.value,
@@ -214,9 +223,8 @@ internal class SyncStatusPublisher(
     /**
      * Why the backup cannot progress right now, or null if nothing is holding it back.
      *
-     * Reported whether or not anything is queued: background data being off means entries
-     * written from here on will not back up either, and the user should hear that before
-     * they lose a week of writing to a setting they do not know is on.
+     * Reported whether or not anything is queued. Background data limits are reported
+     * separately because an open app can still request a manual backup.
      */
     suspend fun currentPausedReason(authenticated: Boolean): SyncPausedReason? {
         if (!authenticated) return SyncPausedReason.NOT_SIGNED_IN
@@ -224,8 +232,7 @@ internal class SyncStatusPublisher(
         val restriction = runCatching { dataUsagePolicy.currentRestriction() }.getOrNull()
         return when (restriction) {
             DataRestriction.OFFLINE -> SyncPausedReason.OFFLINE
-            DataRestriction.BACKGROUND_DATA_BLOCKED -> SyncPausedReason.BACKGROUND_DATA_OFF
-            DataRestriction.NONE, null ->
+            DataRestriction.BACKGROUND_DATA_BLOCKED, DataRestriction.NONE, null ->
                 // Only after something was actually held back - being on cellular with nothing
                 // waiting is not a pause, and saying so would train the user to ignore the line.
                 SyncPausedReason.MEDIA_WAITING_FOR_WIFI.takeIf {
@@ -233,6 +240,12 @@ internal class SyncStatusPublisher(
                 }
         }
     }
+
+    suspend fun backgroundWorkLimited(): Boolean =
+        runCatching { dataUsagePolicy.currentRestriction() == DataRestriction.BACKGROUND_DATA_BLOCKED }
+            .getOrDefault(false)
+
+    fun isQueueObservationHealthy(): Boolean = !queueObservationFailed.value
 
     suspend fun refreshObservedQuotaFromServer(reason: String) {
         val manager = cloudQuotaManager ?: return

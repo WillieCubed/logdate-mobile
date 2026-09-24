@@ -54,6 +54,7 @@ import logdate.client.feature.core.generated.resources.last_synced_time
 import logdate.client.feature.core.generated.resources.never_synced
 import logdate.client.feature.core.generated.resources.sign_in
 import logdate.client.feature.core.generated.resources.sync_and_backup
+import logdate.client.feature.core.generated.resources.sync_background_limited
 import logdate.client.feature.core.generated.resources.sync_devices_subtitle
 import logdate.client.feature.core.generated.resources.sync_feature_access
 import logdate.client.feature.core.generated.resources.sync_feature_backup
@@ -72,6 +73,9 @@ import logdate.client.feature.core.generated.resources.sync_paused_needs_recover
 import logdate.client.feature.core.generated.resources.sync_paused_needs_recovery_phrase_fix
 import logdate.client.feature.core.generated.resources.sync_paused_offline
 import logdate.client.feature.core.generated.resources.sync_paused_signed_out
+import logdate.client.feature.core.generated.resources.sync_status_queued
+import logdate.client.feature.core.generated.resources.sync_status_retry_scheduled
+import logdate.client.feature.core.generated.resources.sync_status_unavailable
 import logdate.client.feature.core.generated.resources.sync_status_waiting
 import logdate.client.feature.core.generated.resources.syncing
 import logdate.client.feature.core.generated.resources.syncing_remaining
@@ -497,7 +501,15 @@ private fun SyncStatusText(
             }
         } else {
             val statusText =
-                if (status.hasErrors) {
+                if (!status.queueReadable) {
+                    stringResource(Res.string.sync_status_unavailable)
+                } else if (status.requestState == app.logdate.client.sync.BackupRequestState.QUEUED) {
+                    stringResource(Res.string.sync_status_queued)
+                } else if (status.requestState == app.logdate.client.sync.BackupRequestState.RETRYING) {
+                    stringResource(Res.string.sync_status_retry_scheduled)
+                } else if (status.requestState == app.logdate.client.sync.BackupRequestState.FAILED) {
+                    stringResource(Res.string.last_sync_failed)
+                } else if (status.hasErrors) {
                     stringResource(Res.string.last_sync_failed)
                 } else if (status.pendingUploads > 0) {
                     // "All backed up" with items still in the queue told people there was nothing
@@ -517,6 +529,13 @@ private fun SyncStatusText(
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
             )
+            if (status.backgroundWorkLimited && status.pendingUploads > 0) {
+                Text(
+                    text = stringResource(Res.string.sync_background_limited),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     } ?: Text(stringResource(UiRes.string.common_loading), color = MaterialTheme.colorScheme.onSurfaceVariant)
 }

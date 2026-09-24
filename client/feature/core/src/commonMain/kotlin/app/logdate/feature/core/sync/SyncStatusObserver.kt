@@ -1,6 +1,7 @@
 package app.logdate.feature.core.sync
 
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.sync.BackupRequestState
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncPausedReason
@@ -39,7 +40,7 @@ fun observeSyncPresentation(
     }
 
 internal fun SyncStatus.toPresentation(): SyncPresentation {
-    if (isSyncing) {
+    if (isSyncing || requestState == BackupRequestState.RUNNING) {
         return SyncPresentation.Syncing(
             progressPercent = SyncPresentation.Syncing.progressPercent(completedInRun, totalForRun),
         )
@@ -68,8 +69,14 @@ internal fun SyncStatus.toPresentation(): SyncPresentation {
         }
     }
 
-    return if (pendingUploads > 0) {
-        SyncPresentation.Pending(pendingCount = pendingUploads)
+    if (!queueReadable) return SyncPresentation.StatusUnavailable
+
+    if (requestState == BackupRequestState.FAILED) {
+        return SyncPresentation.NetworkError(pendingCount = pendingUploads)
+    }
+
+    return if (pendingUploads > 0 || requestState == BackupRequestState.QUEUED || requestState == BackupRequestState.RETRYING) {
+        SyncPresentation.Pending(pendingCount = pendingUploads, requestState = requestState)
     } else {
         SyncPresentation.Hidden
     }

@@ -60,12 +60,12 @@ class DefaultDataUsagePolicyTest {
         }
 
     @Test
-    fun `wifi with data saver on returns restricted`() =
+    fun `unmetered wifi with data saver on still allows backup`() =
         runTest {
             networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = true, connectionType = NetworkConnectionType.WIFI),
             )
-            assertIs<DataUsageMode.Restricted>(policy.currentMode())
+            assertIs<DataUsageMode.Unrestricted>(policy.currentMode())
         }
 
     @Test
@@ -78,10 +78,19 @@ class DefaultDataUsagePolicyTest {
         }
 
     @Test
-    fun `ethernet with data saver on returns restricted`() =
+    fun `unmetered ethernet with data saver on still allows backup`() =
         runTest {
             networkSaverProvider.setNetworkSaverState(
                 NetworkSaverState(isDataSaverEnabled = true, connectionType = NetworkConnectionType.ETHERNET),
+            )
+            assertIs<DataUsageMode.Unrestricted>(policy.currentMode())
+        }
+
+    @Test
+    fun `metered wifi with background restriction does not pretend it is unmetered`() =
+        runTest {
+            networkSaverProvider.setNetworkSaverState(
+                NetworkSaverState(true, NetworkConnectionType.WIFI, isMetered = true),
             )
             assertIs<DataUsageMode.Restricted>(policy.currentMode())
         }
