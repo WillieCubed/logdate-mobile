@@ -14,12 +14,12 @@ import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.feature.core.settings.ui.CheckedServer
 import app.logdate.shared.config.LogDateConfigRepository
-import app.logdate.shared.model.DeploymentKind
-import app.logdate.shared.model.ServerDescriptor
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -31,7 +31,7 @@ data class MoveProgress(
     val failed: Int,
     val isSyncing: Boolean,
     /**
-     * Whether a sync has finished since the switch. Right after the switch nothing is pending yet
+     * Whether a sync has run to the end while the move is being watched. Right after the switch nothing is pending yet
      * either, so an empty queue only means "done" once a sync has run.
      */
     val syncedSinceSwitch: Boolean,
@@ -153,8 +153,20 @@ class DefaultServerMover(
         return switchAndQueue(record)
     }
 
+    /**
+     * An upload is only trusted when the app is on the new server. The server address is saved in
+     * the background, so an app closed right after the switch can come back on the old server with
+     * the move already marked as uploading; that switch is redone.
+     */
     override suspend fun resume(record: ServerMoveRecord): Result<ServerMoveRecord> =
-        if (record.phase == ServerMoveRecord.Phase.SWITCHING) switchAndQueue(record) else Result.success(record)
+        if (record.phase == ServerMoveRecord.Phase.UPLOADING && isConnectedTo(record.to)) {
+            Result.success(record)
+        } else {
+            switchAndQueue(record)
+        }
+
+    private fun isConnectedTo(endpoint: MoveEndpoint): Boolean =
+        configRepository.getCurrentBackendUrl().trimEnd('/') == endpoint.origin.trimEnd('/')
 
     private suspend fun switchAndQueue(record: ServerMoveRecord): Result<ServerMoveRecord> {
         val result =
@@ -194,15 +206,31 @@ class DefaultServerMover(
         withTimeout(SESSION_SWITCH_TIMEOUT) { sessionStorage.getSessionFlow().first { it == expected } }
     }
 
-    override fun progress(record: ServerMoveRecord): Flow<MoveProgress> =
-        combine(syncManager.syncStatusFlow, syncManager.observeDeadLetters()) { status, deadLetters ->
+    /**
+     * A sync counts as finished once one has been seen running and then stopping. The server's
+     * last-sync time can't answer that: it comes from the server's clock and doesn't move when
+     * there's nothing to download.
+     */
+    override fun progress(record: ServerMoveRecord): Flow<MoveProgress> {
+        val syncFinished =
+            syncManager.syncStatusFlow
+                .runningFold(SyncRun()) { run, status ->
+                    SyncRun(started = run.started || status.isSyncing, finished = run.finished || (run.started && !status.isSyncing))
+                }.onStart { syncManager.sync(startNow = true) }
+        return combine(syncManager.syncStatusFlow, syncManager.observeDeadLetters(), syncFinished) { status, deadLetters, run ->
             MoveProgress(
                 remaining = status.pendingUploads,
                 failed = deadLetters.count { it.failedAt >= record.committedAtMillis },
                 isSyncing = status.isSyncing,
-                syncedSinceSwitch = (status.lastSyncTime?.toEpochMilliseconds() ?: 0) >= record.committedAtMillis,
+                syncedSinceSwitch = run.finished,
             )
         }
+    }
+
+    private data class SyncRun(
+        val started: Boolean = false,
+        val finished: Boolean = false,
+    )
 
     override suspend fun deleteSource(record: ServerMoveRecord): SourceDeletion =
         withSourceAccount(record) { account ->
@@ -247,8 +275,7 @@ class DefaultServerMover(
         record: ServerMoveRecord,
         block: suspend (ServerScopedAccount) -> T,
     ): T {
-        val descriptor = record.from.descriptor ?: ServerDescriptorPlaceholder.forOrigin(record.from.origin)
-        val account = scopedAccounts.open(record.from.origin, descriptor)
+        val account = scopedAccounts.open(record.from.origin, record.from.descriptor)
         return try {
             block(account)
         } finally {
@@ -259,15 +286,4 @@ class DefaultServerMover(
     private companion object {
         val SESSION_SWITCH_TIMEOUT = 10.seconds
     }
-}
-
-/** A minimal description for a server that never described itself, enough to reach its API. */
-internal object ServerDescriptorPlaceholder {
-    fun forOrigin(origin: String): ServerDescriptor =
-        ServerDescriptor(
-            serverOrigin = origin,
-            apiBaseUrl = "${origin.trimEnd('/')}/api/v1",
-            deploymentKind = DeploymentKind.SELF_HOSTED,
-            displayName = origin.substringAfter("://").trimEnd('/'),
-        )
 }

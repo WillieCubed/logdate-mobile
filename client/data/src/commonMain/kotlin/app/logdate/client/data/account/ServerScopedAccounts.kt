@@ -45,11 +45,11 @@ interface ServerScopedAccount {
 fun interface ServerScopedAccounts {
     /**
      * Opens the account on [origin], starting from any sign-in already saved for it.
-     * [descriptor] must be the server's own description of itself.
+     * [descriptor] must be the server's own description of itself, or null when it never gave one.
      */
     suspend fun open(
         origin: String,
-        descriptor: ServerDescriptor,
+        descriptor: ServerDescriptor?,
     ): ServerScopedAccount
 }
 
@@ -70,7 +70,7 @@ class DefaultServerScopedAccounts(
 ) : ServerScopedAccounts {
     override suspend fun open(
         origin: String,
-        descriptor: ServerDescriptor,
+        descriptor: ServerDescriptor?,
     ): ServerScopedAccount {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val config = PinnedLogDateConfigRepository(origin, descriptor)

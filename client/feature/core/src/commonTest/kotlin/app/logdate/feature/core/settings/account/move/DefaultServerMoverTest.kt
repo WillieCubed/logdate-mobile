@@ -108,6 +108,48 @@ class DefaultServerMoverTest {
         }
 
     @Test
+    fun `an upload resumed on the old server redoes the switch`() =
+        runTest {
+            val world = World(backgroundScope)
+            world.vault.sessions[serverB] = sessionB
+            val uploading =
+                ServerMoveRecord(
+                    from = MoveEndpoint(serverA, descriptor(serverA)),
+                    to = MoveEndpoint(serverB, descriptor(serverB)),
+                    phase = ServerMoveRecord.Phase.UPLOADING,
+                )
+
+            val record = world.mover.resume(uploading).getOrThrow()
+
+            assertEquals(serverB, world.config.getCurrentBackendUrl())
+            assertEquals(ServerMoveRecord.Phase.UPLOADING, record.phase)
+            assertEquals(listOf(true), world.queuedWhilePaused)
+        }
+
+    @Test
+    fun `a sync that runs to the end counts whatever the clocks say`() =
+        runTest {
+            val world = World(backgroundScope)
+            val record =
+                world.mover
+                    .commit(destination, world.accountOn(serverB, sessionB), survey)
+                    .getOrThrow()
+                    .copy(committedAtMillis = Long.MAX_VALUE)
+            val seen = mutableListOf<MoveProgress>()
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { world.mover.progress(record).collect { seen += it } }
+
+            world.sync.status.value =
+                world.sync.status.value
+                    .copy(isSyncing = true)
+            world.sync.status.value =
+                world.sync.status.value
+                    .copy(isSyncing = false)
+
+            assertFalse(seen.first().syncedSinceSwitch)
+            assertTrue(seen.last().syncedSinceSwitch)
+        }
+
+    @Test
     fun `deleting the old account uses its own sign-in and then forgets it`() =
         runTest {
             val world = World(backgroundScope)
@@ -241,8 +283,10 @@ class DefaultServerMoverTest {
             syncRequested = true
         }
 
-        override val syncStatusFlow: StateFlow<SyncStatus> =
+        val status =
             MutableStateFlow(SyncStatus(isEnabled = true, lastSyncTime = null, pendingUploads = 0, isSyncing = false, hasErrors = false))
+
+        override val syncStatusFlow: StateFlow<SyncStatus> = status
 
         override suspend fun uploadPendingChanges(): SyncResult = SyncResult(success = true)
 
@@ -288,7 +332,7 @@ class DefaultServerMoverTest {
 
         override suspend fun open(
             origin: String,
-            descriptor: ServerDescriptor,
+            descriptor: ServerDescriptor?,
         ): ServerScopedAccount {
             val repository =
                 object : FakeAccountRepository() {
