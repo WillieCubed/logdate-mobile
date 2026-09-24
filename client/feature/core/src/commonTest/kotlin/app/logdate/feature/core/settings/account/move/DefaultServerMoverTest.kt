@@ -7,7 +7,6 @@ import app.logdate.client.datastore.OriginSessionVault
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.domain.account.EnqueueAllLocalDataUseCase
-import app.logdate.client.repository.account.AccountCreationRequest
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncResult
@@ -15,11 +14,10 @@ import app.logdate.client.sync.SyncStatus
 import app.logdate.client.sync.metadata.MediaSyncRef
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.SyncDeadLetterRecord
+import app.logdate.feature.core.settings.account.StubPasskeyAccountRepository
 import app.logdate.feature.core.settings.ui.CheckedServer
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.model.DeploymentKind
-import app.logdate.shared.model.LogDateAccount
-import app.logdate.shared.model.PasskeyInfo
 import app.logdate.shared.model.ServerDescriptor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -352,38 +350,7 @@ class DefaultServerMoverTest {
         }
     }
 
-    private open class FakeAccountRepository : PasskeyAccountRepository {
-        override val currentAccount: StateFlow<LogDateAccount?> = MutableStateFlow(null)
-        override val isAuthenticated: StateFlow<Boolean> = MutableStateFlow(true)
-
-        override suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> =
-            Result.failure(NotImplementedError())
-
-        override suspend fun authenticateWithPasskey(
-            username: String?,
-            adoptLocalData: Boolean,
-        ): Result<LogDateAccount> = Result.failure(NotImplementedError())
-
-        override suspend fun checkUsernameAvailability(username: String): Result<Boolean> = Result.success(true)
-
-        override suspend fun signOut(): Result<Unit> = Result.success(Unit)
-
-        override suspend fun getCurrentAccount(): LogDateAccount? = null
-
-        override suspend fun getAccountInfo(): Result<LogDateAccount> = Result.failure(NotImplementedError())
-
-        override suspend fun refreshAuthentication(): Result<Unit> = Result.success(Unit)
-
-        override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = Result.success(emptyList())
-
-        override suspend fun deletePasskey(credentialId: String): Result<Unit> = Result.success(Unit)
-
-        override suspend fun createRestoreKey(): Result<Unit> = Result.success(Unit)
-
-        override suspend fun signInWithRestoreKey(): Result<LogDateAccount> = Result.failure(NotImplementedError())
-
-        override suspend fun deleteRestoreKey(): Result<Unit> = Result.success(Unit)
-    }
+    private open class FakeAccountRepository : StubPasskeyAccountRepository()
 
     private class StringStorage : KeyValueStorage {
         private val strings = mutableMapOf<String, String>()

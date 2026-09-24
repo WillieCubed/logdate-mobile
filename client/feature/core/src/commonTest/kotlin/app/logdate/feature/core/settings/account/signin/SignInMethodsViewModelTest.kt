@@ -5,11 +5,9 @@ import app.logdate.client.networking.PasskeyApiException
 import app.logdate.client.permissions.PasskeyErrorCodes
 import app.logdate.client.permissions.PasskeyException
 import app.logdate.client.permissions.PasskeyManager
-import app.logdate.client.repository.account.AccountCreationRequest
 import app.logdate.client.repository.account.LinkedSignInProvider
 import app.logdate.client.repository.account.NotSignedInException
-import app.logdate.client.repository.account.PasskeyAccountRepository
-import app.logdate.shared.model.LogDateAccount
+import app.logdate.feature.core.settings.account.StubPasskeyAccountRepository
 import app.logdate.shared.model.PasskeyAuthenticationOptions
 import app.logdate.shared.model.PasskeyCapabilities
 import app.logdate.shared.model.PasskeyInfo
@@ -17,8 +15,6 @@ import app.logdate.shared.model.PasskeyRegistrationOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -349,11 +345,8 @@ class SignInMethodsViewModelTest {
         var providersError: Throwable? = null,
         var addPasskeyResult: Result<PasskeyInfo> = Result.failure(NotImplementedError()),
         var deleteResult: Result<Unit> = Result.success(Unit),
-    ) : PasskeyAccountRepository {
+    ) : StubPasskeyAccountRepository() {
         val deletedCredentialIds = mutableListOf<String>()
-
-        override val currentAccount: StateFlow<LogDateAccount?> = MutableStateFlow(null)
-        override val isAuthenticated: StateFlow<Boolean> = MutableStateFlow(true)
 
         override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = listError?.let { Result.failure(it) } ?: Result.success(passkeys)
 
@@ -366,30 +359,6 @@ class SignInMethodsViewModelTest {
             deletedCredentialIds += credentialId
             return deleteResult.onSuccess { passkeys = passkeys.filterNot { it.credentialId == credentialId } }
         }
-
-        override suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> =
-            Result.failure(NotImplementedError())
-
-        override suspend fun authenticateWithPasskey(
-            username: String?,
-            adoptLocalData: Boolean,
-        ): Result<LogDateAccount> = Result.failure(NotImplementedError())
-
-        override suspend fun checkUsernameAvailability(username: String): Result<Boolean> = Result.success(true)
-
-        override suspend fun signOut(): Result<Unit> = Result.success(Unit)
-
-        override suspend fun getCurrentAccount(): LogDateAccount? = null
-
-        override suspend fun getAccountInfo(): Result<LogDateAccount> = Result.failure(NotImplementedError())
-
-        override suspend fun refreshAuthentication(): Result<Unit> = Result.success(Unit)
-
-        override suspend fun createRestoreKey(): Result<Unit> = Result.success(Unit)
-
-        override suspend fun signInWithRestoreKey(): Result<LogDateAccount> = Result.failure(NotImplementedError())
-
-        override suspend fun deleteRestoreKey(): Result<Unit> = Result.success(Unit)
     }
 
     private class FakePasskeyManager(

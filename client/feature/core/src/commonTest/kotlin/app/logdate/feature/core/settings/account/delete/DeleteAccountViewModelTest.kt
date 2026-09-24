@@ -2,19 +2,15 @@ package app.logdate.feature.core.settings.account.delete
 
 import app.logdate.client.networking.PasskeyApiErrorCodes
 import app.logdate.client.networking.PasskeyApiException
-import app.logdate.client.repository.account.AccountCreationRequest
 import app.logdate.client.repository.account.NotSignedInException
-import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.feature.core.settings.account.ConnectedServer
 import app.logdate.feature.core.settings.account.ConnectedServerInfo
 import app.logdate.feature.core.settings.account.ServerHealth
-import app.logdate.shared.model.LogDateAccount
-import app.logdate.shared.model.PasskeyInfo
+import app.logdate.feature.core.settings.account.StubPasskeyAccountRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -144,39 +140,9 @@ class DeleteAccountViewModelTest {
 
     private class FakeAccountRepository(
         private val result: Result<Unit> = Result.success(Unit),
-    ) : PasskeyAccountRepository {
+    ) : StubPasskeyAccountRepository() {
         var deleted = false
-        override val currentAccount: StateFlow<LogDateAccount?> = MutableStateFlow(null)
-        override val isAuthenticated: StateFlow<Boolean> = MutableStateFlow(true)
 
         override suspend fun deleteAccount(): Result<Unit> = result.onSuccess { deleted = true }
-
-        override suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> =
-            Result.failure(NotImplementedError())
-
-        override suspend fun authenticateWithPasskey(
-            username: String?,
-            adoptLocalData: Boolean,
-        ): Result<LogDateAccount> = Result.failure(NotImplementedError())
-
-        override suspend fun checkUsernameAvailability(username: String): Result<Boolean> = Result.success(true)
-
-        override suspend fun signOut(): Result<Unit> = Result.success(Unit)
-
-        override suspend fun getCurrentAccount(): LogDateAccount? = null
-
-        override suspend fun getAccountInfo(): Result<LogDateAccount> = Result.failure(NotImplementedError())
-
-        override suspend fun refreshAuthentication(): Result<Unit> = Result.success(Unit)
-
-        override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = Result.success(emptyList())
-
-        override suspend fun deletePasskey(credentialId: String): Result<Unit> = Result.success(Unit)
-
-        override suspend fun createRestoreKey(): Result<Unit> = Result.success(Unit)
-
-        override suspend fun signInWithRestoreKey(): Result<LogDateAccount> = Result.failure(NotImplementedError())
-
-        override suspend fun deleteRestoreKey(): Result<Unit> = Result.success(Unit)
     }
 }
