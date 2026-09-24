@@ -3,6 +3,8 @@ package app.logdate.client.data.account
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.networking.PasskeyApiClientContract
+import app.logdate.client.networking.PasskeyApiErrorCodes
+import app.logdate.client.networking.PasskeyApiException
 import app.logdate.client.repository.account.NotSignedInException
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.LogDateAccount
@@ -117,9 +119,11 @@ internal class AccountSessionRefreshCoordinator(
 
             val refreshResult = apiClient.refreshToken(session.refreshToken)
             if (refreshResult.isFailure) {
-                // If refresh fails, clear the session
-                signOut()
-                return Result.failure(refreshResult.exceptionOrNull()!!)
+                val error = refreshResult.exceptionOrNull()!!
+                // Only a server that refuses the refresh token ends the session. A network error
+                // or an outage leaves it in place for the next attempt.
+                if (error.isRejected(REJECTED_REFRESH_TOKEN_CODES)) signOut()
+                return Result.failure(error)
             }
 
             val newAccessToken = refreshResult.getOrThrow()
@@ -145,7 +149,6 @@ internal class AccountSessionRefreshCoordinator(
             Result.success(Unit)
         } catch (e: Exception) {
             Napier.w("Failed to refresh authentication", e)
-            signOut() // Clear session on error
             Result.failure(e)
         }
     }
@@ -182,33 +185,21 @@ internal class AccountSessionRefreshCoordinator(
     }
 
     /**
-     * Runs an authenticated call with the stored access token. If it fails, the session is
-     * refreshed and the call retried once with the new token. Without a session the call never runs.
+     * Runs an authenticated call with the stored access token. If the server rejects the token,
+     * the session is refreshed and the call retried once with the new token. Any other failure is
+     * returned as is, so a call that isn't safe to repeat never runs twice. Without a session the
+     * call never runs.
      */
     suspend fun <T> authorized(call: suspend (accessToken: String) -> Result<T>): Result<T> {
         val session = sessionStorage.getSession() ?: return Result.failure(NotSignedInException())
         val result = call(session.accessToken)
-        if (result.isSuccess) return result
+        if (!result.exceptionOrNull().isRejected(REJECTED_ACCESS_TOKEN_CODES)) return result
         if (refreshAuthentication().isFailure) return result
         val refreshed = sessionStorage.getSession() ?: return result
         return call(refreshed.accessToken)
     }
 
-    suspend fun listPasskeys(): Result<List<PasskeyInfo>> {
-        val session =
-            sessionStorage.getSession()
-                ?: return Result.failure(Exception("No active session"))
-
-        val result = apiClient.listPasskeys(session.accessToken)
-        if (result.isSuccess) return result
-
-        // Same refresh-and-retry as the other authenticated calls: an expired token should cost
-        // the user a refresh, not an empty list that reads as "you have no passkeys".
-        val refreshResult = refreshAuthentication()
-        if (!refreshResult.isSuccess) return result
-        val updatedSession = sessionStorage.getSession() ?: return result
-        return apiClient.listPasskeys(updatedSession.accessToken)
-    }
+    suspend fun listPasskeys(): Result<List<PasskeyInfo>> = authorized { apiClient.listPasskeys(it) }
 
     suspend fun deletePasskey(credentialId: String): Result<Unit> {
         return try {
@@ -265,5 +256,13 @@ internal class AccountSessionRefreshCoordinator(
 
         val updatedSession = sessionStorage.getSession() ?: return first
         return block(updatedSession.accessToken)
+    }
+
+    private fun Throwable?.isRejected(codes: Set<String>): Boolean = this is PasskeyApiException && errorCode in codes
+
+    private companion object {
+        val REJECTED_ACCESS_TOKEN_CODES = setOf(PasskeyApiErrorCodes.INVALID_TOKEN, PasskeyApiErrorCodes.UNAUTHORIZED)
+        val REJECTED_REFRESH_TOKEN_CODES =
+            setOf(PasskeyApiErrorCodes.INVALID_REFRESH_TOKEN, PasskeyApiErrorCodes.REFRESH_TOKEN_REVOKED)
     }
 }

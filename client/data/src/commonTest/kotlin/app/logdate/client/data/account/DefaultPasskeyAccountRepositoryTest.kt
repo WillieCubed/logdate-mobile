@@ -743,7 +743,7 @@ class DefaultPasskeyAccountRepositoryTest {
                 }
             val apiClient =
                 FakePasskeyApiClient().apply {
-                    refreshTokenResponse = Result.failure(Exception("Invalid refresh token"))
+                    refreshTokenResponse = Result.failure(PasskeyApiException("INVALID_REFRESH_TOKEN", "Invalid refresh token"))
                 }
 
             val repository =
@@ -757,6 +757,23 @@ class DefaultPasskeyAccountRepositoryTest {
             assertTrue(result.isFailure)
             assertNull(sessionStorage.getSession())
             assertFalse(repository.isAuthenticated.value)
+        }
+
+    @Test
+    fun `a refresh that can't reach the server keeps the session`() =
+        runTest {
+            val sessionStorage = FakeSessionStorage().apply { saveSession(testSession) }
+            val apiClient =
+                FakePasskeyApiClient().apply {
+                    listPasskeysResponse = Result.failure(PasskeyApiException("NETWORK_ERROR", "Offline"))
+                    refreshTokenResponse = Result.failure(PasskeyApiException("NETWORK_ERROR", "Offline"))
+                }
+            val repository = createRepository(sessionStorage = sessionStorage, apiClient = apiClient)
+
+            assertTrue(repository.listPasskeys().isFailure)
+            assertTrue(repository.refreshAuthentication().isFailure)
+
+            assertEquals(testSession, sessionStorage.getSession())
         }
 
     /**
@@ -976,6 +993,23 @@ class DefaultPasskeyAccountRepositoryTest {
         }
 
     @Test
+    fun `a refused passkey is not sent again`() =
+        runTest {
+            val sessionStorage = FakeSessionStorage().apply { saveSession(testSession) }
+            val apiClient =
+                FakePasskeyApiClient().apply {
+                    completeAddPasskeyResponse =
+                        Result.failure(PasskeyApiException("PASSKEY_VERIFICATION_FAILED", "Refused"))
+                }
+            val repository = createRepository(sessionStorage = sessionStorage, apiClient = apiClient)
+
+            val error = repository.addPasskey().exceptionOrNull()
+
+            assertEquals("PASSKEY_VERIFICATION_FAILED", (error as? PasskeyApiException)?.errorCode)
+            assertEquals(1, apiClient.completeAddPasskeyCalls)
+        }
+
+    @Test
     fun `adding a passkey without a session fails without touching the platform`() =
         runTest {
             val passkeyManager = FakePasskeyManager()
@@ -1135,6 +1169,8 @@ class DefaultPasskeyAccountRepositoryTest {
         var beginAddPasskeyResponse: Result<PasskeyRegistrationOptions> =
             Result.success(beginAccountCreationResponse.getOrThrow().registrationOptions)
         var beginAddPasskeyResponses: List<Result<PasskeyRegistrationOptions>>? = null
+        var listPasskeysResponse: Result<List<PasskeyInfo>> = Result.success(emptyList())
+        var completeAddPasskeyCalls = 0
         var completeAddPasskeyResponse: Result<PasskeyInfo> =
             Result.success(
                 PasskeyInfo(
@@ -1179,6 +1215,7 @@ class DefaultPasskeyAccountRepositoryTest {
         ): Result<PasskeyInfo> {
             lastAddPasskeyAccessToken = accessToken
             lastCompleteAddPasskeyRequest = request
+            completeAddPasskeyCalls++
             return completeAddPasskeyResponse
         }
 
@@ -1218,7 +1255,7 @@ class DefaultPasskeyAccountRepositoryTest {
             return logoutResponse
         }
 
-        override suspend fun listPasskeys(accessToken: String): Result<List<PasskeyInfo>> = Result.success(emptyList())
+        override suspend fun listPasskeys(accessToken: String): Result<List<PasskeyInfo>> = listPasskeysResponse
 
         override suspend fun deletePasskey(
             accessToken: String,
