@@ -108,7 +108,7 @@ class MemorySelectionViewModelTest {
         }
 
     @Test
-    fun `selections survive a fresh view model over the same saved state, as after process death`() =
+    fun `selections survive a fresh view model over the same saved state as after process death`() =
         runTest {
             val memories = listOf(sampleImage("keep-1"), sampleImage("keep-2"))
             fakeMediaManager.queryMediaByDateFlow = { flowOf(memories) }

@@ -219,7 +219,7 @@ class OnboardingFlowPlannerTest {
     }
 
     @Test
-    fun `skipping account setup is remembered, unlike a never-visited step`() {
+    fun `skipping account setup is remembered unlike a never-visited step`() {
         // Every other optional step has a *HandledOnThisDevice flag so skipping it is
         // remembered; account setup used to be the exception, reappearing every re-entry.
         val skipped =
