@@ -221,6 +221,7 @@ fun LogDateNavDisplay(
                             entryDecorators =
                                 listOf(
                                     rememberSaveableStateHolderNavEntryDecorator(),
+                                    rememberPerVisitViewModelsDecorator(),
                                     rememberNavAnimatedVisibilityScopeEntryDecorator(),
                                 ),
                             entryProvider =

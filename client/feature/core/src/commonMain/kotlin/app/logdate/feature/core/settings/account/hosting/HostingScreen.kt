@@ -53,7 +53,7 @@ fun HostingScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    // The view model outlives this screen, so each visit checks the server again.
+    // Coming back from a move checks the server the app is now connected to.
     LaunchedEffect(Unit) { viewModel.checkAgain() }
 
     HostingContent(state = state, onBack = onBack, onCheckAgain = viewModel::checkAgain, onMoveAccount = onMoveAccount)

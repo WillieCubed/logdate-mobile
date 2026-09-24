@@ -65,12 +65,6 @@ class DeleteAccountViewModel(
             choices.copy(serverName = server.displayName ?: server.host)
         }.stateIn(viewModelScope, SharingStarted.Eagerly, DeleteAccountUiState())
 
-    /** Starts over; the view model outlives a visit to the screen. */
-    fun reset() {
-        if (choices.value.phase == DeleteAccountUiState.Phase.Deleting) return
-        choices.value = DeleteAccountUiState()
-    }
-
     fun setEraseThisDevice(erase: Boolean) {
         choices.update { it.copy(eraseThisDevice = erase) }
     }

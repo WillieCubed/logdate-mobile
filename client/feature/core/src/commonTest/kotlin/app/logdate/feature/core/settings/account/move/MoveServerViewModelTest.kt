@@ -13,7 +13,6 @@ import app.logdate.feature.core.settings.ui.ServerProblem
 import app.logdate.shared.model.DeploymentKind
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.ServerDescriptor
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -232,21 +231,6 @@ class MoveServerViewModelTest {
         }
 
     @Test
-    fun `opening the screen while a move is being picked up resumes it once`() =
-        runTest {
-            val record = record(ServerMoveRecord.Phase.SWITCHING)
-            val gate = CompletableDeferred<Unit>()
-            val move = FakeMove(inProgress = record, resumeGate = gate)
-            val viewModel = viewModel(move = move)
-
-            viewModel.start()
-            gate.complete(Unit)
-
-            assertEquals(listOf(record), move.resumed)
-            assertIs<MoveServerUiState.Uploading>(viewModel.state.value)
-        }
-
-    @Test
     fun `keeping the old account ends the move`() =
         runTest {
             val move = FakeMove(inProgress = record(ServerMoveRecord.Phase.UPLOADING))
@@ -297,7 +281,6 @@ class MoveServerViewModelTest {
         private val createResult: Result<Unit> = Result.success(Unit),
         private val commitResult: Result<ServerMoveRecord>? = null,
         private val inProgress: ServerMoveRecord? = null,
-        private val resumeGate: CompletableDeferred<Unit>? = null,
     ) : ServerMove {
         var surveyResult = survey
         val createdUsernames = mutableListOf<String>()
@@ -350,7 +333,6 @@ class MoveServerViewModelTest {
 
         override suspend fun resume(record: ServerMoveRecord): Result<ServerMoveRecord> {
             resumed += record
-            resumeGate?.await()
             return Result.success(record.copy(phase = ServerMoveRecord.Phase.UPLOADING))
         }
 

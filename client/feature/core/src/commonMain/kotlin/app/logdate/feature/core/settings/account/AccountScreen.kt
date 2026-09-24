@@ -115,7 +115,7 @@ fun AccountScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showEmailVerification by remember { mutableStateOf(false) }
 
-    // View models outlive a visit to this screen, so each visit reloads what may have changed.
+    // Coming back from a subpage, such as after adding a passkey, reloads what may have changed there.
     LaunchedEffect(Unit) { viewModel.refresh() }
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->

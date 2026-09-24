@@ -77,8 +77,6 @@ fun DeleteAccountScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    // The view model outlives this screen, so every visit starts from the choices, not a result.
-    LaunchedEffect(Unit) { viewModel.reset() }
     LaunchedEffect(state.phase) {
         val phase = state.phase
         if (phase is DeleteAccountUiState.Phase.Deleted && phase.erasedThisDevice) onDeviceErased()

@@ -127,29 +127,20 @@ class MoveServerViewModel(
 
     private var destinationAccount: ServerScopedAccount? = null
     private var progressJob: Job? = null
-    private var startJob: Job? = null
 
+    /** Starts a new move, or picks up one the app was closed during. */
     init {
-        start()
-    }
-
-    /** Starts over, or picks up a move already under way. The view model outlives the screen. */
-    fun start() {
-        if (startJob?.isActive == true) return
-        if (_state.value !is MoveServerUiState.Loading && _state.value !is MoveServerUiState.Closed) return
-        _state.value = MoveServerUiState.Loading
-        startJob =
-            viewModelScope.launch {
-                val record = move.inProgress()
-                if (record == null) {
-                    _state.value = MoveServerUiState.ChooseServer(source = move.source())
-                    return@launch
-                }
-                move
-                    .resume(record)
-                    .onSuccess(::watchUpload)
-                    .onFailure { _state.value = MoveServerUiState.ChooseServer(source = move.source()) }
+        viewModelScope.launch {
+            val record = move.inProgress()
+            if (record == null) {
+                _state.value = MoveServerUiState.ChooseServer(source = move.source())
+                return@launch
             }
+            move
+                .resume(record)
+                .onSuccess(::watchUpload)
+                .onFailure { _state.value = MoveServerUiState.ChooseServer(source = move.source()) }
+        }
     }
 
     fun setAddress(address: String) {

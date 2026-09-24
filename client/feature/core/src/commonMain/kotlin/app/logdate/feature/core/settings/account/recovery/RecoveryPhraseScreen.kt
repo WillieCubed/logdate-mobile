@@ -21,7 +21,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -63,12 +62,8 @@ fun RecoveryPhraseScreen(
             description = null,
         )
 
-    // The view model outlives this screen. Check again on every visit, since the phrase may have
-    // been entered elsewhere, and never leave it on screen for the next visit. A rotation rebuilds
-    // the screen without the person leaving it, so the phrase stays up through one.
-    val isChangingConfiguration = rememberIsChangingConfiguration()
+    // Coming back from entering the phrase finds it; a revealed phrase stays shown through a rotation.
     LaunchedEffect(Unit) { viewModel.check() }
-    DisposableEffect(Unit) { onDispose { if (!isChangingConfiguration()) viewModel.hide() } }
 
     RecoveryPhraseContent(
         state = state,

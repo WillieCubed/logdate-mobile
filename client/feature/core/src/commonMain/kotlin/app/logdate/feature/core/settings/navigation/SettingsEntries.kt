@@ -44,6 +44,7 @@ import app.logdate.feature.events.ui.calendarsync.CalendarSyncCalendarsScreen
 import app.logdate.feature.events.ui.calendarsync.CalendarSyncSettingsScreen
 import app.logdate.feature.events.ui.settings.EventsSettingsScreen
 import app.logdate.feature.rewind.ui.settings.RewindSettingsScreen
+import app.logdate.ui.navigation.ViewModelsPerVisit
 import app.logdate.ui.navigation.taggedEntry
 import kotlin.uuid.Uuid
 
@@ -106,7 +107,7 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             onNavigateToSignIn = onNavigateToSignIn,
         )
     }
-    taggedEntry<AccountSettingsRoute> {
+    taggedEntry<AccountSettingsRoute>(metadata = ViewModelsPerVisit) {
         AccountScreen(
             destinations =
                 AccountDestinations(
@@ -121,22 +122,22 @@ fun EntryProviderScope<NavKey>.settingsEntries(
                 ),
         )
     }
-    taggedEntry<SignInMethodsRoute> {
+    taggedEntry<SignInMethodsRoute>(metadata = ViewModelsPerVisit) {
         SignInMethodsScreen(onBack = onBack)
     }
-    taggedEntry<RecoveryPhraseRoute> {
+    taggedEntry<RecoveryPhraseRoute>(metadata = ViewModelsPerVisit) {
         RecoveryPhraseScreen(
             onBack = onBack,
             onEnterPhrase = { onNavigateTo(RecoveryPhraseEntrySettingsRoute) },
         )
     }
-    taggedEntry<HostingRoute> {
+    taggedEntry<HostingRoute>(metadata = ViewModelsPerVisit) {
         HostingScreen(onBack = onBack, onMoveAccount = { onNavigateTo(MoveServerRoute) })
     }
-    taggedEntry<MoveServerRoute> {
+    taggedEntry<MoveServerRoute>(metadata = ViewModelsPerVisit) {
         MoveServerScreen(onClose = onBack)
     }
-    taggedEntry<DeleteAccountRoute> {
+    taggedEntry<DeleteAccountRoute>(metadata = ViewModelsPerVisit) {
         DeleteAccountScreen(onBack = onBack, onDeviceErased = onResetApp)
     }
     taggedEntry<PrivacySettingsRoute> {

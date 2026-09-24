@@ -38,3 +38,13 @@ fun NavEntry<*>.routeClass(): KClass<out NavKey>? {
     @Suppress("UNCHECKED_CAST")
     return metadata[ROUTE_CLASS_METADATA_KEY] as? KClass<out NavKey>
 }
+
+/**
+ * Metadata that gives an entry its own view models for each visit: they are created when the
+ * entry is pushed, kept through configuration changes, and cleared when it leaves the back stack.
+ * Without it, a screen's view models belong to the activity and carry state from the last visit.
+ */
+val ViewModelsPerVisit: Map<String, Any> = mapOf("logdate.viewModelsPerVisit" to true)
+
+/** Whether this entry asked for [ViewModelsPerVisit]. */
+fun NavEntry<*>.hasViewModelsPerVisit(): Boolean = metadata["logdate.viewModelsPerVisit"] == true

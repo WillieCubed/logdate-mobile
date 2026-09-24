@@ -118,16 +118,8 @@ fun MoveServerScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    // The view model outlives a visit, so a visit after a finished move starts a new one. It still
-    // says Closed until then, which must not close this visit.
-    var hasOpened by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { viewModel.start() }
     LaunchedEffect(state) {
-        when (state) {
-            MoveServerUiState.Loading -> Unit
-            MoveServerUiState.Closed -> if (hasOpened) onClose()
-            else -> hasOpened = true
-        }
+        if (state == MoveServerUiState.Closed) onClose()
     }
 
     MoveServerContent(
