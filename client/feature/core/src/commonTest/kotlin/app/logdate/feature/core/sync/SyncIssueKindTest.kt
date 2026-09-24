@@ -2,7 +2,9 @@ package app.logdate.feature.core.sync
 
 import app.logdate.client.sync.InterruptedUploadException
 import app.logdate.client.sync.MissingMediaException
+import app.logdate.client.sync.metadata.SyncDeadLetterReason
 import app.logdate.client.sync.metadata.SyncDeadLetterRecord
+import app.logdate.client.sync.metadata.effectiveReason
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -29,7 +31,7 @@ class SyncIssueKindTest {
     fun `an entry set aside for closing the app is explained as that`() {
         val record = setAside(InterruptedUploadException(unfinishedAttempts = 2).message.orEmpty())
 
-        assertEquals(SyncIssueKind.APP_CLOSED, record.issueKind())
+        assertEquals(SyncDeadLetterReason.APP_CLOSED, record.effectiveReason())
     }
 
     @Test
@@ -37,13 +39,24 @@ class SyncIssueKindTest {
         val cause = IllegalStateException("open failed: ENOENT (No such file or directory)")
         val record = setAside(MissingMediaException("/files/audio_notes/recording.m4a", cause).message.orEmpty())
 
-        assertEquals(SyncIssueKind.MISSING_FILE, record.issueKind())
+        assertEquals(SyncDeadLetterReason.MISSING_FILE, record.effectiveReason())
     }
 
     @Test
     fun `any other failure is explained as a failed upload`() {
         val record = setAside("Failed to upload content: HTTP 500")
 
-        assertEquals(SyncIssueKind.FAILED, record.issueKind())
+        assertEquals(SyncDeadLetterReason.UNKNOWN, record.effectiveReason())
+    }
+
+    @Test
+    fun `a server outage is explained as a server problem`() {
+        assertEquals(SyncDeadLetterReason.SERVER_UNAVAILABLE, setAside("An unknown error occurred: Service Unavailable").effectiveReason())
+        assertEquals(SyncDeadLetterReason.SERVER_UNAVAILABLE, setAside("HTTP 503").effectiveReason())
+    }
+
+    @Test
+    fun `an expired session is explained as a sign in problem`() {
+        assertEquals(SyncDeadLetterReason.SIGN_IN_REQUIRED, setAside("HTTP 401 Unauthorized").effectiveReason())
     }
 }

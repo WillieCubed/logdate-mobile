@@ -392,11 +392,10 @@ public class DefaultRepoEngine(
 
     private suspend fun loadSnapshot(repo: AtprotoDid): RepoSnapshot {
         val head = blockStore.readHead(repo).getOrThrow() ?: return RepoSnapshot(head = null, tree = MerkleSearchTree.empty())
-        // Walking the tree with one readBlock per node meant a round trip per node, so simply
-        // opening a repo cost work proportional to how much was in it -- the dominant cost in
-        // every read and every write. The store can hand over a repo's blocks in one go.
-        val blocks = blockStore.listBlocks(repo).getOrThrow().associateBy { it.cid }
-        val tree = MerkleSearchTree.fromBlocks(head.root) { cid -> blocks[cid] }
+        // Only MST nodes reachable from the current head are needed here. listBlocks loads every
+        // historic record, tree, and commit block for the repo into memory on every read/write;
+        // that grows without bound as backups accumulate and can exhaust the server container.
+        val tree = MerkleSearchTree.fromBlocks(head.root) { cid -> blockStore.readBlock(cid).getOrThrow() }
         return RepoSnapshot(head = head, tree = tree)
     }
 

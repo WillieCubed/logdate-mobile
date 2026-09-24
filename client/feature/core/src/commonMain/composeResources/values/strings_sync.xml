@@ -32,9 +32,10 @@
         <item quantity="other">%1$d failed at least once and will retry</item>
     </plurals>
     <plurals name="sync_status_failed_items">
-        <item quantity="one">%1$d item stopped retrying and needs you to decide</item>
-        <item quantity="other">%1$d items stopped retrying and need you to decide</item>
+        <item quantity="one">%1$d item needs attention</item>
+        <item quantity="other">%1$d items need attention</item>
     </plurals>
+    <string name="sync_status_failed_items_detail">These items have not backed up. Open Sync issues to see why and retry them.</string>
     <plurals name="sync_status_unreadable_cloud_items">
         <item quantity="one">%1$d item from another setup can\'t be read here</item>
         <item quantity="other">%1$d items from another setup can\'t be read here</item>
@@ -127,8 +128,12 @@
         <item quantity="one">%1$d item needs attention.</item>
         <item quantity="other">%1$d items need attention.</item>
     </plurals>
-    <string name="sync_issue_review_queue_description">Retry items when the source data should still sync. Discard items only when the local change is no longer useful.</string>
-    <string name="sync_issue_discard">Discard</string>
+    <string name="sync_issue_review_queue_description">These items are still on this device. Review the reason for each item below, then retry it.</string>
+    <string name="sync_issue_discard">Stop trying</string>
+    <string name="sync_issue_discard_title">Stop backing up this item?</string>
+    <string name="sync_issue_discard_description">It will stay on this device, but this change will be removed from the backup queue. You can edit it later to try again.</string>
+    <string name="sync_issue_retry_requested">Retry requested. Waiting for backup to start.</string>
+    <string name="sync_issue_retry_failed">Couldn't start the retry. The item remains on this device.</string>
 
     <!-- Sync issues: what kind of thing failed, and how many -->
     <plurals name="sync_issue_count_note"><item quantity="one">%1$d entry</item><item quantity="other">%1$d entries</item></plurals>
@@ -155,9 +160,13 @@
     <string name="sync_issue_upload_failed_health">This health record didn't upload</string>
     <string name="sync_issue_upload_failed_other">This item didn't upload</string>
 
-    <string name="sync_issue_explain_missing_file">The file it points to is no longer on this device, so there is nothing left to upload. Discarding it removes it from the queue and leaves the entry itself alone.</string>
-    <string name="sync_issue_explain_app_closed">LogDate closed while uploading it twice in a row, so it was set aside to let everything else back up. It is tried again once a day. Retry after updating LogDate, or discard it if you no longer need it synced.</string>
-    <string name="sync_issue_explain_failed">It was tried several times without success. Retry if you are back online, or discard it if you no longer need it synced.</string>
+    <string name="sync_issue_explain_missing_file">The file it points to is no longer on this device, so there is nothing left to upload. Stop trying to remove this change from the backup queue. The entry stays on this device.</string>
+    <string name="sync_issue_explain_app_closed">LogDate closed while uploading it twice in a row, so it was set aside to let everything else back up. It is tried again once a day. Retry after updating LogDate, or stop trying if you no longer need this change backed up.</string>
+    <string name="sync_issue_explain_failed">LogDate could not identify the cause of this upload failure. The item is still on this device. Retry now; if it fails again, leave it in the queue and check for an app update.</string>
+    <string name="sync_issue_explain_server_unavailable">LogDate Cloud could not finish this upload. The entry is still on this device. Retry now; if the service is still unavailable, it will stay in the backup queue.</string>
+    <string name="sync_issue_explain_sign_in_required">Your sign-in may have expired. Sign in again, then retry this entry. It is still on this device.</string>
+    <string name="sync_issue_explain_network_unavailable">The connection failed during upload. This item is still on your device. Reconnect and retry.</string>
+    <string name="sync_issue_explain_file_too_large">This file is too large for backup. It remains on this device. Choose a smaller file before trying again.</string>
     <string name="sync_paused_background_data_off">Automatic backup may wait on mobile data</string>
     <string name="sync_paused_background_data_off_fix">You can still back up while LogDate is open, or connect to Wi-Fi.</string>
     <string name="sync_paused_offline">Paused — waiting for a connection</string>

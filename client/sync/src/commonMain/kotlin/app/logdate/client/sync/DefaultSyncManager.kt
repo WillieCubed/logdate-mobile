@@ -513,12 +513,17 @@ class DefaultSyncManager(
         val uploadResult = uploadPendingChanges()
         val draftResult = syncDrafts()
 
+        val errors = downloadResult.errors + uploadResult.errors + draftResult.errors
+        // Each phase updates the shared last error. A successful upload must not erase a failed
+        // download from the same full run, or the worker retries with no visible reason.
+        lastErrorFlow.value = errors.mostSevere()
+
         return SyncResult(
             success = uploadResult.success && downloadResult.success && draftResult.success,
             uploadedItems = uploadResult.uploadedItems + draftResult.uploadedItems,
             downloadedItems = downloadResult.downloadedItems + draftResult.downloadedItems,
             conflictsResolved = downloadResult.conflictsResolved,
-            errors = downloadResult.errors + uploadResult.errors + draftResult.errors,
+            errors = errors,
             lastSyncTime = latestSyncTime(),
         )
     }

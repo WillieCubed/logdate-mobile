@@ -12,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
@@ -99,5 +100,16 @@ class SyncDeadLetterRetentionTest {
                 coordinator.shouldAttempt(EntityType.NOTE, entityId),
                 "Asking for a retry means asking for it now, not in a day",
             )
+        }
+
+    @Test
+    fun `a later successful upload clears its old sync issue`() =
+        runTest {
+            exhaustRetries()
+
+            coordinator.markUploadSettled(EntityType.NOTE, entityId, Clock.System.now(), 1L)
+
+            assertTrue(deadLetterStore.list().isEmpty())
+            assertFalse(metadataService.getPendingUploads(EntityType.NOTE).any { it.entityId == entityId })
         }
 }

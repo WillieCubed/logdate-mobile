@@ -12,10 +12,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -28,12 +28,16 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.logdate.client.sync.metadata.SyncDeadLetterReason
 import app.logdate.client.sync.metadata.SyncDeadLetterRecord
-import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.client.sync.metadata.effectiveReason
 import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.sync_feedback_up_to_date
@@ -45,9 +49,15 @@ import logdate.client.feature.core.generated.resources.sync_issue_count_media
 import logdate.client.feature.core.generated.resources.sync_issue_count_note
 import logdate.client.feature.core.generated.resources.sync_issue_count_other
 import logdate.client.feature.core.generated.resources.sync_issue_discard
+import logdate.client.feature.core.generated.resources.sync_issue_discard_description
+import logdate.client.feature.core.generated.resources.sync_issue_discard_title
 import logdate.client.feature.core.generated.resources.sync_issue_explain_app_closed
 import logdate.client.feature.core.generated.resources.sync_issue_explain_failed
+import logdate.client.feature.core.generated.resources.sync_issue_explain_file_too_large
 import logdate.client.feature.core.generated.resources.sync_issue_explain_missing_file
+import logdate.client.feature.core.generated.resources.sync_issue_explain_network_unavailable
+import logdate.client.feature.core.generated.resources.sync_issue_explain_server_unavailable
+import logdate.client.feature.core.generated.resources.sync_issue_explain_sign_in_required
 import logdate.client.feature.core.generated.resources.sync_issue_items_need_attention
 import logdate.client.feature.core.generated.resources.sync_issue_missing_file_association
 import logdate.client.feature.core.generated.resources.sync_issue_missing_file_draft
@@ -56,8 +66,9 @@ import logdate.client.feature.core.generated.resources.sync_issue_missing_file_j
 import logdate.client.feature.core.generated.resources.sync_issue_missing_file_media
 import logdate.client.feature.core.generated.resources.sync_issue_missing_file_note
 import logdate.client.feature.core.generated.resources.sync_issue_missing_file_other
+import logdate.client.feature.core.generated.resources.sync_issue_retry_failed
+import logdate.client.feature.core.generated.resources.sync_issue_retry_requested
 import logdate.client.feature.core.generated.resources.sync_issue_review_queue_description
-import logdate.client.feature.core.generated.resources.sync_issue_review_queue_title
 import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_association
 import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_draft
 import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_health
@@ -68,6 +79,7 @@ import logdate.client.feature.core.generated.resources.sync_issue_upload_failed_
 import logdate.client.feature.core.generated.resources.sync_issues_title
 import logdate.client.feature.core.generated.resources.sync_status_waiting
 import logdate.client.ui.generated.resources.common_back
+import logdate.client.ui.generated.resources.common_cancel
 import logdate.client.ui.generated.resources.common_retry
 import org.jetbrains.compose.resources.PluralStringResource
 import org.jetbrains.compose.resources.StringResource
@@ -85,9 +97,13 @@ fun SyncIssuesScreen(
 ) {
     val records by viewModel.records.collectAsStateWithLifecycle()
     val pendingCount by viewModel.pendingCount.collectAsStateWithLifecycle()
+    val labels by viewModel.labels.collectAsStateWithLifecycle()
+    val retryFeedback by viewModel.retryFeedback.collectAsStateWithLifecycle()
     SyncIssuesContent(
         records = records,
         pendingCount = pendingCount,
+        labels = labels,
+        retryFeedback = retryFeedback,
         onRetry = viewModel::retry,
         onDiscard = viewModel::discard,
         onGoBack = onGoBack,
@@ -100,6 +116,8 @@ fun SyncIssuesScreen(
 fun SyncIssuesContent(
     records: List<SyncDeadLetterRecord>,
     pendingCount: Int = 0,
+    labels: Map<String, String> = emptyMap(),
+    retryFeedback: SyncIssueRetryFeedback? = null,
     onRetry: (String) -> Unit,
     onDiscard: (String) -> Unit,
     onGoBack: () -> Unit,
@@ -119,34 +137,18 @@ fun SyncIssuesContent(
         },
     ) { padding ->
         if (records.isEmpty()) {
-            EmptyState(pendingCount = pendingCount, modifier = Modifier.padding(padding))
+            EmptyState(pendingCount = pendingCount, retryFeedback = retryFeedback, modifier = Modifier.padding(padding))
         } else {
-            FoldableBookLayout(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                minPaneWidth = 320.dp,
-                startPane = {
-                    SyncIssuesSummaryPane(
-                        records = records,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                },
-                endPane = {
-                    SyncIssuesList(
-                        records = records,
-                        onRetry = onRetry,
-                        onDiscard = onDiscard,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                },
-                standardContent = {
-                    SyncIssuesList(
-                        records = records,
-                        onRetry = onRetry,
-                        onDiscard = onDiscard,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                },
-            )
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
+                SyncIssuesList(
+                    records = records,
+                    labels = labels,
+                    retryFeedback = retryFeedback,
+                    onRetry = onRetry,
+                    onDiscard = onDiscard,
+                    modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth(),
+                )
+            }
         }
     }
 }
@@ -154,12 +156,15 @@ fun SyncIssuesContent(
 @Composable
 private fun EmptyState(
     pendingCount: Int,
+    retryFeedback: SyncIssueRetryFeedback?,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
             text =
-                if (pendingCount > 0) {
+                if (retryFeedback != null) {
+                    stringResource(retryFeedback.messageResource())
+                } else if (pendingCount > 0) {
                     pluralStringResource(Res.plurals.sync_status_waiting, pendingCount, pendingCount)
                 } else {
                     stringResource(Res.string.sync_feedback_up_to_date)
@@ -171,55 +176,10 @@ private fun EmptyState(
 }
 
 @Composable
-private fun SyncIssuesSummaryPane(
-    records: List<SyncDeadLetterRecord>,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier =
-            modifier
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = stringResource(Res.string.sync_issue_review_queue_title),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(
-                    text = pluralStringResource(Res.plurals.sync_issue_items_need_attention, records.size, records.size),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = stringResource(Res.string.sync_issue_review_queue_description),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
-        records
-            .groupingBy { it.entityType }
-            .eachCount()
-            .forEach { (entityType, count) ->
-                Text(
-                    text = pluralStringResource(countPluralFor(entityType), count, count),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-    }
-}
-
-@Composable
 private fun SyncIssuesList(
     records: List<SyncDeadLetterRecord>,
+    labels: Map<String, String>,
+    retryFeedback: SyncIssueRetryFeedback?,
     onRetry: (String) -> Unit,
     onDiscard: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -229,9 +189,39 @@ private fun SyncIssuesList(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = pluralStringResource(Res.plurals.sync_issue_items_need_attention, records.size, records.size),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = stringResource(Res.string.sync_issue_review_queue_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (retryFeedback != null) {
+            item {
+                Text(
+                    text = stringResource(retryFeedback.messageResource()),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color =
+                        if (retryFeedback ==
+                            SyncIssueRetryFeedback.COULD_NOT_START
+                        ) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                )
+            }
+        }
         items(records, key = { it.id }) { record ->
             SyncIssueCard(
                 record = record,
+                label = labels[record.id],
                 onRetry = { onRetry(record.id) },
                 onDiscard = { onDiscard(record.id) },
             )
@@ -239,18 +229,45 @@ private fun SyncIssuesList(
     }
 }
 
+private fun SyncIssueRetryFeedback.messageResource(): StringResource =
+    when (this) {
+        SyncIssueRetryFeedback.REQUESTED -> Res.string.sync_issue_retry_requested
+        SyncIssueRetryFeedback.COULD_NOT_START -> Res.string.sync_issue_retry_failed
+    }
+
 @Composable
 private fun SyncIssueCard(
     record: SyncDeadLetterRecord,
+    label: String?,
     onRetry: () -> Unit,
     onDiscard: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var confirmDiscard by remember(record.id) { mutableStateOf(false) }
+    if (confirmDiscard) {
+        AlertDialog(
+            onDismissRequest = { confirmDiscard = false },
+            title = { Text(stringResource(Res.string.sync_issue_discard_title)) },
+            text = { Text(stringResource(Res.string.sync_issue_discard_description)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDiscard = false
+                    onDiscard()
+                }) { Text(stringResource(Res.string.sync_issue_discard)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDiscard = false }) { Text(stringResource(UiRes.string.common_cancel)) }
+            },
+        )
+    }
     ElevatedCard(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (label != null) {
+                Text(text = label, style = MaterialTheme.typography.titleMedium)
+            }
             Text(
                 text = stringResource(issueMessageFor(record)),
                 style = MaterialTheme.typography.titleSmall,
@@ -265,7 +282,7 @@ private fun SyncIssueCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                TextButton(onClick = onDiscard) {
+                TextButton(onClick = { confirmDiscard = true }) {
                     Text(stringResource(Res.string.sync_issue_discard))
                 }
                 Spacer(Modifier.size(8.dp))
@@ -294,7 +311,7 @@ internal fun countPluralFor(entityType: String): PluralStringResource =
     }
 
 private fun issueMessageFor(record: SyncDeadLetterRecord): StringResource =
-    if (record.issueKind() == SyncIssueKind.MISSING_FILE) {
+    if (record.effectiveReason() == SyncDeadLetterReason.MISSING_FILE) {
         when (record.entityType.uppercase()) {
             "NOTE" -> Res.string.sync_issue_missing_file_note
             "JOURNAL" -> Res.string.sync_issue_missing_file_journal
@@ -317,27 +334,12 @@ private fun issueMessageFor(record: SyncDeadLetterRecord): StringResource =
     }
 
 private fun explainIssue(record: SyncDeadLetterRecord): StringResource =
-    when (record.issueKind()) {
-        SyncIssueKind.MISSING_FILE -> Res.string.sync_issue_explain_missing_file
-        SyncIssueKind.APP_CLOSED -> Res.string.sync_issue_explain_app_closed
-        SyncIssueKind.FAILED -> Res.string.sync_issue_explain_failed
-    }
-
-/** Why an entry was set aside, which decides how Sync Issues explains it. */
-internal enum class SyncIssueKind {
-    MISSING_FILE,
-
-    /** LogDate closed while uploading it, more than once in a row. */
-    APP_CLOSED,
-    FAILED,
-}
-
-/** Read from [SyncDeadLetterRecord.lastError], the only trace of the cause a record keeps. */
-internal fun SyncDeadLetterRecord.issueKind(): SyncIssueKind =
-    when {
-        lastError.contains("no longer exists", ignoreCase = true) ||
-            lastError.contains("ENOENT", ignoreCase = true) ||
-            lastError.contains("No such file", ignoreCase = true) -> SyncIssueKind.MISSING_FILE
-        lastError.contains("closed while uploading", ignoreCase = true) -> SyncIssueKind.APP_CLOSED
-        else -> SyncIssueKind.FAILED
+    when (record.effectiveReason()) {
+        SyncDeadLetterReason.MISSING_FILE -> Res.string.sync_issue_explain_missing_file
+        SyncDeadLetterReason.SERVER_UNAVAILABLE -> Res.string.sync_issue_explain_server_unavailable
+        SyncDeadLetterReason.SIGN_IN_REQUIRED -> Res.string.sync_issue_explain_sign_in_required
+        SyncDeadLetterReason.APP_CLOSED -> Res.string.sync_issue_explain_app_closed
+        SyncDeadLetterReason.NETWORK_UNAVAILABLE -> Res.string.sync_issue_explain_network_unavailable
+        SyncDeadLetterReason.FILE_TOO_LARGE -> Res.string.sync_issue_explain_file_too_large
+        SyncDeadLetterReason.UNKNOWN -> Res.string.sync_issue_explain_failed
     }

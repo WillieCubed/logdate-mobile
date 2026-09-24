@@ -11,17 +11,12 @@ import kotlin.coroutines.startCoroutine
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * A page of the change feed reads one record at a time, and opening the repo costs a pass over
- * every block it holds. Reading 25 records that way re-reads the whole repo 25 times, which is
- * why `GET /api/v1/contents?since=0&limit=25` timed out on a journal of a few hundred entries
- * while the same request for five journals answered instantly.
- */
+/** A change-feed page reuses one current tree without loading the repo's entire block history. */
 class BatchRecordReadTest {
     private val repo = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
     private val collection = Nsid.require("studio.hypertext.logdate.entry")
 
-    /** Counts how many times the engine asks the store for the repo's blocks. */
+    /** Counts requests to load the repo's entire block history. */
     private class CountingBlockStore : RepoBlockStore by InMemoryRepoBlockStore() {
         private val delegate = InMemoryRepoBlockStore()
         var listBlocksCalls = 0
@@ -65,7 +60,30 @@ class BatchRecordReadTest {
         }
 
     @Test
-    fun `reading a page of records opens the repo once rather than once per record`() =
+    fun `reading and updating a populated repo never loads its entire block history`() =
+        runSuspend {
+            val blockStore = CountingBlockStore()
+            val engine = DefaultRepoEngine(blockStore)
+            val recordId = RepoRecordId(repo, collection, RecordKey.require("entry-1"))
+            engine.putRecord(recordId, entry("before")).getOrThrow()
+
+            val before = blockStore.listBlocksCalls
+            val storedText =
+                engine
+                    .getRecord(recordId)
+                    .getOrThrow()
+                    ?.value
+                    ?.get("text")
+                    ?.toString()
+                    ?.trim('"')
+            assertEquals("before", storedText)
+            engine.putRecord(recordId, entry("after")).getOrThrow()
+
+            assertEquals(before, blockStore.listBlocksCalls)
+        }
+
+    @Test
+    fun `reading a page of records avoids loading the repo block history`() =
         runSuspend {
             val blockStore = CountingBlockStore()
             val engine = DefaultRepoEngine(blockStore)
@@ -84,7 +102,7 @@ class BatchRecordReadTest {
 
             assertEquals(25, records.size)
             assertEquals(25, records.count { it != null })
-            assertEquals(1, blockStore.listBlocksCalls - before)
+            assertEquals(0, blockStore.listBlocksCalls - before)
         }
 
     @Test

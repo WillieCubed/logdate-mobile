@@ -254,7 +254,7 @@ internal fun buildSyncStatusUiState(
     )
 
 /** This item's own title or snippet, or null when it has none (e.g. a voice note). */
-private fun JournalNote.explicitLabelOrNull(): String? =
+internal fun JournalNote.explicitLabelOrNull(): String? =
     when (this) {
         is JournalNote.Text -> content.toPreviewLabelOrNull()
         is JournalNote.Image -> caption.toPreviewLabelOrNull()
@@ -263,7 +263,7 @@ private fun JournalNote.explicitLabelOrNull(): String? =
     }
 
 /** Trimmed and length-capped for a one-line preview, or null when there is nothing to show. */
-private fun String.toPreviewLabelOrNull(): String? {
+internal fun String.toPreviewLabelOrNull(): String? {
     val trimmed = trim()
     if (trimmed.isEmpty()) return null
     return if (trimmed.length <= PREVIEW_LABEL_MAX_LENGTH) {

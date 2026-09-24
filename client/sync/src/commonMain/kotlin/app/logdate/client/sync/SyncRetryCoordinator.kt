@@ -1,9 +1,12 @@
 package app.logdate.client.sync
 
+import app.logdate.client.sync.cloud.CloudApiException
+import app.logdate.client.sync.cloud.MediaTooLargeException
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncBackoff
+import app.logdate.client.sync.metadata.SyncDeadLetterReason
 import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
@@ -142,6 +145,7 @@ internal class SyncRetryCoordinator(
                     retryCount = nextRetryCount,
                     lastError = error.message ?: "Unknown error",
                     failedAt = Clock.System.now().toEpochMilliseconds(),
+                    reason = classifySyncFailure(error),
                 ),
             )
             // Deliberately left in the pending queue. Removing it here would report an entry that
@@ -240,6 +244,7 @@ internal class SyncRetryCoordinator(
     ) {
         syncMetadataService.markAsSynced(entityId, entityType, syncedAt, version)
         retryScheduleStore.clear(entityType, entityId)
+        deadLetterStore.remove("${entityType.name}:$entityId")
         attemptsInFlight.remove(PendingEntityKey(entityType, entityId))
         clearFailureKind(entityType, entityId)
     }
@@ -336,6 +341,21 @@ internal class SyncRetryCoordinator(
         const val DEAD_LETTER_RETRY_INTERVAL_MS = 24L * 60 * 60 * 1000
     }
 }
+
+internal fun classifySyncFailure(error: Throwable): SyncDeadLetterReason =
+    when (error) {
+        is MissingMediaException -> SyncDeadLetterReason.MISSING_FILE
+        is InterruptedUploadException -> SyncDeadLetterReason.APP_CLOSED
+        is MediaTooLargeException -> SyncDeadLetterReason.FILE_TOO_LARGE
+        is CloudApiException ->
+            when {
+                error.statusCode == 401 -> SyncDeadLetterReason.SIGN_IN_REQUIRED
+                error.statusCode in setOf(502, 503, 504) -> SyncDeadLetterReason.SERVER_UNAVAILABLE
+                error.errorCode == "NETWORK_ERROR" -> SyncDeadLetterReason.NETWORK_UNAVAILABLE
+                else -> SyncDeadLetterReason.UNKNOWN
+            }
+        else -> SyncDeadLetterReason.UNKNOWN
+    }
 
 /** Earlier upload attempts at an entry never finished, because the app closed during each one. */
 class InterruptedUploadException(

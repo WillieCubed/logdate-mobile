@@ -203,7 +203,7 @@ actual val coreFeatureModule: Module =
         viewModel { PeopleDirectoryViewModel(get(), get()) }
         viewModel { PeopleInboxViewModel(get()) }
         viewModel { PersonDetailViewModel(get(), get()) }
-        viewModel { SyncIssuesViewModel(get()) }
+        viewModel { SyncIssuesViewModel(get(), get(), get()) }
         viewModel { SyncPresentationViewModel(syncManager = get(), sessionStorage = get()) }
         viewModel {
             SyncStatusViewModel(

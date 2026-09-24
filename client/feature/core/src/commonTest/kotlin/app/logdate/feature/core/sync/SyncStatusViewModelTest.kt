@@ -58,6 +58,60 @@ class SyncStatusViewModelTest {
     }
 
     @Test
+    fun `retrying a sync issue requests a backup immediately`() =
+        runTest {
+            val manager = RecordingSyncManager()
+            val viewModel = SyncIssuesViewModel(manager, FakeJournalRepository(), FakeJournalNotesRepository())
+
+            viewModel.retry("NOTE:entry-1")
+            advanceUntilIdle()
+
+            assertEquals(listOf("NOTE:entry-1"), manager.retriedIssues)
+            assertEquals(listOf(true), manager.syncRequests)
+            assertEquals(SyncIssueRetryFeedback.REQUESTED, viewModel.retryFeedback.value)
+        }
+
+    @Test
+    fun `sync issues report when a retry cannot be scheduled`() =
+        runTest {
+            val manager = RecordingSyncManager(failOnSync = true)
+            val viewModel = SyncIssuesViewModel(manager, FakeJournalRepository(), FakeJournalNotesRepository())
+
+            viewModel.retry("NOTE:entry-1")
+            advanceUntilIdle()
+
+            assertEquals(SyncIssueRetryFeedback.COULD_NOT_START, viewModel.retryFeedback.value)
+        }
+
+    @Test
+    fun `sync issues identify the local journal that failed`() =
+        runTest {
+            val journalId = Uuid.random()
+            val record =
+                SyncDeadLetterRecord(
+                    id = "JOURNAL:$journalId",
+                    entityType = "JOURNAL",
+                    entityId = journalId.toString(),
+                    operation = "CREATE",
+                    retryCount = 9,
+                    lastError = "Service Unavailable",
+                    failedAt = 0L,
+                )
+            val manager = RecordingSyncManager(deadLetters = listOf(record))
+            val viewModel =
+                SyncIssuesViewModel(
+                    manager,
+                    FakeJournalRepository(journals = mapOf(journalId to Journal(id = journalId, title = "Travel"))),
+                    FakeJournalNotesRepository(),
+                )
+
+            viewModel.labels.launchIn(backgroundScope)
+            advanceUntilIdle()
+
+            assertEquals("Travel", viewModel.labels.value[record.id])
+        }
+
+    @Test
     fun `the queue is grouped by kind with the largest group first`() {
         val state =
             buildSyncStatusUiState(
@@ -440,8 +494,10 @@ class SyncStatusViewModelTest {
         private val failOnSync: Boolean = false,
         private val queueOnSync: Boolean = false,
         pendingUploads: Int = 0,
+        private val deadLetters: List<SyncDeadLetterRecord> = emptyList(),
     ) : SyncManager {
         val syncRequests = mutableListOf<Boolean>()
+        val retriedIssues = mutableListOf<String>()
 
         override val syncStatusFlow: StateFlow<SyncStatus> =
             MutableStateFlow(
@@ -479,9 +535,11 @@ class SyncStatusViewModelTest {
 
         override suspend fun getSyncStatus(): SyncStatus = syncStatusFlow.value
 
-        override fun observeDeadLetters(): Flow<List<SyncDeadLetterRecord>> = MutableStateFlow(emptyList())
+        override fun observeDeadLetters(): Flow<List<SyncDeadLetterRecord>> = MutableStateFlow(deadLetters)
 
-        override suspend fun retryDeadLetter(id: String) {}
+        override suspend fun retryDeadLetter(id: String) {
+            retriedIssues += id
+        }
 
         override suspend fun discardDeadLetter(id: String) {}
     }

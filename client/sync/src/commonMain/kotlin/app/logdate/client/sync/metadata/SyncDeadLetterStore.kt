@@ -5,6 +5,8 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
@@ -21,7 +23,36 @@ data class SyncDeadLetterRecord(
     val retryCount: Int,
     val lastError: String,
     val failedAt: Long,
+    val reason: SyncDeadLetterReason = SyncDeadLetterReason.UNKNOWN,
 )
+
+@Serializable
+enum class SyncDeadLetterReason {
+    UNKNOWN,
+    MISSING_FILE,
+    APP_CLOSED,
+    SERVER_UNAVAILABLE,
+    SIGN_IN_REQUIRED,
+    NETWORK_UNAVAILABLE,
+    FILE_TOO_LARGE,
+}
+
+/** Older saved records had only a message; interpret known legacy messages once at this boundary. */
+fun SyncDeadLetterRecord.effectiveReason(): SyncDeadLetterReason {
+    if (reason != SyncDeadLetterReason.UNKNOWN) return reason
+    return when {
+        lastError.contains("no longer exists", ignoreCase = true) ||
+            lastError.contains("ENOENT", ignoreCase = true) ||
+            lastError.contains("No such file", ignoreCase = true) -> SyncDeadLetterReason.MISSING_FILE
+        lastError.contains("closed while uploading", ignoreCase = true) -> SyncDeadLetterReason.APP_CLOSED
+        lastError.contains("Service Unavailable", ignoreCase = true) ||
+            lastError.contains("HTTP 503", ignoreCase = true) ||
+            lastError.contains("HTTP 502", ignoreCase = true) -> SyncDeadLetterReason.SERVER_UNAVAILABLE
+        lastError.contains("HTTP 401", ignoreCase = true) ||
+            lastError.contains("Unauthorized", ignoreCase = true) -> SyncDeadLetterReason.SIGN_IN_REQUIRED
+        else -> SyncDeadLetterReason.UNKNOWN
+    }
+}
 
 interface SyncDeadLetterStore {
     fun observe(): Flow<List<SyncDeadLetterRecord>>
@@ -44,7 +75,11 @@ class KeyValueSyncDeadLetterStore(
     private var loaded = false
     private var corrupted = false
 
-    override fun observe(): Flow<List<SyncDeadLetterRecord>> = recordsFlow.asStateFlow()
+    override fun observe(): Flow<List<SyncDeadLetterRecord>> =
+        flow {
+            ensureLoaded()
+            emitAll(recordsFlow.asStateFlow())
+        }
 
     override suspend fun list(): List<SyncDeadLetterRecord> = ensureLoaded()
 

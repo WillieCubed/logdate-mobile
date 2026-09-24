@@ -30,6 +30,7 @@ import app.logdate.client.repository.account.LinkedSignInProvider
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.sync.SyncStatus
+import app.logdate.client.sync.metadata.SyncDeadLetterReason
 import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.feature.core.account.CloudAccountSignInContent
 import app.logdate.feature.core.account.CloudAccountWelcomeContent
@@ -941,29 +942,37 @@ object SharedScreenshotCatalog {
                                 id = "dead-letter-1",
                                 entityType = "NOTE",
                                 entityId = "note-2026-06-14",
-                                operation = "UPLOAD",
+                                operation = "UPDATE",
                                 retryCount = 3,
-                                lastError = "Server rejected the encrypted payload after the local note was edited offline.",
+                                lastError = "Service Unavailable",
                                 failedAt = baseInstant.toEpochMilliseconds(),
+                                reason = SyncDeadLetterReason.SERVER_UNAVAILABLE,
                             ),
                             SyncDeadLetterRecord(
                                 id = "dead-letter-2",
                                 entityType = "MEDIA",
                                 entityId = "media-summer-video",
-                                operation = "DOWNLOAD",
+                                operation = "CREATE",
                                 retryCount = 2,
-                                lastError = "Network timed out while fetching the original video attachment.",
+                                lastError = "No such file",
                                 failedAt = baseInstant.toEpochMilliseconds(),
+                                reason = SyncDeadLetterReason.MISSING_FILE,
                             ),
                             SyncDeadLetterRecord(
                                 id = "dead-letter-3",
                                 entityType = "JOURNAL",
                                 entityId = "journal-family",
-                                operation = "UPLOAD",
+                                operation = "UPDATE",
                                 retryCount = 1,
-                                lastError = "Remote journal version changed before this update could be committed.",
+                                lastError = "Unauthorized",
                                 failedAt = baseInstant.toEpochMilliseconds(),
+                                reason = SyncDeadLetterReason.SIGN_IN_REQUIRED,
                             ),
+                        ),
+                    labels =
+                        mapOf(
+                            "dead-letter-1" to "Summer trip notes",
+                            "dead-letter-3" to "Family journal",
                         ),
                     onRetry = {},
                     onDiscard = {},

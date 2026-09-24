@@ -66,6 +66,7 @@ import logdate.client.feature.core.generated.resources.sync_paused_signed_out
 import logdate.client.feature.core.generated.resources.sync_status_could_not_start
 import logdate.client.feature.core.generated.resources.sync_status_draft_fallback
 import logdate.client.feature.core.generated.resources.sync_status_failed_items
+import logdate.client.feature.core.generated.resources.sync_status_failed_items_detail
 import logdate.client.feature.core.generated.resources.sync_status_item_audio_fallback
 import logdate.client.feature.core.generated.resources.sync_status_item_photo_fallback
 import logdate.client.feature.core.generated.resources.sync_status_item_text_fallback
@@ -228,7 +229,7 @@ private fun ColumnScope.SyncStatusBody(
     val pausedReason = uiState.pausedReason
     if (pausedReason != null) {
         PausedReason(pausedReason, modifier = Modifier.padding(top = Spacing.sm))
-    } else if (uiState.lastAttemptFailed && !uiState.isSyncing) {
+    } else if (uiState.lastAttemptFailed && uiState.failedCount == 0 && !uiState.isSyncing) {
         Text(
             text = stringResource(Res.string.sync_status_last_attempt_failed),
             style = MaterialTheme.typography.bodyMedium,
@@ -245,6 +246,27 @@ private fun ColumnScope.SyncStatusBody(
         )
     }
 
+    if (uiState.failedCount > 0) {
+        HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.lg))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Icon(Icons.Filled.SyncProblem, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+            Column {
+                Text(
+                    text = pluralStringResource(Res.plurals.sync_status_failed_items, uiState.failedCount, uiState.failedCount),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text = stringResource(Res.string.sync_status_failed_items_detail),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -252,18 +274,25 @@ private fun ColumnScope.SyncStatusBody(
     ) {
         if (pausedReason == SyncPausedReason.NOT_SIGNED_IN) {
             Button(onClick = onSignIn) { Text(stringResource(Res.string.sync_feedback_sign_in_action)) }
+        } else if (uiState.failedCount > 0) {
+            Button(onClick = onOpenSyncIssues) { Text(stringResource(Res.string.sync_banner_review)) }
         } else {
             Button(onClick = onSyncNow, enabled = !uiState.isSyncing) {
                 Text(stringResource(Res.string.sync_now))
             }
         }
-        TextButton(onClick = onOpenSyncSettings) {
-            Text(stringResource(Res.string.sync_status_open_settings))
+        if (uiState.failedCount > 0) {
+            TextButton(onClick = onSyncNow, enabled = !uiState.isSyncing) {
+                Text(stringResource(Res.string.sync_now))
+            }
         }
     }
     feedback
         ?.takeIf { !uiState.isSyncing && uiState.requestState == BackupRequestState.NONE }
         ?.let { SyncNowFeedback(it, pausedReason) }
+    TextButton(onClick = onOpenSyncSettings, modifier = Modifier.padding(top = Spacing.xs)) {
+        Text(stringResource(Res.string.sync_status_open_settings))
+    }
 
     if (uiState.queueUnavailable) {
         Text(
@@ -280,22 +309,6 @@ private fun ColumnScope.SyncStatusBody(
             modifier = Modifier.padding(bottom = Spacing.xs),
         )
         uiState.groups.forEach { group -> QueuedGroupRow(group) }
-    }
-
-    if (uiState.failedCount > 0) {
-        HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.lg))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            Icon(Icons.Filled.SyncProblem, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-            Text(
-                text = pluralStringResource(Res.plurals.sync_status_failed_items, uiState.failedCount, uiState.failedCount),
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f),
-            )
-            TextButton(onClick = onOpenSyncIssues) { Text(stringResource(Res.string.sync_banner_review)) }
-        }
     }
 
     if (uiState.unreadableCloudCount > 0) {
@@ -358,6 +371,7 @@ private fun StatusHeadline(uiState: SyncStatusUiState) {
                         uiState.isSyncing && uiState.pendingCount > 0 ->
                             stringResource(Res.string.syncing_remaining, uiState.pendingCount)
                         uiState.isSyncing -> stringResource(Res.string.syncing)
+                        uiState.failedCount > 0 -> stringResource(Res.string.last_sync_failed)
                         uiState.requestState == BackupRequestState.QUEUED -> stringResource(Res.string.sync_status_queued)
                         uiState.requestState == BackupRequestState.RETRYING -> stringResource(Res.string.sync_status_retry_scheduled)
                         uiState.lastAttemptFailed -> stringResource(Res.string.last_sync_failed)

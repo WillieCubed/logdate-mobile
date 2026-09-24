@@ -35,7 +35,7 @@ import kotlin.test.assertTrue
  */
 class NetworkRecoveryIntegrationTest {
     @Test
-    fun `last error tracked on network failure`() =
+    fun `full sync retains a failed download after later upload phases succeed`() =
         runTest {
             val apiClient = FakeCloudApiClient()
             val syncMetadataService = fakeSyncMetadataService()
@@ -67,7 +67,7 @@ class NetworkRecoveryIntegrationTest {
             // Configure API to fail with network error
             apiClient.configureContentSyncFailure(Exception("Network timeout"))
 
-            val failedResult = syncManager.syncContent()
+            val failedResult = syncManager.fullSync()
 
             assertFalse(failedResult.success, "Sync should fail with network error")
             assertTrue(failedResult.errors.isNotEmpty(), "Should have error information")
