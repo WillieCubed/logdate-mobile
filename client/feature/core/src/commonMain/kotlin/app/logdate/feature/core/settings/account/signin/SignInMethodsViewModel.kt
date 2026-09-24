@@ -112,11 +112,15 @@ sealed interface SignInMethodsEvent {
  * @param defaultPasskeyName the name the server gives a passkey when the client sends none. Older
  *   passkeys all carry it, so it says nothing about which device they belong to and is shown as
  *   an unnamed passkey instead.
+ * @param connectedRpId the connected server's passkey relying party ID, or `null` when unknown
+ * @param passkeysWorkWith whether this device's platform can create passkeys for a relying party
  */
 class SignInMethodsViewModel(
     private val accountRepository: PasskeyAccountRepository,
     private val passkeyManager: PasskeyManager,
     private val defaultPasskeyName: () -> String?,
+    private val connectedRpId: () -> String? = { null },
+    private val passkeysWorkWith: (rpId: String) -> Boolean = { true },
     private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) : ViewModel() {
     private val _state = MutableStateFlow<SignInMethodsUiState>(SignInMethodsUiState.Loading)
@@ -186,11 +190,16 @@ class SignInMethodsViewModel(
             }
 
         val passkeys = passkeysResult.getOrElse { return failedToLoad(it) }
-        val providers = providersResult.getOrElse { return failedToLoad(it) }
-        val canAddPasskey =
+        // Passkeys are the main thing here; a server that can't list linked accounts shouldn't hide them.
+        val providers =
+            providersResult
+                .onFailure { Napier.w("Could not load linked sign-in providers", it) }
+                .getOrDefault(emptyList())
+        val platformSupportsPasskeys =
             runCatching { passkeyManager.getCapabilities().isSupported }
                 .onFailure { Napier.w("Could not read this device's passkey support", it) }
                 .getOrDefault(false)
+        val canAddPasskey = platformSupportsPasskeys && connectedRpId()?.let(passkeysWorkWith) != false
 
         val signInMethodCount = passkeys.size + providers.size
         return SignInMethodsUiState.Loaded(

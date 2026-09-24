@@ -109,8 +109,7 @@ actual val coreFeatureModule: Module =
                 serverHealthChecker = get(),
                 serverDiscoveryClient = get(),
                 configRepository = get(),
-                // iOS only creates passkeys for domains in the app's associated domains.
-                passkeysWorkWith = { rpId -> rpId == "logdate.app" || rpId.endsWith(".logdate.app") },
+                passkeysWorkWith = ::iosCreatesPasskeysFor,
             )
         }
 
@@ -183,6 +182,8 @@ actual val coreFeatureModule: Module =
                 accountRepository = get(),
                 passkeyManager = get(),
                 defaultPasskeyName = { get<LogDateConfigRepository>().getCurrentServerDescriptor()?.passkey?.rpName },
+                connectedRpId = { get<LogDateConfigRepository>().getCurrentServerDescriptor()?.passkey?.rpId },
+                passkeysWorkWith = ::iosCreatesPasskeysFor,
             )
         }
         viewModel {
@@ -240,3 +241,6 @@ actual val coreFeatureModule: Module =
         }
         viewModel { CampfireViewModel(observeCampfire = get(), featureFlagStore = get()) }
     }
+
+/** iOS only creates passkeys for domains in the app's associated domains. */
+private fun iosCreatesPasskeysFor(rpId: String): Boolean = rpId == "logdate.app" || rpId.endsWith(".logdate.app")

@@ -9,6 +9,7 @@ import app.logdate.client.repository.account.LinkedSignInProvider
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyInfo
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -26,7 +27,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -90,8 +90,20 @@ class AccountViewModelTest {
     @Test
     fun `a device without the recovery phrase says so`() =
         runTest {
-            assertFalse(signedIn(viewModel(hasRecoveryPhrase = false)).hasRecoveryPhrase)
-            assertTrue(signedIn(viewModel(hasRecoveryPhrase = true)).hasRecoveryPhrase)
+            assertEquals(false, signedIn(viewModel(hasRecoveryPhrase = false)).hasRecoveryPhrase)
+            assertEquals(true, signedIn(viewModel(hasRecoveryPhrase = true)).hasRecoveryPhrase)
+        }
+
+    @Test
+    fun `the recovery phrase is not called saved before it has been checked`() =
+        runTest {
+            val phraseCheck = CompletableDeferred<Boolean>()
+
+            val viewModel = viewModel(checkRecoveryPhrase = { phraseCheck.await() })
+
+            assertNull(signedIn(viewModel).hasRecoveryPhrase)
+            phraseCheck.complete(false)
+            assertEquals(false, signedIn(viewModel).hasRecoveryPhrase)
         }
 
     @Test
@@ -198,13 +210,14 @@ class AccountViewModelTest {
         identity: ResolvedUserIdentity = identity(),
         server: FakeConnectedServer = FakeConnectedServer(),
         hasRecoveryPhrase: Boolean = true,
+        checkRecoveryPhrase: suspend () -> Boolean = { hasRecoveryPhrase },
         isEmailVerificationAvailable: Boolean = false,
         verifyEmail: suspend () -> EmailVerificationOutcome = { EmailVerificationOutcome.Unsupported },
     ) = AccountViewModel(
         accountRepository = repository,
         userIdentity = MutableStateFlow(identity),
         connectedServer = server,
-        hasRecoveryPhrase = { hasRecoveryPhrase },
+        hasRecoveryPhrase = checkRecoveryPhrase,
         isEmailVerificationAvailable = { isEmailVerificationAvailable },
         verifyEmail = verifyEmail,
     )

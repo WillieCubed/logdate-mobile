@@ -6,8 +6,10 @@ import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.ServerProtocolFeature
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
 
 /**
  * The server this device's account lives on.
@@ -63,20 +65,23 @@ class DefaultConnectedServer(
             )
         }
 
-    override suspend fun refresh(): ServerHealth {
-        val origin = configRepository.getCurrentBackendUrl()
-        discoveryClient
-            .discoverServer(origin)
-            .onSuccess { descriptor -> configRepository.updateServerDescriptor(descriptor) }
-            .onFailure { error -> Napier.w("Could not refresh the description of $origin", error) }
-        return healthChecker
-            .checkServerHealth(origin)
-            .fold(
-                onSuccess = { ServerHealth.Reachable(it.version) },
-                onFailure = { error ->
-                    Napier.w("$origin did not answer a health check", error)
-                    ServerHealth.Unreachable
-                },
-            )
-    }
+    override suspend fun refresh(): ServerHealth =
+        coroutineScope {
+            val origin = configRepository.getCurrentBackendUrl()
+            launch {
+                discoveryClient
+                    .discoverServer(origin)
+                    .onSuccess { descriptor -> configRepository.updateServerDescriptor(descriptor) }
+                    .onFailure { error -> Napier.w("Could not refresh the description of $origin", error) }
+            }
+            healthChecker
+                .checkServerHealth(origin)
+                .fold(
+                    onSuccess = { ServerHealth.Reachable(it.version) },
+                    onFailure = { error ->
+                        Napier.w("$origin did not answer a health check", error)
+                        ServerHealth.Unreachable
+                    },
+                )
+        }
 }

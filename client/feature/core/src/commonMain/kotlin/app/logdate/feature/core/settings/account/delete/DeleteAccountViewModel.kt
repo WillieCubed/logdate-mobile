@@ -8,6 +8,7 @@ import app.logdate.client.repository.account.NotSignedInException
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.feature.core.settings.account.ConnectedServer
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -83,10 +84,7 @@ class DeleteAccountViewModel(
             val result = accountRepository.deleteAccount()
             val phase =
                 result.fold(
-                    onSuccess = {
-                        if (current.eraseThisDevice) eraseThisDevice()
-                        DeleteAccountUiState.Phase.Deleted(erasedThisDevice = current.eraseThisDevice)
-                    },
+                    onSuccess = { DeleteAccountUiState.Phase.Deleted(erasedThisDevice = current.eraseThisDevice && erase()) },
                     onFailure = { error ->
                         Napier.w("Account deletion failed", error)
                         DeleteAccountUiState.Phase.Failed(error.toFailure())
@@ -95,6 +93,18 @@ class DeleteAccountViewModel(
             choices.update { it.copy(phase = phase) }
         }
     }
+
+    /** The account is already gone by now, so a failed erase is reported rather than left hanging. */
+    private suspend fun erase(): Boolean =
+        try {
+            eraseThisDevice()
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.e("The account was deleted but this device could not be erased", e)
+            false
+        }
 }
 
 private fun Throwable.toFailure(): DeleteAccountFailure =

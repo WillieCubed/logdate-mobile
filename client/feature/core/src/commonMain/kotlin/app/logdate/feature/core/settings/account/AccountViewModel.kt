@@ -8,7 +8,9 @@ import app.logdate.client.repository.account.LinkedSignInProvider
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,8 +32,8 @@ sealed interface AccountUiState {
     data class SignedIn(
         val header: AccountHeader,
         val signIn: SignInSummary,
-        /** Whether this device holds the recovery phrase that unlocks the synced journal. */
-        val hasRecoveryPhrase: Boolean,
+        /** Whether this device holds the recovery phrase that unlocks the synced journal; `null` until checked. */
+        val hasRecoveryPhrase: Boolean?,
         /** `null` when there is no email to show and no way to add one here. */
         val email: EmailRow?,
         val server: ServerRow,
@@ -188,22 +190,36 @@ class AccountViewModel(
         }
     }
 
-    private suspend fun loadDetails() {
-        val signIn = loadSignInSummary()
-        val hasPhrase =
-            runCatching { hasRecoveryPhrase() }
-                .onFailure { Napier.w("Could not check for the recovery phrase", it) }
-                .getOrDefault(false)
-        val canVerify =
-            runCatching { isEmailVerificationAvailable() }
-                .onFailure { Napier.w("Could not check whether email verification is available", it) }
-                .getOrDefault(false)
-        details.update { it.copy(signIn = signIn, hasRecoveryPhrase = hasPhrase, canVerifyEmail = canVerify) }
-    }
+    /** Each part is shown as soon as it is known, so the local checks don't wait on the network. */
+    private suspend fun loadDetails() =
+        coroutineScope {
+            launch {
+                val hasPhrase =
+                    runCatching { hasRecoveryPhrase() }
+                        .onFailure { Napier.w("Could not check for the recovery phrase", it) }
+                        .getOrDefault(false)
+                details.update { it.copy(hasRecoveryPhrase = hasPhrase) }
+            }
+            launch {
+                val canVerify =
+                    runCatching { isEmailVerificationAvailable() }
+                        .onFailure { Napier.w("Could not check whether email verification is available", it) }
+                        .getOrDefault(false)
+                details.update { it.copy(canVerifyEmail = canVerify) }
+            }
+            launch {
+                val signIn = loadSignInSummary()
+                details.update { it.copy(signIn = signIn) }
+            }
+        }
 
     private suspend fun loadSignInSummary(): SignInSummary {
-        val passkeys = accountRepository.listPasskeys()
-        val providers = accountRepository.listLinkedSignInProviders()
+        val (passkeys, providers) =
+            coroutineScope {
+                val passkeys = async { accountRepository.listPasskeys() }
+                val providers = async { accountRepository.listLinkedSignInProviders() }
+                passkeys.await() to providers.await()
+            }
         val error = passkeys.exceptionOrNull() ?: providers.exceptionOrNull()
         if (error != null) {
             Napier.w("Could not read sign-in methods for the Account summary", error)
@@ -217,7 +233,7 @@ class AccountViewModel(
 
     private data class AccountDetails(
         val signIn: SignInSummary = SignInSummary.Loading,
-        val hasRecoveryPhrase: Boolean = true,
+        val hasRecoveryPhrase: Boolean? = null,
         val canVerifyEmail: Boolean = false,
         val isSigningOut: Boolean = false,
     )

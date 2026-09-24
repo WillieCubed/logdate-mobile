@@ -244,6 +244,38 @@ class SignInMethodsViewModelTest {
         }
 
     @Test
+    fun `adding a passkey is not offered for a server this platform can't create passkeys for`() =
+        runTest {
+            val repository = FakeAccountRepository(passkeys = listOf(passkey()))
+
+            val state =
+                assertIs<SignInMethodsUiState.Loaded>(
+                    viewModel(
+                        repository,
+                        connectedRpId = "journal.example.com",
+                        passkeysWorkWith = { it.endsWith("logdate.app") },
+                    ).state.value,
+                )
+
+            assertFalse(state.canAddPasskey)
+        }
+
+    @Test
+    fun `passkeys still show when linked accounts can't be loaded`() =
+        runTest {
+            val repository =
+                FakeAccountRepository(
+                    passkeys = listOf(passkey()),
+                    providersError = PasskeyApiException(PasskeyApiErrorCodes.SERVER_ERROR, "Not found"),
+                )
+
+            val state = assertIs<SignInMethodsUiState.Loaded>(viewModel(repository).state.value)
+
+            assertEquals(1, state.passkeys.size)
+            assertTrue(state.linkedProviders.isEmpty())
+        }
+
+    @Test
     fun `an unreachable server is reported as offline and can be retried`() =
         runTest {
             val repository =
@@ -276,10 +308,14 @@ class SignInMethodsViewModelTest {
         repository: FakeAccountRepository,
         passkeyManager: PasskeyManager = FakePasskeyManager(),
         defaultPasskeyName: String? = "LogDate",
+        connectedRpId: String? = null,
+        passkeysWorkWith: (String) -> Boolean = { true },
     ) = SignInMethodsViewModel(
         accountRepository = repository,
         passkeyManager = passkeyManager,
         defaultPasskeyName = { defaultPasskeyName },
+        connectedRpId = { connectedRpId },
+        passkeysWorkWith = passkeysWorkWith,
         timeZone = TimeZone.UTC,
     )
 
@@ -310,6 +346,7 @@ class SignInMethodsViewModelTest {
         var passkeys: List<PasskeyInfo> = emptyList(),
         var linkedProviders: List<LinkedSignInProvider> = emptyList(),
         var listError: Throwable? = null,
+        var providersError: Throwable? = null,
         var addPasskeyResult: Result<PasskeyInfo> = Result.failure(NotImplementedError()),
         var deleteResult: Result<Unit> = Result.success(Unit),
     ) : PasskeyAccountRepository {
@@ -321,7 +358,7 @@ class SignInMethodsViewModelTest {
         override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = listError?.let { Result.failure(it) } ?: Result.success(passkeys)
 
         override suspend fun listLinkedSignInProviders(): Result<List<LinkedSignInProvider>> =
-            listError?.let { Result.failure(it) } ?: Result.success(linkedProviders)
+            (listError ?: providersError)?.let { Result.failure(it) } ?: Result.success(linkedProviders)
 
         override suspend fun addPasskey(): Result<PasskeyInfo> = addPasskeyResult
 

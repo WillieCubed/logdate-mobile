@@ -64,9 +64,11 @@ fun RecoveryPhraseScreen(
         )
 
     // The view model outlives this screen. Check again on every visit, since the phrase may have
-    // been entered elsewhere, and never leave it on screen for the next visit.
+    // been entered elsewhere, and never leave it on screen for the next visit. A rotation rebuilds
+    // the screen without the person leaving it, so the phrase stays up through one.
+    val isChangingConfiguration = rememberIsChangingConfiguration()
     LaunchedEffect(Unit) { viewModel.check() }
-    DisposableEffect(Unit) { onDispose { viewModel.hide() } }
+    DisposableEffect(Unit) { onDispose { if (!isChangingConfiguration()) viewModel.hide() } }
 
     RecoveryPhraseContent(
         state = state,

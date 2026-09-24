@@ -62,6 +62,7 @@ import logdate.client.feature.core.generated.resources.account_email_verified
 import logdate.client.feature.core.generated.resources.account_email_verify
 import logdate.client.feature.core.generated.resources.account_hosting_description
 import logdate.client.feature.core.generated.resources.account_profile_edit_label
+import logdate.client.feature.core.generated.resources.account_recovery_phrase_checking
 import logdate.client.feature.core.generated.resources.account_recovery_phrase_missing
 import logdate.client.feature.core.generated.resources.account_recovery_phrase_saved
 import logdate.client.feature.core.generated.resources.account_recovery_phrase_title
@@ -304,13 +305,17 @@ private fun SignInAndRecoverySection(
             title = stringResource(Res.string.account_recovery_phrase_title),
             description =
                 stringResource(
-                    if (state.hasRecoveryPhrase) Res.string.account_recovery_phrase_saved else Res.string.account_recovery_phrase_missing,
+                    when (state.hasRecoveryPhrase) {
+                        true -> Res.string.account_recovery_phrase_saved
+                        false -> Res.string.account_recovery_phrase_missing
+                        null -> Res.string.account_recovery_phrase_checking
+                    },
                 ),
             icon = {
-                if (state.hasRecoveryPhrase) {
-                    Icon(Icons.Outlined.Password, contentDescription = null)
-                } else {
+                if (state.hasRecoveryPhrase == false) {
                     Icon(Icons.Outlined.WarningAmber, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                } else {
+                    Icon(Icons.Outlined.Password, contentDescription = null)
                 }
             },
             onClick = destinations.onRecoveryPhrase,

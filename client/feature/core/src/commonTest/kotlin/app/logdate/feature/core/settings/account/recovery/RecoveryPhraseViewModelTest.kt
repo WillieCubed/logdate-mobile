@@ -97,6 +97,17 @@ class RecoveryPhraseViewModelTest {
         }
 
     @Test
+    fun `a screen rebuilt while the phrase is shown keeps it shown`() =
+        runTest {
+            val viewModel = viewModel()
+            viewModel.reveal(prompt)
+
+            viewModel.check()
+
+            assertEquals(RecoveryPhraseUiState.Revealed(phrase), viewModel.state.value)
+        }
+
+    @Test
     fun `hiding the phrase covers it again`() =
         runTest {
             val viewModel = viewModel()

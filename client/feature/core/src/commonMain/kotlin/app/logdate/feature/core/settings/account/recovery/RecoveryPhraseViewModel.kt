@@ -68,7 +68,15 @@ class RecoveryPhraseViewModel(
             _state.value =
                 runCatching { loadPhrase() }
                     .fold(
-                        onSuccess = { if (it == null) RecoveryPhraseUiState.NotOnThisDevice else RecoveryPhraseUiState.Hidden },
+                        onSuccess = { phrase ->
+                            val current = _state.value
+                            when {
+                                phrase == null -> RecoveryPhraseUiState.NotOnThisDevice
+                                // A screen rebuilt mid-reveal, such as after a rotation, keeps what the person confirmed.
+                                current is RecoveryPhraseUiState.Revealed || current is RecoveryPhraseUiState.Confirming -> current
+                                else -> RecoveryPhraseUiState.Hidden
+                            }
+                        },
                         onFailure = { error ->
                             Napier.w("Could not check for the recovery phrase", error)
                             RecoveryPhraseUiState.Failed(RevealFailure.UNREADABLE)

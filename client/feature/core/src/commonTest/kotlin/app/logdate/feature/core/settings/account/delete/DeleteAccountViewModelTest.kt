@@ -74,6 +74,17 @@ class DeleteAccountViewModelTest {
         }
 
     @Test
+    fun `a failed erase after deletion still finishes and says the device was kept`() =
+        runTest {
+            val viewModel = viewModel(erase = { throw IllegalStateException("Disk full") })
+
+            viewModel.setEraseThisDevice(true)
+            viewModel.delete()
+
+            assertEquals(DeleteAccountUiState.Phase.Deleted(erasedThisDevice = false), viewModel.state.value.phase)
+        }
+
+    @Test
     fun `a refused deletion leaves this device untouched and says why`() =
         runTest {
             var erased = false

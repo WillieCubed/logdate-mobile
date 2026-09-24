@@ -78,6 +78,7 @@
     </plurals>
     <string name="account_recovery_phrase_title">Recovery phrase</string>
     <string name="account_recovery_phrase_saved">Saved on this device</string>
+    <string name="account_recovery_phrase_checking">Checking this device…</string>
     <string name="account_recovery_phrase_missing">Not on this device. Enter it to read your synced journal.</string>
     <string name="account_email_title">Email</string>
     <string name="account_email_verified">%1$s · Verified</string>
