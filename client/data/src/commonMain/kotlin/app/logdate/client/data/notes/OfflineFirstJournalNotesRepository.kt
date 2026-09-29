@@ -173,6 +173,24 @@ class OfflineFirstJournalNotesRepository(
                 notes.map { note -> note.withCaption(captionMap) }
             }
 
+    override fun observeRecentAudioNotes(limit: Int): Flow<List<JournalNote.Audio>> =
+        notePlaceResolver.observeAll().combine(audioNoteDao.getRecentNotes(limit)) { placeLookup, entities ->
+            entities.map { it.toModel(it.placeId?.let(placeLookup::get)) }
+        }
+
+    override suspend fun getAudioNotesBefore(
+        beforeExclusive: Instant,
+        limit: Int,
+    ): List<JournalNote.Audio> {
+        val placeLookup = notePlaceResolver.observeAll().first()
+        return audioNoteDao
+            .getRecentNotesBefore(beforeExclusive.toEpochMilliseconds(), limit)
+            .map { it.toModel(it.placeId?.let(placeLookup::get)) }
+    }
+
+    override suspend fun hasAudioNotesBefore(beforeExclusive: Instant): Boolean =
+        audioNoteDao.hasNotesBefore(beforeExclusive.toEpochMilliseconds())
+
     override fun observeNotesForDay(day: LocalDate): Flow<List<JournalNote>> {
         val timezone = TimeZone.currentSystemDefault()
         val start = day.atStartOfDayIn(timezone).toEpochMilliseconds()

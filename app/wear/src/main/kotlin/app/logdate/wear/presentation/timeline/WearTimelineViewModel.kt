@@ -59,6 +59,7 @@ sealed interface WearPlaybackUiState {
         val noteId: Uuid,
         val progress: Float,
         val durationMs: Long,
+        val isPaused: Boolean = false,
     ) : WearPlaybackUiState
 
     data class BlockedOutput(

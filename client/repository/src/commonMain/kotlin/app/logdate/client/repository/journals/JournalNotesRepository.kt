@@ -52,6 +52,39 @@ interface JournalNotesRepository {
     fun observeRecentNotes(limit: Int = 20): Flow<List<JournalNote>>
 
     /**
+     * Observes the newest audio notes only, newest first.
+     *
+     * A limit on [observeRecentNotes] counts every note type, so a busy day of text notes can push
+     * recordings out of a list built from it.
+     */
+    fun observeRecentAudioNotes(limit: Int = 20): Flow<List<JournalNote.Audio>> =
+        allNotesObserved.map { notes ->
+            notes
+                .filterIsInstance<JournalNote.Audio>()
+                .sortedByDescending(JournalNote::creationTimestamp)
+                .take(limit)
+        }
+
+    /**
+     * Fetches audio notes older than [beforeExclusive], newest first.
+     */
+    suspend fun getAudioNotesBefore(
+        beforeExclusive: Instant,
+        limit: Int,
+    ): List<JournalNote.Audio> =
+        allNotesObserved
+            .first()
+            .filterIsInstance<JournalNote.Audio>()
+            .filter { note -> note.creationTimestamp < beforeExclusive }
+            .sortedByDescending(JournalNote::creationTimestamp)
+            .take(limit)
+
+    /**
+     * Whether any audio note is older than [beforeExclusive].
+     */
+    suspend fun hasAudioNotesBefore(beforeExclusive: Instant): Boolean = getAudioNotesBefore(beforeExclusive, limit = 1).isNotEmpty()
+
+    /**
      * Observes the notes for a single calendar day.
      */
     fun observeNotesForDay(day: LocalDate): Flow<List<JournalNote>> =

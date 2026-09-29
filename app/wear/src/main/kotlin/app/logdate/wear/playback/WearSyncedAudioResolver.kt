@@ -53,10 +53,6 @@ class PhoneSyncedAudioResolver(
     }
 
     private fun isLocallyPlayable(mediaRef: String): Boolean {
-        if (mediaRef.startsWith("http://") || mediaRef.startsWith("https://")) {
-            return true
-        }
-
         if (mediaRef.startsWith("content://")) {
             return runCatching {
                 context.contentResolver.openAssetFileDescriptor(Uri.parse(mediaRef), "r")?.use { true } ?: false

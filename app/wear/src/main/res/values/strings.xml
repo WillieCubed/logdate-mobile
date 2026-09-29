@@ -71,6 +71,19 @@
     <string name="wear_day_detail_photo">Photo</string>
     <string name="wear_day_detail_video">Video</string>
 
+    <!-- Voice memories -->
+    <string name="wear_memories_title">Voice memories</string>
+    <string name="wear_memories_empty">No voice memories yet</string>
+    <string name="wear_memories_empty_hint">Record one on the home screen</string>
+    <string name="wear_memories_older">Older</string>
+    <string name="wear_memories_row_detail">%1$s \u00b7 %2$s</string>
+    <string name="wear_memory_not_found">Memory not found</string>
+    <string name="wear_player_play">Play</string>
+    <string name="wear_player_pause">Pause</string>
+    <string name="wear_player_skip_back">Back 10 seconds</string>
+    <string name="wear_player_skip_forward">Forward 10 seconds</string>
+    <string name="wear_player_position">%1$s / %2$s</string>
+
     <!-- Audio playback -->
     <string name="wear_playback_play">Play voice note</string>
     <string name="wear_playback_stop">Stop</string>

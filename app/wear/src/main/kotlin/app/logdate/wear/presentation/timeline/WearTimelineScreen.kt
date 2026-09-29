@@ -141,7 +141,7 @@ private fun TimelineDayCard(
 }
 
 @Composable
-private fun formatDayLabel(date: LocalDate): String {
+internal fun formatDayLabel(date: LocalDate): String {
     val now = Clock.System.now()
     val today = now.toLocalDateTime(TimeZone.currentSystemDefault()).date
     val yesterday = today.minus(1, DateTimeUnit.DAY)

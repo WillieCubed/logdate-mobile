@@ -18,10 +18,13 @@ import app.logdate.wear.presentation.camera.WearRemoteCameraViewModel
 import app.logdate.wear.presentation.health.HealthDashboardScreen
 import app.logdate.wear.presentation.health.HealthDashboardViewModel
 import app.logdate.wear.presentation.home.WearHomeScreen
+import app.logdate.wear.presentation.memories.WearMemoryPlayerScreen
+import app.logdate.wear.presentation.memories.WearVoiceMemoriesScreen
 import app.logdate.wear.presentation.mood.MoodCheckInScreen
 import app.logdate.wear.presentation.more.WearMoreScreen
 import app.logdate.wear.presentation.navigation.WearHealthDashboardRoute
 import app.logdate.wear.presentation.navigation.WearHomeRoute
+import app.logdate.wear.presentation.navigation.WearMemoryPlayerRoute
 import app.logdate.wear.presentation.navigation.WearMoodCheckInRoute
 import app.logdate.wear.presentation.navigation.WearMoreRoute
 import app.logdate.wear.presentation.navigation.WearOnboardingRoute
@@ -32,6 +35,7 @@ import app.logdate.wear.presentation.navigation.WearRewindPlaybackRoute
 import app.logdate.wear.presentation.navigation.WearSettingsRoute
 import app.logdate.wear.presentation.navigation.WearTimelineDayDetailRoute
 import app.logdate.wear.presentation.navigation.WearTimelineRoute
+import app.logdate.wear.presentation.navigation.WearVoiceMemoriesRoute
 import app.logdate.wear.presentation.onboarding.WearOnboardingScreen
 import app.logdate.wear.presentation.onboarding.isOnboardingComplete
 import app.logdate.wear.presentation.quicktext.QuickTextLauncher
@@ -95,12 +99,18 @@ fun WearApp(initialRouteName: String? = null) {
                                 backStack.add(WearMoodCheckInRoute)
                             },
                             onNavigateToMemories = {
-                                backStack.add(WearTimelineRoute)
+                                backStack.add(WearVoiceMemoriesRoute)
                             },
                             onNavigateToMore = {
                                 backStack.add(WearMoreRoute)
                             },
                         )
+                    }
+                    entry<WearVoiceMemoriesRoute> {
+                        WearVoiceMemoriesScreen(onOpenMemory = { noteId -> backStack.add(WearMemoryPlayerRoute(noteId)) })
+                    }
+                    entry<WearMemoryPlayerRoute> { route ->
+                        WearMemoryPlayerScreen(noteId = route.noteId)
                     }
                     entry<WearMoreRoute> {
                         WearMoreScreen(
@@ -179,6 +189,7 @@ fun WearApp(initialRouteName: String? = null) {
 private fun String?.toWearRoute(): NavKey? =
     when (this) {
         "quick_record", "voice_note" -> WearHomeRoute
+        "memories" -> WearVoiceMemoriesRoute
         "mood" -> WearMoodCheckInRoute
         "quick_text" -> WearQuickTextRoute
         "timeline" -> WearTimelineRoute

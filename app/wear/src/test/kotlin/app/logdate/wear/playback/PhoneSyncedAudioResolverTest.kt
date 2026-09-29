@@ -89,6 +89,34 @@ class PhoneSyncedAudioResolverTest {
         }
 
     @Test
+    fun `a remote url is fetched from the phone instead of streamed`() =
+        runTest {
+            val noteId = Uuid.random()
+            val note = audioNote(noteId = noteId, mediaRef = "https://cloud.example/media/$noteId")
+            val targetPath = "/tmp/watch-cache-$noteId.m4a"
+            coEvery { audioStorage.createRecordingTarget(any()) } returns AudioRecordingTarget(targetPath)
+            coEvery { dataLayerClient.downloadAudioFromPhone(noteId, targetPath) } returns true
+
+            val result = buildResolver().resolvePlayableUri(note)
+
+            assertEquals(targetPath, result.getOrNull())
+            coVerify { dataLayerClient.downloadAudioFromPhone(noteId, targetPath) }
+        }
+
+    @Test
+    fun `a remote url with no phone in range fails instead of streaming`() =
+        runTest {
+            val noteId = Uuid.random()
+            val note = audioNote(noteId = noteId, mediaRef = "https://cloud.example/media/$noteId")
+            coEvery { dataLayerClient.isPhoneConnected() } returns false
+
+            val result = buildResolver().resolvePlayableUri(note)
+
+            assertTrue(result.isFailure)
+            coVerify(exactly = 0) { dataLayerClient.downloadAudioFromPhone(any(), any()) }
+        }
+
+    @Test
     fun `fails when phone media download fails`() =
         runTest {
             val noteId = Uuid.random()

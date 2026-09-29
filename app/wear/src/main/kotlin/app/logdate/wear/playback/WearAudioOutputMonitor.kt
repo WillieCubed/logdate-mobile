@@ -29,6 +29,14 @@ sealed interface AudioOutputState {
 
 private const val BLUETOOTH_FILTER_TYPE_AUDIO = 1
 
+/** What playback needs to know about where audio can go. */
+interface WearAudioOutputs {
+    val outputState: StateFlow<AudioOutputState>
+
+    /** Opens the system Bluetooth settings so the user can connect audio devices. */
+    fun launchBluetoothSettings()
+}
+
 /**
  * Monitors audio output device availability on Wear OS.
  *
@@ -37,11 +45,11 @@ private const val BLUETOOTH_FILTER_TYPE_AUDIO = 1
  */
 class WearAudioOutputMonitor(
     private val context: Context,
-) {
+) : WearAudioOutputs {
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
     private val _outputState = MutableStateFlow(deriveCurrentState())
-    val outputState: StateFlow<AudioOutputState> = _outputState
+    override val outputState: StateFlow<AudioOutputState> = _outputState
 
     private val deviceCallback =
         object : AudioDeviceCallback() {
@@ -68,7 +76,7 @@ class WearAudioOutputMonitor(
     /**
      * Opens the system Bluetooth settings to let the user connect audio devices.
      */
-    fun launchBluetoothSettings() {
+    override fun launchBluetoothSettings() {
         val intent =
             Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)

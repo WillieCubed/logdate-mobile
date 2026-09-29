@@ -97,6 +97,14 @@ class AndroidAudioPlaybackManager(
         }
     }
 
+    /** Continues a paused track from where it stopped. */
+    fun resumePlayback() {
+        withController { player ->
+            player.play()
+            updateStatus(player)
+        }
+    }
+
     override fun stopPlayback() {
         withController { player ->
             player.stop()

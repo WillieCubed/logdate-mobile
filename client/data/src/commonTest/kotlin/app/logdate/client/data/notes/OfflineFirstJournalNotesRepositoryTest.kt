@@ -401,6 +401,75 @@ class OfflineFirstJournalNotesRepositoryTest {
         }
 
     @Test
+    fun `recent audio notes are not crowded out by newer text notes`() =
+        runTest {
+            val base = Clock.System.now()
+            val oldRecording = audioNoteAt(base - 3.hours)
+            val newerRecording = audioNoteAt(base - 2.hours)
+            repository.create(oldRecording)
+            repository.create(newerRecording)
+            repeat(5) { index -> repository.create(textNoteAt(base - index.seconds)) }
+
+            val recent = repository.observeRecentAudioNotes(limit = 2).first()
+
+            assertEquals(listOf(newerRecording.uid, oldRecording.uid), recent.map { it.uid })
+        }
+
+    @Test
+    fun `recent audio notes are limited and newest first`() =
+        runTest {
+            val base = Clock.System.now()
+            val recordings = (1..4).map { hoursAgo -> audioNoteAt(base - hoursAgo.hours) }
+            recordings.shuffled().forEach { repository.create(it) }
+
+            val recent = repository.observeRecentAudioNotes(limit = 3).first()
+
+            assertEquals(recordings.take(3).map { it.uid }, recent.map { it.uid })
+        }
+
+    @Test
+    fun `recent audio notes are empty when there are only other notes`() =
+        runTest {
+            repository.create(createTestTextNote())
+
+            assertTrue(repository.observeRecentAudioNotes().first().isEmpty())
+        }
+
+    @Test
+    fun `audio notes before a time are the older recordings newest first`() =
+        runTest {
+            val base = Clock.System.now()
+            val recordings = (1..5).map { hoursAgo -> audioNoteAt(base - hoursAgo.hours) }
+            recordings.forEach { repository.create(it) }
+            repository.create(textNoteAt(base - 4.hours - 30.seconds))
+
+            val older = repository.getAudioNotesBefore(beforeExclusive = recordings[1].creationTimestamp, limit = 2)
+
+            assertEquals(listOf(recordings[2].uid, recordings[3].uid), older.map { it.uid })
+        }
+
+    @Test
+    fun `audio notes before a time exclude the boundary note`() =
+        runTest {
+            val recording = audioNoteAt(Clock.System.now())
+            repository.create(recording)
+
+            assertTrue(repository.getAudioNotesBefore(recording.creationTimestamp, limit = 5).isEmpty())
+            assertTrue(!repository.hasAudioNotesBefore(recording.creationTimestamp))
+        }
+
+    @Test
+    fun `has audio notes before is true only when an older recording exists`() =
+        runTest {
+            val base = Clock.System.now()
+            repository.create(audioNoteAt(base - 2.hours))
+            repository.create(textNoteAt(base - 3.hours))
+
+            assertTrue(repository.hasAudioNotesBefore(base - 1.hours))
+            assertTrue(!repository.hasAudioNotesBefore(base - 2.hours - 1.seconds))
+        }
+
+    @Test
     fun `remove text note removes from database`() =
         runTest {
             val textNote = createTestTextNote()
@@ -533,6 +602,23 @@ class OfflineFirstJournalNotesRepositoryTest {
             val journalNotes = journalContentDao.getContentForJournal(journal.id).first()
             assertTrue(journalNotes.isEmpty())
         }
+
+    private fun audioNoteAt(created: kotlin.time.Instant) =
+        JournalNote.Audio(
+            uid = Uuid.random(),
+            creationTimestamp = created,
+            lastUpdated = created,
+            mediaRef = "audio-${Uuid.random()}.m4a",
+            durationMs = 5_000,
+        )
+
+    private fun textNoteAt(created: kotlin.time.Instant) =
+        JournalNote.Text(
+            uid = Uuid.random(),
+            content = "Text at $created",
+            creationTimestamp = created,
+            lastUpdated = created,
+        )
 
     /**
      * Creates a test text note with random UUID and test content.
