@@ -1,9 +1,29 @@
 # `:app:wear` — Wear OS App
 
-LogDate on your wrist. Record a thought with a tap, log your mood with an emoji, or hold the
-screen and talk walkie-talkie style — your journal captures it all without pulling out your phone.
+LogDate on your wrist. Tap to record a thought, or press and hold to talk; log your mood with an
+emoji; and listen back to your voice memories, all without pulling out your phone.
 
-**Min SDK**: 31 (Wear OS 3+) | **Target SDK**: 35 | **Compile SDK**: 36
+**Min SDK**: 31 (Wear OS 3+) | **Target SDK**: 37 | **Compile SDK**: 37
+
+## The watch and the phone are one app
+
+The watch app uses the **phone's package name** (`studio.hypertext.logdate`, and
+`studio.hypertext.logdate.debug` for debug builds) and is signed with the same key. It ships on the same
+Play listing as a Wear OS form factor. This looks odd, but the Wear Data Layer requires it: notes and
+audio only travel between a phone app and a watch app that match on both package name and signing key.
+
+Two things follow from that:
+
+- A debug phone build and a debug watch build made on the same machine share a package name and debug
+  key, so they can talk to each other without any setup.
+- A phone build signed with a different key (the local `dogfood` build type uses the upload key, Play
+  uses the app signing key) will not exchange data with a watch build signed with another. Install
+  both from Play, or both from the same machine.
+
+The watch does not talk to the LogDate server. It hands notes and audio to the phone, and the phone
+backs them up. Release identity, versioning and signing come from the `app.logdate.android-release`
+plugin in `build-logic`; publishing is covered in
+[Google Play Publishing](../../docs/reference/google-play-publishing.md#wear-os).
 
 ## Getting started
 
@@ -83,11 +103,11 @@ After the emulator boots:
 
 | Feature | Description | Entry point |
 |---------|-------------|-------------|
-| **Walkie-Talkie** | Push-to-talk: hold the screen, speak, release to save | Home > Walkie-Talkie |
-| **Voice Note** | Full recording studio with pause/resume and waveform | Home > Voice Note |
-| **Mood Check-in** | Tap an emoji, optionally attach a voice note | Home > Mood Check-in |
-| **Quick Text** | System speech-to-text, saved as a text note | Home > Quick Text |
-| **Home Hub** | Greeting, entry count, capture chips, navigation | App launch |
+| **Voice recorder** | Tap to record until you tap again, or press and hold to talk and release to save. Pause, discard, and a five second Undo after saving | Home |
+| **Voice memories** | Every recording newest first, with a player that has play and pause, 10 second skips and a progress bar | Home > headphones |
+| **Mood Check-in** | Tap an emoji | Home > mood button |
+| **Quick Text** | System speech-to-text, saved as a text note | Home > More > Quick text |
+| **Timeline** | Entries by day, with inline audio playback | Home > More > Timeline |
 | **Haptic Feedback** | Distinct vibration patterns for every interaction | Automatic |
 
 ### Implemented Platform Capabilities
@@ -109,8 +129,12 @@ app/wear/src/main/kotlin/app/logdate/wear/
 ├── haptic/
 │   └── WearHapticEngine.kt          Centralized haptic patterns
 ├── recording/
-│   ├── WearAudioRecordingService.kt Foreground service for mic recording
-│   └── WearAudioRecordingManager.kt Manages MediaRecorder lifecycle
+│   ├── WearRecorder.kt              The recorder as screens see it
+│   └── WearAudioRecordingManager.kt Session logic over the shared recording service
+├── playback/
+│   ├── WearVoiceNotePlayer.kt       Play, pause, skip, output checks
+│   ├── WearPlaybackEngine.kt        Media3 playback behind a small interface
+│   └── WearSyncedAudioResolver.kt   Fetches audio from the phone when the watch lacks it
 ├── location/
 │   └── WearLocationCaptureCoordinator.kt  Journal-entry geotagging policy
 ├── data/storage/
@@ -119,9 +143,11 @@ app/wear/src/main/kotlin/app/logdate/wear/
 │   ├── MainActivity.kt              Single activity, hosts NavDisplay
 │   ├── theme/Theme.kt               Material 3 for Wear OS
 │   ├── navigation/WearNavRoutes.kt  NavKey route definitions
-│   ├── home/                        Hub screen + ViewModel
-│   ├── walkietalkie/                Push-to-talk screen + ViewModel
-│   ├── audio/                       Full recording screen + ViewModel + components
+│   ├── home/                        The recorder screen + ViewModel
+│   ├── recording/                   Recorder ViewModel and its state
+│   ├── memories/                    Voice memories list and player
+│   ├── more/                        Quick text, Timeline and Settings
+│   ├── timeline/                    Day list and day detail
 │   ├── mood/                        Emoji picker + ViewModel
 │   └── quicktext/                   System STT handler
 ├── complication/
@@ -150,7 +176,7 @@ Key shared modules wired into the Wear app:
 Two Koin modules loaded in `LogDateWearApplication`:
 
 - **`wearDataModule`** — Database, repositories, DataStore, passphrase provider
-- **`wearAudioModule`** — ViewModels, `WearAudioRecordingManager`, `StorageSpaceChecker`, `WearHapticEngine`
+- **`wearAudioModule`** — ViewModels, `WearAudioRecordingManager`, the shared recording service controller, playback, `StorageSpaceChecker`, `WearHapticEngine`
 
 ### Navigation
 
@@ -167,6 +193,8 @@ Declared in `AndroidManifest.xml`:
 | `RECORD_AUDIO` | Microphone access for voice notes |
 | `FOREGROUND_SERVICE` | Background recording |
 | `FOREGROUND_SERVICE_MICROPHONE` | Foreground service type |
+| `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | Playback that continues with the screen off |
+| `POST_NOTIFICATIONS` | The recording and playback notifications |
 | `WAKE_LOCK` | Keep recording when screen is off |
 | `VIBRATE` | Haptic feedback |
 
@@ -177,18 +205,18 @@ Three test layers cover every screen:
 ### Unit tests (`src/test/`)
 
 ```bash
-./gradlew :app:wear:test
+./gradlew :app:wear:testDebugUnitTest
 ```
 
-| File | Tests | Covers |
-|------|-------|--------|
-| `WalkieTalkieViewModelTest` | 15 | State machine, duration gate, auto-stop |
-| `MoodCheckInViewModelTest` | 11 | Mood selection, note creation, voice attachment |
-| `WearHapticEngineTest` | 16 | Pattern selection, preference-aware suppression |
+They cover the recorder session (`WearAudioRecordingManagerTest`), the recording ViewModel including
+the tap and hold gesture, undo and interruptions (`WearRecordingViewModelTest`), the voice note player
+and the memories screens' ViewModels, watch to phone sync and its acknowledgement handling, the mood and
+settings ViewModels, and the haptic engine.
 
 ### Screenshot tests (`src/screenshotTest/`)
 
-Render every screen state on small round and large round watch displays. No device needed.
+Render every screen state on small round and large round watch displays, on the watch's black
+background. No device needed.
 
 ```bash
 # Generate or update baseline images
@@ -198,16 +226,9 @@ Render every screen state on small round and large round watch displays. No devi
 ./gradlew :app:wear:validateDebugScreenshotTest
 ```
 
-Baselines live in `src/screenshotTestDebug/reference/` and are committed to git.
-
-| File | Previews | States covered |
-|------|----------|----------------|
-| `WearHomeScreenshots` | 3 | Empty, populated, single entry |
-| `WalkieTalkieScreenshots` | 8 | Ready, recording, long recording, saving, saved, too short, error, null error |
-| `MoodCheckInScreenshots` | 5 | Emoji picker, voice prompt (great/sad/null), saved |
-| `AudioRecordingScreenshots` | 4 | Idle, active, paused, error |
-
-Each preview generates 2 PNGs (small + large round) = **40 baseline images** total.
+Baselines live in `src/screenshotTestDebug/reference/` and are committed to git. Each preview
+produces two images, one per display size. Home has a preview for every recorder state, and the
+voice memories screens have previews for the list, the player, and its failure states.
 
 The `@WearScreenshotPreviewMatrix` annotation applies both device specs automatically:
 ```kotlin
@@ -218,29 +239,15 @@ annotation class WearScreenshotPreviewMatrix
 
 ### Instrumented E2E tests (`src/androidTest/`)
 
-Require a connected Wear OS device or emulator.
+Require a Wear OS emulator or a managed device.
 
 ```bash
-./gradlew :app:wear:connectedAndroidTest
+./gradlew :app:wear:wearSmallRoundApi34DebugAndroidTest
 ```
 
-| File | Tests | Covers |
-|------|-------|--------|
-| `WearHomeScreenTest` | 12 | Greeting, entry count, all chips, navigation callbacks |
-| `WalkieTalkieScreenTest` | 14 | All screen states, duration formatting |
-| `MoodCheckInScreenTest` | 11 | Mood selection, voice prompt, saved confirmation |
-| `AudioRecordingScreenTest` | 8 | Idle, recording, paused, error, button callbacks |
-
-These tests render stateless content composables (`WearHomeContent`, `ReadyContent`, etc.)
-with controlled state, avoiding the need for bound services or ViewModels.
-
-### Test totals
-
-| Layer | Tests | Requires device |
-|-------|-------|-----------------|
-| Unit | 42 | No |
-| Screenshot | 40 baselines | No |
-| E2E instrumented | 45 | Yes |
+`WearHomeScreenTest` checks the controls each recorder state shows, and the day detail, mood and sync
+suites cover the rest. These tests render stateless content composables (such as `WearHomeContent`)
+with controlled state, so they need neither a bound service nor a ViewModel.
 
 ## Quick reference
 
@@ -252,7 +259,7 @@ with controlled state, avoiding the need for bound services or ViewModels.
 ./gradlew :app:wear:installDebug
 
 # Run unit tests
-./gradlew :app:wear:test
+./gradlew :app:wear:testDebugUnitTest
 
 # Generate screenshot baselines
 ./gradlew :app:wear:updateDebugScreenshotTest
@@ -260,8 +267,8 @@ with controlled state, avoiding the need for bound services or ViewModels.
 # Validate screenshots
 ./gradlew :app:wear:validateDebugScreenshotTest
 
-# Run E2E tests on device
-./gradlew :app:wear:connectedAndroidTest
+# Build the release bundle (see the Play publishing doc)
+./gradlew :app:wear:bundleRelease
 
 # Lint
 ./gradlew :app:wear:ktlintCheck

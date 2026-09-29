@@ -5,7 +5,7 @@ import android.net.Uri
 import androidx.benchmark.macro.MacrobenchmarkScope
 
 internal object WearBenchmarkConfig {
-    const val PACKAGE_NAME = "app.logdate.wear"
+    const val PACKAGE_NAME = "studio.hypertext.logdate"
     private const val MAIN_ACTIVITY = "app.logdate.wear.presentation.MainActivity"
 
     fun MacrobenchmarkScope.startFromLauncher() {

@@ -22,11 +22,13 @@ promotion-based production releases, and Android release provenance/versioning, 
 #### Wear OS App
 
 ```shell
-./gradlew :app:wear:assembleRelease
+./run build:wear:release
 ```
 
-The Wear OS APK is built and distributed independently from the phone app. For development
-installation on a physical watch, see the [Wear OS README](../app/wear/README.md#installing-on-a-physical-watch).
+The Wear OS app ships on the phone app's Play listing, under the phone's package name and signing
+key, as a Wear OS form factor. See [Wear OS](./reference/google-play-publishing.md#wear-os) for how it
+publishes. For development installation on a physical watch, see the
+[Wear OS README](../app/wear/README.md#installing-on-a-physical-watch).
 
 ### Desktop (macOS, Linux, Windows)
 

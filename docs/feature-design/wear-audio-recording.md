@@ -1,69 +1,63 @@
 # Audio Recording on Wear OS
 
-Voice capture is the primary input mode on the watch. Two recording flows serve different
-use cases — walkie-talkie for spontaneous capture, and the full recording studio for longer,
-deliberate notes.
+Voice capture is the primary input on the watch. The home screen is the recorder: one large button,
+two ways to use it, and nothing between pressing it and being recorded.
 
-## Recording flows
+## Using the recorder
 
-### Walkie-talkie (push-to-talk)
+| You do | What happens |
+|--------|--------------|
+| Tap the button | Recording starts and keeps going after you lift your finger. Tap again to stop and save. Pause and Discard sit on either side while it runs |
+| Press and hold | Recording starts at once and saves when you let go, like a walkie-talkie |
+| Stop | The note is saved immediately. For five seconds an **Undo** button removes it and its audio file |
+| Record again during the Undo window | The previous note stays saved and the window closes |
 
-Touch the screen, speak, release. The entire screen is the button.
+A recording shorter than half a second is dropped as "Too short". Recordings stop on their own at 30
+minutes, with a haptic warning a minute before, and are saved. That length is about 29 MB of audio, which
+stays under the phone's 31 MiB upload limit.
 
-| State | Behavior |
-|-------|----------|
-| **Ready** | Full-screen touch target, "HOLD TO RECORD" label |
-| **Recording** | Red background, live waveform, timer counting up |
-| **Saved** | Green checkmark, duration, auto-returns to home after 500ms |
-| **Too short** | If held < 500ms, recording is discarded with "Too short / Hold longer" |
-| **Error** | Displays error message (e.g., "Microphone unavailable") |
+Tapping the button while a tap-started recording is paused saves it; the button on its left resumes.
+Someone using TalkBack gets a single action on the button that behaves like a tap.
 
-The 500ms minimum prevents accidental taps from creating empty notes. Maximum duration is
-60 seconds — a warning haptic fires at 50s, and auto-stop triggers at 60s.
+A hint ("Tap to record or hold to talk") shows in place of the greeting until the first recording has
+been saved.
 
-**ViewModel**: `WalkieTalkieViewModel` manages the state machine via `WalkieTalkiePhase`.
-Touch-down starts recording, touch-up stops and saves.
+## The screen states
 
-### Full voice note
+`WearRecordingViewModel` drives the screen. Its phase moves through:
 
-A traditional record/stop flow with pause/resume and cancel controls.
+`READY` → `STARTING` → `RECORDING` ⇄ `PAUSED` → `SAVING` → `SAVED` → `READY`
 
-| State | Controls |
-|-------|----------|
-| **Idle** | Large red record button (64dp) |
-| **Recording** | Waveform + timer + stop button, pause/cancel below |
-| **Paused** | Resume/cancel buttons, waveform frozen |
-| **Error** | Error message displayed above controls |
+with `TOO_SHORT` and `ERROR` as side exits. Every phase change happens **before** the recorder is asked
+to do anything. That ordering is what stops the ViewModel from mistaking its own discard or stop for the
+recorder ending the session by itself.
 
-**ViewModel**: `AudioRecordingViewModel` (extends `AndroidViewModel`). Manages recording
-lifecycle through `WearAudioRecordingManager`.
+Errors say what failed and what to do:
+
+| Error | Shown | Offered |
+|-------|-------|---------|
+| Microphone permission denied | "Microphone is off" | An Allow button |
+| Not enough space for a full-length recording | "Watch storage is full" | |
+| The recorder did not start | "Couldn't start. Try again" | Press again |
+| The recording could not be saved | "Couldn't save. Try again" | Press again |
+
+A call or another app taking the audio pauses the recording, and the screen says "Paused by another
+app". It does not resume by itself.
 
 ## Recording infrastructure
 
-### Foreground service
+The watch reuses the phone's recording service, `AudioRecordingService` in `client:media`, rather than
+keeping its own copy. It brings a confirmed start, error handling and file finalization that were
+already exercised on the phone.
 
-`WearAudioRecordingService` is a foreground service that owns the `MediaRecorder`. It runs
-independently of the UI so recording survives screen-off and app backgrounding.
-
-Responsibilities:
-- MediaRecorder lifecycle (prepare, start, pause, resume, stop, release)
-- Wake lock management (partial wake lock during recording)
-- Haptic feedback via the haptic engine (start, stop, pause, resume)
-- Notification with recording indicator
-- Audio level sampling for waveform visualization
-
-### Recording manager
-
-`WearAudioRecordingManager` bridges ViewModels and the bound foreground service. It
-implements the shared `AudioRecordingManager` interface and exposes reactive state:
-- Start, stop, pause, and resume controls
-- Recording status, audio levels, and elapsed duration as `StateFlow`s
-
-### Storage validation
-
-`StorageSpaceChecker` verifies available space before starting a recording. The estimate is
-based on 128kbps AAC at 44.1kHz — approximately 960KB per minute plus a 512KB buffer.
-If space is insufficient, recording is blocked and the user sees an error.
+- **`WearAudioRecordingManager`** holds the session logic. Start reports success only once the service
+  confirms the recorder is running. Stop returns only after the file is complete. Both run under one
+  mutex, and both check the microphone permission and free space first.
+- **`RecordingSessionOptions`** switch on watch-only behavior in the service without changing the
+  phone: a maximum length (30 minutes), pausing when another app takes audio focus, and a partial wake
+  lock so a dozing watch does not drop audio.
+- **`StorageSpaceChecker`** measures free space where recordings are written, `filesDir`, and requires
+  room for a full-length recording plus headroom.
 
 ### Audio format
 
@@ -73,67 +67,53 @@ If space is insufficient, recording is blocked and the user sees an error.
 | Bitrate | 128 kbps |
 | Sample rate | 44.1 kHz |
 | Container | M4A |
-| Estimated size | ~960 KB/min |
+| Size | about 960 KB per minute |
 
 ### File lifecycle
 
-1. Recorded to a temp file in the cache directory
-2. On successful save, moved to `app_files/audio/{noteId}.m4a`
-3. A `JournalNote.Audio` is created in Room with the file path
-4. Deleted when the associated note is removed
+1. The service writes to `filesDir/audio_notes/recording_<id>.m4a`.
+2. On save, a `JournalNote.Audio` is created in Room with that path and the duration read back from the
+   file.
+3. Discarding, an Undo, and a too-short recording delete the file. A file that a saved note references is
+   never deleted.
+4. The note reaches the phone over the Data Layer, and the watch keeps it pending until the phone
+   acknowledges it. See the sync notes in [`app/wear/README.md`](../../app/wear/README.md).
 
-## Haptic feedback
+**Not covered yet:** a recording in progress when the watch app is killed leaves an unfinalized file that
+nothing recovers, and a `SAVE_FAILED` leaves its file on disk with no note.
 
-Recording interactions use distinct patterns from `WearHapticEngine`:
+## Haptics
 
-| Event | Pattern | Feel |
-|-------|---------|------|
-| Start recording | `startRecording()` | Strong single pulse |
-| Stop recording | `stopRecording()` | Double-tap confirmation |
-| Pause | `pause()` | Light tick |
-| Resume | `resume()` | Light double tick |
-| Too short (walkie-talkie) | `rejection()` | Brief low-frequency buzz |
-| Save confirmed | `success()` | Warm double-pulse |
-| 50s warning (walkie-talkie) | `warning()` | Three quick pulses |
+Recording interactions use patterns from `WearHapticEngine`:
 
-## Battery considerations
-
-- AAC 128kbps balances quality and power consumption
-- UI updates throttled to 100ms intervals (10 FPS waveform)
-- Wake lock is partial (CPU only, screen can turn off)
-- No continuous sensor polling during recording
+| Event | Pattern |
+|-------|---------|
+| Start recording | `startRecording()` |
+| Stop recording | `stopRecording()` |
+| Pause / resume | `pause()` / `resume()` |
+| Too short, or an undo | `rejection()` |
+| Saved | `success()` |
+| A minute before the 30 minute limit | `warning()` |
 
 ## Permissions
 
 | Permission | Required for |
 |------------|-------------|
 | `RECORD_AUDIO` | Microphone access |
-| `FOREGROUND_SERVICE` | Background-capable recording |
-| `FOREGROUND_SERVICE_MICROPHONE` | Foreground service type declaration |
-| `WAKE_LOCK` | Recording continues with screen off |
+| `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_MICROPHONE` | Recording that survives the screen turning off |
+| `POST_NOTIFICATIONS` | The recording notification |
+| `WAKE_LOCK` | Recording continues with the screen off |
 | `VIBRATE` | Haptic feedback |
 
 ## Testing
 
-Both recording flows have full test coverage:
-
-**Unit tests** — `WalkieTalkieViewModelTest` (15 tests): state machine transitions, minimum
-duration gate, maximum duration auto-stop, haptic pattern selection.
-
-**Screenshot tests** — `WalkieTalkieScreenshots` (8 previews) and `AudioRecordingScreenshots`
-(4 previews): every state rendered on small and large round displays.
-
-**E2E instrumented tests** — `WalkieTalkieScreenTest` (14 tests) and
-`AudioRecordingScreenTest` (8 tests): UI elements and callback verification with controlled
-state, no service binding required.
-
 ```bash
-# Run unit tests
-./gradlew :app:wear:test --tests "*WalkieTalkieViewModelTest"
+# Unit tests: the recorder session, the ViewModel, the player
+./gradlew :app:wear:testDebugUnitTest
 
-# Validate screenshots
+# Every recorder state on small and large round displays
 ./gradlew :app:wear:validateDebugScreenshotTest
-
-# Run E2E tests (requires device)
-./gradlew :app:wear:connectedAndroidTest
 ```
+
+The microphone itself cannot be tested on an emulator. `docs/testing/wear-dogfood-checklist.md` lists what
+to check on a real watch.

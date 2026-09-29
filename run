@@ -29,6 +29,7 @@ build|build:android|Build Android debug APK|./gradlew :app:android-main:assemble
 build|build:android:release|Build Android release APK|./gradlew :app:android-main:assembleRelease
 build|build:desktop|Build desktop app for current OS|./gradlew :app:compose-main:packageDistributionForCurrentOS
 build|build:wear|Build Wear OS debug APK|./gradlew :app:wear:assembleDebug
+build|build:wear:release|Build the Wear OS release bundle|./gradlew :app:wear:bundleRelease
 build|build:server|Build server JAR|./gradlew :server:build
 build|build:server:docker|Build server Docker image locally|docker build --target production -t logdate-server:local .
 build|build:all|Build all modules|./gradlew build --continue
@@ -37,7 +38,7 @@ run|run:android|Install and run on connected Android device|./gradlew :app:andro
 run|run:android:dogfood|Install and run the passkey-capable dogfood build|./gradlew :app:android-main:installDogfood && adb shell am start -n studio.hypertext.logdate/app.logdate.client.MainActivity
 run|run:desktop|Run desktop app|./gradlew :app:compose-main:run
 run|run:server|Run server locally|./gradlew :server:run
-run|run:wear|Install and run on connected Wear device|./gradlew :app:wear:installDebug && adb shell am start -n app.logdate.wear/app.logdate.wear.presentation.MainActivity
+run|run:wear|Install and run on connected Wear device|./gradlew :app:wear:installDebug && adb shell am start -n studio.hypertext.logdate.debug/app.logdate.wear.presentation.MainActivity
 
 test|test|Run all unit tests|./gradlew test allTests
 test|test:android|Run Android unit tests|./gradlew :app:android-main:testDebugUnitTest

@@ -16,6 +16,12 @@ dependencies {
     implementation("org.apache.commons:commons-compress:1.28.0")
     implementation("org.jetbrains.dokka:dokka-gradle-plugin:2.2.0")
     compileOnly("com.android.tools.build:gradle:9.1.1")
+
+    testImplementation(kotlin("test"))
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 gradlePlugin {
@@ -35,6 +41,10 @@ gradlePlugin {
         register("dynamicFeature") {
             id = "app.logdate.dynamic-feature"
             implementationClass = "app.logdate.DynamicFeaturePlugin"
+        }
+        register("androidRelease") {
+            id = "app.logdate.android-release"
+            implementationClass = "app.logdate.LogDateReleasePlugin"
         }
     }
 }

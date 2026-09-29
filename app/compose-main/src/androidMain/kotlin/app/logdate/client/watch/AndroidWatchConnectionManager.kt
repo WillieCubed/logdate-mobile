@@ -22,7 +22,6 @@ import kotlinx.coroutines.withContext
 
 private const val WATCH_CAPABILITY = "logdate_watch_app"
 private const val SYNC_REQUEST_PATH = "/logdate/sync/request"
-private const val WEAR_APP_PACKAGE = "app.logdate.wear"
 
 /**
  * Android implementation of [WatchConnectionManager] using Wear transport plus
@@ -64,7 +63,7 @@ class AndroidWatchConnectionManager(
         val playStoreIntent =
             Intent(Intent.ACTION_VIEW)
                 .addCategory(Intent.CATEGORY_BROWSABLE)
-                .setData(Uri.parse("market://details?id=$WEAR_APP_PACKAGE"))
+                .setData(Uri.parse("market://details?id=${context.packageName}"))
 
         try {
             withContext(ioDispatcher) {
@@ -81,7 +80,7 @@ class AndroidWatchConnectionManager(
         val launchIntent =
             Intent(Intent.ACTION_MAIN)
                 .addCategory(Intent.CATEGORY_LAUNCHER)
-                .setPackage(WEAR_APP_PACKAGE)
+                .setPackage(context.packageName)
 
         try {
             withContext(ioDispatcher) {

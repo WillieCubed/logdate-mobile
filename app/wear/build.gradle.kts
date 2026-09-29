@@ -1,4 +1,6 @@
+import app.logdate.LogDateReleaseExtension
 import com.android.build.api.dsl.ApplicationExtension
+import com.github.triplet.gradle.androidpublisher.ResolutionStrategy
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -6,7 +8,17 @@ plugins {
     alias(libs.plugins.androidx.baselineprofile)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.screenshot)
+    alias(libs.plugins.gradlePlayPublisher)
+    id("app.logdate.android-release")
 }
+
+/**
+ * The watch ships on the phone's Play listing, as a Wear OS form factor, under the phone's package
+ * name and signing key. The Wear Data Layer only carries data between apps that match on both, so
+ * identity, versioning and signing come from the same plugin the phone's values are defined by.
+ */
+val release = the<LogDateReleaseExtension>()
+release.requireSigningForReleaseTasks()
 
 val baselineProfileRequested =
     gradle.startParameter.taskNames.any { taskName ->
@@ -18,19 +30,43 @@ extensions.configure<ApplicationExtension> {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "app.logdate.wear"
+        applicationId = release.applicationId
         minSdk = 31
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = release.versionCode
+        versionName = release.versionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    release.signing?.let { key ->
+        signingConfigs {
+            create("release") {
+                storeFile = file(key.storeFile)
+                storePassword = key.storePassword
+                keyAlias = key.keyAlias
+                keyPassword = key.keyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            // Installs beside a release build, and matches the phone's debug package so a debug phone
+            // and a debug watch built on one machine still share Data Layer identity and signing key.
+            applicationIdSuffix = release.debugApplicationIdSuffix
+            versionNameSuffix = "-debug"
+        }
         release {
             isMinifyEnabled = false
+            signingConfig =
+                if (release.signsWithDebugKey) {
+                    signingConfigs.getByName("debug")
+                } else {
+                    signingConfigs.getByName("release")
+                }
             if (baselineProfileRequested) {
-                signingConfig = signingConfigs.getByName("debug")
                 isProfileable = true
             }
             proguardFiles(
@@ -62,6 +98,17 @@ kotlin {
         jvmTarget.set(JvmTarget.JVM_11)
         freeCompilerArgs.add("-opt-in=kotlin.uuid.ExperimentalUuidApi")
     }
+}
+
+play {
+    // Wear OS releases go to the form factor's own track, such as wear:internal.
+    track.set("wear:${release.playTrack}")
+    defaultToAppBundles.set(true)
+    // Keyless: CI signs in with Workload Identity Federation as the Play service account.
+    useApplicationDefaultCredentials.set(System.getenv("ANDROID_PUBLISHER_CREDENTIALS").isNullOrBlank())
+    // Play assigns the phone and the watch codes from one sequence for the listing. AUTO asks Play during
+    // a publish; plain builds keep their local versionCode and need no Play credentials.
+    resolutionStrategy.set(if (release.playPublishRequested) ResolutionStrategy.AUTO else ResolutionStrategy.FAIL)
 }
 
 dependencies {

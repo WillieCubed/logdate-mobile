@@ -41,6 +41,7 @@ Automated publishing is guarded by repository variables:
 
 - `LOGDATE_PLAY_INTERNAL_PUBLISH_ENABLED`
 - `LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED`
+- `LOGDATE_PLAY_WEAR_PUBLISH_ENABLED` (the watch's internal publish, off unless set)
 
 If a variable is not set to `true`, that publish path is skipped. This keeps
 `main` shippable before the Play and signing secrets exist and lets internal
@@ -218,6 +219,56 @@ The production path is intentionally lighter than the internal one:
 
 That optimization is safe only because the production job promotes the
 exact internal artifact already tested for the tagged commit.
+
+## Wear OS
+
+The watch app (`:app:wear`) ships on the **same Play listing** as the phone app, as a Wear OS
+form factor. It uses the phone's package name, `studio.hypertext.logdate` (`.debug` for debug
+builds), and is signed with the same key. That is not a preference: the Wear Data Layer only
+carries notes and audio between a phone app and a watch app that match on both package name and
+signing key, so a watch app under its own package could never hand a recording to the phone.
+
+`app/wear/build.gradle.kts` gets its package name, version, signing material and Play track from
+the `app.logdate.android-release` plugin in `build-logic`, and the values follow the same rules as
+the phone's: [versionCode is assigned by Play](#versioncode-assigned-by-play), `versionName` comes
+from git, and signing material is read from the environment, Gradle properties, or the local
+signing env file. A release build with no signing material fails instead of falling back to the
+debug key, unless `-Plogdate.allowDebugReleaseSigning=true` is passed for a local build that will
+not be published.
+
+### How it publishes
+
+The `publish-internal` job publishes the phone bundle, then, when
+`LOGDATE_PLAY_WEAR_PUBLISH_ENABLED` is `true`, the watch bundle to the `wear:internal` track.
+Play names a form factor's tracks `wear:<track>`. The two publishes run one after the other in one
+job because Play assigns both apps version codes from a single sequence, and two uploads racing for
+the next code would collide.
+
+Promoting the watch to production is not wired up. The `android-v*` tag job promotes only the
+phone's internal release.
+
+### One-time Play Console setup
+
+These steps happen in Play Console and cannot be done or checked from this repository:
+
+1. Add the Wear OS form factor to the LogDate app.
+2. Create the first Wear OS release, by hand, as the phone's first release had to be.
+3. Confirm your account is on the internal testers list, and that the `wear:internal` track exists.
+4. Set the repository variable `LOGDATE_PLAY_WEAR_PUBLISH_ENABLED` to `true`.
+
+Then install LogDate from the Play Store on the watch. If Gradle Play Publisher rejects the
+`wear:internal` track name on the first publish, upload the bundle by hand for that release and
+publish with the Play Developer API directly until the name is sorted out.
+
+### Building locally
+
+```shell
+./run build:wear:release
+```
+
+writes `app/wear/build/outputs/bundle/release/wear-release.aab`. Pass
+`-Plogdate.allowDebugReleaseSigning=true` on a machine with no signing material. CI builds the same
+bundle on every push so a broken watch release cannot reach `main`.
 
 ## Local Verification
 
