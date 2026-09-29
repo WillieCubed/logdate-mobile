@@ -57,10 +57,26 @@ interface RecordingServiceController {
 }
 
 /**
+ * Opt-in behavior for one recording session. The defaults leave the service exactly as the
+ * phone editor uses it; the watch turns these on.
+ *
+ * @property maxDurationMs The recorder finalizes the file and ends the session at this length,
+ *   or never when 0.
+ * @property pauseOnInterruption Pause when another app or a call takes audio focus.
+ * @property holdWakeLock Keep the CPU awake while recording so a dozing device does not drop audio.
+ */
+data class RecordingSessionOptions(
+    val maxDurationMs: Long = 0L,
+    val pauseOnInterruption: Boolean = false,
+    val holdWakeLock: Boolean = false,
+)
+
+/**
  * Production [RecordingServiceController] backed by the app's [AudioRecordingService].
  */
 class AndroidRecordingServiceController(
     private val context: Context,
+    private val options: RecordingSessionOptions = RecordingSessionOptions(),
 ) : RecordingServiceController {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mutableServiceState = MutableStateFlow<RecordingServiceState?>(null)
@@ -105,7 +121,7 @@ class AndroidRecordingServiceController(
         inputDeviceId: String?,
     ): Boolean =
         try {
-            context.startAudioRecordingService(outputFilePath = outputPath, inputDeviceId = inputDeviceId)
+            context.startAudioRecordingService(outputFilePath = outputPath, inputDeviceId = inputDeviceId, options = options)
             bindRequested = true
             val bound = context.bindService(Intent(context, AudioRecordingService::class.java), connection, Context.BIND_AUTO_CREATE)
             if (!bound) Napier.e("Recording service refused the bind request")

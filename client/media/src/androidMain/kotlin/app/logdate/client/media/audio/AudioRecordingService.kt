@@ -4,10 +4,14 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaRecorder
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import app.logdate.client.media.device.AndroidAudioRouteDevices
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
@@ -27,6 +31,7 @@ import java.io.File
 fun Context.startAudioRecordingService(
     outputFilePath: String? = null,
     inputDeviceId: String? = null,
+    options: RecordingSessionOptions = RecordingSessionOptions(),
 ) {
     val intent =
         Intent(this, AudioRecordingService::class.java).apply {
@@ -37,6 +42,9 @@ fun Context.startAudioRecordingService(
             if (inputDeviceId != null) {
                 putExtra(AudioRecordingService.EXTRA_INPUT_DEVICE_ID, inputDeviceId)
             }
+            putExtra(AudioRecordingService.EXTRA_MAX_DURATION_MS, options.maxDurationMs)
+            putExtra(AudioRecordingService.EXTRA_PAUSE_ON_INTERRUPTION, options.pauseOnInterruption)
+            putExtra(AudioRecordingService.EXTRA_HOLD_WAKE_LOCK, options.holdWakeLock)
         }
     startForegroundService(intent)
 }
@@ -72,6 +80,12 @@ class AudioRecordingService : Service() {
         const val SERVICE_ACTION_RESUME = AndroidAudioNotificationHandler.ACTION_RESUME
         const val EXTRA_OUTPUT_PATH = "app.logdate.extra.OUTPUT_PATH"
         const val EXTRA_INPUT_DEVICE_ID = "app.logdate.extra.INPUT_DEVICE_ID"
+        const val EXTRA_MAX_DURATION_MS = "app.logdate.extra.MAX_DURATION_MS"
+        const val EXTRA_PAUSE_ON_INTERRUPTION = "app.logdate.extra.PAUSE_ON_INTERRUPTION"
+        const val EXTRA_HOLD_WAKE_LOCK = "app.logdate.extra.HOLD_WAKE_LOCK"
+        private const val WAKE_LOCK_TAG = "LogDate:AudioRecordingWakeLock"
+        private const val WAKE_LOCK_HEADROOM_MS = 60_000L
+        private const val DEFAULT_WAKE_LOCK_TIMEOUT_MS = 35 * 60_000L
         private const val LEVEL_POLL_INTERVAL_MS = 100L
         private const val DURATION_TICK_MS = 1000L
         private const val MAX_AMPLITUDE = 32768f
@@ -102,6 +116,18 @@ class AudioRecordingService : Service() {
     @Volatile
     private var destroyed: Boolean = false
 
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var focusRequest: AudioFocusRequest? = null
+    private var options = RecordingSessionOptions()
+
+    private val audioFocusListener =
+        AudioManager.OnAudioFocusChangeListener { change ->
+            if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
+                Napier.d("Audio focus lost ($change); pausing the recording")
+                pauseRecording(byInterruption = true)
+            }
+        }
+
     // State flow for UI updates
     private val _recordingState = MutableStateFlow(RecordingServiceState())
     val recordingState = _recordingState.asStateFlow()
@@ -122,11 +148,18 @@ class AudioRecordingService : Service() {
                 Napier.d("Starting audio recording service")
                 val outputPath = intent.getStringExtra(EXTRA_OUTPUT_PATH)
                 val inputDeviceId = intent.getStringExtra(EXTRA_INPUT_DEVICE_ID)
+                options =
+                    RecordingSessionOptions(
+                        maxDurationMs = intent.getLongExtra(EXTRA_MAX_DURATION_MS, 0L),
+                        pauseOnInterruption = intent.getBooleanExtra(EXTRA_PAUSE_ON_INTERRUPTION, false),
+                        holdWakeLock = intent.getBooleanExtra(EXTRA_HOLD_WAKE_LOCK, false),
+                    )
                 startForegroundRecording(outputPath, inputDeviceId)
             }
             SERVICE_ACTION_STOP -> {
                 Napier.d("Stopping audio recording service")
                 stopRecording()
+                releaseSessionResources()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
@@ -149,6 +182,7 @@ class AudioRecordingService : Service() {
         Napier.d("Audio recording service destroyed")
         destroyed = true
         stopRecording()
+        releaseSessionResources()
         stopForeground(STOP_FOREGROUND_REMOVE)
         serviceScope.cancel() // Cancel all coroutines
         super.onDestroy()
@@ -191,7 +225,7 @@ class AudioRecordingService : Service() {
     /**
      * Pauses the current recording
      */
-    internal fun pauseRecording() {
+    internal fun pauseRecording(byInterruption: Boolean = false) {
         if (!_recordingState.value.isRecording || isPaused) {
             return
         }
@@ -200,6 +234,7 @@ class AudioRecordingService : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 synchronized(recorderLock) { mediaRecorder?.pause() }
                 isPaused = true
+                _recordingState.update { it.copy(isPaused = true, pausedByInterruption = byInterruption) }
             } else {
                 Napier.w("Pause recording not supported below Android N")
                 return
@@ -229,6 +264,7 @@ class AudioRecordingService : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 synchronized(recorderLock) { mediaRecorder?.resume() }
                 isPaused = false
+                _recordingState.update { it.copy(isPaused = false, pausedByInterruption = false) }
             } else {
                 Napier.w("Resume recording not supported below Android N")
                 return
@@ -274,9 +310,12 @@ class AudioRecordingService : Service() {
                 mediaRecorder = recorder
                 recordingStartTime = System.currentTimeMillis()
                 isPaused = false
+                acquireSessionResources()
                 _recordingState.update {
                     it.copy(
                         isRecording = true,
+                        isPaused = false,
+                        pausedByInterruption = false,
                         startTime = recordingStartTime,
                         recordedFilePath = null,
                         error = null,
@@ -323,7 +362,86 @@ class AudioRecordingService : Service() {
             setOutputFile(file.absolutePath)
             setAudioEncodingBitRate(128000)
             setAudioSamplingRate(44100)
+            if (options.maxDurationMs > 0) setMaxDuration(options.maxDurationMs.toInt())
+            setOnInfoListener { _, what, _ -> onRecorderInfo(what) }
+            setOnErrorListener { _, what, extra -> onRecorderError(what, extra) }
             applyPreferredInputDevice(inputDeviceId)
+        }
+    }
+
+    /**
+     * The recorder ended the session itself at a configured limit. Finalizing here means the
+     * file is complete before the bound client learns the session is over.
+     */
+    private fun onRecorderInfo(what: Int) {
+        val limitReached =
+            what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED ||
+                what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED
+        if (!limitReached) return
+        Napier.d("Recorder reached its limit ($what); finalizing the recording")
+        stopRecording()
+        releaseSessionResources()
+    }
+
+    private fun onRecorderError(
+        what: Int,
+        extra: Int,
+    ) {
+        Napier.e("Recorder error what=$what extra=$extra")
+        stopRecording()
+        releaseSessionResources()
+        _recordingState.update { it.copy(error = "Recording stopped unexpectedly (error $what)") }
+    }
+
+    private fun acquireSessionResources() {
+        if (options.holdWakeLock) {
+            try {
+                val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+                val timeoutMs =
+                    if (options.maxDurationMs > 0) options.maxDurationMs + WAKE_LOCK_HEADROOM_MS else DEFAULT_WAKE_LOCK_TIMEOUT_MS
+                wakeLock =
+                    powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG).apply { acquire(timeoutMs) }
+            } catch (e: Exception) {
+                Napier.w("Could not acquire the recording wake lock", e)
+            }
+        }
+        if (options.pauseOnInterruption) requestAudioFocus()
+    }
+
+    private fun requestAudioFocus() {
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val request =
+                AudioFocusRequest
+                    .Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                    .setAudioAttributes(
+                        AudioAttributes
+                            .Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build(),
+                    ).setOnAudioFocusChangeListener(audioFocusListener)
+                    .build()
+            focusRequest = request
+            audioManager.requestAudioFocus(request)
+        } catch (e: Exception) {
+            Napier.w("Could not request audio focus for the recording", e)
+        }
+    }
+
+    private fun releaseSessionResources() {
+        try {
+            if (wakeLock?.isHeld == true) wakeLock?.release()
+        } catch (e: Exception) {
+            Napier.w("Error releasing the recording wake lock", e)
+        }
+        wakeLock = null
+        val request = focusRequest ?: return
+        focusRequest = null
+        try {
+            (getSystemService(Context.AUDIO_SERVICE) as AudioManager).abandonAudioFocusRequest(request)
+        } catch (e: Exception) {
+            Napier.w("Error abandoning audio focus", e)
         }
     }
 
@@ -375,14 +493,20 @@ class AudioRecordingService : Service() {
             recorder?.release()
             val path = outputFile?.absolutePath
             _recordingState.update {
-                it.copy(isRecording = false, recordedFilePath = path)
+                it.copy(isRecording = false, isPaused = false, pausedByInterruption = false, recordedFilePath = path)
             }
             path
         } catch (e: Exception) {
             Napier.e("Error stopping recording", e)
             releaseQuietly(recorder)
             _recordingState.update {
-                it.copy(isRecording = false, recordedFilePath = null, error = "Error stopping recording: ${e.message}")
+                it.copy(
+                    isRecording = false,
+                    isPaused = false,
+                    pausedByInterruption = false,
+                    recordedFilePath = null,
+                    error = "Error stopping recording: ${e.message}",
+                )
             }
             null
         }
@@ -440,6 +564,9 @@ class AudioRecordingService : Service() {
  */
 data class RecordingServiceState(
     val isRecording: Boolean = false,
+    val isPaused: Boolean = false,
+    /** True when the pause came from losing audio focus (a call, another app) rather than the user. */
+    val pausedByInterruption: Boolean = false,
     val startTime: Long = 0,
     val durationSeconds: Int = 0,
     val audioLevel: Float = 0f,
