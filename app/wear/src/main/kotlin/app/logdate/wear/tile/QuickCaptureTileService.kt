@@ -32,7 +32,7 @@ private const val RESOURCES_VERSION = "1"
 
 private const val EXTRA_TILE_ROUTE = "tile_route"
 private const val ROUTE_QUICK_RECORD = "quick_record"
-private const val ROUTE_VOICE_NOTE = "voice_note"
+private const val ROUTE_MEMORIES = "memories"
 private const val ROUTE_MOOD = "mood"
 private const val ROUTE_QUICK_TEXT = "quick_text"
 
@@ -145,8 +145,8 @@ private fun captureButtonRow(context: Context): LayoutElementBuilders.LayoutElem
         .addContent(
             captureButton(
                 context = context,
-                label = context.getString(R.string.wear_tile_voice),
-                route = ROUTE_VOICE_NOTE,
+                label = context.getString(R.string.wear_tile_memories),
+                route = ROUTE_MEMORIES,
             ),
         ).addContent(spacer(8f))
         .addContent(

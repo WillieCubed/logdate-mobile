@@ -19,7 +19,7 @@
     <!-- Quick Capture Tile -->
     <string name="wear_tile_quick_capture_label">Quick Capture</string>
     <string name="wear_tile_record">Rec</string>
-    <string name="wear_tile_voice">Mic</string>
+    <string name="wear_tile_memories">Play</string>
     <string name="wear_tile_mood">Mood</string>
     <string name="wear_tile_text">Text</string>
 
