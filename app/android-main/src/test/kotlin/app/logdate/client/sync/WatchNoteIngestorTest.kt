@@ -9,6 +9,7 @@ import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import java.io.ByteArrayInputStream
 import java.io.InputStream
@@ -229,6 +230,87 @@ class WatchNoteIngestorTest {
     }
 
     @Test
+    fun `a note deleted before its metadata arrives is not stored when the metadata shows up late`() =
+        runTest {
+            val note = watchAudioNote()
+            ingestor.onNoteDeleted(note.uid)
+
+            ingestor.onNoteMetadata(mapper.toDataMap(note))
+            ingestor.onAudioBytes(note.uid, bytes("m4a"))
+
+            coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
+            assertTrue(acknowledger.acknowledged.isEmpty())
+            assertTrue(notified.isEmpty())
+            assertFalse(store.hasAudio(note.uid))
+        }
+
+    @Test
+    fun `audio for a deleted note is not written even when it arrives first`() =
+        runTest {
+            val note = watchAudioNote()
+            ingestor.onNoteDeleted(note.uid)
+
+            ingestor.onAudioBytes(note.uid, bytes("m4a"))
+
+            assertFalse(store.hasAudio(note.uid))
+        }
+
+    @Test
+    fun `a text note deleted before it arrives is not stored`() =
+        runTest {
+            val note = watchTextNote()
+            ingestor.onNoteDeleted(note.uid)
+
+            ingestor.onNoteMetadata(mapper.toDataMap(note))
+
+            coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
+            assertTrue(notified.isEmpty())
+        }
+
+    @Test
+    fun `deleting a note does not affect other notes that arrive later`() =
+        runTest {
+            val deleted = watchTextNote()
+            val other = watchTextNote()
+            ingestor.onNoteDeleted(deleted.uid)
+
+            ingestor.onNoteMetadata(mapper.toDataMap(other))
+
+            coVerify(exactly = 1) { notesRepository.create(other) }
+        }
+
+    @Test
+    fun `a slow audio transfer for one note does not block another note`() =
+        runTest {
+            val slow = watchAudioNote()
+            val other = watchTextNote()
+            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            store.writeGate = gate
+            val transfer = async { ingestor.onAudioBytes(slow.uid, bytes("m4a")) }
+            runCurrent()
+
+            ingestor.onNoteMetadata(mapper.toDataMap(other))
+
+            coVerify(exactly = 1) { notesRepository.create(other) }
+            gate.complete(Unit)
+            transfer.await()
+        }
+
+    @Test
+    fun `two deliveries of the same audio are written one after the other`() =
+        runTest {
+            val note = watchAudioNote()
+            ingestor.onNoteMetadata(mapper.toDataMap(note))
+            val first = async { ingestor.onAudioBytes(note.uid, bytes("m4a")) }
+            val second = async { ingestor.onAudioBytes(note.uid, bytes("m4a")) }
+
+            listOf(first, second).awaitAll()
+
+            assertEquals(1, store.writes)
+            coVerify(exactly = 1) { notesRepository.create(any<JournalNote>()) }
+        }
+
+    @Test
     fun `metadata without a note payload is rejected`() = runTest {
         assertFailsWith<IllegalArgumentException> { ingestor.onNoteMetadata(emptyMap()) }
     }
@@ -270,10 +352,15 @@ class WatchNoteIngestorTest {
 
         override fun hasAudio(noteId: Uuid): Boolean = noteId in audio
 
+        var writeGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+        var writes = 0
+
         override suspend fun writeAudio(
             noteId: Uuid,
             source: InputStream,
         ): Boolean {
+            writeGate?.await()
+            writes++
             if (failNextWrite) {
                 failNextWrite = false
                 return false
@@ -299,5 +386,13 @@ class WatchNoteIngestorTest {
             audio.remove(noteId)
             metadata.remove(noteId)
         }
+
+        private val deleted = mutableSetOf<Uuid>()
+
+        override suspend fun markDeleted(noteId: Uuid) {
+            deleted += noteId
+        }
+
+        override suspend fun isDeleted(noteId: Uuid): Boolean = noteId in deleted
     }
 }

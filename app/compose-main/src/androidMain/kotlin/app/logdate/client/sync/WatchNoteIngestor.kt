@@ -8,6 +8,7 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.InputStream
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.uuid.Uuid
 
 /**
@@ -36,8 +37,17 @@ interface WatchAudioStore {
 
     suspend fun clearMetadata(noteId: Uuid)
 
-    /** Removes the file and any stashed metadata. */
+    /** Removes the file and any stashed metadata. A deletion marker set by [markDeleted] stays. */
     suspend fun discard(noteId: Uuid)
+
+    /**
+     * Remembers that the watch deleted this note. Data items and channels are not ordered against each
+     * other, so a delete can arrive before the note it removes; the marker stops the late note and
+     * audio from being stored after the fact.
+     */
+    suspend fun markDeleted(noteId: Uuid)
+
+    suspend fun isDeleted(noteId: Uuid): Boolean
 }
 
 /** Tells the watch a note is stored on the phone, so the watch can stop retrying it. */
@@ -54,7 +64,11 @@ fun interface WatchNoteNotifier {
  *
  * A watch audio note is stored only once its file is on the phone, so the phone never lists a note
  * it cannot play and never uploads a note whose bytes are missing. Delivery is at-least-once: a
- * redelivered note or file is acknowledged again and never stored twice.
+ * redelivered note or file is acknowledged again and never stored twice, and a note the watch has
+ * deleted is never stored, even when its data arrives after the delete.
+ *
+ * Work is serialized per note, not globally, so a long audio transfer for one note does not hold up
+ * the others.
  */
 class WatchNoteIngestor(
     private val notesRepository: JournalNotesRepository,
@@ -63,36 +77,47 @@ class WatchNoteIngestor(
     private val notifier: WatchNoteNotifier,
     private val noteDataMapper: NoteDataMapper = NoteDataMapper(),
 ) {
-    private val mutex = Mutex()
+    private val noteLocks = ConcurrentHashMap<Uuid, Mutex>()
+
+    private suspend fun <T> withNoteLock(
+        noteId: Uuid,
+        block: suspend () -> T,
+    ): T = noteLocks.getOrPut(noteId) { Mutex() }.withLock { block() }
 
     /** @throws IllegalArgumentException if [data] carries no decodable note. */
-    suspend fun onNoteMetadata(data: Map<String, String>) =
-        mutex.withLock {
-            val note = noteDataMapper.fromDataMap(data)
-            if (note is JournalNote.Audio) {
-                receiveAudioMetadata(note, data)
-            } else {
-                receiveNote(note)
+    suspend fun onNoteMetadata(data: Map<String, String>) {
+        val note = noteDataMapper.fromDataMap(data)
+        withNoteLock(note.uid) {
+            when {
+                audioStore.isDeleted(note.uid) -> Napier.d("Ignoring note ${note.uid}: the watch deleted it")
+                note is JournalNote.Audio -> receiveAudioMetadata(note, data)
+                else -> receiveNote(note)
             }
         }
+    }
 
     suspend fun onAudioBytes(
         noteId: Uuid,
         source: InputStream,
-    ) = mutex.withLock {
+    ) = withNoteLock(noteId) {
+        if (audioStore.isDeleted(noteId)) {
+            Napier.d("Dropping audio for note $noteId: the watch deleted it")
+            return@withNoteLock
+        }
         if (notesRepository.getNoteById(noteId) != null) {
             acknowledger.acknowledge(noteId)
-            return@withLock
+            return@withNoteLock
         }
         if (!audioStore.writeAudio(noteId, source)) {
             Napier.w("Could not store audio bytes from the watch for note $noteId")
-            return@withLock
+            return@withNoteLock
         }
         storeIfComplete(noteId)
     }
 
     suspend fun onNoteDeleted(noteId: Uuid) =
-        mutex.withLock {
+        withNoteLock(noteId) {
+            audioStore.markDeleted(noteId)
             if (notesRepository.getNoteById(noteId) != null) {
                 notesRepository.removeById(noteId)
             }

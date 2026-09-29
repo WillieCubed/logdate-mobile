@@ -118,6 +118,46 @@ class FileWatchAudioStoreTest {
         assertNull(store.stashedMetadata(noteId))
     }
 
+    @Test
+    fun `a note is not deleted until it is marked`() =
+        runTest {
+            assertFalse(store.isDeleted(noteId))
+        }
+
+    @Test
+    fun `a marked deletion is remembered`() =
+        runTest {
+            store.markDeleted(noteId)
+
+            assertTrue(store.isDeleted(noteId))
+        }
+
+    @Test
+    fun `a deletion survives a new store over the same directories`() =
+        runTest {
+            store.markDeleted(noteId)
+
+            assertTrue(FileWatchAudioStore(audioDirectory, incomingDirectory).isDeleted(noteId))
+        }
+
+    @Test
+    fun `discarding a note keeps its deletion marker`() =
+        runTest {
+            store.markDeleted(noteId)
+
+            store.discard(noteId)
+
+            assertTrue(store.isDeleted(noteId))
+        }
+
+    @Test
+    fun `a deletion marker for one note does not mark another`() =
+        runTest {
+            store.markDeleted(noteId)
+
+            assertFalse(store.isDeleted(Uuid.random()))
+        }
+
     private class FailingStream(
         private val prefix: ByteArray,
     ) : InputStream() {

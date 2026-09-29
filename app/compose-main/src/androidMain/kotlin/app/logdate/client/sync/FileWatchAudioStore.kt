@@ -96,7 +96,18 @@ class FileWatchAudioStore(
         }
     }
 
+    override suspend fun markDeleted(noteId: Uuid) {
+        withContext(ioDispatcher) {
+            incomingDirectory.mkdirs()
+            deletionMarker(noteId).writeText("")
+        }
+    }
+
+    override suspend fun isDeleted(noteId: Uuid): Boolean = withContext(ioDispatcher) { deletionMarker(noteId).isFile }
+
     private fun audioFile(noteId: Uuid): File = File(audioDirectory, "wear_$noteId.m4a")
 
     private fun metadataFile(noteId: Uuid): File = File(incomingDirectory, "$noteId.json")
+
+    private fun deletionMarker(noteId: Uuid): File = File(incomingDirectory, "$noteId.deleted")
 }
