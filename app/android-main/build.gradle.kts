@@ -1,5 +1,6 @@
 @file:Suppress("UnstableApiUsage")
 
+import app.logdate.LogDateReleaseExtension
 import com.android.build.api.dsl.ApplicationExtension
 import com.android.build.api.variant.ResValue
 import java.util.Properties
@@ -12,6 +13,7 @@ plugins {
     alias(libs.plugins.googleServices)
     alias(libs.plugins.crashlytics)
     alias(libs.plugins.screenshot)
+    id("app.logdate.android-release")
 }
 
 val baselineProfileRequested =
@@ -54,11 +56,7 @@ val resolvedGoogleMapsApiKey =
  * the package matches, so -Plogdate.applicationId rebuilds the current source under the old
  * identity until those installs are migrated.
  */
-val baseApplicationId: String =
-    providers
-        .gradleProperty("logdate.applicationId")
-        .orElse("studio.hypertext.logdate")
-        .get()
+val baseApplicationId: String = the<LogDateReleaseExtension>().applicationId
 
 /**
  * Debug installs under their own identity so they can sit beside a dogfood build rather than
@@ -71,7 +69,7 @@ val baseApplicationId: String =
  * Digital Asset Links for passkey sign-in, which binds package and certificate together. Debug
  * cannot do passkey sign-in under any identity, so it gives up nothing here.
  */
-val debugApplicationIdSuffix = ".debug"
+val debugApplicationIdSuffix: String = the<LogDateReleaseExtension>().debugApplicationIdSuffix
 
 /**
  * Production release versionCode comes from CI. Priority order:
