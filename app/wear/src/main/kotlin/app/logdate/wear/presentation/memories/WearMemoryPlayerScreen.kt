@@ -1,6 +1,5 @@
 package app.logdate.wear.presentation.memories
 
-import android.text.format.DateFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,7 +30,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -50,7 +48,6 @@ import app.logdate.wear.presentation.timeline.formatDayLabel
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.viewmodel.koinViewModel
-import java.util.Date
 import kotlin.uuid.Uuid
 
 @Composable
@@ -78,6 +75,7 @@ internal fun WearMemoryPlayerContent(
     onSkipBack: () -> Unit = {},
     onSkipForward: () -> Unit = {},
     onOpenBluetoothSettings: () -> Unit = {},
+    timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) {
     ScreenScaffold(timeText = { TimeText() }) {
         Column(
@@ -89,7 +87,7 @@ internal fun WearMemoryPlayerContent(
             when {
                 !state.isLoaded -> Unit
                 memory == null -> PlayerMessage(stringResource(R.string.wear_memory_not_found))
-                else -> PlayerBody(state, memory, onPlayPause, onSkipBack, onSkipForward, onOpenBluetoothSettings)
+                else -> PlayerBody(state, memory, timeZone, onPlayPause, onSkipBack, onSkipForward, onOpenBluetoothSettings)
             }
         }
     }
@@ -99,6 +97,7 @@ internal fun WearMemoryPlayerContent(
 private fun PlayerBody(
     state: MemoryPlayerUiState,
     memory: VoiceMemoryItem,
+    timeZone: TimeZone,
     onPlayPause: () -> Unit,
     onSkipBack: () -> Unit,
     onSkipForward: () -> Unit,
@@ -111,7 +110,7 @@ private fun PlayerBody(
 
     Box(modifier = Modifier.height(TITLE_SLOT_HEIGHT).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
         Text(
-            text = memoryTitle(memory),
+            text = memoryTitle(memory, timeZone),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -236,11 +235,12 @@ private fun PlayerMessage(text: String) {
 }
 
 @Composable
-private fun memoryTitle(memory: VoiceMemoryItem): String {
-    val context = LocalContext.current
-    val day = memory.createdAt.toLocalDateTime(TimeZone.currentSystemDefault()).date
-    val time = DateFormat.getTimeFormat(context).format(Date(memory.createdAt.toEpochMilliseconds()))
-    return "${formatDayLabel(day)}, $time"
+private fun memoryTitle(
+    memory: VoiceMemoryItem,
+    timeZone: TimeZone,
+): String {
+    val day = memory.createdAt.toLocalDateTime(timeZone).date
+    return "${formatDayLabel(day)}, ${formatMemoryTime(memory, timeZone)}"
 }
 
 private val TITLE_SLOT_HEIGHT = 34.dp

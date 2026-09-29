@@ -1,6 +1,5 @@
 package app.logdate.wear.presentation.memories
 
-import android.text.format.DateFormat
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -9,7 +8,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -28,7 +26,6 @@ import app.logdate.wear.presentation.timeline.formatDayLabel
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.viewmodel.koinViewModel
-import java.util.Date
 import kotlin.uuid.Uuid
 
 @Composable
@@ -45,6 +42,7 @@ internal fun WearVoiceMemoriesContent(
     state: VoiceMemoriesUiState,
     onOpenMemory: (Uuid) -> Unit = {},
     onLoadMore: () -> Unit = {},
+    timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) {
     val listState = rememberScalingLazyListState()
     ScreenScaffold(timeText = { TimeText() }, scrollState = listState) {
@@ -62,7 +60,7 @@ internal fun WearVoiceMemoriesContent(
                 state.memories.isEmpty() -> item(key = "empty") { EmptyMemories() }
                 else -> {
                     items(items = state.memories, key = { it.noteId.toString() }) { memory ->
-                        MemoryRow(memory = memory, onClick = { onOpenMemory(memory.noteId) })
+                        MemoryRow(memory = memory, timeZone = timeZone, onClick = { onOpenMemory(memory.noteId) })
                     }
                     if (state.hasMore) {
                         item(key = "older") {
@@ -103,11 +101,11 @@ private fun EmptyMemories() {
 @Composable
 private fun MemoryRow(
     memory: VoiceMemoryItem,
+    timeZone: TimeZone,
     onClick: () -> Unit,
 ) {
-    val context = LocalContext.current
-    val day = memory.createdAt.toLocalDateTime(TimeZone.currentSystemDefault()).date
-    val time = DateFormat.getTimeFormat(context).format(Date(memory.createdAt.toEpochMilliseconds()))
+    val day = memory.createdAt.toLocalDateTime(timeZone).date
+    val time = formatMemoryTime(memory, timeZone)
     Button(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
