@@ -3,9 +3,9 @@ package app.logdate.client.sync.cloud
 /**
  * Authenticated remote backup operations.
  *
- * Backup bytes are accepted only while the caller has an access token. The server encrypts the
- * payload before storage and decrypts it only for this authenticated download, so this source
- * deliberately does not expose storage URLs as a separate unauthenticated path.
+ * Backup bytes are accepted only while the caller has an access token. Android seals new archives
+ * with the recovery identity before upload; the server also encrypts stored bytes and returns them
+ * only through an authenticated download. Older server-encrypted ZIP backups remain restorable.
  */
 interface CloudBackupDataSource {
     suspend fun uploadBackup(

@@ -53,6 +53,7 @@ internal class PasskeyRegistrationCoordinator(
                     username = request.username,
                     displayName = request.displayName,
                     bio = request.bio,
+                    originalBio = request.originalBio,
                     requestedOwnerId = canonicalOwnerId,
                 )
 

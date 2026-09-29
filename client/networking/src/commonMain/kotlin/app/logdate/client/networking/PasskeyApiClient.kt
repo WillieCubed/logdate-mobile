@@ -67,6 +67,12 @@ interface PasskeyApiClientContract {
         bio: String? = null,
     ): Result<LogDateAccount>
 
+    suspend fun updateAccountProfileWithOriginalBio(
+        accessToken: String,
+        bio: String?,
+        originalBio: String?,
+    ): Result<LogDateAccount> = Result.failure(UnsupportedOperationException("Cloud original bio updates unavailable"))
+
     suspend fun refreshToken(refreshToken: String): Result<String>
 
     /** Best-effort server-side refresh-token revocation for an explicit sign-out. */
@@ -218,6 +224,7 @@ class PasskeyApiClient(
                             username = request.username,
                             displayName = request.displayName,
                             bio = request.bio,
+                            originalBio = request.originalBio,
                             requestedOwnerId = request.requestedOwnerId,
                         ),
                     )
@@ -364,10 +371,25 @@ class PasskeyApiClient(
         displayName: String?,
         username: String?,
         bio: String?,
+    ): Result<LogDateAccount> = updateAccountProfileFields(accessToken, displayName, username, bio, null)
+
+    override suspend fun updateAccountProfileWithOriginalBio(
+        accessToken: String,
+        bio: String?,
+        originalBio: String?,
+    ): Result<LogDateAccount> = updateAccountProfileFields(accessToken, null, null, bio, originalBio)
+
+    private suspend fun updateAccountProfileFields(
+        accessToken: String,
+        displayName: String?,
+        username: String?,
+        bio: String?,
+        originalBio: String?,
     ): Result<LogDateAccount> =
         try {
             val baseUrl = getBaseUrl()
-            val updateRequest = UpdateAccountProfileRequest(displayName = displayName, username = username, bio = bio)
+            val updateRequest =
+                UpdateAccountProfileRequest(displayName = displayName, username = username, bio = bio, originalBio = originalBio)
             val response =
                 httpClient.put("$baseUrl$AUTH_PATH/me") {
                     contentType(ContentType.Application.Json)
@@ -773,6 +795,7 @@ private data class SignupPasskeyBeginRequestDto(
     val username: String,
     val displayName: String,
     val bio: String? = null,
+    val originalBio: String? = null,
     val requestedOwnerId: String? = null,
 )
 
@@ -823,6 +846,7 @@ private data class AuthAccountDto(
     val did: String? = null,
     val handle: String? = null,
     val bio: String? = null,
+    val originalBio: String? = null,
     val passkeyCredentialIds: List<String> = emptyList(),
     val createdAt: String,
     val updatedAt: String,
@@ -867,6 +891,7 @@ private fun AuthAccountDto.toLogDateAccount(): LogDateAccount =
         did = did,
         handle = handle,
         bio = bio,
+        originalBio = originalBio,
         passkeyCredentialIds = passkeyCredentialIds,
         createdAt = Instant.parse(createdAt),
         updatedAt = Instant.parse(updatedAt),

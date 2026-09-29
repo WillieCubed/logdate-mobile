@@ -85,6 +85,10 @@ kotlin {
             implementation(libs.koin.compose.viewmodel)
         }
 
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+        }
+
         androidMain.dependencies {
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.koin.android)

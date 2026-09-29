@@ -1,24 +1,47 @@
 name: Publish Android to Play
-run-name: Publish Android ${{ github.ref_name }} to Play by ${{ github.actor }}
+run-name: Android Play ${{ inputs.stage || 'internal' }} ${{ inputs.candidate_tag || github.ref_name }} by ${{ github.actor }}
 
 on:
   push:
     branches: [main]
-    tags:
-      - 'android-v*'
   workflow_dispatch:
+    inputs:
+      stage:
+        description: Play release action
+        required: true
+        type: choice
+        options:
+          - internal
+          - start-5
+          - advance-25
+          - complete-100
+          - halt
+          - resume-5
+          - resume-25
+      candidate_tag:
+        description: Tested android-v tag, required for production actions
+        required: false
+        type: string
+      candidate_version_code:
+        description: Exact tested internal Play version code, required for production actions
+        required: false
+        type: string
+      gate_evidence:
+        description: Link to the completed acceptance record and stage signal review
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-play-publish-${{ github.ref }}
-  cancel-in-progress: true
+  group: android-play-publish
+  cancel-in-progress: false
 
 jobs:
   publish-internal:
     name: Publish Android internal release
-    if: ${{ vars.LOGDATE_PLAY_INTERNAL_PUBLISH_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main') }}
+    if: ${{ vars.LOGDATE_PLAY_INTERNAL_PUBLISH_ENABLED == 'true' && (github.event_name == 'push' || inputs.stage == 'internal') }}
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -103,7 +126,7 @@ jobs:
 
   publish-production:
     name: Promote Android release to production
-    if: ${{ vars.LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED == 'true' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/android-v') }}
+    if: ${{ vars.LOGDATE_PLAY_PRODUCTION_PUBLISH_ENABLED == 'true' && github.event_name == 'workflow_dispatch' && inputs.stage != 'internal' }}
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -115,7 +138,20 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.candidate_tag }}
           fetch-depth: 0
+
+      - name: Validate candidate and acceptance record
+        shell: bash
+        env:
+          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+          CANDIDATE_VERSION_CODE: ${{ inputs.candidate_version_code }}
+          GATE_EVIDENCE: ${{ inputs.gate_evidence }}
+        run: |
+          [[ "$CANDIDATE_TAG" =~ ^android-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'A tested android-v tag is required.' >&2; exit 1; }
+          [[ "$CANDIDATE_VERSION_CODE" =~ ^[0-9]+$ ]] || { echo 'The tested internal Play version code is required.' >&2; exit 1; }
+          [[ -n "$GATE_EVIDENCE" ]] || { echo 'An acceptance and signal review link is required.' >&2; exit 1; }
+          [[ "$(git rev-parse HEAD)" == "$(git rev-list -n 1 "$CANDIDATE_TAG")" ]] || { echo 'Checkout does not match candidate tag.' >&2; exit 1; }
 
       - name: Authenticate as the Play publishing service account
         id: auth
@@ -151,23 +187,78 @@ jobs:
         shell: bash
         env:
           PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
-        run: ./scripts/resolve-play-internal-release.sh studio.hypertext.logdate "${{ steps.version.outputs.short_sha }}"
+        run: ./scripts/resolve-play-internal-release.sh studio.hypertext.logdate "${{ steps.version.outputs.short_sha }}" "${{ inputs.candidate_version_code }}"
 
-      - name: Promote tested internal release to Play production
+      - name: Check staged rollout transition
+        id: transition
+        shell: bash
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          ROLLOUT_STAGE: ${{ inputs.stage }}
+          VERSION_CODE: ${{ steps.internal.outputs.version_code }}
+        run: ./scripts/check-play-rollout-transition.sh studio.hypertext.logdate "$VERSION_CODE" "$ROLLOUT_STAGE"
+
+      - name: Start 5% rollout from tested internal artifact
+        if: ${{ inputs.stage == 'start-5' }}
         run: >
           ./gradlew :app:android-main:promoteReleaseArtifact
           --from-track internal
           --promote-track production
           --version-code "${{ steps.internal.outputs.version_code }}"
           --release-name "${{ steps.version.outputs.production_release_name }}"
+          --release-status inProgress
+          --user-fraction 0.05
+
+      - name: Advance the same production artifact to 25%
+        if: ${{ inputs.stage == 'advance-25' }}
+        run: >
+          ./gradlew :app:android-main:promoteReleaseArtifact
+          --update production
+          --version-code "${{ steps.internal.outputs.version_code }}"
+          --release-status inProgress
+          --user-fraction 0.25
+
+      - name: Complete the same production artifact at 100%
+        if: ${{ inputs.stage == 'complete-100' }}
+        run: >
+          ./gradlew :app:android-main:promoteReleaseArtifact
+          --update production
+          --version-code "${{ steps.internal.outputs.version_code }}"
           --release-status completed
 
+      - name: Halt the same production artifact
+        if: ${{ inputs.stage == 'halt' }}
+        run: >
+          ./gradlew :app:android-main:promoteReleaseArtifact
+          --update production
+          --version-code "${{ steps.internal.outputs.version_code }}"
+          --release-status halted
+          --user-fraction "${{ steps.transition.outputs.current_fraction }}"
+
+      - name: Resume the halted artifact at 5%
+        if: ${{ inputs.stage == 'resume-5' }}
+        run: >
+          ./gradlew :app:android-main:promoteReleaseArtifact
+          --update production
+          --version-code "${{ steps.internal.outputs.version_code }}"
+          --release-status inProgress
+          --user-fraction 0.05
+
+      - name: Resume the halted artifact at 25%
+        if: ${{ inputs.stage == 'resume-25' }}
+        run: >
+          ./gradlew :app:android-main:promoteReleaseArtifact
+          --update production
+          --version-code "${{ steps.internal.outputs.version_code }}"
+          --release-status inProgress
+          --user-fraction 0.25
+
       - name: Draft GitHub Release for android-v* tag
-        if: success()
+        if: ${{ success() && inputs.stage == 'start-5' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ github.ref_name }}" \
+          gh release create "${{ inputs.candidate_tag }}" \
             --draft \
             --generate-notes \
             --title "Android ${{ steps.version.outputs.version_name }} (${{ steps.internal.outputs.version_code }})"

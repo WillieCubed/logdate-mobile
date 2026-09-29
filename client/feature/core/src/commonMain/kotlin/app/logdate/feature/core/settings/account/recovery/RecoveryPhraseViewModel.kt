@@ -18,6 +18,12 @@ sealed interface RecoveryPhraseUiState {
 
     data object Confirming : RecoveryPhraseUiState
 
+    data object Verifying : RecoveryPhraseUiState
+
+    data object Verified : RecoveryPhraseUiState
+
+    data object VerificationFailed : RecoveryPhraseUiState
+
     data class Revealed(
         val words: List<String>,
     ) : RecoveryPhraseUiState
@@ -54,7 +60,40 @@ data class RevealPrompt(
 class RecoveryPhraseViewModel(
     private val gatekeeper: BiometricGatekeeper,
     private val loadPhrase: suspend () -> List<String>?,
+    private val confirmPhrase: suspend (List<String>) -> Boolean = { false },
+    private val isPhraseVerified: suspend () -> Boolean = { false },
+    private val onVerified: () -> Unit = {},
 ) : ViewModel() {
+    fun verify(phraseInput: String) {
+        if (_state.value !is RecoveryPhraseUiState.Revealed) return
+        val words =
+            phraseInput
+                .trim()
+                .lowercase()
+                .split(Regex("\\s+"))
+                .filter(String::isNotBlank)
+        _state.value = RecoveryPhraseUiState.Verifying
+        viewModelScope.launch {
+            _state.value =
+                runCatching { confirmPhrase(words) }
+                    .fold(
+                        onSuccess = { verified ->
+                            if (verified) {
+                                runCatching(onVerified)
+                                    .onFailure { error -> Napier.w("Could not request a Cloud backup", error) }
+                                RecoveryPhraseUiState.Verified
+                            } else {
+                                RecoveryPhraseUiState.VerificationFailed
+                            }
+                        },
+                        onFailure = { error ->
+                            Napier.w("Could not verify recovery phrase", error)
+                            RecoveryPhraseUiState.VerificationFailed
+                        },
+                    )
+        }
+    }
+
     private val _state = MutableStateFlow<RecoveryPhraseUiState>(RecoveryPhraseUiState.Checking)
     val state: StateFlow<RecoveryPhraseUiState> = _state.asStateFlow()
 
@@ -66,12 +105,13 @@ class RecoveryPhraseViewModel(
     fun check() {
         viewModelScope.launch {
             _state.value =
-                runCatching { loadPhrase() }
+                runCatching { loadPhrase() to isPhraseVerified() }
                     .fold(
-                        onSuccess = { phrase ->
+                        onSuccess = { (phrase, verified) ->
                             val current = _state.value
                             when {
                                 phrase == null -> RecoveryPhraseUiState.NotOnThisDevice
+                                verified -> RecoveryPhraseUiState.Verified
                                 // A screen rebuilt mid-reveal, such as after a rotation, keeps what the person confirmed.
                                 current is RecoveryPhraseUiState.Revealed || current is RecoveryPhraseUiState.Confirming -> current
                                 else -> RecoveryPhraseUiState.Hidden

@@ -1,5 +1,7 @@
 # Rewind Launch Criteria
 
+This checklist covers the eventual multiplatform and paid Rewind experience. For the first public Android release, use [Android public release acceptance](android-public-release.md): local weekly Rewind is required, while annual and paid Rewind are deferred.
+
 The checklist that says Rewind is ready to ship to all users. Treat every box as
 load-bearing — uncheck means do-not-launch.
 

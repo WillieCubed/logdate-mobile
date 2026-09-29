@@ -24,6 +24,12 @@ interface AccountRepository {
         username: String? = null,
     ): Result<LogDateAccount>
 
+    /** Updates both displayed and original bio on the Cloud account. */
+    suspend fun updateBio(
+        bio: String?,
+        originalBio: String?,
+    ): Result<LogDateAccount> = Result.failure(UnsupportedOperationException("Cloud bio updates unavailable"))
+
     /**
      * Refresh account information from the server.
      */

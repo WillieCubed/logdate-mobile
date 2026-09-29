@@ -6,10 +6,10 @@ import android.app.Application
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.StrictMode
-import android.util.Log
 import app.logdate.client.ambient.AmbientPromptScheduler
 import app.logdate.client.ambient.AmbientPromptSchedulingObserver
 import app.logdate.client.calendar.CalendarImportScheduler
+import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.domain.recommendation.AmbientPromptTriggerContext
 import app.logdate.client.events.EventInferenceScheduler
 import app.logdate.client.image.DataSaverImageInterceptor
@@ -65,7 +65,7 @@ class LogdateApplication :
 
     override fun onCreate() {
         super.onCreate()
-        Log.i(APP_STARTUP_TAG, "Application onCreate: initializing logging and DI")
+        Napier.i("Application onCreate: initializing logging and DI", tag = APP_STARTUP_TAG)
 
         installStrictModeIfDebuggable()
 
@@ -78,7 +78,7 @@ class LogdateApplication :
         Napier.base(LogcatAntilog(isDebuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0))
         Napier.base(CrashlyticsAntilog())
         initializeKoin()
-        Log.i(APP_STARTUP_TAG, "Application onCreate: Koin initialized")
+        Napier.i("Application onCreate: Koin initialized", tag = APP_STARTUP_TAG)
         runCatching {
             LogDateNotificationRegistrar(this).registerAllPhoneChannels()
         }.onFailure { error ->
@@ -98,18 +98,20 @@ class LogdateApplication :
         runCatching {
             val rewindScheduler = RewindGenerationScheduler(this)
             rewindScheduler.schedulePeriodicGeneration()
-            rewindScheduler.scheduleAnnualGeneration()
+            rewindScheduler.disableAnnualGeneration()
             rewindScheduler.enqueueImmediateCheck()
         }.onFailure { error ->
             Napier.w("Failed to initialize rewind generation scheduling", error)
         }
         runCatching {
-            EventInferenceScheduler(this).schedulePeriodicInference()
+            val scheduler = EventInferenceScheduler(this)
+            if (FeatureFlag.EVENTS.availableForLaunch) scheduler.schedulePeriodicInference() else scheduler.disableForLaunch()
         }.onFailure { error ->
             Napier.w("Failed to initialize event inference scheduling", error)
         }
         runCatching {
-            CalendarImportScheduler(this).schedulePeriodicImport()
+            val scheduler = CalendarImportScheduler(this)
+            if (FeatureFlag.EVENTS.availableForLaunch) scheduler.schedulePeriodicImport() else scheduler.disableForLaunch()
         }.onFailure { error ->
             Napier.w("Failed to initialize calendar import scheduling", error)
         }

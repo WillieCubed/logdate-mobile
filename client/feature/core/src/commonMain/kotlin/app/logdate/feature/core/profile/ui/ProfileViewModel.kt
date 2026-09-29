@@ -174,6 +174,35 @@ class ProfileViewModel(
         }
     }
 
+    /** Saves the person's words locally first, then uploads them when a Cloud account is connected. */
+    fun saveBio(words: String) {
+        viewModelScope.launch {
+            val original = words.trim().takeIf { it.isNotEmpty() }
+            _uiState.value = _uiState.value.copy(updateState = ProfileUpdateState.Updating)
+            val localResult = profileRepository.updateBio(original, original)
+            if (localResult.isFailure) {
+                Napier.e("Failed to update local bio", localResult.exceptionOrNull())
+                _uiState.value = _uiState.value.copy(updateState = ProfileUpdateState.Error("Failed to save bio"))
+                return@launch
+            }
+            if (_uiState.value.hasCloudAccount) {
+                val cloudResult = accountRepository.updateBio(original ?: "", original ?: "")
+                if (cloudResult.isFailure) {
+                    Napier.w("Bio saved locally, but Cloud account update failed", cloudResult.exceptionOrNull())
+                    _uiState.value =
+                        _uiState.value.copy(
+                            updateState =
+                                ProfileUpdateState.Error(
+                                    "Bio saved on this device. Cloud could not update; try again when connected.",
+                                ),
+                        )
+                    return@launch
+                }
+            }
+            _uiState.value = _uiState.value.copy(updateState = ProfileUpdateState.Success)
+        }
+    }
+
     /**
      * Save birthday to the local profile.
      */

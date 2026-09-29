@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -41,6 +42,7 @@ fun LibraryPanel(
     state: LibraryUiState,
     columnCount: Int,
     onItemClick: (Uuid) -> Unit,
+    onRetry: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier) {
@@ -74,6 +76,14 @@ fun LibraryPanel(
                             LibraryEmptyState(
                                 headline = "Your memories live here",
                                 body = "Photos and videos you capture in LogDate will show up in your library. Go snap something!",
+                            )
+                        }
+
+                        is LibraryUiState.Error -> {
+                            LibraryEmptyState(
+                                headline = "Library couldn't load",
+                                body = "Your entries are still saved. Try loading your library again.",
+                                onRetry = onRetry,
                             )
                         }
 
@@ -117,6 +127,7 @@ private fun LibraryLoadingPlaceholder(
 private fun LibraryEmptyState(
     headline: String,
     body: String,
+    onRetry: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -155,5 +166,9 @@ private fun LibraryEmptyState(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+        if (onRetry != null) {
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(onClick = onRetry) { Text("Try again") }
+        }
     }
 }

@@ -30,6 +30,7 @@ internal fun MainActivityContent(
     onPendingNavKeyConsumed: () -> Unit,
     onCurrentNavKeyChanged: (NavKey?) -> Unit,
     onShowUnlockPrompt: () -> Unit,
+    onCloudSignIn: () -> Unit,
     onShareSearchResult: (SearchResult) -> Unit,
     updateController: PlayInAppUpdateController,
     onLaunchUpdate: () -> Unit,
@@ -39,6 +40,7 @@ internal fun MainActivityContent(
         LogDateNavDisplay(
             appUiState = state,
             onShowUnlockPrompt = onShowUnlockPrompt,
+            onCloudSignIn = onCloudSignIn,
             pendingNavKey = pendingNavKey,
             onPendingNavKeyConsumed = onPendingNavKeyConsumed,
             onCurrentNavKeyChanged = onCurrentNavKeyChanged,

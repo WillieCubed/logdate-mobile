@@ -25,7 +25,7 @@ class CloudRestoreScheduler(
                 ).build()
         workManager.enqueueUniqueWork(
             CloudRestoreWorker.WORK_NAME,
-            ExistingWorkPolicy.KEEP,
+            ExistingWorkPolicy.REPLACE,
             request,
         )
         Napier.d("Enqueued LogDate Cloud restore")

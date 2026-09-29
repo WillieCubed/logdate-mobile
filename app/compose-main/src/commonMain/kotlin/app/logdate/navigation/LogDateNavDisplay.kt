@@ -31,6 +31,7 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.navigation3.ui.NavDisplay
+import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.ui.LockableContent
@@ -75,6 +76,8 @@ import app.logdate.feature.library.navigation.MediaDetailRoute
 import app.logdate.feature.library.navigation.libraryEntries
 import app.logdate.feature.library.ui.LibraryScreen
 import app.logdate.feature.location.timeline.ui.LocationTimelineScreen
+import app.logdate.feature.onboarding.navigation.FirstEntryImportOffer
+import app.logdate.feature.onboarding.navigation.OnboardingComplete
 import app.logdate.feature.onboarding.navigation.OnboardingStart
 import app.logdate.feature.onboarding.navigation.onboardingEntries
 import app.logdate.feature.postcards.navigation.PostcardEditorRoute
@@ -127,6 +130,7 @@ fun LogDateNavDisplay(
     onPendingNavKeyConsumed: () -> Unit = {},
     onCurrentNavKeyChanged: (NavKey?) -> Unit = {},
     onShareSearchResult: ((SearchResult) -> Unit)? = null,
+    onCloudSignIn: () -> Unit = {},
     sceneStrategy: SceneStrategy<NavKey> = rememberHomeSceneStrategy(),
 ) {
     val backStack = rememberNavBackStack(appNavSavedStateConfiguration, BaseRoute)
@@ -248,6 +252,17 @@ fun LogDateNavDisplay(
                                             libraryContent = { modifier ->
                                                 LibraryScreen(
                                                     onOpenMediaDetail = { backStack.add(MediaDetailRoute(it)) },
+                                                    onOpenSearch = {
+                                                        backStack.add(
+                                                            SearchRoute(
+                                                                typeFtsValues =
+                                                                    listOf(
+                                                                        SearchContentType.MEDIA_CAPTION.ftsValue,
+                                                                        SearchContentType.TRANSCRIPTION.ftsValue,
+                                                                    ),
+                                                            ),
+                                                        )
+                                                    },
                                                     modifier = modifier,
                                                 )
                                             },
@@ -283,11 +298,19 @@ fun LogDateNavDisplay(
                                         onNavigateBack = { backStack.removeLastOrNull() },
                                         onEntrySaved = {
                                             backStack.clear()
-                                            backStack.add(HomeRoute)
+                                            backStack.add(
+                                                if (appUiState.isOnboarded) HomeRoute else OnboardingComplete,
+                                            )
                                         },
                                         metadata = editorRouteTransitionMetadata,
                                     )
-                                    eventDetailEntry(onGoBack = { backStack.removeLastOrNull() })
+                                    if (FeatureFlag.EVENTS.availableForLaunch) {
+                                        eventDetailEntry(onGoBack = { backStack.removeLastOrNull() })
+                                    } else {
+                                        taggedEntry<EventDetailRoute> {
+                                            LaunchedEffect(Unit) { backStack.removeLastOrNull() }
+                                        }
+                                    }
                                     profileEntry(
                                         onBack = { backStack.removeLastOrNull() },
                                         onNavigateToBirthday = { backStack.add(BirthdaySettingsRoute) },
@@ -331,6 +354,7 @@ fun LogDateNavDisplay(
                                     onboardingEntries(
                                         onNavigateBack = { backStack.removeLastOrNull() },
                                         onWelcomeBack = {
+                                            onCloudSignIn()
                                             backStack.clear()
                                             backStack.add(HomeRoute)
                                         },
@@ -338,6 +362,11 @@ fun LogDateNavDisplay(
                                             backStack.clear()
                                             backStack.add(HomeRoute)
                                         },
+                                        onFirstEntryReady = {
+                                            backStack.clear()
+                                            backStack.add(FirstEntryImportOffer)
+                                        },
+                                        onCreateFirstEntry = { backStack.add(EntryEditorRoute(firstEntry = true)) },
                                         onGoToItem = { route -> backStack.add(route) },
                                     )
                                     postcardsEntries(

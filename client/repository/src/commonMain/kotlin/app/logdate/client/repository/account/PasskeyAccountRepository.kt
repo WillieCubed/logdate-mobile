@@ -161,6 +161,7 @@ data class AccountCreationRequest(
     val username: String,
     val displayName: String,
     val bio: String? = null,
+    val originalBio: String? = null,
     val email: String? = null,
 )
 

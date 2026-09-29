@@ -118,6 +118,36 @@ class RecoveryPhraseViewModelTest {
             assertEquals(RecoveryPhraseUiState.Hidden, viewModel.state.value)
         }
 
+    @Test
+    fun `correct reentry verifies recovery and wrong words do not`() =
+        runTest {
+            var confirmed = false
+            var backupRequests = 0
+            val viewModel =
+                RecoveryPhraseViewModel(
+                    gatekeeper = ScriptedGatekeeper(AppAuthState.AUTHENTICATED),
+                    loadPhrase = { phrase },
+                    confirmPhrase = { words ->
+                        confirmed = words == phrase
+                        confirmed
+                    },
+                    isPhraseVerified = { confirmed },
+                    onVerified = { backupRequests++ },
+                )
+
+            viewModel.reveal(prompt)
+            viewModel.verify("incorrect words")
+            assertEquals(RecoveryPhraseUiState.VerificationFailed, viewModel.state.value)
+            assertEquals(false, confirmed)
+            assertEquals(0, backupRequests)
+
+            viewModel.reveal(prompt)
+            viewModel.verify(phrase.joinToString(" "))
+            assertEquals(RecoveryPhraseUiState.Verified, viewModel.state.value)
+            assertEquals(true, confirmed)
+            assertEquals(1, backupRequests)
+        }
+
     private fun viewModel(
         storedPhrase: List<String>? = phrase,
         authResult: AppAuthState = AppAuthState.AUTHENTICATED,

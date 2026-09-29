@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -228,7 +229,21 @@ object ArchiveSchemas {
                         obj(
                             emptyList(),
                             "displayName" to string(),
-                            "birthday" to ref("instant"),
+                            "birthday" to
+                                buildJsonObject {
+                                    put(
+                                        "anyOf",
+                                        buildJsonArray {
+                                            add(
+                                                buildJsonObject {
+                                                    put("type", "string")
+                                                    put("pattern", "^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+                                                },
+                                            )
+                                            add(ref("instant"))
+                                        },
+                                    )
+                                },
                             "bio" to string(),
                             "originalBio" to string(),
                             "createdAt" to ref("instant"),

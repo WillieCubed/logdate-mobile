@@ -758,6 +758,72 @@ class RestoreUserDataUseCaseTest {
             assertTrue(result.warnings.isEmpty())
         }
 
+    @Test
+    fun `automatic Cloud restore preserves populated local profile fields`() =
+        runTest {
+            val local =
+                LogDateProfile(
+                    displayName = "Local name",
+                    birthday = Instant.parse("1992-06-03T00:00:00Z"),
+                    profilePhotoUri = "local-photo",
+                    bio = "Local display bio",
+                    originalBio = "Local original words",
+                    lastUpdatedAt = now - 10.days,
+                )
+            val cloud =
+                LogDateProfile(
+                    displayName = "Cloud name",
+                    birthday = Instant.parse("1991-01-01T00:00:00Z"),
+                    profilePhotoUri = "cloud-photo",
+                    bio = "Cloud display bio",
+                    originalBio = "Cloud original words",
+                    lastUpdatedAt = now,
+                )
+            profileRepo.profile = local
+
+            useCase.restore(
+                buildBundle(profile = cloud),
+                RestoreOptions(preservePopulatedLocalProfile = true),
+            )
+
+            assertEquals(local.displayName, profileRepo.profile.displayName)
+            assertEquals(local.birthday, profileRepo.profile.birthday)
+            assertEquals(local.profilePhotoUri, profileRepo.profile.profilePhotoUri)
+            assertEquals(local.bio, profileRepo.profile.bio)
+            assertEquals(local.originalBio, profileRepo.profile.originalBio)
+        }
+
+    @Test
+    fun `automatic Cloud restore fills blank local profile fields independently`() =
+        runTest {
+            profileRepo.profile =
+                LogDateProfile(
+                    displayName = "Local name",
+                    bio = "Local display bio",
+                    lastUpdatedAt = now,
+                )
+            val cloud =
+                LogDateProfile(
+                    displayName = "Cloud name",
+                    birthday = Instant.parse("1992-06-03T00:00:00Z"),
+                    profilePhotoUri = "cloud-photo",
+                    bio = "Cloud display bio",
+                    originalBio = "Cloud original words",
+                    lastUpdatedAt = now - 10.days,
+                )
+
+            useCase.restore(
+                buildBundle(profile = cloud),
+                RestoreOptions(preservePopulatedLocalProfile = true),
+            )
+
+            assertEquals("Local name", profileRepo.profile.displayName)
+            assertEquals(cloud.birthday, profileRepo.profile.birthday)
+            assertEquals("cloud-photo", profileRepo.profile.profilePhotoUri)
+            assertEquals("Local display bio", profileRepo.profile.bio)
+            assertEquals("Cloud original words", profileRepo.profile.originalBio)
+        }
+
     // endregion
 
     // region Merge strategies

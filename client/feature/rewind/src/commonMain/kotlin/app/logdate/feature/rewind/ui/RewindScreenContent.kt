@@ -112,6 +112,7 @@ import kotlin.uuid.Uuid
 fun RewindScreenContent(
     state: RewindOverviewScreenUiState,
     onOpenRewind: RewindOpenCallback,
+    onRetryRewind: (() -> Unit)? = null,
     onGenerateAnnualRewind: ((year: Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -129,8 +130,10 @@ fun RewindScreenContent(
                             message =
                                 if (state.isGeneratingRewind) {
                                     "Putting your week together..."
+                                } else if (state.generationFailed) {
+                                    "We couldn't finish your Rewind. Try again."
                                 } else {
-                                    "Weaving this week's story..."
+                                    "No entries from last week yet."
                                 },
                             rewindId = Uuid.random(),
                             label = "This Week",
@@ -195,6 +198,16 @@ fun RewindScreenContent(
         },
         containerColor = Color.Transparent,
         modifier = modifier,
+        bottomBar = {
+            if (state is RewindOverviewScreenUiState.NotReady && !state.isGeneratingRewind && onRetryRewind != null) {
+                Button(
+                    onClick = onRetryRewind,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg),
+                ) {
+                    Text(if (state.generationFailed) "Try Rewind again" else "Create this week's Rewind")
+                }
+            }
+        },
     ) { paddingValues ->
         // Connect the scroll behavior to the list
         FloatingRewindCardList(

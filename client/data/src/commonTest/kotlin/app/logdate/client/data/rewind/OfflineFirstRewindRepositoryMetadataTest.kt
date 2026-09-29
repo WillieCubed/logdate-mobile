@@ -247,6 +247,105 @@ class OfflineFirstRewindRepositoryMetadataTest {
             assertEquals(TopListKind.PEOPLE, topList.kind)
             assertEquals(topListItems, topList.items)
         }
+
+    @Test
+    fun `story panel order survives storage across content tables and structural timestamps`() =
+        runTest {
+            val dao = FakeCachedRewindDao()
+            val repository = OfflineFirstRewindRepository(dao, UnconfinedTestDispatcher(testScheduler))
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val opening =
+                RewindContent.PersonalityCard(
+                    now,
+                    Uuid.random(),
+                    WeekStatsSnapshot(1, 1, 0, 0),
+                    ActivityType.MIXED,
+                )
+            val image = RewindContent.Image(now, Uuid.random(), "test://image", null)
+            val transition = RewindContent.Transition(Instant.DISTANT_PAST, Uuid.random(), "And then")
+            val note = RewindContent.TextNote(now, Uuid.random(), "A real moment")
+            val rewind =
+                Rewind(
+                    uid = Uuid.random(),
+                    startDate = now,
+                    endDate = now,
+                    generationDate = now,
+                    label = "2025#05",
+                    title = "A week",
+                    content = listOf(opening, image, transition, note),
+                    metadata = null,
+                )
+
+            repository.saveRewind(rewind)
+            val retrieved = repository.getRewind(rewind.uid).first()
+
+            assertEquals(rewind.content.map { it.sourceId }, retrieved.content.map { it.sourceId })
+            assertNull(retrieved.metadata)
+        }
+
+    @Test
+    fun `refresh preserves the rewind identity and its attached replies`() =
+        runTest {
+            val dao = FakeCachedRewindDao()
+            val repository = OfflineFirstRewindRepository(dao, UnconfinedTestDispatcher(testScheduler))
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val original =
+                Rewind(
+                    uid = Uuid.random(),
+                    startDate = now,
+                    endDate = now,
+                    generationDate = now,
+                    label = "2025#06",
+                    title = "Original",
+                    content = emptyList(),
+                    isViewed = true,
+                    firstViewedAt = now,
+                    viewCount = 2,
+                )
+            repository.saveRewind(original)
+            dao.attachReply(original.uid)
+
+            repository.replaceRewind(original.uid, original.copy(title = "Refreshed"))
+
+            assertEquals(original.uid, repository.getRewind(original.uid).first().uid)
+            assertEquals("Refreshed", repository.getRewind(original.uid).first().title)
+            assertEquals(true, repository.getRewind(original.uid).first().isViewed)
+            assertEquals(2, repository.getRewind(original.uid).first().viewCount)
+            assertEquals(true, dao.hasAttachedReply(original.uid))
+        }
+
+    @Test
+    fun `milestone tagging preserves existing panels and attached replies`() =
+        runTest {
+            val dao = FakeCachedRewindDao()
+            val repository = OfflineFirstRewindRepository(dao, UnconfinedTestDispatcher(testScheduler))
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val note = RewindContent.TextNote(now, Uuid.random(), "An entry")
+            val rewind =
+                Rewind(
+                    uid = Uuid.random(),
+                    startDate = now,
+                    endDate = now,
+                    generationDate = now,
+                    label = "2025#07",
+                    title = "A week",
+                    content = listOf(note),
+                )
+            repository.saveRewind(rewind)
+            dao.attachReply(rewind.uid)
+
+            repository.tagAsMilestone(rewind.uid, "FIRST:An entry")
+
+            assertEquals(
+                listOf(note.sourceId),
+                repository
+                    .getRewind(rewind.uid)
+                    .first()
+                    .content
+                    .map { it.sourceId },
+            )
+            assertEquals(true, dao.hasAttachedReply(rewind.uid))
+        }
 }
 
 private class FakeCachedRewindDao : CachedRewindDao {
@@ -254,6 +353,13 @@ private class FakeCachedRewindDao : CachedRewindDao {
     private val textContent = mutableListOf<RewindTextContentEntity>()
     private val imageContent = mutableListOf<RewindImageContentEntity>()
     private val videoContent = mutableListOf<RewindVideoContentEntity>()
+    private val replyParents = mutableSetOf<Uuid>()
+
+    fun attachReply(rewindId: Uuid) {
+        replyParents.add(rewindId)
+    }
+
+    fun hasAttachedReply(rewindId: Uuid): Boolean = rewindId in replyParents
 
     override fun getAllRewinds(): Flow<List<RewindEntity>> = rewinds
 
@@ -280,7 +386,26 @@ private class FakeCachedRewindDao : CachedRewindDao {
     ): Boolean = rewinds.value.any { it.startDate == start && it.endDate == end }
 
     override suspend fun insertRewind(rewind: RewindEntity) {
+        if (rewinds.value.any { it.uid == rewind.uid }) deleteRewind(rewind.uid)
         rewinds.value = rewinds.value.filterNot { it.uid == rewind.uid } + rewind
+    }
+
+    override suspend fun updateRewind(rewind: RewindEntity): Int {
+        if (rewinds.value.none { it.uid == rewind.uid }) return 0
+        rewinds.value = rewinds.value.map { if (it.uid == rewind.uid) rewind else it }
+        return 1
+    }
+
+    override suspend fun deleteTextContentForRewind(uid: Uuid) {
+        textContent.removeAll { it.rewindId == uid }
+    }
+
+    override suspend fun deleteImageContentForRewind(uid: Uuid) {
+        imageContent.removeAll { it.rewindId == uid }
+    }
+
+    override suspend fun deleteVideoContentForRewind(uid: Uuid) {
+        videoContent.removeAll { it.rewindId == uid }
     }
 
     override suspend fun getTextContentForRewind(rewindId: Uuid): List<RewindTextContentEntity> =
@@ -337,6 +462,7 @@ private class FakeCachedRewindDao : CachedRewindDao {
     }
 
     override suspend fun deleteRewind(uid: Uuid) {
+        replyParents.remove(uid)
         rewinds.value = rewinds.value.filterNot { it.uid == uid }
         textContent.removeAll { it.rewindId == uid }
         imageContent.removeAll { it.rewindId == uid }

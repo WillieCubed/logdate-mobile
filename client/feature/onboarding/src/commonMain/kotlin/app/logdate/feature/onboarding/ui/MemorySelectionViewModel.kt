@@ -6,19 +6,24 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.intelligence.generativeai.GenerativeAIChatClient
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
+import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalNotesRepository
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.minus
+import kotlinx.coroutines.withContext
 import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 private const val SELECTED_MEMORY_IDS_KEY = "memory_selection_selected_ids"
+private const val MEMORY_NOTE_IDS_KEY = "memory_selection_note_ids"
 
 /**
  * ViewModel for the memory selection screen during onboarding.
@@ -27,6 +32,8 @@ class MemorySelectionViewModel(
     private val mediaManager: MediaManager,
     private val aiClient: GenerativeAIChatClient,
     private val savedStateHandle: SavedStateHandle,
+    private val notesRepository: JournalNotesRepository,
+    private val mediaImporter: SelectedMemoryMediaImporter,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(savedStateHandle.restoreUiState())
     val uiState: StateFlow<MemorySelectionUiState> = _uiState.asStateFlow()
@@ -94,19 +101,18 @@ class MemorySelectionViewModel(
     }
 
     private suspend fun loadAvailableMemories(): List<MediaObject> {
-        val sixMonthsAgo = Clock.System.now().minus(6, DateTimeUnit.MONTH, TimeZone.currentSystemDefault())
-        val recentMemories =
+        val libraryMemories =
             mediaManager
                 .queryMediaByDate(
-                    start = sixMonthsAgo,
-                    end = Clock.System.now(),
+                    start = Instant.DISTANT_PAST,
+                    end = Instant.DISTANT_FUTURE,
                 ).first()
 
-        if (recentMemories.isNotEmpty()) {
-            return recentMemories
+        if (libraryMemories.isNotEmpty()) {
+            return libraryMemories.sortedByDescending(MediaObject::timestamp)
         }
 
-        return mediaManager.getRecentMedia().first()
+        return mediaManager.getRecentMedia().first().sortedByDescending(MediaObject::timestamp)
     }
 
     /**
@@ -201,6 +207,7 @@ class MemorySelectionViewModel(
      * Toggles selection state of a memory.
      */
     fun toggleMemorySelection(memoryUri: String) {
+        if (_uiState.value.isImporting) return
         val previous = _uiState.value.selectedMemoryIds
         val selected = if (memoryUri in previous) previous - memoryUri else previous + memoryUri
         _uiState.update { it.copy(selectedMemoryIds = selected) }
@@ -217,7 +224,7 @@ class MemorySelectionViewModel(
      */
     fun getSelectedMemories(): List<MediaObject> {
         val currentState = _uiState.value
-        val allMemories = currentState.allMemories + currentState.aiCuratedMemories
+        val allMemories = availableMemories + currentState.allMemories + currentState.aiCuratedMemories
         return allMemories.filter { it.uri in currentState.selectedMemoryIds }.distinctBy { it.uri }
     }
 
@@ -235,8 +242,11 @@ class MemorySelectionViewModel(
         _uiState.update { it.copy(isImporting = true, importFailed = false) }
 
         val result =
-            runCatching {
+            try {
                 val selectedMemories = getSelectedMemories()
+                check(selectedMemories.size == _uiState.value.selectedMemoryIds.size) {
+                    "Some selected memories are no longer available"
+                }
 
                 Napier.i(
                     tag = "MemorySelectionViewModel",
@@ -244,24 +254,80 @@ class MemorySelectionViewModel(
                 )
 
                 selectedMemories.forEach { memory ->
-                    mediaManager.addToDefaultCollection(memory.uri)
+                    val noteId = savedStateHandle.noteIdFor(memory.uri)
+                    if (notesRepository.getNoteById(noteId) != null) return@forEach
+
+                    val managedUri = mediaImporter.import(memory.uri)
+                    check(managedUri.isNotBlank() && managedUri != memory.uri) {
+                        "Memory import did not create an app-managed copy"
+                    }
+                    val note =
+                        when (memory) {
+                            is MediaObject.Image ->
+                                JournalNote.Image(
+                                    uid = noteId,
+                                    creationTimestamp = memory.timestamp,
+                                    lastUpdated = Clock.System.now(),
+                                    mediaRef = managedUri,
+                                )
+                            is MediaObject.Video ->
+                                JournalNote.Video(
+                                    uid = noteId,
+                                    creationTimestamp = memory.timestamp,
+                                    lastUpdated = Clock.System.now(),
+                                    mediaRef = managedUri,
+                                )
+                        }
+                    try {
+                        notesRepository.create(note)
+                    } catch (failure: Throwable) {
+                        withContext(NonCancellable) {
+                            runCatching {
+                                val published = notesRepository.getNoteById(noteId) != null
+                                val shared =
+                                    notesRepository.allNotesObserved.first().any { existing ->
+                                        when (existing) {
+                                            is JournalNote.Image -> existing.mediaRef == managedUri
+                                            is JournalNote.Video -> existing.mediaRef == managedUri
+                                            is JournalNote.Audio -> existing.mediaRef == managedUri
+                                            is JournalNote.Text -> false
+                                        }
+                                    }
+                                if (!published && !shared) mediaImporter.discard(managedUri)
+                            }.onFailure { error -> Napier.w("Could not clean up an unpublished imported photo or video", error) }
+                        }
+                        throw failure
+                    }
                 }
 
                 Napier.i(
                     tag = "MemorySelectionViewModel",
                     message = "Successfully imported ${selectedMemories.size} memories",
                 )
-            }.onFailure { error ->
+                Result.success(Unit)
+            } catch (cancelled: CancellationException) {
+                _uiState.update { it.copy(isImporting = false) }
+                throw cancelled
+            } catch (error: Exception) {
                 Napier.e(
                     tag = "MemorySelectionViewModel",
                     message = "Failed to import selected memories",
                     throwable = error,
                 )
+                Result.failure(error)
             }
 
         _uiState.update { it.copy(isImporting = false, importFailed = result.isFailure) }
         return result
     }
+}
+
+private fun SavedStateHandle.noteIdFor(sourceUri: String): Uuid {
+    val saved = get<List<String>>(MEMORY_NOTE_IDS_KEY).orEmpty()
+    saved.chunked(2).firstOrNull { it.size == 2 && it[0] == sourceUri }?.let { return Uuid.parse(it[1]) }
+    val noteId = Uuid.random()
+    set(MEMORY_NOTE_IDS_KEY, saved + sourceUri + noteId.toString())
+    return noteId
 }
 
 private fun SavedStateHandle.restoreUiState(): MemorySelectionUiState =

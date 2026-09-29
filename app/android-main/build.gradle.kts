@@ -164,8 +164,11 @@ val playPublishRequested: Boolean =
     }
 val releaseTaskRequested: Boolean =
     gradle.startParameter.taskNames.any { taskName ->
-        taskName.contains("Release", ignoreCase = true) ||
-            taskName.contains("Play", ignoreCase = true)
+        !taskName.contains("promote", ignoreCase = true) &&
+            (
+                taskName.contains("Release", ignoreCase = true) ||
+                    taskName.contains("Play", ignoreCase = true)
+            )
     }
 
 if (releaseTaskRequested && !hasReleaseSigningConfig && !baselineProfileRequested && !allowDebugReleaseSigning) {

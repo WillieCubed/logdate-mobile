@@ -2,6 +2,9 @@
 <resources>
     <!-- Accessibility -->
     <string name="cd_rewind_journal_photo">Photo from %1$s</string>
+    <string name="cd_rewind_video_frame">Video moment from %1$s</string>
+    <string name="rewind_video_frame_label">Video still</string>
+    <string name="rewind_media_unavailable">This memory could not be loaded. Check that it is still on this device, then refresh your Rewind.</string>
 
     <!-- Rewind settings -->
     <string name="rewind_settings_title">Rewind</string>

@@ -13,6 +13,8 @@ sealed interface LibraryUiState {
 
     data object Empty : LibraryUiState
 
+    data object Error : LibraryUiState
+
     data class Content(
         val groups: List<LibraryGridGroup>,
         val totalCount: Int,

@@ -147,6 +147,7 @@ fun RewindStoryView(
     var navigatingForward by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
+    val reduceMotion by rememberSystemReduceMotion()
 
     // Predictive back drives this screen's dismissal: [dismissProgress] tracks the live
     // gesture (0f = fully open, 1f = fully dismissed) and only the story panel itself
@@ -165,7 +166,13 @@ fun RewindStoryView(
             onExit()
         },
         onCancel = {
-            scope.launch { dismissProgress.animateTo(0f, tween(300, easing = FastOutSlowInEasing)) }
+            scope.launch {
+                if (reduceMotion) {
+                    dismissProgress.snapTo(0f)
+                } else {
+                    dismissProgress.animateTo(0f, tween(300, easing = FastOutSlowInEasing))
+                }
+            }
         },
     )
 
@@ -180,10 +187,15 @@ fun RewindStoryView(
 
     // First-view entrance animation: scale up from 0.92 with a spring, then settle.
     // Only plays once when the story first mounts, and only for unviewed rewinds.
-    val entranceScale = remember { Animatable(if (isFirstView) 0.92f else 1f) }
+    val entranceScale = remember { Animatable(if (isFirstView && !reduceMotion) 0.92f else 1f) }
 
-    LaunchedEffect(isFirstView) {
+    LaunchedEffect(isFirstView, reduceMotion) {
         if (isFirstView) {
+            if (reduceMotion) {
+                entranceScale.snapTo(1f)
+                onFirstViewConsumed?.invoke()
+                return@LaunchedEffect
+            }
             // Brief pause so the user registers the screen before the spring fires
             delay(150)
             entranceScale.animateTo(
@@ -222,8 +234,6 @@ fun RewindStoryView(
     // every few seconds feels like the screen is moving without consent for
     // users with vestibular sensitivities or who simply prefer manual paging.
     // The story still renders normally; the user advances by tapping.
-    val reduceMotion by rememberSystemReduceMotion()
-
     // The story stays paused whenever the user is interacting with chrome that lives outside
     // this composable (the share sheet, the reply sheet) so its contents don't tick away
     // while attention is elsewhere.
@@ -297,7 +307,9 @@ fun RewindStoryView(
         AnimatedContent(
             targetState = currentPanelIndex,
             transitionSpec = {
-                if (navigatingForward) {
+                if (reduceMotion) {
+                    fadeIn(tween(150)).togetherWith(fadeOut(tween(150)))
+                } else if (navigatingForward) {
                     (slideInHorizontally { width -> width / 4 } + fadeIn(tween(300)))
                         .togetherWith(slideOutHorizontally { width -> -width / 4 } + fadeOut(tween(300)))
                 } else {
@@ -313,8 +325,8 @@ fun RewindStoryView(
                         // iOS's own interactive dismiss transitions read — not just a flat
                         // slide.
                         val eased = easeDismiss(dismissProgress.value)
-                        translationY = eased * storyContainerHeight
-                        val scale = 1f - eased * DISMISS_CARD_MAX_SCALE_DOWN
+                        translationY = if (reduceMotion) 0f else eased * storyContainerHeight
+                        val scale = if (reduceMotion) 1f else 1f - eased * DISMISS_CARD_MAX_SCALE_DOWN
                         scaleX = scale
                         scaleY = scale
                         alpha = 1f - eased * DISMISS_CARD_MAX_FADE

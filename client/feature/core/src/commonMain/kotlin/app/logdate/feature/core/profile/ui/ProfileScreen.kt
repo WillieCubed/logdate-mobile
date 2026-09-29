@@ -83,11 +83,14 @@ import logdate.client.feature.core.generated.resources.birthday
 import logdate.client.feature.core.generated.resources.campfire_profile_summary
 import logdate.client.feature.core.generated.resources.current_streak
 import logdate.client.feature.core.generated.resources.display_name
+import logdate.client.feature.core.generated.resources.edit_bio
 import logdate.client.feature.core.generated.resources.edit_display_name
 import logdate.client.feature.core.generated.resources.journaling_stats
 import logdate.client.feature.core.generated.resources.no_display_name
 import logdate.client.feature.core.generated.resources.personal_information
 import logdate.client.feature.core.generated.resources.profile
+import logdate.client.feature.core.generated.resources.profile_bio_label
+import logdate.client.feature.core.generated.resources.profile_bio_not_set
 import logdate.client.feature.core.generated.resources.profile_photo
 import logdate.client.feature.core.generated.resources.profile_updated_successfully
 import logdate.client.feature.core.generated.resources.streak_day_count
@@ -126,6 +129,9 @@ fun ProfileScreen(
         if (uiState.updateState is ProfileUpdateState.Success) {
             snackbarHostState.showSnackbar(profileUpdatedMessage)
             viewModel.clearUpdateState()
+        } else if (uiState.updateState is ProfileUpdateState.Error) {
+            snackbarHostState.showSnackbar((uiState.updateState as ProfileUpdateState.Error).message)
+            viewModel.clearUpdateState()
         }
     }
 
@@ -139,6 +145,7 @@ fun ProfileScreen(
         onStartEditingDisplayName = viewModel::startEditingDisplayName,
         onCancelEditing = viewModel::cancelEditing,
         onSaveDisplayName = viewModel::saveDisplayName,
+        onSaveBio = viewModel::saveBio,
         snackbarHostState = snackbarHostState,
         modifier = modifier,
     )
@@ -155,6 +162,7 @@ fun ProfileScreenContent(
     onStartEditingDisplayName: () -> Unit,
     onCancelEditing: () -> Unit,
     onSaveDisplayName: (String) -> Unit,
+    onSaveBio: (String) -> Unit,
     snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier,
 ) {
@@ -223,6 +231,7 @@ fun ProfileScreenContent(
                 onStartEditingDisplayName = onStartEditingDisplayName,
                 onCancelEditing = onCancelEditing,
                 onSaveDisplayName = onSaveDisplayName,
+                onSaveBio = onSaveBio,
             )
         }
     }
@@ -239,6 +248,7 @@ private fun ProfileAdaptiveContent(
     onStartEditingDisplayName: () -> Unit,
     onCancelEditing: () -> Unit,
     onSaveDisplayName: (String) -> Unit,
+    onSaveBio: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     FoldableBookLayout(
@@ -255,6 +265,7 @@ private fun ProfileAdaptiveContent(
                 onStartEditingDisplayName = onStartEditingDisplayName,
                 onCancelEditing = onCancelEditing,
                 onSaveDisplayName = onSaveDisplayName,
+                onSaveBio = onSaveBio,
                 includeSections = false,
             )
         },
@@ -269,6 +280,7 @@ private fun ProfileAdaptiveContent(
                 onStartEditingDisplayName = onStartEditingDisplayName,
                 onCancelEditing = onCancelEditing,
                 onSaveDisplayName = onSaveDisplayName,
+                onSaveBio = onSaveBio,
                 includeHeader = false,
             )
         },
@@ -284,6 +296,7 @@ private fun ProfileAdaptiveContent(
                     onStartEditingDisplayName = onStartEditingDisplayName,
                     onCancelEditing = onCancelEditing,
                     onSaveDisplayName = onSaveDisplayName,
+                    onSaveBio = onSaveBio,
                 )
             }
         },
@@ -301,6 +314,7 @@ private fun ProfileContentList(
     onStartEditingDisplayName: () -> Unit,
     onCancelEditing: () -> Unit,
     onSaveDisplayName: (String) -> Unit,
+    onSaveBio: (String) -> Unit,
     includeHeader: Boolean = true,
     includeSections: Boolean = true,
 ) {
@@ -330,6 +344,7 @@ private fun ProfileContentList(
                 ProfilePersonalInformationSection(
                     profile = profile,
                     onNavigateToBirthday = onNavigateToBirthday,
+                    onSaveBio = onSaveBio,
                 )
             }
 
@@ -356,6 +371,7 @@ private fun ProfileContentList(
 private fun ProfilePersonalInformationSection(
     profile: ProfileDisplayModel,
     onNavigateToBirthday: () -> Unit,
+    onSaveBio: (String) -> Unit,
 ) {
     SettingsSection(
         title = stringResource(Res.string.personal_information),
@@ -382,6 +398,39 @@ private fun ProfilePersonalInformationSection(
             },
             modifier = Modifier.clickable { onNavigateToBirthday() },
         )
+        var editingBio by rememberSaveable { mutableStateOf(false) }
+        var bioDraft by rememberSaveable(profile.editableBio) { mutableStateOf(profile.editableBio.orEmpty()) }
+        if (editingBio) {
+            Column(modifier = Modifier.padding(Spacing.lg)) {
+                OutlinedTextField(
+                    value = bioDraft,
+                    onValueChange = { bioDraft = it },
+                    label = { Text(stringResource(Res.string.profile_bio_label)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                    IconButton(onClick = { editingBio = false }) {
+                        Icon(Icons.Default.Close, contentDescription = stringResource(UiRes.string.common_cancel))
+                    }
+                    IconButton(onClick = {
+                        onSaveBio(bioDraft)
+                        editingBio = false
+                    }) {
+                        Icon(Icons.Default.Check, contentDescription = stringResource(UiRes.string.common_save))
+                    }
+                }
+            }
+        } else {
+            ListItem(
+                headlineContent = { Text(stringResource(Res.string.profile_bio_label)) },
+                supportingContent = { Text(profile.editableBio ?: stringResource(Res.string.profile_bio_not_set)) },
+                trailingContent = {
+                    Icon(Icons.Default.Edit, contentDescription = stringResource(Res.string.edit_bio))
+                },
+                modifier = Modifier.clickable { editingBio = true },
+            )
+        }
     }
 }
 
@@ -643,6 +692,7 @@ fun ProfileScreenContentPreview() {
         onStartEditingDisplayName = {},
         onCancelEditing = {},
         onSaveDisplayName = {},
+        onSaveBio = {},
         snackbarHostState = SnackbarHostState(),
     )
 }

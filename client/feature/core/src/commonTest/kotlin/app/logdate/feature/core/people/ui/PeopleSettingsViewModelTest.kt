@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.TestScope
@@ -57,7 +58,8 @@ class PeopleSettingsViewModelTest {
     @BeforeTest
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        preferences = LogdatePreferencesDataSource(InMemoryPreferencesDataStore())
+        preferences = LogdatePreferencesDataSource(InMemoryPreferencesDataStore(), featureAvailable = { true })
+        runBlocking { preferences.setPeopleEnabled(true) }
     }
 
     @AfterTest
@@ -66,7 +68,7 @@ class PeopleSettingsViewModelTest {
     }
 
     @Test
-    fun `emits default enabled state on fresh install`() =
+    fun `reports enabled state for the internal People fixture`() =
         runTest(testDispatcher) {
             val peopleStore = FakePeopleStore()
             val viewModel = newViewModel(peopleStore, FakeDeviceContactsReader())

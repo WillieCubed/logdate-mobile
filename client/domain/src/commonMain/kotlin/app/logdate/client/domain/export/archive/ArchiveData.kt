@@ -173,6 +173,7 @@ data class ArchiveProfileFile(
 @Serializable
 data class ArchiveProfile(
     val displayName: String? = null,
+    @Serializable(with = BirthdayDateSerializer::class)
     val birthday: Instant? = null,
     val bio: String? = null,
     val originalBio: String? = null,

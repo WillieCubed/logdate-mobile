@@ -124,6 +124,11 @@ class AppViewModel(
         }
     }
 
+    /** Requests the latest Cloud archive after an existing account signs in on this device. */
+    fun requestCloudRestoreAfterSignIn() {
+        onCloudRestoreSignIn()
+    }
+
     /**
      * Show the biometric prompt to the user.
      *

@@ -580,6 +580,7 @@ fun A08_ProfileDefault() {
             onStartEditingDisplayName = {},
             onCancelEditing = {},
             onSaveDisplayName = {},
+            onSaveBio = {},
             onNavigateToBirthday = {},
             snackbarHostState = snackbarHostState,
         )
@@ -1007,6 +1008,7 @@ fun A67_ProfileEditBookPosture() {
                 onStartEditingDisplayName = {},
                 onCancelEditing = {},
                 onSaveDisplayName = {},
+                onSaveBio = {},
                 onNavigateToBirthday = {},
                 snackbarHostState = snackbarHostState,
             )

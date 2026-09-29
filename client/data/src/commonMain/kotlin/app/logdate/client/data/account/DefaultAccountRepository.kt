@@ -36,6 +36,19 @@ class DefaultAccountRepository(
             }
     }
 
+    override suspend fun updateBio(
+        bio: String?,
+        originalBio: String?,
+    ): Result<LogDateAccount> {
+        val token =
+            tokenProvider() ?: return Result.failure(
+                IllegalStateException("No authentication token available"),
+            )
+        return passkeyApiClient
+            .updateAccountProfileWithOriginalBio(token, bio, originalBio)
+            .onSuccess { _currentAccount.value = it }
+    }
+
     override suspend fun refreshAccount(): Result<LogDateAccount> {
         val token =
             tokenProvider() ?: return Result.failure(

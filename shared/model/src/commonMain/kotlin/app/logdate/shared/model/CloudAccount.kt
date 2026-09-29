@@ -27,6 +27,7 @@ data class CloudAccount(
         Uuid,
     >,
     val bio: String? = null,
+    val originalBio: String? = null,
     val isVerified: Boolean = false,
     val lastLoginAt: Instant? = null,
 )

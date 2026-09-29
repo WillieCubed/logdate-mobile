@@ -118,8 +118,7 @@ const val SEARCH_SCREEN_INPUT_ACCESSIBILITY_TAG = "search_screen_input"
 /**
  * Universal search screen.
  *
- * Searches across all indexed content types (notes, journals, places, rewinds,
- * stickers, postcards) via a single FTS5 query. Shows recent searches when idle.
+ * Searches the content types included in this release. Shows recent searches when idle.
  */
 @Composable
 fun SearchScreen(
@@ -694,7 +693,7 @@ private fun FilterChipRow(
                 colors = selectedColors,
             )
         }
-        items(items = SearchContentType.entries, key = { "type_${it.ftsValue}" }) { type ->
+        items(items = SearchContentType.entries.filter { it in launchSearchContentTypes }, key = { "type_${it.ftsValue}" }) { type ->
             FilterChip(
                 selected = filters.contentTypes?.contains(type) == true,
                 onClick = { onToggleType(type) },

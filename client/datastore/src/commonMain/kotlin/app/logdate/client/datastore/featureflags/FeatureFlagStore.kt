@@ -46,7 +46,7 @@ class DataStoreFeatureFlagStore(
 ) : FeatureFlagStore {
     override fun observe(flag: FeatureFlag): Flow<Boolean> =
         userPreferences.data.map { preferences ->
-            preferences[booleanPreferencesKey(flag.key)] ?: flag.defaultEnabled
+            flag.availableForLaunch && (preferences[booleanPreferencesKey(flag.key)] ?: flag.defaultEnabled)
         }
 
     override suspend fun setEnabled(

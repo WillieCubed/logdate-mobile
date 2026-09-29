@@ -178,6 +178,7 @@ class MainActivity : FragmentActivity() {
                     onPendingNavKeyConsumed = { pendingNavKey = null },
                     onCurrentNavKeyChanged = { currentNavKey = it },
                     onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
+                    onCloudSignIn = viewModel::requestCloudRestoreAfterSignIn,
                     onShareSearchResult = ::shareSearchResult,
                     updateController = playInAppUpdateController,
                     onLaunchUpdate = { checkForUpdates(AppUpdateCheckTrigger.Manual) },

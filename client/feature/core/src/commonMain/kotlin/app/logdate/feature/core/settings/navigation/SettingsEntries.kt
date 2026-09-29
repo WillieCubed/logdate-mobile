@@ -1,8 +1,11 @@
 package app.logdate.feature.core.settings.navigation
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
+import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.permissions.rememberContactsPermissionState
 import app.logdate.feature.core.people.ui.PeopleDirectoryScreen
 import app.logdate.feature.core.people.ui.PeopleInboxScreen
@@ -147,7 +150,10 @@ fun EntryProviderScope<NavKey>.settingsEntries(
         )
     }
     taggedEntry<DataSettingsRoute> {
-        DataSettingsScreen(onBack = onBack)
+        DataSettingsScreen(
+            onBack = onBack,
+            onNavigateToRecoveryPhrase = { onNavigateTo(RecoveryPhraseRoute) },
+        )
     }
     taggedEntry<AdvancedSettingsRoute> {
         AdvancedSettingsScreen(onBack = onBack)
@@ -196,7 +202,7 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             onBack = onBack,
             onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
             onNavigateToSignIn = onNavigateToSignIn,
-            onNavigateToRecoveryPhrase = { onNavigateTo(RecoveryPhraseEntrySettingsRoute) },
+            onNavigateToRecoveryPhrase = { onNavigateTo(RecoveryPhraseRoute) },
         )
     }
     taggedEntry<RecoveryPhraseEntrySettingsRoute> {
@@ -240,57 +246,99 @@ fun EntryProviderScope<NavKey>.settingsEntries(
         RewindSettingsScreen(onBack = onBack)
     }
     taggedEntry<EventsSettingsRoute> {
-        EventsSettingsScreen(
-            onBack = onBack,
-            onNavigateToCalendar = { onNavigateTo(EventsCalendarRoute) },
-            onNavigateToCalendarSync = { onNavigateTo(CalendarSyncSettingsRoute) },
-        )
+        if (FeatureFlag.EVENTS.availableForLaunch) {
+            EventsSettingsScreen(
+                onBack = onBack,
+                onNavigateToCalendar = { onNavigateTo(EventsCalendarRoute) },
+                onNavigateToCalendarSync = { onNavigateTo(CalendarSyncSettingsRoute) },
+            )
+        } else {
+            ExitDeferredRoute(onBack)
+        }
     }
     taggedEntry<EventsCalendarRoute> {
-        EventsCalendarScreen(
-            onBack = onBack,
-            onNavigateToEvent = onNavigateToEvent,
-        )
+        if (FeatureFlag.EVENTS.availableForLaunch) {
+            EventsCalendarScreen(
+                onBack = onBack,
+                onNavigateToEvent = onNavigateToEvent,
+            )
+        } else {
+            ExitDeferredRoute(onBack)
+        }
     }
     taggedEntry<CalendarSyncSettingsRoute> {
-        CalendarSyncSettingsScreen(
-            onBack = onBack,
-            onNavigateToCalendars = { onNavigateTo(CalendarSyncCalendarsRoute) },
-            onNavigateToActivity = { onNavigateTo(CalendarSyncActivityRoute) },
-        )
+        if (FeatureFlag.EVENTS.availableForLaunch) {
+            CalendarSyncSettingsScreen(
+                onBack = onBack,
+                onNavigateToCalendars = { onNavigateTo(CalendarSyncCalendarsRoute) },
+                onNavigateToActivity = { onNavigateTo(CalendarSyncActivityRoute) },
+            )
+        } else {
+            ExitDeferredRoute(onBack)
+        }
     }
     taggedEntry<CalendarSyncCalendarsRoute> {
-        CalendarSyncCalendarsScreen(onBack = onBack)
+        if (FeatureFlag.EVENTS.availableForLaunch) {
+            CalendarSyncCalendarsScreen(onBack = onBack)
+        } else {
+            ExitDeferredRoute(onBack)
+        }
     }
     taggedEntry<CalendarSyncActivityRoute> {
-        CalendarSyncActivityScreen(
-            onBack = onBack,
-            onNavigateToEvent = onNavigateToEvent,
-        )
+        if (FeatureFlag.EVENTS.availableForLaunch) {
+            CalendarSyncActivityScreen(
+                onBack = onBack,
+                onNavigateToEvent = onNavigateToEvent,
+            )
+        } else {
+            ExitDeferredRoute(onBack)
+        }
     }
     taggedEntry<PeopleSettingsRoute> {
-        val contactsPermissionState = rememberContactsPermissionState()
-        PeopleSettingsScreen(
-            onBack = onBack,
-            onBrowsePeople = { onNavigateTo(PeopleDirectoryRoute) },
-            onOpenReviewInbox = { onNavigateTo(PeopleInboxRoute) },
-            contactsPermissionState = contactsPermissionState,
-            onImportSelectedContacts = {},
-        )
+        if (FeatureFlag.PEOPLE.availableForLaunch) {
+            val contactsPermissionState = rememberContactsPermissionState()
+            PeopleSettingsScreen(
+                onBack = onBack,
+                onBrowsePeople = { onNavigateTo(PeopleDirectoryRoute) },
+                onOpenReviewInbox = { onNavigateTo(PeopleInboxRoute) },
+                contactsPermissionState = contactsPermissionState,
+                onImportSelectedContacts = {},
+            )
+        } else {
+            ExitDeferredRoute(onBack)
+        }
     }
     taggedEntry<PeopleDirectoryRoute> {
-        PeopleDirectoryScreen(
-            onBack = onBack,
-            onOpenPerson = { onNavigateTo(PersonDetailRoute(it)) },
-        )
+        if (FeatureFlag.PEOPLE.availableForLaunch) {
+            PeopleDirectoryScreen(
+                onBack = onBack,
+                onOpenPerson = { onNavigateTo(PersonDetailRoute(it)) },
+            )
+        } else {
+            ExitDeferredRoute(onBack)
+        }
     }
     taggedEntry<PeopleInboxRoute> {
-        PeopleInboxScreen(onBack = onBack)
+        if (FeatureFlag.PEOPLE.availableForLaunch) {
+            PeopleInboxScreen(onBack = onBack)
+        } else {
+            ExitDeferredRoute(onBack)
+        }
     }
     taggedEntry<PersonDetailRoute> { route ->
-        PersonDetailScreen(
-            personId = Uuid.parse(route.personId),
-            onBack = onBack,
-        )
+        if (FeatureFlag.PEOPLE.availableForLaunch) {
+            PersonDetailScreen(
+                personId = Uuid.parse(route.personId),
+                onBack = onBack,
+            )
+        } else {
+            ExitDeferredRoute(onBack)
+        }
     }
+}
+
+@Composable
+@Suppress("ktlint:standard:function-naming")
+private fun ExitDeferredRoute(onBack: () -> Unit) {
+    LaunchedEffect(Unit) { onBack() }
 }

@@ -53,3 +53,6 @@ That runbook names configuration variables but does not contain their values.
 
 Android and iOS internal publishing stay disabled until their repository enablement variables are
 explicitly set. Production server deployment remains independently gated by release tags.
+# Historical launch snapshot
+
+This document records the August 31 audit. The current Android release contract and open acceptance gates are in [Android public release acceptance](android-public-release.md).

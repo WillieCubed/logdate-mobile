@@ -134,15 +134,14 @@ class MediaDetailViewModel(
             }.collect { (mediaItems, notes, selectedMediaId) ->
                 val libraryMedia = buildLibraryMediaSources(mediaItems, notes)
                 allMediaItems.value = libraryMedia
-                updateViewerState(libraryMedia, selectedMediaId)
 
                 val media =
-                    libraryMedia.find { it.id == selectedMediaId }
-                        ?: libraryMedia.firstOrNull()
+                    libraryMedia.find { it.id == selectedMediaId || it.matchingNotes.any { note -> note.uid == selectedMediaId } }
                 if (media == null) {
                     _viewerState.value = MediaViewerState()
                     _uiState.value = MediaDetailUiState.Error("Media not found.")
                 } else {
+                    updateViewerState(libraryMedia, media.id)
                     if (media.id != selectedMediaId) {
                         currentMediaId.value = media.id
                     }

@@ -39,6 +39,7 @@ data class EntryEditorRoute(
     val entryId: String? = null,
     val draftId: String? = null,
     val journalIds: List<String> = emptyList(),
+    val firstEntry: Boolean = false,
 ) : NavKey
 
 /** Pushes the editor onto the back stack with optional entry / draft / journal context. */
@@ -91,6 +92,7 @@ fun EntryProviderScope<NavKey>.editorEntry(
                 onEntrySaved = onEntrySaved,
                 entryId = route.entryId?.let(Uuid::parse),
                 draftId = route.draftId?.let(Uuid::parse),
+                firstEntry = route.firstEntry,
                 journalIds = route.journalIds.map(Uuid::parse),
                 modifier = sharedBoundsModifier,
             )

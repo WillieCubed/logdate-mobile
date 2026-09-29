@@ -11,6 +11,7 @@ import app.logdate.shared.model.PasskeyCredentialResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.toByteArray
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -74,6 +75,12 @@ class PasskeyApiClientTest {
             val mockEngine =
                 MockEngine { request ->
                     assertEquals("/api/v1/auth/signup/passkey/begin", request.url.encodedPath)
+                    assertTrue(
+                        request.body
+                            .toByteArray()
+                            .decodeToString()
+                            .contains("\"originalBio\":\"The raw introduction\""),
+                    )
                     respond(
                         content =
                             """
@@ -98,7 +105,11 @@ class PasskeyApiClientTest {
                 }
 
             val apiClient = createMockApiClient(mockEngine)
-            val result = apiClient.beginAccountCreation(BeginAccountCreationRequest("newuser", "New User"))
+            val signup =
+                Json.decodeFromString<BeginAccountCreationRequest>(
+                    """{"username":"newuser","displayName":"New User","originalBio":"The raw introduction"}""",
+                )
+            val result = apiClient.beginAccountCreation(signup)
 
             assertTrue(result.isSuccess)
             assertEquals("session123", result.getOrThrow().sessionToken)

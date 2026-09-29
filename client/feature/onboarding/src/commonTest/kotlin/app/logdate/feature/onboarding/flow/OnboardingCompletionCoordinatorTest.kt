@@ -73,15 +73,12 @@ class OnboardingCompletionCoordinatorTest {
         }
 
     @Test
-    fun `an incomplete required step is reported without saving`() =
+    fun `first entry can complete onboarding without optional profile setup`() =
         runTest {
-            completeRequiredSteps()
-            profileRepository.setProfile(LogDateProfile(displayName = ""))
-
             val result = coordinator.finishOnboarding()
 
-            assertEquals(OnboardingFinishResult.IncompleteStep(OnboardingStep.PERSONAL_INTRO), result)
-            assertFalse(userStateRepository.isOnboardingComplete)
+            assertEquals(OnboardingFinishResult.Finished, result)
+            assertTrue(userStateRepository.isOnboardingComplete)
         }
 
     private suspend fun completeRequiredSteps() {

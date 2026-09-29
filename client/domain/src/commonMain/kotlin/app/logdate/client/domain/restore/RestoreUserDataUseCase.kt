@@ -245,7 +245,7 @@ class RestoreUserDataUseCase(
                 }
             }
 
-            restoreProfile(profilePayload?.profile, options.strategy, warnings, onProgress)
+            restoreProfile(profilePayload?.profile, options, warnings, onProgress)
             restorePlaces(placesPayload?.places.orEmpty(), warnings, onProgress)
             restoreLocationHistory(locationHistoryPayload?.locationHistory.orEmpty(), warnings, onProgress)
 
@@ -340,7 +340,7 @@ class RestoreUserDataUseCase(
 
     private suspend fun restoreProfile(
         profile: LogDateProfile?,
-        strategy: RestoreStrategy,
+        options: RestoreOptions,
         warnings: MutableList<String>,
         onProgress: (suspend (RestoreProgressPhase) -> Unit)?,
     ) {
@@ -351,6 +351,34 @@ class RestoreUserDataUseCase(
         onProgress?.invoke(RestoreProgressPhase.RESTORING_PROFILE)
         Napier.i("Restore: importing profile")
         val existing = profileRepository.getCurrentProfile()
+        if (options.preservePopulatedLocalProfile) {
+            if (existing.displayName.isBlank() && profile.displayName.isNotBlank()) {
+                profileRepository
+                    .updateDisplayName(profile.displayName)
+                    .onFailure { warnings.add("Failed to restore profile display name: ${it.message ?: "unknown error"}") }
+            }
+            if (existing.birthday == null && profile.birthday != null) {
+                profileRepository
+                    .updateBirthday(profile.birthday)
+                    .onFailure { warnings.add("Failed to restore profile birthday: ${it.message ?: "unknown error"}") }
+            }
+            if (existing.profilePhotoUri.isNullOrBlank() && !profile.profilePhotoUri.isNullOrBlank()) {
+                profileRepository
+                    .updateProfilePhoto(profile.profilePhotoUri)
+                    .onFailure { warnings.add("Failed to restore profile photo: ${it.message ?: "unknown error"}") }
+            }
+            val bio = existing.bio.takeUnless { it.isNullOrBlank() } ?: profile.bio.takeUnless { it.isNullOrBlank() }
+            val originalBio =
+                existing.originalBio.takeUnless { it.isNullOrBlank() }
+                    ?: profile.originalBio.takeUnless { it.isNullOrBlank() }
+            if (bio != existing.bio || originalBio != existing.originalBio) {
+                profileRepository
+                    .updateBio(bio, originalBio)
+                    .onFailure { warnings.add("Failed to restore profile bio: ${it.message ?: "unknown error"}") }
+            }
+            return
+        }
+        val strategy = options.strategy
         val shouldWrite =
             if (strategy == RestoreStrategy.MERGE_KEEP_NEWEST && existing == LogDateProfile()) {
                 profile != LogDateProfile()
@@ -709,6 +737,7 @@ data class RestoreOptions(
     val strategy: RestoreStrategy = RestoreStrategy.MERGE_KEEP_NEWEST,
     val includeDrafts: Boolean = true,
     val includeMedia: Boolean = true,
+    val preservePopulatedLocalProfile: Boolean = false,
 )
 
 enum class RestoreStrategy {

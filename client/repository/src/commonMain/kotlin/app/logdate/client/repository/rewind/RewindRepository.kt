@@ -72,6 +72,12 @@ interface RewindRepository {
      */
     suspend fun saveRewind(rewind: Rewind)
 
+    /** Atomically updates one Rewind and its panels, keeping its UID and attached replies. */
+    suspend fun replaceRewind(
+        existingUid: Uuid,
+        replacement: Rewind,
+    ): Unit = throw UnsupportedOperationException("Atomic Rewind replacement is unavailable")
+
     /**
      * Removes a rewind and all of its content from the repository.
      *

@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import app.logdate.client.MainActivity
+import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.domain.recommendation.AmbientCaptureNudgeStyle
 import app.logdate.client.domain.recommendation.AmbientPromptCandidate
 import app.logdate.client.domain.recommendation.AmbientPromptFamily
@@ -22,8 +23,9 @@ class AmbientPromptNotificationCoordinator(
     private val notificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-    fun post(candidate: AmbientPromptCandidate): Boolean =
-        runCatching {
+    fun post(candidate: AmbientPromptCandidate): Boolean {
+        if (candidate.family == AmbientPromptFamily.EVENT_NUDGE && !FeatureFlag.EVENTS.availableForLaunch) return false
+        return runCatching {
             val channelKey = candidate.channelKey()
             val content = notificationContent(candidate)
             val notification =
@@ -43,6 +45,7 @@ class AmbientPromptNotificationCoordinator(
         }.onFailure { error ->
             Napier.w("Failed to post ambient prompt notification", error)
         }.isSuccess
+    }
 
     private fun buildPendingIntent(candidate: AmbientPromptCandidate): PendingIntent {
         val launchIntent =

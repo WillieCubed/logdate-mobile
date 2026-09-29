@@ -39,6 +39,7 @@ import org.koin.compose.viewmodel.koinViewModel
 
 class RecoveryPhraseEntryViewModel(
     private val recoverIdentityUseCase: RecoverIdentityUseCase,
+    private val onRecoverySuccess: () -> Unit = {},
 ) : ViewModel() {
     fun submit(
         words: List<String>,
@@ -47,6 +48,10 @@ class RecoveryPhraseEntryViewModel(
         viewModelScope.launch {
             val result = recoverIdentityUseCase(words)
             result.onFailure { Napier.e("Could not recover identity from Settings", it) }
+            result.onSuccess {
+                runCatching(onRecoverySuccess)
+                    .onFailure { error -> Napier.w("Could not request Cloud restore after recovery", error) }
+            }
             onResult(result)
         }
     }

@@ -29,7 +29,7 @@ import io.ktor.http.HttpStatusCode
 internal object SyncStorageDocs {
     private const val MEDIA_DOWNLOAD_URL = "https://cloud.logdate.app/api/v1/media/${SyncExamples.MEDIA_ID}/binary"
     private const val BACKUP_DOWNLOAD_URL = "https://cloud.logdate.app/api/v1/backups/${SyncExamples.BACKUP_ID}/binary"
-    private const val BACKUP_MANIFEST = """{"schemaVersion":3,"app":"logdate-android/2.4.0","entryCount":412,"mediaCount":58}"""
+    private const val BACKUP_MANIFEST = """{"format":"logdate-cloud-backup","encryption":"identity-aes-gcm-v1"}"""
 
     private val mediaMetadata =
         MediaMetadataResponse(
@@ -270,7 +270,7 @@ internal object SyncStorageDocs {
             | Part | Type | Meaning |
             |---|---|---|
             | `deviceId` | text | Which device made the backup. |
-            | `manifest` | text | A JSON document describing the backup (schema version, counts, app version). Stored verbatim and returned with the listing. |
+            | `manifest` | text | JSON metadata stored verbatim and returned with the listing. Identity-encrypted archives expose only format and encryption version; older backups may include counts and app version. |
             | `data` | file | The backup archive. Must not be empty. |
 
             The app encrypts the archive before upload; the server encrypts it again at rest. Every upload

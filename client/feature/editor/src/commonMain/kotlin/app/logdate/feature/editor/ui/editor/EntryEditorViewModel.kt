@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.editor.ObserveEditorDataUseCase
 import app.logdate.client.domain.editor.SaveEntryUseCase
+import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.feature.editor.ui.editor.delegate.AudioBlockFinalizer
 import app.logdate.feature.editor.ui.editor.delegate.ContentLoader
 import app.logdate.feature.editor.ui.editor.delegate.DraftManager
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -896,6 +898,19 @@ class EntryEditorViewModel(
     /**
      * Loads a draft into the editor.
      */
+    fun resumeFirstEntryDraft() {
+        viewModelScope.launch {
+            val drafts = editorState.first { !it.isLoading }.availableDrafts
+            val latest =
+                drafts
+                    .withIndex()
+                    .maxWithOrNull(
+                        compareBy<IndexedValue<EntryDraft>> { it.value.updatedAt }.thenBy { it.index },
+                    )?.value
+            if (latest != null) loadDraft(latest.id)
+        }
+    }
+
     fun loadDraft(draftId: Uuid) {
         val request = LoadRequest.Draft(draftId)
         if (activeLoadRequest == request) return

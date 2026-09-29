@@ -1,0 +1,2 @@
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS original_bio TEXT;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS original_bio TEXT;

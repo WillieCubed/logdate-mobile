@@ -3,6 +3,7 @@ package app.logdate.feature.search.ui
 import app.logdate.client.domain.search.ObserveRecentSearchesUseCase
 import app.logdate.client.domain.search.UniversalSearchUseCase
 import app.logdate.client.repository.search.RecentSearchesRepository
+import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchRepository
 import app.logdate.client.repository.search.SearchResult
 import kotlinx.coroutines.Dispatchers
@@ -47,6 +48,29 @@ class SearchViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
     }
+
+    @Test
+    fun `launch search excludes deferred people results even without a selected filter`() =
+        runTest(dispatcher) {
+            val repository =
+                FakeSearchRepository(
+                    listOf(
+                        SearchResult(Uuid.random(), "Morning walk", Instant.fromEpochMilliseconds(1_000), SearchContentType.TEXT_NOTE),
+                        SearchResult(Uuid.random(), "Morning walk", Instant.fromEpochMilliseconds(1_000), SearchContentType.PERSON),
+                    ),
+                )
+            val viewModel =
+                SearchViewModel(UniversalSearchUseCase(repository), ObserveRecentSearchesUseCase(FakeRecentSearchesRepository()))
+            backgroundScope.launch { viewModel.searchState.collect() }
+            runCurrent()
+
+            viewModel.updateQuery("Morning")
+            advanceTimeBy(150)
+            advanceUntilIdle()
+
+            val resultState = assertIs<SearchScreenState.Results>(viewModel.searchState.value)
+            assertEquals(listOf(SearchContentType.TEXT_NOTE), resultState.results.map { it.contentType })
+        }
 
     @Test
     fun `typing shows searching until debounced results arrive`() =

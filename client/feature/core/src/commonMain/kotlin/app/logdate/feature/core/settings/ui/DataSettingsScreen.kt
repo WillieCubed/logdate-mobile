@@ -55,10 +55,25 @@ import logdate.client.feature.core.generated.resources.account_sign_in_to_enable
 import logdate.client.feature.core.generated.resources.audit_and_repair_local_links_and_sync_metadata
 import logdate.client.feature.core.generated.resources.check
 import logdate.client.feature.core.generated.resources.checking
-import logdate.client.feature.core.generated.resources.cloud_sync
+import logdate.client.feature.core.generated.resources.cloud_archive_checking
+import logdate.client.feature.core.generated.resources.cloud_archive_complete
+import logdate.client.feature.core.generated.resources.cloud_archive_failed
+import logdate.client.feature.core.generated.resources.cloud_archive_needs_recovery
+import logdate.client.feature.core.generated.resources.cloud_archive_never
+import logdate.client.feature.core.generated.resources.cloud_archive_previous
+import logdate.client.feature.core.generated.resources.cloud_archive_queued
+import logdate.client.feature.core.generated.resources.cloud_archive_retry
+import logdate.client.feature.core.generated.resources.cloud_archive_retrying
+import logdate.client.feature.core.generated.resources.cloud_archive_running
+import logdate.client.feature.core.generated.resources.cloud_archive_signed_out
+import logdate.client.feature.core.generated.resources.cloud_archive_start
+import logdate.client.feature.core.generated.resources.cloud_archive_title
+import logdate.client.feature.core.generated.resources.cloud_archive_unavailable
 import logdate.client.feature.core.generated.resources.create_account
 import logdate.client.feature.core.generated.resources.data_and_storage
 import logdate.client.feature.core.generated.resources.data_management
+import logdate.client.feature.core.generated.resources.entry_sync_now
+import logdate.client.feature.core.generated.resources.entry_sync_title
 import logdate.client.feature.core.generated.resources.export
 import logdate.client.feature.core.generated.resources.`import`
 import logdate.client.feature.core.generated.resources.import_backup
@@ -67,6 +82,7 @@ import logdate.client.feature.core.generated.resources.last_check_issue_count
 import logdate.client.feature.core.generated.resources.last_sync_failed
 import logdate.client.feature.core.generated.resources.last_synced_time
 import logdate.client.feature.core.generated.resources.never_synced
+import logdate.client.feature.core.generated.resources.recovery_phrase_enter
 import logdate.client.feature.core.generated.resources.repair
 import logdate.client.feature.core.generated.resources.repairing
 import logdate.client.feature.core.generated.resources.restore_entries_from_a_logdate_export_archive
@@ -82,7 +98,6 @@ import logdate.client.feature.core.generated.resources.sync_feedback_sign_in_act
 import logdate.client.feature.core.generated.resources.sync_feedback_started
 import logdate.client.feature.core.generated.resources.sync_feedback_succeeded
 import logdate.client.feature.core.generated.resources.sync_feedback_up_to_date
-import logdate.client.feature.core.generated.resources.sync_now
 import logdate.client.feature.core.generated.resources.sync_status_queued
 import logdate.client.feature.core.generated.resources.sync_status_retry_scheduled
 import logdate.client.feature.core.generated.resources.sync_status_unavailable
@@ -93,6 +108,7 @@ import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
+import kotlin.time.Instant
 import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
@@ -100,6 +116,7 @@ fun DataSettingsScreen(
     onBack: () -> Unit,
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
+    onNavigateToRecoveryPhrase: () -> Unit = {},
     onBrowseFile: (String) -> Unit = {},
     viewModel: DataSettingsViewModel = koinViewModel(),
     exportViewModel: UserDataExportViewModel = koinViewModel(),
@@ -200,8 +217,11 @@ fun DataSettingsScreen(
         onRepairIntegrity = viewModel::repairIntegrity,
         snackbarHostState = snackbarHostState,
         syncStatus = uiState.syncStatus,
+        cloudArchiveStatus = uiState.cloudArchiveStatus,
         isAuthenticated = isAuthenticated,
         onSyncNow = viewModel::syncNow,
+        onArchiveBackupNow = viewModel::backupArchiveNow,
+        onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
         onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
         onNavigateToSignIn = onNavigateToSignIn,
     )
@@ -235,8 +255,11 @@ fun DataSettingsContent(
     onRepairIntegrity: () -> Unit,
     snackbarHostState: SnackbarHostState,
     syncStatus: app.logdate.client.sync.SyncStatus? = null,
+    cloudArchiveStatus: CloudArchiveStatus = CloudArchiveStatus(CloudArchivePhase.CHECKING),
     isAuthenticated: Boolean = false,
     onSyncNow: () -> Unit = {},
+    onArchiveBackupNow: () -> Unit = {},
+    onNavigateToRecoveryPhrase: () -> Unit = {},
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
 ) {
@@ -316,6 +339,12 @@ fun DataSettingsContent(
                     onNavigateToSignIn = onNavigateToSignIn,
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
+                CloudArchiveSection(
+                    status = cloudArchiveStatus,
+                    onArchiveBackupNow = onArchiveBackupNow,
+                    onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
             }
         },
         standardContent = {
@@ -357,6 +386,14 @@ fun DataSettingsContent(
                         onSyncNow = onSyncNow,
                         onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
                         onNavigateToSignIn = onNavigateToSignIn,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+                item {
+                    CloudArchiveSection(
+                        status = cloudArchiveStatus,
+                        onArchiveBackupNow = onArchiveBackupNow,
+                        onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
@@ -517,7 +554,7 @@ private fun SyncSettingsSection(
     modifier: Modifier = Modifier,
 ) {
     SettingsSection(
-        title = stringResource(Res.string.cloud_sync),
+        title = stringResource(Res.string.entry_sync_title),
         modifier = modifier,
     ) {
         if (!isAuthenticated) {
@@ -589,10 +626,77 @@ private fun SyncStatusItem(
                 onClick = onSyncNow,
                 enabled = syncStatus?.isSyncing != true,
             ) {
-                Text(stringResource(Res.string.sync_now))
+                Text(stringResource(Res.string.entry_sync_now))
             }
         },
     )
+}
+
+@Composable
+internal fun CloudArchiveSection(
+    status: CloudArchiveStatus,
+    onArchiveBackupNow: () -> Unit,
+    onNavigateToRecoveryPhrase: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SettingsSection(title = stringResource(Res.string.cloud_archive_title), modifier = modifier) {
+        ListItem(
+            headlineContent = {
+                val text =
+                    when (status.phase) {
+                        CloudArchivePhase.CHECKING -> stringResource(Res.string.cloud_archive_checking)
+                        CloudArchivePhase.SIGNED_OUT -> stringResource(Res.string.cloud_archive_signed_out)
+                        CloudArchivePhase.NEEDS_RECOVERY -> stringResource(Res.string.cloud_archive_needs_recovery)
+                        CloudArchivePhase.NEVER_BACKED_UP -> stringResource(Res.string.cloud_archive_never)
+                        CloudArchivePhase.QUEUED -> stringResource(Res.string.cloud_archive_queued)
+                        CloudArchivePhase.RUNNING -> stringResource(Res.string.cloud_archive_running)
+                        CloudArchivePhase.RETRYING -> stringResource(Res.string.cloud_archive_retrying)
+                        CloudArchivePhase.FAILED -> stringResource(Res.string.cloud_archive_failed)
+                        CloudArchivePhase.COMPLETE ->
+                            status.lastCompletedAt?.let {
+                                stringResource(
+                                    Res.string.cloud_archive_complete,
+                                    Instant.fromEpochMilliseconds(it).toReadableDateTimeShort(),
+                                )
+                            } ?: stringResource(Res.string.cloud_archive_unavailable)
+                        CloudArchivePhase.UNAVAILABLE -> stringResource(Res.string.cloud_archive_unavailable)
+                    }
+                Text(text)
+            },
+            supportingContent = {
+                if (status.phase != CloudArchivePhase.COMPLETE && status.lastCompletedAt != null) {
+                    Text(
+                        stringResource(
+                            Res.string.cloud_archive_previous,
+                            Instant.fromEpochMilliseconds(status.lastCompletedAt).toReadableDateTimeShort(),
+                        ),
+                    )
+                }
+            },
+            trailingContent = {
+                if (status.phase == CloudArchivePhase.NEEDS_RECOVERY) {
+                    TextButton(onClick = onNavigateToRecoveryPhrase) {
+                        Text(stringResource(Res.string.recovery_phrase_enter))
+                    }
+                } else if (status.canRetry) {
+                    Button(onClick = onArchiveBackupNow) {
+                        Text(
+                            stringResource(
+                                if (status.phase == CloudArchivePhase.FAILED ||
+                                    status.phase == CloudArchivePhase.RETRYING ||
+                                    status.phase == CloudArchivePhase.UNAVAILABLE
+                                ) {
+                                    Res.string.cloud_archive_retry
+                                } else {
+                                    Res.string.cloud_archive_start
+                                },
+                            ),
+                        )
+                    }
+                }
+            },
+        )
+    }
 }
 
 @Composable

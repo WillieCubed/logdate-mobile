@@ -4,9 +4,12 @@ import app.logdate.feature.core.main.HomeRoute
 import app.logdate.feature.core.navigation.BaseRoute
 import app.logdate.feature.core.settings.navigation.SettingsRoute
 import app.logdate.feature.editor.navigation.EntryEditorRoute
+import app.logdate.feature.onboarding.navigation.FirstEntryImportOffer
+import app.logdate.feature.onboarding.navigation.FirstEntryMemorySelection
 import app.logdate.feature.onboarding.navigation.OnboardingComplete
 import app.logdate.feature.onboarding.navigation.OnboardingStart
 import app.logdate.feature.onboarding.navigation.PersonalIntro
+import app.logdate.feature.onboarding.navigation.WelcomeBack
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -60,11 +63,37 @@ class NavBootstrapActionTest {
     }
 
     @Test
-    fun `finishing onboarding replaces the onboarding stack with home`() {
+    fun `finishing onboarding keeps the post entry offer available`() {
         assertEquals(
-            NavBootstrapAction.ResetTo(HomeRoute),
+            NavBootstrapAction.None,
             resolveNavBootstrapAction(
                 backStack = listOf(OnboardingStart, PersonalIntro, OnboardingComplete),
+                isOnboarded = true,
+                requiresUnlock = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `post entry import survives onboarding flag update and recreation`() {
+        listOf(FirstEntryImportOffer, FirstEntryMemorySelection).forEach { route ->
+            assertEquals(
+                NavBootstrapAction.None,
+                resolveNavBootstrapAction(
+                    backStack = listOf(OnboardingStart, OnboardingComplete, route),
+                    isOnboarded = true,
+                    requiresUnlock = false,
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `welcome back can finish after onboarding flag is saved`() {
+        assertEquals(
+            NavBootstrapAction.None,
+            resolveNavBootstrapAction(
+                backStack = listOf(OnboardingStart, WelcomeBack),
                 isOnboarded = true,
                 requiresUnlock = false,
             ),
@@ -89,6 +118,18 @@ class NavBootstrapActionTest {
             NavBootstrapAction.None,
             resolveNavBootstrapAction(
                 backStack = listOf(OnboardingStart, PersonalIntro),
+                isOnboarded = false,
+                requiresUnlock = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `rotating during first entry keeps the live editor`() {
+        assertEquals(
+            NavBootstrapAction.None,
+            resolveNavBootstrapAction(
+                backStack = listOf(OnboardingStart, EntryEditorRoute(firstEntry = true)),
                 isOnboarded = false,
                 requiresUnlock = false,
             ),

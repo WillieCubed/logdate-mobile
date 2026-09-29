@@ -51,6 +51,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -148,6 +150,7 @@ class GetRewindUseCaseTest {
                 peopleExtractor = peopleExtractor,
                 locationHistoryRepository = FakeLocationHistoryRepository(),
                 transcriptionRepository = FakeTranscriptionRepository(),
+                mediaManager = FakeMediaManager(),
             )
         useCase =
             GetRewindUseCase(
@@ -218,6 +221,19 @@ class GetRewindUseCaseTest {
             // Then
             assertEquals(RewindQueryResult.Generating, result)
             assertEquals(1, rewindRepository.getRewindBetweenCalls.size)
+        }
+
+    @Test
+    fun `failed generation reports retryable failure instead of an empty week`() =
+        runTest {
+            generationManager.failRequest = true
+            rewindRepository.rewindResult = null
+            val results =
+                useCase(RewindParams(Instant.fromEpochMilliseconds(2_000), Instant.fromEpochMilliseconds(6_000)))
+                    .take(2)
+                    .toList()
+
+            assertEquals(listOf(RewindQueryResult.Generating, RewindQueryResult.Failed), results)
         }
 
     @Test
@@ -427,12 +443,14 @@ class GetRewindUseCaseTest {
 
     private class FakeRewindGenerationManager : RewindGenerationManager {
         var inProgress = false
+        var failRequest = false
 
         override suspend fun requestGeneration(
             startTime: Instant,
             endTime: Instant,
-        ): RewindGenerationRequest =
-            RewindGenerationRequest(
+        ): RewindGenerationRequest {
+            if (failRequest) error("Could not start generation")
+            return RewindGenerationRequest(
                 id = Uuid.random(),
                 startTime = startTime,
                 endTime = endTime,
@@ -441,6 +459,7 @@ class GetRewindUseCaseTest {
                 details = null,
                 rewindId = null,
             )
+        }
 
         override suspend fun getGenerationRequest(requestId: Uuid): RewindGenerationRequest? = null
 
@@ -546,7 +565,7 @@ class GetRewindUseCaseTest {
 
         override suspend fun deleteOwnedMedia(uri: String): Boolean = false
 
-        override suspend fun exists(mediaId: String): Boolean = false
+        override suspend fun exists(mediaId: String): Boolean = true
 
         override suspend fun getRecentMedia(limit: Int): Flow<List<MediaObject>> = flowOf(emptyList())
 

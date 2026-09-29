@@ -36,23 +36,28 @@ chmod +x "$TMP_DIR/bin/curl"
 cat >"$TMP_DIR/track.json" <<'EOF'
 {"track":"internal","releases":[
   {"name":"internal 0.1.0 3072ae3","versionCodes":["1921442"],"status":"completed"},
-  {"name":"internal 0.1.0 abc1234","versionCodes":["1921443"],"status":"completed"}
+  {"name":"internal 0.1.0 abc1234","versionCodes":["1921443"],"status":"completed"},
+  {"name":"internal 0.1.0 abc1234","versionCodes":["1921444"],"status":"completed"}
 ]}
 EOF
 
 resolve() {
     TRACK_FILE="$TMP_DIR/track.json" PLAY_ACCESS_TOKEN=fake PATH="$TMP_DIR/bin:$PATH" \
-        ./scripts/resolve-play-internal-release.sh studio.hypertext.logdate "$1" 2>&1
+        ./scripts/resolve-play-internal-release.sh studio.hypertext.logdate "$1" "$2" 2>&1
 }
 
-assert_contains "version_code=1921443" "$(resolve abc1234)"
-assert_contains "version_code=1921442" "$(resolve 3072ae3)"
+assert_contains "version_code=1921443" "$(resolve abc1234 1921443)"
+assert_contains "version_code=1921442" "$(resolve 3072ae3 1921442)"
 
 set +e
-missing="$(resolve deadbee)"
+missing="$(resolve deadbee 1921443)"
 missing_exit=$?
+wrong_code="$(resolve abc1234 1921442)"
+wrong_code_exit=$?
 set -e
 assert_exit_code 1 "$missing_exit"
 assert_contains "No internal release" "$missing"
+assert_exit_code 1 "$wrong_code_exit"
+assert_contains "No internal release" "$wrong_code"
 
 print_pass_summary "Play internal release lookup"

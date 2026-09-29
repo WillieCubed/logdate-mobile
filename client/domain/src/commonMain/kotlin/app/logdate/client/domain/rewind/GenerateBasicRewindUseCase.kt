@@ -7,8 +7,11 @@ import app.logdate.client.intelligence.entity.people.PeopleExtractor
 import app.logdate.client.intelligence.rewind.strategy.AudioEntryWithTranscript
 import app.logdate.client.intelligence.rewind.strategy.RewindInput
 import app.logdate.client.intelligence.rewind.strategy.RewindStrategySelector
+import app.logdate.client.media.MediaManager
+import app.logdate.client.media.MediaObject
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.location.LocationHistoryRepository
+import app.logdate.client.repository.media.IndexedMedia
 import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.repository.rewind.RewindGenerationManager
 import app.logdate.client.repository.rewind.RewindRepository
@@ -48,6 +51,7 @@ class GenerateBasicRewindUseCase(
     private val peopleExtractor: PeopleExtractor,
     private val locationHistoryRepository: LocationHistoryRepository,
     private val transcriptionRepository: TranscriptionRepository,
+    private val mediaManager: MediaManager,
 ) {
     private companion object {
         private val DEFAULT_WAIT_TIMEOUT = 5.seconds
@@ -61,12 +65,14 @@ class GenerateBasicRewindUseCase(
      * @param endTime End of the time period (exclusive)
      * @param waitTimeout Maximum time to wait for an in-progress generation
      * @param pollInterval How frequently to check generation status when waiting
+     * @param replaceExisting Existing Rewind to update atomically after generation succeeds
      */
     suspend operator fun invoke(
         startTime: Instant,
         endTime: Instant,
         waitTimeout: Duration = DEFAULT_WAIT_TIMEOUT,
         pollInterval: Duration = DEFAULT_POLL_INTERVAL,
+        replaceExisting: Rewind? = null,
     ): GenerateBasicRewindResult {
         Napier.d("Generating rewind for period: $startTime to $endTime")
 
@@ -92,16 +98,10 @@ class GenerateBasicRewindUseCase(
             }
 
         try {
-            // Index media for the period — non-fatal if this fails.
-            try {
-                val newlyIndexedCount = indexMediaForPeriod(startTime, endTime)
-                Napier.d("Indexed $newlyIndexedCount new media items")
-            } catch (e: Exception) {
-                Napier.w("Media indexing failed, continuing with already-indexed media", e)
-            }
-
             val allTextEntries = mutableListOf<JournalNote.Text>()
             val allAudioEntries = mutableListOf<JournalNote.Audio>()
+            val allImageEntries = mutableListOf<JournalNote.Image>()
+            val allVideoEntries = mutableListOf<JournalNote.Video>()
             val timezone = TimeZone.currentSystemDefault()
             var currentDate = startTime.toLocalDateTime(timezone).date
             if (startTime < endTime) {
@@ -112,13 +112,51 @@ class GenerateBasicRewindUseCase(
                         .date
                 while (currentDate <= lastIncludedDate) {
                     val notesForDay = fetchNotesForDay(currentDate).firstOrNull() ?: emptyList()
-                    allTextEntries.addAll(notesForDay.filterIsInstance<JournalNote.Text>())
-                    allAudioEntries.addAll(notesForDay.filterIsInstance<JournalNote.Audio>())
+                    allTextEntries.addAll(
+                        notesForDay.filterIsInstance<JournalNote.Text>().filter {
+                            it.creationTimestamp >= startTime && it.creationTimestamp < endTime
+                        },
+                    )
+                    allAudioEntries.addAll(
+                        notesForDay.filterIsInstance<JournalNote.Audio>().filter {
+                            it.creationTimestamp >= startTime && it.creationTimestamp < endTime
+                        },
+                    )
+                    allImageEntries.addAll(
+                        notesForDay.filterIsInstance<JournalNote.Image>().filter {
+                            it.creationTimestamp >= startTime && it.creationTimestamp < endTime
+                        },
+                    )
+                    allVideoEntries.addAll(
+                        notesForDay.filterIsInstance<JournalNote.Video>().filter {
+                            it.creationTimestamp >= startTime && it.creationTimestamp < endTime
+                        },
+                    )
                     currentDate = currentDate.plus(1, DateTimeUnit.DAY)
                 }
             }
 
-            val mediaItems = indexedMediaRepository.getForPeriod(startTime, endTime).firstOrNull() ?: emptyList()
+            val mediaItems =
+                allImageEntries.mapNotNull { note ->
+                    if (runCatching { mediaManager.exists(note.mediaRef) }.getOrDefault(false)) {
+                        IndexedMedia.Image(note.uid, note.mediaRef, note.creationTimestamp, note.caption)
+                    } else {
+                        Napier.w("Skipping unavailable image in Rewind: ${note.uid}")
+                        null
+                    }
+                } +
+                    allVideoEntries.mapNotNull { note ->
+                        val video =
+                            runCatching {
+                                if (mediaManager.exists(note.mediaRef)) mediaManager.getMedia(note.mediaRef) as? MediaObject.Video else null
+                            }.getOrNull()
+                        if (video == null) {
+                            Napier.w("Skipping unavailable video in Rewind: ${note.uid}")
+                            null
+                        } else {
+                            IndexedMedia.Video(note.uid, note.mediaRef, note.creationTimestamp, note.caption, video.duration)
+                        }
+                    }
 
             if (allTextEntries.isEmpty() && mediaItems.isEmpty() && allAudioEntries.isEmpty()) {
                 updateGenerationStatus(
@@ -186,17 +224,24 @@ class GenerateBasicRewindUseCase(
             val titleInfo = generateRewindTitle(startTime, endTime)
             val rewind =
                 Rewind(
-                    uid = Uuid.random(),
+                    uid = replaceExisting?.uid ?: Uuid.random(),
                     startDate = startTime,
                     endDate = endTime,
                     generationDate = Clock.System.now(),
                     label = titleInfo.label,
                     title = titleInfo.title,
                     content = output.content,
-                    metadata = output.metadata,
+                    metadata = output.metadata.copy(milestones = replaceExisting?.metadata?.milestones.orEmpty()),
+                    isViewed = replaceExisting?.isViewed ?: false,
+                    firstViewedAt = replaceExisting?.firstViewedAt,
+                    viewCount = replaceExisting?.viewCount ?: 0,
                 )
 
-            rewindRepository.saveRewind(rewind)
+            if (replaceExisting == null) {
+                rewindRepository.saveRewind(rewind)
+            } else {
+                rewindRepository.replaceRewind(replaceExisting.uid, rewind)
+            }
             updateGenerationStatus(request.id, RewindGenerationRequest.Status.COMPLETED)
             return GenerateBasicRewindResult.Success(rewind)
         } catch (e: Exception) {

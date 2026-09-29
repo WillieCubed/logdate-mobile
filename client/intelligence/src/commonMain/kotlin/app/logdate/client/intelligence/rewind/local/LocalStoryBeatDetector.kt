@@ -125,24 +125,22 @@ class LocalStoryBeatDetector(
             return listOf(DaySegment(listOf(day), dayEntries, dayMedia, dayAudio))
         }
 
-        // Assign each entry / media / audio entry to the cluster whose timestamp range
-        // it falls within.
+        // GPS captures are sparse. Assign each item to the nearest capture instead
+        // of requiring its timestamp to fall inside a capture window; the latter
+        // silently loses moments before, between, and after recorded points.
+        fun nearestCluster(at: Instant): Int =
+            clusters.indices.minBy { index ->
+                clusters[index].minOf { point ->
+                    val distance = point.timestamp - at
+                    if (distance.isNegative()) -distance else distance
+                }
+            }
+
         val perCluster =
-            clusters.map { cluster ->
-                val clusterStart = cluster.first().timestamp
-                val clusterEnd = cluster.last().timestamp
-                val matchingEntries =
-                    dayEntries.filter {
-                        it.creationTimestamp >= clusterStart && it.creationTimestamp <= clusterEnd
-                    }
-                val matchingMedia =
-                    dayMedia.filter {
-                        it.timestamp >= clusterStart && it.timestamp <= clusterEnd
-                    }
-                val matchingAudio =
-                    dayAudio.filter {
-                        it.audio.creationTimestamp >= clusterStart && it.audio.creationTimestamp <= clusterEnd
-                    }
+            clusters.indices.map { index ->
+                val matchingEntries = dayEntries.filter { nearestCluster(it.creationTimestamp) == index }
+                val matchingMedia = dayMedia.filter { nearestCluster(it.timestamp) == index }
+                val matchingAudio = dayAudio.filter { nearestCluster(it.audio.creationTimestamp) == index }
                 DaySegment(
                     days = listOf(day),
                     entries = matchingEntries,

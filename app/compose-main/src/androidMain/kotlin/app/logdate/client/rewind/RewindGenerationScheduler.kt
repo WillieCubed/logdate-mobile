@@ -73,6 +73,10 @@ class RewindGenerationScheduler(
         Napier.d("Scheduled annual rewind generation")
     }
 
+    fun disableAnnualGeneration() {
+        workManager.cancelUniqueWork(AnnualRewindGenerationWorker.WORK_NAME)
+    }
+
     /**
      * Triggers an immediate check for pending rewind generation.
      *

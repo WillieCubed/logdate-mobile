@@ -19,6 +19,16 @@ class IdentityKeyManager(
     private val cryptoManager: CryptoManager,
     private val backupStore: IdentityKeyBackupStore = NoOpIdentityKeyBackupStore,
 ) {
+    suspend fun isRecoveryPhraseVerified(): Boolean = hasIdentityKey() && secureStorage.getString(KEY_RECOVERY_VERIFIED) == "true"
+
+    suspend fun verifyRecoveryPhrase(words: List<String>): Boolean =
+        identityMutex.withLock {
+            val storedWords = getStoredRecoveryPhrase()?.words ?: return@withLock false
+            if (storedWords != words) return@withLock false
+            secureStorage.putString(KEY_RECOVERY_VERIFIED, "true")
+            true
+        }
+
     /**
      * Checks if this device has already been set up with an identity key.
      */
@@ -69,6 +79,7 @@ class IdentityKeyManager(
         val identityKey = cryptoManager.deriveMasterKey(phrase)
         val phraseText = phrase.joinToString(" ")
 
+        secureStorage.remove(KEY_RECOVERY_VERIFIED)
         secureStorage.putBytes(KEY_IDENTITY_KEY, identityKey)
         secureStorage.putString(KEY_RECOVERY_PHRASE, phraseText)
         backupStore.writePhrase(phraseText)
@@ -92,6 +103,7 @@ class IdentityKeyManager(
 
         val identityKey = cryptoManager.deriveMasterKey(phrase)
         val phraseText = phrase.joinToString(" ")
+        secureStorage.remove(KEY_RECOVERY_VERIFIED)
         secureStorage.putBytes(KEY_IDENTITY_KEY, identityKey)
         secureStorage.putString(KEY_RECOVERY_PHRASE, phraseText)
         backupStore.writePhrase(phraseText)
@@ -126,6 +138,7 @@ class IdentityKeyManager(
         }
 
         val identityKey = cryptoManager.deriveMasterKey(words)
+        secureStorage.remove(KEY_RECOVERY_VERIFIED)
         secureStorage.putBytes(KEY_IDENTITY_KEY, identityKey)
         secureStorage.putString(KEY_RECOVERY_PHRASE, phraseText)
         Napier.i("Identity key silently restored from backup store")
@@ -177,6 +190,7 @@ class IdentityKeyManager(
     suspend fun clearIdentityKey() {
         secureStorage.remove(KEY_IDENTITY_KEY)
         secureStorage.remove(KEY_RECOVERY_PHRASE)
+        secureStorage.remove(KEY_RECOVERY_VERIFIED)
         backupStore.clear()
         Napier.d("Identity key cleared from device")
     }
@@ -184,6 +198,7 @@ class IdentityKeyManager(
     companion object {
         private const val KEY_IDENTITY_KEY = "identity_key_v1"
         private const val KEY_RECOVERY_PHRASE = "identity_recovery_phrase_v1"
+        private const val KEY_RECOVERY_VERIFIED = "identity_recovery_verified_v1"
         private const val RECOVERY_PHRASE_WORD_COUNT = 12
     }
 }

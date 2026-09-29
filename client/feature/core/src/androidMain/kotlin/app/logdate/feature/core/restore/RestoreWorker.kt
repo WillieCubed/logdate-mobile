@@ -36,6 +36,7 @@ class RestoreWorker(
         const val SOURCE_URI_KEY = "restore_source_uri"
         const val INCLUDE_DRAFTS_KEY = "restore_include_drafts"
         const val INCLUDE_MEDIA_KEY = "restore_include_media"
+        const val PRESERVE_POPULATED_PROFILE_KEY = "restore_preserve_populated_profile"
         const val DELETE_SOURCE_AFTER_RESTORE_KEY = "restore_delete_source_after_restore"
         const val SUMMARY_JSON_KEY = "restore_summary_json"
         const val ERROR_KEY = "restore_error"
@@ -50,6 +51,7 @@ class RestoreWorker(
     private val sourceUri: Uri? = inputData.getString(SOURCE_URI_KEY)?.toUri()
     private val includeDrafts: Boolean = inputData.getBoolean(INCLUDE_DRAFTS_KEY, true)
     private val includeMedia: Boolean = inputData.getBoolean(INCLUDE_MEDIA_KEY, true)
+    private val preservePopulatedProfile: Boolean = inputData.getBoolean(PRESERVE_POPULATED_PROFILE_KEY, false)
     private val deleteSourceAfterRestore: Boolean = inputData.getBoolean(DELETE_SOURCE_AFTER_RESTORE_KEY, false)
 
     override suspend fun getForegroundInfo(): ForegroundInfo = notificationHelper.createForegroundInfo(RestoreStage.PREPARING)
@@ -104,6 +106,7 @@ class RestoreWorker(
                 RestoreOptions(
                     includeDrafts = includeDrafts,
                     includeMedia = includeMedia,
+                    preservePopulatedLocalProfile = preservePopulatedProfile,
                 )
 
             val result =

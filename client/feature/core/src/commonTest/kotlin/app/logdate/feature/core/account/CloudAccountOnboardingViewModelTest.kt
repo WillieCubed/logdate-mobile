@@ -223,17 +223,46 @@ class CloudAccountOnboardingViewModelTest {
             assertTrue(viewModel.uiState.value.isSkipped)
         }
 
+    @Test
+    fun `account signup carries the original introduction with the displayed bio`() =
+        runTest {
+            val passkeyRepo = FakePasskeyAccountRepository()
+            val profileRepo =
+                FakeProfileRepository(
+                    LogDateProfile(
+                        displayName = "Writer",
+                        bio = "A polished description",
+                        originalBio = "I keep a journal every morning",
+                    ),
+                )
+            val viewModel =
+                buildViewModel(
+                    isEmailVerificationAvailable = false,
+                    passkeyRepo = passkeyRepo,
+                    profileRepo = profileRepo,
+                )
+            advanceUntilIdle()
+            viewModel.updateDisplayName("Writer")
+            viewModel.updateUsername("writer")
+            viewModel.createAccount()
+            advanceUntilIdle()
+
+            assertEquals("A polished description", passkeyRepo.lastCreationRequest?.bio)
+            assertEquals("I keep a journal every morning", passkeyRepo.lastCreationRequest?.originalBio)
+        }
+
     // --- helpers -----------------------------------------------------------
 
     private fun buildViewModel(
         isEmailVerificationAvailable: Boolean,
         verifyOutcome: EmailVerificationOutcome = EmailVerificationOutcome.Failed("not_invoked"),
+        passkeyRepo: FakePasskeyAccountRepository = FakePasskeyAccountRepository(),
+        profileRepo: FakeProfileRepository = FakeProfileRepository(),
     ): CloudAccountOnboardingViewModel {
         val sessionStorage = FakeSessionStorage()
         val emailManager = FakeEmailVerificationManager()
         val verifyEmailUseCase = StubVerifyEmailUseCase(sessionStorage, emailManager, verifyOutcome)
         val emailAvailability = StubEmailVerificationAvailability(emailManager, isEmailVerificationAvailable)
-        val passkeyRepo = FakePasskeyAccountRepository()
         return CloudAccountOnboardingViewModel(
             createPasskeyAccountUseCase = CreatePasskeyAccountUseCase(passkeyRepo),
             checkUsernameAvailabilityUseCase = CheckUsernameAvailabilityUseCase(passkeyRepo),
@@ -253,7 +282,7 @@ class CloudAccountOnboardingViewModelTest {
             passkeyManager = FakePasskeyManager(),
             verifyEmailUseCase = verifyEmailUseCase,
             emailVerificationAvailability = emailAvailability,
-            profileRepository = FakeProfileRepository(),
+            profileRepository = profileRepo,
             syncManager = FakeSyncManager(),
             serverConfigurationCoordinator =
                 ServerConfigurationCoordinator(
@@ -317,11 +346,14 @@ class CloudAccountOnboardingViewModelTest {
     }
 
     private class FakePasskeyAccountRepository : PasskeyAccountRepository {
+        var lastCreationRequest: AccountCreationRequest? = null
         override val currentAccount: StateFlow<LogDateAccount?> = MutableStateFlow(null)
         override val isAuthenticated: StateFlow<Boolean> = MutableStateFlow(false)
 
-        override suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> =
-            Result.failure(NotImplementedError())
+        override suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> {
+            lastCreationRequest = request
+            return Result.failure(NotImplementedError())
+        }
 
         override suspend fun authenticateWithPasskey(
             username: String?,
@@ -500,8 +532,10 @@ class CloudAccountOnboardingViewModelTest {
         override suspend fun markAccountBackfilled(accountId: String) {}
     }
 
-    private class FakeProfileRepository : ProfileRepository {
-        override val currentProfile: Flow<LogDateProfile> = flowOf(LogDateProfile())
+    private class FakeProfileRepository(
+        private val profile: LogDateProfile = LogDateProfile(),
+    ) : ProfileRepository {
+        override val currentProfile: Flow<LogDateProfile> = flowOf(profile)
 
         override suspend fun updateDisplayName(displayName: String): Result<LogDateProfile> =
             Result.success(LogDateProfile(displayName = displayName))
@@ -515,7 +549,7 @@ class CloudAccountOnboardingViewModelTest {
             originalBio: String?,
         ): Result<LogDateProfile> = Result.success(LogDateProfile())
 
-        override suspend fun getCurrentProfile(): LogDateProfile = LogDateProfile()
+        override suspend fun getCurrentProfile(): LogDateProfile = profile
 
         override suspend fun clearProfile(): Result<Unit> = Result.success(Unit)
     }

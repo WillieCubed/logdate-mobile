@@ -15,13 +15,13 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 @Composable
 actual fun rememberSystemReduceMotion(): State<Boolean> {
     val context = LocalContext.current
-    val state = remember(context) { mutableStateOf(isHapticDisabled(context)) }
+    val state = remember(context) { mutableStateOf(isSystemAnimatorDisabled(context)) }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, context) {
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
-                    state.value = isHapticDisabled(context)
+                    state.value = isSystemAnimatorDisabled(context)
                 }
             }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -29,6 +29,11 @@ actual fun rememberSystemReduceMotion(): State<Boolean> {
     }
     return state
 }
+
+internal fun isSystemAnimatorDisabled(context: Context): Boolean =
+    isMotionReducedByAnimatorScale(
+        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f),
+    )
 
 /**
  * Whether the user turned off touch haptics in system settings. The setting is deprecated

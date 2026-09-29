@@ -134,6 +134,7 @@ data class ImageRewindPanelUiState(
     val imageUri: String,
     val caption: String? = null,
     val dateFormatted: String,
+    val isVideoFrame: Boolean = false,
 ) : RewindPanelUiState
 
 /**

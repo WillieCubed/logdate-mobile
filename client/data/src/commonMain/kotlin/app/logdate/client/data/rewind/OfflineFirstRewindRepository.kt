@@ -155,6 +155,22 @@ class OfflineFirstRewindRepository(
             }
         }
 
+    override suspend fun replaceRewind(
+        existingUid: Uuid,
+        replacement: Rewind,
+    ): Unit =
+        withContext(ioDispatcher) {
+            require(replacement.uid == existingUid)
+            val (textEntities, imageEntities, videoEntities) = replacement.content.toEntities(replacement.uid)
+            cachedRewindDao.replaceRewind(
+                existingUid = existingUid,
+                replacement = replacement.toEntity(),
+                textContent = textEntities,
+                imageContent = imageEntities,
+                videoContent = videoEntities,
+            )
+        }
+
     override fun getRewindsInRange(
         start: Instant,
         end: Instant,
@@ -187,9 +203,8 @@ class OfflineFirstRewindRepository(
         signal: String,
     ): Unit =
         withContext(ioDispatcher) {
-            // Read the existing rewind, prepend the signal to its metadata.milestones,
-            // and re-save. The cascade-friendly path is `saveRewind` which re-inserts
-            // the panel content rows; for a one-time tag operation that's acceptable.
+            // Update the existing row in place. REPLACE would delete it first and
+            // cascade into panels and replies even though only metadata changed.
             val rewind = cachedRewindDao.getRewindById(uid).firstOrNull() ?: return@withContext
             val metadataObject =
                 rewind.metadata?.let { json ->
@@ -198,7 +213,7 @@ class OfflineFirstRewindRepository(
                 }
             val updated =
                 metadataObject?.let {
-                    it.copy(milestones = listOf(signal) + it.milestones)
+                    it.copy(milestones = listOf(signal) + it.milestones, hasDomainMetadata = true)
                 } ?: SerializableRewindMetadata(
                     detectedActivities = emptyList(),
                     locationSummary = null,
@@ -206,7 +221,7 @@ class OfflineFirstRewindRepository(
                     peopleHighlighted = emptyList(),
                 )
             val encoded = contentJson.encodeToString(updated)
-            cachedRewindDao.insertRewind(rewind.copy(metadata = encoded))
+            cachedRewindDao.updateRewind(rewind.copy(metadata = encoded))
             Napier.d("Tagged rewind $uid as milestone: $signal")
         }
 
@@ -226,15 +241,13 @@ class OfflineFirstRewindRepository(
         // Convert video content
         dbContent.videoContent.map { it.toDomainModel() }.let { content.addAll(it) }
 
-        // Sort by timestamp to maintain chronological order
-        val sortedContent = content.sortedBy { it.timestamp }
-
-        val rewindMetadata =
+        val storedMetadata =
             metadata?.let { json ->
                 runCatching { contentJson.decodeFromString<SerializableRewindMetadata>(json) }
-                    .map { it.toDomainModel() }
                     .getOrNull()
             }
+        val orderedContent = restorePanelOrder(content, storedMetadata?.panelOrder.orEmpty())
+        val rewindMetadata = storedMetadata?.takeIf { it.hasDomainMetadata }?.toDomainModel()
 
         return Rewind(
             uid = uid,
@@ -243,12 +256,26 @@ class OfflineFirstRewindRepository(
             generationDate = generationDate,
             label = label,
             title = title,
-            content = sortedContent,
+            content = orderedContent,
             metadata = rewindMetadata,
             isViewed = isViewed,
             firstViewedAt = firstViewedAt,
             viewCount = viewCount,
         )
+    }
+
+    private fun restorePanelOrder(
+        content: List<RewindContent>,
+        panelOrder: List<String>,
+    ): List<RewindContent> {
+        if (panelOrder.isEmpty()) return content.sortedBy { it.timestamp }
+        val remaining = content.toMutableList()
+        val ordered =
+            panelOrder.mapNotNull { sourceId ->
+                val index = remaining.indexOfFirst { it.sourceId.toString() == sourceId }
+                if (index < 0) null else remaining.removeAt(index)
+            }
+        return ordered + remaining.sortedBy { it.timestamp }
     }
 
     /**
@@ -262,9 +289,23 @@ class OfflineFirstRewindRepository(
             generationDate = generationDate,
             label = label,
             title = title,
+            isViewed = isViewed,
+            firstViewedAt = firstViewedAt,
+            viewCount = viewCount,
             metadata =
-                metadata?.let { meta ->
-                    contentJson.encodeToString(SerializableRewindMetadata.fromDomainModel(meta))
+                if (metadata == null && content.isEmpty()) {
+                    null
+                } else {
+                    val stored =
+                        metadata?.let { SerializableRewindMetadata.fromDomainModel(it) }
+                            ?: SerializableRewindMetadata(
+                                detectedActivities = emptyList(),
+                                locationSummary = null,
+                                milestones = emptyList(),
+                                peopleHighlighted = emptyList(),
+                                hasDomainMetadata = false,
+                            )
+                    contentJson.encodeToString(stored.copy(panelOrder = content.map { it.sourceId.toString() }))
                 },
         )
 
@@ -705,6 +746,8 @@ class OfflineFirstRewindRepository(
         val highlightedQuotes: List<HighlightedQuote> = emptyList(),
         val weatherContext: WeatherContext? = null,
         val locationPath: List<MapPoint> = emptyList(),
+        val panelOrder: List<String> = emptyList(),
+        val hasDomainMetadata: Boolean = true,
     ) {
         fun toDomainModel(): RewindMetadata =
             RewindMetadata(

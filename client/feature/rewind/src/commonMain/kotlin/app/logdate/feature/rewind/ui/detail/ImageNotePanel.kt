@@ -12,6 +12,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,6 +27,9 @@ import app.logdate.ui.content.ImageScrimOverlay
 import coil3.compose.AsyncImage
 import logdate.client.feature.rewind.generated.resources.Res
 import logdate.client.feature.rewind.generated.resources.cd_rewind_journal_photo
+import logdate.client.feature.rewind.generated.resources.cd_rewind_video_frame
+import logdate.client.feature.rewind.generated.resources.rewind_media_unavailable
+import logdate.client.feature.rewind.generated.resources.rewind_video_frame_label
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -46,8 +53,10 @@ fun ImageNotePanel(
     imageUri: String,
     caption: String?,
     dateFormatted: String,
+    isVideoFrame: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    var imageFailed by remember(imageUri) { mutableStateOf(false) }
     Box(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
@@ -56,16 +65,46 @@ fun ImageNotePanel(
         AsyncImage(
             model = imageUri,
             contentDescription =
-                caption?.takeIf { it.isNotBlank() }
-                    ?: stringResource(Res.string.cd_rewind_journal_photo, dateFormatted),
+                if (isVideoFrame) {
+                    stringResource(Res.string.cd_rewind_video_frame, dateFormatted)
+                } else {
+                    caption?.takeIf { it.isNotBlank() }
+                        ?: stringResource(Res.string.cd_rewind_journal_photo, dateFormatted)
+                },
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
+            onError = { imageFailed = true },
+            onSuccess = { imageFailed = false },
         )
 
         // Top and bottom gradient overlays for more polished look
         ImageScrimOverlay(alphaStops = listOf(0.3f, 0f, 0f, 0.7f))
 
+        if (imageFailed) {
+            Text(
+                text = stringResource(Res.string.rewind_media_unavailable),
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.White,
+                modifier = Modifier.padding(24.dp),
+            )
+        }
+
         // Date indicator at top
+        if (isVideoFrame) {
+            Text(
+                text = stringResource(Res.string.rewind_video_frame_label),
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White,
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color.Black.copy(alpha = 0.6f))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+        }
+
         Box(
             modifier =
                 Modifier

@@ -43,6 +43,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import app.logdate.client.awareness.daylight.DaylightClassifier
 import app.logdate.client.datastore.LogdatePreferencesDataSource
+import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.domain.events.LinkNoteToEventUseCase
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.HomeRecommendation
@@ -750,7 +751,7 @@ class HomeViewModel(
         val placeUiStates = placesVisited.map { place -> place.toUiState() }
         val peopleUiStates = people.map(Person::toUiState)
         val momentUiStates = moments.toMomentUiStates(peopleUiStates)
-        val eventUiStates = events.map { it.toDayEventUiState() }
+        val eventUiStates = if (FeatureFlag.EVENTS.availableForLaunch) events.map { it.toDayEventUiState() } else emptyList()
 
         return createSemanticTimelineDayUiState(
             summary = tldr,

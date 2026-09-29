@@ -54,6 +54,11 @@ class EventInferenceScheduler(
         Napier.d("Scheduled periodic event inference")
     }
 
+    fun disableForLaunch() {
+        workManager.cancelUniqueWork(EventInferenceWorker.WORK_NAME)
+        workManager.cancelUniqueWork("${EventInferenceWorker.WORK_NAME}:immediate")
+    }
+
     /**
      * Triggers an immediate run of the event inference worker. Used by the auto-events
      * settings screen's "Run now" button.

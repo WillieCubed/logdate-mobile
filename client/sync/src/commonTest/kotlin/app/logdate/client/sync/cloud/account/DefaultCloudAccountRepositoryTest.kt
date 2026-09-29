@@ -60,6 +60,8 @@ class DefaultCloudAccountRepositoryTest {
                                                     displayName = "Tester",
                                                     did = "did:web:tester.logdate.app",
                                                     handle = "tester.logdate.app",
+                                                    bio = "Polished bio",
+                                                    originalBio = "My own words",
                                                     passkeyCredentialIds = listOf("cred-1"),
                                                     createdAt = Instant.parse("2026-03-05T00:00:00Z"),
                                                     updatedAt = Instant.parse("2026-03-05T00:00:00Z"),
@@ -105,6 +107,8 @@ class DefaultCloudAccountRepositoryTest {
             val current = reloaded.getCurrentAccount()
             assertEquals("did:web:tester.logdate.app", current?.did)
             assertEquals("tester.logdate.app", current?.handle)
+            assertEquals("Polished bio", current?.bio)
+            assertEquals("My own words", current?.originalBio)
         }
 
     @Test

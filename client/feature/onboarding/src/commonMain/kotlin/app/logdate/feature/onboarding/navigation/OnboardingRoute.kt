@@ -22,9 +22,9 @@ import app.logdate.feature.core.account.CloudAccountOnboardingScreen
 import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.feature.onboarding.flow.OnboardingEntryMode
 import app.logdate.feature.onboarding.flow.OnboardingStep
-import app.logdate.feature.onboarding.flow.firstOnboardingStep
 import app.logdate.feature.onboarding.flow.nextOnboardingStepAfter
 import app.logdate.feature.onboarding.ui.CloudAccountSetupScreen
+import app.logdate.feature.onboarding.ui.FirstEntryImportOfferScreen
 import app.logdate.feature.onboarding.ui.MemoriesImportInfoScreen
 import app.logdate.feature.onboarding.ui.MemorySelectionScreen
 import app.logdate.feature.onboarding.ui.MemorySelectionViewModel
@@ -98,6 +98,12 @@ data object FeatureNotifications : OnboardingBaseRoute
 data object OnboardingComplete : OnboardingBaseRoute
 
 @Serializable
+data object FirstEntryImportOffer : OnboardingBaseRoute
+
+@Serializable
+data object FirstEntryMemorySelection : OnboardingBaseRoute
+
+@Serializable
 data object WelcomeBack : OnboardingBaseRoute
 
 /** Pushes the onboarding flow onto the back stack, starting from [OnboardingStart]. */
@@ -124,6 +130,8 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
     onNavigateBack: () -> Unit,
     onWelcomeBack: () -> Unit,
     onOnboardingComplete: () -> Unit,
+    onFirstEntryReady: () -> Unit,
+    onCreateFirstEntry: () -> Unit,
     onGoToItem: (route: OnboardingBaseRoute) -> Unit,
 ) {
     taggedEntry<OnboardingRoute> {
@@ -132,29 +140,10 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
         LaunchedEffect(Unit) { onGoToItem(OnboardingStart) }
     }
     taggedEntry<OnboardingStart> {
-        val flowViewModel = koinViewModel<OnboardingViewModel>()
-        val progressSnapshot by flowViewModel.progressSnapshot.collectAsState()
-        val coroutineScope = rememberCoroutineScope()
-
         OnboardingInsets {
             OnboardingStartScreen(
-                onNext = {
-                    coroutineScope.launch {
-                        flowViewModel.setActiveEntryMode(OnboardingEntryMode.FRESH)
-                        onGoToItem(
-                            routeForStep(firstOnboardingStep(OnboardingEntryMode.FRESH, progressSnapshot)),
-                        )
-                    }
-                },
-                onSignIn = {
-                    coroutineScope.launch {
-                        // "Sign into LogDate Cloud" previously dropped the user at the first
-                        // CONTINUE_SETUP step, which is the local personal-introduction screen -
-                        // there was no reachable path to authenticate an existing account.
-                        flowViewModel.setActiveEntryMode(OnboardingEntryMode.CONTINUE_SETUP)
-                        onGoToItem(SignIn)
-                    }
-                },
+                onNext = onCreateFirstEntry,
+                onSignIn = { onGoToItem(SignIn) },
             )
         }
     }
@@ -247,6 +236,20 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
             onToggleMemorySelection = viewModel::toggleMemorySelection,
             onLoadMoreMemories = viewModel::loadMoreMemories,
             onRefreshMemories = viewModel::refreshMemories,
+        )
+    }
+    taggedEntry<FirstEntryImportOffer> {
+        OnboardingInsets {
+            FirstEntryImportOfferScreen(
+                onImport = { onGoToItem(FirstEntryMemorySelection) },
+                onContinue = onOnboardingComplete,
+            )
+        }
+    }
+    taggedEntry<FirstEntryMemorySelection> {
+        FirstEntryMemorySelectionEntry(
+            onBack = onNavigateBack,
+            onComplete = onOnboardingComplete,
         )
     }
     taggedEntry<AccountCreation> {
@@ -488,9 +491,6 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
         )
     }
     taggedEntry<SignIn> {
-        val flowViewModel = koinViewModel<OnboardingViewModel>()
-        val progressSnapshot by flowViewModel.progressSnapshot.collectAsState()
-        val entryMode by flowViewModel.activeEntryMode.collectAsState()
         val cloudAccountViewModel = koinViewModel<CloudAccountOnboardingViewModel>()
 
         LaunchedEffect(Unit) {
@@ -500,34 +500,15 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
 
         CloudAccountOnboardingScreen(
             viewModel = cloudAccountViewModel,
-            onAccountCreated = {
-                onGoToItem(
-                    routeForStep(
-                        nextOnboardingStepAfter(
-                            currentStep = OnboardingStep.ACCOUNT,
-                            entryMode = entryMode,
-                            snapshot = progressSnapshot.copy(hasCloudAccount = true),
-                        ) ?: terminalStepFor(entryMode),
-                    ),
-                )
-            },
-            onSkipOnboarding = {
-                onGoToItem(
-                    routeForStep(
-                        nextOnboardingStepAfter(
-                            currentStep = OnboardingStep.ACCOUNT,
-                            entryMode = entryMode,
-                            snapshot = progressSnapshot,
-                        ) ?: terminalStepFor(entryMode),
-                    ),
-                )
-            },
+            onAccountCreated = { onGoToItem(WelcomeBack) },
+            onSkipOnboarding = { onGoToItem(OnboardingStart) },
             onBack = onNavigateBack,
         )
     }
     taggedEntry<OnboardingComplete> {
         OnboardingCompletionScreen(
-            onFinish = onOnboardingComplete,
+            onFinish = onFirstEntryReady,
+            finishImmediately = true,
             onRequirementsIncomplete = { step ->
                 onGoToItem(routeForStep(step))
             },
@@ -541,6 +522,27 @@ fun EntryProviderScope<NavKey>.onboardingEntries(
             )
         }
     }
+}
+
+@Composable
+private fun FirstEntryMemorySelectionEntry(
+    onBack: () -> Unit,
+    onComplete: () -> Unit,
+) {
+    val viewModel = koinViewModel<MemorySelectionViewModel>()
+    val coroutineScope = rememberCoroutineScope()
+    MemorySelectionScreen(
+        uiState = viewModel.uiState.collectAsState().value,
+        onBack = onBack,
+        onContinue = {
+            coroutineScope.launch {
+                viewModel.processSelectedMemories().onSuccess { onComplete() }
+            }
+        },
+        onToggleMemorySelection = viewModel::toggleMemorySelection,
+        onLoadMoreMemories = viewModel::loadMoreMemories,
+        onRefreshMemories = viewModel::refreshMemories,
+    )
 }
 
 private fun routeForStep(step: OnboardingStep): OnboardingBaseRoute =

@@ -91,6 +91,19 @@ class FetchNotesForDayUseCaseTest {
         }
 
     @Test
+    fun `local day boundaries cover both daylight saving transitions`() =
+        runTest {
+            val zone = TimeZone.of("America/New_York")
+            val useCase = FetchNotesForDayUseCase(mockRepository, zone)
+
+            useCase(LocalDate(2026, 3, 8)).first()
+            assertEquals(23.hours, mockRepository.lastEndTime!! - mockRepository.lastStartTime!!)
+
+            useCase(LocalDate(2026, 11, 1)).first()
+            assertEquals(25.hours, mockRepository.lastEndTime!! - mockRepository.lastStartTime!!)
+        }
+
+    @Test
     fun `invoke should handle different dates correctly`() =
         runTest {
             // Given

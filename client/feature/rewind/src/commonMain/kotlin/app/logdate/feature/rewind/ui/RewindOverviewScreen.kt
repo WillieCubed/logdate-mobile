@@ -54,7 +54,8 @@ fun RewindOverviewScreen(
     RewindScreenContent(
         uiState,
         onOpenRewind = onOpenRewind,
-        onGenerateAnnualRewind = viewModel::generateAnnualRewind,
+        onRetryRewind = viewModel::forceGenerateLastWeekRewind,
+        onGenerateAnnualRewind = null,
         modifier = modifier.fillMaxSize(),
     )
 }

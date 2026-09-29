@@ -95,7 +95,7 @@ class ArchiveDtoConventionsTest {
     @Test
     fun `every instant is RFC 3339 in UTC`() {
         val instant = Regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$")
-        val timestampKeys = setOf("createdAt", "updatedAt", "exportedAt", "timestamp", "loggedAt", "from", "to", "birthday")
+        val timestampKeys = setOf("createdAt", "updatedAt", "exportedAt", "timestamp", "loggedAt", "from", "to")
 
         fun check(
             file: String,
@@ -105,6 +105,12 @@ class ArchiveDtoConventionsTest {
                 element.forEach { (key, value) ->
                     if (key in timestampKeys && value is JsonPrimitive) {
                         assertTrue(instant.matches(value.content), "$file.$key is not RFC 3339 UTC: ${value.content}")
+                    }
+                    if (key == "birthday" && value is JsonPrimitive) {
+                        assertTrue(
+                            Regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}$").matches(value.content),
+                            "$file.$key is not a date: ${value.content}",
+                        )
                     }
                     check(file, value)
                 }

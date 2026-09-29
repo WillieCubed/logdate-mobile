@@ -2,10 +2,13 @@ package app.logdate.feature.library.ui
 
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.media.IndexedMedia
+import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.feature.library.fakes.FakeIndexedMediaRepository
 import app.logdate.feature.library.fakes.FakeJournalNotesRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -62,6 +65,52 @@ class LibraryViewModelTest {
             advanceUntilIdle()
 
             assertIs<LibraryUiState.Empty>(viewModel.uiState.value)
+            collectJob.cancel()
+        }
+
+    @Test
+    fun `repository failure produces a retryable error rather than an empty library`() =
+        runTest(testDispatcher) {
+            val failingRepository =
+                object : IndexedMediaRepository by FakeIndexedMediaRepository() {
+                    override fun observeAllMedia() = flow<List<IndexedMedia>> { error("database unavailable") }
+                }
+            val viewModel = LibraryViewModel(FakeJournalNotesRepository(), failingRepository)
+
+            val collectJob = launch { viewModel.uiState.collect {} }
+            advanceUntilIdle()
+
+            assertIs<LibraryUiState.Error>(viewModel.uiState.value)
+            collectJob.cancel()
+        }
+
+    @Test
+    fun `retry reopens the library after a transient repository failure`() =
+        runTest(testDispatcher) {
+            var failing = true
+            val media =
+                listOf(
+                    IndexedMedia.Image(
+                        uid = Uuid.random(),
+                        uri = "file:///restored.jpg",
+                        timestamp = Instant.parse("2024-03-09T00:00:00Z"),
+                    ),
+                )
+            val repository =
+                object : IndexedMediaRepository by FakeIndexedMediaRepository() {
+                    override fun observeAllMedia() =
+                        if (failing) flow<List<IndexedMedia>> { error("database unavailable") } else flowOf(media)
+                }
+            val viewModel = LibraryViewModel(FakeJournalNotesRepository(), repository)
+            val collectJob = launch { viewModel.uiState.collect {} }
+            advanceUntilIdle()
+            assertIs<LibraryUiState.Error>(viewModel.uiState.value)
+
+            failing = false
+            viewModel.retry()
+            advanceUntilIdle()
+
+            assertEquals(1, assertIs<LibraryUiState.Content>(viewModel.uiState.value).totalCount)
             collectJob.cancel()
         }
 

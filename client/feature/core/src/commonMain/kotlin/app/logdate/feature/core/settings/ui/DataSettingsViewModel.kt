@@ -15,12 +15,15 @@ import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.CloudStorageQuota
 import app.logdate.shared.model.ServerCapability
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
@@ -33,6 +36,7 @@ data class DataSettingsState(
     val isQuotaAvailable: Boolean,
     val integrityState: IntegrityState,
     val syncStatus: app.logdate.client.sync.SyncStatus?,
+    val cloudArchiveStatus: CloudArchiveStatus,
     /**
      * Null until the stored session has been read.
      *
@@ -81,6 +85,7 @@ class DataSettingsViewModel(
     private val preferencesDataSource: LogdatePreferencesDataSource,
     private val configRepository: LogDateConfigRepository,
     private val dataIntegrityService: DataIntegrityService,
+    private val cloudArchiveStatusSource: CloudArchiveStatusSource = UnavailableCloudArchiveStatusSource,
 ) : ViewModel() {
     private val _integrityState = MutableStateFlow(IntegrityState())
     val integrityState: StateFlow<IntegrityState> = _integrityState.asStateFlow()
@@ -97,6 +102,16 @@ class DataSettingsViewModel(
             .map<CloudStorageQuota, CloudStorageQuota?> { it }
             .onStart { emit(null) }
     private val sessionFlow = sessionStorage.getSessionFlow()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val archiveStatusFlow =
+        sessionFlow.flatMapLatest { session ->
+            if (session == null) {
+                flowOf(null to CloudArchiveStatus(CloudArchivePhase.SIGNED_OUT))
+            } else {
+                cloudArchiveStatusSource.observe(session).map { session.accountId to it }
+            }
+        }
     private val quotaAvailabilityFlow =
         configRepository.serverDescriptor
             .combine(configRepository.backendUrl) { descriptor, backendUrl ->
@@ -124,6 +139,7 @@ class DataSettingsViewModel(
                 isQuotaAvailable = isQuotaAvailable,
                 integrityState = integrityState,
                 syncStatus = null,
+                cloudArchiveStatus = CloudArchiveStatus(CloudArchivePhase.CHECKING),
                 isAuthenticated = null,
             )
         }
@@ -133,9 +149,12 @@ class DataSettingsViewModel(
             sourceStateFlow,
             syncStatusFlow,
             sessionFlow,
-        ) { sourceState, syncStatus, session ->
+            archiveStatusFlow,
+        ) { sourceState, syncStatus, session, accountArchiveStatus ->
             sourceState.copy(
                 syncStatus = syncStatus,
+                cloudArchiveStatus =
+                    scopedCloudArchiveStatus(session?.accountId, accountArchiveStatus.first, accountArchiveStatus.second),
                 isAuthenticated = session != null,
             )
         }.stateIn(
@@ -147,6 +166,7 @@ class DataSettingsViewModel(
                 isQuotaAvailable = true,
                 integrityState = IntegrityState(),
                 syncStatus = null,
+                cloudArchiveStatus = CloudArchiveStatus(CloudArchivePhase.CHECKING),
                 isAuthenticated = null,
             ),
         )
@@ -215,6 +235,20 @@ class DataSettingsViewModel(
                 Napier.e("Could not start sync", e)
                 _syncFeedback.value = SyncFeedback.Failed(describeSyncFailure(null))
             }
+        }
+    }
+
+    fun backupArchiveNow() {
+        viewModelScope.launch {
+            val session = sessionStorage.getSession()
+            if (session == null ||
+                uiState.value.cloudArchiveStatus.canRetry
+                    .not()
+            ) {
+                return@launch
+            }
+            runCatching { cloudArchiveStatusSource.requestBackup() }
+                .onFailure { error -> Napier.w("Could not request Cloud archive backup", error) }
         }
     }
 

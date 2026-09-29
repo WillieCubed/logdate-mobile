@@ -161,6 +161,28 @@ class LocalStoryBeatDetectorTest {
     }
 
     @Test
+    fun `location split retains every journal entry between and outside GPS samples`() {
+        val early = textEntry("Early morning before location capture.", at = day0 + 1.hours)
+        val between = textEntry("The journey between the two places.", at = day0 + 4.hours)
+        val late = textEntry("Late evening after location capture.", at = day0 + 9.hours)
+        val locations =
+            listOf(
+                locationPoint(day0 + 2.hours, 37.7749, -122.4194),
+                locationPoint(day0 + 3.hours, 37.7755, -122.4200),
+                locationPoint(day0 + 6.hours, 37.6038, -122.4995),
+                locationPoint(day0 + 7.hours, 37.6040, -122.5000),
+            )
+
+        val beats = detector.detect(listOf(early, between, late), day0, day0 + 1.days, locationHistory = locations)
+
+        assertEquals(3, beats.flatMap { it.evidenceIds }.distinct().size)
+        assertEquals(
+            setOf(early.uid.toString(), between.uid.toString(), late.uid.toString()),
+            beats.flatMap { it.evidenceIds }.toSet(),
+        )
+    }
+
+    @Test
     fun `respects the six-beat cap even with location subdivision`() {
         val entries =
             (0..4).map { dayIdx ->

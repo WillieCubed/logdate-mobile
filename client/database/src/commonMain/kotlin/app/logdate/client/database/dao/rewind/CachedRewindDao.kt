@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 import app.logdate.client.database.entities.rewind.RewindConstants
 import app.logdate.client.database.entities.rewind.RewindEntity
 import app.logdate.client.database.entities.rewind.RewindImageContentEntity
@@ -108,6 +109,9 @@ interface CachedRewindDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRewind(rewind: RewindEntity)
 
+    @Update
+    suspend fun updateRewind(rewind: RewindEntity): Int
+
     /**
      * Retrieves all text content for a given rewind.
      *
@@ -203,6 +207,15 @@ interface CachedRewindDao {
     @Query("DELETE FROM rewinds WHERE ${RewindConstants.COLUMN_UID} = :uid")
     suspend fun deleteRewind(uid: Uuid)
 
+    @Query("DELETE FROM rewind_text_content WHERE ${RewindConstants.COLUMN_REWIND_ID} = :uid")
+    suspend fun deleteTextContentForRewind(uid: Uuid)
+
+    @Query("DELETE FROM rewind_image_content WHERE ${RewindConstants.COLUMN_REWIND_ID} = :uid")
+    suspend fun deleteImageContentForRewind(uid: Uuid)
+
+    @Query("DELETE FROM rewind_video_content WHERE ${RewindConstants.COLUMN_REWIND_ID} = :uid")
+    suspend fun deleteVideoContentForRewind(uid: Uuid)
+
     /**
      * Helper method to get all content for a rewind.
      * This combines text, image, and video content into respective lists.
@@ -241,6 +254,23 @@ interface CachedRewindDao {
         if (videoContent.isNotEmpty()) {
             insertVideoContent(videoContent)
         }
+    }
+
+    /** Updates panels without deleting the parent row or its attached replies. */
+    @Transaction
+    suspend fun replaceRewind(
+        existingUid: Uuid,
+        replacement: RewindEntity,
+        textContent: List<RewindTextContentEntity>,
+        imageContent: List<RewindImageContentEntity>,
+        videoContent: List<RewindVideoContentEntity>,
+    ) {
+        require(replacement.uid == existingUid)
+        check(updateRewind(replacement) == 1) { "Rewind to refresh no longer exists" }
+        deleteTextContentForRewind(existingUid)
+        deleteImageContentForRewind(existingUid)
+        deleteVideoContentForRewind(existingUid)
+        insertRewindContent(textContent, imageContent, videoContent)
     }
 }
 

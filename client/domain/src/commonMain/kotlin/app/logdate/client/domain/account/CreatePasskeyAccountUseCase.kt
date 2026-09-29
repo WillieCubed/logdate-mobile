@@ -53,6 +53,7 @@ class CreatePasskeyAccountUseCase(
         username: String,
         displayName: String,
         bio: String? = null,
+        originalBio: String? = null,
     ): Result {
         return try {
             // Validate input
@@ -79,6 +80,7 @@ class CreatePasskeyAccountUseCase(
                     username = username,
                     displayName = displayName,
                     bio = bio,
+                    originalBio = originalBio,
                 )
             val createResult = passkeyAccountRepository.createAccountWithPasskey(request)
 

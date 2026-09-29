@@ -117,6 +117,7 @@ class LogDateCloudApiClient(
                             username = request.username,
                             displayName = request.displayName,
                             bio = request.bio,
+                            originalBio = request.originalBio,
                             requestedOwnerId = request.requestedOwnerId,
                         ),
                     )
@@ -977,6 +978,7 @@ private data class SignupPasskeyBeginRequestDto(
     val username: String,
     val displayName: String,
     val bio: String? = null,
+    val originalBio: String? = null,
     val requestedOwnerId: String? = null,
 )
 
@@ -1012,6 +1014,7 @@ private data class AuthAccountDto(
     val did: String? = null,
     val handle: String? = null,
     val bio: String? = null,
+    val originalBio: String? = null,
     val passkeyCredentialIds: List<String> = emptyList(),
     val createdAt: String,
     val updatedAt: String,
@@ -1050,6 +1053,7 @@ private fun AuthAccountDto.toLogDateAccount(): LogDateAccount =
         did = did,
         handle = handle,
         bio = bio,
+        originalBio = originalBio,
         passkeyCredentialIds = passkeyCredentialIds,
         createdAt = Instant.parse(createdAt),
         updatedAt = Instant.parse(updatedAt),

@@ -119,7 +119,14 @@ object ArchiveSamples {
 
     val profileFile =
         ArchiveProfileFile(
-            ArchiveProfile(displayName = "Sam", birthday = at, bio = "Hello", originalBio = "Hi", createdAt = at, updatedAt = at),
+            ArchiveProfile(
+                displayName = "Sam",
+                birthday = Instant.parse("2026-09-18T00:00:00Z"),
+                bio = "Hello",
+                originalBio = "Hi",
+                createdAt = at,
+                updatedAt = at,
+            ),
         )
 
     val locationSample =

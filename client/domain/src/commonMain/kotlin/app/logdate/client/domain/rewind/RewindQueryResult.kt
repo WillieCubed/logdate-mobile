@@ -29,6 +29,9 @@ sealed class RewindQueryResult {
      */
     data object NoneAvailable : RewindQueryResult()
 
+    /** Generation failed and can be tried again after the cause is resolved. */
+    data object Failed : RewindQueryResult()
+
     /**
      * Indicates that a [Rewind] is currently being generated for the requested time period.
      *

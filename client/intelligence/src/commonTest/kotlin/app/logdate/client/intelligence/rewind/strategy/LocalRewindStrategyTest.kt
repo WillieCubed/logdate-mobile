@@ -11,11 +11,14 @@ import app.logdate.client.intelligence.curation.RejectReason
 import app.logdate.client.intelligence.curation.RewindMediaCurator
 import app.logdate.client.intelligence.curation.SignificanceScorer
 import app.logdate.client.intelligence.narrative.RewindSequencer
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.media.IndexedMedia
+import app.logdate.shared.model.RewindContent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -55,6 +58,48 @@ class LocalRewindStrategyTest {
                 output.curation.rejected.any { it.media.uid == screenshot.uid },
                 "screenshot should survive the hard filter when the user opted in",
             )
+        }
+
+    @Test
+    fun `sparse journal week renders its real entry with a valid source`() =
+        runTest {
+            val note =
+                JournalNote.Text(
+                    creationTimestamp = baseTs,
+                    lastUpdated = baseTs,
+                    content = "I finally finished the project this week.",
+                )
+            val strategy = strategyFor(screenshotPhoto(), includeScreenshots = false)
+            val output = strategy.produce(inputWith(emptyList(), listOf(note)))
+
+            assertEquals(
+                listOf(note.uid),
+                output.content.filterIsInstance<RewindContent.TextNote>().map { it.sourceId },
+            )
+            assertTrue(output.narrative.storyBeats.any { note.uid.toString() in it.evidenceIds })
+        }
+
+    @Test
+    fun `media heavy week keeps selected panels tied to indexed media`() =
+        runTest {
+            val media =
+                (0 until 25).map { index ->
+                    IndexedMedia.Image(
+                        uid = Uuid.random(),
+                        uri = "test://photo/$index",
+                        timestamp = baseTs + index.hours,
+                        caption = null,
+                    )
+                }
+            val output = strategyFor(screenshotPhoto(), includeScreenshots = true).produce(inputWith(media))
+            val imagePanels = output.content.filterIsInstance<RewindContent.Image>()
+
+            assertTrue(imagePanels.isNotEmpty())
+            assertTrue(imagePanels.size <= 20)
+            assertTrue(
+                imagePanels.all { panel -> media.any { it.uid == panel.sourceId && it.uri == panel.uri } },
+            )
+            assertTrue(imagePanels.all { it.significanceScore != null })
         }
 
     private fun screenshotPhoto(): IndexedMedia.Image =
@@ -100,12 +145,17 @@ class LocalRewindStrategyTest {
         )
     }
 
-    private fun inputWith(screenshot: IndexedMedia.Image): RewindInput =
+    private fun inputWith(screenshot: IndexedMedia.Image): RewindInput = inputWith(listOf(screenshot))
+
+    private fun inputWith(
+        media: List<IndexedMedia>,
+        textEntries: List<JournalNote.Text> = emptyList(),
+    ): RewindInput =
         RewindInput(
             periodStart = baseTs,
             periodEnd = Instant.fromEpochMilliseconds(baseTs.toEpochMilliseconds() + 7L * 24L * 60L * 60L * 1000L),
-            textEntries = emptyList(),
-            media = listOf(screenshot),
+            textEntries = textEntries,
+            media = media,
             people = emptyList(),
             locationHistory = emptyList(),
             weekId = "2026-W18",

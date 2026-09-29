@@ -79,6 +79,7 @@ sealed interface RewindOverviewScreenUiState {
          * that their rewind is being processed.
          */
         val isGeneratingRewind: Boolean = false,
+        val generationFailed: Boolean = false,
     ) : RewindOverviewScreenUiState
 
     /**

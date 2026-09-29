@@ -19,28 +19,28 @@ package app.logdate.client.datastore.featureflags
 enum class FeatureFlag(
     val key: String,
     val defaultEnabled: Boolean,
+    val availableForLaunch: Boolean = true,
 ) {
     /**
      * The media Library browsing experience.
      *
-     * Off by default: Library is still behind the launch bar for search and error handling.
+     * On by default for the first public Android release.
      */
-    LIBRARY(key = "library_enabled", defaultEnabled = false),
+    LIBRARY(key = "library_enabled", defaultEnabled = true),
 
     /**
      * Automatic event detection and the Events surface.
      *
-     * On by default: noticing things automatically is the point of the feature, so it would be
-     * odd to make someone opt in to discover it. The auto-events settings screen turns it off.
+     * Deferred from the first public Android release, including for previously enabled devices.
      */
-    EVENTS(key = "events_enabled", defaultEnabled = true),
+    EVENTS(key = "events_enabled", defaultEnabled = false, availableForLaunch = false),
 
     /**
      * The People slice.
      *
-     * On by default: intended to ship as a headline capability rather than a hidden lab feature.
+     * Deferred from the first public Android release, including for previously enabled devices.
      */
-    PEOPLE(key = "people_enabled", defaultEnabled = true),
+    PEOPLE(key = "people_enabled", defaultEnabled = false, availableForLaunch = false),
 
     /**
      * The forgiving campfire streak that replaces the consecutive-day counter.

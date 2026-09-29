@@ -21,6 +21,7 @@ import app.logdate.feature.rewind.ui.detail.RewindShareRequest
 import app.logdate.feature.rewind.ui.detail.RewindShareVisual
 import app.logdate.feature.rewind.ui.detail.RewindStatsShareRequest
 import app.logdate.feature.rewind.ui.detail.qualifiesForMapPanel
+import app.logdate.feature.rewind.ui.detail.toVideoFramePanel
 import app.logdate.shared.model.MapPoint
 import app.logdate.shared.model.ReflectionPrompt
 import app.logdate.shared.model.ReflectionPromptKey
@@ -442,14 +443,7 @@ class RewindDetailViewModel(
                     }
 
                     is RewindContent.Video -> {
-                        // For now, treat videos like images - video playback support can be added later
-                        ImageRewindPanelUiState(
-                            sourceId = content.sourceId,
-                            timestamp = content.timestamp,
-                            imageUri = content.uri,
-                            caption = content.caption,
-                            dateFormatted = formatTimestamp(content.timestamp),
-                        )
+                        content.toVideoFramePanel(formatTimestamp(content.timestamp))
                     }
 
                     is RewindContent.AudioNote -> {

@@ -115,6 +115,11 @@
 
     <!-- Recovery phrase -->
     <string name="recovery_phrase_title">Recovery phrase</string>
+    <string name="recovery_phrase_verify_action">Verify recovery phrase</string>
+    <string name="recovery_phrase_verify_prompt">Put the phrase away, then enter its 12 words in order to enable Cloud backup.</string>
+    <string name="recovery_phrase_verify_label">Recovery phrase</string>
+    <string name="recovery_phrase_verify_failed">Those words did not match this journal. Reveal the phrase and try again.</string>
+    <string name="recovery_phrase_verified">Recovery setup complete. Cloud backup can now run.</string>
     <string name="recovery_phrase_intro">These 12 words unlock your synced journal on a new device. Anyone who has them can read it, so keep them somewhere private, like a password manager.</string>
     <string name="recovery_phrase_show">Show recovery phrase</string>
     <string name="recovery_phrase_hide">Hide recovery phrase</string>
@@ -373,4 +378,7 @@
     <string name="account_adopt_local_data_title">Keep what's already here?</string>
     <string name="account_adopt_local_data_body">This device has entries that aren't in any account yet. Signing in adds them to your account and syncs them to your other devices.</string>
     <string name="account_adopt_local_data_confirm">Sign in and keep them</string>
+    <string name="profile_bio_label">About me</string>
+    <string name="profile_bio_not_set">Add a few words about yourself</string>
+    <string name="edit_bio">Edit about me</string>
 </resources>

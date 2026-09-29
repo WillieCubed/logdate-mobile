@@ -40,6 +40,7 @@ class PostgreSQLSessionManager : SessionManager {
                     it[username] = session.username
                     it[displayName] = session.displayName
                     it[bio] = session.bio
+                    it[originalBio] = session.originalBio
                     it[deviceInfo] = session.deviceInfo?.toString()
                     it[createdAt] = session.createdAt
                     it[expiresAt] = session.expiresAt
@@ -113,6 +114,7 @@ class PostgreSQLSessionManager : SessionManager {
         challenge: String,
         deviceInfo: DeviceInfo?,
         bio: String?,
+        originalBio: String?,
     ): TemporarySession {
         val sessionId = generateSessionId()
         val resolvedUserId = temporaryUserId ?: Uuid.random()
@@ -126,6 +128,7 @@ class PostgreSQLSessionManager : SessionManager {
                 username = username,
                 displayName = displayName,
                 bio = bio,
+                originalBio = originalBio,
                 deviceInfo = deviceInfo,
                 sessionType = SessionType.ACCOUNT_CREATION,
                 createdAt = now,
@@ -198,6 +201,7 @@ class PostgreSQLSessionManager : SessionManager {
             username = this[SessionsTable.username] ?: "",
             displayName = this[SessionsTable.displayName] ?: "",
             bio = this[SessionsTable.bio],
+            originalBio = this[SessionsTable.originalBio],
             deviceInfo =
                 this[SessionsTable.deviceInfo]?.let {
                     // Parse device info JSON if needed

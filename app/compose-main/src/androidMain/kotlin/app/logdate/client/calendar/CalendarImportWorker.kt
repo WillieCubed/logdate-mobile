@@ -33,7 +33,7 @@ class CalendarImportWorker(
     override suspend fun doWork(): Result {
         Napier.d(tag = TAG, message = "Starting device calendar import pass")
 
-        if (!preferences.isDeviceCalendarSyncEnabled()) {
+        if (!preferences.isEventsEnabled() || !preferences.isDeviceCalendarSyncEnabled()) {
             Napier.d(tag = TAG, message = "Device calendar sync disabled, skipping run")
             return Result.success()
         }

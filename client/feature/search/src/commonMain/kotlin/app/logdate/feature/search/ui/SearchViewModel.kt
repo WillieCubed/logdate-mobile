@@ -52,7 +52,9 @@ class SearchViewModel(
                 if (settledQuery.isBlank) {
                     flowOf(SearchResultSnapshot(settledQuery, emptyList()))
                 } else {
-                    universalSearchUseCase(flowOf(settledQuery), filters).map { results ->
+                    val launchFilters =
+                        filters.copy(contentTypes = filters.contentTypes ?: launchSearchContentTypes)
+                    universalSearchUseCase(flowOf(settledQuery), launchFilters).map { results ->
                         SearchResultSnapshot(settledQuery, results)
                     }
                 }
@@ -104,10 +106,10 @@ class SearchViewModel(
     }
 
     /**
-     * Toggles a content-type filter chip. The empty selection (all 10 types unselected) is
-     * normalized to `null` so the search use case treats it as "no type restriction".
+     * Toggles a launch content-type filter chip. An empty selection restores the launch scope.
      */
     fun toggleContentType(type: SearchContentType) {
+        if (type !in launchSearchContentTypes) return
         filtersState.update { current ->
             val active = current.contentTypes ?: emptySet()
             val next = if (type in active) active - type else active + type

@@ -2,6 +2,7 @@ package app.logdate.feature.core.di
 
 import android.app.Activity
 import app.logdate.client.device.crypto.IdentityKeyManager
+import app.logdate.client.device.crypto.KeyDerivation
 import app.logdate.client.domain.account.EmailVerificationAvailability
 import app.logdate.client.domain.account.EnqueueAllLocalDataUseCase
 import app.logdate.client.domain.account.VerifyEmailUseCase
@@ -18,6 +19,8 @@ import app.logdate.feature.core.BiometricGatekeeper
 import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.feature.core.export.AndroidExportLauncher
 import app.logdate.feature.core.export.AndroidMediaSourceOpener
+import app.logdate.feature.core.export.CloudArchiveCipher
+import app.logdate.feature.core.export.CloudBackupScheduler
 import app.logdate.feature.core.export.ExportLauncher
 import app.logdate.feature.core.export.ExportWorker
 import app.logdate.feature.core.export.UserDataExportViewModel
@@ -46,6 +49,8 @@ import app.logdate.feature.core.settings.account.move.ServerMoveStore
 import app.logdate.feature.core.settings.account.recovery.RecoveryPhraseViewModel
 import app.logdate.feature.core.settings.account.signin.SignInMethodsViewModel
 import app.logdate.feature.core.settings.ui.AdvancedSettingsViewModel
+import app.logdate.feature.core.settings.ui.AndroidCloudArchiveStatusSource
+import app.logdate.feature.core.settings.ui.CloudArchiveStatusSource
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
 import app.logdate.feature.core.settings.ui.DataSettingsViewModel
 import app.logdate.feature.core.settings.ui.DayBoundarySettingsViewModel
@@ -94,7 +99,17 @@ actual val coreFeatureModule: Module =
 
         // Single instance exposed as both concrete type and interface
         single<MediaSourceOpener> { AndroidMediaSourceOpener(androidContext()) }
+        single {
+            val identity = get<IdentityKeyManager>()
+            val derivation = get<KeyDerivation>()
+            CloudArchiveCipher {
+                derivation.deriveKey(identity.getIdentityKey(), "cloud_archive", "cloud_archive_v1")
+            }
+        }
         single { AndroidExportLauncher(androidContext()) }
+        single<CloudArchiveStatusSource> {
+            AndroidCloudArchiveStatusSource(androidContext(), get(), get(), get())
+        }
         single<ExportLauncher> { get<AndroidExportLauncher>() }
         workerOf(::ExportWorker)
         single { AndroidRestoreLauncher(androidContext()) }
@@ -120,6 +135,9 @@ actual val coreFeatureModule: Module =
             RecoveryPhraseViewModel(
                 gatekeeper = get(),
                 loadPhrase = { get<IdentityKeyManager>().getStoredRecoveryPhrase()?.words },
+                confirmPhrase = { get<IdentityKeyManager>().verifyRecoveryPhrase(it) },
+                isPhraseVerified = { get<IdentityKeyManager>().isRecoveryPhraseVerified() },
+                onVerified = { get<CloudBackupScheduler>().enqueueImmediateBackup() },
             )
         }
         viewModel {
@@ -176,10 +194,14 @@ actual val coreFeatureModule: Module =
             )
         }
         viewModel {
-            RecoveryPhraseEntryViewModel(get())
+            RecoveryPhraseEntryViewModel(
+                recoverIdentityUseCase = get(),
+                onRecoverySuccess = { get<CloudRestoreScheduler>().enqueueRestore() },
+            )
         }
         viewModel {
             DataSettingsViewModel(
+                get(),
                 get(),
                 get(),
                 get(),

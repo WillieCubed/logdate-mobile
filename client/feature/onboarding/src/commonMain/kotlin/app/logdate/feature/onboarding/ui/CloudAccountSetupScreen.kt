@@ -5,13 +5,8 @@
 
 package app.logdate.feature.onboarding.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material3.Button
@@ -27,7 +22,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -36,7 +30,6 @@ import app.logdate.feature.core.account.CloudAccountOnboardingViewModel
 import app.logdate.ui.step.StepHeroIcon
 import app.logdate.ui.step.StepScaffold
 import app.logdate.ui.theme.LogDateTheme
-import app.logdate.ui.theme.Spacing
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.ui.generated.resources.common_continue
@@ -93,10 +86,6 @@ fun CloudAccountSetupScreen(
     )
 }
 
-/**
- * The plans are shown as information, not as choices: nothing downstream reads a selection here,
- * so presenting them as tappable cards promised a choice that did nothing.
- */
 @Composable
 fun CloudAccountSetupContent(
     onBack: () -> Unit,
@@ -142,50 +131,11 @@ fun CloudAccountSetupContent(
             )
         },
     ) {
-        PlanSummary(
-            title = stringResource(Res.string.onboarding_plan_basic_title),
-            price = stringResource(Res.string.onboarding_plan_basic_price),
-            description = stringResource(Res.string.onboarding_plan_basic_description),
-        )
-        PlanSummary(
-            title = stringResource(Res.string.onboarding_plan_standard_title),
-            price = stringResource(Res.string.onboarding_plan_standard_price),
-            description = stringResource(Res.string.onboarding_plan_standard_description),
-        )
-    }
-}
-
-@Composable
-private fun PlanSummary(
-    title: String,
-    price: String,
-    description: String,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(MaterialTheme.shapes.large)
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                .padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(text = title, style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = price,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
         Text(
-            text = description,
+            text = stringResource(Res.string.onboarding_free_cloud_explanation),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
     }
 }

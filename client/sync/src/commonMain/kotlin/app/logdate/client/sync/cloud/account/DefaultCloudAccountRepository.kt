@@ -53,6 +53,8 @@ class DefaultCloudAccountRepository(
         const val ACCOUNT_ID = "cloud_account_id"
         const val ACCOUNT_USERNAME = "cloud_username"
         const val ACCOUNT_DISPLAY_NAME = "cloud_display_name"
+        const val ACCOUNT_BIO = "cloud_account_bio"
+        const val ACCOUNT_ORIGINAL_BIO = "cloud_account_original_bio"
         const val ACCOUNT_DID = "cloud_account_did"
         const val ACCOUNT_HANDLE = "cloud_account_handle"
         const val USER_ID = "cloud_user_id"
@@ -91,6 +93,8 @@ class DefaultCloudAccountRepository(
             val accountId = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_ID, backendUrl))
             val username = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_USERNAME, backendUrl))
             val displayName = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_DISPLAY_NAME, backendUrl))
+            val bio = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_BIO, backendUrl))
+            val originalBio = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_ORIGINAL_BIO, backendUrl))
             val did = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_DID, backendUrl))
             val handle = secureStorage.getString(scopedKey(StorageKeys.ACCOUNT_HANDLE, backendUrl))
             val userIdString = secureStorage.getString(scopedKey(StorageKeys.USER_ID, backendUrl))
@@ -121,6 +125,8 @@ class DefaultCloudAccountRepository(
                         id = Uuid.parse(accountId),
                         username = username,
                         displayName = displayName,
+                        bio = bio,
+                        originalBio = originalBio,
                         did = did,
                         handle = handle,
                         userId = userId,
@@ -248,6 +254,8 @@ class DefaultCloudAccountRepository(
                             id = accountDto.id,
                             username = accountDto.username,
                             displayName = accountDto.displayName,
+                            bio = accountDto.bio,
+                            originalBio = accountDto.originalBio,
                             did = accountDto.did,
                             handle = accountDto.handle,
                             userId = accountDto.id,
@@ -334,6 +342,8 @@ class DefaultCloudAccountRepository(
             secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_ID, backendUrl))
             secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_USERNAME, backendUrl))
             secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_DISPLAY_NAME, backendUrl))
+            secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_BIO, backendUrl))
+            secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_ORIGINAL_BIO, backendUrl))
             secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_DID, backendUrl))
             secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_HANDLE, backendUrl))
             secureStorage.remove(scopedKey(StorageKeys.USER_ID, backendUrl))
@@ -415,6 +425,10 @@ class DefaultCloudAccountRepository(
         secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_ID, backendUrl), account.id.toString())
         secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_USERNAME, backendUrl), account.username)
         secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_DISPLAY_NAME, backendUrl), account.displayName)
+        account.bio?.let { secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_BIO, backendUrl), it) }
+            ?: secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_BIO, backendUrl))
+        account.originalBio?.let { secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_ORIGINAL_BIO, backendUrl), it) }
+            ?: secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_ORIGINAL_BIO, backendUrl))
         account.did?.let { secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_DID, backendUrl), it) }
             ?: secureStorage.remove(scopedKey(StorageKeys.ACCOUNT_DID, backendUrl))
         account.handle?.let { secureStorage.putString(scopedKey(StorageKeys.ACCOUNT_HANDLE, backendUrl), it) }
@@ -458,6 +472,14 @@ class DefaultCloudAccountRepository(
             destinationKey = scopedKey(StorageKeys.ACCOUNT_DISPLAY_NAME, backendUrl),
         )
         copyLegacyValue(
+            sourceKey = StorageKeys.ACCOUNT_BIO,
+            destinationKey = scopedKey(StorageKeys.ACCOUNT_BIO, backendUrl),
+        )
+        copyLegacyValue(
+            sourceKey = StorageKeys.ACCOUNT_ORIGINAL_BIO,
+            destinationKey = scopedKey(StorageKeys.ACCOUNT_ORIGINAL_BIO, backendUrl),
+        )
+        copyLegacyValue(
             sourceKey = StorageKeys.ACCOUNT_DID,
             destinationKey = scopedKey(StorageKeys.ACCOUNT_DID, backendUrl),
         )
@@ -488,6 +510,8 @@ class DefaultCloudAccountRepository(
             StorageKeys.ACCOUNT_ID,
             StorageKeys.ACCOUNT_USERNAME,
             StorageKeys.ACCOUNT_DISPLAY_NAME,
+            StorageKeys.ACCOUNT_BIO,
+            StorageKeys.ACCOUNT_ORIGINAL_BIO,
             StorageKeys.ACCOUNT_DID,
             StorageKeys.ACCOUNT_HANDLE,
             StorageKeys.USER_ID,

@@ -83,12 +83,12 @@ class GetRewindUseCase(
                                 }
                                 is GenerateBasicRewindResult.Error -> {
                                     Napier.e("Failed to generate rewind: ${result.error}", result.exception)
-                                    send(RewindQueryResult.NoneAvailable)
+                                    send(RewindQueryResult.Failed)
                                 }
                             }
                         } catch (e: Exception) {
                             Napier.e("Error during background rewind generation", e)
-                            send(RewindQueryResult.NoneAvailable)
+                            send(RewindQueryResult.Failed)
                         }
                     }
                 }

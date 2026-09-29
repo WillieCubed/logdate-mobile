@@ -75,6 +75,7 @@ class DynamicShortcutRefreshObserver(
                 RewindQueryResult.NotReady -> RewindShortcutSnapshot(state = "not_ready")
                 RewindQueryResult.Generating -> RewindShortcutSnapshot(state = "generating")
                 RewindQueryResult.NoneAvailable -> RewindShortcutSnapshot(state = "none")
+                RewindQueryResult.Failed -> RewindShortcutSnapshot(state = "failed")
             }
         }
 

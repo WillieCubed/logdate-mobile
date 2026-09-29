@@ -63,6 +63,7 @@ data class ProfileDisplayModel(
     // Local profile data (always available)
     val displayName: String,
     val birthday: Instant?,
+    val editableBio: String? = null,
     val hasProfilePhoto: Boolean = false,
     val profileCreatedAt: Instant,
     // Cloud account data (progressive enhancement when connected)
@@ -89,6 +90,7 @@ fun createProfileDisplayModel(
         // Local profile data (always available)
         displayName = localProfile.displayName.ifEmpty { account?.displayName ?: "" },
         birthday = localProfile.birthday ?: userData?.birthday?.takeIf { it != Instant.DISTANT_PAST },
+        editableBio = localProfile.originalBio ?: localProfile.bio ?: account?.originalBio ?: account?.bio,
         hasProfilePhoto = !localProfile.profilePhotoUri.isNullOrEmpty(),
         profileCreatedAt = localProfile.createdAt,
         // Cloud account data (progressive enhancement)

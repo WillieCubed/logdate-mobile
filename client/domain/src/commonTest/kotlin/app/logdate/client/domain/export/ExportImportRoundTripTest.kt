@@ -44,6 +44,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -287,6 +288,9 @@ class ExportImportRoundTripTest {
             exportThenImport()
 
             assertEquals("Willie", destProfileRepo.profile.displayName)
+            assertEquals(Instant.parse("1992-06-03T00:00:00Z"), destProfileRepo.profile.birthday)
+            assertEquals("Keeps travel journals", destProfileRepo.profile.bio)
+            assertEquals("I remember every trip", destProfileRepo.profile.originalBio)
             assertEquals(1, destPlacesRepo.places.size)
             assertEquals("Home Base", (destPlacesRepo.places.first() as Place.UserDefined).displayName)
             assertEquals(1, destLocationHistoryRepo.entries.size)
@@ -573,6 +577,8 @@ class ExportImportRoundTripTest {
             LogDateProfile(
                 displayName = "Willie",
                 bio = "Keeps travel journals",
+                originalBio = "I remember every trip",
+                birthday = Instant.parse("1992-06-03T00:00:00Z"),
                 createdAt = now - 30.days,
                 lastUpdatedAt = now - 1.days,
             )

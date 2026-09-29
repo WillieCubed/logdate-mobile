@@ -116,6 +116,28 @@ class MediaDetailViewModelTest {
         }
 
     @Test
+    fun `unknown media id does not open an unrelated image`() =
+        runTest(testDispatcher) {
+            val known = IndexedMedia.Image(Uuid.random(), "content://media/known", Instant.fromEpochMilliseconds(1710000000000))
+            indexedMediaRepository.setMedia(listOf(known))
+            val viewModel =
+                MediaDetailViewModel(
+                    Uuid.random(),
+                    FakeJournalNotesRepository(emptyList()),
+                    contentRepository,
+                    indexedMediaRepository,
+                    resolveLocationUseCase,
+                    remoteDisplayManager,
+                )
+
+            val collectJob = launch { viewModel.uiState.collect {} }
+            advanceUntilIdle()
+
+            assertIs<MediaDetailUiState.Error>(viewModel.uiState.value)
+            collectJob.cancel()
+        }
+
+    @Test
     fun `indexed image produces image content without matching note`() =
         runTest(testDispatcher) {
             val mediaId = Uuid.random()
@@ -180,6 +202,41 @@ class MediaDetailViewModelTest {
             assertIs<MediaDetailUiState.ImageContent>(state)
             assertEquals(noteId, state.mediaId)
             assertEquals("content://media/external/images/note-only", state.mediaRef)
+            collectJob.cancel()
+        }
+
+    @Test
+    fun `caption search note id opens its indexed image instead of the first image`() =
+        runTest(testDispatcher) {
+            val timestamp = Instant.fromEpochMilliseconds(1710000000000)
+            val first = IndexedMedia.Image(Uuid.random(), "content://media/first", timestamp)
+            val target = IndexedMedia.Image(Uuid.random(), "content://media/target", timestamp)
+            val targetNote =
+                JournalNote.Image(
+                    creationTimestamp = timestamp,
+                    lastUpdated = timestamp,
+                    mediaRef = target.uri,
+                    caption = "Find me",
+                )
+            indexedMediaRepository.setMedia(listOf(first, target))
+            val viewModel =
+                MediaDetailViewModel(
+                    targetNote.uid,
+                    FakeJournalNotesRepository(listOf(targetNote)),
+                    contentRepository,
+                    indexedMediaRepository,
+                    resolveLocationUseCase,
+                    remoteDisplayManager,
+                )
+
+            val collectJob = launch { viewModel.uiState.collect {} }
+            advanceUntilIdle()
+
+            val state = assertIs<MediaDetailUiState.ImageContent>(viewModel.uiState.value)
+            assertEquals(target.uri, state.mediaRef)
+            assertEquals(target.uid, state.mediaId)
+            val viewer = viewModel.viewerState.value
+            assertEquals(target.uid, viewer.mediaItems[viewer.currentIndex].uid)
             collectJob.cancel()
         }
 

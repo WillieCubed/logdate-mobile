@@ -46,6 +46,9 @@ data class RewindHistoryUiState(
     val dominantActivity: ActivityType? = null,
 )
 
+fun List<RewindHistoryUiState>.forWeeklyLaunch(): List<RewindHistoryUiState> =
+    filterNot { rewind -> rewind.label.length == 4 && rewind.label.all(Char::isDigit) }
+
 /**
  * Optional milestone marker rendered on a past-rewind card.
  *

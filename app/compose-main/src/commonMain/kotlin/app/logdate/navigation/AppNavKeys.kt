@@ -62,6 +62,8 @@ import app.logdate.feature.onboarding.navigation.FeatureDayBoundaries
 import app.logdate.feature.onboarding.navigation.FeatureLocationTimeline
 import app.logdate.feature.onboarding.navigation.FeatureNotifications
 import app.logdate.feature.onboarding.navigation.FeatureRecommendations
+import app.logdate.feature.onboarding.navigation.FirstEntryImportOffer
+import app.logdate.feature.onboarding.navigation.FirstEntryMemorySelection
 import app.logdate.feature.onboarding.navigation.MemoryImport
 import app.logdate.feature.onboarding.navigation.MemorySelection
 import app.logdate.feature.onboarding.navigation.OnboardingComplete
@@ -116,6 +118,8 @@ val appNavSavedStateConfiguration: SavedStateConfiguration =
                     subclass(FeatureLocationTimeline::class, FeatureLocationTimeline.serializer())
                     subclass(FeatureNotifications::class, FeatureNotifications.serializer())
                     subclass(OnboardingComplete::class, OnboardingComplete.serializer())
+                    subclass(FirstEntryImportOffer::class, FirstEntryImportOffer.serializer())
+                    subclass(FirstEntryMemorySelection::class, FirstEntryMemorySelection.serializer())
                     subclass(WelcomeBack::class, WelcomeBack.serializer())
 
                     // Settings

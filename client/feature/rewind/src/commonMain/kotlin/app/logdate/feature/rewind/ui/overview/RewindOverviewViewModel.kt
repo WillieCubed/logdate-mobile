@@ -78,57 +78,59 @@ class RewindOverviewViewModel(
 ) : ViewModel() {
     // Tracks whether a rewind generation is in progress
     private val isGeneratingRewindState = MutableStateFlow(false)
+    private val generationFailedState = MutableStateFlow(false)
 
     private val pastRewinds: StateFlow<List<RewindHistoryUiState>> =
         getPastRewindsUseCase()
             .map { pastRewinds ->
-                pastRewinds.map { rewind ->
-                    val milestoneSignal = parseMilestoneSignal(rewind.metadata?.milestones?.firstOrNull())
-                    val photoCount = rewind.content.count { it is RewindContent.Image }
-                    val textCount = rewind.content.count { it is RewindContent.TextNote }
-                    val audioCount = rewind.content.count { it is RewindContent.AudioNote }
-                    val peopleCount = rewind.metadata?.peopleHighlighted?.size ?: 0
-                    val primaryLocation = rewind.metadata?.locationSummary?.primaryLocation
-                    val themes =
-                        rewind.metadata
-                            ?.detectedActivities
-                            ?.map { it.name }
-                            .orEmpty()
-                    RewindHistoryUiState(
-                        uid = rewind.uid,
-                        title = rewind.title,
-                        label = rewind.label,
-                        startDate = rewind.startDate.toLocalDateTime(TimeZone.currentSystemDefault()).date,
-                        endDate = rewind.endDate.toLocalDateTime(TimeZone.currentSystemDefault()).date,
-                        message =
-                            rewindMessageGenerator.generateContextualMessage(
-                                rewindAvailable = true,
-                                photoCount = photoCount,
-                                textCount = textCount,
-                                peopleCount = peopleCount,
-                                themes = themes,
-                            ),
-                        isViewed = rewind.isViewed,
-                        entryCount = textCount,
-                        photoCount = photoCount,
-                        audioCount = audioCount,
-                        peopleCount = peopleCount,
-                        primaryLocation = primaryLocation,
-                        milestone =
-                            milestoneSignal?.let {
-                                MilestoneSummaryUiState(
-                                    kind =
-                                        when (it.kind) {
-                                            MilestoneKind.LOCATION_CHANGE -> MilestoneKindUiState.LOCATION_CHANGE
-                                        },
-                                    summary = it.summary,
-                                )
-                            },
-                        heroImageUri = rewind.heroImageUri(),
-                        highlightedQuote = rewind.highlightedQuote(),
-                        dominantActivity = rewind.metadata?.detectedActivities?.firstOrNull(),
-                    )
-                }
+                pastRewinds
+                    .map { rewind ->
+                        val milestoneSignal = parseMilestoneSignal(rewind.metadata?.milestones?.firstOrNull())
+                        val photoCount = rewind.content.count { it is RewindContent.Image }
+                        val textCount = rewind.content.count { it is RewindContent.TextNote }
+                        val audioCount = rewind.content.count { it is RewindContent.AudioNote }
+                        val peopleCount = rewind.metadata?.peopleHighlighted?.size ?: 0
+                        val primaryLocation = rewind.metadata?.locationSummary?.primaryLocation
+                        val themes =
+                            rewind.metadata
+                                ?.detectedActivities
+                                ?.map { it.name }
+                                .orEmpty()
+                        RewindHistoryUiState(
+                            uid = rewind.uid,
+                            title = rewind.title,
+                            label = rewind.label,
+                            startDate = rewind.startDate.toLocalDateTime(TimeZone.currentSystemDefault()).date,
+                            endDate = rewind.endDate.toLocalDateTime(TimeZone.currentSystemDefault()).date,
+                            message =
+                                rewindMessageGenerator.generateContextualMessage(
+                                    rewindAvailable = true,
+                                    photoCount = photoCount,
+                                    textCount = textCount,
+                                    peopleCount = peopleCount,
+                                    themes = themes,
+                                ),
+                            isViewed = rewind.isViewed,
+                            entryCount = textCount,
+                            photoCount = photoCount,
+                            audioCount = audioCount,
+                            peopleCount = peopleCount,
+                            primaryLocation = primaryLocation,
+                            milestone =
+                                milestoneSignal?.let {
+                                    MilestoneSummaryUiState(
+                                        kind =
+                                            when (it.kind) {
+                                                MilestoneKind.LOCATION_CHANGE -> MilestoneKindUiState.LOCATION_CHANGE
+                                            },
+                                        summary = it.summary,
+                                    )
+                                },
+                            heroImageUri = rewind.heroImageUri(),
+                            highlightedQuote = rewind.highlightedQuote(),
+                            dominantActivity = rewind.metadata?.detectedActivities?.firstOrNull(),
+                        )
+                    }.forWeeklyLaunch()
             }.stateIn(
                 viewModelScope,
                 started = SharingStarted.WhileSubscribed(),
@@ -140,9 +142,11 @@ class RewindOverviewViewModel(
             getWeekRewindUseCase(),
             pastRewinds,
             isGeneratingRewindState,
-        ) { rewindResult, pastRewinds, isGenerating ->
+            generationFailedState,
+        ) { rewindResult, pastRewinds, isGenerating, generationFailed ->
             when (rewindResult) {
                 is RewindQueryResult.Success -> {
+                    generationFailedState.value = false
                     val rewind = rewindResult.rewind
                     val photoCount = rewind.content.count { it is RewindContent.Image }
                     val textCount = rewind.content.count { it is RewindContent.TextNote }
@@ -213,6 +217,15 @@ class RewindOverviewViewModel(
                     RewindOverviewScreenUiState.NotReady(
                         pastRewinds = pastRewinds,
                         isGeneratingRewind = false,
+                        generationFailed = generationFailed,
+                    )
+                }
+
+                RewindQueryResult.Failed -> {
+                    RewindOverviewScreenUiState.NotReady(
+                        pastRewinds = pastRewinds,
+                        isGeneratingRewind = isGenerating,
+                        generationFailed = !isGenerating,
                     )
                 }
             }
@@ -250,6 +263,7 @@ class RewindOverviewViewModel(
 
         viewModelScope.launch {
             isGeneratingRewindState.update { true }
+            generationFailedState.value = false
             lastGenerationAttempt = Clock.System.now()
 
             try {
@@ -271,6 +285,7 @@ class RewindOverviewViewModel(
                 when (val result = generateBasicRewindUseCase(startTime, endTime)) {
                     is GenerateBasicRewindResult.Success -> {
                         Napier.i("Successfully generated rewind: ${result.rewind.uid}")
+                        generationFailedState.value = false
                     }
                     is GenerateBasicRewindResult.AlreadyInProgress -> {
                         Napier.d("Rewind generation already in progress")
@@ -280,10 +295,12 @@ class RewindOverviewViewModel(
                     }
                     is GenerateBasicRewindResult.Error -> {
                         Napier.e("Failed to generate rewind: ${result.error}", result.exception)
+                        generationFailedState.value = true
                     }
                 }
             } catch (e: Exception) {
                 Napier.e("Error generating rewind", e)
+                generationFailedState.value = true
             } finally {
                 // Mark as no longer generating
                 isGeneratingRewindState.update { false }

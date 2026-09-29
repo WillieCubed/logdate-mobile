@@ -41,9 +41,8 @@ import kotlinx.coroutines.delay
 import logdate.client.feature.onboarding.generated.resources.*
 import logdate.client.feature.onboarding.generated.resources.Res
 import logdate.client.feature.onboarding.generated.resources.onboarding_action_sign_in
-import logdate.client.ui.generated.resources.common_get_started
+import logdate.client.feature.onboarding.generated.resources.onboarding_start_write_entry
 import org.jetbrains.compose.resources.stringResource
-import logdate.client.ui.generated.resources.Res as UiRes
 
 private const val DELAY_TIME = 1_000L
 const val ONBOARDING_START_ROOT_TAG = "onboarding_start_root"
@@ -60,19 +59,13 @@ fun OnboardingStartScreen(
     modifier: Modifier = Modifier,
     useLargerTextSizes: Boolean = false,
 ) {
-    var shouldShowMain by remember { mutableStateOf(false) }
-
-    LaunchedEffect(shouldShowMain) {
-        delay(DELAY_TIME * 3)
-        shouldShowMain = true
-    }
-
     OnboardingStartScreenContent(
-        showLanding = shouldShowMain,
+        showLanding = true,
         onGetStarted = onNext,
         onSignIn = onSignIn,
         modifier = modifier,
         useLargerTextSizes = useLargerTextSizes,
+        animateContent = false,
     )
 }
 
@@ -295,7 +288,7 @@ private fun OnboardingLandingActions(
                         contentDescription = ONBOARDING_START_GET_STARTED_TAG
                     },
         ) {
-            Text(stringResource(UiRes.string.common_get_started))
+            Text(stringResource(Res.string.onboarding_start_write_entry))
         }
         OutlinedButton(
             onClick = onSignIn,

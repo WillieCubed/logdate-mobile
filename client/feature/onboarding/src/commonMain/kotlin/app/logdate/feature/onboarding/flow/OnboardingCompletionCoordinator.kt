@@ -35,10 +35,6 @@ class OnboardingCompletionCoordinator(
      * recreation would send them back into onboarding.
      */
     suspend fun finishOnboarding(): OnboardingFinishResult {
-        currentProgressSnapshot().firstIncompleteRequiredOnboardingStep()?.let { step ->
-            return OnboardingFinishResult.IncompleteStep(step)
-        }
-
         runCatching { userStateRepository.setIsOnboardingComplete(true) }
             .onFailure { error ->
                 Napier.e("Failed to save onboarding completion", error)

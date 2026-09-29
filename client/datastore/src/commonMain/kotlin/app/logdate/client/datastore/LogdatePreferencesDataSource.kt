@@ -7,6 +7,8 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.shared.model.profile.asBirthdayDateInstant
 import app.logdate.shared.model.user.AppSecurityLevel
 import app.logdate.shared.model.user.UserData
 import io.github.aakira.napier.Napier
@@ -24,6 +26,7 @@ private const val DEFAULT_PEOPLE_CONTACTS_ACCESS_MODE = "NONE"
  */
 class LogdatePreferencesDataSource(
     private val userPreferences: DataStore<Preferences>,
+    private val featureAvailable: (FeatureFlag) -> Boolean = { it.availableForLaunch },
 ) {
     // TODO: Migrate to datastore-proto
     companion object {
@@ -96,7 +99,9 @@ class LogdatePreferencesDataSource(
             Napier.d("Read birthday from preferences: $birthdayMillis")
 
             UserData(
-                birthday = millisToInstantOrDistantPast(birthdayMillis),
+                birthday =
+                    millisToInstantOrDistantPast(birthdayMillis).takeUnless { it == Instant.DISTANT_PAST }?.asBirthdayDateInstant()
+                        ?: Instant.DISTANT_PAST,
                 isOnboarded = prefs[IS_ONBOARDED] == true,
                 onboardedDate = millisToInstantOrDistantPast(prefs[ONBOARDED_TIMESTAMP]),
                 securityLevel =
@@ -119,7 +124,7 @@ class LogdatePreferencesDataSource(
      */
     fun observeLibraryEnabled(): Flow<Boolean> =
         userPreferences.data.map { prefs ->
-            prefs[LIBRARY_ENABLED] ?: false
+            prefs[LIBRARY_ENABLED] ?: FeatureFlag.LIBRARY.defaultEnabled
         }
 
     fun observeSystemSearchVisibilityEnabled(): Flow<Boolean> =
@@ -148,10 +153,8 @@ class LogdatePreferencesDataSource(
      */
     fun observeEventsEnabled(): Flow<Boolean> =
         userPreferences.data.map { prefs ->
-            // Default to on. Auto-events is the headline behavior of the feature; users
-            // shouldn't have to opt in to discover that LogDate is noticing things for
-            // them. They can still turn it off from the auto-events settings screen.
-            prefs[EVENTS_ENABLED] ?: true
+            featureAvailable(FeatureFlag.EVENTS) &&
+                (prefs[EVENTS_ENABLED] ?: FeatureFlag.EVENTS.defaultEnabled)
         }
 
     suspend fun isEventsEnabled(): Boolean = observeEventsEnabled().first()
@@ -170,12 +173,12 @@ class LogdatePreferencesDataSource(
     /**
      * Observes whether the People slice is enabled for this installation.
      *
-     * This now defaults to on because the Android-first People experience is intended to ship as
-     * a headline capability rather than a hidden lab feature.
+     * The People experience remains unavailable for the first public Android release.
      */
     fun observePeopleEnabled(): Flow<Boolean> =
         userPreferences.data.map { prefs ->
-            prefs[PEOPLE_ENABLED] ?: true
+            featureAvailable(FeatureFlag.PEOPLE) &&
+                (prefs[PEOPLE_ENABLED] ?: FeatureFlag.PEOPLE.defaultEnabled)
         }
 
     suspend fun setPeopleEnabled(enabled: Boolean) {
@@ -298,7 +301,7 @@ class LogdatePreferencesDataSource(
                 if (birthday == Instant.DISTANT_PAST) {
                     0L
                 } else {
-                    birthday.toEpochMilliseconds()
+                    birthday.asBirthdayDateInstant().toEpochMilliseconds()
                 }
             Napier.d("Birthday in milliseconds: $millisValue")
 

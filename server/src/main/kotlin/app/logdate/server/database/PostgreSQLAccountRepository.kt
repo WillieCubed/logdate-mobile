@@ -36,6 +36,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[emailVerified] = account.emailVerified
                     it[emailVerifiedAt] = account.emailVerifiedAt
                     it[bio] = account.bio
+                    it[originalBio] = account.originalBio
                     it[createdAt] = account.createdAt
                     it[lastSignInAt] = account.lastSignInAt
                     it[isActive] = account.isActive
@@ -64,6 +65,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[emailVerified] = account.emailVerified
                     it[emailVerifiedAt] = account.emailVerifiedAt
                     it[bio] = account.bio
+                    it[originalBio] = account.originalBio
                     it[lastSignInAt] = account.lastSignInAt
                     it[isActive] = account.isActive
                     it[preferences] = account.preferences ?: "{}"
@@ -83,6 +85,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[emailVerified] = account.emailVerified
                     it[emailVerifiedAt] = account.emailVerifiedAt
                     it[bio] = account.bio
+                    it[originalBio] = account.originalBio
                     it[createdAt] = account.createdAt
                     it[lastSignInAt] = account.lastSignInAt
                     it[isActive] = account.isActive
@@ -107,6 +110,7 @@ class PostgreSQLAccountRepository : AccountRepository {
                     it[emailVerified] = account.emailVerified
                     it[emailVerifiedAt] = account.emailVerifiedAt
                     it[bio] = account.bio
+                    it[originalBio] = account.originalBio
                     it[createdAt] = account.createdAt
                     it[lastSignInAt] = account.lastSignInAt
                     it[isActive] = account.isActive
@@ -258,6 +262,7 @@ class PostgreSQLAccountRepository : AccountRepository {
             emailVerified = this[AccountsTable.emailVerified],
             emailVerifiedAt = this[AccountsTable.emailVerifiedAt],
             bio = this[AccountsTable.bio],
+            originalBio = this[AccountsTable.originalBio],
             createdAt = this[AccountsTable.createdAt],
             lastSignInAt = this[AccountsTable.lastSignInAt],
             isActive = this[AccountsTable.isActive],

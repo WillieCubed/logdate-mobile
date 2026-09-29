@@ -47,8 +47,9 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateTimeShort
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.backing_up_progress
-import logdate.client.feature.core.generated.resources.cloud_sync
 import logdate.client.feature.core.generated.resources.create_account
+import logdate.client.feature.core.generated.resources.entry_sync_now
+import logdate.client.feature.core.generated.resources.entry_sync_title
 import logdate.client.feature.core.generated.resources.last_sync_failed
 import logdate.client.feature.core.generated.resources.last_synced_time
 import logdate.client.feature.core.generated.resources.never_synced
@@ -65,7 +66,6 @@ import logdate.client.feature.core.generated.resources.sync_feedback_sign_in_act
 import logdate.client.feature.core.generated.resources.sync_feedback_started
 import logdate.client.feature.core.generated.resources.sync_feedback_succeeded
 import logdate.client.feature.core.generated.resources.sync_feedback_up_to_date
-import logdate.client.feature.core.generated.resources.sync_now
 import logdate.client.feature.core.generated.resources.sync_paused_background_data_off
 import logdate.client.feature.core.generated.resources.sync_paused_background_data_off_fix
 import logdate.client.feature.core.generated.resources.sync_paused_media_waiting_for_wifi
@@ -161,8 +161,10 @@ fun SyncSettingsScreen(
     SyncSettingsContent(
         onBack = onBack,
         syncStatus = uiState.syncStatus,
+        cloudArchiveStatus = uiState.cloudArchiveStatus,
         isAuthenticated = isAuthenticated,
         onSyncNow = viewModel::syncNow,
+        onArchiveBackupNow = viewModel::backupArchiveNow,
         onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
         onNavigateToSignIn = onNavigateToSignIn,
         onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
@@ -176,8 +178,10 @@ fun SyncSettingsScreen(
 fun SyncSettingsContent(
     onBack: () -> Unit,
     syncStatus: app.logdate.client.sync.SyncStatus?,
+    cloudArchiveStatus: CloudArchiveStatus = CloudArchiveStatus(CloudArchivePhase.CHECKING),
     isAuthenticated: Boolean,
     onSyncNow: () -> Unit,
+    onArchiveBackupNow: () -> Unit = {},
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit,
     onNavigateToRecoveryPhrase: () -> Unit = {},
@@ -208,6 +212,12 @@ fun SyncSettingsContent(
                     CloudSyncSection(
                         syncStatus = syncStatus,
                         onSyncNow = onSyncNow,
+                        onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                    CloudArchiveSection(
+                        status = cloudArchiveStatus,
+                        onArchiveBackupNow = onArchiveBackupNow,
                         onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
@@ -269,6 +279,14 @@ fun SyncSettingsContent(
                         CloudSyncSection(
                             syncStatus = syncStatus,
                             onSyncNow = onSyncNow,
+                            onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        )
+                    }
+                    item {
+                        CloudArchiveSection(
+                            status = cloudArchiveStatus,
+                            onArchiveBackupNow = onArchiveBackupNow,
                             onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
                             modifier = Modifier.padding(horizontal = Spacing.lg),
                         )
@@ -387,7 +405,7 @@ private fun CloudSyncSection(
     modifier: Modifier = Modifier,
 ) {
     SettingsSection(
-        title = stringResource(Res.string.cloud_sync),
+        title = stringResource(Res.string.entry_sync_title),
         modifier = modifier,
     ) {
         Column {
@@ -422,7 +440,7 @@ private fun SyncStatusItem(
                 onClick = onSyncNow,
                 enabled = syncStatus?.isSyncing != true,
             ) {
-                Text(stringResource(Res.string.sync_now))
+                Text(stringResource(Res.string.entry_sync_now))
             }
         },
     )

@@ -22,30 +22,43 @@ class FeatureFlagStoreTest {
     @Test
     fun `an unset flag uses its declared default`() =
         runTest {
-            assertFalse(store.isEnabled(FeatureFlag.LIBRARY))
-            assertTrue(store.isEnabled(FeatureFlag.EVENTS))
-            assertTrue(store.isEnabled(FeatureFlag.PEOPLE))
+            assertTrue(store.isEnabled(FeatureFlag.LIBRARY))
+            assertFalse(store.isEnabled(FeatureFlag.EVENTS))
+            assertFalse(store.isEnabled(FeatureFlag.PEOPLE))
             assertTrue(store.isEnabled(FeatureFlag.CAMPFIRE_STREAKS))
         }
 
     @Test
     fun `setting a flag persists it and overrides the default`() =
         runTest {
-            store.setEnabled(FeatureFlag.LIBRARY, enabled = true)
+            store.setEnabled(FeatureFlag.LIBRARY, enabled = false)
             store.setEnabled(FeatureFlag.EVENTS, enabled = false)
 
-            assertTrue(store.isEnabled(FeatureFlag.LIBRARY))
+            assertFalse(store.isEnabled(FeatureFlag.LIBRARY))
             assertFalse(store.isEnabled(FeatureFlag.EVENTS))
         }
 
     @Test
     fun `observing a flag emits its current value`() =
         runTest {
-            assertFalse(store.observe(FeatureFlag.LIBRARY).first())
-
-            store.setEnabled(FeatureFlag.LIBRARY, enabled = true)
-
             assertTrue(store.observe(FeatureFlag.LIBRARY).first())
+
+            store.setEnabled(FeatureFlag.LIBRARY, enabled = false)
+
+            assertFalse(store.observe(FeatureFlag.LIBRARY).first())
+        }
+
+    @Test
+    fun `deferred features stay unavailable even with an old enabled preference`() =
+        runTest {
+            val dataSource = LogdatePreferencesDataSource(preferences)
+            store.setEnabled(FeatureFlag.EVENTS, enabled = true)
+            store.setEnabled(FeatureFlag.PEOPLE, enabled = true)
+
+            assertFalse(store.isEnabled(FeatureFlag.EVENTS))
+            assertFalse(store.isEnabled(FeatureFlag.PEOPLE))
+            assertFalse(dataSource.observeEventsEnabled().first())
+            assertFalse(dataSource.observePeopleEnabled().first())
         }
 
     @Test

@@ -106,6 +106,8 @@ actual val coreFeatureModule: Module =
             RecoveryPhraseViewModel(
                 gatekeeper = get(),
                 loadPhrase = { get<IdentityKeyManager>().getStoredRecoveryPhrase()?.words },
+                confirmPhrase = { get<IdentityKeyManager>().verifyRecoveryPhrase(it) },
+                isPhraseVerified = { get<IdentityKeyManager>().isRecoveryPhraseVerified() },
             )
         }
         viewModel {

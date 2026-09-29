@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -60,6 +61,38 @@ const val ONBOARDING_COMPLETION_ROOT_TAG = "onboarding_complete_root"
 const val ONBOARDING_COMPLETION_CONTINUE_TAG = "onboarding_complete_continue"
 const val ONBOARDING_COMPLETION_FINAL_TAG = "onboarding_complete_final"
 const val ONBOARDING_COMPLETION_LOADING_TAG = "onboarding_complete_loading"
+const val FIRST_ENTRY_IMPORT_ACTION_TAG = "first_entry_import_action"
+const val FIRST_ENTRY_CONTINUE_ACTION_TAG = "first_entry_continue_action"
+
+@Composable
+fun FirstEntryImportOfferScreen(
+    onImport: () -> Unit,
+    onContinue: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    StepScaffold(
+        title = stringResource(Res.string.first_entry_saved_title),
+        supportingText = stringResource(Res.string.first_entry_import_description),
+        onBack = null,
+        actions = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Button(
+                    onClick = onContinue,
+                    modifier = Modifier.fillMaxWidth().testTag(FIRST_ENTRY_CONTINUE_ACTION_TAG),
+                ) {
+                    Text(stringResource(Res.string.first_entry_continue_home))
+                }
+                OutlinedButton(
+                    onClick = onImport,
+                    modifier = Modifier.fillMaxWidth().testTag(FIRST_ENTRY_IMPORT_ACTION_TAG),
+                ) {
+                    Text(stringResource(Res.string.first_entry_import_photos))
+                }
+            }
+        },
+        modifier = modifier,
+    )
+}
 
 /**
  * The last screen of the onboarding flow.
@@ -70,6 +103,7 @@ const val ONBOARDING_COMPLETION_LOADING_TAG = "onboarding_complete_loading"
 fun OnboardingCompletionScreen(
     onFinish: () -> Unit,
     onRequirementsIncomplete: (OnboardingStep) -> Unit = {},
+    finishImmediately: Boolean = false,
     campfireViewModel: CampfireViewModel = koinViewModel(),
     completionCoordinator: OnboardingCompletionCoordinator = koinInject(),
     modifier: Modifier = Modifier,
@@ -79,11 +113,6 @@ fun OnboardingCompletionScreen(
     val coroutineScope = rememberCoroutineScope()
     val isCampfireEnabled by campfireViewModel.isCampfireEnabled.collectAsState()
     val showCampfire = isCampfireEnabled
-
-    if (showCampfire == null) {
-        GenericLoadingScreen(modifier = modifier.testTag(ONBOARDING_COMPLETION_LOADING_TAG))
-        return
-    }
 
     val finishOnboarding: () -> Unit = {
         coroutineScope.launch {
@@ -95,6 +124,10 @@ fun OnboardingCompletionScreen(
         }
     }
 
+    LaunchedEffect(finishImmediately) {
+        if (finishImmediately) finishOnboarding()
+    }
+
     if (saveFailed) {
         OnboardingSaveFailedContent(
             onRetry = {
@@ -103,6 +136,11 @@ fun OnboardingCompletionScreen(
             },
             modifier = modifier,
         )
+        return
+    }
+
+    if (finishImmediately || showCampfire == null) {
+        GenericLoadingScreen(modifier = modifier.testTag(ONBOARDING_COMPLETION_LOADING_TAG))
         return
     }
 

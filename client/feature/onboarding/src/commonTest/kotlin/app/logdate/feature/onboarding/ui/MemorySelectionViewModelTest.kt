@@ -8,11 +8,15 @@ import app.logdate.client.intelligence.generativeai.GenerativeAIResponse
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalNotesRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -27,8 +31,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * Exercises the [MemorySelectionViewModel] to ensure smooth media curation during onboarding.
@@ -43,11 +49,15 @@ import kotlin.time.Instant
 class MemorySelectionViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var fakeMediaManager: FakeMediaManager
+    private lateinit var notes: TestJournalNotesRepository
+    private lateinit var importer: TestSelectedMemoryImporter
 
     @BeforeTest
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         fakeMediaManager = FakeMediaManager()
+        notes = TestJournalNotesRepository()
+        importer = TestSelectedMemoryImporter()
     }
 
     @AfterTest
@@ -66,7 +76,7 @@ class MemorySelectionViewModelTest {
             viewModel.refreshMemories()
             advanceUntilIdle()
 
-            assertEquals(olderMemories, viewModel.uiState.value.allMemories)
+            assertEquals(olderMemories.sortedByDescending(MediaObject::timestamp), viewModel.uiState.value.allMemories)
             assertEquals(
                 olderMemories.toSet(),
                 viewModel.uiState.value.aiCuratedMemories
@@ -74,6 +84,39 @@ class MemorySelectionViewModelTest {
             )
             assertEquals(false, viewModel.uiState.value.isLoading)
             assertFalse(viewModel.uiState.value.loadFailed)
+        }
+
+    @Test
+    fun `older library photos remain browsable and importable after the first page`() =
+        runTest {
+            val recentTimestamp = Clock.System.now()
+            val recent = (1..21).map { sampleImage("recent-$it").copy(timestamp = recentTimestamp) }
+            val older = sampleImage("older").copy(timestamp = Instant.parse("2011-03-04T12:00:00Z"))
+            fakeMediaManager.queryMediaByDateFlow = { flowOf(listOf(older) + recent) }
+            val viewModel = createViewModel()
+
+            viewModel.refreshMemories()
+            advanceUntilIdle()
+            assertEquals(
+                recent.take(20).map { it.uri },
+                viewModel.uiState.value.allMemories
+                    .map { it.uri },
+            )
+            assertTrue(viewModel.uiState.value.hasMoreMemories)
+            viewModel.loadMoreMemories()
+            advanceUntilIdle()
+
+            assertEquals(
+                older.uri,
+                viewModel.uiState.value.allMemories
+                    .last()
+                    .uri,
+            )
+            assertTrue(fakeMediaManager.lastQueryStart!! < older.timestamp)
+            assertTrue(fakeMediaManager.lastQueryEnd!! > recentTimestamp)
+            viewModel.toggleMemorySelection(older.uri)
+            assertTrue(viewModel.processSelectedMemories().isSuccess)
+            assertEquals(older.timestamp, notes.saved.single().creationTimestamp)
         }
 
     @Test
@@ -142,7 +185,10 @@ class MemorySelectionViewModelTest {
             assertTrue(result.isSuccess)
             assertFalse(viewModel.uiState.value.isImporting)
             assertFalse(viewModel.uiState.value.importFailed)
-            assertEquals(listOf(memories.single().uri), fakeMediaManager.addedToCollection)
+            val image = notes.saved.single() as JournalNote.Image
+            assertEquals(memories.single().timestamp, image.creationTimestamp)
+            assertEquals("file:///managed/keep-1", image.mediaRef)
+            assertEquals(listOf(memories.single().uri), importer.imported)
         }
 
     @Test
@@ -150,7 +196,7 @@ class MemorySelectionViewModelTest {
         runTest {
             val memories = listOf(sampleImage("broken-1"))
             fakeMediaManager.queryMediaByDateFlow = { flowOf(memories) }
-            fakeMediaManager.addToDefaultCollectionError = IllegalStateException("Import failed")
+            importer.errorFor = memories.single().uri
 
             val viewModel = createViewModel()
             viewModel.refreshMemories()
@@ -169,7 +215,7 @@ class MemorySelectionViewModelTest {
         runTest {
             val memories = listOf(sampleImage("slow-1"))
             fakeMediaManager.queryMediaByDateFlow = { flowOf(memories) }
-            fakeMediaManager.addToDefaultCollectionDelay = { delay(1_000) }
+            importer.delayBeforeImport = { delay(1_000) }
 
             val viewModel = createViewModel()
             viewModel.refreshMemories()
@@ -185,7 +231,124 @@ class MemorySelectionViewModelTest {
 
             advanceUntilIdle()
             assertTrue(firstImport.await().isSuccess)
-            assertEquals(1, fakeMediaManager.addedToCollection.size)
+            assertEquals(1, notes.saved.size)
+        }
+
+    @Test
+    fun `retry after a later photo fails does not duplicate the completed photo`() =
+        runTest {
+            val memories = listOf(sampleImage("first"), sampleImage("second"))
+            fakeMediaManager.queryMediaByDateFlow = { flowOf(memories) }
+            val viewModel = createViewModel()
+            viewModel.refreshMemories()
+            advanceUntilIdle()
+            memories.forEach { viewModel.toggleMemorySelection(it.uri) }
+            importer.errorFor = memories.last().uri
+
+            assertTrue(viewModel.processSelectedMemories().isFailure)
+            assertEquals(1, notes.saved.size)
+            importer.errorFor = null
+
+            assertTrue(viewModel.processSelectedMemories().isSuccess)
+            assertEquals(2, notes.saved.size)
+            assertEquals(1, importer.imported.count { it == memories.first().uri })
+        }
+
+    @Test
+    fun `retry after note creation failure uses the same note id`() =
+        runTest {
+            val memory = sampleImage("uncertain")
+            fakeMediaManager.queryMediaByDateFlow = { flowOf(listOf(memory)) }
+            val savedStateHandle = SavedStateHandle()
+            val firstViewModel = createViewModel(savedStateHandle)
+            firstViewModel.refreshMemories()
+            advanceUntilIdle()
+            firstViewModel.toggleMemorySelection(memory.uri)
+            notes.failAfterCreate = true
+
+            assertTrue(firstViewModel.processSelectedMemories().isFailure)
+            assertEquals(1, notes.saved.size)
+            notes.failAfterCreate = false
+            val secondViewModel = createViewModel(savedStateHandle)
+            secondViewModel.refreshMemories()
+            advanceUntilIdle()
+
+            assertTrue(secondViewModel.processSelectedMemories().isSuccess)
+            assertEquals(1, notes.saved.size)
+            assertEquals(1, importer.imported.size)
+        }
+
+    @Test
+    fun `failed note write discards its unpublished media copy`() =
+        runTest {
+            val memory = sampleImage("unpublished")
+            fakeMediaManager.queryMediaByDateFlow = { flowOf(listOf(memory)) }
+            val viewModel = createViewModel()
+            viewModel.refreshMemories()
+            advanceUntilIdle()
+            viewModel.toggleMemorySelection(memory.uri)
+            notes.failBeforeCreate = true
+
+            assertTrue(viewModel.processSelectedMemories().isFailure)
+            assertTrue(notes.saved.isEmpty())
+            assertEquals(listOf("file:///managed/unpublished"), importer.discarded)
+        }
+
+    @Test
+    fun `selected video is copied into a video entry at its capture time`() =
+        runTest {
+            val video = sampleVideo("clip")
+            fakeMediaManager.queryMediaByDateFlow = { flowOf(listOf(video)) }
+            val viewModel = createViewModel()
+            viewModel.refreshMemories()
+            advanceUntilIdle()
+            viewModel.toggleMemorySelection(video.uri)
+
+            assertTrue(viewModel.processSelectedMemories().isSuccess)
+            val saved = notes.saved.single() as JournalNote.Video
+            assertEquals(video.timestamp, saved.creationTimestamp)
+            assertEquals("file:///managed/clip", saved.mediaRef)
+        }
+
+    @Test
+    fun `cancelled import clears the busy state`() =
+        runTest {
+            val memory = sampleImage("slow")
+            fakeMediaManager.queryMediaByDateFlow = { flowOf(listOf(memory)) }
+            importer.delayBeforeImport = { delay(1_000) }
+            val viewModel = createViewModel()
+            viewModel.refreshMemories()
+            advanceUntilIdle()
+            viewModel.toggleMemorySelection(memory.uri)
+
+            val import = async { viewModel.processSelectedMemories() }
+            runCurrent()
+            assertTrue(viewModel.uiState.value.isImporting)
+            import.cancelAndJoin()
+
+            assertFalse(viewModel.uiState.value.isImporting)
+            assertTrue(notes.saved.isEmpty())
+        }
+
+    @Test
+    fun `selection cannot change while import is in progress`() =
+        runTest {
+            val memories = listOf(sampleImage("first"), sampleImage("second"))
+            fakeMediaManager.queryMediaByDateFlow = { flowOf(memories) }
+            importer.delayBeforeImport = { delay(1_000) }
+            val viewModel = createViewModel()
+            viewModel.refreshMemories()
+            advanceUntilIdle()
+            viewModel.toggleMemorySelection(memories.first().uri)
+
+            val import = async { viewModel.processSelectedMemories() }
+            runCurrent()
+            viewModel.toggleMemorySelection(memories.last().uri)
+            advanceUntilIdle()
+
+            assertTrue(import.await().isSuccess)
+            assertEquals(setOf(memories.first().uri), viewModel.uiState.value.selectedMemoryIds)
+            assertEquals(1, notes.saved.size)
         }
 
     private fun createViewModel(savedStateHandle: SavedStateHandle = SavedStateHandle()): MemorySelectionViewModel =
@@ -193,6 +356,8 @@ class MemorySelectionViewModelTest {
             mediaManager = fakeMediaManager,
             aiClient = FakeGenerativeAIChatClient(),
             savedStateHandle = savedStateHandle,
+            notesRepository = notes,
+            mediaImporter = importer,
         )
 
     private fun sampleImage(id: String): MediaObject.Image =
@@ -213,12 +378,84 @@ class MemorySelectionViewModelTest {
         )
 }
 
+private class TestSelectedMemoryImporter : SelectedMemoryMediaImporter {
+    var errorFor: String? = null
+    var delayBeforeImport: suspend () -> Unit = {}
+    val imported = mutableListOf<String>()
+    val discarded = mutableListOf<String>()
+
+    override suspend fun import(sourceUri: String): String {
+        delayBeforeImport()
+        if (sourceUri == errorFor) error("Import failed")
+        imported += sourceUri
+        return "file:///managed/${sourceUri.substringAfterLast('/')}"
+    }
+
+    override suspend fun discard(managedUri: String) {
+        discarded += managedUri
+    }
+}
+
+private class TestJournalNotesRepository : JournalNotesRepository {
+    val saved = mutableListOf<JournalNote>()
+    var failAfterCreate = false
+    var failBeforeCreate = false
+    override val allNotesObserved = MutableStateFlow<List<JournalNote>>(emptyList())
+
+    override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> = allNotesObserved
+
+    override fun observeNotesInRange(
+        start: Instant,
+        end: Instant,
+    ): Flow<List<JournalNote>> = allNotesObserved
+
+    override fun observeNotesPage(
+        pageSize: Int,
+        offset: Int,
+    ): Flow<List<JournalNote>> = allNotesObserved
+
+    override fun observeNotesStream(pageSize: Int): Flow<List<JournalNote>> = allNotesObserved
+
+    override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = allNotesObserved
+
+    override suspend fun getNoteById(noteId: Uuid): JournalNote? = saved.find { it.uid == noteId }
+
+    override suspend fun create(note: JournalNote): Uuid {
+        if (failBeforeCreate) error("Write failed")
+        saved += note
+        allNotesObserved.value = saved.toList()
+        if (failAfterCreate) error("Write confirmation failed")
+        return note.uid
+    }
+
+    override suspend fun remove(note: JournalNote) {
+        saved.remove(note)
+    }
+
+    override suspend fun removeById(noteId: Uuid) {
+        saved.removeAll { it.uid == noteId }
+    }
+
+    override suspend fun create(
+        note: JournalNote,
+        journalId: Uuid,
+    ) {
+        create(note)
+    }
+
+    override suspend fun removeFromJournal(
+        noteId: Uuid,
+        journalId: Uuid,
+    ) = Unit
+
+    override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
+}
+
 private class FakeMediaManager : MediaManager {
     var queryMediaByDateFlow: () -> Flow<List<MediaObject>> = { flowOf(emptyList()) }
     var recentMediaFlow: () -> Flow<List<MediaObject>> = { flowOf(emptyList()) }
-    var addToDefaultCollectionError: Throwable? = null
-    var addToDefaultCollectionDelay: suspend () -> Unit = {}
-    val addedToCollection = mutableListOf<String>()
+    var lastQueryStart: Instant? = null
+    var lastQueryEnd: Instant? = null
 
     override suspend fun getMedia(uri: String): MediaObject = error("Not used in test")
 
@@ -231,13 +468,13 @@ private class FakeMediaManager : MediaManager {
     override suspend fun queryMediaByDate(
         start: Instant,
         end: Instant,
-    ): Flow<List<MediaObject>> = queryMediaByDateFlow()
-
-    override suspend fun addToDefaultCollection(uri: String) {
-        addToDefaultCollectionDelay()
-        addToDefaultCollectionError?.let { throw it }
-        addedToCollection += uri
+    ): Flow<List<MediaObject>> {
+        lastQueryStart = start
+        lastQueryEnd = end
+        return queryMediaByDateFlow()
     }
+
+    override suspend fun addToDefaultCollection(uri: String) = Unit
 
     override suspend fun readMedia(uri: String): MediaPayload = error("Not used in test")
 

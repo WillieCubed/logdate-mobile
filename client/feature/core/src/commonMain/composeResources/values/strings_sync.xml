@@ -2,15 +2,31 @@
 <resources>
     <!-- Cloud sync -->
     <string name="cloud_sync">Your journal</string>
+    <string name="entry_sync_title">Entry sync</string>
+    <string name="entry_sync_now">Sync entries</string>
+    <string name="cloud_archive_title">Encrypted Cloud archive</string>
+    <string name="cloud_archive_checking">Checking archive backup…</string>
+    <string name="cloud_archive_signed_out">Sign in to use Cloud archive backup.</string>
+    <string name="cloud_archive_needs_recovery">Verify your recovery phrase before Cloud archive backup can run.</string>
+    <string name="cloud_archive_never">No encrypted Cloud archive has been saved to this account.</string>
+    <string name="cloud_archive_queued">Archive backup is waiting to start.</string>
+    <string name="cloud_archive_running">Uploading encrypted archive…</string>
+    <string name="cloud_archive_retrying">Archive backup failed and will retry automatically.</string>
+    <string name="cloud_archive_failed">The last archive backup failed.</string>
+    <string name="cloud_archive_complete">Last encrypted archive: %1$s</string>
+    <string name="cloud_archive_unavailable">Couldn’t check the Cloud archive. Try again when connected.</string>
+    <string name="cloud_archive_start">Back up now</string>
+    <string name="cloud_archive_retry">Retry archive backup</string>
+    <string name="cloud_archive_previous">Previous archive: %1$s</string>
     <string name="sync_and_backup">Backup</string>
     <string name="sync_and_backup_description">Back up your entries and keep them available on your devices</string>
     <string name="sync_now">Back up now</string>
     <string name="syncing">Backing up…</string>
     <string name="syncing_remaining">Backing up · %1$d to go</string>
-    <string name="last_synced_time">All backed up · %1$s</string>
+    <string name="last_synced_time">Entries synced · %1$s</string>
     <string name="last_backed_up_time">Last backed up %1$s</string>
     <string name="last_sync_failed">Couldn't finish backing up</string>
-    <string name="never_synced">Nothing backed up yet</string>
+    <string name="never_synced">No entries synced yet</string>
 
     <!-- Backup status, shared by the timeline's status button, the sync banner, and Sync issues -->
     <string name="sync_status_open">Open backup status</string>

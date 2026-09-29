@@ -57,6 +57,7 @@ fun LibraryScreen(
         onItemClick = onOpenMediaDetail,
         onOpenSearch = onOpenSearch,
         onOpenPostcards = onOpenPostcards,
+        onRetry = viewModel::retry,
         modifier = modifier,
     )
 }
@@ -75,6 +76,7 @@ fun LibraryScreenContent(
     onItemClick: (Uuid) -> Unit,
     onOpenSearch: () -> Unit = {},
     onOpenPostcards: (() -> Unit)? = null,
+    onRetry: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -125,6 +127,7 @@ fun LibraryScreenContent(
                     state = state,
                     columnCount = columnCount,
                     onItemClick = onItemClick,
+                    onRetry = onRetry,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

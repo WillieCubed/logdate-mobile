@@ -122,6 +122,7 @@ data class SignupPasskeyBeginRequest(
     val username: String,
     val displayName: String,
     val bio: String? = null,
+    val originalBio: String? = null,
     val requestedOwnerId: String? = null,
 )
 
@@ -197,6 +198,7 @@ data class AuthAccountView(
     val did: String? = null,
     val handle: String? = null,
     val bio: String? = null,
+    val originalBio: String? = null,
     val email: String? = null,
     val emailVerified: Boolean,
     val emailVerifiedAt: String? = null,
@@ -399,6 +401,7 @@ fun Route.authV1Routes(
                                 challenge = registrationOptions.challenge,
                                 deviceInfo = null,
                                 bio = request.bio,
+                                originalBio = request.originalBio,
                             )
 
                         call.respond(
@@ -502,6 +505,7 @@ fun Route.authV1Routes(
                                 username = session.username,
                                 displayName = session.displayName,
                                 bio = session.bio,
+                                originalBio = session.originalBio ?: session.bio,
                                 createdAt = now,
                                 lastSignInAt = now,
                                 isActive = true,
@@ -1151,7 +1155,7 @@ fun Route.authV1Routes(
                     resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
                         ?: return@put
                 val request = call.receive<UpdateAccountProfileRequest>()
-                if (request.displayName == null && request.username == null && request.bio == null) {
+                if (request.displayName == null && request.username == null && request.bio == null && request.originalBio == null) {
                     return@put call.respondApiError(
                         HttpStatusCode.BadRequest,
                         "VALIDATION_ERROR",
@@ -1188,6 +1192,7 @@ fun Route.authV1Routes(
                             username = request.username ?: account.username,
                             displayName = request.displayName ?: account.displayName,
                             bio = request.bio ?: account.bio,
+                            originalBio = request.originalBio ?: account.originalBio,
                         ),
                     )
                 val ensuredAccount = atprotoIdentityService.ensureIdentity(saved)
@@ -1204,6 +1209,7 @@ fun Route.authV1Routes(
                                 did = ensuredAccount.did,
                                 handle = ensuredAccount.handle,
                                 bio = ensuredAccount.bio,
+                                originalBio = ensuredAccount.originalBio,
                                 passkeyCredentialIds = webAuthnService.getPasskeysForUser(ensuredAccount.id).map { it.credentialId },
                                 createdAt = ensuredAccount.createdAt,
                                 updatedAt = ensuredAccount.lastSignInAt ?: ensuredAccount.createdAt,
@@ -1745,6 +1751,7 @@ private suspend fun issueAuthResponse(
                         did = fresh.did,
                         handle = fresh.handle,
                         bio = fresh.bio,
+                        originalBio = fresh.originalBio,
                         email = fresh.email,
                         emailVerified = fresh.emailVerified,
                         emailVerifiedAt = fresh.emailVerifiedAt?.toString(),

@@ -28,6 +28,7 @@ interface SessionManager {
         challenge: String,
         deviceInfo: DeviceInfo?,
         bio: String?,
+        originalBio: String? = null,
     ): TemporarySession
 
     /**
@@ -103,6 +104,7 @@ class InMemorySessionManager : SessionManager {
         challenge: String,
         deviceInfo: DeviceInfo?,
         bio: String?,
+        originalBio: String?,
     ): TemporarySession {
         val sessionId = generateSessionId()
         val resolvedUserId = temporaryUserId ?: Uuid.random()
@@ -116,6 +118,7 @@ class InMemorySessionManager : SessionManager {
                 username = username,
                 displayName = displayName,
                 bio = bio,
+                originalBio = originalBio,
                 deviceInfo = deviceInfo,
                 sessionType = SessionType.ACCOUNT_CREATION,
                 createdAt = now,

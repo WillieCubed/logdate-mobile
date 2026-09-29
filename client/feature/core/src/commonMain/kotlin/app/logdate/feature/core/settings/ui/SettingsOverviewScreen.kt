@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsNavigationItem
@@ -424,18 +425,22 @@ fun SettingsOverviewContent(
                             icon = { Icon(Icons.Default.Replay, contentDescription = null) },
                             onClick = onNavigateToRewindSettings,
                         )
-                        SettingsNavigationItem(
-                            title = "Events",
-                            description = "The moments worth remembering, gathered for you",
-                            icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
-                            onClick = onNavigateToEventsSettings,
-                        )
-                        SettingsNavigationItem(
-                            title = stringResource(Res.string.people_title),
-                            description = stringResource(Res.string.people_overview_description),
-                            icon = { Icon(Icons.Default.Person, contentDescription = null) },
-                            onClick = onNavigateToPeopleSettings,
-                        )
+                        if (FeatureFlag.EVENTS.availableForLaunch) {
+                            SettingsNavigationItem(
+                                title = "Events",
+                                description = "The moments worth remembering, gathered for you",
+                                icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+                                onClick = onNavigateToEventsSettings,
+                            )
+                        }
+                        if (FeatureFlag.PEOPLE.availableForLaunch) {
+                            SettingsNavigationItem(
+                                title = stringResource(Res.string.people_title),
+                                description = stringResource(Res.string.people_overview_description),
+                                icon = { Icon(Icons.Default.Person, contentDescription = null) },
+                                onClick = onNavigateToPeopleSettings,
+                            )
+                        }
                         SettingsNavigationItem(
                             title = "Your library",
                             description = "Browse and manage your photos and videos",

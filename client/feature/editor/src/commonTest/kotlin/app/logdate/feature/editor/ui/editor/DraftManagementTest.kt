@@ -988,6 +988,27 @@ class DraftManagementTest {
         }
 
     @Test
+    fun `first entry resumes the most recently updated draft`() =
+        testScope.runTest {
+            val older = entryDraftRepository.createDraft(listOf(textNote("Older draft")))
+            val recent = entryDraftRepository.createDraft(listOf(textNote("Recent draft")))
+            advanceUntilIdle()
+
+            viewModel.resumeFirstEntryDraft()
+            advanceUntilIdle()
+
+            assertEquals(DraftState.Active(recent), viewModel.editorState.value.draftState)
+            assertEquals(
+                "Recent draft",
+                (
+                    viewModel.editorState.value.blocks
+                        .single() as TextBlockUiState
+                ).content,
+            )
+            assertTrue(older != recent)
+        }
+
+    @Test
     fun `queued old autosave cannot retarget content to newly loaded draft`() =
         testScope.runTest {
             val targetDraftId = entryDraftRepository.createDraft(listOf(textNote("Loaded target")))

@@ -4,10 +4,11 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
-import kotlin.time.Duration.Companion.hours
+import kotlinx.datetime.plus
 
 /**
  * Fetches notes for the given day.
@@ -17,10 +18,11 @@ import kotlin.time.Duration.Companion.hours
  */
 class FetchNotesForDayUseCase(
     private val repository: JournalNotesRepository,
+    private val timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) {
     operator fun invoke(date: LocalDate): Flow<List<JournalNote>> {
-        val start = date.atStartOfDayIn(TimeZone.currentSystemDefault())
-        val end = start + 24.hours
+        val start = date.atStartOfDayIn(timeZone)
+        val end = date.plus(1, DateTimeUnit.DAY).atStartOfDayIn(timeZone)
         val startInstant = start
         val endInstant = end
 

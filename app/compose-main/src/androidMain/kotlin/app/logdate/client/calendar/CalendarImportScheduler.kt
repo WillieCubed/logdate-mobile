@@ -51,6 +51,11 @@ class CalendarImportScheduler(
         Napier.d("Scheduled periodic device calendar import")
     }
 
+    fun disableForLaunch() {
+        workManager.cancelUniqueWork(CalendarImportWorker.WORK_NAME)
+        workManager.cancelUniqueWork("${CalendarImportWorker.WORK_NAME}:immediate")
+    }
+
     fun enqueueImmediateRun() {
         val request =
             OneTimeWorkRequestBuilder<CalendarImportWorker>()

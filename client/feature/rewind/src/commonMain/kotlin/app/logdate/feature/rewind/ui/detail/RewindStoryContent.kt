@@ -118,6 +118,7 @@ fun RewindStoryContent(
                 imageUri = panel.imageUri,
                 caption = panel.caption,
                 dateFormatted = panel.dateFormatted,
+                isVideoFrame = panel.isVideoFrame,
                 modifier = modifier,
             )
         }

@@ -18,14 +18,19 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -44,6 +49,11 @@ import logdate.client.feature.core.generated.resources.recovery_phrase_prompt_ti
 import logdate.client.feature.core.generated.resources.recovery_phrase_show
 import logdate.client.feature.core.generated.resources.recovery_phrase_title
 import logdate.client.feature.core.generated.resources.recovery_phrase_unreadable
+import logdate.client.feature.core.generated.resources.recovery_phrase_verified
+import logdate.client.feature.core.generated.resources.recovery_phrase_verify_action
+import logdate.client.feature.core.generated.resources.recovery_phrase_verify_failed
+import logdate.client.feature.core.generated.resources.recovery_phrase_verify_label
+import logdate.client.feature.core.generated.resources.recovery_phrase_verify_prompt
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -71,6 +81,7 @@ fun RecoveryPhraseScreen(
         onReveal = { viewModel.reveal(prompt) },
         onHide = viewModel::hide,
         onEnterPhrase = onEnterPhrase,
+        onVerify = viewModel::verify,
     )
 }
 
@@ -81,7 +92,16 @@ fun RecoveryPhraseContent(
     onReveal: () -> Unit,
     onHide: () -> Unit,
     onEnterPhrase: () -> Unit,
+    onVerify: (String) -> Unit = {},
 ) {
+    var isReentering by remember { mutableStateOf(false) }
+    var enteredPhrase by remember { mutableStateOf("") }
+    LaunchedEffect(state) {
+        if (state !is RecoveryPhraseUiState.Revealed) {
+            isReentering = false
+            enteredPhrase = ""
+        }
+    }
     SettingsScaffold(title = stringResource(Res.string.recovery_phrase_title), onBack = onBack) {
         item {
             Column(
@@ -89,7 +109,10 @@ fun RecoveryPhraseContent(
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
                 when (state) {
-                    RecoveryPhraseUiState.Checking, RecoveryPhraseUiState.Confirming ->
+                    RecoveryPhraseUiState.Checking,
+                    RecoveryPhraseUiState.Confirming,
+                    RecoveryPhraseUiState.Verifying,
+                    ->
                         Box(modifier = Modifier.fillMaxWidth().padding(Spacing.xl), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator()
                         }
@@ -106,6 +129,16 @@ fun RecoveryPhraseContent(
 
                     RecoveryPhraseUiState.Hidden -> {
                         Intro()
+                        ShowButton(onReveal)
+                    }
+
+                    RecoveryPhraseUiState.Verified -> Text(stringResource(Res.string.recovery_phrase_verified))
+
+                    RecoveryPhraseUiState.VerificationFailed -> {
+                        Text(
+                            stringResource(Res.string.recovery_phrase_verify_failed),
+                            color = MaterialTheme.colorScheme.error,
+                        )
                         ShowButton(onReveal)
                     }
 
@@ -126,10 +159,29 @@ fun RecoveryPhraseContent(
 
                     is RecoveryPhraseUiState.Revealed -> {
                         Intro()
-                        PhraseGrid(state.words)
-                        OutlinedButton(onClick = onHide) {
-                            Icon(Icons.Outlined.VisibilityOff, contentDescription = null)
-                            Text(stringResource(Res.string.recovery_phrase_hide), modifier = Modifier.padding(start = Spacing.sm))
+                        if (isReentering) {
+                            Text(stringResource(Res.string.recovery_phrase_verify_prompt))
+                            OutlinedTextField(
+                                value = enteredPhrase,
+                                onValueChange = { enteredPhrase = it },
+                                label = { Text(stringResource(Res.string.recovery_phrase_verify_label)) },
+                                visualTransformation = PasswordVisualTransformation(),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Button(
+                                onClick = { onVerify(enteredPhrase) },
+                                enabled = enteredPhrase.isNotBlank(),
+                            ) { Text(stringResource(Res.string.recovery_phrase_verify_action)) }
+                        } else {
+                            PhraseGrid(state.words)
+                            Button(onClick = {
+                                enteredPhrase = ""
+                                isReentering = true
+                            }) { Text(stringResource(Res.string.recovery_phrase_verify_action)) }
+                            OutlinedButton(onClick = onHide) {
+                                Icon(Icons.Outlined.VisibilityOff, contentDescription = null)
+                                Text(stringResource(Res.string.recovery_phrase_hide), modifier = Modifier.padding(start = Spacing.sm))
+                            }
                         }
                     }
                 }

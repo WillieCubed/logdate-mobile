@@ -16,6 +16,7 @@ data class LogDateAccount(
     val did: String? = null,
     val handle: String? = null,
     val bio: String? = null,
+    val originalBio: String? = null,
     val passkeyCredentialIds: List<String> = emptyList(),
     val createdAt: Instant = Clock.System.now(),
     val updatedAt: Instant = Clock.System.now(),
@@ -35,6 +36,7 @@ data class BeginAccountCreationRequest(
     val username: String,
     val displayName: String,
     val bio: String? = null,
+    val originalBio: String? = null,
     /** The durable local owner that a new Cloud account must bind to. */
     val requestedOwnerId: String? = null,
 )
@@ -181,6 +183,7 @@ data class UpdateAccountProfileRequest(
     val displayName: String? = null,
     val username: String? = null,
     val bio: String? = null,
+    val originalBio: String? = null,
 )
 
 @Serializable

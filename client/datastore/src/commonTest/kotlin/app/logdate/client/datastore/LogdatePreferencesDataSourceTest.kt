@@ -29,9 +29,9 @@ class LogdatePreferencesDataSourceTest {
         }
 
     @Test
-    fun `people feature defaults to enabled`() =
+    fun `people feature is unavailable for public launch`() =
         runTest {
-            assertEquals(true, dataSource.observePeopleEnabled().first())
+            assertEquals(false, dataSource.observePeopleEnabled().first())
         }
 
     @Test

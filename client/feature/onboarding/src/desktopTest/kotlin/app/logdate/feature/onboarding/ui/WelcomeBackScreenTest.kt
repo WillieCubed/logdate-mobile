@@ -16,7 +16,6 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -116,7 +115,7 @@ class WelcomeBackScreenTest {
         }
 
     @Test
-    fun `finishing welcome back routes to the missing step instead of finishing`() =
+    fun `welcome back does not require an optional birthday`() =
         runComposeUiTest {
             // Birthday deliberately left unset.
             fakeProfileRepository.setProfile(LogDateProfile(displayName = "Alex", bio = "Bio"))
@@ -129,9 +128,9 @@ class WelcomeBackScreenTest {
 
             val outcome = runWelcomeBack()
 
-            assertEquals(OnboardingStep.BIRTHDAY, outcome.incompleteStep)
-            assertTrue(!outcome.finished, "onFinish must not be called when required steps are incomplete")
-            assertTrue(!fakeUserStateRepository.isOnboardingComplete)
+            assertNull(outcome.incompleteStep)
+            assertTrue(outcome.finished)
+            assertTrue(fakeUserStateRepository.isOnboardingComplete)
         }
 
     @Test
