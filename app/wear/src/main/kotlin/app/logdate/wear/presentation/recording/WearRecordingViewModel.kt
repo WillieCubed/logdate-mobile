@@ -75,7 +75,8 @@ interface RecordingHintStore {
  *
  * Pressing the record surface starts recording at once. Lifting the finger quickly (a tap) latches
  * the recording so it continues until the next tap; holding past [HOLD_THRESHOLD_MS] is
- * push-to-talk and saves on release. A saved note stays undoable for [UNDO_WINDOW_MS].
+ * push-to-talk and saves on release. While a latched recording is paused, the record surface saves
+ * it and the side control resumes. A saved note stays undoable for [UNDO_WINDOW_MS].
  *
  * Every phase change happens before the recorder is asked to do anything, so the recorder's own
  * state flow can never be mistaken for the recorder ending a session by itself.
@@ -128,16 +129,17 @@ class WearRecordingViewModel(
                 beginRecording()
             }
             RecordingPhase.RECORDING -> if (_uiState.value.isLatched) stopAndSave()
-            RecordingPhase.PAUSED -> resume()
+            RecordingPhase.PAUSED -> stopAndSave()
             RecordingPhase.STARTING, RecordingPhase.SAVING, RecordingPhase.TOO_SHORT -> Unit
         }
     }
 
     fun onRelease() {
         val state = _uiState.value
+        val recorderRunning = state.phase == RecordingPhase.RECORDING || state.phase == RecordingPhase.PAUSED
         when {
             state.phase == RecordingPhase.STARTING -> releasedAtMs = now()
-            state.phase == RecordingPhase.RECORDING && !state.isLatched -> applyRelease(now())
+            recorderRunning && !state.isLatched -> applyRelease(now())
         }
     }
 

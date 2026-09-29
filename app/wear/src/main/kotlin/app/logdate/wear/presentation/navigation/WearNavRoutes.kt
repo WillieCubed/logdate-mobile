@@ -25,4 +25,6 @@ data object WearRemoteCameraRoute : NavKey
 
 data object WearSettingsRoute : NavKey
 
+data object WearMoreRoute : NavKey
+
 data object WearOnboardingRoute : NavKey

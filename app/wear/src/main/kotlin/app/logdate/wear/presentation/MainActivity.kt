@@ -19,9 +19,11 @@ import app.logdate.wear.presentation.health.HealthDashboardScreen
 import app.logdate.wear.presentation.health.HealthDashboardViewModel
 import app.logdate.wear.presentation.home.WearHomeScreen
 import app.logdate.wear.presentation.mood.MoodCheckInScreen
+import app.logdate.wear.presentation.more.WearMoreScreen
 import app.logdate.wear.presentation.navigation.WearHealthDashboardRoute
 import app.logdate.wear.presentation.navigation.WearHomeRoute
 import app.logdate.wear.presentation.navigation.WearMoodCheckInRoute
+import app.logdate.wear.presentation.navigation.WearMoreRoute
 import app.logdate.wear.presentation.navigation.WearOnboardingRoute
 import app.logdate.wear.presentation.navigation.WearQuickTextRoute
 import app.logdate.wear.presentation.navigation.WearRemoteCameraRoute
@@ -92,15 +94,19 @@ fun WearApp(initialRouteName: String? = null) {
                             onNavigateToMoodCheckIn = {
                                 backStack.add(WearMoodCheckInRoute)
                             },
-                            onNavigateToQuickText = {
-                                backStack.add(WearQuickTextRoute)
-                            },
-                            onNavigateToTimeline = {
+                            onNavigateToMemories = {
                                 backStack.add(WearTimelineRoute)
                             },
-                            onNavigateToSettings = {
-                                backStack.add(WearSettingsRoute)
+                            onNavigateToMore = {
+                                backStack.add(WearMoreRoute)
                             },
+                        )
+                    }
+                    entry<WearMoreRoute> {
+                        WearMoreScreen(
+                            onNavigateToQuickText = { backStack.add(WearQuickTextRoute) },
+                            onNavigateToTimeline = { backStack.add(WearTimelineRoute) },
+                            onNavigateToSettings = { backStack.add(WearSettingsRoute) },
                         )
                     }
                     entry<WearMoodCheckInRoute> {

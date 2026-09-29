@@ -601,7 +601,7 @@ class WearRecordingViewModelTest {
         }
 
     @Test
-    fun `pressing while paused resumes`() =
+    fun `pressing the record surface while paused saves the recording`() =
         runTest {
             val viewModel = createViewModel()
             tapToStart(viewModel)
@@ -610,8 +610,39 @@ class WearRecordingViewModelTest {
 
             press(viewModel)
 
+            assertEquals(RecordingPhase.SAVED, viewModel.uiState.value.phase)
+            assertEquals(1, recorder.stops)
+        }
+
+    @Test
+    fun `a hold paused by an interruption saves when the finger lifts`() =
+        runTest {
+            val viewModel = createViewModel()
+            press(viewModel)
+            recorder.pausedFlow.value = true
+            recorder.interruptedFlow.value = true
+            runCurrent()
+            assertEquals(RecordingPhase.PAUSED, viewModel.uiState.value.phase)
+
+            release(viewModel, afterMs = WearRecordingViewModel.HOLD_THRESHOLD_MS + 600)
+
+            assertEquals(RecordingPhase.SAVED, viewModel.uiState.value.phase)
+        }
+
+    @Test
+    fun `resuming from the side control continues the same recording`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            viewModel.onPauseToggle()
+            runCurrent()
+
+            viewModel.onPauseToggle()
+            runCurrent()
+
             assertEquals(RecordingPhase.RECORDING, viewModel.uiState.value.phase)
             assertEquals(1, recorder.resumes)
+            assertEquals(0, recorder.stops)
         }
 
     @Test

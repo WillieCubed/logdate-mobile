@@ -12,7 +12,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -20,21 +23,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Mood
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material.icons.filled.ViewTimeline
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.input.pointer.pointerInput
@@ -64,12 +64,17 @@ import app.logdate.wear.presentation.recording.WearRecordingViewModel
 import app.logdate.wear.presentation.recording.formatDuration
 import org.koin.compose.viewmodel.koinViewModel
 
+private val STATUS_SLOT_HEIGHT = 40.dp
+private val FOLLOW_UP_SLOT_HEIGHT = 34.dp
+private val STATUS_HORIZONTAL_PADDING = 20.dp
+private val SIDE_CONTROL_SIZE = 36.dp
+private val RECORD_SURFACE_SIZE = 72.dp
+
 @Composable
 fun WearHomeScreen(
     onNavigateToMoodCheckIn: () -> Unit,
-    onNavigateToQuickText: () -> Unit,
-    onNavigateToTimeline: () -> Unit,
-    onNavigateToSettings: () -> Unit,
+    onNavigateToMemories: () -> Unit,
+    onNavigateToMore: () -> Unit,
     homeViewModel: WearHomeViewModel = koinViewModel(),
     recordingViewModel: WearRecordingViewModel = koinViewModel(),
 ) {
@@ -84,9 +89,8 @@ fun WearHomeScreen(
         homeState = homeState,
         recordingState = recordingState,
         onNavigateToMoodCheckIn = onNavigateToMoodCheckIn,
-        onNavigateToQuickText = onNavigateToQuickText,
-        onNavigateToTimeline = onNavigateToTimeline,
-        onNavigateToSettings = onNavigateToSettings,
+        onNavigateToMemories = onNavigateToMemories,
+        onNavigateToMore = onNavigateToMore,
         onPress = recordingViewModel::onPress,
         onRelease = recordingViewModel::onRelease,
         onPauseToggle = recordingViewModel::onPauseToggle,
@@ -101,9 +105,8 @@ fun WearHomeContent(
     homeState: WearHomeUiState,
     modifier: Modifier = Modifier,
     onNavigateToMoodCheckIn: () -> Unit = {},
-    onNavigateToQuickText: () -> Unit = {},
-    onNavigateToTimeline: () -> Unit = {},
-    onNavigateToSettings: () -> Unit = {},
+    onNavigateToMemories: () -> Unit = {},
+    onNavigateToMore: () -> Unit = {},
     onPress: () -> Unit = {},
     onRelease: () -> Unit = {},
     onPauseToggle: () -> Unit = {},
@@ -112,50 +115,31 @@ fun WearHomeContent(
     onAllowMicrophone: () -> Unit = {},
     recordingState: RecordingUiState = RecordingUiState(),
 ) {
-    val isIdle = recordingState.phase == RecordingPhase.READY
-
     ScreenScaffold(
         timeText = { TimeText() },
         modifier = modifier,
     ) {
-        Box(
+        Column(
             modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                RecorderStatus(homeState = homeState, recordingState = recordingState)
-                RecorderControls(
-                    recordingState = recordingState,
-                    onPress = onPress,
-                    onRelease = onRelease,
-                    onPauseToggle = onPauseToggle,
-                    onDiscard = onDiscard,
-                )
-                RecorderFollowUp(
-                    recordingState = recordingState,
-                    onUndo = onUndo,
-                    onAllowMicrophone = onAllowMicrophone,
-                )
-            }
-
-            val bottomAlpha by animateFloatAsState(
-                targetValue = if (isIdle) 1f else 0f,
-                animationSpec = tween(150),
-                label = "bottomAlpha",
+            RecorderStatus(homeState = homeState, recordingState = recordingState)
+            RecorderControls(
+                recordingState = recordingState,
+                onPress = onPress,
+                onRelease = onRelease,
+                onPauseToggle = onPauseToggle,
+                onDiscard = onDiscard,
+                onNavigateToMemories = onNavigateToMemories,
+                onNavigateToMoodCheckIn = onNavigateToMoodCheckIn,
             )
-            if (bottomAlpha > 0f) {
-                HomeActionRow(
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp).alpha(bottomAlpha),
-                    onNavigateToMoodCheckIn = onNavigateToMoodCheckIn,
-                    onNavigateToQuickText = onNavigateToQuickText,
-                    onNavigateToTimeline = onNavigateToTimeline,
-                    onNavigateToSettings = onNavigateToSettings,
-                )
-            }
+            RecorderFollowUp(
+                recordingState = recordingState,
+                onUndo = onUndo,
+                onAllowMicrophone = onAllowMicrophone,
+                onNavigateToMore = onNavigateToMore,
+            )
         }
     }
 }
@@ -163,6 +147,19 @@ fun WearHomeContent(
 /** The text above the record surface: what the recorder is doing or what to do next. */
 @Composable
 private fun RecorderStatus(
+    homeState: WearHomeUiState,
+    recordingState: RecordingUiState,
+) {
+    Box(
+        modifier = Modifier.height(STATUS_SLOT_HEIGHT).fillMaxWidth(),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        RecorderStatusContent(homeState, recordingState)
+    }
+}
+
+@Composable
+private fun RecorderStatusContent(
     homeState: WearHomeUiState,
     recordingState: RecordingUiState,
 ) {
@@ -179,12 +176,22 @@ private fun RecorderStatus(
                     R.string.wear_recorder_paused
                 }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                StatusText(formatDuration(recordingState.recordingDurationMs), MaterialTheme.colorScheme.onSurface)
-                StatusText(stringResource(message), secondary)
+                Text(
+                    text = formatDuration(recordingState.recordingDurationMs),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = stringResource(message),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = secondary,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                )
             }
         }
         RecordingPhase.SAVING -> StatusText(stringResource(R.string.wear_recording_saving), secondary)
-        RecordingPhase.SAVED -> StatusText(savedText(recordingState.saveFeedback), MaterialTheme.colorScheme.primary)
+        RecordingPhase.SAVED -> SavedStatus(recordingState.saveFeedback)
         RecordingPhase.TOO_SHORT -> StatusText(stringResource(R.string.wear_recording_too_short), secondary)
         RecordingPhase.ERROR -> StatusText(errorText(recordingState.error), MaterialTheme.colorScheme.error)
     }
@@ -237,17 +244,35 @@ private fun StatusText(
         style = MaterialTheme.typography.labelMedium,
         color = color,
         textAlign = TextAlign.Center,
-        modifier = Modifier.padding(horizontal = 24.dp),
+        maxLines = 2,
+        modifier = Modifier.padding(horizontal = STATUS_HORIZONTAL_PADDING),
     )
 }
 
 @Composable
-private fun savedText(feedback: SaveFeedback?): String =
-    when (feedback) {
-        SaveFeedback.SYNCING_TO_PHONE -> stringResource(R.string.wear_saved_syncing_to_phone)
-        SaveFeedback.SAVED_LOCALLY -> stringResource(R.string.wear_saved_on_watch)
-        null -> stringResource(R.string.wear_recording_saved)
+private fun SavedStatus(feedback: SaveFeedback?) {
+    val detail =
+        when (feedback) {
+            SaveFeedback.SYNCING_TO_PHONE -> R.string.wear_saved_detail_syncing
+            SaveFeedback.SAVED_LOCALLY -> R.string.wear_saved_detail_watch_only
+            null -> null
+        }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = stringResource(R.string.wear_recording_saved),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        if (detail != null) {
+            Text(
+                text = stringResource(detail),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
     }
+}
 
 @Composable
 private fun errorText(error: RecordingError?): String =
@@ -269,32 +294,39 @@ private fun RecorderControls(
     onRelease: () -> Unit,
     onPauseToggle: () -> Unit,
     onDiscard: () -> Unit,
+    onNavigateToMemories: () -> Unit,
+    onNavigateToMoodCheckIn: () -> Unit,
 ) {
     val phase = recordingState.phase
-    val showSideControls =
+    val isIdle = phase == RecordingPhase.READY
+    val showRecordingControls =
         recordingState.isLatched && (phase == RecordingPhase.RECORDING || phase == RecordingPhase.PAUSED)
     Row(
-        modifier = Modifier.padding(vertical = 8.dp),
+        modifier = Modifier.padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (showSideControls) {
-            SideControl(
-                icon = if (phase == RecordingPhase.PAUSED) Icons.Default.PlayArrow else Icons.Default.Pause,
-                description =
-                    stringResource(
-                        if (phase == RecordingPhase.PAUSED) R.string.wear_recording_resume else R.string.wear_recording_pause,
-                    ),
-                onClick = onPauseToggle,
-            )
+        when {
+            showRecordingControls ->
+                SideControl(
+                    icon = if (phase == RecordingPhase.PAUSED) Icons.Default.PlayArrow else Icons.Default.Pause,
+                    description =
+                        stringResource(
+                            if (phase == RecordingPhase.PAUSED) R.string.wear_recording_resume else R.string.wear_recording_pause,
+                        ),
+                    onClick = onPauseToggle,
+                )
+            isIdle ->
+                SideControl(Icons.Default.Headphones, stringResource(R.string.wear_home_memories), onNavigateToMemories)
+            else -> Spacer(Modifier.size(SIDE_CONTROL_SIZE))
         }
         RecordSurface(phase = phase, isLatched = recordingState.isLatched, onPress = onPress, onRelease = onRelease)
-        if (showSideControls) {
-            SideControl(
-                icon = Icons.Default.Close,
-                description = stringResource(R.string.wear_recorder_discard),
-                onClick = onDiscard,
-            )
+        when {
+            showRecordingControls ->
+                SideControl(Icons.Default.Close, stringResource(R.string.wear_recorder_discard), onDiscard)
+            isIdle ->
+                SideControl(Icons.Default.Mood, stringResource(R.string.wear_home_mood_checkin), onNavigateToMoodCheckIn)
+            else -> Spacer(Modifier.size(SIDE_CONTROL_SIZE))
         }
     }
 }
@@ -307,41 +339,33 @@ private fun SideControl(
 ) {
     IconButton(
         onClick = onClick,
-        modifier = Modifier.size(36.dp),
+        modifier = Modifier.size(SIDE_CONTROL_SIZE),
         colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Icon(imageVector = icon, contentDescription = description, modifier = Modifier.size(18.dp))
     }
 }
 
-/** What sits under the record surface after the recording: Undo for a saved note, or the fix for an error. */
+/** What sits under the record surface: More when idle, Undo for a saved note, or the fix for an error. */
 @Composable
 private fun RecorderFollowUp(
     recordingState: RecordingUiState,
     onUndo: () -> Unit,
     onAllowMicrophone: () -> Unit,
+    onNavigateToMore: () -> Unit,
 ) {
-    when {
-        recordingState.phase == RecordingPhase.SAVED && recordingState.undoableNoteId != null ->
-            CompactButton(onClick = onUndo, label = { Text(stringResource(R.string.wear_recorder_undo)) })
-        recordingState.phase == RecordingPhase.ERROR && recordingState.error == RecordingError.MICROPHONE_PERMISSION_DENIED ->
-            CompactButton(onClick = onAllowMicrophone, label = { Text(stringResource(R.string.wear_onboarding_permissions_allow)) })
-    }
-}
-
-@Composable
-private fun HomeActionRow(
-    onNavigateToMoodCheckIn: () -> Unit,
-    onNavigateToQuickText: () -> Unit,
-    onNavigateToTimeline: () -> Unit,
-    onNavigateToSettings: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        SideControl(Icons.Default.Mood, stringResource(R.string.wear_home_mood_checkin), onNavigateToMoodCheckIn)
-        SideControl(Icons.Default.TextFields, stringResource(R.string.wear_home_quick_text), onNavigateToQuickText)
-        SideControl(Icons.Default.ViewTimeline, stringResource(R.string.wear_home_timeline), onNavigateToTimeline)
-        SideControl(Icons.Default.Settings, stringResource(R.string.wear_home_settings), onNavigateToSettings)
+    Box(
+        modifier = Modifier.height(FOLLOW_UP_SLOT_HEIGHT).fillMaxWidth(),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        when {
+            recordingState.phase == RecordingPhase.READY ->
+                CompactButton(onClick = onNavigateToMore, label = { Text(stringResource(R.string.wear_home_more)) })
+            recordingState.phase == RecordingPhase.SAVED && recordingState.undoableNoteId != null ->
+                CompactButton(onClick = onUndo, label = { Text(stringResource(R.string.wear_recorder_undo)) })
+            recordingState.phase == RecordingPhase.ERROR && recordingState.error == RecordingError.MICROPHONE_PERMISSION_DENIED ->
+                CompactButton(onClick = onAllowMicrophone, label = { Text(stringResource(R.string.wear_onboarding_permissions_allow)) })
+        }
     }
 }
 
@@ -381,7 +405,7 @@ fun RecordSurface(
     Box(
         modifier =
             modifier
-                .size(80.dp)
+                .size(RECORD_SURFACE_SIZE)
                 .scale(scale)
                 .clip(CircleShape)
                 .background(color)
@@ -419,7 +443,7 @@ private fun RecordSurfaceIcon(
             phase == RecordingPhase.SAVED -> Icons.Default.Check to MaterialTheme.colorScheme.onPrimaryContainer
             isRecording && isLatched -> Icons.Default.Stop to MaterialTheme.colorScheme.onPrimary
             isRecording -> Icons.Default.Mic to MaterialTheme.colorScheme.onPrimary
-            phase == RecordingPhase.PAUSED -> Icons.Default.PlayArrow to MaterialTheme.colorScheme.onSurface
+            phase == RecordingPhase.PAUSED -> Icons.Default.Stop to MaterialTheme.colorScheme.onSurface
             else -> Icons.Default.Mic to MaterialTheme.colorScheme.onSurface
         }
     Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(32.dp), tint = tint)
@@ -431,6 +455,6 @@ private fun recordSurfaceDescription(
 ): Int =
     when {
         phase == RecordingPhase.RECORDING && isLatched -> R.string.wear_recording_stop
-        phase == RecordingPhase.PAUSED -> R.string.wear_recording_resume
+        phase == RecordingPhase.PAUSED -> R.string.wear_recording_stop
         else -> R.string.wear_home_record_audio
     }
