@@ -45,7 +45,12 @@ enum class RecordingError {
     MICROPHONE_PERMISSION_DENIED,
     NOT_ENOUGH_STORAGE,
     RECORDER_UNAVAILABLE,
+
+    /** The recording finished but could not be stored. Its file is intact and pressing again saves it. */
     SAVE_FAILED,
+
+    /** The recorder produced no usable file, so there is nothing to save. */
+    RECORDING_LOST,
 }
 
 data class RecordingUiState(
@@ -111,6 +116,9 @@ class WearRecordingViewModel(
     private var nearLimitWarned = false
     private var undoJob: Job? = null
 
+    /** A finalized recording that could not be stored, kept so the next press saves it rather than losing it. */
+    private var unsavedPath: String? = null
+
     init {
         observeRecorder()
     }
@@ -122,7 +130,8 @@ class WearRecordingViewModel(
 
     fun onPress() {
         when (_uiState.value.phase) {
-            RecordingPhase.READY, RecordingPhase.ERROR -> beginRecording()
+            RecordingPhase.READY -> beginRecording()
+            RecordingPhase.ERROR -> retrySaveOrBeginRecording()
             RecordingPhase.SAVED -> {
                 // Recording again keeps the last note; the undo window ends.
                 undoJob?.cancel()
@@ -175,7 +184,14 @@ class WearRecordingViewModel(
         }
     }
 
+    private fun retrySaveOrBeginRecording() {
+        val path = unsavedPath ?: return beginRecording()
+        _uiState.update { it.copy(phase = RecordingPhase.SAVING, error = null) }
+        viewModelScope.launch { saveRecording(path) }
+    }
+
     private fun beginRecording() {
+        unsavedPath = null
         pressedAtMs = now()
         releasedAtMs = null
         nearLimitWarned = false
@@ -211,7 +227,7 @@ class WearRecordingViewModel(
             val path = recorder.stop()
             if (path == null) {
                 Napier.e("Recording ended without a file")
-                _uiState.update { it.copy(phase = RecordingPhase.ERROR, error = RecordingError.SAVE_FAILED) }
+                _uiState.update { it.copy(phase = RecordingPhase.ERROR, error = RecordingError.RECORDING_LOST) }
                 return@launch
             }
             saveRecording(path)
@@ -242,6 +258,7 @@ class WearRecordingViewModel(
             onSaved(note, durationMs)
         } catch (e: Exception) {
             Napier.e("Failed to save recording $path", e)
+            unsavedPath = path
             _uiState.update { it.copy(phase = RecordingPhase.ERROR, error = RecordingError.SAVE_FAILED) }
         }
     }
@@ -250,6 +267,7 @@ class WearRecordingViewModel(
         note: JournalNote.Audio,
         durationMs: Long,
     ) {
+        unsavedPath = null
         val feedback =
             if (dataLayerClient.isPhoneConnected()) SaveFeedback.SYNCING_TO_PHONE else SaveFeedback.SAVED_LOCALLY
         hintStore.markHintSeen()
@@ -271,6 +289,7 @@ class WearRecordingViewModel(
     }
 
     private suspend fun discardTooShort(path: String) {
+        unsavedPath = null
         deleteFile(path)
         haptics.rejection()
         _uiState.update { it.copy(phase = RecordingPhase.TOO_SHORT) }

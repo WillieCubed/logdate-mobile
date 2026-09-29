@@ -145,8 +145,9 @@
     <string name="wear_recorder_undo">Undo</string>
     <string name="wear_recorder_error_microphone">Microphone is off</string>
     <string name="wear_recorder_error_storage">Watch storage is full</string>
-    <string name="wear_recorder_error_unavailable">Couldn\'t start. Try again</string>
-    <string name="wear_recorder_error_save">Couldn\'t save. Try again</string>
+    <string name="wear_recorder_error_unavailable">Couldn\'t start.\nTry again</string>
+    <string name="wear_recorder_error_save">Couldn\'t save.\nTap to retry</string>
+    <string name="wear_recorder_error_lost">Recording lost.\nTry again</string>
 
     <!-- Quick Text -->
     <string name="wear_quick_text_prompt">What\'s on your mind?</string>

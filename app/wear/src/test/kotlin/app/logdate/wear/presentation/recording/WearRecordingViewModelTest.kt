@@ -443,7 +443,7 @@ class WearRecordingViewModelTest {
         }
 
     @Test
-    fun `a recording that produced no file is reported and creates no note`() =
+    fun `a recording that produced no file is reported as lost and creates no note`() =
         runTest {
             recorder.stopPath = null
             val viewModel = createViewModel()
@@ -452,12 +452,27 @@ class WearRecordingViewModelTest {
             press(viewModel)
 
             assertEquals(RecordingPhase.ERROR, viewModel.uiState.value.phase)
-            assertEquals(RecordingError.SAVE_FAILED, viewModel.uiState.value.error)
+            assertEquals(RecordingError.RECORDING_LOST, viewModel.uiState.value.error)
             coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
         }
 
     @Test
-    fun `a note that cannot be stored is reported and its file is left for recovery`() =
+    fun `pressing after a lost recording starts a new one`() =
+        runTest {
+            recorder.stopPath = null
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            press(viewModel)
+            recorder.stopPath = "/fake/audio.m4a"
+
+            press(viewModel)
+
+            assertEquals(RecordingPhase.RECORDING, viewModel.uiState.value.phase)
+            assertEquals(2, recorder.starts)
+        }
+
+    @Test
+    fun `a note that cannot be stored is reported and its file is not deleted`() =
         runTest {
             coEvery { notesRepository.create(any<JournalNote>()) } throws IllegalStateException("database closed")
             val viewModel = createViewModel()
@@ -467,6 +482,45 @@ class WearRecordingViewModelTest {
 
             assertEquals(RecordingError.SAVE_FAILED, viewModel.uiState.value.error)
             assertTrue(deletedFiles.isEmpty())
+        }
+
+    @Test
+    fun `pressing after a failed save saves the same recording instead of starting another`() =
+        runTest {
+            recorder.stopPath = "/files/audio_notes/kept-safe.m4a"
+            val created = mutableListOf<JournalNote>()
+            var failures = 1
+            coEvery { notesRepository.create(any<JournalNote>()) } answers {
+                if (failures-- > 0) throw IllegalStateException("database closed")
+                created += firstArg<JournalNote>()
+                Uuid.random()
+            }
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            press(viewModel)
+            assertEquals(RecordingError.SAVE_FAILED, viewModel.uiState.value.error)
+
+            press(viewModel)
+
+            assertEquals(RecordingPhase.SAVED, viewModel.uiState.value.phase)
+            assertEquals(1, recorder.starts)
+            assertEquals(1, recorder.stops)
+            assertEquals("/files/audio_notes/kept-safe.m4a", (created.single() as JournalNote.Audio).mediaRef)
+        }
+
+    @Test
+    fun `a save that keeps failing stays retryable`() =
+        runTest {
+            coEvery { notesRepository.create(any<JournalNote>()) } throws IllegalStateException("database closed")
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            press(viewModel)
+
+            press(viewModel)
+            press(viewModel)
+
+            assertEquals(RecordingError.SAVE_FAILED, viewModel.uiState.value.error)
+            assertEquals(1, recorder.starts)
         }
 
     @Test

@@ -282,6 +282,7 @@ private fun errorText(error: RecordingError?): String =
             RecordingError.NOT_ENOUGH_STORAGE -> R.string.wear_recorder_error_storage
             RecordingError.RECORDER_UNAVAILABLE -> R.string.wear_recorder_error_unavailable
             RecordingError.SAVE_FAILED -> R.string.wear_recorder_error_save
+            RecordingError.RECORDING_LOST -> R.string.wear_recorder_error_lost
             null -> R.string.wear_recording_error
         },
     )

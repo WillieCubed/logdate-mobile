@@ -157,6 +157,20 @@ class WearHomeScreenshots {
     fun S13_HomeErrorStorage() {
         HomeWithRecorder(RecordingUiState(phase = RecordingPhase.ERROR, error = RecordingError.NOT_ENOUGH_STORAGE))
     }
+
+    @PreviewTest
+    @WearScreenshotPreviewMatrix
+    @Composable
+    fun S14_HomeErrorSaveFailed() {
+        HomeWithRecorder(RecordingUiState(phase = RecordingPhase.ERROR, error = RecordingError.SAVE_FAILED))
+    }
+
+    @PreviewTest
+    @WearScreenshotPreviewMatrix
+    @Composable
+    fun S15_HomeErrorRecordingLost() {
+        HomeWithRecorder(RecordingUiState(phase = RecordingPhase.ERROR, error = RecordingError.RECORDING_LOST))
+    }
 }
 
 @Composable

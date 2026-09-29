@@ -39,7 +39,8 @@ Errors say what failed and what to do:
 | Microphone permission denied | "Microphone is off" | An Allow button |
 | Not enough space for a full-length recording | "Watch storage is full" | |
 | The recorder did not start | "Couldn't start. Try again" | Press again |
-| The recording could not be saved | "Couldn't save. Try again" | Press again |
+| The recording finished but could not be stored | "Couldn't save. Tap to retry" | Press again: it saves the same recording rather than starting a new one |
+| The recorder produced no usable file | "Recording lost. Try again" | Press again to start a new recording |
 
 A call or another app taking the audio pauses the recording, and the screen says "Paused by another
 app". It does not resume by itself.
@@ -80,7 +81,8 @@ already exercised on the phone.
    acknowledges it. See the sync notes in [`app/wear/README.md`](../../app/wear/README.md).
 
 **Not covered yet:** a recording in progress when the watch app is killed leaves an unfinalized file that
-nothing recovers, and a `SAVE_FAILED` leaves its file on disk with no note.
+nothing recovers. An MPEG-4 file has no index until the recorder finishes it, so it cannot be played
+back, and recovering it would need a crash-safe output format.
 
 ## Haptics
 
