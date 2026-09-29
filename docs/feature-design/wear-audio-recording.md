@@ -11,6 +11,7 @@ two ways to use it, and nothing between pressing it and being recorded.
 | Press and hold | Recording starts at once and saves when you let go, like a walkie-talkie |
 | Stop | The note is saved immediately. For five seconds an **Undo** button removes it and its audio file |
 | Record again during the Undo window | The previous note stays saved and the window closes |
+| Close the app or swipe back out of the screen while recording | The recording is stopped and saved, the same as tapping stop. Sending the app to the background with the side button does not stop it |
 
 A recording shorter than half a second is dropped as "Too short". Recordings stop on their own at 30
 minutes, with a haptic warning a minute before, and are saved. That length is about 29 MB of audio, which
@@ -79,6 +80,10 @@ already exercised on the phone.
    never deleted.
 4. The note reaches the phone over the Data Layer, and the watch keeps it pending until the phone
    acknowledges it. See the sync notes in [`app/wear/README.md`](../../app/wear/README.md).
+5. An Undo also tells the phone. A note that is still pending is dropped from the watch's queue before
+   it is ever sent, so the watch sends the phone an explicit delete, and the phone records that the note
+   was deleted. Data items and channels are not ordered against each other, so a delete can arrive
+   before the note it removes, and without that record the late note and audio would be stored anyway.
 
 **Not covered yet:** a recording in progress when the watch app is killed leaves an unfinalized file that
 nothing recovers. An MPEG-4 file has no index until the recorder finishes it, so it cannot be played

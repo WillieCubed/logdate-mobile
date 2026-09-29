@@ -12,8 +12,10 @@ Nothing below installs from your computer to the watch: install from Play on bot
    under the Wear OS track in Play Console.
 3. LogDate is installed on the phone from Play, and you are signed in.
 4. LogDate is installed on the watch from the Play Store on the watch. Allow the microphone when asked.
-5. Any older watch install under the retired `app.logdate.wear` package is uninstalled. It will not
-   update in place, and it holds no data worth keeping because the watch never synced to a server.
+5. An older watch install under the retired `app.logdate.wear` package can stay while you test; it is a
+   separate app and does not interfere. It will not update in place, and it never synced to the phone,
+   so any recordings still on it exist nowhere else. Play them back or export them before you
+   uninstall it.
 
 Bring the phone and watch within range and confirm the watch's Settings screen says it is connected.
 
@@ -27,6 +29,9 @@ Bring the phone and watch within range and confirm the watch's Settings screen s
 | Tap, pause, resume, stop | The timer stops while paused, and the saved length matches what you recorded |
 | Tap, then Discard | Back to ready, nothing saved |
 | Save a recording, then Undo within five seconds | The note is gone from the watch, and from the phone a few seconds later |
+| Record, then swipe back out of the app before stopping | The recording is saved, not lost, and appears in Voice memories |
+| Record, then press the side button, then reopen LogDate | The recording continued while the app was in the background, and the screen still shows it recording |
+| Undo a recording with the phone out of range, then bring it back | The note never appears on the phone |
 | Record for 5 minutes with the screen off | A full-length recording, with sound throughout |
 | Keep a recording going past 29 minutes | A haptic warning, then a save at 30 minutes |
 
