@@ -128,9 +128,9 @@ class AudioSyncFlowTest {
 
             // --- Assert: Verify the complete pipeline ---
 
-            // 1. Sync succeeded
+            // 1. Sending succeeded, and the note still waits for the phone's acknowledgement
             assertTrue(result.success, "Sync should succeed")
-            assertEquals(1, result.uploadedItems, "One note should be uploaded")
+            assertEquals(0, result.uploadedItems, "The note is not counted uploaded until acknowledged")
 
             // 2. Note metadata was put at the correct path
             assertEquals(NoteDataMapper.notePath(noteId), capturedPath.captured)
@@ -146,7 +146,11 @@ class AudioSyncFlowTest {
             assertEquals("${NoteDataMapper.notePath(noteId)}/audio", capturedChannelPath.captured)
             assertEquals(audioFilePath, capturedFilePath.captured)
 
-            // 5. Note was marked as synced in the outbox
+            // 5. Note stays in the outbox until the phone confirms it has the note and its audio
+            coVerify(exactly = 0) { syncMetadataService.markAsSynced(any(), any(), any(), any()) }
+
+            // 6. The phone's acknowledgement clears it
+            syncManager.onNoteAcknowledged(noteId)
             coVerify {
                 syncMetadataService.markAsSynced(
                     entityId = noteId.toString(),
@@ -156,7 +160,7 @@ class AudioSyncFlowTest {
                 )
             }
 
-            // 6. Result has a last sync time
+            // 7. Result has a last sync time
             assertNotNull(result.lastSyncTime)
         }
 
@@ -203,11 +207,11 @@ class AudioSyncFlowTest {
         }
 
     // =======================================================================
-    // Scenario: Audio metadata syncs but file transfer fails (Bluetooth flaky)
+    // Scenario: Audio metadata is delivered but file transfer fails (Bluetooth flaky)
     // =======================================================================
 
     @Test
-    fun `audio metadata syncs even when file transfer fails`() =
+    fun `audio note stays pending for retry when file transfer fails`() =
         runTest {
             val noteId = Uuid.random()
             val audioNote =
@@ -230,14 +234,13 @@ class AudioSyncFlowTest {
 
             val result = syncManager.syncContent()
 
-            // Metadata sync still counts as success — phone can request file later
-            assertTrue(result.success)
-            assertEquals(1, result.uploadedItems)
+            // Without the audio the phone cannot store the note, so the attempt fails and retries
+            assertTrue(!result.success)
+            assertEquals(0, result.uploadedItems)
+            assertTrue(result.errors.first().retryable)
 
-            // Note is marked synced so we don't re-send metadata
-            coVerify {
-                syncMetadataService.markAsSynced(noteId.toString(), EntityType.NOTE, any(), any())
-            }
+            coVerify(exactly = 0) { syncMetadataService.markAsSynced(any(), any(), any(), any()) }
+            coVerify { syncMetadataService.incrementRetryCount(noteId.toString(), EntityType.NOTE) }
         }
 
     // =======================================================================
@@ -271,13 +274,14 @@ class AudioSyncFlowTest {
             val result = syncManager.syncContent()
 
             assertTrue(result.success)
-            assertEquals(5, result.uploadedItems)
 
             // 5 metadata puts + 5 file sends
             coVerify(exactly = 5) { dataLayerClient.putDataItem(any(), any()) }
             coVerify(exactly = 5) { dataLayerClient.sendFile(any(), any()) }
 
-            // All 5 marked as synced
+            // Nothing is marked synced until the phone acknowledges each note
+            coVerify(exactly = 0) { syncMetadataService.markAsSynced(any(), any(), any(), any()) }
+            for ((id, _) in notes) syncManager.onNoteAcknowledged(id)
             coVerify(exactly = 5) {
                 syncMetadataService.markAsSynced(any(), EntityType.NOTE, any(), any())
             }

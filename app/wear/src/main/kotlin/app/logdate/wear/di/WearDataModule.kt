@@ -38,8 +38,11 @@ import app.logdate.wear.sync.GoogleWearDataLayerClient
 import app.logdate.wear.sync.NoteDataMapper
 import app.logdate.wear.sync.WearDataLayerClient
 import app.logdate.wear.sync.WearDataLayerSyncManager
+import app.logdate.wear.sync.WearNoteAckHandler
+import app.logdate.wear.sync.WearPhoneMessageHandler
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.json.Json
+import org.koin.dsl.binds
 import org.koin.dsl.module
 
 /**
@@ -77,7 +80,7 @@ val wearDataModule =
         single { HealthSnapshotDataMapper(get()) }
         single<SyncDeadLetterStore> { KeyValueSyncDeadLetterStore(get()) }
         single<SyncRetryScheduleStore> { KeyValueSyncRetryScheduleStore(get()) }
-        single<SyncManager> {
+        single {
             WearDataLayerSyncManager(
                 dataLayerClient = get(),
                 syncMetadataService = get(),
@@ -91,7 +94,8 @@ val wearDataModule =
                 associationDataMapper = get(),
                 healthSnapshotDataMapper = get(),
             )
-        }
+        } binds arrayOf(SyncManager::class, WearNoteAckHandler::class)
+        single { WearPhoneMessageHandler(ackHandler = get(), syncManager = get()) }
 
         // Health sensor manager: use Health Services when available, then degrade gracefully.
         single<WearHealthSensorManager> {

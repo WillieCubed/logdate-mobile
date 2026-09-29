@@ -31,6 +31,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -132,6 +133,25 @@ class WearDataLayerSyncManagerTest {
                 healthSnapshotDataMapper = healthSnapshotDataMapper,
             )
     }
+
+    private fun fixedClockSyncManager(): WearDataLayerSyncManager =
+        WearDataLayerSyncManager(
+            dataLayerClient = dataLayerClient,
+            syncMetadataService = syncMetadataService,
+            retryScheduleStore = retryScheduleStore,
+            deadLetterStore = deadLetterStore,
+            notesRepository = notesRepository,
+            journalRepository = journalRepository,
+            healthSnapshotDao = healthSnapshotDao,
+            noteDataMapper = noteDataMapper,
+            journalDataMapper = journalDataMapper,
+            associationDataMapper = associationDataMapper,
+            healthSnapshotDataMapper = healthSnapshotDataMapper,
+            clock =
+                object : Clock {
+                    override fun now(): Instant = fixedTime
+                },
+        )
 
     // =======================================================================
     // getSyncStatus
@@ -325,7 +345,7 @@ class WearDataLayerSyncManagerTest {
         }
 
     @Test
-    fun `upload succeeds for audio note even when file transfer fails`() =
+    fun `upload fails for audio note when file transfer fails`() =
         runTest {
             coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
                 listOf(
@@ -336,9 +356,127 @@ class WearDataLayerSyncManagerTest {
 
             val result = syncManager.uploadPendingChanges()
 
-            // Metadata was sent successfully, so the upload counts as success
+            assertFalse(result.success)
+            assertEquals(0, result.uploadedItems)
+            coVerify { syncMetadataService.incrementRetryCount(noteId.toString(), EntityType.NOTE) }
+            coVerify(exactly = 0) { syncMetadataService.markAsSynced(any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `upload leaves an audio note pending until the phone acknowledges it`() =
+        runTest {
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(
+                    PendingUpload(noteId.toString(), PendingOperation.CREATE),
+                )
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote
+
+            val result = syncManager.uploadPendingChanges()
+
             assertTrue(result.success)
-            assertEquals(1, result.uploadedItems)
+            assertEquals(0, result.uploadedItems)
+            coVerify(exactly = 0) { syncMetadataService.markAsSynced(any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `upload holds off resending an unacknowledged audio note for the acknowledgement window`() =
+        runTest {
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(
+                    PendingUpload(noteId.toString(), PendingOperation.CREATE),
+                )
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote
+
+            fixedClockSyncManager().uploadPendingChanges()
+
+            coVerify {
+                retryScheduleStore.setNextAttemptAt(
+                    EntityType.NOTE,
+                    noteId.toString(),
+                    fixedTime.toEpochMilliseconds() + WearDataLayerSyncManager.ACK_TIMEOUT_MS,
+                )
+            }
+        }
+
+    @Test
+    fun `upload skips an audio note still inside its acknowledgement window`() =
+        runTest {
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(
+                    PendingUpload(noteId.toString(), PendingOperation.CREATE, retryCount = 1),
+                )
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote
+            coEvery { retryScheduleStore.nextAttemptAt(EntityType.NOTE, noteId.toString()) } returns
+                fixedTime.toEpochMilliseconds() + 1
+
+            fixedClockSyncManager().uploadPendingChanges()
+
+            coVerify(exactly = 0) { dataLayerClient.putDataItem(any(), any()) }
+            coVerify(exactly = 0) { dataLayerClient.sendFile(any(), any()) }
+        }
+
+    @Test
+    fun `upload resends an unacknowledged audio note once the window has passed`() =
+        runTest {
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(
+                    PendingUpload(noteId.toString(), PendingOperation.CREATE, retryCount = 1),
+                )
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote
+            coEvery { retryScheduleStore.nextAttemptAt(EntityType.NOTE, noteId.toString()) } returns
+                fixedTime.toEpochMilliseconds()
+
+            fixedClockSyncManager().uploadPendingChanges()
+
+            coVerify(exactly = 1) { dataLayerClient.sendFile(any(), audioNote.mediaRef) }
+        }
+
+    @Test
+    fun `upload stamps each audio send so the phone sees a changed data item`() =
+        runTest {
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(
+                    PendingUpload(noteId.toString(), PendingOperation.CREATE),
+                )
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote
+            val sentData = mutableListOf<Map<String, String>>()
+            coEvery { dataLayerClient.putDataItem(any(), capture(sentData)) } returns true
+
+            fixedClockSyncManager().uploadPendingChanges()
+
+            assertEquals(
+                fixedTime.toEpochMilliseconds().toString(),
+                sentData.single()[WearDataLayerSyncManager.KEY_SENT_AT],
+            )
+        }
+
+    @Test
+    fun `upload gives up on an audio note the phone never acknowledges after the maximum attempts`() =
+        runTest {
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(
+                    PendingUpload(
+                        noteId.toString(),
+                        PendingOperation.CREATE,
+                        retryCount = WearDataLayerSyncManager.MAX_RETRY_ATTEMPTS - 1,
+                    ),
+                )
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote
+
+            val result = syncManager.uploadPendingChanges()
+
+            assertFalse(result.success)
+            assertEquals(false, result.errors.single().retryable)
+            coVerify { deadLetterStore.add(any()) }
+        }
+
+    @Test
+    fun `acknowledged audio note is marked synced and its retry schedule cleared`() =
+        runTest {
+            syncManager.onNoteAcknowledged(noteId)
+
+            coVerify { syncMetadataService.markAsSynced(noteId.toString(), EntityType.NOTE, any(), any()) }
+            coVerify { retryScheduleStore.clear(EntityType.NOTE, noteId.toString()) }
         }
 
     @Test
@@ -435,7 +573,8 @@ class WearDataLayerSyncManagerTest {
             val result = syncManager.uploadPendingChanges()
 
             assertTrue(result.success)
-            assertEquals(2, result.uploadedItems)
+            // The text note is delivered; the audio note waits for the phone's acknowledgement
+            assertEquals(1, result.uploadedItems)
             // File sent only for audio, not text
             coVerify(exactly = 1) { dataLayerClient.sendFile(any(), any()) }
             coVerify(exactly = 2) { dataLayerClient.putDataItem(any(), any()) }

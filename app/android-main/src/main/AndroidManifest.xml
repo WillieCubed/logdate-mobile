@@ -259,6 +259,13 @@
                     android:host="*"
                     android:pathPrefix="/logdate/camera" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.CHANNEL_EVENT" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/logdate/notes" />
+            </intent-filter>
         </service>
 
         <!--

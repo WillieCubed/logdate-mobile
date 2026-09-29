@@ -7,10 +7,8 @@ import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.remote.RemoteCameraActivity
 import app.logdate.client.remote.RemoteCameraSessionController
-import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.SyncableJournalContentRepository
-import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.client.sync.datalayer.AssociationDataMapper
 import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
@@ -18,9 +16,11 @@ import app.logdate.client.sync.datalayer.JournalDataMapper
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import app.logdate.feature.editor.ui.camera.CameraRemoteCommand
+import com.google.android.gms.wearable.ChannelClient
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
+import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
@@ -30,14 +30,17 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import java.io.InputStream
 
 /**
  * Receives data items from the paired Wear OS watch via the Data Layer API.
  *
- * Handles notes, journals, journal-content associations, and health snapshots.
- * Uses sync-aware repository methods (e.g. [SyncableJournalNotesRepository.createFromSync])
- * to avoid re-triggering outbound sync.
+ * Handles notes, journals, journal-content associations, health snapshots, and the audio files
+ * that go with watch audio notes. Notes and audio go through [WatchNoteIngestor], which queues
+ * them for cloud backup once they are complete and tells the watch they arrived. Journals and
+ * associations use sync-aware repository methods so they don't re-trigger outbound sync.
  *
  * For new notes, a notification is posted so the user can tap to expand the note
  * in the editor (entry handoff).
@@ -141,6 +144,43 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
         }
     }
 
+    override fun onChannelOpened(channel: ChannelClient.Channel) {
+        if (!WearAudioRequestPaths.isAudioTransferPath(channel.path)) {
+            Napier.d("Ignoring channel at unknown path: ${channel.path}")
+            return
+        }
+        serviceScope.launch { receiveAudioChannel(channel) }
+    }
+
+    /**
+     * Streams the watch's audio file into the ingestor. Runs inside [NonCancellable] so a service
+     * teardown mid-transfer does not leave a half-received file for the watch to retry.
+     */
+    private suspend fun receiveAudioChannel(channel: ChannelClient.Channel) =
+        withContext(NonCancellable) {
+            val noteId =
+                runCatching { WearAudioRequestPaths.noteIdFromAudioTransferPath(channel.path) }
+                    .getOrElse { error ->
+                        Napier.w("Invalid audio transfer path: ${channel.path}", error)
+                        closeChannel(channel)
+                        return@withContext
+                    }
+            val ingestor = resolveSyncDependencies()?.noteIngestor
+            if (ingestor == null) {
+                Napier.e("Koin unavailable, dropping audio from the watch for note $noteId")
+                closeChannel(channel)
+                return@withContext
+            }
+
+            try {
+                openChannelInput(channel).use { input -> ingestor.onAudioBytes(noteId, input) }
+            } catch (e: Exception) {
+                Napier.w("Failed to receive audio from the watch for note $noteId", e)
+            } finally {
+                closeChannel(channel)
+            }
+        }
+
     override fun onDataChanged(dataEvents: DataEventBuffer) {
         // Snapshot events before they are recycled by the system
         val events = mutableListOf<PhoneDataLayerSnapshotEvent>()
@@ -172,9 +212,8 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
     protected open suspend fun resolveSyncDependencies(): PhoneDataLayerSyncDependencies? {
         val koin = resolveKoin() ?: return null
         return PhoneDataLayerSyncDependencies(
-            notesRepository = koin.get(),
+            noteIngestor = koin.get(),
             journalRepository = koin.get(),
-            notificationHelper = koin.get(),
             contentRepository = koin.getOrNull(),
             journalContentDao = koin.getOrNull(),
             healthSnapshotDao = koin.get(),
@@ -193,10 +232,8 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
 
         try {
             when {
-                NoteDataMapper.isDeletePath(path) -> handleNoteDelete(path, dependencies.notesRepository)
-                NoteDataMapper.isNotePath(
-                    path,
-                ) -> handleNoteSync(event, path, dependencies.notesRepository, dependencies.notificationHelper)
+                NoteDataMapper.isDeletePath(path) -> handleNoteDelete(path, dependencies.noteIngestor)
+                NoteDataMapper.isNotePath(path) -> handleNoteSync(event, path, dependencies.noteIngestor)
                 JournalDataMapper.isDeletePath(path) -> handleJournalDelete(path, dependencies.journalRepository)
                 JournalDataMapper.isJournalPath(path) -> handleJournalSync(event, path, dependencies.journalRepository)
                 AssociationDataMapper.isDeletePath(path) -> handleAssociationDelete(path, dependencies)
@@ -210,7 +247,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
 
     private suspend fun handleNoteDelete(
         path: String,
-        notesRepository: JournalNotesRepository,
+        ingestor: WatchNoteIngestor,
     ) {
         val noteId =
             try {
@@ -222,11 +259,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
 
         Napier.d("Received delete signal from watch for note: $noteId")
         try {
-            if (notesRepository is SyncableJournalNotesRepository) {
-                notesRepository.deleteFromSync(noteId)
-            } else {
-                notesRepository.removeById(noteId)
-            }
+            ingestor.onNoteDeleted(noteId)
         } catch (e: Exception) {
             Napier.w("Failed to delete synced note from watch: $noteId", e)
         }
@@ -235,18 +268,10 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
     private suspend fun handleNoteSync(
         event: PhoneDataLayerSnapshotEvent,
         path: String,
-        notesRepository: JournalNotesRepository,
-        notificationHelper: WearSyncNotificationHelper,
+        ingestor: WatchNoteIngestor,
     ) {
         try {
-            val note = noteDataMapper.fromDataMap(event.data)
-            Napier.d("Received note from watch: ${note.uid} (${note.type})")
-            if (notesRepository is SyncableJournalNotesRepository) {
-                notesRepository.createFromSync(note)
-            } else {
-                notesRepository.create(note)
-            }
-            notificationHelper.notifyNoteReceived(note)
+            ingestor.onNoteMetadata(event.data)
         } catch (e: Exception) {
             Napier.w("Failed to process synced note from watch at path: $path", e)
         }
@@ -387,6 +412,14 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
 
     protected open suspend fun resolvePhoneWearSyncBridge(): PhoneWearSyncBridge? = resolveKoin()?.get()
 
+    protected open suspend fun openChannelInput(channel: ChannelClient.Channel): InputStream =
+        Wearable.getChannelClient(this).getInputStream(channel).await()
+
+    protected open suspend fun closeChannel(channel: ChannelClient.Channel) {
+        runCatching { Wearable.getChannelClient(this).close(channel).await() }
+            .onFailure { error -> Napier.w("Failed to close audio channel ${channel.path}", error) }
+    }
+
     protected open fun launchCamera() {
         startActivity(RemoteCameraActivity.createIntent(this))
     }
@@ -419,9 +452,8 @@ data class PhoneDataLayerSnapshotEvent(
 )
 
 data class PhoneDataLayerSyncDependencies(
-    val notesRepository: JournalNotesRepository,
+    val noteIngestor: WatchNoteIngestor,
     val journalRepository: JournalRepository,
-    val notificationHelper: WearSyncNotificationHelper,
     val contentRepository: SyncableJournalContentRepository? = null,
     val journalContentDao: JournalContentDao? = null,
     val healthSnapshotDao: HealthSnapshotDao,

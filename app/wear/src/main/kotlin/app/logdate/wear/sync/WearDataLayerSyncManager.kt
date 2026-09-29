@@ -41,7 +41,8 @@ import kotlin.uuid.Uuid
  * - Exponential backoff (5s base, 5min cap) for transient failures
  * - Dead letter queue for permanently failed items (after 5 attempts)
  * - Parent-before-child ordering (journals → notes → associations → health)
- * - Audio file retry tracking (metadata success + file failure tracked separately)
+ * - Audio notes stay pending until the phone acknowledges them, and are resent after
+ *   [ACK_TIMEOUT_MS] without one
  *
  * Incoming data from the phone is handled by [WearDataLayerListenerService].
  */
@@ -58,7 +59,8 @@ class WearDataLayerSyncManager(
     private val associationDataMapper: AssociationDataMapper,
     private val healthSnapshotDataMapper: HealthSnapshotDataMapper,
     private val clock: Clock = Clock.System,
-) : SyncManager {
+) : SyncManager,
+    WearNoteAckHandler {
     @Volatile
     private var isSyncing = false
 
@@ -113,6 +115,16 @@ class WearDataLayerSyncManager(
             errors = errors,
             lastSyncTime = now,
         )
+    }
+
+    override suspend fun onNoteAcknowledged(noteId: Uuid) {
+        syncMetadataService.markAsSynced(
+            entityId = noteId.toString(),
+            entityType = EntityType.NOTE,
+            syncedAt = clock.now(),
+            version = 1,
+        )
+        retryScheduleStore.clear(EntityType.NOTE, noteId.toString())
     }
 
     override suspend fun downloadRemoteChanges(): SyncResult {
@@ -348,28 +360,31 @@ class WearDataLayerSyncManager(
             return UploadOutcome.SKIPPED
         }
 
-        val dataMap = noteDataMapper.toDataMap(note)
         val path = NoteDataMapper.notePath(noteId)
-        val putSuccess = dataLayerClient.putDataItem(path, dataMap)
+        val putSuccess = dataLayerClient.putDataItem(path, dataMapFor(note))
 
         if (!putSuccess) {
             Napier.w("Failed to put data item for note $noteId")
             return UploadOutcome.FAILED
         }
 
-        // For audio notes, also send the audio file via channel
-        if (note is JournalNote.Audio) {
-            val channelPath = "$path/audio"
-            val fileSuccess = dataLayerClient.sendFile(channelPath, note.mediaRef)
-            if (!fileSuccess) {
-                Napier.w("Audio file transfer failed for note $noteId, metadata was sent")
-                // Metadata succeeded — phone has the note and can request the
-                // file later. The note will be re-synced (with file retry) on
-                // the next full sync cycle since metadata is already delivered.
-            }
-        }
+        if (note !is JournalNote.Audio) return UploadOutcome.SUCCESS
 
-        return UploadOutcome.SUCCESS
+        if (!dataLayerClient.sendFile("$path/audio", note.mediaRef)) {
+            Napier.w("Audio file transfer failed for note $noteId")
+            return UploadOutcome.FAILED
+        }
+        return UploadOutcome.AWAITING_ACK
+    }
+
+    /**
+     * Audio notes carry the send time so a resend is a changed data item. The Data Layer drops a
+     * put that matches what it already holds, and the phone may have lost the earlier one.
+     */
+    private fun dataMapFor(note: JournalNote): Map<String, String> {
+        val dataMap = noteDataMapper.toDataMap(note)
+        if (note !is JournalNote.Audio) return dataMap
+        return dataMap + (KEY_SENT_AT to clock.now().toEpochMilliseconds().toString())
     }
 
     private suspend fun uploadNoteDelete(pending: PendingUpload): UploadOutcome {
@@ -492,6 +507,7 @@ class WearDataLayerSyncManager(
         pending: PendingUpload,
         entityType: EntityType,
         errorMessage: String,
+        retryDelayMs: Long? = null,
     ): Boolean {
         val nextRetryCount = pending.retryCount + 1
         syncMetadataService.incrementRetryCount(pending.entityId, entityType)
@@ -521,7 +537,7 @@ class WearDataLayerSyncManager(
         }
 
         // Schedule next attempt with exponential backoff
-        val backoffMs = computeBackoffMs(nextRetryCount)
+        val backoffMs = retryDelayMs ?: computeBackoffMs(nextRetryCount)
         val nextAttemptAt = clock.now().toEpochMilliseconds() + backoffMs
         retryScheduleStore.setNextAttemptAt(entityType, pending.entityId, nextAttemptAt)
         Napier.d(
@@ -584,6 +600,13 @@ class WearDataLayerSyncManager(
                 )
                 retryScheduleStore.clear(entityType, pending.entityId)
             }
+            UploadOutcome.AWAITING_ACK -> {
+                val errorMsg = "Phone did not confirm ${entityType.name.lowercase()} ${pending.entityId}"
+                val deadLettered = handleSyncFailure(pending, entityType, errorMsg, retryDelayMs = ACK_TIMEOUT_MS)
+                if (deadLettered) {
+                    errors.add(SyncError(type = SyncErrorType.NETWORK_ERROR, message = errorMsg, retryable = false))
+                }
+            }
             UploadOutcome.FAILED -> {
                 val errorMsg = "Failed to sync ${entityType.name.lowercase()} ${pending.entityId}"
                 val deadLettered = handleSyncFailure(pending, entityType, errorMsg)
@@ -610,9 +633,14 @@ class WearDataLayerSyncManager(
         SUCCESS,
         SKIPPED,
         FAILED,
+
+        /** Sent in full; the outbox entry stays until the phone confirms it. */
+        AWAITING_ACK,
     }
 
     companion object {
+        const val KEY_SENT_AT = "sentAt"
+        const val ACK_TIMEOUT_MS = 30_000L
         const val MAX_RETRY_ATTEMPTS = 5
         const val RETRY_BASE_DELAY_MS = 5_000L
         const val RETRY_MAX_DELAY_MS = 300_000L

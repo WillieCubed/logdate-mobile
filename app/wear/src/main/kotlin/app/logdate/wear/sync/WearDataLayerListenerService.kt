@@ -13,8 +13,10 @@ import app.logdate.client.sync.datalayer.RemoteCameraCaptureResultDataMapper
 import app.logdate.client.sync.datalayer.RemoteCameraDeviceDataMapper
 import app.logdate.wear.presentation.camera.WearRemoteCameraCaptureResultStore
 import app.logdate.wear.presentation.camera.WearRemoteCameraDeviceStore
+import com.google.android.gms.wearable.CapabilityInfo
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
+import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.WearableListenerService
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
@@ -33,6 +35,9 @@ import kotlinx.coroutines.withContext
  * Uses [SyncableJournalNotesRepository.createFromSync] (and equivalents) to
  * avoid re-triggering outbound sync.
  *
+ * Messages from the phone (note acknowledgements, sync requests) and the phone becoming reachable
+ * again go to [WearPhoneMessageHandler].
+ *
  * Koin resilience: If DI is not ready when data arrives (e.g. app was just
  * started by the system), retries up to [MAX_KOIN_RETRIES] times with a short
  * delay before dropping the event.
@@ -42,6 +47,28 @@ class WearDataLayerListenerService : WearableListenerService() {
     private val noteDataMapper = NoteDataMapper()
     private val journalDataMapper = JournalDataMapper()
     private val associationDataMapper = AssociationDataMapper()
+
+    override fun onMessageReceived(messageEvent: MessageEvent) {
+        serviceScope.launch {
+            withContext(NonCancellable) { resolvePhoneMessageHandler()?.onMessage(messageEvent.path) }
+        }
+    }
+
+    override fun onCapabilityChanged(capabilityInfo: CapabilityInfo) {
+        if (capabilityInfo.nodes.isEmpty()) return
+        serviceScope.launch {
+            withContext(NonCancellable) { resolvePhoneMessageHandler()?.onPhoneReachable() }
+        }
+    }
+
+    private suspend fun resolvePhoneMessageHandler(): WearPhoneMessageHandler? {
+        val koin = resolveKoin()
+        if (koin == null) {
+            Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries, dropping phone message")
+            return null
+        }
+        return koin.get()
+    }
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {
         // Snapshot events before they are recycled by the system

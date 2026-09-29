@@ -97,6 +97,24 @@
                     android:host="*"
                     android:pathPrefix="/logdate/associations" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/logdate/notes" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/logdate/sync" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.CAPABILITY_CHANGED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:path="/logdate_phone_app" />
+            </intent-filter>
         </service>
             
         <!-- Entry Count complication: shows today's journal entry count -->

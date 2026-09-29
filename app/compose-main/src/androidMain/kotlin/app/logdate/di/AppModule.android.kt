@@ -41,10 +41,18 @@ import app.logdate.client.shortcuts.DynamicShortcutRefreshWorker
 import app.logdate.client.shortcuts.DynamicShortcutScheduler
 import app.logdate.client.sync.AndroidPhoneAudioStreamOpener
 import app.logdate.client.sync.DefaultPhoneWearSyncBridge
+import app.logdate.client.sync.FileWatchAudioStore
 import app.logdate.client.sync.GooglePhoneWearTransport
+import app.logdate.client.sync.GoogleWatchMessageSender
+import app.logdate.client.sync.MessageWatchNoteAcknowledger
 import app.logdate.client.sync.PhoneAudioStreamOpener
 import app.logdate.client.sync.PhoneWearSyncBridge
 import app.logdate.client.sync.PhoneWearTransport
+import app.logdate.client.sync.WatchAudioStore
+import app.logdate.client.sync.WatchMessageSender
+import app.logdate.client.sync.WatchNoteAcknowledger
+import app.logdate.client.sync.WatchNoteIngestor
+import app.logdate.client.sync.WatchNoteNotifier
 import app.logdate.client.sync.WearSyncNotificationHelper
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.updates.PlayInAppUpdateController
@@ -160,6 +168,19 @@ actual val appModule: Module =
         single { WearSyncNotificationHelper(androidContext()) }
         single<PhoneWearTransport> { GooglePhoneWearTransport(androidContext()) }
         single<PhoneAudioStreamOpener> { AndroidPhoneAudioStreamOpener(androidContext()) }
+        single<WatchAudioStore> { FileWatchAudioStore(androidContext()) }
+        single<WatchMessageSender> { GoogleWatchMessageSender(androidContext()) }
+        single<WatchNoteAcknowledger> { MessageWatchNoteAcknowledger(get()) }
+        single {
+            val notificationHelper = get<WearSyncNotificationHelper>()
+            WatchNoteIngestor(
+                notesRepository = get(),
+                audioStore = get(),
+                acknowledger = get(),
+                notifier = WatchNoteNotifier(notificationHelper::notifyNoteReceived),
+                noteDataMapper = get(),
+            )
+        }
         single<PhoneWearSyncBridge> {
             DefaultPhoneWearSyncBridge(
                 notesRepository = get(),

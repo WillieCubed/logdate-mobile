@@ -6,10 +6,8 @@ import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.entities.HealthSnapshotEntity
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.repository.journals.JournalNote
-import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.SyncableJournalContentRepository
-import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.client.sync.datalayer.AssociationDataMapper
 import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
@@ -20,6 +18,7 @@ import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.feature.editor.ui.camera.CameraRemoteCommand
 import app.logdate.shared.model.Journal
+import com.google.android.gms.wearable.ChannelClient
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataItem
@@ -38,7 +37,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import java.io.ByteArrayInputStream
+import java.io.InputStream
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Clock
@@ -263,71 +266,112 @@ class PhoneDataLayerListenerServiceTest {
     }
 
     @Test
-    fun `note sync uses sync-aware repository and posts notification`() = runTest {
+    fun `note sync hands the note to the ingestor`() = runTest {
         val note = textNote()
-        val notesRepository = mockk<SyncableJournalNotesRepository>(relaxed = true)
-        val notificationHelper = mockk<WearSyncNotificationHelper>(relaxed = true)
-        val service =
-            serviceWithDependencies(
-                notesRepository = notesRepository,
-                notificationHelper = notificationHelper,
-            )
+        val ingestor = mockk<WatchNoteIngestor>(relaxed = true)
+        val service = serviceWithDependencies(noteIngestor = ingestor)
 
         service.processEvents(noteEvent(note))
 
-        coVerify(exactly = 1) { notesRepository.createFromSync(note) }
-        coVerify(exactly = 1) { notificationHelper.notifyNoteReceived(note) }
+        coVerify(exactly = 1) { ingestor.onNoteMetadata(noteDataMapper.toDataMap(note)) }
     }
 
     @Test
-    fun `note sync falls back to create for non-syncable repository`() = runTest {
-        val note = textNote()
-        val notesRepository = mockk<JournalNotesRepository>(relaxed = true)
-        coEvery { notesRepository.create(note) } returns note.uid
-        val notificationHelper = mockk<WearSyncNotificationHelper>(relaxed = true)
-        val service =
-            serviceWithDependencies(
-                notesRepository = notesRepository,
-                notificationHelper = notificationHelper,
-            )
+    fun `note sync survives an undecodable note`() = runTest {
+        val ingestor = mockk<WatchNoteIngestor>()
+        coEvery { ingestor.onNoteMetadata(any()) } throws IllegalArgumentException("no payload")
+        val service = serviceWithDependencies(noteIngestor = ingestor)
 
-        service.processEvents(noteEvent(note))
+        service.processEvents(PhoneDataLayerSnapshotEvent(path = NoteDataMapper.notePath(Uuid.random()), data = emptyMap()))
 
-        coVerify(exactly = 1) { notesRepository.create(note) }
-        coVerify(exactly = 1) { notificationHelper.notifyNoteReceived(note) }
+        coVerify(exactly = 1) { ingestor.onNoteMetadata(emptyMap()) }
     }
 
     @Test
-    fun `note delete uses sync-aware repository when available`() = runTest {
+    fun `note delete is handed to the ingestor`() = runTest {
         val noteId = Uuid.random()
-        val notesRepository = mockk<SyncableJournalNotesRepository>(relaxed = true)
-        val service = serviceWithDependencies(notesRepository = notesRepository)
+        val ingestor = mockk<WatchNoteIngestor>(relaxed = true)
+        val service = serviceWithDependencies(noteIngestor = ingestor)
 
         service.processEvents(noteDeleteEvent(noteId))
 
-        coVerify(exactly = 1) { notesRepository.deleteFromSync(noteId) }
+        coVerify(exactly = 1) { ingestor.onNoteDeleted(noteId) }
     }
 
     @Test
-    fun `note delete falls back to repository removal for non-syncable repository`() = runTest {
-        val noteId = Uuid.random()
-        val notesRepository = mockk<JournalNotesRepository>(relaxed = true)
-        val service = serviceWithDependencies(notesRepository = notesRepository)
-
-        service.processEvents(noteDeleteEvent(noteId))
-
-        coVerify(exactly = 1) { notesRepository.removeById(noteId) }
-    }
-
-    @Test
-    fun `invalid note delete path does not touch note repository`() = runTest {
-        val notesRepository = mockk<JournalNotesRepository>(relaxed = true)
-        val service = serviceWithDependencies(notesRepository = notesRepository)
+    fun `invalid note delete path does not reach the ingestor`() = runTest {
+        val ingestor = mockk<WatchNoteIngestor>(relaxed = true)
+        val service = serviceWithDependencies(noteIngestor = ingestor)
 
         service.processEvents(PhoneDataLayerSnapshotEvent(path = "/logdate/notes/not-a-uuid/delete", data = emptyMap()))
 
-        coVerify(exactly = 0) { notesRepository.removeById(any()) }
-        confirmVerified(notesRepository)
+        coVerify(exactly = 0) { ingestor.onNoteDeleted(any()) }
+        confirmVerified(ingestor)
+    }
+
+    @Test
+    fun `audio channel from the watch streams its bytes to the ingestor and closes`() = runTest {
+        val noteId = Uuid.random()
+        val ingestor = mockk<WatchNoteIngestor>(relaxed = true)
+        val received = mutableListOf<ByteArray>()
+        coEvery { ingestor.onAudioBytes(noteId, any()) } coAnswers { received += secondArg<InputStream>().readBytes() }
+        val service =
+            TestPhoneDataLayerListenerService(
+                serviceScope = this,
+                syncDependencies = dependencies(noteIngestor = ingestor),
+                channelBytes = byteArrayOf(4, 5, 6),
+            )
+
+        service.onChannelOpened(channel(WearAudioRequestPaths.audioTransferPath(noteId)))
+        advanceUntilIdle()
+
+        assertEquals(1, received.size)
+        assertContentEquals(byteArrayOf(4, 5, 6), received.single())
+        assertEquals(1, service.closedChannels.size)
+    }
+
+    @Test
+    fun `channel at an unknown path is ignored`() = runTest {
+        val ingestor = mockk<WatchNoteIngestor>(relaxed = true)
+        val service =
+            TestPhoneDataLayerListenerService(
+                serviceScope = this,
+                syncDependencies = dependencies(noteIngestor = ingestor),
+            )
+
+        service.onChannelOpened(channel("/logdate/other/thing"))
+        advanceUntilIdle()
+
+        confirmVerified(ingestor)
+        assertTrue(service.closedChannels.isEmpty())
+    }
+
+    @Test
+    fun `audio channel is closed when the ingestor fails`() = runTest {
+        val noteId = Uuid.random()
+        val ingestor = mockk<WatchNoteIngestor>()
+        coEvery { ingestor.onAudioBytes(any(), any()) } throws IllegalStateException("disk full")
+        val service =
+            TestPhoneDataLayerListenerService(
+                serviceScope = this,
+                syncDependencies = dependencies(noteIngestor = ingestor),
+            )
+
+        service.onChannelOpened(channel(WearAudioRequestPaths.audioTransferPath(noteId)))
+        advanceUntilIdle()
+
+        assertEquals(1, service.closedChannels.size)
+    }
+
+    @Test
+    fun `audio channel is closed and dropped when dependencies are unavailable`() = runTest {
+        val noteId = Uuid.random()
+        val service = TestPhoneDataLayerListenerService(serviceScope = this, syncDependencies = null)
+
+        service.onChannelOpened(channel(WearAudioRequestPaths.audioTransferPath(noteId)))
+        advanceUntilIdle()
+
+        assertEquals(1, service.closedChannels.size)
     }
 
     @Test
@@ -515,20 +559,11 @@ class PhoneDataLayerListenerServiceTest {
     @Test
     fun `onDataChanged snapshots wearable events and processes valid payloads`() = runTest {
         val note = textNote()
-        val notesRepository = mockk<SyncableJournalNotesRepository>(relaxed = true)
-        val notificationHelper = mockk<WearSyncNotificationHelper>(relaxed = true)
+        val ingestor = mockk<WatchNoteIngestor>(relaxed = true)
         val service =
             TestPhoneDataLayerListenerService(
                 serviceScope = this,
-                syncDependencies =
-                    PhoneDataLayerSyncDependencies(
-                        notesRepository = notesRepository,
-                        journalRepository = mockk<SyncableJournalRepository>(relaxed = true),
-                        notificationHelper = notificationHelper,
-                        contentRepository = mockk(relaxed = true),
-                        journalContentDao = mockk(relaxed = true),
-                        healthSnapshotDao = mockk(relaxed = true),
-                    ),
+                syncDependencies = dependencies(noteIngestor = ingestor),
             )
         val payload =
             buildMap {
@@ -545,8 +580,7 @@ class PhoneDataLayerListenerServiceTest {
             service.onDataChanged(dataEvents)
             advanceUntilIdle()
 
-            coVerify(exactly = 1) { notesRepository.createFromSync(note) }
-            coVerify(exactly = 1) { notificationHelper.notifyNoteReceived(note) }
+            coVerify(exactly = 1) { ingestor.onNoteMetadata(noteDataMapper.toDataMap(note)) }
         } finally {
             unmockkStatic(DataMapItem::class)
         }
@@ -554,32 +588,23 @@ class PhoneDataLayerListenerServiceTest {
 
     @Test
     fun `onDataChanged skips events without a path`() = runTest {
-        val notesRepository = mockk<SyncableJournalNotesRepository>(relaxed = true)
+        val ingestor = mockk<WatchNoteIngestor>(relaxed = true)
         val service =
             TestPhoneDataLayerListenerService(
                 serviceScope = this,
-                syncDependencies =
-                    PhoneDataLayerSyncDependencies(
-                        notesRepository = notesRepository,
-                        journalRepository = mockk<SyncableJournalRepository>(relaxed = true),
-                        notificationHelper = mockk(relaxed = true),
-                        contentRepository = mockk(relaxed = true),
-                        journalContentDao = mockk(relaxed = true),
-                        healthSnapshotDao = mockk(relaxed = true),
-                    ),
+                syncDependencies = dependencies(noteIngestor = ingestor),
             )
 
         val dataEvents = mockDataEventBuffer(mockDataEvent(mockDataItem(uriPath = null)))
         service.onDataChanged(dataEvents)
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { notesRepository.createFromSync(any()) }
+        confirmVerified(ingestor)
     }
 
     private fun serviceWithDependencies(
-        notesRepository: JournalNotesRepository = mockk<SyncableJournalNotesRepository>(relaxed = true),
+        noteIngestor: WatchNoteIngestor = mockk(relaxed = true),
         journalRepository: JournalRepository = mockk<SyncableJournalRepository>(relaxed = true),
-        notificationHelper: WearSyncNotificationHelper = mockk(relaxed = true),
         contentRepository: SyncableJournalContentRepository? = mockk(relaxed = true),
         journalContentDao: JournalContentDao? = mockk(relaxed = true),
         healthSnapshotDao: HealthSnapshotDao = mockk(relaxed = true),
@@ -587,15 +612,34 @@ class PhoneDataLayerListenerServiceTest {
         TestPhoneDataLayerListenerService(
             serviceScope = CoroutineScope(Dispatchers.Unconfined),
             syncDependencies =
-                PhoneDataLayerSyncDependencies(
-                    notesRepository = notesRepository,
+                dependencies(
+                    noteIngestor = noteIngestor,
                     journalRepository = journalRepository,
-                    notificationHelper = notificationHelper,
                     contentRepository = contentRepository,
                     journalContentDao = journalContentDao,
                     healthSnapshotDao = healthSnapshotDao,
                 ),
         )
+
+    private fun dependencies(
+        noteIngestor: WatchNoteIngestor = mockk(relaxed = true),
+        journalRepository: JournalRepository = mockk<SyncableJournalRepository>(relaxed = true),
+        contentRepository: SyncableJournalContentRepository? = mockk(relaxed = true),
+        journalContentDao: JournalContentDao? = mockk(relaxed = true),
+        healthSnapshotDao: HealthSnapshotDao = mockk(relaxed = true),
+    ): PhoneDataLayerSyncDependencies =
+        PhoneDataLayerSyncDependencies(
+            noteIngestor = noteIngestor,
+            journalRepository = journalRepository,
+            contentRepository = contentRepository,
+            journalContentDao = journalContentDao,
+            healthSnapshotDao = healthSnapshotDao,
+        )
+
+    private fun channel(path: String): ChannelClient.Channel =
+        mockk {
+            every { this@mockk.path } returns path
+        }
 
     private fun message(
         path: String,
@@ -705,9 +749,18 @@ class PhoneDataLayerListenerServiceTest {
         private val syncDependencies: PhoneDataLayerSyncDependencies? = null,
         private val onLaunchCamera: () -> Unit = {},
         private val onCameraCommand: (CameraRemoteCommand) -> Unit = {},
+        private val channelBytes: ByteArray = ByteArray(0),
     ) : PhoneDataLayerListenerService() {
+        val closedChannels = mutableListOf<ChannelClient.Channel>()
+
         suspend fun processEvents(vararg events: PhoneDataLayerSnapshotEvent) {
             processSnapshotEvents(events.toList())
+        }
+
+        override suspend fun openChannelInput(channel: ChannelClient.Channel): InputStream = ByteArrayInputStream(channelBytes)
+
+        override suspend fun closeChannel(channel: ChannelClient.Channel) {
+            closedChannels += channel
         }
 
         override suspend fun resolvePhoneWearSyncBridge(): PhoneWearSyncBridge? = syncBridge
