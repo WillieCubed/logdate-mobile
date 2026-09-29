@@ -14,8 +14,11 @@ import app.logdate.wear.recording.RecordingStartFailure
 import app.logdate.wear.recording.WearAudioRecordingManager
 import app.logdate.wear.recording.WearRecorder
 import app.logdate.wear.sync.WearDataLayerClient
+import app.logdate.wear.sync.WearNoteRemovalNotifier
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +26,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import kotlin.time.Clock
@@ -85,6 +89,9 @@ interface RecordingHintStore {
  *
  * Every phase change happens before the recorder is asked to do anything, so the recorder's own
  * state flow can never be mistaken for the recorder ending a session by itself.
+ *
+ * Leaving the screen never drops a recording. A recording still running is stopped and saved on
+ * [applicationScope], which outlives this ViewModel, and one that failed to save is saved again.
  */
 class WearRecordingViewModel(
     private val recorder: WearRecorder,
@@ -95,6 +102,8 @@ class WearRecordingViewModel(
     private val locationCaptureCoordinator: WearLocationCaptureCoordinator,
     private val haptics: WearHapticEngine,
     private val hintStore: RecordingHintStore,
+    private val removalNotifier: WearNoteRemovalNotifier,
+    private val applicationScope: CoroutineScope,
     private val clock: Clock = Clock.System,
     private val deleteFile: (String) -> Unit = { path -> File(path).delete() },
 ) : ViewModel() {
@@ -124,7 +133,12 @@ class WearRecordingViewModel(
     }
 
     override fun onCleared() {
-        recorder.requestStop()
+        when (_uiState.value.phase) {
+            RecordingPhase.RECORDING, RecordingPhase.PAUSED -> applicationScope.launch { stopAndSaveDetached() }
+            RecordingPhase.STARTING -> recorder.requestStop()
+            RecordingPhase.ERROR -> unsavedPath?.let { path -> applicationScope.launch { saveDetached(path) } }
+            else -> Unit
+        }
         super.onCleared()
     }
 
@@ -177,6 +191,9 @@ class WearRecordingViewModel(
                 val mediaRef = (notesRepository.getNoteById(noteId) as? JournalNote.Audio)?.mediaRef
                 notesRepository.removeById(noteId)
                 if (mediaRef != null && notesRepository.getNoteById(noteId) == null) deleteFile(mediaRef)
+                // The outbox drops a delete that meets a pending create, but the phone may already have
+                // the note, so it is told directly.
+                removalNotifier.notifyRemoved(noteId)
                 haptics.rejection()
             } catch (e: Exception) {
                 Napier.e("Failed to undo saved recording $noteId", e)
@@ -204,6 +221,11 @@ class WearRecordingViewModel(
             }
             haptics.startRecording()
             _uiState.update { it.copy(phase = RecordingPhase.RECORDING) }
+            // The recorder can end between start() returning and the phase changing, and the flow does not repeat itself.
+            if (!recorder.isRecording.value) {
+                stopAndSave()
+                return@launch
+            }
             releasedAtMs?.let(::applyRelease)
         }
     }
@@ -223,38 +245,83 @@ class WearRecordingViewModel(
     private fun stopAndSave() {
         _uiState.update { it.copy(phase = RecordingPhase.SAVING) }
         viewModelScope.launch {
-            haptics.stopRecording()
-            val path = recorder.stop()
-            if (path == null) {
-                Napier.e("Recording ended without a file")
-                _uiState.update { it.copy(phase = RecordingPhase.ERROR, error = RecordingError.RECORDING_LOST) }
-                return@launch
+            // Stopping and saving finish even if the screen is cleared partway through.
+            withContext(NonCancellable) {
+                haptics.stopRecording()
+                val path = recorder.stop()
+                if (path == null) {
+                    Napier.e("Recording ended without a file")
+                    _uiState.update { it.copy(phase = RecordingPhase.ERROR, error = RecordingError.RECORDING_LOST) }
+                    return@withContext
+                }
+                saveRecording(path)
             }
-            saveRecording(path)
+        }
+    }
+
+    /**
+     * How long the recording is. The file's own length wins when it reads as a real recording. A
+     * missing or empty reading falls back to the recorder's clock, so a metadata hiccup cannot make a
+     * long recording look too short to keep.
+     */
+    private suspend fun recordedDurationMs(path: String): Long {
+        val resolved = durationResolver.resolveDurationMs(path)
+        if (resolved != null && resolved >= MIN_DURATION_MS) return resolved
+        return maxOf(resolved ?: 0L, recorder.elapsed.value.inWholeMilliseconds)
+    }
+
+    private suspend fun persistNote(
+        path: String,
+        durationMs: Long,
+    ): JournalNote.Audio {
+        val now = clock.now()
+        val location = withTimeoutOrNull(LOCATION_TIMEOUT_MS) { locationCaptureCoordinator.captureForJournalEntry() }
+        val note =
+            JournalNote.Audio(
+                mediaRef = path,
+                uid = Uuid.random(),
+                creationTimestamp = now,
+                lastUpdated = now,
+                durationMs = durationMs,
+                location = location,
+                timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
+            )
+        notesRepository.create(note)
+        noteHealthAnnotator.annotate(note.uid)
+        return note
+    }
+
+    /** Stops the recorder and stores its file after the screen is gone, so there is no state to update. */
+    private suspend fun stopAndSaveDetached() {
+        val path = recorder.stop()
+        if (path == null) {
+            Napier.e("Recording ended without a file when the screen was cleared")
+            return
+        }
+        saveDetached(path)
+    }
+
+    private suspend fun saveDetached(path: String) {
+        val durationMs = recordedDurationMs(path)
+        if (durationMs < MIN_DURATION_MS) {
+            deleteFile(path)
+            return
+        }
+        try {
+            persistNote(path, durationMs)
+        } catch (e: Exception) {
+            Napier.e("Failed to save recording $path after the screen was cleared", e)
         }
     }
 
     private suspend fun saveRecording(path: String) {
-        val durationMs = durationResolver.resolveDurationMs(path) ?: recorder.elapsed.value.inWholeMilliseconds
+        val durationMs = recordedDurationMs(path)
         if (durationMs < MIN_DURATION_MS) {
             discardTooShort(path)
             return
         }
         try {
-            val now = clock.now()
-            val location = withTimeoutOrNull(LOCATION_TIMEOUT_MS) { locationCaptureCoordinator.captureForJournalEntry() }
-            val note =
-                JournalNote.Audio(
-                    mediaRef = path,
-                    uid = Uuid.random(),
-                    creationTimestamp = now,
-                    lastUpdated = now,
-                    durationMs = durationMs,
-                    location = location,
-                    timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
-                )
-            notesRepository.create(note)
-            noteHealthAnnotator.annotate(note.uid)
+            val note = persistNote(path, durationMs)
             onSaved(note, durationMs)
         } catch (e: Exception) {
             Napier.e("Failed to save recording $path", e)

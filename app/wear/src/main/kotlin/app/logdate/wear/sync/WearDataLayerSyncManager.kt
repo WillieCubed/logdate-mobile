@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -60,9 +62,17 @@ class WearDataLayerSyncManager(
     private val healthSnapshotDataMapper: HealthSnapshotDataMapper,
     private val clock: Clock = Clock.System,
 ) : SyncManager,
-    WearNoteAckHandler {
+    WearNoteAckHandler,
+    WearNoteRemovalNotifier {
     @Volatile
     private var isSyncing = false
+
+    /**
+     * Sync entry points can overlap: a reconnect, a phone request, the repository's debounce and the
+     * Sync now button all start one. Running them together would put the same audio note on the wire
+     * twice, so each runs alone.
+     */
+    private val syncLock = Mutex()
 
     private val _syncStatusFlow =
         MutableStateFlow(
@@ -80,7 +90,9 @@ class WearDataLayerSyncManager(
         Napier.d("Wear sync requested (startNow=$startNow)")
     }
 
-    override suspend fun uploadPendingChanges(): SyncResult {
+    override suspend fun uploadPendingChanges(): SyncResult = syncLock.withLock { uploadPendingChangesLocked() }
+
+    private suspend fun uploadPendingChangesLocked(): SyncResult {
         if (!dataLayerClient.isPhoneConnected()) {
             return notConnectedResult()
         }
@@ -117,6 +129,12 @@ class WearDataLayerSyncManager(
         )
     }
 
+    override suspend fun notifyRemoved(noteId: Uuid) {
+        if (!dataLayerClient.putDataItem(NoteDataMapper.noteDeletePath(noteId), deleteSignal(noteId))) {
+            Napier.w("Could not tell the phone note $noteId was removed")
+        }
+    }
+
     override suspend fun onNoteAcknowledged(noteId: Uuid) {
         syncMetadataService.markAsSynced(
             entityId = noteId.toString(),
@@ -141,7 +159,9 @@ class WearDataLayerSyncManager(
         }
     }
 
-    override suspend fun syncJournals(): SyncResult {
+    override suspend fun syncJournals(): SyncResult = syncLock.withLock { syncJournalsLocked() }
+
+    private suspend fun syncJournalsLocked(): SyncResult {
         if (!dataLayerClient.isPhoneConnected()) {
             return notConnectedResult()
         }
@@ -177,7 +197,9 @@ class WearDataLayerSyncManager(
 
     override suspend fun syncDrafts(): SyncResult = SyncResult(success = true)
 
-    override suspend fun syncAssociations(): SyncResult {
+    override suspend fun syncAssociations(): SyncResult = syncLock.withLock { syncAssociationsLocked() }
+
+    private suspend fun syncAssociationsLocked(): SyncResult {
         if (!dataLayerClient.isPhoneConnected()) {
             return notConnectedResult()
         }
@@ -222,15 +244,17 @@ class WearDataLayerSyncManager(
      * If a parent sync phase fails, child phases still attempt — the phone
      * will buffer orphaned items and reconcile when the parent arrives.
      */
-    override suspend fun fullSync(): SyncResult {
+    override suspend fun fullSync(): SyncResult = syncLock.withLock { fullSyncLocked() }
+
+    private suspend fun fullSyncLocked(): SyncResult {
         isSyncing = true
         try {
             // Phase 1: Journals first (parents)
-            val journalsResult = syncJournals()
+            val journalsResult = syncJournalsLocked()
             // Phase 2: Notes second (children of journals)
-            val notesResult = uploadPendingChanges()
+            val notesResult = uploadPendingChangesLocked()
             // Phase 3: Associations third (links between journals and notes)
-            val associationsResult = syncAssociations()
+            val associationsResult = syncAssociationsLocked()
             // Phase 4: Health snapshots last (reference notes)
             val healthResult = syncHealthSnapshots()
 
@@ -390,18 +414,18 @@ class WearDataLayerSyncManager(
     private suspend fun uploadNoteDelete(pending: PendingUpload): UploadOutcome {
         val noteId = parseUuid(pending.entityId) ?: return UploadOutcome.SKIPPED
 
-        val path = NoteDataMapper.noteDeletePath(noteId)
-        val deleteData =
-            mapOf(
-                NoteDataMapper.KEY_UID to noteId.toString(),
-                NoteDataMapper.KEY_NOTE_TYPE to "DELETE",
-            )
-        return if (dataLayerClient.putDataItem(path, deleteData)) {
+        return if (dataLayerClient.putDataItem(NoteDataMapper.noteDeletePath(noteId), deleteSignal(noteId))) {
             UploadOutcome.SUCCESS
         } else {
             UploadOutcome.FAILED
         }
     }
+
+    private fun deleteSignal(noteId: Uuid): Map<String, String> =
+        mapOf(
+            NoteDataMapper.KEY_UID to noteId.toString(),
+            NoteDataMapper.KEY_NOTE_TYPE to "DELETE",
+        )
 
     // -----------------------------------------------------------------------
     // Journal upload helpers

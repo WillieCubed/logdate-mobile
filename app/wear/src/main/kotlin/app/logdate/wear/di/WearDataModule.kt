@@ -39,6 +39,7 @@ import app.logdate.wear.sync.NoteDataMapper
 import app.logdate.wear.sync.WearDataLayerClient
 import app.logdate.wear.sync.WearDataLayerSyncManager
 import app.logdate.wear.sync.WearNoteAckHandler
+import app.logdate.wear.sync.WearNoteRemovalNotifier
 import app.logdate.wear.sync.WearPhoneMessageHandler
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.json.Json
@@ -94,7 +95,7 @@ val wearDataModule =
                 associationDataMapper = get(),
                 healthSnapshotDataMapper = get(),
             )
-        } binds arrayOf(SyncManager::class, WearNoteAckHandler::class)
+        } binds arrayOf(SyncManager::class, WearNoteAckHandler::class, WearNoteRemovalNotifier::class)
         single { WearPhoneMessageHandler(ackHandler = get(), syncManager = get()) }
 
         // Health sensor manager: use Health Services when available, then degrade gracefully.

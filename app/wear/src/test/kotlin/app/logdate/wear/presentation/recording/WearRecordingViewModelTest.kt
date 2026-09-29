@@ -15,13 +15,17 @@ import app.logdate.wear.presentation.common.SaveFeedback
 import app.logdate.wear.recording.RecordingStartFailure
 import app.logdate.wear.recording.WearRecorder
 import app.logdate.wear.sync.WearDataLayerClient
+import app.logdate.wear.sync.WearNoteRemovalNotifier
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -68,7 +72,10 @@ class WearRecordingViewModelTest {
     private val hintStore = FakeHintStore()
     private val clock = TestClock()
     private val deletedFiles = mutableListOf<String>()
+    private val removedNotes = mutableListOf<Uuid>()
+    private val removalNotifier = WearNoteRemovalNotifier { noteId -> removedNotes += noteId }
     private val viewModelStore = ViewModelStore()
+    private val applicationScope = CoroutineScope(SupervisorJob() + testDispatcher)
 
     @Before
     fun setUp() {
@@ -82,6 +89,7 @@ class WearRecordingViewModelTest {
     @After
     fun tearDown() {
         viewModelStore.clear()
+        applicationScope.cancel()
         Dispatchers.resetMain()
     }
 
@@ -97,6 +105,8 @@ class WearRecordingViewModelTest {
                 locationCaptureCoordinator = locationCaptureCoordinator,
                 haptics = haptics,
                 hintStore = hintStore,
+                removalNotifier = removalNotifier,
+                applicationScope = applicationScope,
                 clock = clock,
                 deleteFile = { deletedFiles += it },
             )
@@ -540,6 +550,22 @@ class WearRecordingViewModelTest {
         }
 
     @Test
+    fun `a file the resolver reads as empty is kept when the recorder clock says it ran`() =
+        runTest {
+            coEvery { durationResolver.resolveDurationMs(any()) } returns 0L
+            recorder.stopPath = "/files/audio_notes/twenty-seconds.m4a"
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            recorder.elapsedFlow.value = 20.seconds
+
+            press(viewModel)
+
+            assertEquals(RecordingPhase.SAVED, viewModel.uiState.value.phase)
+            assertEquals(20_000L, viewModel.uiState.value.savedDurationMs)
+            assertTrue(deletedFiles.isEmpty())
+        }
+
+    @Test
     fun `too short returns to ready after a moment`() =
         runTest {
             coEvery { durationResolver.resolveDurationMs(any()) } returns 300L
@@ -572,6 +598,35 @@ class WearRecordingViewModelTest {
             coVerify { notesRepository.removeById(noteId) }
             assertEquals(listOf("/files/audio_notes/undo.m4a"), deletedFiles)
             assertEquals(RecordingPhase.READY, viewModel.uiState.value.phase)
+        }
+
+    @Test
+    fun `undo tells the phone the note is gone even when the phone already has it`() =
+        runTest {
+            coEvery { notesRepository.getNoteById(any()) } returnsMany listOf(audioNote("/files/audio_notes/x.m4a"), null)
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            press(viewModel)
+            val noteId = viewModel.uiState.value.undoableNoteId!!
+
+            viewModel.onUndo()
+            runCurrent()
+
+            assertEquals(listOf(noteId), removedNotes)
+        }
+
+    @Test
+    fun `undo does not tell the phone when the note could not be removed`() =
+        runTest {
+            coEvery { notesRepository.removeById(any()) } throws IllegalStateException("database closed")
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            press(viewModel)
+
+            viewModel.onUndo()
+            runCurrent()
+
+            assertTrue(removedNotes.isEmpty())
         }
 
     @Test
@@ -744,6 +799,18 @@ class WearRecordingViewModelTest {
         }
 
     @Test
+    fun `a recorder that ends right after it started is saved instead of leaving the screen recording`() =
+        runTest {
+            recorder.endsRightAfterStart = true
+            val viewModel = createViewModel()
+
+            press(viewModel)
+
+            assertEquals(RecordingPhase.SAVED, viewModel.uiState.value.phase)
+            assertEquals(1, recorder.stops)
+        }
+
+    @Test
     fun `a recording the recorder ends on its own is saved`() =
         runTest {
             val viewModel = createViewModel()
@@ -815,14 +882,99 @@ class WearRecordingViewModelTest {
         }
 
     @Test
-    fun `clearing the screen while recording asks the recorder to stop`() =
+    fun `clearing the screen while recording stops and saves the recording`() =
         runTest {
+            recorder.stopPath = "/files/audio_notes/cleared.m4a"
+            val created = mutableListOf<JournalNote>()
+            coEvery { notesRepository.create(any<JournalNote>()) } answers {
+                created += firstArg<JournalNote>()
+                Uuid.random()
+            }
             val viewModel = createViewModel()
             tapToStart(viewModel)
 
             viewModelStore.clear()
+            runCurrent()
 
-            assertEquals(1, recorder.stopRequests)
+            assertEquals(1, recorder.stops)
+            assertEquals("/files/audio_notes/cleared.m4a", (created.single() as JournalNote.Audio).mediaRef)
+            assertFalse(recorder.stopRequested)
+        }
+
+    @Test
+    fun `clearing the screen while paused saves the recording`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            viewModel.onPauseToggle()
+            runCurrent()
+
+            viewModelStore.clear()
+            runCurrent()
+
+            coVerify(exactly = 1) { notesRepository.create(any<JournalNote>()) }
+        }
+
+    @Test
+    fun `clearing the screen keeps a recording that is too short out of the journal`() =
+        runTest {
+            coEvery { durationResolver.resolveDurationMs(any()) } returns 200L
+            recorder.stopPath = "/files/audio_notes/blip.m4a"
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            viewModelStore.clear()
+            runCurrent()
+
+            coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
+            assertEquals(listOf("/files/audio_notes/blip.m4a"), deletedFiles)
+        }
+
+    @Test
+    fun `clearing the screen after a failed save saves the recording again`() =
+        runTest {
+            recorder.stopPath = "/files/audio_notes/retry-on-exit.m4a"
+            var failures = 1
+            val created = mutableListOf<JournalNote>()
+            coEvery { notesRepository.create(any<JournalNote>()) } answers {
+                if (failures-- > 0) throw IllegalStateException("database closed")
+                created += firstArg<JournalNote>()
+                Uuid.random()
+            }
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            press(viewModel)
+            assertEquals(RecordingError.SAVE_FAILED, viewModel.uiState.value.error)
+
+            viewModelStore.clear()
+            runCurrent()
+
+            assertEquals("/files/audio_notes/retry-on-exit.m4a", (created.single() as JournalNote.Audio).mediaRef)
+        }
+
+    @Test
+    fun `clearing the screen while the recorder is still starting asks it to stop`() =
+        runTest {
+            recorder.startDelay = 500.milliseconds
+            val viewModel = createViewModel()
+            viewModel.onPress()
+            advanceTimeBy(100)
+
+            viewModelStore.clear()
+
+            assertTrue(recorder.stopRequested)
+        }
+
+    @Test
+    fun `clearing an idle screen does nothing`() =
+        runTest {
+            createViewModel()
+
+            viewModelStore.clear()
+            runCurrent()
+
+            assertEquals(0, recorder.stops)
+            assertFalse(recorder.stopRequested)
         }
 
     // -----------------------------------------------------------------------
@@ -875,12 +1027,14 @@ class WearRecordingViewModelTest {
         var stops = 0
         var resumes = 0
         var discards = 0
-        var stopRequests = 0
+        var stopRequested = false
+        var endsRightAfterStart = false
 
         override suspend fun start(): Boolean {
             starts++
             if (startDelay > Duration.ZERO) delay(startDelay)
             if (startResult) recordingFlow.value = true
+            if (startResult && endsRightAfterStart) recordingFlow.value = false
             return startResult
         }
 
@@ -910,7 +1064,7 @@ class WearRecordingViewModelTest {
         }
 
         override fun requestStop() {
-            stopRequests++
+            stopRequested = true
         }
     }
 }

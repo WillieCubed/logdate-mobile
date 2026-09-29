@@ -125,6 +125,8 @@ val wearAudioModule =
                 locationCaptureCoordinator = get(),
                 haptics = get(),
                 hintStore = get(),
+                removalNotifier = get(),
+                applicationScope = get(),
             )
         }
         viewModel {

@@ -22,7 +22,9 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -468,6 +470,63 @@ class WearDataLayerSyncManagerTest {
             assertFalse(result.success)
             assertEquals(false, result.errors.single().retryable)
             coVerify { deadLetterStore.add(any()) }
+        }
+
+    @Test
+    fun `a removed note is announced to the phone at its delete path`() =
+        runTest {
+            val sent = mutableListOf<Pair<String, Map<String, String>>>()
+            coEvery { dataLayerClient.putDataItem(any(), any()) } answers {
+                sent += firstArg<String>() to secondArg<Map<String, String>>()
+                true
+            }
+
+            syncManager.notifyRemoved(noteId)
+
+            assertEquals(NoteDataMapper.noteDeletePath(noteId), sent.single().first)
+            assertEquals(noteId.toString(), sent.single().second[NoteDataMapper.KEY_UID])
+        }
+
+    @Test
+    fun `a removed note is announced even when the phone is not connected`() =
+        runTest {
+            coEvery { dataLayerClient.isPhoneConnected(any()) } returns false
+
+            syncManager.notifyRemoved(noteId)
+
+            coVerify(exactly = 1) { dataLayerClient.putDataItem(NoteDataMapper.noteDeletePath(noteId), any()) }
+        }
+
+    @Test
+    fun `a removal that cannot be put does not throw`() =
+        runTest {
+            coEvery { dataLayerClient.putDataItem(any(), any()) } returns false
+
+            syncManager.notifyRemoved(noteId)
+        }
+
+    @Test
+    fun `overlapping syncs run one after the other so the audio is not sent twice at once`() =
+        runTest {
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(PendingUpload(noteId.toString(), PendingOperation.CREATE))
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote
+            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            coEvery { dataLayerClient.sendFile(any(), any()) } coAnswers {
+                gate.await()
+                true
+            }
+
+            val first = async { syncManager.fullSync() }
+            runCurrent()
+            val second = async { syncManager.fullSync() }
+            runCurrent()
+
+            coVerify(exactly = 1) { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId), any()) }
+            gate.complete(Unit)
+            first.await()
+            second.await()
+            coVerify(exactly = 2) { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId), any()) }
         }
 
     @Test
