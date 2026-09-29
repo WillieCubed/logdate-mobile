@@ -234,6 +234,7 @@ class AudioRecordingService : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 synchronized(recorderLock) { mediaRecorder?.pause() }
                 isPaused = true
+                releaseWakeLock()
                 _recordingState.update { it.copy(isPaused = true, pausedByInterruption = byInterruption) }
             } else {
                 Napier.w("Pause recording not supported below Android N")
@@ -264,6 +265,7 @@ class AudioRecordingService : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 synchronized(recorderLock) { mediaRecorder?.resume() }
                 isPaused = false
+                acquireWakeLock()
                 _recordingState.update { it.copy(isPaused = false, pausedByInterruption = false) }
             } else {
                 Napier.w("Resume recording not supported below Android N")
@@ -394,18 +396,35 @@ class AudioRecordingService : Service() {
     }
 
     private fun acquireSessionResources() {
-        if (options.holdWakeLock) {
-            try {
-                val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-                val timeoutMs =
-                    if (options.maxDurationMs > 0) options.maxDurationMs + WAKE_LOCK_HEADROOM_MS else DEFAULT_WAKE_LOCK_TIMEOUT_MS
-                wakeLock =
-                    powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG).apply { acquire(timeoutMs) }
-            } catch (e: Exception) {
-                Napier.w("Could not acquire the recording wake lock", e)
-            }
-        }
+        releaseSessionResources()
+        acquireWakeLock()
         if (options.pauseOnInterruption) requestAudioFocus()
+    }
+
+    /**
+     * The lock's timeout is the longest the session can still record. The recorder counts recorded
+     * time only, so it is dropped while paused and taken again, with a fresh timeout, on resume.
+     */
+    private fun acquireWakeLock() {
+        if (!options.holdWakeLock) return
+        releaseWakeLock()
+        try {
+            val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+            val timeoutMs =
+                if (options.maxDurationMs > 0) options.maxDurationMs + WAKE_LOCK_HEADROOM_MS else DEFAULT_WAKE_LOCK_TIMEOUT_MS
+            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG).apply { acquire(timeoutMs) }
+        } catch (e: Exception) {
+            Napier.w("Could not acquire the recording wake lock", e)
+        }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            if (wakeLock?.isHeld == true) wakeLock?.release()
+        } catch (e: Exception) {
+            Napier.w("Error releasing the recording wake lock", e)
+        }
+        wakeLock = null
     }
 
     private fun requestAudioFocus() {
@@ -430,12 +449,7 @@ class AudioRecordingService : Service() {
     }
 
     private fun releaseSessionResources() {
-        try {
-            if (wakeLock?.isHeld == true) wakeLock?.release()
-        } catch (e: Exception) {
-            Napier.w("Error releasing the recording wake lock", e)
-        }
-        wakeLock = null
+        releaseWakeLock()
         val request = focusRequest ?: return
         focusRequest = null
         try {
