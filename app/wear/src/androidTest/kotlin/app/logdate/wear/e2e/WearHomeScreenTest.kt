@@ -1,5 +1,6 @@
 package app.logdate.wear.e2e
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
@@ -7,6 +8,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.wear.compose.material3.MaterialTheme
 import app.logdate.wear.presentation.home.WearHomeContent
@@ -125,6 +127,30 @@ class WearHomeScreenTest {
 
         composeRule.onNodeWithContentDescription("Record Audio").performClick()
 
+        assertEquals(listOf("press", "release"), events)
+    }
+
+    @Test
+    fun `a hold keeps going when the finger slides off the button and ends only when it lifts`() {
+        val events = mutableListOf<String>()
+        composeRule.setContent {
+            MaterialTheme {
+                WearHomeContent(
+                    homeState = home,
+                    onPress = { events += "press" },
+                    onRelease = { events += "release" },
+                )
+            }
+        }
+        val button = composeRule.onNodeWithContentDescription("Record Audio")
+
+        button.performTouchInput { down(center) }
+        assertEquals(listOf("press"), events)
+
+        button.performTouchInput { moveTo(center + Offset(width * 3f, 0f)) }
+        assertEquals("Sliding off the button must not end the hold", listOf("press"), events)
+
+        button.performTouchInput { up() }
         assertEquals(listOf("press", "release"), events)
     }
 

@@ -7,7 +7,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -82,7 +83,11 @@ fun WearHomeScreen(
     val recordingState by recordingViewModel.uiState.collectAsState()
     val microphonePermission =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) recordingViewModel.onPress()
+            if (granted) {
+                // A tap, so the recording is latched and keeps Pause and Discard; a bare press would never be released.
+                recordingViewModel.onPress()
+                recordingViewModel.onRelease()
+            }
         }
 
     WearHomeContent(
@@ -411,13 +416,19 @@ fun RecordSurface(
                 .clip(CircleShape)
                 .background(color)
                 .pointerInput(Unit) {
-                    detectTapGestures(
-                        onPress = {
-                            currentOnPress()
-                            tryAwaitRelease()
+                    // Not detectTapGestures: it reports a cancelled press when the finger slides off this
+                    // small circle, which would end a hold-to-talk recording while the finger is still down.
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        currentOnPress()
+                        try {
+                            do {
+                                val event = awaitPointerEvent()
+                            } while (event.changes.any { it.pressed })
+                        } finally {
                             currentOnRelease()
-                        },
-                    )
+                        }
+                    }
                 }.semantics(mergeDescendants = true) {
                     contentDescription = description
                     role = Role.Button
