@@ -487,7 +487,7 @@ class WearRecordingViewModelTest {
     @Test
     fun `pressing after a failed save saves the same recording instead of starting another`() =
         runTest {
-            recorder.stopPath = "/files/audio_notes/kept-safe.m4a"
+            recorder.stopPath = "/files/audio_notes/unsaved.m4a"
             val created = mutableListOf<JournalNote>()
             var failures = 1
             coEvery { notesRepository.create(any<JournalNote>()) } answers {
@@ -505,7 +505,7 @@ class WearRecordingViewModelTest {
             assertEquals(RecordingPhase.SAVED, viewModel.uiState.value.phase)
             assertEquals(1, recorder.starts)
             assertEquals(1, recorder.stops)
-            assertEquals("/files/audio_notes/kept-safe.m4a", (created.single() as JournalNote.Audio).mediaRef)
+            assertEquals("/files/audio_notes/unsaved.m4a", (created.single() as JournalNote.Audio).mediaRef)
         }
 
     @Test

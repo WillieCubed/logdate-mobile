@@ -116,7 +116,7 @@ class WearRecordingViewModel(
     private var nearLimitWarned = false
     private var undoJob: Job? = null
 
-    /** A finalized recording that could not be stored, kept so the next press saves it rather than losing it. */
+    /** A finalized recording that could not be stored. The next press saves it instead of starting a new one. */
     private var unsavedPath: String? = null
 
     init {
