@@ -39,13 +39,11 @@ import app.logdate.shared.model.SerializableEntryBlock
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.SerializableVideoBlock
-import app.logdate.shared.model.profile.LogDateProfile
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
-import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class RestoreUserDataUseCase(
@@ -57,6 +55,7 @@ class RestoreUserDataUseCase(
     private val locationHistoryRepository: LocationHistoryRepository,
 ) {
     private val migrationRunner = ExportMigrationRunner(exportMigrations)
+    private val profileRestorer = ProfileRestorer(profileRepository)
     private val json =
         Json {
             ignoreUnknownKeys = true
@@ -245,7 +244,7 @@ class RestoreUserDataUseCase(
                 }
             }
 
-            restoreProfile(profilePayload?.profile, options, warnings, onProgress)
+            profileRestorer.restore(profilePayload?.profile, options, warnings, onProgress)
             restorePlaces(placesPayload?.places.orEmpty(), warnings, onProgress)
             restoreLocationHistory(locationHistoryPayload?.locationHistory.orEmpty(), warnings, onProgress)
 
@@ -294,16 +293,6 @@ class RestoreUserDataUseCase(
         }
     }
 
-    private fun shouldOverwrite(
-        existing: Instant?,
-        incoming: Instant,
-        strategy: RestoreStrategy,
-    ): Boolean =
-        when (strategy) {
-            RestoreStrategy.MERGE_KEEP_NEWEST -> existing == null || incoming > existing
-            RestoreStrategy.REPLACE_EXISTING -> true
-        }
-
     private fun validateArchiveIntegrity(
         stats: ExportStats,
         actualJournals: Int,
@@ -337,79 +326,6 @@ class RestoreUserDataUseCase(
                 add(IntegrityMismatch(IntegrityCategory.PROFILE, if (stats.hasProfile) 1 else 0, if (hasProfile) 1 else 0))
             }
         }
-
-    private suspend fun restoreProfile(
-        profile: LogDateProfile?,
-        options: RestoreOptions,
-        warnings: MutableList<String>,
-        onProgress: (suspend (RestoreProgressPhase) -> Unit)?,
-    ) {
-        if (profile == null) {
-            return
-        }
-
-        onProgress?.invoke(RestoreProgressPhase.RESTORING_PROFILE)
-        Napier.i("Restore: importing profile")
-        val existing = profileRepository.getCurrentProfile()
-        if (options.preservePopulatedLocalProfile) {
-            if (existing.displayName.isBlank() && profile.displayName.isNotBlank()) {
-                profileRepository
-                    .updateDisplayName(profile.displayName)
-                    .onFailure { warnings.add("Failed to restore profile display name: ${it.message ?: "unknown error"}") }
-            }
-            if (existing.birthday == null && profile.birthday != null) {
-                profileRepository
-                    .updateBirthday(profile.birthday)
-                    .onFailure { warnings.add("Failed to restore profile birthday: ${it.message ?: "unknown error"}") }
-            }
-            if (existing.profilePhotoUri.isNullOrBlank() && !profile.profilePhotoUri.isNullOrBlank()) {
-                profileRepository
-                    .updateProfilePhoto(profile.profilePhotoUri)
-                    .onFailure { warnings.add("Failed to restore profile photo: ${it.message ?: "unknown error"}") }
-            }
-            val bio = existing.bio.takeUnless { it.isNullOrBlank() } ?: profile.bio.takeUnless { it.isNullOrBlank() }
-            val originalBio =
-                existing.originalBio.takeUnless { it.isNullOrBlank() }
-                    ?: profile.originalBio.takeUnless { it.isNullOrBlank() }
-            if (bio != existing.bio || originalBio != existing.originalBio) {
-                profileRepository
-                    .updateBio(bio, originalBio)
-                    .onFailure { warnings.add("Failed to restore profile bio: ${it.message ?: "unknown error"}") }
-            }
-            return
-        }
-        val strategy = options.strategy
-        val shouldWrite =
-            if (strategy == RestoreStrategy.MERGE_KEEP_NEWEST && existing == LogDateProfile()) {
-                profile != LogDateProfile()
-            } else {
-                shouldOverwrite(existing.lastUpdatedAt, profile.lastUpdatedAt, strategy)
-            }
-        if (!shouldWrite) {
-            return
-        }
-
-        if (existing.displayName != profile.displayName) {
-            profileRepository
-                .updateDisplayName(profile.displayName)
-                .onFailure { warnings.add("Failed to restore profile display name: ${it.message ?: "unknown error"}") }
-        }
-        if (existing.birthday != profile.birthday) {
-            profileRepository
-                .updateBirthday(profile.birthday)
-                .onFailure { warnings.add("Failed to restore profile birthday: ${it.message ?: "unknown error"}") }
-        }
-        if (existing.profilePhotoUri != profile.profilePhotoUri) {
-            profileRepository
-                .updateProfilePhoto(profile.profilePhotoUri)
-                .onFailure { warnings.add("Failed to restore profile photo: ${it.message ?: "unknown error"}") }
-        }
-        if (existing.bio != profile.bio || existing.originalBio != profile.originalBio) {
-            profileRepository
-                .updateBio(profile.bio, profile.originalBio)
-                .onFailure { warnings.add("Failed to restore profile bio: ${it.message ?: "unknown error"}") }
-        }
-    }
 
     private suspend fun restorePlaces(
         places: List<ExportPlace>,

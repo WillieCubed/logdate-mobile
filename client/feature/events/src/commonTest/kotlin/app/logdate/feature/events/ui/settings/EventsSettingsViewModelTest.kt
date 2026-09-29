@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
 
 /**
  * Tests for [EventsSettingsViewModel]. Covers the master toggle, the smart-names toggle,
- * and the default-on behavior of both — the only state the VM owns.
+ * and the launch-gated Events state — the only state the VM owns.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class EventsSettingsViewModelTest {
@@ -49,7 +49,7 @@ class EventsSettingsViewModelTest {
 
             val state = viewModel.uiState.value
 
-            assertTrue(state.isAutoEventsEnabled)
+            assertFalse(state.isAutoEventsEnabled)
             assertTrue(state.isSmartNamingEnabled)
             tearDownViewModel(viewModel, collectJob)
         }
@@ -81,16 +81,15 @@ class EventsSettingsViewModelTest {
         }
 
     @Test
-    fun `reflects persisted disabled state`() =
+    fun `keeps previously enabled events unavailable for launch`() =
         runTest(testDispatcher) {
-            preferences.setEventsEnabled(false)
+            preferences.setEventsEnabled(true)
             val viewModel = newViewModel()
             val collectJob = startCollecting(viewModel.uiState)
 
             assertFalse(viewModel.uiState.value.isAutoEventsEnabled)
-            // Re-enable, then drive back through the toggle.
             viewModel.setAutoEventsEnabled(true)
-            assertTrue(viewModel.uiState.value.isAutoEventsEnabled)
+            assertFalse(viewModel.uiState.value.isAutoEventsEnabled)
             tearDownViewModel(viewModel, collectJob)
         }
 

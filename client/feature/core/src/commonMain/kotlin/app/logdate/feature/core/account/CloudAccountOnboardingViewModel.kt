@@ -269,25 +269,12 @@ class CloudAccountOnboardingViewModel(
             )
 
         viewModelScope.launch {
-            val localProfile =
-                try {
-                    profileRepository.getCurrentProfile()
-                } catch (e: Exception) {
-                    Napier.w("Could not read original bio for Cloud signup", e)
-                    null
-                }
-            val originalBio =
-                if (currentState.bio == localProfile?.bio) {
-                    localProfile.originalBio
-                } else {
-                    currentState.bio.takeIf { it.isNotBlank() }
-                }
             val result =
                 createPasskeyAccountUseCase(
                     username = currentState.username,
                     displayName = currentState.displayName,
                     bio = currentState.bio.takeIf { it.isNotBlank() },
-                    originalBio = originalBio,
+                    originalBio = originalBioForSignup(profileRepository, currentState.bio),
                 )
 
             when (result) {
@@ -869,4 +856,22 @@ enum class InitialSyncStatus {
     Partial,
     TimedOut,
     Failed,
+}
+
+private suspend fun originalBioForSignup(
+    profileRepository: ProfileRepository,
+    bio: String,
+): String? {
+    val localProfile =
+        try {
+            profileRepository.getCurrentProfile()
+        } catch (error: Exception) {
+            Napier.w("Could not read original bio for Cloud signup", error)
+            null
+        }
+    return if (bio == localProfile?.bio) {
+        localProfile.originalBio
+    } else {
+        bio.takeIf { it.isNotBlank() }
+    }
 }

@@ -55,14 +55,7 @@ class CloudBackupWorker(
 
         val archive = File(context.filesDir, "cloud-backup-$id.zip")
         return try {
-            val export =
-                FileOutputStream(archive).use { output ->
-                    ZipOutputStream(output.buffered()).use { zip ->
-                        exportArchiveUseCase
-                            .export(ArchiveExportOptions(), ZipStreamArchiveContainer(zip))
-                            .firstOrNull { it is ArchiveExportProgress.Completed || it is ArchiveExportProgress.Failed }
-                    }
-                }
+            val export = exportArchive(archive)
             if (export !is ArchiveExportProgress.Completed) {
                 archive.delete()
                 return Result.retry()
@@ -74,30 +67,7 @@ class CloudBackupWorker(
                 Napier.w("CloudBackupWorker: archive omitted unreadable data; backup was not uploaded")
                 return Result.failure()
             }
-            ZipFile(archive).use { zip ->
-                requireNotNull(zip.getEntry(MANIFEST_PATH)) { "V2 archive is missing $MANIFEST_PATH" }
-            }
-            val encryptedArchive = cloudArchiveCipher.encrypt(archive)
-            val uploadResult =
-                cloudBackupDataSource.uploadBackup(
-                    accessToken = session.accessToken,
-                    backup =
-                        BackupFile(
-                            deviceId = deviceIdProvider.getDeviceId().value.toString(),
-                            manifest = CloudArchiveCipher.MANIFEST,
-                            data = encryptedArchive,
-                        ),
-                )
-
-            uploadResult.fold(
-                onSuccess = {
-                    Result.success()
-                },
-                onFailure = { error ->
-                    Napier.w("CloudBackupWorker: upload failed; WorkManager will retry", error)
-                    Result.retry()
-                },
-            )
+            uploadArchive(archive, session.accessToken)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: Throwable) {
@@ -106,6 +76,43 @@ class CloudBackupWorker(
         } finally {
             archive.delete()
         }
+    }
+
+    private suspend fun exportArchive(archive: File): ArchiveExportProgress? =
+        FileOutputStream(archive).use { output ->
+            ZipOutputStream(output.buffered()).use { zip ->
+                exportArchiveUseCase
+                    .export(ArchiveExportOptions(), ZipStreamArchiveContainer(zip))
+                    .firstOrNull { it is ArchiveExportProgress.Completed || it is ArchiveExportProgress.Failed }
+            }
+        }
+
+    private suspend fun uploadArchive(
+        archive: File,
+        accessToken: String,
+    ): Result {
+        ZipFile(archive).use { zip ->
+            requireNotNull(zip.getEntry(MANIFEST_PATH)) { "V2 archive is missing $MANIFEST_PATH" }
+        }
+        val encryptedArchive = cloudArchiveCipher.encrypt(archive)
+        val uploadResult =
+            cloudBackupDataSource.uploadBackup(
+                accessToken = accessToken,
+                backup =
+                    BackupFile(
+                        deviceId = deviceIdProvider.getDeviceId().value.toString(),
+                        manifest = CloudArchiveCipher.MANIFEST,
+                        data = encryptedArchive,
+                    ),
+            )
+
+        return uploadResult.fold(
+            onSuccess = { Result.success() },
+            onFailure = { error ->
+                Napier.w("CloudBackupWorker: upload failed; WorkManager will retry", error)
+                Result.retry()
+            },
+        )
     }
 
     companion object {

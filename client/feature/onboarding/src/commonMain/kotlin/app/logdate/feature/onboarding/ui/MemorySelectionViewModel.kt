@@ -253,52 +253,7 @@ class MemorySelectionViewModel(
                     message = "Processing ${selectedMemories.size} selected memories for import",
                 )
 
-                selectedMemories.forEach { memory ->
-                    val noteId = savedStateHandle.noteIdFor(memory.uri)
-                    if (notesRepository.getNoteById(noteId) != null) return@forEach
-
-                    val managedUri = mediaImporter.import(memory.uri)
-                    check(managedUri.isNotBlank() && managedUri != memory.uri) {
-                        "Memory import did not create an app-managed copy"
-                    }
-                    val note =
-                        when (memory) {
-                            is MediaObject.Image ->
-                                JournalNote.Image(
-                                    uid = noteId,
-                                    creationTimestamp = memory.timestamp,
-                                    lastUpdated = Clock.System.now(),
-                                    mediaRef = managedUri,
-                                )
-                            is MediaObject.Video ->
-                                JournalNote.Video(
-                                    uid = noteId,
-                                    creationTimestamp = memory.timestamp,
-                                    lastUpdated = Clock.System.now(),
-                                    mediaRef = managedUri,
-                                )
-                        }
-                    try {
-                        notesRepository.create(note)
-                    } catch (failure: Throwable) {
-                        withContext(NonCancellable) {
-                            runCatching {
-                                val published = notesRepository.getNoteById(noteId) != null
-                                val shared =
-                                    notesRepository.allNotesObserved.first().any { existing ->
-                                        when (existing) {
-                                            is JournalNote.Image -> existing.mediaRef == managedUri
-                                            is JournalNote.Video -> existing.mediaRef == managedUri
-                                            is JournalNote.Audio -> existing.mediaRef == managedUri
-                                            is JournalNote.Text -> false
-                                        }
-                                    }
-                                if (!published && !shared) mediaImporter.discard(managedUri)
-                            }.onFailure { error -> Napier.w("Could not clean up an unpublished imported photo or video", error) }
-                        }
-                        throw failure
-                    }
-                }
+                selectedMemories.forEach { memory -> importSelectedMemory(memory) }
 
                 Napier.i(
                     tag = "MemorySelectionViewModel",
@@ -319,6 +274,53 @@ class MemorySelectionViewModel(
 
         _uiState.update { it.copy(isImporting = false, importFailed = result.isFailure) }
         return result
+    }
+
+    private suspend fun importSelectedMemory(memory: MediaObject) {
+        val noteId = savedStateHandle.noteIdFor(memory.uri)
+        if (notesRepository.getNoteById(noteId) != null) return
+
+        val managedUri = mediaImporter.import(memory.uri)
+        check(managedUri.isNotBlank() && managedUri != memory.uri) {
+            "Memory import did not create an app-managed copy"
+        }
+        val note =
+            when (memory) {
+                is MediaObject.Image ->
+                    JournalNote.Image(
+                        uid = noteId,
+                        creationTimestamp = memory.timestamp,
+                        lastUpdated = Clock.System.now(),
+                        mediaRef = managedUri,
+                    )
+                is MediaObject.Video ->
+                    JournalNote.Video(
+                        uid = noteId,
+                        creationTimestamp = memory.timestamp,
+                        lastUpdated = Clock.System.now(),
+                        mediaRef = managedUri,
+                    )
+            }
+        try {
+            notesRepository.create(note)
+        } catch (failure: Throwable) {
+            withContext(NonCancellable) {
+                runCatching {
+                    val published = notesRepository.getNoteById(noteId) != null
+                    val shared =
+                        notesRepository.allNotesObserved.first().any { existing ->
+                            when (existing) {
+                                is JournalNote.Image -> existing.mediaRef == managedUri
+                                is JournalNote.Video -> existing.mediaRef == managedUri
+                                is JournalNote.Audio -> existing.mediaRef == managedUri
+                                is JournalNote.Text -> false
+                            }
+                        }
+                    if (!published && !shared) mediaImporter.discard(managedUri)
+                }.onFailure { error -> Napier.w("Could not clean up an unpublished imported photo or video", error) }
+            }
+            throw failure
+        }
     }
 }
 
