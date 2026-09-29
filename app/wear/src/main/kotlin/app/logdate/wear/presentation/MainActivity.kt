@@ -13,19 +13,16 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.location.WearLocationCaptureCoordinator
-import app.logdate.wear.presentation.audio.AudioRecordingScreen
 import app.logdate.wear.presentation.camera.WearRemoteCameraScreen
 import app.logdate.wear.presentation.camera.WearRemoteCameraViewModel
 import app.logdate.wear.presentation.health.HealthDashboardScreen
 import app.logdate.wear.presentation.health.HealthDashboardViewModel
 import app.logdate.wear.presentation.home.WearHomeScreen
 import app.logdate.wear.presentation.mood.MoodCheckInScreen
-import app.logdate.wear.presentation.navigation.WearAudioRecordingRoute
 import app.logdate.wear.presentation.navigation.WearHealthDashboardRoute
 import app.logdate.wear.presentation.navigation.WearHomeRoute
 import app.logdate.wear.presentation.navigation.WearMoodCheckInRoute
 import app.logdate.wear.presentation.navigation.WearOnboardingRoute
-import app.logdate.wear.presentation.navigation.WearQuickRecordRoute
 import app.logdate.wear.presentation.navigation.WearQuickTextRoute
 import app.logdate.wear.presentation.navigation.WearRemoteCameraRoute
 import app.logdate.wear.presentation.navigation.WearRewindListRoute
@@ -36,7 +33,6 @@ import app.logdate.wear.presentation.navigation.WearTimelineRoute
 import app.logdate.wear.presentation.onboarding.WearOnboardingScreen
 import app.logdate.wear.presentation.onboarding.isOnboardingComplete
 import app.logdate.wear.presentation.quicktext.QuickTextLauncher
-import app.logdate.wear.presentation.recording.WearRecordingScreen
 import app.logdate.wear.presentation.rewind.WearRewindListScreen
 import app.logdate.wear.presentation.rewind.WearRewindPlaybackScreen
 import app.logdate.wear.presentation.rewind.WearRewindViewModel
@@ -107,19 +103,10 @@ fun WearApp(initialRouteName: String? = null) {
                             },
                         )
                     }
-                    entry<WearQuickRecordRoute> {
-                        WearRecordingScreen(onNavigateBack = navigateBack)
-                    }
-                    entry<WearAudioRecordingRoute> {
-                        AudioRecordingScreen(onNavigateBack = navigateBack)
-                    }
                     entry<WearMoodCheckInRoute> {
                         MoodCheckInScreen(
                             onNavigateBack = navigateBack,
-                            onNavigateToVoiceNote = {
-                                navigateBack()
-                                backStack.add(WearQuickRecordRoute)
-                            },
+                            onNavigateToVoiceNote = navigateBack,
                         )
                     }
                     entry<WearQuickTextRoute> {
@@ -185,8 +172,7 @@ fun WearApp(initialRouteName: String? = null) {
 
 private fun String?.toWearRoute(): NavKey? =
     when (this) {
-        "quick_record" -> WearQuickRecordRoute
-        "voice_note" -> WearAudioRecordingRoute
+        "quick_record", "voice_note" -> WearHomeRoute
         "mood" -> WearMoodCheckInRoute
         "quick_text" -> WearQuickTextRoute
         "timeline" -> WearTimelineRoute

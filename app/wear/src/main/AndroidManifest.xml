@@ -61,13 +61,6 @@
                 tools:node="remove" />
         </provider>
 
-        <!-- Audio Recording Service -->
-        <service
-            android:name=".recording.WearAudioRecordingService"
-            android:foregroundServiceType="microphone"
-            android:enabled="true"
-            android:exported="false" />
-
         <!-- Audio Playback Service — reused from client:media for voice note playback -->
         <service
             android:name="app.logdate.client.media.audio.AudioPlaybackService"

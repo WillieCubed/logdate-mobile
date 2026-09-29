@@ -5,10 +5,6 @@ import kotlinx.datetime.LocalDate
 
 data object WearHomeRoute : NavKey
 
-data object WearAudioRecordingRoute : NavKey
-
-data object WearQuickRecordRoute : NavKey
-
 data object WearMoodCheckInRoute : NavKey
 
 data object WearQuickTextRoute : NavKey

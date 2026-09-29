@@ -38,10 +38,12 @@ class LogDateWearApplication : Application() {
             )
         }
 
-        runCatching {
-            LogDateNotificationRegistrar(this).registerChannel(LogDateNotificationChannelKey.AUDIO_PLAYBACK)
-        }.onFailure { error ->
-            Napier.w("Failed to register Wear playback notification channel on app startup", error)
+        listOf(LogDateNotificationChannelKey.AUDIO_PLAYBACK, LogDateNotificationChannelKey.AUDIO_RECORDING).forEach { channel ->
+            runCatching {
+                LogDateNotificationRegistrar(this).registerChannel(channel)
+            }.onFailure { error ->
+                Napier.w("Failed to register Wear notification channel ${channel.id} on app startup", error)
+            }
         }
 
         // Schedule morning/evening journal prompt alarms.

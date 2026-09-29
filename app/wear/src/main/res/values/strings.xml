@@ -2,7 +2,6 @@
 <resources>
     <string name="app_name">LogDate Wear</string>
     <string name="cancel">Cancel</string>
-    <string name="record_audio_2">Record Audio</string>
 
     <!-- Home Screen -->
     <string name="wear_home_greeting_morning">Good morning</string>
@@ -10,15 +9,10 @@
     <string name="wear_home_greeting_evening">Good evening</string>
     <string name="wear_home_no_entries">No entries yet</string>
     <string name="wear_home_record_audio">Record Audio</string>
-    <string name="wear_home_voice_note">Voice Note</string>
     <string name="wear_home_mood_checkin">Mood Check-in</string>
     <string name="wear_home_quick_text">Quick Text</string>
     <string name="wear_home_timeline">Timeline</string>
     <string name="wear_home_settings">Settings</string>
-    <string name="wear_recording_channel_description">Audio recording notifications</string>
-    <string name="wear_recording_channel_name">Recording</string>
-    <string name="wear_recording_in_progress">Recording in progress on your watch</string>
-    <string name="wear_recording_title">Recording Audio</string>
 
     <!-- Quick Capture Tile -->
     <string name="wear_tile_quick_capture_label">Quick Capture</string>
@@ -121,19 +115,23 @@
     <string name="wear_mood_saved">Saved</string>
 
     <!-- Recording -->
-    <string name="wear_recording_hold_to_record">HOLD TO\nRECORD</string>
-    <string name="wear_recording_active">RECORDING</string>
     <string name="wear_recording_saving">Saving\u2026</string>
     <string name="wear_recording_saved">Saved</string>
     <string name="wear_recording_too_short">Too short</string>
-    <string name="wear_recording_hold_longer">Hold longer</string>
     <string name="wear_recording_error">Something went wrong</string>
-    <string name="wear_recording_paused">PAUSED</string>
-    <string name="wear_recording_save">Save</string>
-    <string name="wear_recording_start">Start Recording</string>
-    <string name="wear_recording_stop">Stop Recording</string>
+    <string name="wear_recording_stop">Stop recording</string>
     <string name="wear_recording_pause">Pause</string>
     <string name="wear_recording_resume">Resume</string>
+    <string name="wear_recorder_hint">Tap to record, or hold to talk</string>
+    <string name="wear_recorder_starting">Starting\u2026</string>
+    <string name="wear_recorder_paused">Paused</string>
+    <string name="wear_recorder_paused_interrupted">Paused. Another app is using audio</string>
+    <string name="wear_recorder_discard">Discard recording</string>
+    <string name="wear_recorder_undo">Undo</string>
+    <string name="wear_recorder_error_microphone">Microphone is off</string>
+    <string name="wear_recorder_error_storage">Not enough storage on the watch</string>
+    <string name="wear_recorder_error_unavailable">Couldn\'t start recording. Try again</string>
+    <string name="wear_recorder_error_save">Couldn\'t save the recording. Try again</string>
 
     <!-- Quick Text -->
     <string name="wear_quick_text_prompt">What\'s on your mind?</string>

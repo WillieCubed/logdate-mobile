@@ -2,32 +2,36 @@ package app.logdate.wear.presentation.recording
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SystemCaptureTimeZone
-import app.logdate.wear.data.storage.StorageSpaceChecker
+import app.logdate.wear.haptic.WearHapticEngine
 import app.logdate.wear.health.NoteHealthAnnotator
 import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.presentation.common.SaveFeedback
+import app.logdate.wear.recording.RecordingStartFailure
 import app.logdate.wear.recording.WearAudioRecordingManager
+import app.logdate.wear.recording.WearRecorder
 import app.logdate.wear.sync.WearDataLayerClient
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.sample
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import java.io.File
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.Uuid
 
 enum class RecordingPhase {
     READY,
+    STARTING,
     RECORDING,
     PAUSED,
     SAVING,
@@ -36,325 +40,301 @@ enum class RecordingPhase {
     ERROR,
 }
 
+/** What went wrong, for the screen to explain in words. */
+enum class RecordingError {
+    MICROPHONE_PERMISSION_DENIED,
+    NOT_ENOUGH_STORAGE,
+    RECORDER_UNAVAILABLE,
+    SAVE_FAILED,
+}
+
 data class RecordingUiState(
     val phase: RecordingPhase = RecordingPhase.READY,
     val recordingDurationMs: Long = 0,
     val audioLevels: List<Float> = emptyList(),
+    /** True once a tap started the recording, so it keeps going after the finger lifts. */
+    val isLatched: Boolean = false,
+    val pausedByInterruption: Boolean = false,
     val savedDurationMs: Long = 0,
-    val errorMessage: String? = null,
+    /** The note just saved, while it can still be undone. */
+    val undoableNoteId: Uuid? = null,
     val saveFeedback: SaveFeedback? = null,
+    val error: RecordingError? = null,
+    val showGestureHint: Boolean = false,
 )
 
-sealed interface RecordingScreenEvent {
-    data object NavigateBack : RecordingScreenEvent
+/** Remembers whether the tap-or-hold hint has already been shown. */
+interface RecordingHintStore {
+    fun hasSeenHint(): Boolean
+
+    fun markHintSeen()
 }
 
+/**
+ * Drives the watch's voice recorder.
+ *
+ * Pressing the record surface starts recording at once. Lifting the finger quickly (a tap) latches
+ * the recording so it continues until the next tap; holding past [HOLD_THRESHOLD_MS] is
+ * push-to-talk and saves on release. A saved note stays undoable for [UNDO_WINDOW_MS].
+ *
+ * Every phase change happens before the recorder is asked to do anything, so the recorder's own
+ * state flow can never be mistaken for the recorder ending a session by itself.
+ */
 class WearRecordingViewModel(
-    private val recordingManager: WearAudioRecordingManager,
+    private val recorder: WearRecorder,
     private val notesRepository: JournalNotesRepository,
-    private val storageChecker: StorageSpaceChecker,
+    private val durationResolver: AudioDurationResolver,
     private val noteHealthAnnotator: NoteHealthAnnotator,
     private val dataLayerClient: WearDataLayerClient,
     private val locationCaptureCoordinator: WearLocationCaptureCoordinator,
+    private val haptics: WearHapticEngine,
+    private val hintStore: RecordingHintStore,
     private val clock: Clock = Clock.System,
+    private val deleteFile: (String) -> Unit = { path -> File(path).delete() },
 ) : ViewModel() {
     companion object {
+        const val HOLD_THRESHOLD_MS = 400L
         const val MIN_DURATION_MS = 500L
-        const val MAX_DURATION_MS = 60_000L
-        private const val ONE_MINUTE_RECORDING_SIZE_BYTES = 960 * 1024L
-        private const val BUFFER_SPACE_BYTES = 512 * 1024L
-        private const val TOO_SHORT_DISPLAY_MS = 1200L
-        private const val SAVED_DISPLAY_MS = 800L
+        const val UNDO_WINDOW_MS = 5_000L
+        const val TOO_SHORT_DISPLAY_MS = 1_200L
+        const val LOCATION_TIMEOUT_MS = 3_000L
+        private const val MAX_LEVEL_SAMPLES = 50
+        private val NEAR_LIMIT = WearAudioRecordingManager.MAX_RECORDING_DURATION - 1.minutes
     }
 
-    private val _uiState = MutableStateFlow(RecordingUiState())
+    private val _uiState = MutableStateFlow(RecordingUiState(showGestureHint = !hintStore.hasSeenHint()))
     val uiState: StateFlow<RecordingUiState> = _uiState.asStateFlow()
 
-    private val _events = MutableSharedFlow<RecordingScreenEvent>(extraBufferCapacity = 1)
-    val events: SharedFlow<RecordingScreenEvent> = _events.asSharedFlow()
+    private var pressedAtMs = 0L
+    private var releasedAtMs: Long? = null
+    private var nearLimitWarned = false
+    private var undoJob: Job? = null
 
-    private var recordingStartTimeMs: Long = 0
-    private var accumulatedDurationMs: Long = 0
-    private var audioLevelJob: Job? = null
-    private var autoStopJob: Job? = null
+    init {
+        observeRecorder()
+    }
 
     override fun onCleared() {
-        audioLevelJob?.cancel()
-        autoStopJob?.cancel()
-        recordingManager.release()
+        recorder.requestStop()
         super.onCleared()
     }
 
-    fun onTouchDown() {
-        val currentPhase = _uiState.value.phase
-        when (currentPhase) {
-            RecordingPhase.READY -> startFreshRecording()
-            RecordingPhase.PAUSED -> resumeRecording()
-            else -> return
-        }
-    }
-
-    private fun startFreshRecording() {
-        viewModelScope.launch {
-            try {
-                val availableSpace = storageChecker.getAvailableStorageSpace()
-                val requiredSpace = ONE_MINUTE_RECORDING_SIZE_BYTES + BUFFER_SPACE_BYTES
-                if (availableSpace < requiredSpace) {
-                    _uiState.update {
-                        it.copy(
-                            phase = RecordingPhase.ERROR,
-                            errorMessage = "Not enough storage space",
-                        )
-                    }
-                    return@launch
-                }
-
-                val started = recordingManager.startRecording()
-                if (!started) {
-                    _uiState.update {
-                        it.copy(
-                            phase = RecordingPhase.ERROR,
-                            errorMessage = "Failed to start recording",
-                        )
-                    }
-                    return@launch
-                }
-
-                recordingStartTimeMs = clock.now().toEpochMilliseconds()
-                accumulatedDurationMs = 0
-                _uiState.update {
-                    it.copy(
-                        phase = RecordingPhase.RECORDING,
-                        recordingDurationMs = 0,
-                        audioLevels = emptyList(),
-                    )
-                }
-
-                startAudioLevelCollection()
-                startAutoStopTimer()
-
-                Napier.d("Push-to-record recording started")
-            } catch (e: Exception) {
-                Napier.e("Failed to start recording", e)
-                _uiState.update {
-                    it.copy(
-                        phase = RecordingPhase.ERROR,
-                        errorMessage = "Failed to start: ${e.message}",
-                    )
-                }
+    fun onPress() {
+        when (_uiState.value.phase) {
+            RecordingPhase.READY, RecordingPhase.ERROR -> beginRecording()
+            RecordingPhase.SAVED -> {
+                // Recording again keeps the last note; the undo window ends.
+                undoJob?.cancel()
+                beginRecording()
             }
+            RecordingPhase.RECORDING -> if (_uiState.value.isLatched) stopAndSave()
+            RecordingPhase.PAUSED -> resume()
+            RecordingPhase.STARTING, RecordingPhase.SAVING, RecordingPhase.TOO_SHORT -> Unit
         }
     }
 
-    private fun resumeRecording() {
-        viewModelScope.launch {
-            try {
-                val resumed = recordingManager.resumeRecording()
-                if (!resumed) {
-                    _uiState.update {
-                        it.copy(
-                            phase = RecordingPhase.ERROR,
-                            errorMessage = "Failed to resume recording",
-                        )
-                    }
-                    return@launch
-                }
-
-                recordingStartTimeMs = clock.now().toEpochMilliseconds()
-                _uiState.update {
-                    it.copy(phase = RecordingPhase.RECORDING)
-                }
-
-                startAudioLevelCollection()
-                startAutoStopTimer()
-
-                Napier.d("Push-to-record recording resumed")
-            } catch (e: Exception) {
-                Napier.e("Failed to resume recording", e)
-                _uiState.update {
-                    it.copy(
-                        phase = RecordingPhase.ERROR,
-                        errorMessage = "Failed to resume: ${e.message}",
-                    )
-                }
-            }
+    fun onRelease() {
+        val state = _uiState.value
+        when {
+            state.phase == RecordingPhase.STARTING -> releasedAtMs = now()
+            state.phase == RecordingPhase.RECORDING && !state.isLatched -> applyRelease(now())
         }
     }
 
-    fun onTouchUp() {
-        if (_uiState.value.phase != RecordingPhase.RECORDING) return
-
-        autoStopJob?.cancel()
-        autoStopJob = null
-
-        val segmentDurationMs = clock.now().toEpochMilliseconds() - recordingStartTimeMs
-        val totalDurationMs = accumulatedDurationMs + segmentDurationMs
-
-        viewModelScope.launch {
-            try {
-                if (totalDurationMs < MIN_DURATION_MS) {
-                    recordingManager.stopRecording()
-                    stopAudioLevelCollection()
-                    Napier.d("Recording too short: ${totalDurationMs}ms")
-                    _uiState.update { it.copy(phase = RecordingPhase.TOO_SHORT) }
-                    delay(TOO_SHORT_DISPLAY_MS)
-                    _uiState.update { RecordingUiState(phase = RecordingPhase.READY) }
-                    return@launch
-                }
-
-                val paused = recordingManager.pauseRecording()
-                if (!paused) {
-                    _uiState.update {
-                        it.copy(
-                            phase = RecordingPhase.ERROR,
-                            errorMessage = "Failed to pause recording",
-                        )
-                    }
-                    return@launch
-                }
-
-                stopAudioLevelCollection()
-                accumulatedDurationMs = totalDurationMs
-
-                _uiState.update {
-                    it.copy(
-                        phase = RecordingPhase.PAUSED,
-                        recordingDurationMs = totalDurationMs,
-                    )
-                }
-
-                Napier.d("Recording paused at ${totalDurationMs}ms")
-            } catch (e: Exception) {
-                Napier.e("Failed to pause recording", e)
-                _uiState.update {
-                    it.copy(
-                        phase = RecordingPhase.ERROR,
-                        errorMessage = "Failed to pause: ${e.message}",
-                    )
-                }
-            }
+    fun onPauseToggle() {
+        when (_uiState.value.phase) {
+            RecordingPhase.RECORDING -> viewModelScope.launch { recorder.pause() }
+            RecordingPhase.PAUSED -> resume()
+            else -> Unit
         }
     }
 
-    fun save() {
-        if (_uiState.value.phase != RecordingPhase.PAUSED) return
-
-        viewModelScope.launch {
-            try {
-                val filePath = recordingManager.stopRecording()
-
-                if (filePath == null) {
-                    _uiState.update {
-                        it.copy(
-                            phase = RecordingPhase.ERROR,
-                            errorMessage = "Failed to save recording",
-                        )
-                    }
-                    return@launch
-                }
-
-                _uiState.update { it.copy(phase = RecordingPhase.SAVING) }
-
-                val now = clock.now()
-                val noteLocation = locationCaptureCoordinator.captureForJournalEntry()
-                val audioNote =
-                    JournalNote.Audio(
-                        mediaRef = filePath,
-                        uid = Uuid.random(),
-                        creationTimestamp = now,
-                        lastUpdated = now,
-                        durationMs = accumulatedDurationMs,
-                        location = noteLocation,
-                        timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
-                    )
-                notesRepository.create(audioNote)
-                noteHealthAnnotator.annotate(audioNote.uid)
-
-                val feedback =
-                    if (dataLayerClient.isPhoneConnected()) {
-                        SaveFeedback.SYNCING_TO_PHONE
-                    } else {
-                        SaveFeedback.SAVED_LOCALLY
-                    }
-
-                _uiState.update {
-                    it.copy(
-                        phase = RecordingPhase.SAVED,
-                        savedDurationMs = accumulatedDurationMs,
-                        saveFeedback = feedback,
-                    )
-                }
-
-                Napier.d("Audio note saved: $filePath (${accumulatedDurationMs}ms)")
-
-                delay(SAVED_DISPLAY_MS)
-                _events.emit(RecordingScreenEvent.NavigateBack)
-            } catch (e: Exception) {
-                Napier.e("Failed to save recording", e)
-                _uiState.update {
-                    it.copy(
-                        phase = RecordingPhase.ERROR,
-                        errorMessage = "Failed to save: ${e.message}",
-                    )
-                }
-            }
-        }
-    }
-
-    fun discard() {
+    fun onDiscard() {
         val phase = _uiState.value.phase
-        if (phase != RecordingPhase.PAUSED && phase != RecordingPhase.RECORDING) return
+        if (phase != RecordingPhase.RECORDING && phase != RecordingPhase.PAUSED) return
+        _uiState.update { RecordingUiState(showGestureHint = it.showGestureHint) }
+        viewModelScope.launch { recorder.discard() }
+    }
 
+    fun onUndo() {
+        val noteId = _uiState.value.undoableNoteId ?: return
+        if (_uiState.value.phase != RecordingPhase.SAVED) return
+        undoJob?.cancel()
+        _uiState.update { RecordingUiState(showGestureHint = it.showGestureHint) }
         viewModelScope.launch {
-            autoStopJob?.cancel()
-            autoStopJob = null
-            stopAudioLevelCollection()
-            recordingManager.stopRecording()
-            accumulatedDurationMs = 0
-            _uiState.update { RecordingUiState(phase = RecordingPhase.READY) }
-            Napier.d("Recording discarded")
+            try {
+                val mediaRef = (notesRepository.getNoteById(noteId) as? JournalNote.Audio)?.mediaRef
+                notesRepository.removeById(noteId)
+                if (mediaRef != null && notesRepository.getNoteById(noteId) == null) deleteFile(mediaRef)
+                haptics.rejection()
+            } catch (e: Exception) {
+                Napier.e("Failed to undo saved recording $noteId", e)
+            }
         }
     }
 
-    fun onNavigatedBack() {
-        _uiState.update { RecordingUiState(phase = RecordingPhase.READY) }
+    private fun beginRecording() {
+        pressedAtMs = now()
+        releasedAtMs = null
+        nearLimitWarned = false
+        _uiState.update { RecordingUiState(phase = RecordingPhase.STARTING, showGestureHint = it.showGestureHint) }
+        viewModelScope.launch {
+            if (!recorder.start()) {
+                _uiState.update { it.copy(phase = RecordingPhase.ERROR, error = recorder.lastStartFailure.toError()) }
+                haptics.rejection()
+                return@launch
+            }
+            haptics.startRecording()
+            _uiState.update { it.copy(phase = RecordingPhase.RECORDING) }
+            releasedAtMs?.let(::applyRelease)
+        }
     }
 
-    private fun startAudioLevelCollection() {
-        audioLevelJob?.cancel()
-        audioLevelJob =
+    private fun applyRelease(releasedAt: Long) {
+        if (releasedAt - pressedAtMs < HOLD_THRESHOLD_MS) {
+            _uiState.update { it.copy(isLatched = true) }
+        } else {
+            stopAndSave()
+        }
+    }
+
+    private fun resume() {
+        viewModelScope.launch { recorder.resume() }
+    }
+
+    private fun stopAndSave() {
+        _uiState.update { it.copy(phase = RecordingPhase.SAVING) }
+        viewModelScope.launch {
+            haptics.stopRecording()
+            val path = recorder.stop()
+            if (path == null) {
+                Napier.e("Recording ended without a file")
+                _uiState.update { it.copy(phase = RecordingPhase.ERROR, error = RecordingError.SAVE_FAILED) }
+                return@launch
+            }
+            saveRecording(path)
+        }
+    }
+
+    private suspend fun saveRecording(path: String) {
+        val durationMs = durationResolver.resolveDurationMs(path) ?: recorder.elapsed.value.inWholeMilliseconds
+        if (durationMs < MIN_DURATION_MS) {
+            discardTooShort(path)
+            return
+        }
+        try {
+            val now = clock.now()
+            val location = withTimeoutOrNull(LOCATION_TIMEOUT_MS) { locationCaptureCoordinator.captureForJournalEntry() }
+            val note =
+                JournalNote.Audio(
+                    mediaRef = path,
+                    uid = Uuid.random(),
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    durationMs = durationMs,
+                    location = location,
+                    timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
+                )
+            notesRepository.create(note)
+            noteHealthAnnotator.annotate(note.uid)
+            onSaved(note, durationMs)
+        } catch (e: Exception) {
+            Napier.e("Failed to save recording $path", e)
+            _uiState.update { it.copy(phase = RecordingPhase.ERROR, error = RecordingError.SAVE_FAILED) }
+        }
+    }
+
+    private suspend fun onSaved(
+        note: JournalNote.Audio,
+        durationMs: Long,
+    ) {
+        val feedback =
+            if (dataLayerClient.isPhoneConnected()) SaveFeedback.SYNCING_TO_PHONE else SaveFeedback.SAVED_LOCALLY
+        hintStore.markHintSeen()
+        haptics.success()
+        _uiState.update {
+            RecordingUiState(
+                phase = RecordingPhase.SAVED,
+                savedDurationMs = durationMs,
+                undoableNoteId = note.uid,
+                saveFeedback = feedback,
+            )
+        }
+        undoJob?.cancel()
+        undoJob =
             viewModelScope.launch {
-                @OptIn(kotlinx.coroutines.FlowPreview::class)
-                recordingManager
-                    .getAudioLevelFlow()
-                    .sample(periodMillis = 100)
-                    .collect { level ->
-                        _uiState.update { state ->
-                            val levels = (state.audioLevels + level).takeLast(50)
-                            val segmentMs = clock.now().toEpochMilliseconds() - recordingStartTimeMs
-                            val durationMs = accumulatedDurationMs + segmentMs
-                            state.copy(
-                                audioLevels = levels,
-                                recordingDurationMs = durationMs,
-                            )
-                        }
-                    }
+                delay(UNDO_WINDOW_MS)
+                _uiState.update { RecordingUiState() }
             }
     }
 
-    private fun stopAudioLevelCollection() {
-        audioLevelJob?.cancel()
-        audioLevelJob = null
+    private suspend fun discardTooShort(path: String) {
+        deleteFile(path)
+        haptics.rejection()
+        _uiState.update { it.copy(phase = RecordingPhase.TOO_SHORT) }
+        delay(TOO_SHORT_DISPLAY_MS)
+        _uiState.update { RecordingUiState(showGestureHint = it.showGestureHint) }
     }
 
-    private fun startAutoStopTimer() {
-        autoStopJob?.cancel()
-        val remainingMs = MAX_DURATION_MS - accumulatedDurationMs
-        autoStopJob =
-            viewModelScope.launch {
-                delay(remainingMs)
-                Napier.d("Auto-pause at ${MAX_DURATION_MS}ms")
-                onTouchUp()
+    private fun observeRecorder() {
+        viewModelScope.launch {
+            recorder.audioLevel.collect { level ->
+                _uiState.update { state ->
+                    if (state.phase != RecordingPhase.RECORDING) return@update state
+                    state.copy(audioLevels = (state.audioLevels + level).takeLast(MAX_LEVEL_SAMPLES))
+                }
             }
+        }
+        viewModelScope.launch {
+            recorder.elapsed.collect { elapsed ->
+                _uiState.update { state ->
+                    val live = state.phase == RecordingPhase.RECORDING || state.phase == RecordingPhase.PAUSED
+                    if (live) state.copy(recordingDurationMs = elapsed.inWholeMilliseconds) else state
+                }
+                if (!nearLimitWarned && _uiState.value.phase == RecordingPhase.RECORDING && elapsed >= NEAR_LIMIT) {
+                    nearLimitWarned = true
+                    haptics.warning()
+                }
+            }
+        }
+        viewModelScope.launch {
+            combine(recorder.isPaused, recorder.pausedByInterruption) { paused, interrupted -> paused to interrupted }
+                .collect { (paused, interrupted) -> onPauseStateChanged(paused, interrupted) }
+        }
+        viewModelScope.launch {
+            recorder.isRecording.collect { recording ->
+                val phase = _uiState.value.phase
+                if (!recording && (phase == RecordingPhase.RECORDING || phase == RecordingPhase.PAUSED)) stopAndSave()
+            }
+        }
     }
+
+    private fun onPauseStateChanged(
+        paused: Boolean,
+        interrupted: Boolean,
+    ) {
+        val phase = _uiState.value.phase
+        when {
+            paused && phase == RecordingPhase.RECORDING -> {
+                haptics.pause()
+                _uiState.update { it.copy(phase = RecordingPhase.PAUSED, pausedByInterruption = interrupted) }
+            }
+            paused && phase == RecordingPhase.PAUSED -> {
+                _uiState.update { it.copy(pausedByInterruption = interrupted) }
+            }
+            !paused && phase == RecordingPhase.PAUSED -> {
+                haptics.resume()
+                _uiState.update { it.copy(phase = RecordingPhase.RECORDING, pausedByInterruption = false) }
+            }
+        }
+    }
+
+    private fun now(): Long = clock.now().toEpochMilliseconds()
+
+    private fun RecordingStartFailure?.toError(): RecordingError =
+        when (this) {
+            RecordingStartFailure.MICROPHONE_PERMISSION_DENIED -> RecordingError.MICROPHONE_PERMISSION_DENIED
+            RecordingStartFailure.NOT_ENOUGH_STORAGE -> RecordingError.NOT_ENOUGH_STORAGE
+            RecordingStartFailure.RECORDER_UNAVAILABLE, null -> RecordingError.RECORDER_UNAVAILABLE
+        }
 }

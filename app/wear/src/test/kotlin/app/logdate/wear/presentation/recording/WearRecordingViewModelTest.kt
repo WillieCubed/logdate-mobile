@@ -1,755 +1,831 @@
 package app.logdate.wear.presentation.recording
 
-import androidx.lifecycle.viewModelScope
-import app.cash.turbine.test
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
+import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
-import app.logdate.client.repository.journals.JournalNotesRepository
-import app.logdate.wear.data.storage.StorageSpaceChecker
+import app.logdate.wear.haptic.WearHapticEngine
 import app.logdate.wear.health.NoteHealthAnnotator
 import app.logdate.wear.location.WearLocationCaptureCoordinator
-import app.logdate.wear.recording.WearAudioRecordingManager
+import app.logdate.wear.presentation.common.SaveFeedback
+import app.logdate.wear.recording.RecordingStartFailure
+import app.logdate.wear.recording.WearRecorder
 import app.logdate.wear.sync.WearDataLayerClient
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * Tests for [WearRecordingViewModel], ensuring robust handling of the audio recording lifecycle
- * on Wear OS.
+ * Tests [WearRecordingViewModel]: the gesture that starts and stops a recording, saving with an
+ * undo window, and what the screen is told when something goes wrong.
  *
- * This test suite verifies the complex state transitions between recording phases (Ready, Recording,
- * Paused, Saving, etc.), storage availability enforcement, and the graceful handling of hardware
- * failures. It also validates that audio levels are correctly sampled and that the final
- * recording is properly persisted with the necessary metadata and health annotations.
+ * A press starts recording. A quick lift latches it until the next tap, and a long hold is
+ * push-to-talk that saves on release. Nothing the user recorded may be dropped silently, so every
+ * failure lands in the state as a specific error.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WearRecordingViewModelTest {
     private val testDispatcher = StandardTestDispatcher()
-    private lateinit var recordingManager: WearAudioRecordingManager
-    private lateinit var notesRepository: JournalNotesRepository
-    private lateinit var storageChecker: StorageSpaceChecker
-    private lateinit var noteHealthAnnotator: NoteHealthAnnotator
-    private lateinit var dataLayerClient: WearDataLayerClient
-    private lateinit var locationCaptureCoordinator: WearLocationCaptureCoordinator
-    private lateinit var testClock: TestClock
-
-    private val audioLevelFlow = MutableStateFlow(0f)
-
-    private val plentyOfStorage = 10 * 1024 * 1024L
-    private val insufficientStorage = 1024L
+    private val recorder = FakeRecorder()
+    private val notesRepository = mockk<JournalNotesRepository>(relaxed = true)
+    private val durationResolver = mockk<AudioDurationResolver>()
+    private val noteHealthAnnotator = mockk<NoteHealthAnnotator>(relaxed = true)
+    private val dataLayerClient = mockk<WearDataLayerClient>(relaxed = true)
+    private val locationCaptureCoordinator = mockk<WearLocationCaptureCoordinator>()
+    private val haptics = mockk<WearHapticEngine>(relaxed = true)
+    private val hintStore = FakeHintStore()
+    private val clock = TestClock()
+    private val deletedFiles = mutableListOf<String>()
+    private val viewModelStore = ViewModelStore()
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-
-        recordingManager = mockk(relaxed = true)
-        notesRepository = mockk(relaxed = true)
-        storageChecker = mockk(relaxed = true)
-        noteHealthAnnotator = mockk(relaxed = true)
-        dataLayerClient = mockk(relaxed = true)
-        locationCaptureCoordinator = mockk(relaxed = true)
-        testClock = TestClock()
-
         coEvery { dataLayerClient.isPhoneConnected(any()) } returns false
         coEvery { locationCaptureCoordinator.captureForJournalEntry() } returns null
-
-        every { recordingManager.getAudioLevelFlow() } returns audioLevelFlow
+        coEvery { durationResolver.resolveDurationMs(any()) } returns 4_200L
         coEvery { notesRepository.create(any<JournalNote>()) } returns Uuid.random()
-        coEvery { storageChecker.getAvailableStorageSpace() } returns plentyOfStorage
-        coEvery { recordingManager.startRecording() } returns true
-        coEvery { recordingManager.pauseRecording() } returns true
-        coEvery { recordingManager.resumeRecording() } returns true
-        coEvery { recordingManager.stopRecording() } returns "/fake/audio.aac"
     }
 
     @After
     fun tearDown() {
+        viewModelStore.clear()
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel(): WearRecordingViewModel =
-        WearRecordingViewModel(
-            recordingManager,
-            notesRepository,
-            storageChecker,
-            noteHealthAnnotator,
-            dataLayerClient,
-            locationCaptureCoordinator,
-            testClock,
-        )
+    /** Created through a [ViewModelProvider] so clearing [viewModelStore] runs the real `onCleared`. */
+    private fun createViewModel(): WearRecordingViewModel {
+        val viewModel =
+            WearRecordingViewModel(
+                recorder = recorder,
+                notesRepository = notesRepository,
+                durationResolver = durationResolver,
+                noteHealthAnnotator = noteHealthAnnotator,
+                dataLayerClient = dataLayerClient,
+                locationCaptureCoordinator = locationCaptureCoordinator,
+                haptics = haptics,
+                hintStore = hintStore,
+                clock = clock,
+                deleteFile = { deletedFiles += it },
+            )
+        val factory =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T = viewModel as T
+            }
+        return ViewModelProvider(viewModelStore, factory)["viewModel-${Uuid.random()}", WearRecordingViewModel::class.java]
+    }
 
-    /**
-     * Cancel the ViewModel's coroutine scope to stop the sample() timer and auto-stop timer.
-     * Must be called before runTest cleanup, which calls advanceUntilIdle() and would hang
-     * on the never-ending sample() operator.
-     */
-    private fun WearRecordingViewModel.cancelScope() {
-        viewModelScope.cancel()
+    private fun TestScope.press(viewModel: WearRecordingViewModel) {
+        viewModel.onPress()
+        runCurrent()
+    }
+
+    private fun TestScope.release(
+        viewModel: WearRecordingViewModel,
+        afterMs: Long,
+    ) {
+        clock.advanceMs(afterMs)
+        viewModel.onRelease()
+        runCurrent()
+    }
+
+    /** A tap: press, then lift straight away, leaving the recording latched. */
+    private fun TestScope.tapToStart(viewModel: WearRecordingViewModel) {
+        press(viewModel)
+        release(viewModel, afterMs = 120)
     }
 
     // -----------------------------------------------------------------------
-    // Initial state
+    // Starting
     // -----------------------------------------------------------------------
 
     @Test
-    fun `initial state is READY`() =
+    fun `initial state is ready`() =
         runTest {
             val viewModel = createViewModel()
 
-            viewModel.uiState.test {
-                val state = awaitItem()
-                assertEquals(RecordingPhase.READY, state.phase)
-                assertEquals(0, state.recordingDurationMs)
-                assertEquals(emptyList(), state.audioLevels)
-                assertNull(state.errorMessage)
-            }
-        }
-
-    // -----------------------------------------------------------------------
-    // onTouchDown -- successful start
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `touch down transitions to RECORDING when storage available`() =
-        runTest {
-            val viewModel = createViewModel()
-
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-
-            assertEquals(RecordingPhase.RECORDING, viewModel.uiState.value.phase)
-            viewModel.cancelScope()
-        }
-
-    @Test
-    fun `touch down starts recording via manager`() =
-        runTest {
-            val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-
-            coVerify { recordingManager.startRecording() }
-            viewModel.cancelScope()
-        }
-
-    @Test
-    fun `touch down checks storage space before recording`() =
-        runTest {
-            val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-
-            coVerify { storageChecker.getAvailableStorageSpace() }
-            viewModel.cancelScope()
-        }
-
-    // -----------------------------------------------------------------------
-    // onTouchDown -- insufficient storage
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `touch down transitions to ERROR when storage insufficient`() =
-        runTest {
-            coEvery { storageChecker.getAvailableStorageSpace() } returns insufficientStorage
-            val viewModel = createViewModel()
-
-            viewModel.onTouchDown()
-            advanceUntilIdle()
-
-            assertEquals(RecordingPhase.ERROR, viewModel.uiState.value.phase)
-            assertNotNull(viewModel.uiState.value.errorMessage)
-        }
-
-    @Test
-    fun `touch down does not start recording when storage insufficient`() =
-        runTest {
-            coEvery { storageChecker.getAvailableStorageSpace() } returns insufficientStorage
-            val viewModel = createViewModel()
-
-            viewModel.onTouchDown()
-            advanceUntilIdle()
-
-            coVerify(exactly = 0) { recordingManager.startRecording() }
-        }
-
-    // -----------------------------------------------------------------------
-    // onTouchDown -- recording fails to start
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `touch down transitions to ERROR when recording fails to start`() =
-        runTest {
-            coEvery { recordingManager.startRecording() } returns false
-            val viewModel = createViewModel()
-
-            viewModel.onTouchDown()
-            advanceUntilIdle()
-
-            assertEquals(RecordingPhase.ERROR, viewModel.uiState.value.phase)
-            assertNotNull(viewModel.uiState.value.errorMessage)
-        }
-
-    @Test
-    fun `touch down transitions to ERROR when recording throws exception`() =
-        runTest {
-            coEvery { recordingManager.startRecording() } throws RuntimeException("mic unavailable")
-            val viewModel = createViewModel()
-
-            viewModel.onTouchDown()
-            advanceUntilIdle()
-
-            assertEquals(RecordingPhase.ERROR, viewModel.uiState.value.phase)
-            assertNotNull(viewModel.uiState.value.errorMessage)
-        }
-
-    // -----------------------------------------------------------------------
-    // onTouchDown -- guard against re-entry
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `touch down is ignored when in RECORDING phase`() =
-        runTest {
-            val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-
-            coVerify(exactly = 1) { recordingManager.startRecording() }
-
-            viewModel.onTouchDown() // should be ignored
-            advanceTimeBy(200)
-
-            coVerify(exactly = 1) { recordingManager.startRecording() }
-            viewModel.cancelScope()
-        }
-
-    // -----------------------------------------------------------------------
-    // onTouchUp -- pauses recording (release to pause)
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `touch up pauses recording via manager`() =
-        runTest {
-            val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            testClock.advanceBy(1000)
-
-            viewModel.onTouchUp()
-            advanceTimeBy(200)
-
-            coVerify { recordingManager.pauseRecording() }
-            viewModel.cancelScope()
-        }
-
-    @Test
-    fun `touch up transitions to PAUSED with sufficient duration`() =
-        runTest {
-            val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            testClock.advanceBy(1000)
-
-            viewModel.onTouchUp()
-            advanceTimeBy(200)
-
-            assertEquals(RecordingPhase.PAUSED, viewModel.uiState.value.phase)
-            viewModel.cancelScope()
-        }
-
-    @Test
-    fun `paused state includes accumulated duration`() =
-        runTest {
-            val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            testClock.advanceBy(2500)
-
-            viewModel.onTouchUp()
-            advanceTimeBy(200)
-
-            assertEquals(2500, viewModel.uiState.value.recordingDurationMs)
-            viewModel.cancelScope()
-        }
-
-    @Test
-    fun `touch up does not create note in repository`() =
-        runTest {
-            val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            testClock.advanceBy(1000)
-
-            viewModel.onTouchUp()
-            advanceTimeBy(200)
-
-            coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
-            viewModel.cancelScope()
-        }
-
-    // -----------------------------------------------------------------------
-    // onTouchUp -- recording too short
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `touch up shows TOO_SHORT when duration under threshold`() =
-        runTest {
-            val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            // Do NOT advance test clock — duration stays at 0ms (< 500ms threshold)
-            viewModel.onTouchUp()
-            advanceTimeBy(50)
-
-            coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
-            assertEquals(RecordingPhase.TOO_SHORT, viewModel.uiState.value.phase)
-            viewModel.cancelScope()
-        }
-
-    @Test
-    fun `touch up resets to READY after showing TOO_SHORT`() =
-        runTest {
-            val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            viewModel.onTouchUp()
-            advanceTimeBy(50)
-
-            assertEquals(RecordingPhase.TOO_SHORT, viewModel.uiState.value.phase)
-
-            advanceTimeBy(2000)
             assertEquals(RecordingPhase.READY, viewModel.uiState.value.phase)
-            viewModel.cancelScope()
         }
 
     @Test
-    fun `touch up does not save note when duration is too short`() =
+    fun `gesture hint shows until it has been seen`() =
         runTest {
-            val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            viewModel.onTouchUp()
-            advanceTimeBy(2000)
+            assertTrue(createViewModel().uiState.value.showGestureHint)
 
-            coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
-            viewModel.cancelScope()
+            hintStore.seen = true
+
+            assertFalse(createViewModel().uiState.value.showGestureHint)
         }
 
-    // -----------------------------------------------------------------------
-    // onTouchUp -- pause fails
-    // -----------------------------------------------------------------------
-
     @Test
-    fun `touch up transitions to ERROR when pause fails`() =
-        runTest {
-            coEvery { recordingManager.pauseRecording() } returns false
-            val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            testClock.advanceBy(1000)
-
-            viewModel.onTouchUp()
-            advanceTimeBy(200)
-
-            assertEquals(RecordingPhase.ERROR, viewModel.uiState.value.phase)
-            viewModel.cancelScope()
-        }
-
-    // -----------------------------------------------------------------------
-    // onTouchUp -- guard against wrong phase
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `touch up is ignored when not in RECORDING phase`() =
+    fun `pressing the record surface starts recording at once`() =
         runTest {
             val viewModel = createViewModel()
 
-            viewModel.onTouchUp()
-            advanceUntilIdle()
+            press(viewModel)
 
-            coVerify(exactly = 0) { recordingManager.pauseRecording() }
-            coVerify(exactly = 0) { recordingManager.stopRecording() }
-        }
-
-    // -----------------------------------------------------------------------
-    // Resume from PAUSED (touch down while paused)
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `touch down from PAUSED resumes recording`() =
-        runTest {
-            val viewModel = createViewModel()
-            // Start -> pause
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            testClock.advanceBy(1000)
-            viewModel.onTouchUp()
-            advanceTimeBy(200)
-            assertEquals(RecordingPhase.PAUSED, viewModel.uiState.value.phase)
-
-            // Resume
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-
-            coVerify { recordingManager.resumeRecording() }
             assertEquals(RecordingPhase.RECORDING, viewModel.uiState.value.phase)
-            viewModel.cancelScope()
+            assertEquals(1, recorder.starts)
+            verify { haptics.startRecording() }
         }
 
     @Test
-    fun `duration accumulates across pause-resume cycles`() =
+    fun `phase is starting until the recorder confirms`() =
         runTest {
+            recorder.startDelay = 500.milliseconds
             val viewModel = createViewModel()
-            // First segment: 1000ms
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            testClock.advanceBy(1000)
-            viewModel.onTouchUp()
-            advanceTimeBy(200)
-            assertEquals(1000, viewModel.uiState.value.recordingDurationMs)
 
-            // Second segment: 500ms
-            testClock.advanceBy(5000) // paused time doesn't count
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            testClock.advanceBy(500)
-            viewModel.onTouchUp()
-            advanceTimeBy(200)
+            viewModel.onPress()
+            advanceTimeBy(100)
 
-            assertEquals(1500, viewModel.uiState.value.recordingDurationMs)
-            viewModel.cancelScope()
+            assertEquals(RecordingPhase.STARTING, viewModel.uiState.value.phase)
         }
 
     @Test
-    fun `touch down from PAUSED transitions to ERROR when resume fails`() =
+    fun `a second press while starting does not start twice`() =
         runTest {
+            recorder.startDelay = 500.milliseconds
             val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            testClock.advanceBy(1000)
-            viewModel.onTouchUp()
-            advanceTimeBy(200)
 
-            coEvery { recordingManager.resumeRecording() } returns false
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
+            viewModel.onPress()
+            viewModel.onPress()
+            advanceTimeBy(600)
+            runCurrent()
 
-            assertEquals(RecordingPhase.ERROR, viewModel.uiState.value.phase)
-            viewModel.cancelScope()
+            assertEquals(1, recorder.starts)
         }
 
-    // -----------------------------------------------------------------------
-    // save() -- explicit save from PAUSED
-    // -----------------------------------------------------------------------
-
     @Test
-    fun `save stops recording and creates audio note`() =
+    fun `a start the recorder refuses is reported with its reason`() =
         runTest {
-            val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            testClock.advanceBy(2000)
-            viewModel.onTouchUp()
-            advanceTimeBy(200)
-
-            viewModel.save()
-            advanceTimeBy(2000)
-
-            coVerify { recordingManager.stopRecording() }
-            coVerify {
-                notesRepository.create(
-                    match { note ->
-                        note is JournalNote.Audio && note.mediaRef == "/fake/audio.aac"
-                    },
+            val reasons =
+                mapOf(
+                    RecordingStartFailure.MICROPHONE_PERMISSION_DENIED to RecordingError.MICROPHONE_PERMISSION_DENIED,
+                    RecordingStartFailure.NOT_ENOUGH_STORAGE to RecordingError.NOT_ENOUGH_STORAGE,
+                    RecordingStartFailure.RECORDER_UNAVAILABLE to RecordingError.RECORDER_UNAVAILABLE,
                 )
+            for ((failure, expected) in reasons) {
+                recorder.startResult = false
+                recorder.lastStartFailure = failure
+                val viewModel = createViewModel()
+
+                press(viewModel)
+
+                assertEquals(RecordingPhase.ERROR, viewModel.uiState.value.phase)
+                assertEquals(expected, viewModel.uiState.value.error)
             }
         }
 
     @Test
-    fun `save attaches current watch location to audio note`() =
+    fun `pressing after an error tries again`() =
         runTest {
-            val capturedLocation =
-                NoteLocation(
-                    coordinates =
-                        NoteCoordinates(
-                            latitude = 37.7749,
-                            longitude = -122.4194,
-                            altitude = 14.0,
-                        ),
-                )
-            coEvery { locationCaptureCoordinator.captureForJournalEntry() } returns capturedLocation
+            recorder.startResult = false
+            recorder.lastStartFailure = RecordingStartFailure.RECORDER_UNAVAILABLE
             val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            testClock.advanceBy(2000)
-            viewModel.onTouchUp()
-            advanceTimeBy(200)
+            press(viewModel)
+            recorder.startResult = true
 
-            viewModel.save()
-            advanceTimeBy(2000)
+            press(viewModel)
 
-            coVerify {
-                notesRepository.create(
-                    match { note ->
-                        note is JournalNote.Audio && note.location == capturedLocation
-                    },
-                )
-            }
+            assertEquals(RecordingPhase.RECORDING, viewModel.uiState.value.phase)
+            assertNull(viewModel.uiState.value.error)
+        }
+
+    // -----------------------------------------------------------------------
+    // Tap and hold
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `lifting quickly latches the recording`() =
+        runTest {
+            val viewModel = createViewModel()
+
+            tapToStart(viewModel)
+
+            assertEquals(RecordingPhase.RECORDING, viewModel.uiState.value.phase)
+            assertTrue(viewModel.uiState.value.isLatched)
+            assertEquals(0, recorder.stops)
         }
 
     @Test
-    fun `save transitions through SAVING to SAVED`() =
+    fun `tapping again stops and saves a latched recording`() =
         runTest {
             val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            testClock.advanceBy(2000)
-            viewModel.onTouchUp()
-            advanceTimeBy(200)
+            tapToStart(viewModel)
 
-            viewModel.save()
-            advanceTimeBy(2000)
+            press(viewModel)
+
+            assertEquals(RecordingPhase.SAVED, viewModel.uiState.value.phase)
+            assertEquals(1, recorder.stops)
+        }
+
+    @Test
+    fun `holding then lifting saves the recording`() =
+        runTest {
+            val viewModel = createViewModel()
+            press(viewModel)
+
+            release(viewModel, afterMs = WearRecordingViewModel.HOLD_THRESHOLD_MS + 600)
+
+            assertEquals(RecordingPhase.SAVED, viewModel.uiState.value.phase)
+            assertFalse(viewModel.uiState.value.isLatched)
+        }
+
+    @Test
+    fun `a hold is not latched when it ends exactly at the threshold`() =
+        runTest {
+            val viewModel = createViewModel()
+            press(viewModel)
+
+            release(viewModel, afterMs = WearRecordingViewModel.HOLD_THRESHOLD_MS)
 
             assertEquals(RecordingPhase.SAVED, viewModel.uiState.value.phase)
         }
 
     @Test
-    fun `save includes accumulated duration`() =
+    fun `lifting before the recorder confirms still latches a tap`() =
         runTest {
+            recorder.startDelay = 500.milliseconds
             val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            testClock.advanceBy(3000)
-            viewModel.onTouchUp()
-            advanceTimeBy(200)
+            viewModel.onPress()
+            advanceTimeBy(100)
+            clock.advanceMs(100)
+            viewModel.onRelease()
 
-            viewModel.save()
-            advanceTimeBy(2000)
+            advanceTimeBy(600)
+            runCurrent()
 
-            assertEquals(3000, viewModel.uiState.value.savedDurationMs)
+            assertEquals(RecordingPhase.RECORDING, viewModel.uiState.value.phase)
+            assertTrue(viewModel.uiState.value.isLatched)
         }
 
     @Test
-    fun `save emits NavigateBack after delay`() =
+    fun `lifting after a long hold before the recorder confirms saves`() =
+        runTest {
+            recorder.startDelay = 1.seconds
+            val viewModel = createViewModel()
+            viewModel.onPress()
+            advanceTimeBy(100)
+            clock.advanceMs(900)
+            viewModel.onRelease()
+
+            advanceTimeBy(1_100)
+            runCurrent()
+
+            assertEquals(RecordingPhase.SAVED, viewModel.uiState.value.phase)
+        }
+
+    @Test
+    fun `lifting a latched recording changes nothing`() =
         runTest {
             val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            testClock.advanceBy(1000)
-            viewModel.onTouchUp()
-            advanceTimeBy(200)
+            tapToStart(viewModel)
 
-            viewModel.events.test {
-                viewModel.save()
-                advanceTimeBy(2000)
+            release(viewModel, afterMs = 2_000)
 
-                assertEquals(RecordingScreenEvent.NavigateBack, awaitItem())
+            assertEquals(RecordingPhase.RECORDING, viewModel.uiState.value.phase)
+            assertEquals(0, recorder.stops)
+        }
+
+    // -----------------------------------------------------------------------
+    // Saving
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `saving creates an audio note from the finalized file`() =
+        runTest {
+            recorder.stopPath = "/files/audio_notes/recording_1.m4a"
+            val created = slot<JournalNote>()
+            coEvery { notesRepository.create(capture(created)) } returns Uuid.random()
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            press(viewModel)
+
+            val note = created.captured as JournalNote.Audio
+            assertEquals("/files/audio_notes/recording_1.m4a", note.mediaRef)
+            assertEquals(4_200L, note.durationMs)
+            assertEquals(viewModel.uiState.value.undoableNoteId, note.uid)
+        }
+
+    @Test
+    fun `duration comes from the file when it can be read`() =
+        runTest {
+            coEvery { durationResolver.resolveDurationMs("/fake/audio.m4a") } returns 7_300L
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            recorder.elapsedFlow.value = 9.seconds
+
+            press(viewModel)
+
+            assertEquals(7_300L, viewModel.uiState.value.savedDurationMs)
+        }
+
+    @Test
+    fun `duration falls back to the recorder clock when the file cannot be read`() =
+        runTest {
+            coEvery { durationResolver.resolveDurationMs(any()) } returns null
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            recorder.elapsedFlow.value = 9.seconds
+
+            press(viewModel)
+
+            assertEquals(9_000L, viewModel.uiState.value.savedDurationMs)
+        }
+
+    @Test
+    fun `saving records where the phone sync stands`() =
+        runTest {
+            coEvery { dataLayerClient.isPhoneConnected(any()) } returns true
+            val connected = createViewModel()
+            tapToStart(connected)
+            press(connected)
+            assertEquals(SaveFeedback.SYNCING_TO_PHONE, connected.uiState.value.saveFeedback)
+
+            coEvery { dataLayerClient.isPhoneConnected(any()) } returns false
+            val offline = createViewModel()
+            tapToStart(offline)
+            press(offline)
+            assertEquals(SaveFeedback.SAVED_LOCALLY, offline.uiState.value.saveFeedback)
+        }
+
+    @Test
+    fun `saving includes the captured location`() =
+        runTest {
+            val location = NoteLocation(coordinates = NoteCoordinates(latitude = 37.77, longitude = -122.41))
+            coEvery { locationCaptureCoordinator.captureForJournalEntry() } returns location
+            val created = slot<JournalNote>()
+            coEvery { notesRepository.create(capture(created)) } returns Uuid.random()
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            press(viewModel)
+
+            assertEquals(location, created.captured.location)
+        }
+
+    @Test
+    fun `a location that takes too long does not hold up the save`() =
+        runTest {
+            coEvery { locationCaptureCoordinator.captureForJournalEntry() } coAnswers {
+                delay(60_000)
+                null
             }
+            val created = slot<JournalNote>()
+            coEvery { notesRepository.create(capture(created)) } returns Uuid.random()
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            viewModel.onPress()
+            advanceTimeBy(WearRecordingViewModel.LOCATION_TIMEOUT_MS + 100)
+
+            assertEquals(RecordingPhase.SAVED, viewModel.uiState.value.phase)
+            assertNull(created.captured.location)
         }
 
     @Test
-    fun `save annotates note with health data`() =
+    fun `saving annotates the note with health data`() =
         runTest {
+            val created = slot<JournalNote>()
+            coEvery { notesRepository.create(capture(created)) } returns Uuid.random()
             val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            testClock.advanceBy(2000)
-            viewModel.onTouchUp()
-            advanceTimeBy(200)
+            tapToStart(viewModel)
 
-            viewModel.save()
-            advanceTimeBy(2000)
+            press(viewModel)
 
-            coVerify { noteHealthAnnotator.annotate(any()) }
+            coVerify { noteHealthAnnotator.annotate(created.captured.uid) }
         }
 
     @Test
-    fun `save is ignored when not PAUSED`() =
+    fun `saving marks the gesture hint as seen`() =
         runTest {
             val viewModel = createViewModel()
+            tapToStart(viewModel)
 
-            viewModel.save()
-            advanceUntilIdle()
+            press(viewModel)
 
-            coVerify(exactly = 0) { recordingManager.stopRecording() }
+            assertTrue(hintStore.seen)
+            assertFalse(viewModel.uiState.value.showGestureHint)
         }
 
     @Test
-    fun `save transitions to ERROR when file path is null`() =
+    fun `a recording that produced no file is reported and creates no note`() =
         runTest {
-            coEvery { recordingManager.stopRecording() } returns null
+            recorder.stopPath = null
             val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            testClock.advanceBy(1000)
-            viewModel.onTouchUp()
-            advanceTimeBy(200)
+            tapToStart(viewModel)
 
-            viewModel.save()
-            advanceTimeBy(200)
+            press(viewModel)
 
             assertEquals(RecordingPhase.ERROR, viewModel.uiState.value.phase)
-            viewModel.cancelScope()
-        }
-
-    // -----------------------------------------------------------------------
-    // discard()
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `discard stops recording and resets to READY`() =
-        runTest {
-            val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
-            testClock.advanceBy(1000)
-            viewModel.onTouchUp()
-            advanceTimeBy(200)
-
-            viewModel.discard()
-            advanceTimeBy(200)
-
-            coVerify { recordingManager.stopRecording() }
-            assertEquals(RecordingPhase.READY, viewModel.uiState.value.phase)
+            assertEquals(RecordingError.SAVE_FAILED, viewModel.uiState.value.error)
             coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
         }
 
     @Test
-    fun `discard is ignored when in READY phase`() =
+    fun `a note that cannot be stored is reported and its file is left for recovery`() =
         runTest {
+            coEvery { notesRepository.create(any<JournalNote>()) } throws IllegalStateException("database closed")
             val viewModel = createViewModel()
+            tapToStart(viewModel)
 
-            viewModel.discard()
-            advanceUntilIdle()
+            press(viewModel)
 
-            coVerify(exactly = 0) { recordingManager.stopRecording() }
+            assertEquals(RecordingError.SAVE_FAILED, viewModel.uiState.value.error)
+            assertTrue(deletedFiles.isEmpty())
         }
 
-    // -----------------------------------------------------------------------
-    // onNavigatedBack
-    // -----------------------------------------------------------------------
+    @Test
+    fun `a recording shorter than the minimum is discarded as too short`() =
+        runTest {
+            coEvery { durationResolver.resolveDurationMs(any()) } returns 300L
+            recorder.stopPath = "/files/audio_notes/short.m4a"
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            press(viewModel)
+
+            assertEquals(RecordingPhase.TOO_SHORT, viewModel.uiState.value.phase)
+            assertEquals(listOf("/files/audio_notes/short.m4a"), deletedFiles)
+            coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
+            verify { haptics.rejection() }
+        }
 
     @Test
-    fun `onNavigatedBack resets state to READY`() =
+    fun `too short returns to ready after a moment`() =
         runTest {
-            coEvery { recordingManager.startRecording() } returns false
+            coEvery { durationResolver.resolveDurationMs(any()) } returns 300L
             val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceUntilIdle()
+            tapToStart(viewModel)
+            press(viewModel)
 
-            assertEquals(RecordingPhase.ERROR, viewModel.uiState.value.phase)
-
-            viewModel.onNavigatedBack()
-            advanceUntilIdle()
+            advanceTimeBy(WearRecordingViewModel.TOO_SHORT_DISPLAY_MS + 100)
 
             assertEquals(RecordingPhase.READY, viewModel.uiState.value.phase)
-            assertNull(viewModel.uiState.value.errorMessage)
         }
 
     // -----------------------------------------------------------------------
-    // Audio level collection
+    // Undo
     // -----------------------------------------------------------------------
 
     @Test
-    fun `audio level flow collection starts on touch down`() =
+    fun `undo removes the note and deletes its file`() =
         runTest {
+            val audio = audioNote("/files/audio_notes/undo.m4a")
+            coEvery { notesRepository.getNoteById(any()) } returnsMany listOf(audio, null)
             val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
+            tapToStart(viewModel)
+            press(viewModel)
+            val noteId = viewModel.uiState.value.undoableNoteId!!
 
-            verify { recordingManager.getAudioLevelFlow() }
-            viewModel.cancelScope()
+            viewModel.onUndo()
+            runCurrent()
+
+            coVerify { notesRepository.removeById(noteId) }
+            assertEquals(listOf("/files/audio_notes/undo.m4a"), deletedFiles)
+            assertEquals(RecordingPhase.READY, viewModel.uiState.value.phase)
         }
 
     @Test
-    fun `audio levels are collected while recording`() =
+    fun `undo leaves the file alone while the note still exists`() =
         runTest {
+            val audio = audioNote("/files/audio_notes/still-there.m4a")
+            coEvery { notesRepository.getNoteById(any()) } returns audio
             val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
+            tapToStart(viewModel)
+            press(viewModel)
 
-            audioLevelFlow.value = 0.5f
-            advanceTimeBy(150) // advance past the sample(100ms) window
-            audioLevelFlow.value = 0.8f
-            advanceTimeBy(150)
+            viewModel.onUndo()
+            runCurrent()
 
-            val state = viewModel.uiState.value
-            assertEquals(RecordingPhase.RECORDING, state.phase)
-            assertTrue(state.audioLevels.isNotEmpty(), "Expected audio levels to be collected")
-            viewModel.cancelScope()
+            assertTrue(deletedFiles.isEmpty())
         }
 
     @Test
-    fun `audio levels list is bounded to last 50 entries`() =
+    fun `the undo window closes on its own`() =
         runTest {
             val viewModel = createViewModel()
-            viewModel.onTouchDown()
-            advanceTimeBy(200)
+            tapToStart(viewModel)
+            press(viewModel)
 
-            repeat(60) { i ->
-                audioLevelFlow.value = i / 60f
-                advanceTimeBy(150) // advance past sample window each time
+            advanceTimeBy(WearRecordingViewModel.UNDO_WINDOW_MS + 100)
+
+            assertEquals(RecordingPhase.READY, viewModel.uiState.value.phase)
+            assertNull(viewModel.uiState.value.undoableNoteId)
+        }
+
+    @Test
+    fun `undo does nothing once the window has closed`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            press(viewModel)
+            advanceTimeBy(WearRecordingViewModel.UNDO_WINDOW_MS + 100)
+
+            viewModel.onUndo()
+            runCurrent()
+
+            coVerify(exactly = 0) { notesRepository.removeById(any()) }
+        }
+
+    @Test
+    fun `recording again keeps the previous note`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            press(viewModel)
+
+            press(viewModel)
+
+            assertEquals(RecordingPhase.RECORDING, viewModel.uiState.value.phase)
+            assertNull(viewModel.uiState.value.undoableNoteId)
+            coVerify(exactly = 0) { notesRepository.removeById(any()) }
+            advanceTimeBy(WearRecordingViewModel.UNDO_WINDOW_MS + 100)
+            assertEquals(RecordingPhase.RECORDING, viewModel.uiState.value.phase)
+        }
+
+    // -----------------------------------------------------------------------
+    // Pause, discard, interruptions
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `pausing and resuming follow the recorder`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            viewModel.onPauseToggle()
+            runCurrent()
+            assertEquals(RecordingPhase.PAUSED, viewModel.uiState.value.phase)
+            assertFalse(viewModel.uiState.value.pausedByInterruption)
+
+            viewModel.onPauseToggle()
+            runCurrent()
+            assertEquals(RecordingPhase.RECORDING, viewModel.uiState.value.phase)
+            verify { haptics.pause() }
+            verify { haptics.resume() }
+        }
+
+    @Test
+    fun `pressing while paused resumes`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            viewModel.onPauseToggle()
+            runCurrent()
+
+            press(viewModel)
+
+            assertEquals(RecordingPhase.RECORDING, viewModel.uiState.value.phase)
+            assertEquals(1, recorder.resumes)
+        }
+
+    @Test
+    fun `a pause caused by another app is reported as an interruption`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            recorder.pausedFlow.value = true
+            recorder.interruptedFlow.value = true
+            runCurrent()
+
+            assertEquals(RecordingPhase.PAUSED, viewModel.uiState.value.phase)
+            assertTrue(viewModel.uiState.value.pausedByInterruption)
+        }
+
+    @Test
+    fun `discarding drops the recording without creating a note`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            viewModel.onDiscard()
+            runCurrent()
+
+            assertEquals(RecordingPhase.READY, viewModel.uiState.value.phase)
+            assertEquals(1, recorder.discards)
+            assertEquals(0, recorder.stops)
+            coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
+        }
+
+    @Test
+    fun `discarding a paused recording works too`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            viewModel.onPauseToggle()
+            runCurrent()
+
+            viewModel.onDiscard()
+            runCurrent()
+
+            assertEquals(RecordingPhase.READY, viewModel.uiState.value.phase)
+            assertEquals(1, recorder.discards)
+        }
+
+    @Test
+    fun `a recording the recorder ends on its own is saved`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            recorder.recordingFlow.value = false
+            runCurrent()
+
+            assertEquals(RecordingPhase.SAVED, viewModel.uiState.value.phase)
+            assertEquals(1, recorder.stops)
+        }
+
+    @Test
+    fun `discarding is not mistaken for the recorder ending on its own`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            viewModel.onDiscard()
+            runCurrent()
+
+            assertEquals(0, recorder.stops)
+            coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
+        }
+
+    // -----------------------------------------------------------------------
+    // Live readouts and lifecycle
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun `elapsed time and input level follow the recorder while recording`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            recorder.elapsedFlow.value = 12.seconds
+            recorder.levelFlow.value = 0.6f
+            runCurrent()
+
+            assertEquals(12_000L, viewModel.uiState.value.recordingDurationMs)
+            assertEquals(0.6f, viewModel.uiState.value.audioLevels.last())
+        }
+
+    @Test
+    fun `input level history is capped`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            repeat(80) { index ->
+                recorder.levelFlow.value = (index % 10) / 10f + 0.01f
+                runCurrent()
             }
 
-            val state = viewModel.uiState.value
-            assertTrue(
-                state.audioLevels.size <= 50,
-                "Expected at most 50 audio levels but got ${state.audioLevels.size}",
-            )
-            viewModel.cancelScope()
+            assertEquals(50, viewModel.uiState.value.audioLevels.size)
+        }
+
+    @Test
+    fun `a haptic warns as the length limit approaches`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            recorder.elapsedFlow.value = 29.minutes + 1.seconds
+            runCurrent()
+
+            verify(exactly = 1) { haptics.warning() }
+            assertEquals(RecordingPhase.RECORDING, viewModel.uiState.value.phase)
+        }
+
+    @Test
+    fun `clearing the screen while recording asks the recorder to stop`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            viewModelStore.clear()
+
+            assertEquals(1, recorder.stopRequests)
         }
 
     // -----------------------------------------------------------------------
-    // Constants verification
+    // Fakes
     // -----------------------------------------------------------------------
 
-    @Test
-    fun `MIN_DURATION_MS is 500`() {
-        assertEquals(500L, WearRecordingViewModel.MIN_DURATION_MS)
+    private fun audioNote(path: String): JournalNote.Audio {
+        val now = clock.now()
+        return JournalNote.Audio(mediaRef = path, creationTimestamp = now, lastUpdated = now, durationMs = 4_200)
     }
 
-    @Test
-    fun `MAX_DURATION_MS is 60 seconds`() {
-        assertEquals(60_000L, WearRecordingViewModel.MAX_DURATION_MS)
+    private class FakeHintStore : RecordingHintStore {
+        var seen = false
+
+        override fun hasSeenHint(): Boolean = seen
+
+        override fun markHintSeen() {
+            seen = true
+        }
     }
 
-    // -----------------------------------------------------------------------
-    // Test Clock
-    // -----------------------------------------------------------------------
+    private class TestClock : Clock {
+        private var nowMs = 1_710_000_000_000L
 
-    /**
-     * A test implementation of [Clock] that allows manual time advancement for testing.
-     */
-    private class TestClock(
-        private var currentMs: Long = 1_000_000L,
-    ) : Clock {
-        fun advanceBy(ms: Long) {
-            currentMs += ms
+        fun advanceMs(delta: Long) {
+            nowMs += delta
         }
 
-        override fun now(): Instant = Instant.fromEpochMilliseconds(currentMs)
+        override fun now(): Instant = Instant.fromEpochMilliseconds(nowMs)
+    }
+
+    private class FakeRecorder : WearRecorder {
+        val recordingFlow = MutableStateFlow(false)
+        val pausedFlow = MutableStateFlow(false)
+        val interruptedFlow = MutableStateFlow(false)
+        val levelFlow = MutableStateFlow(0f)
+        val elapsedFlow = MutableStateFlow(Duration.ZERO)
+
+        override val isRecording: StateFlow<Boolean> = recordingFlow
+        override val isPaused: StateFlow<Boolean> = pausedFlow
+        override val pausedByInterruption: StateFlow<Boolean> = interruptedFlow
+        override val audioLevel: StateFlow<Float> = levelFlow
+        override val elapsed: StateFlow<Duration> = elapsedFlow
+        override var lastStartFailure: RecordingStartFailure? = null
+
+        var startResult = true
+        var startDelay: Duration = Duration.ZERO
+        var stopPath: String? = "/fake/audio.m4a"
+        var starts = 0
+        var stops = 0
+        var resumes = 0
+        var discards = 0
+        var stopRequests = 0
+
+        override suspend fun start(): Boolean {
+            starts++
+            if (startDelay > Duration.ZERO) delay(startDelay)
+            if (startResult) recordingFlow.value = true
+            return startResult
+        }
+
+        override suspend fun stop(): String? {
+            stops++
+            recordingFlow.value = false
+            pausedFlow.value = false
+            return stopPath
+        }
+
+        override suspend fun pause(): Boolean {
+            pausedFlow.value = true
+            return true
+        }
+
+        override suspend fun resume(): Boolean {
+            resumes++
+            pausedFlow.value = false
+            interruptedFlow.value = false
+            return true
+        }
+
+        override suspend fun discard() {
+            discards++
+            recordingFlow.value = false
+            pausedFlow.value = false
+        }
+
+        override fun requestStop() {
+            stopRequests++
+        }
     }
 }

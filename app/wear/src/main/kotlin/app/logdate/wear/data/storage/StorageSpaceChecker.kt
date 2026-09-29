@@ -1,7 +1,6 @@
 package app.logdate.wear.data.storage
 
 import android.content.Context
-import android.os.Environment
 import android.os.StatFs
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
@@ -17,26 +16,18 @@ class StorageSpaceChecker(
     private val context: Context,
 ) {
     /**
-     * Gets the available storage space in bytes.
+     * Gets the free space, in bytes, where recordings are stored: the app's private files directory.
      *
-     * @return Available storage space in bytes
+     * @return Available storage space in bytes, or 0 when it cannot be read so a recording is not
+     *   started on a guess
      */
     suspend fun getAvailableStorageSpace(): Long =
         withContext(Dispatchers.IO) {
             try {
-                // Try to get app-specific external storage first
-                val externalDir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
-                if (externalDir != null && externalDir.exists()) {
-                    return@withContext getAvailableSpaceForPath(externalDir.absolutePath)
-                }
-
-                // Fall back to app cache directory
-                val cacheDir = context.cacheDir
-                return@withContext getAvailableSpaceForPath(cacheDir.absolutePath)
+                getAvailableSpaceForPath(context.filesDir.absolutePath)
             } catch (e: Exception) {
                 Napier.e("Error checking storage space", e)
-                // Return a minimal value that will fail the space check to be safe
-                return@withContext 0L
+                0L
             }
         }
 

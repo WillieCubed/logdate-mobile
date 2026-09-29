@@ -1,316 +1,304 @@
 package app.logdate.wear.recording
 
-import android.content.ComponentName
-import android.content.Context
-import android.content.Intent
-import android.content.ServiceConnection
-import android.os.IBinder
-import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.client.media.audio.AudioRecordingTarget
 import app.logdate.client.media.audio.AudioStorage
-import app.logdate.client.media.audio.transcription.TranscriptionService
+import app.logdate.client.media.audio.RecordingServiceController
+import app.logdate.client.media.audio.RecordingServiceState
 import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.wear.data.storage.StorageSpaceChecker
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import java.io.File
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.uuid.Uuid
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+
+/** Whether the app may use the microphone right now. Checked at the moment recording starts. */
+fun interface MicrophonePermissionChecker {
+    fun isGranted(): Boolean
+}
 
 /**
- * Wear OS implementation of the AudioRecordingManager interface.
+ * Wear OS [WearRecorder] over the shared foreground recording service.
  *
- * Manages audio recording on Wear OS devices with optimizations for:
- * - Small form factor
- * - Limited battery capacity
- * - Storage validation before recording
+ * All session transitions run under one mutex. A start reports success only once the service
+ * confirms the recorder is running, and a stop finalizes the file through the service before the
+ * service is torn down, so the path handed back always points at a complete recording. A session
+ * the service ends on its own (the length limit) is handed back by the next [stop].
  */
 class WearAudioRecordingManager(
-    private val context: Context,
     private val storageChecker: StorageSpaceChecker,
     private val audioStorage: AudioStorage,
     private val audioRouteRepository: AudioRouteRepository,
-) : AudioRecordingManager {
+    private val serviceController: RecordingServiceController,
+    private val microphonePermission: MicrophonePermissionChecker,
+    private val workDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val startTimeout: Duration = DEFAULT_START_TIMEOUT,
+) : WearRecorder {
     companion object {
-        // Estimate size of 1-minute audio recording (AAC format, 128kbps)
-        // 128 kilobits per second * 60 seconds / 8 bits per byte = 960 kilobytes
-        private const val ONE_MINUTE_RECORDING_SIZE_BYTES = 960 * 1024L
+        /** Longest recording. About 29 MB of AAC, under the phone's 31 MiB upload ceiling. */
+        val MAX_RECORDING_DURATION: Duration = 30.minutes
 
-        // Buffer space to leave free (0.5 MB)
-        private const val BUFFER_SPACE_BYTES = 512 * 1024L
+        private val DEFAULT_START_TIMEOUT = 10.seconds
+        private const val BYTES_PER_SECOND = 128_000L / 8
+        private const val STORAGE_HEADROOM_BYTES = 8L * 1024 * 1024
+        val REQUIRED_STORAGE_BYTES: Long = MAX_RECORDING_DURATION.inWholeSeconds * BYTES_PER_SECOND + STORAGE_HEADROOM_BYTES
     }
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val scope = CoroutineScope(SupervisorJob() + workDispatcher)
+    private val sessionMutex = Mutex()
+    private val recordingStateFlow = MutableStateFlow(false)
+    private val pausedFlow = MutableStateFlow(false)
+    private val interruptedFlow = MutableStateFlow(false)
     private val audioLevelFlow = MutableStateFlow(0f)
-    private val durationFlow = MutableStateFlow(Duration.ZERO)
-    private val transcriptionFlow = MutableStateFlow<String?>(null)
-    private var transcriptionService: TranscriptionService? = null
+    private val elapsedFlow = MutableStateFlow(Duration.ZERO)
 
-    // Recording state
-    private var recordingActive = false
-    private var serviceBound = false
-    private var recordingService: WearAudioRecordingService? = null
-    private var recordedAudioPath: String? = null
+    @Volatile
     private var recordingTarget: AudioRecordingTarget? = null
+
+    /** File the service reported when it ended the session on its own; handed back by the next stop. */
+    @Volatile
+    private var externallyRecordedPath: String? = null
+
+    @Volatile
+    private var startInFlight = false
+    private var serviceStateJob: Job? = null
     private var routeSyncJob: Job? = null
 
-    // Service connection
-    private val serviceConnection =
-        object : ServiceConnection {
-            override fun onServiceConnected(
-                name: ComponentName?,
-                service: IBinder?,
-            ) {
-                val binder = service as WearAudioRecordingService.AudioServiceBinder
-                recordingService = binder.getService()
-                serviceBound = true
+    @Volatile
+    override var lastStartFailure: RecordingStartFailure? = null
+        private set
 
-                routeSyncJob?.cancel()
-                routeSyncJob =
-                    scope.launch {
-                        audioRouteRepository.inputDevices.collect { selection ->
-                            if (recordingActive && serviceBound) {
-                                recordingService?.updatePreferredInputDevice(selection.selectedDeviceId)
-                            }
-                        }
-                    }
+    override val isRecording: StateFlow<Boolean> = recordingStateFlow.asStateFlow()
+    override val isPaused: StateFlow<Boolean> = pausedFlow.asStateFlow()
+    override val pausedByInterruption: StateFlow<Boolean> = interruptedFlow.asStateFlow()
+    override val audioLevel: StateFlow<Float> = audioLevelFlow.asStateFlow()
+    override val elapsed: StateFlow<Duration> = elapsedFlow.asStateFlow()
 
-                // Observe service state
-                scope.launch {
-                    recordingService?.recordingState?.collect { serviceState ->
-                        // Process updates only while recording is active
-                        if (recordingActive) {
-                            // Update audio level
-                            audioLevelFlow.value = serviceState.audioLevel
-
-                            // Update duration
-                            val durationMs = serviceState.durationSeconds * 1000L
-                            durationFlow.value = durationMs.milliseconds
-
-                            // Check if recording stopped on service side
-                            if (!serviceState.isRecording) {
-                                recordingActive = false
-                                recordedAudioPath = serviceState.recordedFilePath
-                                unbindFromService()
-                            }
-                        }
-                    }
+    override suspend fun start(): Boolean =
+        withContext(workDispatcher) {
+            sessionMutex.withLock {
+                startInFlight = true
+                try {
+                    startSessionLocked()
+                } finally {
+                    startInFlight = false
                 }
-
-                Napier.d("Connected to Wear OS audio recording service")
-            }
-
-            override fun onServiceDisconnected(name: ComponentName?) {
-                recordingService = null
-                serviceBound = false
-                routeSyncJob?.cancel()
-                routeSyncJob = null
-                Napier.d("Disconnected from Wear OS audio recording service")
             }
         }
 
-    init {
-        Napier.d("WearAudioRecordingManager initialized")
-    }
-
-    override val isRecording: Boolean
-        get() = recordingActive
-
-    override fun getAudioLevelFlow(): Flow<Float> = audioLevelFlow
-
-    override fun getRecordingDurationFlow(): Flow<Duration> = durationFlow
-
-    override fun getTranscriptionFlow(): Flow<String?> = transcriptionFlow
-
-    override fun setTranscriptionService(service: TranscriptionService) {
-        transcriptionService = service
-    }
-
-    private fun bindToService() {
-        try {
-            val intent = Intent(context, WearAudioRecordingService::class.java)
-            context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
-            serviceBound = true
-            Napier.d("Binding to Wear OS audio recording service")
-        } catch (e: Exception) {
-            Napier.e("Failed to bind to Wear OS recording service", e)
-            serviceBound = false
+    private suspend fun startSessionLocked(): Boolean {
+        if (recordingStateFlow.value) {
+            Napier.w("Attempted to start recording while already recording")
+            return false
         }
-    }
-
-    private fun unbindFromService() {
-        if (serviceBound) {
+        lastStartFailure = null
+        if (!microphonePermission.isGranted()) return failStart(RecordingStartFailure.MICROPHONE_PERMISSION_DENIED)
+        if (storageChecker.getAvailableStorageSpace() < REQUIRED_STORAGE_BYTES) {
+            return failStart(RecordingStartFailure.NOT_ENOUGH_STORAGE)
+        }
+        val target =
             try {
-                context.unbindService(serviceConnection)
-                serviceBound = false
-                routeSyncJob?.cancel()
-                routeSyncJob = null
-                Napier.d("Unbound from Wear OS audio recording service")
+                audioStorage.createRecordingTarget()
             } catch (e: Exception) {
-                Napier.e("Error unbinding from Wear OS recording service", e)
+                Napier.e("Could not create a recording target", e)
+                return failStart(RecordingStartFailure.RECORDER_UNAVAILABLE)
             }
+
+        recordingTarget = target
+        externallyRecordedPath = null
+        resetLiveState()
+
+        val started = serviceController.start(target.path, audioRouteRepository.inputDevices.value.selectedDeviceId)
+        if (!started || awaitServiceStarted() == null) {
+            serviceController.shutdown()
+            deleteQuietly(target.path)
+            recordingTarget = null
+            return failStart(RecordingStartFailure.RECORDER_UNAVAILABLE)
+        }
+        recordingStateFlow.value = true
+        observeService()
+        return true
+    }
+
+    private fun failStart(reason: RecordingStartFailure): Boolean {
+        lastStartFailure = reason
+        return false
+    }
+
+    /**
+     * Waits for the service to report the recorder is running. Returns null when the service
+     * reports an error or never confirms within [startTimeout], which covers a foreground start
+     * the platform refused and a recorder that failed to prepare.
+     */
+    private suspend fun awaitServiceStarted(): RecordingServiceState? {
+        val state =
+            withTimeoutOrNull(startTimeout) {
+                serviceController.serviceState
+                    .filterNotNull()
+                    .first { it.isRecording || it.error != null }
+            }
+        return when {
+            state == null -> {
+                Napier.e("Recording service did not confirm a start within $startTimeout")
+                null
+            }
+            !state.isRecording -> {
+                Napier.e("Recording service failed to start: ${state.error}")
+                null
+            }
+            else -> state
+        }
+    }
+
+    private fun observeService() {
+        serviceStateJob?.cancel()
+        serviceStateJob = scope.launch { serviceController.serviceState.collect(::onServiceState) }
+        routeSyncJob?.cancel()
+        routeSyncJob =
+            scope.launch {
+                audioRouteRepository.inputDevices.collect { selection ->
+                    if (recordingStateFlow.value) serviceController.updatePreferredInputDevice(selection.selectedDeviceId)
+                }
+            }
+    }
+
+    private fun onServiceState(state: RecordingServiceState?) {
+        if (state == null) {
+            if (recordingStateFlow.value) {
+                Napier.w("Recording service went away mid-session")
+                recordingStateFlow.value = false
+                pausedFlow.value = false
+            }
+            return
+        }
+        audioLevelFlow.value = state.audioLevel
+        elapsedFlow.value = (state.durationSeconds * 1000L).milliseconds
+        interruptedFlow.value = state.pausedByInterruption
+        pausedFlow.value = state.isPaused
+        if (!state.isRecording && recordingStateFlow.value) {
+            Napier.d("Recording service stopped on its own; file=${state.recordedFilePath} error=${state.error}")
+            externallyRecordedPath = state.recordedFilePath
+            recordingStateFlow.value = false
+            pausedFlow.value = false
+        }
+    }
+
+    override suspend fun stop(): String? =
+        withContext(workDispatcher) {
+            sessionMutex.withLock { stopSessionLocked() }
+        }
+
+    override suspend fun discard() {
+        withContext(workDispatcher) {
+            sessionMutex.withLock {
+                val target = recordingTarget?.path
+                val finalized = stopSessionLocked()
+                (finalized ?: target)?.let(::deleteQuietly)
+            }
+        }
+    }
+
+    private fun stopSessionLocked(): String? {
+        if (!recordingStateFlow.value && externallyRecordedPath == null) {
+            Napier.w("Attempted to stop recording while not recording")
+            return null
+        }
+        serviceStateJob?.cancel()
+        serviceStateJob = null
+        routeSyncJob?.cancel()
+        routeSyncJob = null
+
+        return try {
+            finalizeServiceRecording()
+        } catch (e: Exception) {
+            Napier.e("Error finalizing the recording", e)
+            null
+        } finally {
+            serviceController.shutdown()
+            recordingStateFlow.value = false
+            pausedFlow.value = false
+            interruptedFlow.value = false
+            recordingTarget = null
+            externallyRecordedPath = null
         }
     }
 
     /**
-     * Check if there's enough storage space for a 1-minute recording
+     * Asks the bound service to finalize the file. When the service already ended the session on
+     * its own, the path it reported then is used instead.
      */
-    private suspend fun checkStorageSpace(): Boolean {
-        val requiredSpace = ONE_MINUTE_RECORDING_SIZE_BYTES + BUFFER_SPACE_BYTES
-        val availableSpace = storageChecker.getAvailableStorageSpace()
-
-        Napier.d("Available storage: ${availableSpace / 1024}KB, Required: ${requiredSpace / 1024}KB")
-
-        return availableSpace >= requiredSpace
+    private fun finalizeServiceRecording(): String? {
+        val stopped = serviceController.stopRecordingNow()
+        if (stopped != null) return stopped
+        val snapshot = serviceController.serviceState.value
+        val reported = snapshot?.recordedFilePath ?: externallyRecordedPath
+        if (reported == null) Napier.e("Recording produced no file: ${snapshot?.error ?: "service not bound"}")
+        return reported
     }
 
-    override suspend fun startRecording(targetNoteId: Uuid?): Boolean {
-        if (recordingActive) {
-            return false
-        }
-
-        return try {
-            val hasEnoughSpace = checkStorageSpace()
-            if (!hasEnoughSpace) {
-                Napier.w("Not enough storage space for recording")
-                return false
-            }
-
-            Napier.d("Starting Wear OS recording with foreground service")
-
-            // Reset state
-            recordingActive = true
-            recordedAudioPath = null
-            durationFlow.value = Duration.ZERO
-            audioLevelFlow.value = 0f
-            recordingTarget = audioStorage.createRecordingTarget()
-
-            // Start foreground service
-            context.startWearAudioRecordingService(
-                outputFilePath = recordingTarget?.path,
-                inputDeviceId = audioRouteRepository.inputDevices.value.selectedDeviceId,
-            )
-
-            // Bind to service
-            bindToService()
-
-            Napier.d("Wear OS recording started successfully")
-            true
-        } catch (e: Exception) {
-            Napier.e("Error starting Wear OS recording", e)
-            recordingActive = false
-            false
-        }
-    }
-
-    override suspend fun stopRecording(): String? {
-        return try {
-            Napier.d("Stopping Wear OS recording")
-
-            if (!recordingActive) {
-                Napier.w("Attempted to stop Wear OS recording when not active")
-                return null
-            }
-
-            // Get file path before stopping
-            val filePath = recordingService?.getRecordedFilePath() ?: recordingTarget?.path
-
-            // Stop service
-            context.stopWearAudioRecordingService()
-
-            // Give service time to stop properly
-            scope.launch {
-                withContext(Dispatchers.IO) {
-                    delay(300) // Short delay
-                    unbindFromService()
+    override suspend fun pause(): Boolean =
+        withContext(workDispatcher) {
+            sessionMutex.withLock {
+                if (!recordingStateFlow.value) return@withLock false
+                try {
+                    serviceController.pause()
+                } catch (e: Exception) {
+                    Napier.e("Error pausing recording", e)
+                    false
                 }
             }
-
-            // Return audio path
-            recordingActive = false
-            recordingTarget = null
-            routeSyncJob?.cancel()
-            routeSyncJob = null
-            filePath ?: recordedAudioPath
-        } catch (e: Exception) {
-            Napier.e("Error stopping Wear OS recording", e)
-            recordingActive = false
-            unbindFromService()
-            recordingTarget = null
-            routeSyncJob?.cancel()
-            routeSyncJob = null
-            null
-        }
-    }
-
-    override suspend fun pauseRecording(): Boolean {
-        if (!recordingActive || recordingService == null) {
-            return false
         }
 
-        try {
-            // Send pause action to service
-            val intent =
-                Intent(context, WearAudioRecordingService::class.java).apply {
-                    action = WearAudioRecordingService.ACTION_PAUSE
+    override suspend fun resume(): Boolean =
+        withContext(workDispatcher) {
+            sessionMutex.withLock {
+                if (!recordingStateFlow.value) return@withLock false
+                try {
+                    serviceController.resume()
+                } catch (e: Exception) {
+                    Napier.e("Error resuming recording", e)
+                    false
                 }
-            context.startService(intent)
-
-            delay(200) // Small delay
-
-            return recordingService?.isRecordingPaused() == true
-        } catch (e: Exception) {
-            Napier.e("Error pausing Wear OS recording", e)
-            return false
-        }
-    }
-
-    override suspend fun resumeRecording(): Boolean {
-        if (!recordingActive || recordingService == null) {
-            return false
-        }
-
-        try {
-            // Send resume action to service
-            val intent =
-                Intent(context, WearAudioRecordingService::class.java).apply {
-                    action = WearAudioRecordingService.ACTION_RESUME
-                }
-            context.startService(intent)
-
-            delay(200) // Small delay
-
-            return recordingService?.isRecordingPaused() == false
-        } catch (e: Exception) {
-            Napier.e("Error resuming Wear OS recording", e)
-            return false
-        }
-    }
-
-    override fun release() {
-        try {
-            Napier.d("Clearing Wear OS recording resources")
-
-            if (recordingActive) {
-                context.stopWearAudioRecordingService()
-                recordingActive = false
             }
-
-            unbindFromService()
-            recordingTarget = null
-
-            Napier.d("Wear OS recording resources cleared")
-        } catch (e: Exception) {
-            Napier.e("Error clearing Wear OS recording resources", e)
         }
+
+    /** The stopped file is left on disk for startup recovery to find. */
+    override fun requestStop() {
+        if (!recordingStateFlow.value && !startInFlight && externallyRecordedPath == null) return
+        scope.launch {
+            try {
+                stop()
+            } catch (e: Exception) {
+                Napier.e("Error stopping recording from a background request", e)
+            }
+        }
+    }
+
+    private fun resetLiveState() {
+        audioLevelFlow.value = 0f
+        elapsedFlow.value = Duration.ZERO
+        pausedFlow.value = false
+        interruptedFlow.value = false
+    }
+
+    private fun deleteQuietly(path: String) {
+        runCatching { File(path).delete() }
+            .onFailure { error -> Napier.w("Could not delete $path", error) }
     }
 }
