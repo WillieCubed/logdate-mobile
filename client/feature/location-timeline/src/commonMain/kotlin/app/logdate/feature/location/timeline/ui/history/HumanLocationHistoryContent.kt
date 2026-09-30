@@ -205,8 +205,10 @@ private fun HistoryDayOverview(
     expandedByDefault: Boolean = false,
 ) {
     var expanded by remember { mutableStateOf(expandedByDefault) }
-    Box(Modifier.padding(horizontal = 16.dp).clip(RoundedCornerShape(20.dp)).animateContentSize()) {
-        mapContent(Modifier.fillMaxWidth().height(if (expanded) 280.dp else 96.dp))
+    if (expanded) {
+        Box(Modifier.padding(horizontal = 16.dp).clip(RoundedCornerShape(20.dp)).animateContentSize()) {
+            mapContent(Modifier.fillMaxWidth().height(280.dp))
+        }
     }
     HistoryReplay(state, actions) {
         TextButton(onClick = { expanded = !expanded }) {

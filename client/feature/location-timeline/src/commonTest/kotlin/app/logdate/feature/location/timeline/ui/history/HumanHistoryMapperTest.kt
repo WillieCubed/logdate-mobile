@@ -82,6 +82,77 @@ class HumanHistoryMapperTest {
         assertEquals(1, rows.first { it.id == cafe.id }.memories.size)
     }
 
+    @Test
+    fun `place rows keep linked memories with their visit across many other places`() {
+        val otherVisits =
+            (0 until 250).map { index ->
+                val other = SemanticPlace("other-$index", "Place $index", 36.0, -115.0)
+                visit("visit-$index").copy(place = other)
+            }
+        val cafe = SemanticPlace("cafe", "Cafe", 36.001, -115.0)
+        val cafeVisit = visit("coffee").copy(place = cafe, memoryIds = listOf(memory.uid.toString()))
+        val rows = snapshot(otherVisits + cafeVisit, listOf(memory)).placeRows()
+
+        assertEquals(251, rows.size)
+        assertEquals(listOf(memory.uid.toString()), rows.first { it.id == cafe.id }.memories.map { it.id })
+        assertTrue(rows.filter { it.id != cafe.id }.all { it.memories.isEmpty() })
+    }
+
+    @Test
+    fun `one memory linked to visits at two places remains visible at both`() {
+        val cafe = SemanticPlace("cafe", "Cafe", 36.001, -115.0)
+        val linkedId = memory.uid.toString()
+        val rows =
+            snapshot(
+                listOf(
+                    visit("library").copy(memoryIds = listOf(linkedId)),
+                    visit("coffee").copy(place = cafe, memoryIds = listOf(linkedId)),
+                ),
+                listOf(memory),
+            ).placeRows()
+
+        assertEquals(listOf(linkedId), rows.first { it.id == place.id }.memories.map { it.id })
+        assertEquals(listOf(linkedId), rows.first { it.id == cafe.id }.memories.map { it.id })
+    }
+
+    @Test
+    fun `sparse evidence is described as a location clue rather than a visit`() {
+        val clue = visit("clue").copy(confirmedStay = false, place = null)
+        val row = clue.toHistoryUi(emptyList())
+        assertEquals("Location recorded", row.title)
+        assertTrue(row.timeLabel.startsWith("Around "))
+        assertTrue(row.isApproximate)
+    }
+
+    @Test
+    fun `nearby automatic labels group without losing visits and newest places come first`() {
+        val older = SemanticPlace("road-a", "Near West Spring Mountain Road", 36.0, -115.0)
+        val newer = SemanticPlace("road-b", "Near West Spring Mountain Road", 36.0002, -115.0)
+        val distant = SemanticPlace("road-c", "Near West Spring Mountain Road", 36.01, -115.0)
+        val rows =
+            snapshot(
+                listOf(
+                    visit("older").copy(place = older, start = time - 2.days),
+                    visit("newer").copy(place = newer, start = time),
+                    visit("distant").copy(place = distant, start = time - 1.days),
+                ),
+                emptyList(),
+            ).placeRows()
+
+        assertEquals(2, rows.size)
+        assertEquals(setOf("road-a", "road-b"), rows.first().sourceIds)
+        assertTrue(rows.first().supportingText.contains("2 visits"))
+        assertEquals(setOf("road-c"), rows.last().sourceIds)
+    }
+
+    @Test
+    fun `user named places stay separate even when they share coordinates and a name`() {
+        val one = SemanticPlace("one", "Home", 36.0, -115.0, userConfirmed = true)
+        val two = SemanticPlace("two", "Home", 36.0, -115.0, userConfirmed = true)
+        val rows = snapshot(listOf(visit("one").copy(place = one), visit("two").copy(place = two)), emptyList()).placeRows()
+        assertEquals(2, rows.size)
+    }
+
     private fun visit(id: String) = PlaceVisit(id, time, time, listOf(id), 36.0, -115.0, true, place)
 
     private fun snapshot(

@@ -34,8 +34,11 @@ internal fun HumanPlaceDetail(
     onMerge: (String, SemanticPlace) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val row = snapshot.placeRows().firstOrNull { it.id == placeId }
-    val visits = snapshot.items.filterIsInstance<PlaceVisit>().filter { (it.place?.id ?: "evidence:${it.evidenceIds.first()}") == placeId }
+    val row = snapshot.placeRows().firstOrNull { placeId in it.sourceIds }
+    val visits =
+        snapshot.items.filterIsInstance<PlaceVisit>().filter {
+            (it.place?.id ?: "evidence:${it.evidenceIds.first()}") in row?.sourceIds.orEmpty()
+        }
     var merging by remember { mutableStateOf(false) }
     var target by remember { mutableStateOf<SemanticPlace?>(null) }
     ModalBottomSheet(onDismissRequest = onDismiss) {

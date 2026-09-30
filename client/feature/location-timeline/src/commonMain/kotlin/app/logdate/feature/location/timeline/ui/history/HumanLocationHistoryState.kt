@@ -26,6 +26,7 @@ data class HistoryItemUi(
     val timeLabel: String,
     val supportingText: String = "",
     val memories: List<HistoryMemoryUi> = emptyList(),
+    val isApproximate: Boolean = false,
 )
 
 data class HistoryPlaceUi(
@@ -33,6 +34,7 @@ data class HistoryPlaceUi(
     val title: String,
     val supportingText: String,
     val memories: List<HistoryMemoryUi> = emptyList(),
+    val sourceIds: Set<String> = setOf(id),
 )
 
 data class HumanLocationHistoryState(

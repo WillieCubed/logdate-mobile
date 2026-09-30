@@ -69,6 +69,7 @@ class HumanLocationHistoryViewModel(
     val recordingEnabled = MutableStateFlow(false)
     val completeDayEnabled = MutableStateFlow(false)
     private var observeJob: Job? = null
+    private var enrichmentJob: Job? = null
     private var replayJob: Job? = null
     private var failedAction: (suspend () -> Unit)? = null
     private var rangeDays = 30
@@ -300,6 +301,8 @@ class HumanLocationHistoryViewModel(
 
     private fun observe() {
         observeJob?.cancel()
+        enrichmentJob?.cancel()
+        resolving.clear()
         observeJob =
             viewModelScope.launch {
                 try {
@@ -343,6 +346,7 @@ class HumanLocationHistoryViewModel(
         data: LocationHistorySnapshot,
         tracking: app.logdate.client.location.settings.LocationTrackingSettings,
     ) {
+        val notesById = data.notes.associateBy { it.uid.toString() }
         val selection =
             remapHistorySelection(
                 state.value.selectedItemId,
@@ -360,10 +364,20 @@ class HumanLocationHistoryViewModel(
                 detailVisible = current.detailVisible && selection != null,
                 dateLabel = selectedDateLabel(),
                 daySummary =
-                    data.items.filterIsInstance<PlaceVisit>().size.let {
-                        "$it ${if (it == 1) "visit" else "visits"} in your day"
+                    data.items.filterIsInstance<PlaceVisit>().let { visits ->
+                        val confirmed = visits.count { it.confirmedStay }
+                        val clues = visits.size - confirmed
+                        listOfNotNull(
+                            "$confirmed ${if (confirmed == 1) "visit" else "visits"}",
+                            "$clues ${if (clues == 1) "location clue" else "location clues"}".takeIf { clues > 0 },
+                        ).joinToString(" · ")
                     },
-                items = data.items.map { it.toHistoryUi(data.notes) },
+                items =
+                    data.items.map { item ->
+                        item.toHistoryUi(
+                            if (item is PlaceVisit) item.memoryIds.mapNotNull(notesById::get) else emptyList(),
+                        )
+                    },
                 places = data.placeRows(),
                 placesFilterLabel = "$rangeDays days",
                 recoveryActionLabel =
@@ -390,62 +404,65 @@ class HumanLocationHistoryViewModel(
     }
 
     private fun enrich(data: LocationHistorySnapshot) {
+        if (state.value.tab != HistoryTab.Day) return
         data.places.forEach { place -> place.externalId?.let { resolvedExternalPlaces.getOrPut(it) { place.id } } }
-        data.items.filterIsInstance<PlaceVisit>().filter { it.place == null }.take(20).forEach { visit ->
-            if (!resolving.add(visit.id)) return@forEach
+        val unresolved = data.items.filterIsInstance<PlaceVisit>().filter { it.place == null && resolving.add(it.id) }
+        if (unresolved.isEmpty()) return
+        enrichmentJob =
             viewModelScope.launch {
-                try {
-                    val result =
-                        placeResolution.resolve(
-                            Location(visit.latitude, visit.longitude, LocationAltitude(0.0, AltitudeUnit.METERS)),
-                        )
-                    if (result is PlaceResolutionResult.UserDefinedPlace && data.places.any { it.id == result.place.uid.toString() }) {
-                        return@launch
-                    }
-                    val name =
-                        when (result) {
-                            is PlaceResolutionResult.UserDefinedPlace -> result.place.name
-                            is PlaceResolutionResult.ExternalSuggestion -> "Near ${result.suggestion.name}"
-                            is PlaceResolutionResult.CoarseLocation ->
-                                result.address.thoroughfare?.let { "Near $it" }
-                                    ?: result.address.locality?.let { "Somewhere in $it" }
-                            else -> null
+                unresolved.forEach { visit ->
+                    try {
+                        val result =
+                            placeResolution.resolve(
+                                Location(visit.latitude, visit.longitude, LocationAltitude(0.0, AltitudeUnit.METERS)),
+                            )
+                        if (result is PlaceResolutionResult.UserDefinedPlace && data.places.any { it.id == result.place.uid.toString() }) {
+                            return@forEach
                         }
-                    if (name != null) {
-                        val place =
+                        val name =
                             when (result) {
-                                is PlaceResolutionResult.UserDefinedPlace ->
-                                    SemanticPlace(
-                                        result.place.uid.toString(),
-                                        result.place.name,
-                                        result.place.latitude,
-                                        result.place.longitude,
-                                        userConfirmed = true,
-                                    )
-                                is PlaceResolutionResult.ExternalSuggestion ->
-                                    SemanticPlace(
-                                        result.suggestion.externalId?.let {
-                                            resolvedExternalPlaces.getOrPut(
-                                                it,
-                                            ) { Uuid.random().toString() }
-                                        }
-                                            ?: "evidence:${visit.evidenceIds.first()}",
-                                        name,
-                                        result.suggestion.latitude,
-                                        result.suggestion.longitude,
-                                        locality = result.suggestion.address,
-                                        externalId = result.suggestion.externalId,
-                                    )
-                                else -> SemanticPlace("evidence:${visit.evidenceIds.first()}", name, visit.latitude, visit.longitude)
+                                is PlaceResolutionResult.UserDefinedPlace -> result.place.name
+                                is PlaceResolutionResult.ExternalSuggestion -> "Near ${result.suggestion.name}"
+                                is PlaceResolutionResult.CoarseLocation ->
+                                    result.address.thoroughfare?.let { "Near $it" }
+                                        ?: result.address.locality?.let { "Somewhere in $it" }
+                                else -> null
                             }
-                        history.savePlace(place)
+                        if (name != null) {
+                            val place =
+                                when (result) {
+                                    is PlaceResolutionResult.UserDefinedPlace ->
+                                        SemanticPlace(
+                                            result.place.uid.toString(),
+                                            result.place.name,
+                                            result.place.latitude,
+                                            result.place.longitude,
+                                            userConfirmed = true,
+                                        )
+                                    is PlaceResolutionResult.ExternalSuggestion ->
+                                        SemanticPlace(
+                                            result.suggestion.externalId?.let {
+                                                resolvedExternalPlaces.getOrPut(
+                                                    it,
+                                                ) { Uuid.random().toString() }
+                                            }
+                                                ?: "evidence:${visit.evidenceIds.first()}",
+                                            name,
+                                            result.suggestion.latitude,
+                                            result.suggestion.longitude,
+                                            locality = result.suggestion.address,
+                                            externalId = result.suggestion.externalId,
+                                        )
+                                    else -> SemanticPlace("evidence:${visit.evidenceIds.first()}", name, visit.latitude, visit.longitude)
+                                }
+                            history.savePlace(place)
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        Napier.w("Place name unavailable; keeping the visit", error)
                     }
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (error: Exception) {
-                    Napier.w("Place name unavailable; keeping the visit", error)
                 }
             }
-        }
     }
 }

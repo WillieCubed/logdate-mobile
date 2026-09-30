@@ -13,6 +13,12 @@ import app.logdate.util.localTime
 import app.logdate.util.toReadableDateShort
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.math.PI
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 internal fun LocationDayItem.toHistoryUi(notes: List<JournalNote>): HistoryItemUi =
     when (this) {
@@ -20,10 +26,11 @@ internal fun LocationDayItem.toHistoryUi(notes: List<JournalNote>): HistoryItemU
             HistoryItemUi(
                 id,
                 HistoryItemKind.Visit,
-                place?.name ?: "A place you visited",
+                place?.name ?: if (confirmedStay) "A place you visited" else "Location recorded",
                 if (confirmedStay) historyTimeRange() else "Around ${start.localTime}",
                 place?.locality.orEmpty(),
                 notes.filter { it.uid.toString() in memoryIds }.map { it.toHistoryMemory() },
+                isApproximate = !confirmedStay,
             )
         is JourneyLeg ->
             HistoryItemUi(
@@ -37,7 +44,7 @@ internal fun LocationDayItem.toHistoryUi(notes: List<JournalNote>): HistoryItemU
             HistoryItemUi(
                 id,
                 HistoryItemKind.Gap,
-                "Part of this day wasn’t recorded",
+                "Not recorded",
                 historyTimeRange(),
                 "You can add a missing visit.",
             )
@@ -103,6 +110,7 @@ internal fun LocationHistorySnapshot.visitPlaces(): List<SemanticPlace> =
 internal fun LocationHistorySnapshot.collectionPlaces(): List<SemanticPlace> {
     val visited = visitPlaces()
     val linked = items.filterIsInstance<PlaceVisit>().flatMap { it.memoryIds }.toSet()
+    val savedPlacesById = places.associateBy { it.id }
     val memoryPlaces =
         notes.filterNot { it.uid.toString() in linked }.mapNotNull { note ->
             val location = note.location ?: return@mapNotNull null
@@ -110,36 +118,96 @@ internal fun LocationHistorySnapshot.collectionPlaces(): List<SemanticPlace> {
             val longitude = location.effectiveLongitude ?: return@mapNotNull null
             val oldId = location.place?.id?.toString() ?: "memory:${note.uid}"
             val id = placeAliases[oldId] ?: oldId
-            places.firstOrNull { it.id == id } ?: SemanticPlace(id, location.place?.name ?: "A place in your memories", latitude, longitude)
+            savedPlacesById[id] ?: SemanticPlace(id, location.place?.name ?: "A place in your memories", latitude, longitude)
         }
     return (visited + memoryPlaces).distinctBy { it.id }
 }
 
-internal fun LocationHistorySnapshot.placeRows(): List<HistoryPlaceUi> =
-    collectionPlaces().map { place ->
-        val visits = items.filterIsInstance<PlaceVisit>().filter { (it.place?.id ?: "evidence:${it.evidenceIds.first()}") == place.id }
-        val ids = visits.flatMap { it.memoryIds }.toSet()
-        val allLinked = items.filterIsInstance<PlaceVisit>().flatMap { it.memoryIds }.toSet()
-        val memories =
-            notes
-                .filter {
-                    val oldId =
-                        it.location
-                            ?.place
-                            ?.id
-                            ?.toString() ?: "memory:${it.uid}"
-                    it.uid.toString() in ids || (it.uid.toString() !in allLinked && (placeAliases[oldId] ?: oldId) == place.id)
-                }.distinctBy { it.uid }
-                .sortedByDescending { it.creationTimestamp }
-        val lastVisit =
-            visits.maxByOrNull { it.start }?.let {
-                "Last visited ${it.start.toReadableDateShort()} · ${visits.size} ${if (visits.size == 1) "visit" else "visits"}"
-            }
-        val latestMemory = memories.firstOrNull()?.let { "Latest memory ${it.creationTimestamp.toReadableDateShort()}" }
-        HistoryPlaceUi(
-            place.id,
-            place.name,
-            listOfNotNull(place.locality, lastVisit, latestMemory).joinToString("\n"),
-            memories.map { it.toHistoryMemory() },
-        )
+internal fun LocationHistorySnapshot.placeRows(): List<HistoryPlaceUi> {
+    val visitsByPlace =
+        items.filterIsInstance<PlaceVisit>().groupBy { it.place?.id ?: "evidence:${it.evidenceIds.first()}" }
+    val notesById = notes.associateBy { it.uid.toString() }
+    val linkedIds =
+        visitsByPlace.values
+            .flatten()
+            .flatMap { it.memoryIds }
+            .toSet()
+    val memoriesByPlace = mutableMapOf<String, MutableList<JournalNote>>()
+    visitsByPlace.forEach { (placeId, visits) ->
+        visits.flatMap { it.memoryIds }.forEach { memoryId ->
+            notesById[memoryId]?.let { memoriesByPlace.getOrPut(placeId) { mutableListOf() }.add(it) }
+        }
     }
+    notes.filterNot { it.uid.toString() in linkedIds }.forEach { note ->
+        val oldId =
+            note.location
+                ?.place
+                ?.id
+                ?.toString() ?: "memory:${note.uid}"
+        val placeId = placeAliases[oldId] ?: oldId
+        memoriesByPlace.getOrPut(placeId) { mutableListOf() }.add(note)
+    }
+    val groups = mutableListOf<MutableList<SemanticPlace>>()
+    val groupsByBucket = mutableMapOf<String, MutableList<MutableList<SemanticPlace>>>()
+    collectionPlaces().forEach { place ->
+        val bucket =
+            if (place.userConfirmed) {
+                "confirmed:${place.id}"
+            } else {
+                "${place.name.trim().lowercase()}:${(place.latitude * 1000).roundToInt()}:${(place.longitude * 1000).roundToInt()}"
+            }
+        val candidates = groupsByBucket.getOrPut(bucket) { mutableListOf() }
+        val group = candidates.firstOrNull { nearby(it.first(), place) }
+        if (group == null) {
+            mutableListOf(place).also {
+                candidates.add(it)
+                groups.add(it)
+            }
+        } else {
+            group.add(place)
+        }
+    }
+    return groups
+        .map { group ->
+            val place = group.first()
+            val ids = group.mapTo(mutableSetOf()) { it.id }
+            val visits = ids.flatMap { visitsByPlace[it].orEmpty() }
+            val memories = ids.flatMap { memoriesByPlace[it].orEmpty() }.distinctBy { it.uid }.sortedByDescending { it.creationTimestamp }
+            val lastVisit =
+                visits.filter { it.confirmedStay }.maxByOrNull { it.start }?.let {
+                    val count = visits.count { visit -> visit.confirmedStay }
+                    "Last visited ${it.start.toReadableDateShort()} · $count ${if (count == 1) "visit" else "visits"}"
+                }
+            val lastClue =
+                if (lastVisit == null) {
+                    visits.maxByOrNull { it.start }?.let { "Location recorded ${it.start.toReadableDateShort()}" }
+                } else {
+                    null
+                }
+            val latestMemory = memories.firstOrNull()?.let { "Latest memory ${it.creationTimestamp.toReadableDateShort()}" }
+            HistoryPlaceUi(
+                place.id,
+                place.name,
+                listOfNotNull(place.locality, lastVisit, lastClue, latestMemory).joinToString("\n"),
+                memories.map { it.toHistoryMemory() },
+                ids,
+            )
+        }.sortedByDescending { row ->
+            row.sourceIds.flatMap { visitsByPlace[it].orEmpty() }.maxOfOrNull { it.start }
+                ?: row.sourceIds.flatMap { memoriesByPlace[it].orEmpty() }.maxOfOrNull { it.creationTimestamp }
+        }
+}
+
+private fun nearby(
+    first: SemanticPlace,
+    second: SemanticPlace,
+): Boolean {
+    if (first.id == second.id) return true
+    if (first.userConfirmed || second.userConfirmed || first.name != second.name) return false
+    val latitude = (second.latitude - first.latitude) * PI / 180
+    val longitude = (second.longitude - first.longitude) * PI / 180
+    val haversine =
+        sin(latitude / 2) * sin(latitude / 2) +
+            cos(first.latitude * PI / 180) * cos(second.latitude * PI / 180) * sin(longitude / 2) * sin(longitude / 2)
+    return 6371000 * 2 * atan2(sqrt(haversine.coerceIn(0.0, 1.0)), sqrt((1 - haversine).coerceIn(0.0, 1.0))) <= 75
+}

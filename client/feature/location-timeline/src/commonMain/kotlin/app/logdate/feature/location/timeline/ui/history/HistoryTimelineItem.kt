@@ -121,12 +121,12 @@ internal fun HistoryTimelineItem(
                                 0.dp
                             },
                     ).semantics { selected = isSelected },
-            shape = RoundedCornerShape(if (item.kind == HistoryItemKind.Visit && isSelected) 28.dp else 12.dp),
+            shape = RoundedCornerShape(if (item.kind == HistoryItemKind.Visit && isSelected) 24.dp else 12.dp),
             color =
                 when {
                     item.kind != HistoryItemKind.Visit -> Color.Transparent
                     isSelected -> colors.primaryContainer
-                    else -> colors.surfaceContainerLow
+                    else -> colors.surfaceContainerHigh
                 },
             contentColor = if (item.kind == HistoryItemKind.Visit && isSelected) colors.onPrimaryContainer else colors.onSurface,
         ) {
@@ -145,14 +145,17 @@ private fun HistoryVisit(
     isSelected: Boolean,
     actions: HumanLocationHistoryActions,
 ) {
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        Modifier.padding(horizontal = 16.dp, vertical = if (item.isApproximate) 10.dp else 16.dp),
+        verticalArrangement = Arrangement.spacedBy(if (item.isApproximate) 4.dp else 8.dp),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(item.timeLabel, style = MaterialTheme.typography.labelMedium, color = LocalContentColor.current.copy(alpha = 0.74f))
                 Text(
                     item.title,
                     Modifier.semantics { heading() },
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = if (item.isApproximate) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = LocalContentColor.current,
                 )
@@ -169,7 +172,7 @@ private fun HistoryVisit(
                 item.memories.forEach { HistoryMemoryPreview(it, actions.onOpenMemory) }
             }
         }
-        if (item.memories.isEmpty()) {
+        if (item.memories.isEmpty() && !item.isApproximate) {
             TextButton(
                 onClick = { actions.onEdit(item.id, HistoryEditAction.AddMemory) },
                 contentPadding = PaddingValues(0.dp),
@@ -196,9 +199,6 @@ private fun HistoryConnection(item: HistoryItemUi) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(item.timeLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (item.kind == HistoryItemKind.Gap && item.supportingText.isNotBlank()) {
-            Text(item.supportingText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
     }
 }
 

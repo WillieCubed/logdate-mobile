@@ -19,6 +19,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import logdate.client.feature.location.timeline.generated.resources.Res
@@ -29,9 +30,10 @@ import org.jetbrains.compose.resources.stringResource
 internal fun HistoryMemoryThumbnail(
     uri: String,
     video: Boolean,
+    size: Dp = 64.dp,
 ) {
     var unavailable by remember(uri) { mutableStateOf(false) }
-    Surface(Modifier.size(64.dp), shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.surfaceContainerHighest) {
+    Surface(Modifier.size(size), shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.surfaceContainerHighest) {
         Box(contentAlignment = Alignment.Center) {
             AsyncImage(
                 model = uri,

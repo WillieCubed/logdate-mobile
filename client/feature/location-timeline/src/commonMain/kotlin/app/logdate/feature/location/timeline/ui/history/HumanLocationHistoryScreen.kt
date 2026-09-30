@@ -120,10 +120,11 @@ fun HumanLocationHistoryScreen(
         ) { mapModifier ->
             val mapItems =
                 if (state.tab == HistoryTab.Places) {
+                    val visiblePlaceIds = state.filteredPlaces().flatMapTo(mutableSetOf()) { it.sourceIds }
                     snapshot
                         ?.collectionPlaces()
                         .orEmpty()
-                        .filter { place -> state.filteredPlaces().any { it.id == place.id } }
+                        .filter { place -> place.id in visiblePlaceIds }
                         .map {
                             PlaceVisit(
                                 it.id,

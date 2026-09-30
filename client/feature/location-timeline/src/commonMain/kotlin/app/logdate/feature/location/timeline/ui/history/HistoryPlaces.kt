@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -124,19 +125,19 @@ private fun HistoryPlaceRow(
     place: HistoryPlaceUi,
     onClick: () -> Unit,
 ) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+    Surface(onClick = onClick, shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
         Row(
-            Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val image = place.memories.firstOrNull { it.thumbnailUri != null }
             if (image?.thumbnailUri != null) {
-                HistoryMemoryThumbnail(image.thumbnailUri, image.kind == HistoryMemoryKind.Video)
+                HistoryMemoryThumbnail(image.thumbnailUri, image.kind == HistoryMemoryKind.Video, 48.dp)
             } else {
-                Surface(Modifier.size(56.dp), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+                Surface(Modifier.size(48.dp), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
                     Box(contentAlignment = Alignment.Center) {
-                        Text(place.title.take(1), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.Place, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
                     }
                 }
             }
