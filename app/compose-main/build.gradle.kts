@@ -187,6 +187,15 @@ compose.desktop {
     application {
         mainClass = "app.logdate.MainKt"
 
+        buildTypes {
+            release {
+                proguard {
+                    // Preserve bundled JNA and optional codec integrations during packaging.
+                    isEnabled.set(false)
+                }
+            }
+        }
+
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "LogDate"
@@ -204,7 +213,7 @@ compose.desktop {
                 bundleID = "app.logdate"
                 dockName = "LogDate"
                 appCategory = "public.app-category.lifestyle"
-                iconFile.set(project.file("src/commonMain/composeResources/drawable/ic_launcher_google_play.png"))
+                iconFile.set(project.file("packaging/LogDate.icns"))
             }
 
             linux {
