@@ -3,14 +3,19 @@
 package app.logdate.feature.location.timeline.ui.history
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -20,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.logdate.client.location.tracking.LocationCaptureStatus
 import app.logdate.shared.model.location.HistoryField
@@ -56,19 +62,8 @@ fun HumanLocationHistoryScreen(
     var reviewingChanges by remember { mutableStateOf(false) }
     var openedPlace by remember { mutableStateOf<String?>(null) }
     var linkingVisit by remember { mutableStateOf<String?>(null) }
+    var moreMenu by remember { mutableStateOf(false) }
     Column(modifier) {
-        FlowRow(Modifier.fillMaxWidth()) {
-            TextButton(onClick = { recording = true }) { Text("Recording") }
-            if (state.tab == HistoryTab.Places) {
-                TextButton(onClick = { calendar = true }) { Text("Through ${state.dateLabel}") }
-            }
-            if (snapshot?.conflicts?.isNotEmpty() == true) {
-                TextButton(onClick = { reviewingChanges = true }) { Text("Review changes") }
-            }
-            snapshot?.recordingDevices?.takeIf { it.size > 1 }?.forEachIndexed { index, device ->
-                TextButton(onClick = { viewModel.selectSource(device) }) { Text("Device ${index + 1}") }
-            }
-        }
         HumanLocationHistoryContent(
             when {
                 state.recoveryActionLabel == "Try again" -> state
@@ -116,42 +111,70 @@ fun HumanLocationHistoryScreen(
                     }
                 },
             ),
-            Modifier.weight(1f),
-        ) { mapModifier ->
-            val mapItems =
-                if (state.tab == HistoryTab.Places) {
-                    val visiblePlaceIds = state.filteredPlaces().flatMapTo(mutableSetOf()) { it.sourceIds }
-                    snapshot
-                        ?.collectionPlaces()
-                        .orEmpty()
-                        .filter { place -> place.id in visiblePlaceIds }
-                        .map {
-                            PlaceVisit(
-                                it.id,
-                                viewModel.date.atStartOfDayIn(TimeZone.currentSystemDefault()),
-                                viewModel.date.atStartOfDayIn(TimeZone.currentSystemDefault()),
-                                listOf(it.id),
-                                it.latitude,
-                                it.longitude,
-                                false,
-                                it,
-                            )
-                        }
-                } else {
-                    snapshot?.items.orEmpty()
+            modifier = Modifier.weight(1f),
+            toolbarActions = {
+                IconButton(onClick = { moreMenu = true }) {
+                    Icon(Icons.Default.MoreVert, "More location options", Modifier.size(20.dp))
                 }
-            HumanHistoryMap(
-                mapItems,
-                state.selectedItemId,
-                {
-                    if (state.tab == HistoryTab.Places) openedPlace = it else viewModel.select(it)
-                },
-                mapModifier,
-                viewModel::pauseReplay,
-                "${state.tab}:${state.dateLabel}:${state.placesFilterLabel}:" +
-                    "${snapshot?.selectedDeviceId}:${state.selectionRevision}",
-            )
-        }
+                DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                    DropdownMenuItem(text = { Text("Recording settings") }, onClick = {
+                        moreMenu = false
+                        recording = true
+                    })
+                    if (state.tab == HistoryTab.Places) {
+                        DropdownMenuItem(text = { Text("Through ${state.dateLabel}") }, onClick = {
+                            moreMenu = false
+                            calendar = true
+                        })
+                    }
+                    if (snapshot?.conflicts?.isNotEmpty() == true) {
+                        DropdownMenuItem(text = { Text("Review changes") }, onClick = {
+                            moreMenu = false
+                            reviewingChanges = true
+                        })
+                    }
+                    snapshot?.recordingDevices?.takeIf { it.size > 1 }?.forEachIndexed { index, device ->
+                        DropdownMenuItem(text = { Text("Device ${index + 1}") }, onClick = {
+                            moreMenu = false
+                            viewModel.selectSource(device)
+                        })
+                    }
+                }
+            },
+            mapContent = { mapModifier ->
+                val mapItems =
+                    if (state.tab == HistoryTab.Places) {
+                        val visiblePlaceIds = state.filteredPlaces().flatMapTo(mutableSetOf()) { it.sourceIds }
+                        snapshot
+                            ?.collectionPlaces()
+                            .orEmpty()
+                            .filter { place -> place.id in visiblePlaceIds }
+                            .map {
+                                PlaceVisit(
+                                    it.id,
+                                    viewModel.date.atStartOfDayIn(TimeZone.currentSystemDefault()),
+                                    viewModel.date.atStartOfDayIn(TimeZone.currentSystemDefault()),
+                                    listOf(it.id),
+                                    it.latitude,
+                                    it.longitude,
+                                    false,
+                                    it,
+                                )
+                            }
+                    } else {
+                        snapshot?.items.orEmpty()
+                    }
+                HumanHistoryMap(
+                    mapItems,
+                    state.selectedItemId,
+                    {
+                        if (state.tab == HistoryTab.Places) openedPlace = it else viewModel.select(it)
+                    },
+                    mapModifier,
+                    viewModel::pauseReplay,
+                )
+            },
+        )
     }
     if (calendar) {
         val picker = rememberDatePickerState(initialSelectedDateMillis = viewModel.date.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds())

@@ -172,7 +172,7 @@ private fun HistoryVisit(
                 item.memories.forEach { HistoryMemoryPreview(it, actions.onOpenMemory) }
             }
         }
-        if (item.memories.isEmpty() && !item.isApproximate) {
+        if (item.memories.isEmpty() && !item.isApproximate && isSelected) {
             TextButton(
                 onClick = { actions.onEdit(item.id, HistoryEditAction.AddMemory) },
                 contentPadding = PaddingValues(0.dp),

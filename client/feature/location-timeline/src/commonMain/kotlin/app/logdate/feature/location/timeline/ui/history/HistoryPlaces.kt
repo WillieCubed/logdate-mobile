@@ -8,10 +8,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -54,27 +57,35 @@ internal fun HistoryPlaces(
     actions: HumanLocationHistoryActions,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
-    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        item { HistoryPlaceSearch(state, actions) }
-        if (state.placesMapVisible) {
-            item { mapContent(Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(28.dp))) }
-        }
-        val places = state.filteredPlaces()
-        if (places.isEmpty()) {
-            item {
-                val noResults = state.placesQuery.isNotBlank()
-                Column(Modifier.padding(vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        stringResource(if (noResults) Res.string.history_no_matching_places else Res.string.history_empty_places),
-                        style = MaterialTheme.typography.titleLarge,
-                    )
-                    Text(
-                        stringResource(if (noResults) Res.string.history_no_matching_places_body else Res.string.history_empty_places_body),
-                    )
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        LazyColumn(
+            Modifier.widthIn(max = 680.dp).fillMaxHeight(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            item { HistoryPlaceSearch(state, actions) }
+            if (state.placesMapVisible) {
+                item { mapContent(Modifier.fillMaxWidth().height(192.dp).clip(RoundedCornerShape(16.dp))) }
+            }
+            val places = state.filteredPlaces()
+            if (places.isEmpty()) {
+                item {
+                    val noResults = state.placesQuery.isNotBlank()
+                    Column(Modifier.padding(vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            stringResource(if (noResults) Res.string.history_no_matching_places else Res.string.history_empty_places),
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                        Text(
+                            stringResource(
+                                if (noResults) Res.string.history_no_matching_places_body else Res.string.history_empty_places_body,
+                            ),
+                        )
+                    }
                 }
             }
+            items(places, key = { it.id }) { place -> HistoryPlaceRow(place) { actions.onOpenPlace(place.id) } }
         }
-        items(places, key = { it.id }) { place -> HistoryPlaceRow(place) { actions.onOpenPlace(place.id) } }
     }
 }
 

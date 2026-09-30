@@ -11,10 +11,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -65,6 +70,7 @@ import app.logdate.client.repository.transcription.TranscriptionStatus
 import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.feature.core.sync.SyncAction
 import app.logdate.feature.core.sync.SyncErrorBanner
+import app.logdate.feature.core.sync.SyncPresentation
 import app.logdate.feature.core.sync.SyncPresentationViewModel
 import app.logdate.feature.core.sync.SyncStatusButton
 import app.logdate.feature.core.sync.SyncStatusSheet
@@ -237,10 +243,20 @@ fun HomeScreen(
         // on every home tab — the auth banner can't only render on Timeline. The Timeline tab
         // itself still renders the banner inside TimelinePane (which is also used standalone in
         // the desktop pane), so we suppress the home-level banner there to avoid duplication.
-        val showHomeLevelSyncBanner = currentDestination != HomeRouteDestination.Timeline
+        val showHomeLevelSyncBanner =
+            currentDestination != HomeRouteDestination.Timeline &&
+                when (val presentation = syncPresentation.value) {
+                    SyncPresentation.AuthError,
+                    SyncPresentation.NeedsRecovery,
+                    is SyncPresentation.StorageError,
+                    is SyncPresentation.ConflictError,
+                    -> true
+                    is SyncPresentation.NetworkError -> presentation.pendingCount > 0
+                    else -> false
+                }
         Column(modifier = Modifier.padding(innerPadding)) {
             if (showHomeLevelSyncBanner) {
-                syncBanner()
+                Box(Modifier.statusBarsPadding()) { syncBanner() }
             }
             NavigationSuiteScaffold(
                 layoutType = navLayoutType,
@@ -289,7 +305,9 @@ fun HomeScreen(
                     containerColor = Color.Transparent,
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
                     floatingActionButton = {
-                        if (!(currentPlatform.isApple && currentDestination == HomeRouteDestination.Timeline)) {
+                        if (currentDestination != HomeRouteDestination.LocationHistory &&
+                            !(currentPlatform.isApple && currentDestination == HomeRouteDestination.Timeline)
+                        ) {
                             FloatingActionButton(
                                 onClick = {
                                     when (currentDestination) {
@@ -362,7 +380,17 @@ fun HomeScreen(
                                 locationContent(
                                     Modifier
                                         .applyScreenStyles()
-                                        .safeDrawingPadding(),
+                                        .then(
+                                            if (showHomeLevelSyncBanner) {
+                                                Modifier.windowInsetsPadding(
+                                                    WindowInsets.safeDrawing.only(
+                                                        WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
+                                                    ),
+                                                )
+                                            } else {
+                                                Modifier.safeDrawingPadding()
+                                            },
+                                        ),
                                 )
                             }
 

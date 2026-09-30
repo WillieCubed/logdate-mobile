@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,8 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,7 +44,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -77,11 +76,22 @@ fun HumanLocationHistoryContent(
     actions: HumanLocationHistoryActions,
     modifier: Modifier = Modifier,
     mapContent: @Composable (Modifier) -> Unit = {},
+    toolbarActions: @Composable RowScope.() -> Unit = {},
 ) {
     Surface(modifier.fillMaxSize()) {
         Box(contentAlignment = Alignment.TopCenter) {
-            Column(Modifier.widthIn(max = 1100.dp).fillMaxSize()) {
-                PrimaryTabRow(selectedTabIndex = state.tab.ordinal) {
+            Column(Modifier.widthIn(max = 980.dp).fillMaxSize()) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Locations", Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    toolbarActions()
+                }
+                PrimaryTabRow(
+                    selectedTabIndex = state.tab.ordinal,
+                    modifier = Modifier.widthIn(max = 440.dp).align(Alignment.CenterHorizontally),
+                ) {
                     HistoryTab.entries.forEach { tab ->
                         Tab(
                             selected = state.tab == tab,
@@ -136,15 +146,23 @@ private fun HistoryDay(
     Column(Modifier.fillMaxSize()) {
         HistoryDateHeader(state, actions)
         BoxWithConstraints(Modifier.weight(1f)) {
-            if (maxWidth >= 720.dp && state.items.isNotEmpty()) {
-                Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Column(Modifier.weight(0.4f)) {
+            if (maxWidth >= 840.dp && state.items.isNotEmpty()) {
+                Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    Column(Modifier.widthIn(max = 320.dp)) {
                         HistoryDayOverview(state, actions, mapContent, expandedByDefault = true)
                     }
-                    HistoryDayList(state, actions, Modifier.weight(0.6f).fillMaxHeight())
+                    HistoryDayList(state, actions, Modifier.weight(1f).fillMaxHeight())
                 }
             } else {
-                HistoryDayList(state, actions, Modifier.fillMaxSize()) {
+                HistoryDayList(
+                    state,
+                    actions,
+                    Modifier
+                        .widthIn(max = 680.dp)
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .align(Alignment.Center),
+                ) {
                     if (state.items.isNotEmpty()) {
                         HistoryDayOverview(state, actions, mapContent)
                     }
@@ -159,16 +177,15 @@ private fun HistoryDateHeader(
     state: HumanLocationHistoryState,
     actions: HumanLocationHistoryActions,
 ) {
-    val largeText = LocalDensity.current.fontScale > 1.3f
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        if (largeText) HistoryDateButton(state, actions, Modifier.fillMaxWidth())
+        HistoryDateButton(state, actions, Modifier.fillMaxWidth())
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                if (!largeText) HistoryDateButton(state, actions, Modifier.fillMaxWidth())
-                if (state.daySummary.isNotBlank()) {
-                    Text(state.daySummary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
+            Text(
+                state.daySummary,
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             IconButton(onClick = { actions.onDayOffset(-1) }) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.history_previous_day))
             }
@@ -204,19 +221,35 @@ private fun HistoryDayOverview(
     mapContent: @Composable (Modifier) -> Unit,
     expandedByDefault: Boolean = false,
 ) {
-    var expanded by remember { mutableStateOf(expandedByDefault) }
-    if (expanded) {
-        Box(Modifier.padding(horizontal = 16.dp).clip(RoundedCornerShape(20.dp)).animateContentSize()) {
-            mapContent(Modifier.fillMaxWidth().height(280.dp))
+    var mapVisible by remember(state.dateLabel) { mutableStateOf(expandedByDefault) }
+    var replayVisible by remember(state.dateLabel) { mutableStateOf(false) }
+    Column {
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = { mapVisible = !mapVisible }) {
+                Icon(Icons.Default.Map, null, Modifier.size(18.dp))
+                Text(
+                    stringResource(if (mapVisible) Res.string.history_collapse_map else Res.string.history_expand_map),
+                    Modifier.padding(start = 6.dp),
+                )
+            }
+            TextButton(onClick = {
+                if (replayVisible) actions.onReplayPlaying?.invoke(false)
+                replayVisible = !replayVisible
+            }) {
+                Icon(Icons.Default.PlayArrow, null, Modifier.size(18.dp))
+                Text(
+                    stringResource(if (replayVisible) Res.string.history_hide_replay else Res.string.history_replay),
+                    Modifier.padding(start = 6.dp),
+                )
+            }
         }
-    }
-    HistoryReplay(state, actions) {
-        TextButton(onClick = { expanded = !expanded }) {
-            Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, Modifier.size(18.dp))
-            Text(
-                stringResource(if (expanded) Res.string.history_collapse_map else Res.string.history_expand_map),
-                Modifier.padding(start = 4.dp),
-            )
+        if (mapVisible) {
+            Box(Modifier.padding(horizontal = 4.dp).clip(RoundedCornerShape(16.dp)).animateContentSize()) {
+                mapContent(Modifier.fillMaxWidth().height(if (expandedByDefault) 240.dp else 168.dp))
+            }
+        }
+        if (replayVisible) {
+            HistoryReplay(state, actions)
         }
     }
 }
@@ -263,22 +296,9 @@ private fun HistoryDayList(
 private fun HistoryReplay(
     state: HumanLocationHistoryState,
     actions: HumanLocationHistoryActions,
-    mapAction: @Composable () -> Unit,
 ) {
     val replayLabel = stringResource(Res.string.history_replay)
-    var expanded by remember(state.dateLabel) { mutableStateOf(false) }
-    Column(Modifier.padding(horizontal = 16.dp)) {
-        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            TextButton(onClick = {
-                if (expanded) actions.onReplayPlaying?.invoke(false)
-                expanded = !expanded
-            }) {
-                Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.PlayArrow, null, Modifier.size(18.dp))
-                Text(if (expanded) stringResource(Res.string.history_hide_replay) else replayLabel, Modifier.padding(start = 4.dp))
-            }
-            mapAction()
-        }
-        if (!expanded) return@Column
+    Column(Modifier.padding(horizontal = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(replayLabel, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
             actions.onReplayPlaying?.let { onPlay ->
