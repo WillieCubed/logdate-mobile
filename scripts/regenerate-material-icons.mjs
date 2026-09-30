@@ -42,7 +42,7 @@ const shadow = `  <defs>
   </defs>\n`;
 const full = `${header}${shadow}${background}${photos}</svg>\n`;
 // Adaptive masks show only the center of the 108dp foreground canvas.
-const foreground = `${header}${shadow}  <g transform="translate(512 512) scale(0.60) translate(-512 -512)">\n${photos}  </g>\n</svg>\n`;
+const foreground = `${header}${shadow}  <g transform="translate(512 512) scale(0.68) translate(-512 -512)">\n${photos}  </g>\n</svg>\n`;
 const maskable = `${header}${shadow}${background}  <g transform="translate(512 512) scale(0.72) translate(-512 -512)">\n${photos}  </g>\n</svg>\n`;
 const rounded = `${header}${shadow}  <defs><clipPath id="desktop-shape"><rect width="1024" height="1024" rx="112"/></clipPath></defs>\n  <g clip-path="url(#desktop-shape)">\n${background}${photos}  </g>\n</svg>\n`;
 const circular = `${header}${shadow}  <defs><clipPath id="round-shape"><circle cx="512" cy="512" r="512"/></clipPath></defs>\n  <g clip-path="url(#round-shape)">\n${background}${photos}  </g>\n</svg>\n`;
