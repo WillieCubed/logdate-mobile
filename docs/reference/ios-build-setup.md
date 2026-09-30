@@ -7,7 +7,7 @@ identifier, signing, Firebase configuration, and the local-vs-CI workflow.
 
 - Xcode 16 or newer (current builds were verified on Xcode 26.4)
 - An Apple Developer account with provisioning enabled for the bundle
-  `studio.hypertext.LogDate` under team `39AB9DY3K8`
+  `studio.hypertext.LogDate` under team `T95VDD3A4W`
 - Kotlin/JDK already provisioned by the repo's Gradle wrapper — no extra setup
 
 The Xcode project lives in
@@ -30,7 +30,7 @@ and assembled by `PRODUCT_BUNDLE_IDENTIFIER = "${BUNDLE_ID}${TEAM_ID}"` in the
 
 Before the first build, register the App ID in
 [Apple Developer Console](https://developer.apple.com/account/resources/identifiers/list)
-under team `39AB9DY3K8`. The App ID needs **HealthKit**, **Associated
+under team `T95VDD3A4W`. The App ID needs **HealthKit**, **Associated
 Domains**, and **Push Notifications** capabilities — without them
 `xcodebuild` fails with `Failed Registering Bundle Identifier: ... not
 available` and the auto-generated provisioning profile lacks the required
