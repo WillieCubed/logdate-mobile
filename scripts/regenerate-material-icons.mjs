@@ -23,6 +23,14 @@ const photos = source.slice(start, end).replaceAll(
 if ((photos.match(/filter="url\(#photo-shadow\)"/g) ?? []).length !== 2) {
   throw new Error("Expected two photo surfaces");
 }
+// Keep the photos at legacy apparent size in the 72dp viewport, but pull their
+// opposing corners inside the 66dp adaptive safe circle.
+const adaptivePhotos = photos
+  .replace('transform="rotate(8 370 360)"', 'transform="translate(66 66) rotate(8 370 360)"')
+  .replace('transform="rotate(-11 710 680)"', 'transform="translate(-66 -66) rotate(-11 710 680)"');
+if (adaptivePhotos === photos || (adaptivePhotos.match(/translate\((?:-)?66 (?:-)?66\) rotate/g) ?? []).length !== 2) {
+  throw new Error("Expected two adaptive photo surfaces");
+}
 const shadow = `  <defs>
     <filter id="photo-shadow" x="-25%" y="-25%" width="160%" height="170%">
       <feGaussianBlur in="SourceAlpha" stdDeviation="18" result="ambient-blur"/>
@@ -42,7 +50,7 @@ const shadow = `  <defs>
   </defs>\n`;
 const full = `${header}${shadow}${background}${photos}</svg>\n`;
 // Adaptive masks show only the center of the 108dp foreground canvas.
-const foreground = `${header}${shadow}  <g transform="translate(512 512) scale(0.68) translate(-512 -512)">\n${photos}  </g>\n</svg>\n`;
+const foreground = `${header}${shadow}  <g transform="translate(512 512) scale(0.68) translate(-512 -512)">\n${adaptivePhotos}  </g>\n</svg>\n`;
 const maskable = `${header}${shadow}${background}  <g transform="translate(512 512) scale(0.72) translate(-512 -512)">\n${photos}  </g>\n</svg>\n`;
 const rounded = `${header}${shadow}  <defs><clipPath id="desktop-shape"><rect width="1024" height="1024" rx="112"/></clipPath></defs>\n  <g clip-path="url(#desktop-shape)">\n${background}${photos}  </g>\n</svg>\n`;
 const circular = `${header}${shadow}  <defs><clipPath id="round-shape"><circle cx="512" cy="512" r="512"/></clipPath></defs>\n  <g clip-path="url(#round-shape)">\n${background}${photos}  </g>\n</svg>\n`;
