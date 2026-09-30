@@ -126,6 +126,10 @@ Screenshot validation:
 ./gradlew :app:android-main:validateDebugScreenshotTest --tests '*HumanLocationHistory*'
 ```
 
+The landing onto current main found an independently added V28 migration. Location history
+uses V29; all eight server/client tests passed again against isolated PostgreSQL 18 with both
+V28 and V29 applied. Evidence: `.superpowers/sdd/human-location-history/ship-postgres-e2e.log`.
+
 ## Release gates and limits
 
 - Deploy backward-compatible server support before enabling Android clients. Keep the flag off
