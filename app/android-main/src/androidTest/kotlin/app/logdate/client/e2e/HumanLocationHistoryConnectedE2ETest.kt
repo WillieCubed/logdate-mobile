@@ -3,6 +3,7 @@ package app.logdate.client.e2e
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -74,7 +75,7 @@ class HumanLocationHistoryConnectedE2ETest {
                 ?.notes
                 ?.any { it.uid == memory.uid } == true
         }
-        composeRule.onNodeWithText("See details").performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("See details").performScrollTo().performClick()
         composeRule.onNodeWithText("Link an existing memory").performScrollTo().performClick()
         composeRule.onNodeWithText(memory.content).performScrollTo().performClick()
         composeRule.waitUntil(15_000) {

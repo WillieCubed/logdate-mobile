@@ -4,14 +4,30 @@ package app.logdate.feature.location.timeline.ui.history
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.EditLocationAlt
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -19,7 +35,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.history_add_memory
@@ -34,6 +55,7 @@ import logdate.client.feature.location.timeline.generated.resources.history_dele
 import logdate.client.feature.location.timeline.generated.resources.history_delete_body
 import logdate.client.feature.location.timeline.generated.resources.history_delete_title
 import logdate.client.feature.location.timeline.generated.resources.history_link_memory
+import logdate.client.feature.location.timeline.generated.resources.history_visit_settings
 import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,38 +94,89 @@ fun HumanLocationHistoryDetailContent(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(item.title, style = MaterialTheme.typography.headlineSmall)
-        Text(item.timeLabel, style = MaterialTheme.typography.labelLarge)
-        if (item.supportingText.isNotBlank()) Text(item.supportingText)
-        item.memories.forEach { HistoryMemoryPreview(it, actions.onOpenMemory) }
-        val edits =
-            when (item.kind) {
-                HistoryItemKind.Visit ->
-                    listOf(
-                        HistoryEditAction.ChangePlace,
-                        HistoryEditAction.ChangeTime,
-                        HistoryEditAction.AddMemory,
-                        HistoryEditAction.LinkMemory,
-                    )
-                HistoryItemKind.Journey ->
-                    listOf(
-                        HistoryEditAction.ChangeActivity,
-                        HistoryEditAction.ChangeTime,
-                    )
-                HistoryItemKind.Gap -> listOf(HistoryEditAction.AddVisit)
-            }
-        edits.forEach { action ->
-            TextButton(onClick = { actions.onEdit(item.id, action) }) { Text(stringResource(action.label())) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                item.title,
+                Modifier.weight(1f).semantics { heading() },
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            IconButton(onClick = actions.onCloseDetail) { Icon(Icons.Default.Close, stringResource(Res.string.history_close)) }
         }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+                Text(item.timeLabel, Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
+            }
+            if (item.supportingText.isNotBlank()) {
+                Text(
+                    item.supportingText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        item.memories.forEach { HistoryMemoryPreview(it, actions.onOpenMemory) }
         if (item.kind == HistoryItemKind.Visit) {
-            TextButton(onClick = onRequestDelete) {
+            FilledTonalButton(onClick = { actions.onEdit(item.id, HistoryEditAction.AddMemory) }, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.Add, null, Modifier.size(20.dp))
+                Text(stringResource(Res.string.history_add_memory), Modifier.padding(start = 8.dp))
+            }
+        }
+        Text(
+            stringResource(Res.string.history_visit_settings),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        HistoryDetailActions(item, actions)
+        if (item.kind == HistoryItemKind.Visit) {
+            TextButton(onClick = onRequestDelete, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                 Text(stringResource(Res.string.history_delete), color = MaterialTheme.colorScheme.error)
             }
         }
-        TextButton(onClick = actions.onCloseDetail) { Text(stringResource(Res.string.history_close)) }
+    }
+}
+
+@Composable
+private fun HistoryDetailActions(
+    item: HistoryItemUi,
+    actions: HumanLocationHistoryActions,
+) {
+    val edits =
+        when (item.kind) {
+            HistoryItemKind.Visit -> listOf(HistoryEditAction.ChangePlace, HistoryEditAction.ChangeTime, HistoryEditAction.LinkMemory)
+            HistoryItemKind.Journey -> listOf(HistoryEditAction.ChangeActivity, HistoryEditAction.ChangeTime)
+            HistoryItemKind.Gap -> listOf(HistoryEditAction.AddVisit)
+        }
+    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Column {
+            edits.forEachIndexed { index, action ->
+                if (index > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                Surface(onClick = { actions.onEdit(item.id, action) }, color = Color.Transparent) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            when (action) {
+                                HistoryEditAction.ChangePlace -> Icons.Default.EditLocationAlt
+                                HistoryEditAction.ChangeTime -> Icons.Default.Schedule
+                                HistoryEditAction.LinkMemory -> Icons.Default.Link
+                                HistoryEditAction.ChangeActivity -> Icons.Default.Route
+                                else -> Icons.Default.Add
+                            },
+                            null,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(stringResource(action.label()), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, Modifier.size(20.dp))
+                    }
+                }
+            }
+        }
     }
 }
 

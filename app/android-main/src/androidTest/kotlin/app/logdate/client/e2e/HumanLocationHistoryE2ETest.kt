@@ -54,7 +54,7 @@ class HumanLocationHistoryE2ETest {
             assertTrue("Tapping the time must not open a memory", openedMemories.isEmpty())
         }
         composeRule.onNodeWithText("Change place").assertDoesNotExist()
-        composeRule.onNodeWithText("See details").performClick()
+        composeRule.onNodeWithContentDescription("See details").performClick()
         composeRule.onNodeWithText("Change place").assertIsDisplayed()
     }
 
@@ -72,8 +72,8 @@ class HumanLocationHistoryE2ETest {
     @Test
     fun `dismissed details stay dismissed after new history arrives`() {
         show(singleVisit())
-        composeRule.onNodeWithText("See details").performClick()
-        composeRule.onNodeWithText("Close").performScrollTo().performClick()
+        composeRule.onNodeWithContentDescription("See details").performClick()
+        composeRule.onNodeWithContentDescription("Close").performScrollTo().performClick()
         composeRule.runOnIdle {
             state.value = state.value.copy(recoveryMessage = "Location is paused. Your saved day is still here.")
         }
@@ -190,7 +190,7 @@ class HumanLocationHistoryE2ETest {
     @Test
     fun `delete requires confirmation and sends only the selected visit action`() {
         show(singleVisit())
-        composeRule.onNodeWithText("See details").performClick()
+        composeRule.onNodeWithContentDescription("See details").performClick()
         composeRule.onNodeWithText("Delete from history").performScrollTo().performClick()
         composeRule.onNodeWithText("Delete this moment?").assertIsDisplayed()
         composeRule.runOnIdle { assertTrue(edits.isEmpty()) }

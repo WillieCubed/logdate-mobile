@@ -44,4 +44,7 @@
     <string name="history_hide_replay">Hide replay</string>
     <string name="history_confirm_delete">Delete</string>
     <string name="history_preview_unavailable">Preview unavailable</string>
+    <string name="history_expand_map">Expand map</string>
+    <string name="history_collapse_map">Collapse map</string>
+    <string name="history_visit_settings">Visit details</string>
 </resources>

@@ -32,11 +32,11 @@ private val cafeMemory = HistoryMemoryUi("coffee-note", "A quiet table, a good b
 private val historyDay =
     HumanLocationHistoryState(
         dateLabel = "Tuesday, September 29",
-        daySummary = "A little room to wander",
+        daySummary = "6 visits in your day",
         selectedItemId = "cafe-morning",
         items =
             listOf(
-                HistoryItemUi("home-morning", HistoryItemKind.Visit, "Home", "Until 9:10 AM", "A slow start"),
+                HistoryItemUi("home-morning", HistoryItemKind.Visit, "Home", "Until 9:10 AM", ""),
                 HistoryItemUi("walk-cafe", HistoryItemKind.Journey, "Walked", "9:10–9:28 AM", "18 min"),
                 HistoryItemUi(
                     "cafe-morning",
@@ -124,7 +124,7 @@ fun HumanLocationHistoryLargeTextScreenshot() = HistoryScene(historyDay)
 @PreviewTest
 @Preview(name = "History Places", device = PHONE, showBackground = true)
 @Composable
-fun HumanLocationHistoryPlacesScreenshot() = HistoryScene(historyDay.copy(tab = HistoryTab.Places))
+fun HumanLocationHistoryPlacesScreenshot() = HistoryScene(historyDay.copy(tab = HistoryTab.Places, placesFilterLabel = "30 days"))
 
 @PreviewTest
 @Preview(name = "History Recovery", device = PHONE, showBackground = true)
