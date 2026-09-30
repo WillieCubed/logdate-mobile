@@ -73,7 +73,9 @@ class AndroidLogDateSyncWorker(
             val syncType = inputData.getString(KEY_SYNC_TYPE) ?: SYNC_TYPE_FULL
             val result = if (promoted) withProgressNotification { runSync(syncType) } else runSync(syncType)
 
-            if (result.success) {
+            if (result.success && result.hasMorePending) {
+                Result.retry()
+            } else if (result.success) {
                 val uploaded = result.uploadedItems
                 val downloaded = result.downloadedItems
                 val conflicts = result.conflictsResolved

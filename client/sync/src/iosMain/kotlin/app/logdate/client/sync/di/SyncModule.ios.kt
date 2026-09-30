@@ -75,6 +75,7 @@ actual val syncModule: Module =
                 cloudApiClient = get(),
                 identityRecoveryNeededStore = KeyValueIdentityRecoveryNeededStore(get()),
                 unreadableCloudRecordStore = KeyValueUnreadableCloudRecordStore(get()),
+                locationHistorySyncEngine = get(),
             )
         }
         single<SyncManager> { ForegroundSyncManager(get(), get(), get(), get(), get()) }

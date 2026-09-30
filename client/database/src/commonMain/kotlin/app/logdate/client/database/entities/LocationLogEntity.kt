@@ -3,6 +3,7 @@ package app.logdate.client.database.entities
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import kotlin.time.Instant
 
@@ -19,7 +20,14 @@ import kotlin.time.Instant
  * This data should not be used as a source of truth for a user's location but can be used to
  * approximate a user's location at a given time.
  */
-@Entity(tableName = "location_logs")
+@Entity(
+    tableName = "location_logs",
+    indices = [
+        Index(
+            value = ["user_id", "device_id", "timestamp", "sample_id"],
+        ), Index(value = ["timestamp"]), Index(value = ["user_id", "device_id", "logged_at", "sample_id"]),
+    ],
+)
 data class LocationLogEntity(
     @PrimaryKey
     @ColumnInfo(name = "sample_id")
@@ -83,6 +91,10 @@ data class LocationLogEntity(
     val bearingDegrees: Float? = null,
     @ColumnInfo(name = "is_mock")
     val isMock: Boolean = false,
+    @ColumnInfo(name = "activity_type")
+    val activityType: String? = null,
+    @ColumnInfo(name = "time_zone_id")
+    val timeZoneId: String? = null,
 )
 
 /**

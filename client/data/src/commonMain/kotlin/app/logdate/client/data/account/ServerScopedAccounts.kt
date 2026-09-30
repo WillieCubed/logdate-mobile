@@ -67,6 +67,7 @@ class DefaultServerScopedAccounts(
     private val canonicalOwnerProvider: CanonicalOwnerProvider,
     private val hasLocalData: suspend () -> Boolean,
     private val deviceName: () -> String?,
+    private val adoptCanonicalOwner: (suspend (String, String) -> Boolean)? = null,
 ) : ServerScopedAccounts {
     override suspend fun open(
         origin: String,
@@ -89,6 +90,9 @@ class DefaultServerScopedAccounts(
                 repositoryScope = scope,
                 deviceName = deviceName,
                 createsRestoreKey = false,
+                adoptCanonicalOwner = { owner ->
+                    adoptCanonicalOwner?.invoke(owner, origin) ?: canonicalOwnerProvider.adoptRemoteOwnerIfUninitialized(owner)
+                },
             )
         return object : ServerScopedAccount {
             override val origin: String = config.getCurrentBackendUrl()

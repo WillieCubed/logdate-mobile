@@ -49,6 +49,9 @@ enum class FeatureFlag(
      * switch back to the old counter until that counter's code is deleted, and both go together.
      */
     CAMPFIRE_STREAKS(key = "campfire_streaks_enabled", defaultEnabled = true),
+
+    /** Encrypted history sync and the reconstructed day surface remain opt-in during validation. */
+    HUMAN_LOCATION_HISTORY(key = "human_location_history_enabled", defaultEnabled = false),
     ;
 
     companion object {

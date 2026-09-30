@@ -59,6 +59,7 @@ class DefaultPasskeyAccountRepository(
      * opened on a server the app isn't connected to must not replace the connected server's.
      */
     private val createsRestoreKey: Boolean = true,
+    private val adoptCanonicalOwner: (suspend (String) -> Boolean)? = null,
 ) : PasskeyAccountRepository {
     private val sessionState = PasskeyAccountSessionState()
     override val currentAccount: StateFlow<LogDateAccount?> = sessionState.currentAccount
@@ -69,6 +70,7 @@ class DefaultPasskeyAccountRepository(
             canonicalOwnerProvider = canonicalOwnerProvider,
             hasLocalData = hasLocalData,
             configRepository = configRepository,
+            adoptCanonicalOwner = adoptCanonicalOwner,
         )
 
     private val credentialCodec = PasskeyCredentialCodec(json)

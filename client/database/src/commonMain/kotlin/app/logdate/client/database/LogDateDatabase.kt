@@ -19,9 +19,12 @@ import app.logdate.client.database.dao.AudioTagDao
 import app.logdate.client.database.dao.EventDao
 import app.logdate.client.database.dao.EventNoteLinkDao
 import app.logdate.client.database.dao.HealthSnapshotDao
+import app.logdate.client.database.dao.HistoryOwnerAdoptionDao
+import app.logdate.client.database.dao.HistoryRecordDao
 import app.logdate.client.database.dao.ImageNoteDao
 import app.logdate.client.database.dao.JournalDao
 import app.logdate.client.database.dao.JournalNotesDao
+import app.logdate.client.database.dao.LocationActivityDao
 import app.logdate.client.database.dao.LocationHistoryDao
 import app.logdate.client.database.dao.MediaCaptionDao
 import app.logdate.client.database.dao.PlaceDao
@@ -53,9 +56,12 @@ import app.logdate.client.database.entities.AudioTagEntity
 import app.logdate.client.database.entities.EventEntity
 import app.logdate.client.database.entities.EventNoteLinkEntity
 import app.logdate.client.database.entities.HealthSnapshotEntity
+import app.logdate.client.database.entities.HistoryCursorEntity
+import app.logdate.client.database.entities.HistoryRecordEntity
 import app.logdate.client.database.entities.ImageNoteEntity
 import app.logdate.client.database.entities.JournalEntity
 import app.logdate.client.database.entities.JournalNoteCrossRef
+import app.logdate.client.database.entities.LocationActivityEntity
 import app.logdate.client.database.entities.LocationLogEntity
 import app.logdate.client.database.entities.MediaCaptionEntity
 import app.logdate.client.database.entities.PlaceEntity
@@ -127,6 +133,7 @@ import app.logdate.client.database.migrations.MIGRATION_43_44
 import app.logdate.client.database.migrations.MIGRATION_44_45
 import app.logdate.client.database.migrations.MIGRATION_45_46
 import app.logdate.client.database.migrations.MIGRATION_46_47
+import app.logdate.client.database.migrations.MIGRATION_47_48
 import app.logdate.client.database.migrations.MIGRATION_4_5
 import app.logdate.client.database.migrations.MIGRATION_5_6
 import app.logdate.client.database.migrations.MIGRATION_6_7
@@ -153,6 +160,9 @@ import kotlinx.coroutines.CoroutineDispatcher
         JournalEntity::class,
         JournalNoteCrossRef::class,
         LocationLogEntity::class,
+        HistoryRecordEntity::class,
+        HistoryCursorEntity::class,
+        LocationActivityEntity::class,
         StorageMetadataEntity::class,
         UserDeviceEntity::class,
         MediaImageEntity::class,
@@ -195,7 +205,7 @@ import kotlinx.coroutines.CoroutineDispatcher
         PersonLinkEntity::class,
         PersonResolutionDecisionEntity::class,
     ],
-    version = 47,
+    version = 48,
     exportSchema = true,
 )
 @TypeConverters(
@@ -225,6 +235,12 @@ abstract class LogDateDatabase : RoomDatabase() {
     abstract fun rewindDao(): CachedRewindDao
 
     abstract fun rewindGenerationRequestDao(): RewindGenerationRequestDao
+
+    abstract fun locationActivityDao(): LocationActivityDao
+
+    abstract fun historyRecordDao(): HistoryRecordDao
+
+    abstract fun historyOwnerAdoptionDao(): HistoryOwnerAdoptionDao
 
     abstract fun locationHistoryDao(): LocationHistoryDao
 
@@ -359,6 +375,7 @@ fun getRoomDatabase(
                 MIGRATION_44_45,
                 MIGRATION_45_46,
                 MIGRATION_46_47,
+                MIGRATION_47_48,
             ).addCallback(FtsTableCallback)
             .fallbackToDestructiveMigration(destroyTablesOnUpgrade)
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)

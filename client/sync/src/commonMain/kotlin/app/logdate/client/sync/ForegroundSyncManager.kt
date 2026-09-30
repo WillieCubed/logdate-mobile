@@ -113,8 +113,12 @@ class ForegroundSyncManager(
                     val mode = dataUsagePolicy.currentMode()
                     if (mode.shouldSyncMetadata()) {
                         val status = defaultSyncManager.getSyncStatus()
-                        if (status.pendingUploads > 0 || status.hasErrors) {
-                            defaultSyncManager.fullSync()
+                        if (status.pendingUploads > 0 || status.hasErrors || defaultSyncManager.isLocationHistorySyncEnabled()) {
+                            do {
+                                val result = defaultSyncManager.fullSync()
+                                if (!result.success || !result.hasMorePending || !dataUsagePolicy.currentMode().shouldSyncMetadata()) break
+                                delay(1_000)
+                            } while (isActive)
                         }
                     } else {
                         Napier.d("Skipping periodic sync cycle — data usage policy restricts metadata sync")

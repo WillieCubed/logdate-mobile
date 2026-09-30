@@ -13,6 +13,7 @@ import android.os.Looper
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import app.logdate.client.location.history.LocationTracker
+import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.notifications.LogDateNotificationChannelKey
 import app.logdate.client.permissions.PermissionManager
 import app.logdate.client.permissions.PermissionType
@@ -35,10 +36,13 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.koin.core.qualifier.named
+import kotlin.time.Clock
+import kotlin.time.Instant
 import android.location.Location as AndroidLocation
 
 /**
@@ -105,6 +109,8 @@ class ActivityAwareLocationService :
         private val CHANNEL_ID = LogDateNotificationChannelKey.LOCATION_HISTORY.id
         private val NOTIFICATION_ID = LogDateNotificationChannelKey.LOCATION_HISTORY.notificationId ?: 1905
         private const val ACTIVITY_TRANSITION_REQUEST_CODE = 1906
+        private val captureStatusTracker = LocationCaptureStatusTracker()
+        val captureStatus: StateFlow<LocationCaptureStatus> = captureStatusTracker.status
 
         /**
          * Weak reference to the running service instance so that [ActivityTransitionReceiver]
@@ -117,6 +123,7 @@ class ActivityAwareLocationService :
 
     private val ioDispatcher: CoroutineDispatcher by inject(named("io-dispatcher"))
     private val serviceScope by lazy { CoroutineScope(SupervisorJob() + ioDispatcher) }
+    private val settings: LocationTrackingSettingsRepository by inject()
     private val locationTracker: LocationTracker by inject()
     private val permissionManager: PermissionManager by inject()
 
@@ -124,6 +131,13 @@ class ActivityAwareLocationService :
     private lateinit var activityRecognitionClient: ActivityRecognitionClient
     private var locationCallback: LocationCallback? = null
     private var currentProfile: LocationProfile? = null
+
+    @Volatile
+    private var currentActivityType: String? = null
+
+    @Volatile
+    private var currentActivitySince: Instant? = null
+    private val clock: Clock by inject()
     private var activityTransitionPendingIntent: PendingIntent? = null
 
     override fun onCreate() {
@@ -164,8 +178,15 @@ class ActivityAwareLocationService :
     fun onActivityTransition(
         activityType: Int,
         transitionType: Int,
+        observedAt: Instant = clock.now(),
     ) {
-        if (transitionType != ActivityTransition.ACTIVITY_TRANSITION_ENTER) return
+        if (currentActivitySince?.let { observedAt < it } == true) return
+        currentActivitySince = observedAt
+        if (transitionType != ActivityTransition.ACTIVITY_TRANSITION_ENTER) {
+            if (currentActivityType == activityType.activityLabel()) currentActivityType = null
+            return
+        }
+        currentActivityType = activityType.activityLabel()
 
         val profile =
             when (activityType) {
@@ -209,12 +230,14 @@ class ActivityAwareLocationService :
             return
         }
 
+        LocationRecordingActionReceiver.clearPausedNotification(this)
         registerActivityTransitions()
         applyLocationProfile(LocationProfile.ON_FOOT)
-        Napier.i("Activity-aware location tracking started")
+        Napier.i("Activity-aware location subscription requested")
     }
 
     private fun stopTracking() {
+        captureStatusTracker.stop()
         unregisterActivityTransitions()
         locationCallback?.let { callback ->
             try {
@@ -225,11 +248,14 @@ class ActivityAwareLocationService :
         }
         locationCallback = null
         currentProfile = null
+        currentActivityType = null
+        currentActivitySince = null
         Napier.i("Activity-aware location tracking stopped")
     }
 
     private fun applyLocationProfile(profile: LocationProfile) {
         if (profile == currentProfile) return
+        val requestGeneration = captureStatusTracker.beginRequest()
 
         locationCallback?.let { callback ->
             try {
@@ -243,26 +269,48 @@ class ActivityAwareLocationService :
             object : LocationCallback() {
                 override fun onLocationResult(result: LocationResult) {
                     result.locations.forEach { androidLocation ->
-                        serviceScope.launch {
-                            persistLocation(androidLocation)
-                        }
+                        persistLocation(androidLocation)
                     }
                 }
             }
 
+        locationCallback = callback
+        currentProfile = profile
         try {
-            fusedLocationClient.requestLocationUpdates(
-                profile.toLocationRequest(),
-                callback,
-                Looper.getMainLooper(),
-            )
-            locationCallback = callback
-            currentProfile = profile
-            Napier.d("Location profile applied: $profile")
+            fusedLocationClient
+                .requestLocationUpdates(
+                    profile.toLocationRequest(),
+                    callback,
+                    Looper.getMainLooper(),
+                ).addOnCompleteListener { task ->
+                    if (!captureStatusTracker.completeRequest(requestGeneration, task.isSuccessful)) {
+                        removeStaleLocationCallback(callback)
+                    } else if (task.isSuccessful) {
+                        Napier.d("Location profile subscription accepted: $profile")
+                    } else {
+                        stopAfterLocationRequestFailure(task.exception)
+                    }
+                }
         } catch (e: SecurityException) {
-            Napier.e("Location permission lost, stopping service", e)
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
+            if (captureStatusTracker.completeRequest(requestGeneration, succeeded = false)) {
+                stopAfterLocationRequestFailure(e)
+            }
+        }
+    }
+
+    private fun stopAfterLocationRequestFailure(error: Exception?) {
+        Napier.e("Location updates could not be registered; stopping service", error)
+        locationCallback = null
+        currentProfile = null
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    private fun removeStaleLocationCallback(callback: LocationCallback) {
+        try {
+            fusedLocationClient.removeLocationUpdates(callback)
+        } catch (e: SecurityException) {
+            Napier.w("Failed to remove superseded location updates", e)
         }
     }
 
@@ -278,19 +326,22 @@ class ActivityAwareLocationService :
                     ),
             )
 
+        val recordedAt = clock.now()
+        val metadata =
+            androidLocation.captureMetadata(
+                recordedAt,
+                LocationCapturePipeline.HIGH_DETAIL,
+                LocationCaptureSource.FOREGROUND_STREAM,
+                currentActivityType.takeIf { currentActivitySince?.let { it <= androidLocation.observedAt(recordedAt) } == true },
+            )
         serviceScope.launch {
-            runCatching {
-                locationTracker.logLocation(
+            if (!settings.getSettings().backgroundTrackingEnabled) return@launch
+            locationTracker
+                .logLocation(
                     location = location,
-                    metadata =
-                        mapOf(
-                            "capturePipeline" to LocationCapturePipeline.HIGH_DETAIL,
-                            "captureSource" to LocationCaptureSource.FOREGROUND_STREAM,
-                        ),
-                )
-            }.onFailure { error ->
-                Napier.w("Failed to persist location", error)
-            }
+                    timestamp = androidLocation.observedAt(recordedAt),
+                    metadata = metadata,
+                ).onFailure { error -> Napier.w("Failed to persist location", error) }
         }
     }
 
@@ -310,13 +361,13 @@ class ActivityAwareLocationService :
                 DetectedActivity.IN_VEHICLE,
                 DetectedActivity.ON_BICYCLE,
             ).flatMap { activityType ->
-                listOf(
+                listOf(ActivityTransition.ACTIVITY_TRANSITION_ENTER, ActivityTransition.ACTIVITY_TRANSITION_EXIT).map { transition ->
                     ActivityTransition
                         .Builder()
                         .setActivityType(activityType)
-                        .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
-                        .build(),
-                )
+                        .setActivityTransition(transition)
+                        .build()
+                }
             }
 
         val request = ActivityTransitionRequest(transitions)
@@ -368,8 +419,12 @@ class ActivityAwareLocationService :
 
         return NotificationCompat
             .Builder(this, CHANNEL_ID)
-            .setContentTitle("Location history is on")
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setContentTitle("Recording your day")
+            .addAction(
+                android.R.drawable.ic_media_pause,
+                "Pause",
+                LocationRecordingActionReceiver.actionIntent(this, LocationRecordingActionReceiver.ACTION_PAUSE),
+            ).setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentIntent(pendingIntent)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setPriority(NotificationCompat.PRIORITY_MIN)

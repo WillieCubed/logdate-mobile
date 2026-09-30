@@ -51,8 +51,12 @@ kotlin {
         commonMain.dependencies {
             // Project dependencies
             implementation(projects.shared.model)
+            implementation(projects.shared.config)
+            implementation(projects.client.device)
+            implementation(projects.client.logdateDatastore)
             implementation(projects.client.domain)
             implementation(projects.client.ui)
+            implementation(projects.client.awareness)
             implementation(projects.client.repository)
             implementation(projects.client.location)
             implementation(projects.client.permissions)
@@ -67,6 +71,7 @@ kotlin {
             implementation(libs.compose.components.resources)
 
             // External dependencies
+            implementation(libs.coil.compose)
             implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.kotlinx.coroutines.core)
@@ -90,6 +95,7 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.google.maps.compose)
+            implementation(libs.androidx.activity.compose)
         }
     }
 }

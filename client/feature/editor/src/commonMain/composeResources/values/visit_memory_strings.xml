@@ -1,0 +1,4 @@
+<resources>
+    <string name="editor_visit_memory_context">Memory of %1$s · %2$s</string>
+    <string name="editor_visit_memory_unknown_place">this visit</string>
+</resources>

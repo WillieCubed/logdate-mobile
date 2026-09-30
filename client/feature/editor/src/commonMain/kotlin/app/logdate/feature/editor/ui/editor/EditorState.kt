@@ -3,6 +3,7 @@ package app.logdate.feature.editor.ui.editor
 import androidx.compose.runtime.Stable
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.shared.model.Journal
+import app.logdate.shared.model.location.VisitMemoryContext
 import kotlin.uuid.Uuid
 
 /**
@@ -53,6 +54,7 @@ class EditorState(
     val isSaving: Boolean = false,
     val isEditingLocked: Boolean = false,
     val contentRevision: Long = 0,
+    val visitContext: VisitMemoryContext? = null,
 ) {
     /**
      * Checks if a block is read-only
@@ -122,6 +124,7 @@ class EditorState(
         isSaving: Boolean = this.isSaving,
         isEditingLocked: Boolean = this.isEditingLocked,
         contentRevision: Long = this.contentRevision,
+        visitContext: VisitMemoryContext? = this.visitContext,
     ): EditorState =
         EditorState(
             blocks = blocks,
@@ -142,6 +145,7 @@ class EditorState(
             isSaving = isSaving,
             isEditingLocked = isEditingLocked,
             contentRevision = contentRevision,
+            visitContext = visitContext,
         )
 
     override fun equals(other: Any?): Boolean {
@@ -166,12 +170,14 @@ class EditorState(
         if (isSaving != other.isSaving) return false
         if (isEditingLocked != other.isEditingLocked) return false
         if (contentRevision != other.contentRevision) return false
+        if (visitContext != other.visitContext) return false
 
         return true
     }
 
     override fun hashCode(): Int {
         var result = blocks.hashCode()
+        result = 31 * result + (visitContext?.hashCode() ?: 0)
         result = 31 * result + (expandedBlockId?.hashCode() ?: 0)
         result = 31 * result + readOnlyBlocks.hashCode()
         result = 31 * result + availableJournals.hashCode()

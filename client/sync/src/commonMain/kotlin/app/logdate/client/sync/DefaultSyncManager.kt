@@ -18,6 +18,7 @@ import app.logdate.client.sync.cloud.CloudMediaDataSource
 import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
+import app.logdate.client.sync.location.LocationHistorySyncEngine
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.FirstSyncEnqueueStore
 import app.logdate.client.sync.metadata.IdentityRecoveryNeededStore
@@ -98,6 +99,7 @@ class DefaultSyncManager(
     private val cloudApiClient: CloudApiClient? = null,
     private val identityRecoveryNeededStore: IdentityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
     private val unreadableCloudRecordStore: UnreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+    private val locationHistorySyncEngine: LocationHistorySyncEngine? = null,
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     private val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -145,7 +147,11 @@ class DefaultSyncManager(
         if (startNow) {
             syncScope.launch {
                 releaseUploadBackoff()
-                fullSync()
+                do {
+                    val result = fullSync()
+                    if (!result.success || !result.hasMorePending) break
+                    kotlinx.coroutines.delay(1_000)
+                } while (true)
             }
         }
     }
@@ -224,7 +230,9 @@ class DefaultSyncManager(
             val journals = client.getJournalChanges(accessToken, since = 0L, limit = 1).getOrThrow()
             if (journals.changes.isNotEmpty() || journals.deletions.isNotEmpty()) return@runCatching true
             val content = client.getContentChanges(accessToken, since = 0L, limit = 1).getOrThrow()
-            content.changes.isNotEmpty() || content.deletions.isNotEmpty()
+            content.changes.isNotEmpty() ||
+                content.deletions.isNotEmpty() ||
+                locationHistorySyncEngine?.hasRemoteRecords(accessToken) == true
         }.getOrElse {
             Napier.w("Could not check whether the account already has cloud data", it)
             null
@@ -302,17 +310,20 @@ class DefaultSyncManager(
             val contentResult = uploader.uploadContent(accessToken)
             val associationResult = uploader.uploadAssociations(accessToken)
             val draftResult = uploader.uploadDrafts(accessToken)
+            val historyResult = locationHistorySyncEngine?.upload(accessToken) ?: SyncResult(success = true)
             val totalUploaded =
                 journalResult.uploadedItems +
                     contentResult.uploadedItems +
                     associationResult.uploadedItems +
-                    draftResult.uploadedItems
+                    draftResult.uploadedItems +
+                    historyResult.uploadedItems
             statusPublisher.setRunCompleted(totalUploaded)
             val errors =
                 journalResult.errors +
                     contentResult.errors +
                     associationResult.errors +
-                    draftResult.errors
+                    draftResult.errors +
+                    historyResult.errors
 
             val success = errors.isEmpty()
             if (success) {
@@ -327,6 +338,7 @@ class DefaultSyncManager(
                 uploadedItems = totalUploaded,
                 errors = errors,
                 lastSyncTime = latestSyncTime(),
+                hasMorePending = historyResult.hasMorePending,
             )
         }
 
@@ -345,10 +357,12 @@ class DefaultSyncManager(
             val journalResult = downloader.downloadJournals(accessToken, journalSince)
             val contentResult = downloader.downloadContent(accessToken, contentSince)
             val associationResult = downloader.downloadAssociations(accessToken, associationSince)
+            val historyResult = locationHistorySyncEngine?.download(accessToken) ?: SyncResult(success = true)
             val totalDownloaded =
                 journalResult.downloadedItems +
                     contentResult.downloadedItems +
-                    associationResult.downloadedItems
+                    associationResult.downloadedItems +
+                    historyResult.downloadedItems
             val conflictsResolved =
                 journalResult.conflictsResolved +
                     contentResult.conflictsResolved +
@@ -356,7 +370,8 @@ class DefaultSyncManager(
             val errors =
                 journalResult.errors +
                     contentResult.errors +
-                    associationResult.errors
+                    associationResult.errors +
+                    historyResult.errors
 
             val success = errors.isEmpty()
             if (success) {
@@ -372,6 +387,7 @@ class DefaultSyncManager(
                 conflictsResolved = conflictsResolved,
                 errors = errors,
                 lastSyncTime = latestSyncTime(),
+                hasMorePending = historyResult.hasMorePending,
             )
         }
 
@@ -525,8 +541,11 @@ class DefaultSyncManager(
             conflictsResolved = downloadResult.conflictsResolved,
             errors = errors,
             lastSyncTime = latestSyncTime(),
+            hasMorePending = downloadResult.hasMorePending || uploadResult.hasMorePending || draftResult.hasMorePending,
         )
     }
+
+    suspend fun isLocationHistorySyncEnabled(): Boolean = locationHistorySyncEngine?.isEnabled() == true
 
     override suspend fun getSyncStatus(): SyncStatus {
         val pendingCountResult =

@@ -1,5 +1,6 @@
 package app.logdate.client.data.location
 
+import app.logdate.client.database.dao.LocationActivityDao
 import app.logdate.client.database.dao.LocationHistoryDao
 import app.logdate.client.database.entities.Coordinates
 import app.logdate.client.database.entities.LocationLogEntity
@@ -21,6 +22,7 @@ import kotlin.time.Instant
  */
 class OfflineFirstLocationHistoryRepository(
     private val locationHistoryDao: LocationHistoryDao,
+    private val activityDao: LocationActivityDao? = null,
 ) : LocationHistoryRepository {
     override suspend fun getAllLocationHistory(): List<LocationHistoryItem> =
         locationHistoryDao.getAllLocationHistory().map {
@@ -31,6 +33,32 @@ class OfflineFirstLocationHistoryRepository(
         locationHistoryDao.observeAllLocationHistory().map { entities ->
             entities.map { it.toDomainModel() }
         }
+
+    override fun observeLocationHistoryBetween(
+        startTime: Instant,
+        endTime: Instant,
+    ): Flow<List<LocationHistoryItem>> =
+        locationHistoryDao.observeLocationHistoryBetween(startTime, endTime).map { entities -> entities.map { it.toDomainModel() } }
+
+    override suspend fun getLocationHistoryPage(
+        userId: String,
+        deviceId: String,
+        afterLoggedAt: Instant,
+        afterSampleId: String,
+        limit: Int,
+    ): List<LocationHistoryItem> =
+        locationHistoryDao
+            .getPage(userId, deviceId, afterLoggedAt, afterSampleId, limit.coerceIn(1, 1000))
+            .map { it.toDomainModel() }
+
+    override suspend fun getLocationHistoryBefore(
+        userId: String,
+        deviceId: String,
+        before: Instant,
+        beforeSampleId: String,
+        limit: Int,
+    ): List<LocationHistoryItem> =
+        locationHistoryDao.before(userId, deviceId, before, beforeSampleId, limit.coerceIn(1, 256)).map { it.toDomainModel() }
 
     override suspend fun getRecentLocationHistory(limit: Int): List<LocationHistoryItem> =
         locationHistoryDao.getRecentLocationHistory(limit).map {
@@ -98,6 +126,8 @@ class OfflineFirstLocationHistoryRepository(
                     speedMetersPerSecond = record.speedMetersPerSecond,
                     bearingDegrees = record.bearingDegrees,
                     isMock = record.isMock,
+                    activityType = record.activityType,
+                    timeZoneId = record.timeZoneId,
                 )
             locationHistoryDao.addLocationLog(entity)
             Result.success(Unit)
@@ -123,6 +153,7 @@ class OfflineFirstLocationHistoryRepository(
     ): Result<Unit> =
         try {
             locationHistoryDao.deleteLogsWithinRange(startTime, endTime)
+            activityDao?.deleteBetween(startTime, endTime)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -155,6 +186,8 @@ class OfflineFirstLocationHistoryRepository(
             speedMetersPerSecond = speedMetersPerSecond,
             bearingDegrees = bearingDegrees,
             isMock = isMock,
+            activityType = activityType,
+            timeZoneId = timeZoneId,
         )
 
     private fun String.toCapturePipeline(): LocationCapturePipeline =

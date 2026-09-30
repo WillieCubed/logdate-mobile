@@ -123,6 +123,8 @@ data class SyncResult(
     val conflictsResolved: Int = 0,
     val errors: List<SyncError> = emptyList(),
     val lastSyncTime: Instant? = null,
+    /** Another bounded pass is required; this is progress, not an error. */
+    val hasMorePending: Boolean = false,
 )
 
 /**

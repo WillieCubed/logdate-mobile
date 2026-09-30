@@ -69,6 +69,7 @@ import app.logdate.client.sync.conflict.LastWriteWinsResolver
 import app.logdate.client.sync.conflict.SyncConflictRecord
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
+import app.logdate.client.sync.location.LocationHistorySyncEngine
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.FirstSyncEnqueueStore
 import app.logdate.client.sync.metadata.IdentityRecoveryNeededStore
@@ -223,6 +224,7 @@ fun testDefaultSyncManager(
     cloudApiClient: CloudApiClient? = null,
     identityRecoveryNeededStore: IdentityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
     unreadableCloudRecordStore: UnreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
+    locationHistorySyncEngine: LocationHistorySyncEngine? = null,
 ): DefaultSyncManager =
     if (syncScope == null) {
         DefaultSyncManager(
@@ -254,6 +256,7 @@ fun testDefaultSyncManager(
             cloudApiClient = cloudApiClient,
             identityRecoveryNeededStore = identityRecoveryNeededStore,
             unreadableCloudRecordStore = unreadableCloudRecordStore,
+            locationHistorySyncEngine = locationHistorySyncEngine,
         )
     } else {
         DefaultSyncManager(
@@ -285,6 +288,7 @@ fun testDefaultSyncManager(
             cloudApiClient = cloudApiClient,
             identityRecoveryNeededStore = identityRecoveryNeededStore,
             unreadableCloudRecordStore = unreadableCloudRecordStore,
+            locationHistorySyncEngine = locationHistorySyncEngine,
             syncScope = syncScope,
         )
     }

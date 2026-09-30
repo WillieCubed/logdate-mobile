@@ -117,7 +117,7 @@ import logdate.client.ui.generated.resources.Res as UiRes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LocationTimelineScreen(
+internal fun LegacyLocationTimelineScreen(
     modifier: Modifier = Modifier,
     onOpenNote: (Uuid) -> Unit = {},
     viewModel: LocationTimelineViewModel = koinViewModel(),

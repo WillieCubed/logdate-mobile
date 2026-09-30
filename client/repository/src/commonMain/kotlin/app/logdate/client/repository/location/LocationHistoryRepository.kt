@@ -2,6 +2,7 @@ package app.logdate.client.repository.location
 
 import app.logdate.shared.model.Location
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -18,6 +19,30 @@ interface LocationHistoryRepository {
      * Observes all location history.
      */
     fun observeLocationHistory(): Flow<List<LocationHistoryItem>>
+
+    /** Observes samples in [startTime, endTime), without including the following day. */
+    fun observeLocationHistoryBetween(
+        startTime: Instant,
+        endTime: Instant,
+    ): Flow<List<LocationHistoryItem>> =
+        observeLocationHistory().map { items -> items.filter { it.timestamp >= startTime && it.timestamp < endTime } }
+
+    suspend fun getLocationHistoryBefore(
+        userId: String,
+        deviceId: String,
+        before: Instant,
+        beforeSampleId: String,
+        limit: Int = 256,
+    ): List<LocationHistoryItem> = emptyList()
+
+    /** Reads one owner/device page strictly after the ingestion time and sample-id cursor. */
+    suspend fun getLocationHistoryPage(
+        userId: String,
+        deviceId: String,
+        afterLoggedAt: Instant,
+        afterSampleId: String,
+        limit: Int = 500,
+    ): List<LocationHistoryItem> = emptyList()
 
     /**
      * Gets recent location history with a limit.
@@ -122,6 +147,8 @@ data class LocationLogRecord(
     val speedMetersPerSecond: Float? = null,
     val bearingDegrees: Float? = null,
     val isMock: Boolean = false,
+    val activityType: String? = null,
+    val timeZoneId: String? = null,
 )
 
 /**
@@ -142,4 +169,6 @@ data class LocationHistoryItem(
     val speedMetersPerSecond: Float? = null,
     val bearingDegrees: Float? = null,
     val isMock: Boolean = false,
+    val activityType: String? = null,
+    val timeZoneId: String? = null,
 )

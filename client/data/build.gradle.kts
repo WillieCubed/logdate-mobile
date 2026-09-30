@@ -33,6 +33,7 @@ kotlin {
     jvm("desktop")
 
     sourceSets {
+        val desktopTest by getting { dependencies { implementation(libs.sqlite.bundled) } }
         val desktopMain by getting
 
         all {

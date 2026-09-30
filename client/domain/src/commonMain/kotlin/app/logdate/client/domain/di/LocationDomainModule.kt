@@ -10,6 +10,7 @@ import app.logdate.client.domain.location.ObserveLocationHistoryUseCase
 import app.logdate.client.domain.location.ObserveLocationMemoryPlacesUseCase
 import app.logdate.client.domain.location.ObserveLocationRetryStatusUseCase
 import app.logdate.client.domain.location.ObserveLocationStopsUseCase
+import app.logdate.client.domain.location.history.LocationHistoryService
 import app.logdate.client.domain.world.GetLocationUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
 import app.logdate.client.domain.world.ObserveLocationUseCase
@@ -22,6 +23,7 @@ import org.koin.dsl.module
  */
 val locationDomainModule: Module =
     module {
+        single { LocationHistoryService(get(), get(), get(), get(), get(), get(), get(), activityHistory = get()) }
         // Location History
         factory { GetLocationHistoryUseCase(get()) }
         factory { DeleteLocationEntryUseCase(get()) }

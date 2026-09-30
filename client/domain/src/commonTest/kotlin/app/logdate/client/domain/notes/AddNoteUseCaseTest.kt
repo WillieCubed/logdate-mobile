@@ -2,8 +2,10 @@ package app.logdate.client.domain.notes
 
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.DeviceIdProvider
+import app.logdate.client.domain.editor.SaveEntryUseCase
 import app.logdate.client.domain.location.LocationRetryWorker
 import app.logdate.client.domain.location.LogCurrentLocationUseCase
+import app.logdate.client.domain.notes.drafts.DeleteEntryDraftUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.location.settings.LocationTrackingSettings
@@ -11,9 +13,12 @@ import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.repository.journals.EntryDraft
+import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.PendingMediaRecord
 import app.logdate.client.repository.location.LocationHistoryItem
 import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.timeline.ActivityTimelineRepository
@@ -22,6 +27,7 @@ import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
+import app.logdate.shared.model.location.VisitMemoryContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -35,8 +41,11 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -271,6 +280,81 @@ class AddNoteUseCaseTest {
             assertEquals(0, mockLogLocationUseCase.loggedActivities)
             assertEquals(0, mockLogCurrentLocationUseCase.loggedLocations)
         }
+
+    @Test
+    fun `retrospective memory preserves creation time without recording current location`() =
+        runTest {
+            val testNote = createTestNote()
+            useCase(notes = listOf(testNote), captureCurrentLocation = false)
+            assertEquals(testNote.creationTimestamp, mockRepository.createdNotes.single().creationTimestamp)
+            assertEquals(0, mockLogLocationUseCase.loggedActivities)
+            assertEquals(0, mockLogCurrentLocationUseCase.loggedLocations)
+        }
+
+    @Test
+    fun `historical publish links the saved note before removing its draft`() =
+        runTest {
+            val drafts = VisitDraftRepository()
+            val note = createTestNote()
+            val links = mutableListOf<Pair<String, String>>()
+            val save =
+                SaveEntryUseCase(useCase, DeleteEntryDraftUseCase(drafts, mockRepository)) { evidence, noteId ->
+                    assertFalse(drafts.deleted)
+                    assertEquals(note.uid, mockRepository.createdNotes.single().uid)
+                    links.add(evidence to noteId)
+                }
+            val visit = VisitMemoryContext("visit-evidence", null, null, 36.1, -115.1, Instant.parse("2026-09-28T16:00:00Z"))
+            save(listOf(note), emptyList(), Uuid.random(), visit)
+            assertEquals(listOf("visit-evidence" to note.uid.toString()), links)
+            assertTrue(drafts.deleted)
+            assertEquals(
+                36.1,
+                mockRepository.createdNotes
+                    .single()
+                    .location
+                    ?.effectiveLatitude,
+            )
+            assertEquals(note.creationTimestamp, mockRepository.createdNotes.single().creationTimestamp)
+            assertEquals(0, mockLogCurrentLocationUseCase.loggedLocations)
+        }
+
+    @Test
+    fun `failed historical memory link keeps the draft available for retry`() =
+        runTest {
+            val drafts = VisitDraftRepository()
+            val save = SaveEntryUseCase(useCase, DeleteEntryDraftUseCase(drafts, mockRepository)) { _, _ -> error("storage unavailable") }
+            val visit = VisitMemoryContext("visit-evidence", null, null, 36.1, -115.1, Instant.parse("2026-09-28T16:00:00Z"))
+            assertFailsWith<IllegalStateException> { save(listOf(createTestNote()), emptyList(), Uuid.random(), visit) }
+            assertFalse(drafts.deleted)
+        }
+
+    private class VisitDraftRepository : EntryDraftRepository {
+        var deleted = false
+
+        override fun getDrafts(): Flow<List<EntryDraft>> = flowOf(emptyList())
+
+        override fun getDraft(uid: Uuid): Flow<Result<EntryDraft>> = flowOf(Result.failure(NoSuchElementException()))
+
+        override suspend fun createDraft(notes: List<JournalNote>): Uuid = error("not used")
+
+        override suspend fun updateDraft(
+            uid: Uuid,
+            notes: List<JournalNote>,
+        ): Uuid = error("not used")
+
+        override suspend fun setPendingMedia(
+            uid: Uuid,
+            pendingMedia: List<PendingMediaRecord>,
+        ) = Unit
+
+        override suspend fun deleteDraft(uid: Uuid) {
+            deleted = true
+        }
+
+        override suspend fun deleteAllDrafts() = Unit
+
+        override suspend fun deleteExpiredDrafts(maxAge: Duration): Int = 0
+    }
 
     private fun createTestNote(content: String = "Test note content") =
         JournalNote.Text(

@@ -3,6 +3,7 @@ package app.logdate.client.domain.notes.drafts
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.PendingMediaRecord
+import app.logdate.shared.model.location.VisitMemoryContext
 import kotlin.uuid.Uuid
 
 /**
@@ -23,12 +24,14 @@ class CreateEntryDraftUseCase(
         notes: List<JournalNote>,
         pendingMedia: List<PendingMediaRecord> = emptyList(),
         selectedJournalIds: List<Uuid> = emptyList(),
+        visitContext: VisitMemoryContext? = null,
     ): Uuid =
         entryDraftRepository.createDraft(
             uid = draftId,
             notes = notes,
             pendingMedia = pendingMedia,
             selectedJournalIds = selectedJournalIds,
+            visitContext = visitContext,
         )
 
     /**

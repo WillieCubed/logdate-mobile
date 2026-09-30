@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
+import app.logdate.shared.model.location.VisitMemoryContext
 import io.github.aakira.napier.Napier
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
@@ -55,9 +56,10 @@ fun NoteEditorScreen(
     initialTextContent: String? = null,
     attachments: List<String> = emptyList(),
     viewModel: EntryEditorViewModel = koinViewModel(),
+    visitContext: VisitMemoryContext? = null,
 ) {
     // Load an existing draft or journal entry when provided
-    LaunchedEffect(entryId, draftId, firstEntry) {
+    LaunchedEffect(entryId, draftId, firstEntry, visitContext) {
         if (draftId != null) {
             try {
                 Napier.d("NoteEditorScreen: Loading draft: $draftId")
@@ -74,8 +76,9 @@ fun NoteEditorScreen(
             }
         } else if (firstEntry) {
             viewModel.resumeFirstEntryDraft()
-        } else if (journalIds.isNotEmpty()) {
-            viewModel.initializeSelectedJournals(journalIds)
+        } else {
+            viewModel.initializeVisitContext(visitContext)
+            if (journalIds.isNotEmpty()) viewModel.initializeSelectedJournals(journalIds)
         }
     }
 

@@ -4,6 +4,7 @@ import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.PendingMediaRecord
+import app.logdate.shared.model.location.VisitMemoryContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -89,6 +90,14 @@ class OfflineFirstEntryDraftRepository(
         notes: List<JournalNote>,
         pendingMedia: List<PendingMediaRecord>,
         selectedJournalIds: List<Uuid>,
+    ): Uuid = createDraft(uid, notes, pendingMedia, selectedJournalIds, null)
+
+    override suspend fun createDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+        pendingMedia: List<PendingMediaRecord>,
+        selectedJournalIds: List<Uuid>,
+        visitContext: VisitMemoryContext?,
     ): Uuid =
         mutationMutex.withLock {
             val now = Clock.System.now()
@@ -101,6 +110,7 @@ class OfflineFirstEntryDraftRepository(
                     updatedAt = now,
                     pendingMedia = pendingMedia,
                     selectedJournalIds = selectedJournalIds,
+                    visitContext = visitContext,
                 )
 
             // The store is authoritative: expose the draft only after its complete snapshot is durable.
@@ -136,6 +146,17 @@ class OfflineFirstEntryDraftRepository(
                 pendingMedia = pendingMedia,
                 selectedJournalIds = selectedJournalIds,
             )
+        }
+
+    override suspend fun updateDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+        pendingMedia: List<PendingMediaRecord>,
+        selectedJournalIds: List<Uuid>,
+        visitContext: VisitMemoryContext?,
+    ): Uuid =
+        mutationMutex.withLock {
+            persistUpdatedDraft(requireDraft(uid), notes, pendingMedia, selectedJournalIds, visitContext)
         }
 
     override suspend fun setPendingMedia(
@@ -209,6 +230,7 @@ class OfflineFirstEntryDraftRepository(
         notes: List<JournalNote>,
         pendingMedia: List<PendingMediaRecord>,
         selectedJournalIds: List<Uuid>,
+        visitContext: VisitMemoryContext? = existingDraft.visitContext,
     ): Uuid {
         val updatedDraft =
             existingDraft.copy(
@@ -216,6 +238,7 @@ class OfflineFirstEntryDraftRepository(
                 pendingMedia = pendingMedia,
                 selectedJournalIds = selectedJournalIds,
                 updatedAt = Clock.System.now(),
+                visitContext = visitContext,
             )
         draftStore.saveDraft(updatedDraft)
         draftsFlow.value = draftsFlow.value + (existingDraft.id to updatedDraft)

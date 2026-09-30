@@ -162,7 +162,7 @@ val domainModule: Module =
 
         // Editor
         factory { ObserveEditorDataUseCase(get(), get(), get(), get()) }
-        factory { SaveEntryUseCase(get(), get()) }
+        factory { SaveEntryUseCase(get(), get(), get<app.logdate.client.domain.location.history.LocationHistoryService>()::linkMemory) }
 
         // Rewind
         factory { GetPastRewindsUseCase(get()) }

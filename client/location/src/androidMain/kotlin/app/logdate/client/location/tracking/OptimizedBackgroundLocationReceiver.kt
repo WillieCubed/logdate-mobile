@@ -3,8 +3,8 @@ package app.logdate.client.location.tracking
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import app.logdate.client.location.history.LocationTracker
+import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.repository.location.LocationCapturePipeline
 import app.logdate.client.repository.location.LocationCaptureSource
 import app.logdate.shared.model.AltitudeUnit
@@ -21,7 +21,6 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.koin.core.qualifier.named
 import kotlin.time.Clock
-import kotlin.time.Instant
 import android.location.Location as AndroidLocation
 
 /**
@@ -40,6 +39,7 @@ import android.location.Location as AndroidLocation
 class OptimizedBackgroundLocationReceiver :
     BroadcastReceiver(),
     KoinComponent {
+    private val settings: LocationTrackingSettingsRepository by inject()
     private val locationTracker: LocationTracker by inject()
     private val ioDispatcher: CoroutineDispatcher by inject(named("io-dispatcher"))
     private val clock: Clock by inject()
@@ -74,29 +74,23 @@ class OptimizedBackgroundLocationReceiver :
     }
 
     private suspend fun logPassiveLocation(androidLocation: AndroidLocation) {
-        val observedAt =
-            if (androidLocation.time > 0) {
-                Instant.fromEpochMilliseconds(androidLocation.time)
-            } else {
-                clock.now()
-            }
+        if (!settings.getSettings().backgroundTrackingEnabled) return
+        val observedAt = androidLocation.observedAt(clock.now())
 
         locationTracker
             .logLocation(
                 location = androidLocation.toLogDateLocation(),
                 timestamp = observedAt,
-                metadata = androidLocation.toMetadata(),
+                metadata =
+                    androidLocation.captureMetadata(
+                        clock.now(),
+                        LocationCapturePipeline.OPTIMIZED_BACKGROUND,
+                        LocationCaptureSource.PASSIVE_UPDATE,
+                    ),
             ).onFailure { error ->
                 Napier.w("Failed to persist passive background location update", error)
             }
     }
-
-    private fun isMock(location: AndroidLocation): Boolean =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            location.isMock
-        } else {
-            false
-        }
 
     private fun AndroidLocation.toLogDateLocation(): Location =
         Location(
@@ -108,21 +102,4 @@ class OptimizedBackgroundLocationReceiver :
                     units = AltitudeUnit.METERS,
                 ),
         )
-
-    private fun AndroidLocation.toMetadata(): Map<String, Any> =
-        buildMap {
-            put("loggedAt", clock.now())
-            put("capturePipeline", LocationCapturePipeline.OPTIMIZED_BACKGROUND)
-            put("captureSource", LocationCaptureSource.PASSIVE_UPDATE)
-            if (this@toMetadata.hasAccuracy()) {
-                put("accuracyMeters", this@toMetadata.accuracy)
-            }
-            if (this@toMetadata.hasSpeed()) {
-                put("speedMetersPerSecond", this@toMetadata.speed)
-            }
-            if (this@toMetadata.hasBearing()) {
-                put("bearingDegrees", this@toMetadata.bearing)
-            }
-            put("isMock", isMock(this@toMetadata))
-        }
 }

@@ -15,6 +15,7 @@ internal class CanonicalOwnerBindingGuard(
     private val canonicalOwnerProvider: CanonicalOwnerProvider,
     private val hasLocalData: suspend () -> Boolean,
     private val configRepository: LogDateConfigRepository,
+    private val adoptCanonicalOwner: (suspend (String) -> Boolean)? = null,
 ) {
     enum class OwnerBinding { ALLOWED, NEEDS_LOCAL_DATA_CONSENT, REFUSED }
 
@@ -29,7 +30,7 @@ internal class CanonicalOwnerBindingGuard(
     ): OwnerBinding {
         if (canonicalOwnerProvider.hasBoundOwner()) {
             val matches = account.id.toString() == canonicalOwnerProvider.getCanonicalOwnerId()
-            return if (matches) OwnerBinding.ALLOWED else OwnerBinding.REFUSED
+            return if (matches && adoptOwner(account.id.toString())) OwnerBinding.ALLOWED else OwnerBinding.REFUSED
         }
 
         // A probe that fails tells us nothing about what is on the device, so ask rather than
@@ -38,12 +39,15 @@ internal class CanonicalOwnerBindingGuard(
             return OwnerBinding.NEEDS_LOCAL_DATA_CONSENT
         }
 
-        return if (canonicalOwnerProvider.adoptRemoteOwnerIfUninitialized(account.id.toString())) {
+        return if (adoptOwner(account.id.toString())) {
             OwnerBinding.ALLOWED
         } else {
             OwnerBinding.REFUSED
         }
     }
+
+    private suspend fun adoptOwner(ownerId: String): Boolean =
+        adoptCanonicalOwner?.invoke(ownerId) ?: canonicalOwnerProvider.adoptRemoteOwnerIfUninitialized(ownerId)
 
     suspend fun belongsToCanonicalOwner(account: LogDateAccount): Boolean =
         ownerBindingFor(account, adoptLocalData = false) == OwnerBinding.ALLOWED

@@ -33,6 +33,8 @@ import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnConfig
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.ratelimit.SlidingWindowRateLimiter
+import app.logdate.server.routes.sync.locationHistoryRoutes
+import app.logdate.server.sync.LocationHistoryRepository
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.transcription.cloudTranscriptionSessionProviderFromEnvironment
 import io.ktor.client.HttpClient
@@ -152,6 +154,7 @@ internal fun Application.contentApiRoutes() {
     val entitlementService by inject<EntitlementService>()
     val entitlementEnforcer by inject<EntitlementEnforcer>()
     val usageCalculator by inject<UsageCalculator>()
+    val locationHistoryRepository by inject<LocationHistoryRepository>()
     val syncMetrics by inject<SyncMetricsRegistry>()
     val blobStorage by inject<LogDateBlobStorage>()
     val logDateCollectionsRepository by inject<RepoBackedLogDateCollectionsRepository>()
@@ -163,6 +166,7 @@ internal fun Application.contentApiRoutes() {
 
     routing {
         route("/api/v1") {
+            locationHistoryRoutes(tokenService, locationHistoryRepository)
             syncRoutes(
                 tokenService = tokenService,
                 mediaStorage = blobStorage,

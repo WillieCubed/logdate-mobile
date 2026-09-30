@@ -1,5 +1,6 @@
 package app.logdate.client.location.history
 
+import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.location.ClientLocationProvider
 import app.logdate.client.repository.location.LocationCapturePipeline
 import app.logdate.client.repository.location.LocationCaptureSource
@@ -25,7 +26,8 @@ class StandardLocationTracker(
     private val locationProvider: ClientLocationProvider,
     private val locationHistoryRepository: LocationHistoryRepository,
     private val deviceId: String,
-    private val userId: String = "default_user", // Should be injected from auth system
+    private val userId: String = "default_user",
+    private val canonicalOwnerProvider: CanonicalOwnerProvider? = null,
 ) : LocationTracker {
     override suspend fun getLastLocation(): LocationHistoryItem? = locationHistoryRepository.getLastLocation()
 
@@ -69,6 +71,7 @@ class StandardLocationTracker(
         metadata: Map<String, Any>,
     ): Result<LocationHistoryItem> =
         try {
+            val ownerId = canonicalOwnerProvider?.getCanonicalOwnerId() ?: userId
             val confidence = metadata["confidence"] as? Float ?: 1.0f
             val isGenuine = metadata["isGenuine"] as? Boolean ?: true
             val capturePipeline = metadata["capturePipeline"] as? LocationCapturePipeline ?: LocationCapturePipeline.LEGACY
@@ -76,11 +79,13 @@ class StandardLocationTracker(
             val accuracyMeters = metadata["accuracyMeters"] as? Float
             val speedMetersPerSecond = metadata["speedMetersPerSecond"] as? Float
             val bearingDegrees = metadata["bearingDegrees"] as? Float
+            val activityType = metadata["activityType"] as? String
+            val timeZoneId = metadata["timeZoneId"] as? String
             val isMock = metadata["isMock"] as? Boolean ?: false
             val loggedAt = metadata["loggedAt"] as? Instant ?: Clock.System.now()
             val record =
                 LocationLogRecord(
-                    userId = userId,
+                    userId = ownerId,
                     deviceId = deviceId,
                     timestamp = timestamp,
                     loggedAt = loggedAt,
@@ -93,6 +98,8 @@ class StandardLocationTracker(
                     speedMetersPerSecond = speedMetersPerSecond,
                     bearingDegrees = bearingDegrees,
                     isMock = isMock,
+                    activityType = activityType,
+                    timeZoneId = timeZoneId,
                 )
 
             val result =
@@ -102,7 +109,7 @@ class StandardLocationTracker(
                 val historyItem =
                     LocationHistoryItem(
                         sampleId = record.sampleId,
-                        userId = userId,
+                        userId = ownerId,
                         deviceId = deviceId,
                         timestamp = timestamp,
                         loggedAt = record.loggedAt,
@@ -115,6 +122,8 @@ class StandardLocationTracker(
                         speedMetersPerSecond = speedMetersPerSecond,
                         bearingDegrees = bearingDegrees,
                         isMock = isMock,
+                        activityType = activityType,
+                        timeZoneId = timeZoneId,
                     )
                 Result.success(historyItem)
             } else {

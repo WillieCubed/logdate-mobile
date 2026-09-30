@@ -268,6 +268,7 @@ fun LogDateNavDisplay(
                                             },
                                             locationContent = { modifier ->
                                                 LocationTimelineScreen(
+                                                    onAddMemory = { backStack.add(EntryEditorRoute(visitContext = it)) },
                                                     onOpenNote = { backStack.add(NoteDetailRoute(it)) },
                                                     modifier = modifier,
                                                 )
@@ -391,6 +392,7 @@ fun LogDateNavDisplay(
                                     // Location timeline (top-level)
                                     taggedEntry<LocationTimelineRoute> {
                                         LocationTimelineScreen(
+                                            onAddMemory = { backStack.add(EntryEditorRoute(visitContext = it)) },
                                             onOpenNote = { backStack.add(NoteDetailRoute(it)) },
                                         )
                                     }

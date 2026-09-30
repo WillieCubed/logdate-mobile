@@ -5,7 +5,9 @@ import app.logdate.client.data.account.DefaultAccountIdentityRepository
 import app.logdate.client.data.account.DefaultAccountRepository
 import app.logdate.client.data.account.DefaultPasskeyAccountRepository
 import app.logdate.client.data.account.DefaultServerScopedAccounts
+import app.logdate.client.data.account.HistoryOwnerAdoption
 import app.logdate.client.data.account.ServerScopedAccounts
+import app.logdate.client.data.account.historyOwnerAdoptionModule
 import app.logdate.client.data.audio.OfflineFirstAudioTagRepository
 import app.logdate.client.data.events.OfflineFirstEventRepository
 import app.logdate.client.data.journals.JournalUserDataRepository
@@ -15,7 +17,9 @@ import app.logdate.client.data.journals.OfflineFirstJournalContentRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
 import app.logdate.client.data.journals.OfflineFirstJournalUserDataRepository
 import app.logdate.client.data.journals.RemoteJournalDataSource
+import app.logdate.client.data.location.OfflineFirstActivityHistoryRepository
 import app.logdate.client.data.location.OfflineFirstLocationHistoryRepository
+import app.logdate.client.data.location.RoomHistoryRecordStore
 import app.logdate.client.data.maintenance.DataIntegrityService
 import app.logdate.client.data.media.OfflineIndexedMediaRepository
 import app.logdate.client.data.notes.DatabaseNotePlaceResolver
@@ -73,6 +77,8 @@ import app.logdate.client.repository.knowledge.PeopleContactsRepository
 import app.logdate.client.repository.knowledge.PeopleProfileRepository
 import app.logdate.client.repository.knowledge.PeopleRepository
 import app.logdate.client.repository.knowledge.PersonLinkRepository
+import app.logdate.client.repository.location.ActivityHistoryRepository
+import app.logdate.client.repository.location.HistoryRecordStore
 import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.repository.places.UserPlacesRepository
@@ -99,6 +105,7 @@ import org.koin.dsl.module
 actual val dataModule: Module =
     module {
         includes(databaseModule)
+        includes(historyOwnerAdoptionModule)
         includes(deviceInstanceModule)
         includes(datastoreModule)
         includes(configModule)
@@ -172,7 +179,9 @@ actual val dataModule: Module =
         single<ActivityTimelineRepository> { OfflineFirstActivityTimelineRepository() }
 
         // Location
-        single<LocationHistoryRepository> { OfflineFirstLocationHistoryRepository(get()) }
+        single<LocationHistoryRepository> { OfflineFirstLocationHistoryRepository(get(), get()) }
+        single<HistoryRecordStore> { RoomHistoryRecordStore(get()) }
+        single<ActivityHistoryRepository> { OfflineFirstActivityHistoryRepository(get()) }
 
         // Places
         single<UserPlacesRepository> { OfflineFirstUserPlacesRepository(get()) }
@@ -232,13 +241,15 @@ actual val dataModule: Module =
                 get(),
                 get(),
                 get(),
+                adoptCanonicalOwner = { get<HistoryOwnerAdoption>().adopt(it) },
                 hasLocalData = {
                     val journals = get<JournalRepository>()
                     val notes = get<JournalNotesRepository>()
                     journals.allJournalsObserved.first().isNotEmpty() ||
                         notes.allNotesObserved.first().isNotEmpty() ||
                         journals.getAllDrafts().isNotEmpty() ||
-                        notes.getAllJournalNoteLinks().isNotEmpty()
+                        notes.getAllJournalNoteLinks().isNotEmpty() ||
+                        get<HistoryOwnerAdoption>().hasLocalHistory()
                 },
                 googleSignInManager = get(),
                 serverClientId = DefaultLogDateConfigRepository.GOOGLE_SERVER_CLIENT_ID,
@@ -255,6 +266,7 @@ actual val dataModule: Module =
                 canonicalOwnerProvider = get(),
                 // Only a moving account is opened this way, and it always has this device's entries.
                 hasLocalData = { true },
+                adoptCanonicalOwner = { owner, origin -> get<HistoryOwnerAdoption>().adoptOnOrigin(owner, origin) },
                 deviceName = { context.userVisibleDeviceName() },
             )
         }

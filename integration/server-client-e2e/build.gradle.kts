@@ -16,6 +16,13 @@ java {
 dependencies {
     testImplementation(projects.server)
     testImplementation(projects.client.sync)
+    testImplementation(projects.client.networking)
+    testImplementation(projects.client.data)
+    testImplementation(projects.client.database)
+    testImplementation(projects.client.device)
+    testImplementation(projects.client.repository)
+    testImplementation(projects.client.logdateDatastore)
+    testImplementation(libs.sqlite.bundled)
     testImplementation(projects.shared.config)
     testImplementation(projects.shared.model)
 
@@ -31,4 +38,16 @@ dependencies {
     testImplementation(libs.ktor.client.core)
     testImplementation(libs.ktor.client.okhttp)
     testImplementation(libs.ktor.client.content.negotiation)
+}
+
+// Build once, then launch the local Android fixture without holding a Gradle daemon or runner lock.
+tasks.register("writeAndroidHistoryHarnessClasspath") {
+    dependsOn(tasks.testClasses)
+    val destination = layout.buildDirectory.file("android-history-harness.classpath")
+    val harnessClasspath = sourceSets.test.get().runtimeClasspath
+    inputs.files(harnessClasspath)
+    outputs.file(destination)
+    doLast {
+        destination.get().asFile.writeText(harnessClasspath.asPath)
+    }
 }

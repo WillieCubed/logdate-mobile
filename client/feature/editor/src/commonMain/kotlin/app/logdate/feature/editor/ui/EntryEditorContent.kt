@@ -12,6 +12,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarDuration
@@ -241,25 +242,31 @@ fun EntryEditorContent(
             )
         },
         editorContent = {
-            MainEditorContent(
-                uiState = uiState,
-                shouldReturnToPickerOnBack = shouldReturnToPickerOnBack,
-                onDismissExpanded = {
-                    viewModel.dismissExpandedBlockOrClearSingleEmpty()
-                },
-                onBackProgress = { p ->
-                    if (isImmersiveBlockActive) scope.launch { chromeProgress.snapTo(p) }
-                },
-                onBackCommit = {
-                    if (isImmersiveBlockActive) scope.launch { chromeProgress.animateTo(1f, tween(300, easing = FastOutSlowInEasing)) }
-                },
-                onBackCancel = {
-                    if (isImmersiveBlockActive) scope.launch { chromeProgress.animateTo(0f, tween(300, easing = FastOutSlowInEasing)) }
-                },
-                onAudioResolverReady = { blockId, resolver ->
-                    viewModel.bindAudioBlockFinalizer(blockId, DefaultAudioBlockFinalizer(resolver))
-                },
-            )
+            Column(Modifier.fillMaxSize()) {
+                if (!isImmersiveBlockActive) {
+                    editorState.visitContext?.let { VisitMemoryContextBanner(it) }
+                }
+                MainEditorContent(
+                    modifier = Modifier.weight(1f),
+                    uiState = uiState,
+                    shouldReturnToPickerOnBack = shouldReturnToPickerOnBack,
+                    onDismissExpanded = {
+                        viewModel.dismissExpandedBlockOrClearSingleEmpty()
+                    },
+                    onBackProgress = { p ->
+                        if (isImmersiveBlockActive) scope.launch { chromeProgress.snapTo(p) }
+                    },
+                    onBackCommit = {
+                        if (isImmersiveBlockActive) scope.launch { chromeProgress.animateTo(1f, tween(300, easing = FastOutSlowInEasing)) }
+                    },
+                    onBackCancel = {
+                        if (isImmersiveBlockActive) scope.launch { chromeProgress.animateTo(0f, tween(300, easing = FastOutSlowInEasing)) }
+                    },
+                    onAudioResolverReady = { blockId, resolver ->
+                        viewModel.bindAudioBlockFinalizer(blockId, DefaultAudioBlockFinalizer(resolver))
+                    },
+                )
+            }
         },
         bottomContent = {
             EditorBottomContent(

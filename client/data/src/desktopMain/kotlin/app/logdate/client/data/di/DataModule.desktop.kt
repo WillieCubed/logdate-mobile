@@ -5,6 +5,7 @@ import app.logdate.client.data.account.ServerScopedAccounts
 import app.logdate.client.data.account.UnavailableAccountIdentityRepository
 import app.logdate.client.data.account.UnavailableAccountRepository
 import app.logdate.client.data.account.UnavailablePasskeyAccountRepository
+import app.logdate.client.data.account.historyOwnerAdoptionModule
 import app.logdate.client.data.audio.OfflineFirstAudioTagRepository
 import app.logdate.client.data.events.OfflineFirstEventRepository
 import app.logdate.client.data.journals.JournalUserDataRepository
@@ -14,7 +15,9 @@ import app.logdate.client.data.journals.OfflineFirstJournalContentRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
 import app.logdate.client.data.journals.OfflineFirstJournalUserDataRepository
 import app.logdate.client.data.journals.RemoteJournalDataSource
+import app.logdate.client.data.location.OfflineFirstActivityHistoryRepository
 import app.logdate.client.data.location.OfflineFirstLocationHistoryRepository
+import app.logdate.client.data.location.RoomHistoryRecordStore
 import app.logdate.client.data.maintenance.DataIntegrityService
 import app.logdate.client.data.media.OfflineIndexedMediaRepository
 import app.logdate.client.data.notes.DatabaseNotePlaceResolver
@@ -69,6 +72,8 @@ import app.logdate.client.repository.knowledge.PeopleContactsRepository
 import app.logdate.client.repository.knowledge.PeopleProfileRepository
 import app.logdate.client.repository.knowledge.PeopleRepository
 import app.logdate.client.repository.knowledge.PersonLinkRepository
+import app.logdate.client.repository.location.ActivityHistoryRepository
+import app.logdate.client.repository.location.HistoryRecordStore
 import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.repository.places.UserPlacesRepository
@@ -94,6 +99,7 @@ actual val dataModule: Module =
         includes(deviceInstanceModule)
         includes(datastoreModule)
         includes(databaseModule)
+        includes(historyOwnerAdoptionModule)
         includes(configModule)
         includes(permissionsModule)
 
@@ -164,7 +170,9 @@ actual val dataModule: Module =
         single<ActivityTimelineRepository> { OfflineFirstActivityTimelineRepository() }
 
         // Location
-        single<LocationHistoryRepository> { OfflineFirstLocationHistoryRepository(get()) }
+        single<LocationHistoryRepository> { OfflineFirstLocationHistoryRepository(get(), get()) }
+        single<HistoryRecordStore> { RoomHistoryRecordStore(get()) }
+        single<ActivityHistoryRepository> { OfflineFirstActivityHistoryRepository(get()) }
 
         // Places
         single<UserPlacesRepository> { OfflineFirstUserPlacesRepository(get()) }

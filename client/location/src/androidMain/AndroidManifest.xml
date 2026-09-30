@@ -35,6 +35,10 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".tracking.LocationRecordingActionReceiver"
+            android:exported="false" />
+
         <!-- Activity-aware location tracking foreground service -->
         <service
             android:name=".tracking.ActivityAwareLocationService"

@@ -2,6 +2,7 @@
 
 package app.logdate.client.repository.journals
 
+import app.logdate.shared.model.location.VisitMemoryContext
 import app.logdate.util.UuidSerializer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -98,6 +99,28 @@ interface EntryDraftRepository {
         selectedJournalIds: List<Uuid>,
     ) = Unit
 
+    suspend fun createDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+        pendingMedia: List<PendingMediaRecord>,
+        selectedJournalIds: List<Uuid>,
+        visitContext: VisitMemoryContext?,
+    ): Uuid {
+        check(visitContext == null) { "This draft repository cannot preserve visit context" }
+        return createDraft(uid, notes, pendingMedia, selectedJournalIds)
+    }
+
+    suspend fun updateDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+        pendingMedia: List<PendingMediaRecord>,
+        selectedJournalIds: List<Uuid>,
+        visitContext: VisitMemoryContext?,
+    ): Uuid {
+        check(visitContext == null) { "This draft repository cannot preserve visit context" }
+        return updateDraft(uid, notes, pendingMedia, selectedJournalIds)
+    }
+
     /**
      * Deletes any drafts with the given UID.
      *
@@ -138,6 +161,7 @@ data class EntryDraft(
         @Serializable(with = UuidSerializer::class)
         Uuid,
     > = emptyList(),
+    val visitContext: VisitMemoryContext? = null,
 )
 
 /** Type of pending media. Currently only audio is wired; camera/video will follow. */

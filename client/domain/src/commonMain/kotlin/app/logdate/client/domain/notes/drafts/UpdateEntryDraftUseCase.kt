@@ -4,6 +4,7 @@ import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.PendingMediaRecord
+import app.logdate.shared.model.location.VisitMemoryContext
 import kotlin.uuid.Uuid
 
 /**
@@ -34,12 +35,14 @@ class UpdateEntryDraftUseCase(
         pendingMedia: List<PendingMediaRecord>,
         selectedJournalIds: List<Uuid>,
         overwrite: Boolean = true,
+        visitContext: VisitMemoryContext? = null,
     ): Uuid =
         entryDraftRepository.updateDraft(
             uid = draftId,
             notes = content,
             pendingMedia = pendingMedia,
             selectedJournalIds = selectedJournalIds,
+            visitContext = visitContext,
         )
 
     suspend operator fun invoke(
@@ -53,5 +56,6 @@ class UpdateEntryDraftUseCase(
             overwrite = overwrite,
             pendingMedia = content.pendingMedia,
             selectedJournalIds = content.selectedJournalIds,
+            visitContext = content.visitContext,
         )
 }

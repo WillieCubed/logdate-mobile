@@ -34,11 +34,13 @@ class AddNoteUseCase(
         notes: List<JournalNote>,
         journalIds: List<Uuid> = emptyList(),
         attachments: List<String> = emptyList(),
+        captureCurrentLocation: Boolean = true,
     ) {
         invoke(
             notes = notes.toTypedArray(),
             journalIds = journalIds.toTypedArray(),
             attachments = attachments,
+            captureCurrentLocation = captureCurrentLocation,
         )
     }
 
@@ -46,8 +48,10 @@ class AddNoteUseCase(
         notes: Array<out JournalNote>,
         journalIds: Array<out Uuid>,
         attachments: List<String> = emptyList(),
+        captureCurrentLocation: Boolean = true,
     ) = coroutineScope {
-        val shouldTrackLocation = runCatching { settingsRepository.getSettings().autoTrackForJournalEntries }.getOrDefault(true)
+        val shouldTrackLocation =
+            captureCurrentLocation && runCatching { settingsRepository.getSettings().autoTrackForJournalEntries }.getOrDefault(true)
         val noteJobs =
             notes.map { note ->
                 async {

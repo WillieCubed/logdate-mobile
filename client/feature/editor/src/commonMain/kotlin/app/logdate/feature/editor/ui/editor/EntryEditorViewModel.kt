@@ -11,6 +11,7 @@ import app.logdate.feature.editor.ui.editor.delegate.DraftManager
 import app.logdate.feature.editor.ui.editor.delegate.PendingAudioRecoverer
 import app.logdate.feature.editor.ui.mapper.toDomainBlock
 import app.logdate.feature.editor.ui.mapper.toJournalNote
+import app.logdate.shared.model.location.VisitMemoryContext
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -199,6 +200,12 @@ class EntryEditorViewModel(
                     isModified = true,
                 )
             }
+        }
+    }
+
+    fun initializeVisitContext(context: VisitMemoryContext?) {
+        mutateEditorContent { current ->
+            if (current.visitContext == context) current else current.copy(visitContext = context)
         }
     }
 
@@ -642,7 +649,7 @@ class EntryEditorViewModel(
             val activeDraftId = (publishSnapshot.draftState as? DraftState.Active)?.id
             val cleanupDraftId = draftManager.draftIdForCleanup(activeDraftId)
             try {
-                saveEntryUseCase(notes, publishSnapshot.selectedJournalIds, cleanupDraftId)
+                saveEntryUseCase(notes, publishSnapshot.selectedJournalIds, cleanupDraftId, publishSnapshot.visitContext)
                 draftManager.acknowledgeDraftDeletion(cleanupDraftId)
             } catch (cancellation: CancellationException) {
                 throw cancellation
@@ -931,6 +938,7 @@ class EntryEditorViewModel(
                                 currentState.copy(
                                     blocks = recoveredBlocks,
                                     selectedJournalIds = loaded.selectedJournalIds,
+                                    visitContext = loaded.visitContext,
                                     hasJournalSelectionChanges = false,
                                     draftState = DraftState.Active(loaded.draftId),
                                     isModified = true,

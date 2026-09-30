@@ -91,9 +91,12 @@ import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnConfig
 import app.logdate.server.passkeys.WebAuthnPasskeyService
 import app.logdate.server.routes.AssetLinksConfig
+import app.logdate.server.sync.DbLocationHistoryRepository
 import app.logdate.server.sync.DbSyncRepository
 import app.logdate.server.sync.GcsMediaStorage
+import app.logdate.server.sync.InMemoryLocationHistoryRepository
 import app.logdate.server.sync.InMemorySyncRepository
+import app.logdate.server.sync.LocationHistoryRepository
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncRepository
 import io.github.aakira.napier.Napier
@@ -355,6 +358,9 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             )
         }
 
+        single<LocationHistoryRepository> {
+            if (isDatabaseAvailable) DbLocationHistoryRepository() else InMemoryLocationHistoryRepository()
+        }
         single<SyncRepository> {
             if (isDatabaseAvailable) DbSyncRepository() else InMemorySyncRepository()
         }

@@ -16,6 +16,7 @@ import app.logdate.feature.editor.ui.editor.EditorState
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.mapper.toDomainBlock
 import app.logdate.feature.editor.ui.mapper.toJournalNote
+import app.logdate.shared.model.location.VisitMemoryContext
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
@@ -30,6 +31,7 @@ data class LoadedDraft(
     val blocks: List<EntryBlockUiState>,
     val draftId: Uuid,
     val selectedJournalIds: List<Uuid> = emptyList(),
+    val visitContext: VisitMemoryContext? = null,
 )
 
 /**
@@ -87,6 +89,7 @@ class DraftManager(
                         content = notes,
                         pendingMedia = pendingMedia,
                         selectedJournalIds = state.selectedJournalIds,
+                        visitContext = state.visitContext,
                     )
                     pendingDraftId = null
                     draft.id
@@ -98,6 +101,7 @@ class DraftManager(
                         notes = notes,
                         pendingMedia = pendingMedia,
                         selectedJournalIds = state.selectedJournalIds,
+                        visitContext = state.visitContext,
                     ).also {
                         pendingDraftId = null
                     }
@@ -127,6 +131,7 @@ class DraftManager(
                     blocks = noteBlocks + pendingBlocks,
                     draftId = draft.id,
                     selectedJournalIds = draft.selectedJournalIds,
+                    visitContext = draft.visitContext,
                 )
             }
         } catch (cancellation: CancellationException) {

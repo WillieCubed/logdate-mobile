@@ -12,6 +12,7 @@ internal object ApiTags {
     const val CONTENTS = "Contents"
     const val JOURNALS = "Journals"
     const val ASSOCIATIONS = "Associations"
+    const val LOCATION_HISTORY = "Location history"
     const val DRAFTS = "Drafts"
     const val MEDIA = "Media"
     const val BACKUPS = "Backups"
@@ -131,6 +132,11 @@ internal val apiTagGroups: List<ApiTagGroup> =
                     phone and finish it on their laptop. Drafts have their own, simpler change feed and are meant to be
                     short-lived: delete the draft once the finished entry has been saved as a content.
                     """.trimIndent(),
+                ),
+                ApiTag(
+                    ApiTags.LOCATION_HISTORY,
+                    "Encrypted observations, activity, places, corrections and memory links. Each account has its own " +
+                        "version cursor; permanent tombstones let offline devices learn about deletions.",
                 ),
                 ApiTag(
                     ApiTags.MEDIA,

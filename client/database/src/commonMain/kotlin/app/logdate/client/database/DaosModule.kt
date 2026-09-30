@@ -18,6 +18,9 @@ val daosModule: Module =
         single { get<LogDateDatabase>().rewindDao() }
         single { get<LogDateDatabase>().rewindGenerationRequestDao() }
         single { get<LogDateDatabase>().locationHistoryDao() }
+        single { get<LogDateDatabase>().historyRecordDao() }
+        single { get<LogDateDatabase>().historyOwnerAdoptionDao() }
+        single { get<LogDateDatabase>().locationActivityDao() }
         single { get<LogDateDatabase>().storageMetadataDao() }
         single { get<LogDateDatabase>().userDevicesDao() }
         single { get<LogDateDatabase>().userMediaDao() }

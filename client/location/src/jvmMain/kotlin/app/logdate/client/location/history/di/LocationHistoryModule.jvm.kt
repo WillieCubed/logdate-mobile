@@ -29,6 +29,7 @@ actual val locationHistoryModule: Module =
             StandardLocationTracker(
                 locationProvider = get(),
                 locationHistoryRepository = get(),
+                canonicalOwnerProvider = get(),
                 deviceId = get(),
             )
         }

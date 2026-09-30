@@ -14,6 +14,7 @@ import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import app.logdate.feature.editor.ui.NoteEditorScreen
+import app.logdate.shared.model.location.VisitMemoryContext
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.navigation.taggedEntry
@@ -40,6 +41,7 @@ data class EntryEditorRoute(
     val draftId: String? = null,
     val journalIds: List<String> = emptyList(),
     val firstEntry: Boolean = false,
+    val visitContext: VisitMemoryContext? = null,
 ) : NavKey
 
 /** Pushes the editor onto the back stack with optional entry / draft / journal context. */
@@ -47,12 +49,14 @@ fun NavBackStack<NavKey>.navigateToEditor(
     entryId: Uuid? = null,
     draftId: Uuid? = null,
     journalIds: List<Uuid> = emptyList(),
+    visitContext: VisitMemoryContext? = null,
 ) {
     add(
         EntryEditorRoute(
             entryId = entryId?.toString(),
             draftId = draftId?.toString(),
             journalIds = journalIds.map { it.toString() },
+            visitContext = visitContext,
         ),
     )
 }
@@ -94,6 +98,7 @@ fun EntryProviderScope<NavKey>.editorEntry(
                 draftId = route.draftId?.let(Uuid::parse),
                 firstEntry = route.firstEntry,
                 journalIds = route.journalIds.map(Uuid::parse),
+                visitContext = route.visitContext,
                 modifier = sharedBoundsModifier,
             )
         }
