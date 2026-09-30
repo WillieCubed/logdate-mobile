@@ -2,10 +2,16 @@
 
 ## Delivery state
 
-The Android experience is implemented behind `HUMAN_LOCATION_HISTORY`
-(`human_location_history_enabled`), which defaults to false. Disabling it keeps recorded data.
-Release was authorized on September 29, 2026. Server deployment precedes client enablement;
-the initial landing retains the flag default until production support is verified.
+The Android experience is enabled by default through `HUMAN_LOCATION_HISTORY`
+(`human_location_history_enabled`). Disabling it keeps recorded data. Complete-day recording
+still requires explicit opt-in and preserves existing recording preferences.
+
+Production server support shipped as `server-v2026.09.29.3` at commit `e1f3900c3`, before client
+enablement. The [production deployment](https://github.com/WillieCubed/logdate-mobile/actions/runs/36666399343)
+passed migrations, authenticated candidate checks, traffic promotion, and public durability checks.
+The canonical health endpoint reports that revision, and the new history route rejects anonymous
+requests. The enabled client is delivered through the existing Play internal-track workflow;
+public Android promotion remains governed by `docs/launch/android-public-release.md`.
 
 The Locations destination has Your day and Your places. A day contains individually browsable
 visits, compact journeys, explicit gaps, visit-specific memories, and optional replay. Place
@@ -130,10 +136,14 @@ The landing onto current main found an independently added V28 migration. Locati
 uses V29; all eight server/client tests passed again against isolated PostgreSQL 18 with both
 V28 and V29 applied. Evidence: `.superpowers/sdd/human-location-history/ship-postgres-e2e.log`.
 
+Static-analysis helper extraction passed history unit tests and Android assembly. Shared history
+UI also compiles for the iOS simulator after replacing a Java-only map call. The enabled default
+passed datastore tests and Android assembly.
+
 ## Release gates and limits
 
-- Deploy backward-compatible server support before enabling Android clients. Keep the flag off
-  until production server support is verified. The release owner authorized shipping on September 29.
+- Backward-compatible production server support was verified before enabling Android clients.
+  The release owner authorized shipping on September 29.
 - Emulator results establish behavior, not real-world battery life or exhaustive travel capture.
   Battery use, background restrictions across vendors, and field travel reliability need separate
   release evidence.
