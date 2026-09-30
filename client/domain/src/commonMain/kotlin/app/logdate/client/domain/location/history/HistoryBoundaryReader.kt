@@ -50,51 +50,14 @@ internal class HistoryBoundaryReader(
             var cursorTime = next.timestamp
             var cursorId = next.id
             while (true) {
-                val local =
-                    raw.getLocationHistoryBefore(owner, device, cursorTime, cursorId, PAGE_SIZE) +
-                        if (device ==
-                            localDevice
-                        ) {
-                            raw.getLocationHistoryBefore("default_user", device, cursorTime, cursorId, PAGE_SIZE)
-                        } else {
-                            emptyList()
-                        }
-                val remote =
-                    store
-                        .observationsBefore(owner, origin, device, cursorTime.toEpochMilliseconds(), cursorId, PAGE_SIZE)
-                        .mapNotNull { (decode(it) as? HistoryPayload.Observation)?.value }
-                val page =
-                    (local.map { it.toObservation(owner) } + remote)
-                        .filter { it.ownerId == owner && it.deviceId == device }
-                        .distinctBy { it.id }
-                        .sortedWith(compareByDescending<LocationObservation> { it.timestamp }.thenByDescending { it.id })
-                        .take(PAGE_SIZE)
+                val page = observationPage(owner, origin, localDevice, device, cursorTime, cursorId)
                 if (page.isEmpty()) break
                 val valid = page.filter { it.id !in deletedSamples && it.validCoordinates() }
                 if (valid.isNotEmpty()) {
                     val from = valid.last().timestamp - 10.minutes
                     val until = next.timestamp + 1.milliseconds
                     try {
-                        val localEvents =
-                            activity?.observeActivityHistoryBetween(from, until)?.first().orEmpty().map {
-                                ActivityObservation(
-                                    it.id,
-                                    it.userId,
-                                    it.deviceId,
-                                    it.timestamp,
-                                    it.activityType,
-                                    it.transitionType,
-                                    it.timeZoneId,
-                                )
-                            }
-                        val remoteEvents =
-                            store
-                                .activitiesBetween(owner, origin, device, from.toEpochMilliseconds(), until.toEpochMilliseconds())
-                                .mapNotNull { (decode(it) as? HistoryPayload.Activity)?.value }
-                        allActivities +=
-                            (localEvents + remoteEvents).filter {
-                                it.ownerId == owner && it.deviceId == device && activityHistoryRecordId(it.id) !in deletedActivities
-                            }
+                        allActivities += readActivities(owner, origin, device, from, until, deletedActivities)
                     } catch (error: Exception) {
                         if (error is CancellationException) throw error
                         activityFailed = true
@@ -120,6 +83,63 @@ internal class HistoryBoundaryReader(
             }
         }
         return BoundaryEvidence(observations + prefix, allActivities.distinctBy { Triple(it.ownerId, it.deviceId, it.id) }, activityFailed)
+    }
+
+    private suspend fun observationPage(
+        owner: String,
+        origin: String,
+        localDevice: String,
+        device: String,
+        cursorTime: kotlin.time.Instant,
+        cursorId: String,
+    ): List<LocationObservation> {
+        val local =
+            raw.getLocationHistoryBefore(owner, device, cursorTime, cursorId, PAGE_SIZE) +
+                if (device ==
+                    localDevice
+                ) {
+                    raw.getLocationHistoryBefore("default_user", device, cursorTime, cursorId, PAGE_SIZE)
+                } else {
+                    emptyList()
+                }
+        val remote =
+            store
+                .observationsBefore(owner, origin, device, cursorTime.toEpochMilliseconds(), cursorId, PAGE_SIZE)
+                .mapNotNull { (decode(it) as? HistoryPayload.Observation)?.value }
+        return (local.map { it.toObservation(owner) } + remote)
+            .filter { it.ownerId == owner && it.deviceId == device }
+            .distinctBy { it.id }
+            .sortedWith(compareByDescending<LocationObservation> { it.timestamp }.thenByDescending { it.id })
+            .take(PAGE_SIZE)
+    }
+
+    private suspend fun readActivities(
+        owner: String,
+        origin: String,
+        device: String,
+        from: kotlin.time.Instant,
+        until: kotlin.time.Instant,
+        deletedActivities: Set<String>,
+    ): List<ActivityObservation> {
+        val localEvents =
+            activity?.observeActivityHistoryBetween(from, until)?.first().orEmpty().map {
+                ActivityObservation(
+                    it.id,
+                    it.userId,
+                    it.deviceId,
+                    it.timestamp,
+                    it.activityType,
+                    it.transitionType,
+                    it.timeZoneId,
+                )
+            }
+        val remoteEvents =
+            store
+                .activitiesBetween(owner, origin, device, from.toEpochMilliseconds(), until.toEpochMilliseconds())
+                .mapNotNull { (decode(it) as? HistoryPayload.Activity)?.value }
+        return (localEvents + remoteEvents).filter {
+            it.ownerId == owner && it.deviceId == device && activityHistoryRecordId(it.id) !in deletedActivities
+        }
     }
 
     private fun provesBoundary(

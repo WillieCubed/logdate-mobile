@@ -308,62 +308,7 @@ class HumanLocationHistoryViewModel(
                         data to
                             tracking
                     }.collect { (data, tracking) ->
-                        val selection =
-                            remapHistorySelection(
-                                state.value.selectedItemId,
-                                snapshot.value?.items.orEmpty(),
-                                data.items,
-                                savedState["historySelectionEvidence"],
-                            )
-                        snapshot.value = data
-                        savedState["historySelection"] = selection
-                        recordingEnabled.value = tracking.backgroundTrackingEnabled
-                        completeDayEnabled.value = tracking.backgroundTrackingEnabled && tracking.captureMode == LocationCaptureMode.ACTIVE
-                        mutableState.update { current ->
-                            current.copy(
-                                selectedItemId = selection,
-                                detailVisible = current.detailVisible && selection != null,
-                                dateLabel =
-                                    date.atStartOfDayIn(zone).toReadableDateShort().let {
-                                        if (date.year ==
-                                            Clock.System
-                                                .now()
-                                                .toLocalDateTime(zone)
-                                                .year
-                                        ) {
-                                            it
-                                        } else {
-                                            "$it, ${date.year}"
-                                        }
-                                    },
-                                daySummary =
-                                    data.items.filterIsInstance<PlaceVisit>().size.let {
-                                        "$it ${if (it == 1) "visit" else "visits"} in your day"
-                                    },
-                                items = data.items.map { it.toHistoryUi(data.notes) },
-                                places = data.placeRows(),
-                                placesFilterLabel = "$rangeDays days",
-                                recoveryActionLabel =
-                                    when {
-                                        failedAction != null -> "Try again"
-                                        data.failedSections.isNotEmpty() -> "Try again"
-                                        data.conflicts.isNotEmpty() -> "Review changes"
-                                        else -> null
-                                    },
-                                recoveryMessage =
-                                    when {
-                                        failedAction != null -> "That change could not be saved. Try again."
-                                        data.failedSections.isNotEmpty() ->
-                                            "Some details couldn’t be loaded. Your available history is still here."
-                                        data.conflicts.isNotEmpty() ->
-                                            "Some changes differ across your devices. Tap Review changes to choose what to keep."
-                                        !tracking.backgroundTrackingEnabled && tracking.captureMode == LocationCaptureMode.PASSIVE ->
-                                            "Location history is off. You can still browse memories with a saved place."
-                                        !tracking.backgroundTrackingEnabled -> "Location history is paused. Your saved days are still here."
-                                        else -> null
-                                    },
-                            )
-                        }
+                        applySnapshot(data, tracking)
                         enrich(data)
                     }
                 } catch (cancelled: CancellationException) {
@@ -380,8 +325,72 @@ class HumanLocationHistoryViewModel(
             }
     }
 
+    private fun selectedDateLabel(): String {
+        val label = date.atStartOfDayIn(zone).toReadableDateShort()
+        return if (date.year ==
+            Clock.System
+                .now()
+                .toLocalDateTime(zone)
+                .year
+        ) {
+            label
+        } else {
+            "$label, ${date.year}"
+        }
+    }
+
+    private fun applySnapshot(
+        data: LocationHistorySnapshot,
+        tracking: app.logdate.client.location.settings.LocationTrackingSettings,
+    ) {
+        val selection =
+            remapHistorySelection(
+                state.value.selectedItemId,
+                snapshot.value?.items.orEmpty(),
+                data.items,
+                savedState["historySelectionEvidence"],
+            )
+        snapshot.value = data
+        savedState["historySelection"] = selection
+        recordingEnabled.value = tracking.backgroundTrackingEnabled
+        completeDayEnabled.value = tracking.backgroundTrackingEnabled && tracking.captureMode == LocationCaptureMode.ACTIVE
+        mutableState.update { current ->
+            current.copy(
+                selectedItemId = selection,
+                detailVisible = current.detailVisible && selection != null,
+                dateLabel = selectedDateLabel(),
+                daySummary =
+                    data.items.filterIsInstance<PlaceVisit>().size.let {
+                        "$it ${if (it == 1) "visit" else "visits"} in your day"
+                    },
+                items = data.items.map { it.toHistoryUi(data.notes) },
+                places = data.placeRows(),
+                placesFilterLabel = "$rangeDays days",
+                recoveryActionLabel =
+                    when {
+                        failedAction != null -> "Try again"
+                        data.failedSections.isNotEmpty() -> "Try again"
+                        data.conflicts.isNotEmpty() -> "Review changes"
+                        else -> null
+                    },
+                recoveryMessage =
+                    when {
+                        failedAction != null -> "That change could not be saved. Try again."
+                        data.failedSections.isNotEmpty() ->
+                            "Some details couldn’t be loaded. Your available history is still here."
+                        data.conflicts.isNotEmpty() ->
+                            "Some changes differ across your devices. Tap Review changes to choose what to keep."
+                        !tracking.backgroundTrackingEnabled && tracking.captureMode == LocationCaptureMode.PASSIVE ->
+                            "Location history is off. You can still browse memories with a saved place."
+                        !tracking.backgroundTrackingEnabled -> "Location history is paused. Your saved days are still here."
+                        else -> null
+                    },
+            )
+        }
+    }
+
     private fun enrich(data: LocationHistorySnapshot) {
-        data.places.forEach { place -> place.externalId?.let { resolvedExternalPlaces.putIfAbsent(it, place.id) } }
+        data.places.forEach { place -> place.externalId?.let { resolvedExternalPlaces.getOrPut(it) { place.id } } }
         data.items.filterIsInstance<PlaceVisit>().filter { it.place == null }.take(20).forEach { visit ->
             if (!resolving.add(visit.id)) return@forEach
             viewModelScope.launch {

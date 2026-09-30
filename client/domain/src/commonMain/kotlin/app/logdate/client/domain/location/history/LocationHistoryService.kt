@@ -101,13 +101,8 @@ class LocationHistoryService(
             val contextEnd = end + 24.hours
             var rawRevision = 0L
             var recordRevision = 0L
-            var boundaryKey: Triple<Long, Long, Long>? = null
-            var boundary: BoundaryEvidence? = null
-            val reader = HistoryBoundaryReader(rawHistory, store, activityHistory, ::decode)
-            val linkedNotes = mutableMapOf<String, JournalNote>()
-            var previousLinkIds: Set<String>? = null
-            var previousNotesRevision = -1L
-            var linkedNotesFailed = false
+            val boundaryCache = BoundaryCache(ownerId, origin, localDevice)
+            val memoryCache = LinkedMemoryCache()
             emitAll(
                 combine(
                     rawHistory.observeLocationHistoryBetween(contextStart, contextEnd).map { it to ++rawRevision },
@@ -125,140 +120,236 @@ class LocationHistoryService(
                     val records = recordSource.first
                     val savedPlaces = placeSource.items
                     val localActivities = activitySource.items
-                    val deletedPlaces = records.filter { it.deleted && it.recordType == "place" }.map { it.id }.toSet()
-                    val payloads =
-                        records.filterNot { it.deleted }.mapNotNull(::decode) +
-                            savedPlaces
-                                .filterNot { it.uid.toString() in deletedPlaces }
-                                .map {
-                                    HistoryPayload.Place(
-                                        SemanticPlace(it.uid.toString(), it.name, it.latitude, it.longitude, userConfirmed = true),
-                                    )
-                                }
-                    val deletedSamples =
-                        records
-                            .filter { it.deleted && it.recordType == "observation" }
-                            .map { it.id.removePrefix("observation:") }
-                            .toSet()
-                    val observations =
-                        (
-                            local
-                                .filter { it.userId == ownerId || (it.userId == "default_user" && it.deviceId == localDevice) }
-                                .map { it.toObservation(ownerId) } +
-                                payloads.filterIsInstance<HistoryPayload.Observation>().map { it.value }
-                        ).filter {
-                            it.ownerId == ownerId &&
-                                it.id !in deletedSamples &&
-                                it.timestamp >= contextStart &&
-                                it.timestamp < contextEnd
-                        }
-                    val deletedActivities =
-                        records
-                            .filter { it.deleted && it.recordType == "activity" }
-                            .map { it.id }
-                            .toSet()
-                    val activities =
-                        (
-                            localActivities.map {
-                                ActivityObservation(
-                                    it.id,
-                                    it.userId,
-                                    it.deviceId,
-                                    it.timestamp,
-                                    it.activityType,
-                                    it.transitionType,
-                                    it.timeZoneId,
-                                )
-                            } + payloads.filterIsInstance<HistoryPayload.Activity>().map { it.value }
-                        ).filterNot { activityHistoryRecordId(it.id) in deletedActivities }
+                    val evidence =
+                        rangeEvidence(records, savedPlaces, local, localActivities, ownerId, localDevice, contextStart, contextEnd)
+                    val payloads = evidence.payloads
                     val key = Triple(localSource.second, recordSource.second, activitySource.revision)
-                    if (boundaryKey != key) {
-                        boundary = reader.read(ownerId, origin, localDevice, observations, activities, deletedSamples, deletedActivities)
-                        boundaryKey = key
-                    }
-                    val carried = checkNotNull(boundary)
+                    val carried = boundaryCache.read(key, evidence)
                     val enriched = applyActivityEvidence(carried.observations, carried.activities)
                     val inferredByDevice = enriched.groupBy { it.deviceId }.mapValues { (_, samples) -> ReconstructLocationDay()(samples) }
-                    val contextEvidenceIds =
-                        inferredByDevice.values
-                            .flatten()
-                            .filter { it.overlaps(contextStart, contextEnd) }
-                            .flatMap { it.evidenceIds }
-                            .toSet() +
-                            payloads
-                                .filterIsInstance<HistoryPayload.Manual>()
-                                .filter {
-                                    it.value.start < contextEnd && it.value.end >= contextStart
-                                }.map { it.value.id }
-                    val boundedNoteIds = memorySource.items.map { it.uid.toString() }.toSet()
-                    val linkedIds =
-                        payloads
-                            .filterIsInstance<HistoryPayload.MemoryLink>()
-                            .filter {
-                                it.value.targetEvidenceId in contextEvidenceIds && it.value.noteId !in boundedNoteIds
-                            }.map { it.value.noteId }
-                            .toSet()
-                    if (linkedIds != previousLinkIds || memorySource.revision != previousNotesRevision) {
-                        linkedNotes.keys.retainAll(linkedIds)
-                        linkedNotesFailed = false
-                        for (id in linkedIds) {
-                            val noteId = runCatching { Uuid.parse(id) }.getOrNull() ?: continue
-                            try {
-                                val note = notes.getNoteById(noteId)
-                                if (note == null) linkedNotes.remove(id) else linkedNotes[id] = note
-                            } catch (error: Exception) {
-                                if (error is CancellationException) throw error
-                                linkedNotesFailed = true
-                                Napier.w("Linked location memory unavailable", error)
-                            }
-                        }
-                        previousLinkIds = linkedIds
-                        previousNotesRevision = memorySource.revision
-                    }
-                    val memories = memorySource.items + linkedNotes.values
+                    val memories =
+                        memoryCache.resolve(
+                            inferredByDevice,
+                            payloads,
+                            memorySource.items,
+                            memorySource.revision,
+                            contextStart,
+                            contextEnd,
+                        )
 
-                    val edits = payloads.filterIsInstance<HistoryPayload.Correction>().map { it.value }
-                    val correctedByDevice = inferredByDevice.mapValues { (_, items) -> ApplyHistoryEdits()(items, edits, emptyList()) }
-                    // Collections union each day's chosen source while preserving original item identities and intervals.
-                    val selectedItems = linkedMapOf<String, LocationDayItem>()
-                    val availableDevices = mutableSetOf<String>()
-                    var preferred = ""
-                    var day = first
-                    while (day <= last) {
-                        val dayStart = day.atStartOfDayIn(zone)
-                        val nextDay = day.plus(DatePeriod(days = 1))
-                        val dayEnd = nextDay.atStartOfDayIn(zone)
-                        val available =
-                            correctedByDevice
-                                .filterValues { items ->
-                                    items.any { it.overlaps(dayStart, dayEnd) }
-                                }.keys
-                                .sorted()
-                        availableDevices.addAll(available)
-                        preferred = sourceDeviceId?.takeIf { it in available }
-                            ?: localDevice.takeIf { it in available } ?: available.firstOrNull().orEmpty()
-                        val selectedIds =
-                            correctedByDevice[preferred]
-                                .orEmpty()
-                                .filter { it.overlaps(dayStart, dayEnd) }
-                                .map { it.id }
-                                .toSet()
-                        inferredByDevice[preferred].orEmpty().filter { it.id in selectedIds }.forEach { selectedItems[it.id] = it }
-                        day = nextDay
-                    }
-                    buildSnapshot(selectedItems.values.toList(), payloads, memories, availableDevices.sorted(), preferred, start, end).copy(
+                    val selection = selectDaySources(inferredByDevice, payloads, first, last, zone, sourceDeviceId, localDevice)
+                    buildSnapshot(selection.items, payloads, memories, selection.devices, selection.preferred, start, end).copy(
                         failedSections =
                             listOfNotNull(
                                 memorySource.failure,
                                 placeSource.failure,
                                 activitySource.failure,
                                 HistoryFailedSection.ACTIVITY.takeIf { carried.activityFailed },
-                                HistoryFailedSection.NOTES.takeIf { linkedNotesFailed },
+                                HistoryFailedSection.NOTES.takeIf { memoryCache.linkedNotesFailed },
                             ).toSet(),
                     )
                 },
             )
         }.flowOn(reconstructionDispatcher)
+
+    private inner class BoundaryCache(
+        private val ownerId: String,
+        private val origin: String,
+        private val localDevice: String,
+    ) {
+        private var boundaryKey: Triple<Long, Long, Long>? = null
+        private var boundary: BoundaryEvidence? = null
+        private val reader = HistoryBoundaryReader(rawHistory, store, activityHistory, ::decode)
+
+        suspend fun read(
+            key: Triple<Long, Long, Long>,
+            evidence: RangeEvidence,
+        ): BoundaryEvidence {
+            if (boundaryKey != key) {
+                boundary =
+                    reader.read(
+                        ownerId,
+                        origin,
+                        localDevice,
+                        evidence.observations,
+                        evidence.activities,
+                        evidence.deletedSamples,
+                        evidence.deletedActivities,
+                    )
+                boundaryKey = key
+            }
+            return checkNotNull(boundary)
+        }
+    }
+
+    private inner class LinkedMemoryCache {
+        val linkedNotes = mutableMapOf<String, JournalNote>()
+        var previousLinkIds: Set<String>? = null
+        var previousNotesRevision = -1L
+        var linkedNotesFailed = false
+            private set
+
+        suspend fun resolve(
+            inferredByDevice: Map<String, List<LocationDayItem>>,
+            payloads: List<HistoryPayload>,
+            boundedNotes: List<JournalNote>,
+            revision: Long,
+            contextStart: Instant,
+            contextEnd: Instant,
+        ): List<JournalNote> {
+            val contextEvidenceIds =
+                inferredByDevice.values
+                    .flatten()
+                    .filter { it.overlaps(contextStart, contextEnd) }
+                    .flatMap { it.evidenceIds }
+                    .toSet() +
+                    payloads
+                        .filterIsInstance<HistoryPayload.Manual>()
+                        .filter {
+                            it.value.start < contextEnd && it.value.end >= contextStart
+                        }.map { it.value.id }
+            val boundedNoteIds = boundedNotes.map { it.uid.toString() }.toSet()
+            val linkedIds =
+                payloads
+                    .filterIsInstance<HistoryPayload.MemoryLink>()
+                    .filter {
+                        it.value.targetEvidenceId in contextEvidenceIds && it.value.noteId !in boundedNoteIds
+                    }.map { it.value.noteId }
+                    .toSet()
+            if (linkedIds != previousLinkIds || revision != previousNotesRevision) {
+                linkedNotes.keys.retainAll(linkedIds)
+                linkedNotesFailed = false
+                for (id in linkedIds) {
+                    val noteId = runCatching { Uuid.parse(id) }.getOrNull() ?: continue
+                    try {
+                        val note = notes.getNoteById(noteId)
+                        if (note == null) linkedNotes.remove(id) else linkedNotes[id] = note
+                    } catch (error: Exception) {
+                        if (error is CancellationException) throw error
+                        linkedNotesFailed = true
+                        Napier.w("Linked location memory unavailable", error)
+                    }
+                }
+                previousLinkIds = linkedIds
+                previousNotesRevision = revision
+            }
+            return boundedNotes + linkedNotes.values
+        }
+    }
+
+    private data class RangeEvidence(
+        val payloads: List<HistoryPayload>,
+        val observations: List<LocationObservation>,
+        val activities: List<ActivityObservation>,
+        val deletedSamples: Set<String>,
+        val deletedActivities: Set<String>,
+    )
+
+    private fun rangeEvidence(
+        records: List<HistoryRecord>,
+        savedPlaces: List<app.logdate.shared.model.Place>,
+        local: List<LocationHistoryItem>,
+        localActivities: List<app.logdate.client.repository.location.ActivityHistoryItem>,
+        ownerId: String,
+        localDevice: String,
+        contextStart: Instant,
+        contextEnd: Instant,
+    ): RangeEvidence {
+        val deletedPlaces = records.filter { it.deleted && it.recordType == "place" }.map { it.id }.toSet()
+        val payloads =
+            records.filterNot { it.deleted }.mapNotNull(::decode) +
+                savedPlaces
+                    .filterNot { it.uid.toString() in deletedPlaces }
+                    .map {
+                        HistoryPayload.Place(
+                            SemanticPlace(it.uid.toString(), it.name, it.latitude, it.longitude, userConfirmed = true),
+                        )
+                    }
+        val deletedSamples =
+            records
+                .filter { it.deleted && it.recordType == "observation" }
+                .map { it.id.removePrefix("observation:") }
+                .toSet()
+        val observations =
+            (
+                local
+                    .filter { it.userId == ownerId || (it.userId == "default_user" && it.deviceId == localDevice) }
+                    .map { it.toObservation(ownerId) } +
+                    payloads.filterIsInstance<HistoryPayload.Observation>().map { it.value }
+            ).filter {
+                it.ownerId == ownerId &&
+                    it.id !in deletedSamples &&
+                    it.timestamp >= contextStart &&
+                    it.timestamp < contextEnd
+            }
+        val deletedActivities =
+            records
+                .filter { it.deleted && it.recordType == "activity" }
+                .map { it.id }
+                .toSet()
+        val activities =
+            (
+                localActivities.map {
+                    ActivityObservation(
+                        it.id,
+                        it.userId,
+                        it.deviceId,
+                        it.timestamp,
+                        it.activityType,
+                        it.transitionType,
+                        it.timeZoneId,
+                    )
+                } + payloads.filterIsInstance<HistoryPayload.Activity>().map { it.value }
+            ).filterNot { activityHistoryRecordId(it.id) in deletedActivities }
+        return RangeEvidence(payloads, observations, activities, deletedSamples, deletedActivities)
+    }
+
+    private data class DaySources(
+        val items: List<LocationDayItem>,
+        val devices: List<String>,
+        val preferred: String,
+    )
+
+    private fun selectDaySources(
+        inferredByDevice: Map<String, List<LocationDayItem>>,
+        payloads: List<HistoryPayload>,
+        first: LocalDate,
+        last: LocalDate,
+        zone: TimeZone,
+        sourceDeviceId: String?,
+        localDevice: String,
+    ): DaySources {
+        val edits = payloads.filterIsInstance<HistoryPayload.Correction>().map { it.value }
+        val correctedByDevice = inferredByDevice.mapValues { (_, items) -> ApplyHistoryEdits()(items, edits, emptyList()) }
+        // Collections union each day's chosen source while preserving original item identities and intervals.
+        val selectedItems = linkedMapOf<String, LocationDayItem>()
+        val availableDevices = mutableSetOf<String>()
+        var preferred = ""
+        var day = first
+        while (day <= last) {
+            val dayStart = day.atStartOfDayIn(zone)
+            val nextDay = day.plus(DatePeriod(days = 1))
+            val dayEnd = nextDay.atStartOfDayIn(zone)
+            val available =
+                correctedByDevice
+                    .filterValues { items ->
+                        items.any { it.overlaps(dayStart, dayEnd) }
+                    }.keys
+                    .sorted()
+            availableDevices.addAll(available)
+            preferred = sourceDeviceId?.takeIf { it in available }
+                ?: localDevice.takeIf { it in available } ?: available.firstOrNull().orEmpty()
+            val selectedIds =
+                correctedByDevice[preferred]
+                    .orEmpty()
+                    .filter { it.overlaps(dayStart, dayEnd) }
+                    .map { it.id }
+                    .toSet()
+            inferredByDevice[preferred].orEmpty().filter { it.id in selectedIds }.forEach { selectedItems[it.id] = it }
+            day = nextDay
+        }
+        return DaySources(selectedItems.values.toList(), availableDevices.sorted(), preferred)
+    }
 
     private fun buildSnapshot(
         inferred: List<LocationDayItem>,

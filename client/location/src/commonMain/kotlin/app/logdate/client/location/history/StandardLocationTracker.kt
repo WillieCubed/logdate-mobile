@@ -102,8 +102,7 @@ class StandardLocationTracker(
                     timeZoneId = timeZoneId,
                 )
 
-            val result =
-                locationHistoryRepository.logLocation(record)
+            val result = locationHistoryRepository.logLocation(record)
 
             if (result.isSuccess) {
                 val historyItem =
