@@ -100,7 +100,14 @@ kotlin {
             implementation(libs.filekit.compose)
         }
 
+        val desktopTest by getting
+        desktopTest.dependencies {
+            implementation(libs.compose.ui.test)
+            implementation(compose.desktop.currentOs)
+        }
+
         commonTest.dependencies {
+            implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
             // Location logging resolves its owner and device through these providers, so the

@@ -35,6 +35,7 @@ import app.logdate.feature.editor.ui.common.PlatformBackHandler
 import app.logdate.feature.editor.ui.content.EditorBottomContent
 import app.logdate.feature.editor.ui.dialog.DraftsBottomSheet
 import app.logdate.feature.editor.ui.dialog.alert.ConfirmEntryExitDialog
+import app.logdate.feature.editor.ui.editor.CameraBlockUiState
 import app.logdate.feature.editor.ui.editor.EditorExitReason
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.delegate.DefaultAudioBlockFinalizer
@@ -83,8 +84,12 @@ fun EntryEditorContent(
             onUpdateJournalSelection = viewModel::setSelectedJournals,
         )
 
-    // Immersive chrome follows the currently expanded block only.
-    val isImmersiveBlockActive = editorState.isImmersiveBlockActive()
+    // Only live camera capture takes over the entry chrome.
+    val activeCamera =
+        editorState.blocks.any {
+            it.id == editorState.expandedBlockId && it is CameraBlockUiState && it.uri == null
+        }
+    val isImmersiveBlockActive = activeCamera
 
     // Single float that drives all immersive chrome interpolation (0 = fully immersive, 1 = normal).
     // During a predictive back gesture it's scrubbed in real-time via snapTo; on non-gesture
@@ -107,7 +112,7 @@ fun EntryEditorContent(
     val handleEditorBack: () -> Unit = {
         when {
             editorState.isSaving || editorState.shouldExit -> Unit
-            editorState.expandedBlockId != null -> {
+            activeCamera -> {
                 viewModel.dismissExpandedBlockOrClearSingleEmpty()
                 Unit
             }
@@ -124,12 +129,12 @@ fun EntryEditorContent(
         }
     }
 
-    // Expanded-block back is handled by MainEditorContent via PlatformPredictiveBackHandler.
+    // Live camera back is handled by MainEditorContent via PlatformPredictiveBackHandler.
     // This handler only covers cases that must interrupt navigation: unsaved changes and
     // shouldReturnToPicker. Plain exit is left to Nav3 so predictive back can animate.
     PlatformBackHandler(
         enabled =
-            editorState.expandedBlockId == null &&
+            !activeCamera &&
                 (shouldReturnToPickerOnBack || !editorState.canExitWithoutSaving),
     ) {
         handleEditorBack()

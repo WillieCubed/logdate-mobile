@@ -189,6 +189,7 @@ class ExportUserDataUseCase(
                                     type = "image",
                                     mediaPath = note.mediaRef,
                                     caption = note.caption.takeIf { it.isNotEmpty() },
+                                    photoPresentation = note.presentation.name,
                                     createdAt = note.creationTimestamp,
                                     updatedAt = note.lastUpdated,
                                     location = note.location?.toExportLocation(),

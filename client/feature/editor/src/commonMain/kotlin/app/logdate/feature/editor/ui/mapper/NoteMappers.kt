@@ -34,6 +34,7 @@ fun JournalNote.toDomainBlock(): EntryBlockUiState =
                 location = null,
                 uri = mediaRef,
                 caption = caption,
+                presentation = presentation,
                 timeZoneId = timeZoneId,
             )
 
@@ -84,6 +85,7 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
                 lastUpdated = now,
                 mediaRef = uri ?: return null,
                 caption = caption,
+                presentation = presentation,
                 timeZoneId = timeZoneId,
             )
         }

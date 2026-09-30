@@ -13,25 +13,30 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.audio.AudioBlockEditor
+import app.logdate.feature.editor.ui.blocks.EntryMemorySequence
 import app.logdate.feature.editor.ui.camera.CameraBlockEditor
 import app.logdate.feature.editor.ui.content.EditorContentFooter
 import app.logdate.feature.editor.ui.content.EmptyEditorStateContent
@@ -44,7 +49,9 @@ import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
 import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
+import app.logdate.feature.editor.ui.image.ImageBlockPreview
 import app.logdate.feature.editor.ui.layout.EntryEditorSurface
+import app.logdate.feature.editor.ui.layout.FocusedBlockLayout
 import app.logdate.feature.editor.ui.layout.LocalEditorIsCompact
 import app.logdate.feature.editor.ui.state.BlocksUiState
 import app.logdate.feature.editor.ui.text.TextBlockContent
@@ -91,6 +98,12 @@ fun MainEditorContent(
     onBackCancel: () -> Unit = {},
     onAudioResolverReady: (Uuid, PendingAudioResolver) -> Unit = { _, _ -> },
 ) {
+    val activeCamera = uiState.blocks.any { it.id == uiState.expandedBlockId && it is CameraBlockUiState && it.uri == null }
+    if (uiState.blocks.isNotEmpty() && !activeCamera) {
+        EntryMemorySequence(uiState, listState, onAudioResolverReady, modifier)
+        return
+    }
+
     val scope = rememberCoroutineScope()
 
     val expandedBlock =
@@ -207,7 +220,7 @@ fun MainEditorContent(
                                 uiState.blocks.find { it.id == target.block.id }
                                     ?: target.block
                             with(sts) {
-                                Surface(
+                                Box(
                                     modifier =
                                         Modifier
                                             .fillMaxSize()
@@ -215,18 +228,33 @@ fun MainEditorContent(
                                                 rememberSharedContentState("block_surface_${liveBlock.id}"),
                                                 animatedVisibilityScope = avs,
                                             ),
-                                    color = MaterialTheme.colorScheme.surfaceContainer,
-                                    shape = MaterialTheme.shapes.medium,
                                 ) {
-                                    BlockContentInner(
-                                        block = liveBlock,
-                                        isExpanded = true,
-                                        onBlockFocused = uiState.onBlockFocused,
-                                        onBlockUpdated = uiState.onUpdateBlock,
-                                        onBlockDeleted = uiState.onDeleteBlock,
-                                        onAudioResolverReady = onAudioResolverReady,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
+                                    val editBlock: @Composable () -> Unit = {
+                                        BlockContentInner(
+                                            block = liveBlock,
+                                            isExpanded = true,
+                                            onBlockFocused = uiState.onBlockFocused,
+                                            onBlockUpdated = uiState.onUpdateBlock,
+                                            onBlockDeleted = uiState.onDeleteBlock,
+                                            onAudioResolverReady = onAudioResolverReady,
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                    }
+                                    if (liveBlock is TextBlockUiState) {
+                                        val photo = uiState.blocks.filterIsInstance<ImageBlockUiState>().firstOrNull { it.uri != null }
+                                        FocusedBlockLayout(
+                                            textEditor = true,
+                                            preview =
+                                                if (photo == null) {
+                                                    null
+                                                } else {
+                                                    { ImageBlockPreview(photo, modifier = Modifier.fillMaxSize()) }
+                                                },
+                                            editor = editBlock,
+                                        )
+                                    } else {
+                                        editBlock()
+                                    }
                                 }
                             }
                         }
@@ -242,6 +270,7 @@ fun MainEditorContent(
                                 blockSurface = { block, modifier ->
                                     with(sts) {
                                         EntryEditorSurface(
+                                            wrapContentHeight = block is ImageBlockUiState,
                                             modifier =
                                                 modifier
                                                     .sharedBounds(
@@ -339,14 +368,31 @@ private fun AdaptiveEditorListContent(
                     )
                 },
                 standardContent = {
-                    EditorBlockList(
-                        uiState = uiState,
-                        listState = listState,
-                        onAddBlock = onAddBlock,
-                        blockSurface = blockSurface,
-                        includeFooter = true,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                        val showCreationPane = maxWidth >= 840.dp
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                        ) {
+                            EditorBlockList(
+                                uiState = uiState,
+                                listState = listState,
+                                onAddBlock = onAddBlock,
+                                blockSurface = blockSurface,
+                                includeFooter = !showCreationPane,
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                            )
+                            if (showCreationPane) {
+                                EmptyEditorStateContent(
+                                    onStartTextBlock = { onAddBlock(BlockType.TEXT, it) },
+                                    onStartPhotoBlock = { onAddBlock(BlockType.IMAGE, it) },
+                                    onStartAudioBlock = { onAddBlock(BlockType.AUDIO, it) },
+                                    onStartCameraBlock = { onAddBlock(BlockType.CAMERA, it) },
+                                    modifier = Modifier.width(320.dp).fillMaxHeight(),
+                                )
+                            }
+                        }
+                    }
                 },
             )
         },
@@ -365,7 +411,7 @@ private fun EditorBlockList(
 ) {
     LazyColumn(
         state = listState,
-        modifier = modifier,
+        modifier = modifier.testTag("editor_block_list"),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         items(
@@ -411,6 +457,7 @@ private fun BlockContentInner(
                 block = block,
                 onBlockUpdated = onBlockUpdated,
                 onDeleteRequested = { onBlockDeleted(block.id) },
+                isExpanded = isExpanded,
                 modifier = modifier,
             )
 

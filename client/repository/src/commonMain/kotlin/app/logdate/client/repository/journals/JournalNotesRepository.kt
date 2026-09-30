@@ -1,5 +1,6 @@
 package app.logdate.client.repository.journals
 
+import app.logdate.shared.model.PhotoPresentation
 import app.logdate.util.UuidSerializer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -271,6 +272,7 @@ sealed class JournalNote(
         override val lastUpdated: Instant,
         val mediaRef: String,
         val caption: String = "",
+        val presentation: PhotoPresentation = PhotoPresentation.EdgeToEdge,
         override val syncVersion: Long = 0,
         override val location: NoteLocation? = null,
         override val timeZoneId: String? = null,

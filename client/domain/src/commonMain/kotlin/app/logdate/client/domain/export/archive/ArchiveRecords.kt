@@ -102,6 +102,7 @@ internal fun JournalNote.toArchiveNote(
         text = text,
         textFormat = ArchiveTextFormat.MARKDOWN.takeIf { text != null },
         caption = caption.ifEmpty { null },
+        photoPresentation = (this as? JournalNote.Image)?.presentation?.name,
         media = mediaRefOrNull()?.let(media::refFor),
         durationMs = (this as? JournalNote.Audio)?.durationMs,
         location = location?.toArchiveLocation(),
@@ -150,6 +151,7 @@ private fun SerializableEntryBlock.toArchiveBlock(media: MediaReferences): Archi
                 type = ArchiveBlockType.IMAGE,
                 media = uri?.let(media::refFor),
                 caption = caption.ifEmpty { null },
+                photoPresentation = presentation.name,
             )
         is SerializableVideoBlock ->
             base.copy(

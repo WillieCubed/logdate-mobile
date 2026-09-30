@@ -173,6 +173,7 @@ class JournalDetailViewModel(
                     timestamp = creationTimestamp,
                     mediaRef = mediaRef,
                     caption = caption,
+                    presentation = presentation,
                     otherJournals = otherJournals,
                 )
             is JournalNote.Video ->

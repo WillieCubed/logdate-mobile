@@ -328,6 +328,7 @@ class TimelineViewModel(
                         uri = note.mediaRef,
                         timestamp = note.creationTimestamp,
                         caption = note.caption,
+                        presentation = note.presentation,
                         journals = noteJournals,
                     )
                 is JournalNote.Audio ->

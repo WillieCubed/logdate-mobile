@@ -45,6 +45,7 @@ data class ExportNote(
     val type: String, // "text", "image", "video", "audio"
     val content: String? = null, // Text content for text notes
     val caption: String? = null, // Caption for media notes
+    val photoPresentation: String? = null,
     val mediaPath: String? = null, // Path to media file
     val durationMs: Long? = null,
     val createdAt: Instant,

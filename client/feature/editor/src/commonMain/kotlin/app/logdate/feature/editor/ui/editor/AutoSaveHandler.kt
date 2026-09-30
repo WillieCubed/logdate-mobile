@@ -344,6 +344,7 @@ internal fun getEditorDraftFingerprint(state: EditorState): String =
                         appendCommonBlockFields(block)
                         appendFingerprintField(block.uri)
                         appendFingerprintField(block.caption)
+                        appendFingerprintField(block.presentation)
                     }
                     is VideoBlockUiState -> {
                         appendFingerprintField("video")

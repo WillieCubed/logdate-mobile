@@ -325,6 +325,7 @@ internal fun LogDateEntry.toContentChange(): ContentChange =
         serverVersion = version,
         isDeleted = false,
         caption = caption,
+        photoPresentation = photoPresentation,
         location = location,
     )
 

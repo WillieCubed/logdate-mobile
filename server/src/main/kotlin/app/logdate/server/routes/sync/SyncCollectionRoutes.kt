@@ -102,6 +102,7 @@ private fun Route.contentRoutes(
                                 version = 0L,
                                 deviceId = req.deviceId,
                                 caption = req.caption,
+                                photoPresentation = req.photoPresentation,
                                 location = req.location,
                             ),
                     )
@@ -186,6 +187,7 @@ private fun Route.contentRoutes(
                                 version = existing?.version ?: 0L,
                                 deviceId = req.deviceId,
                                 caption = req.caption ?: existing?.caption,
+                                photoPresentation = req.photoPresentation ?: existing?.photoPresentation,
                                 location = req.location ?: existing?.location,
                             ),
                     )

@@ -2,6 +2,7 @@ package app.logdate.ui.timeline
 
 import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.shared.model.Event
+import app.logdate.shared.model.PhotoPresentation
 import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.util.now
@@ -189,6 +190,7 @@ data class ImageNoteUiState(
     val uri: String,
     val timestamp: Instant,
     val caption: String = "",
+    val presentation: PhotoPresentation = PhotoPresentation.EdgeToEdge,
     override val journals: List<JournalBadgeUiState> = emptyList(),
 ) : NoteUiState
 

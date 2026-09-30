@@ -111,6 +111,7 @@ fun AudioBlockContent(
     outputSelection: MediaDeviceSelectionUiState? = null,
     onOutputDeviceSelected: (String) -> Unit = {},
     modifier: Modifier = Modifier,
+    showDeleteAction: Boolean = true,
 ) {
     val audioContextProcessor: AudioContextProcessor = koinInject()
     val waveformAmplitudes by produceState(
@@ -200,6 +201,7 @@ fun AudioBlockContent(
                     timedTranscript = timedTranscript,
                     onPlayPauseClicked = onPlayPauseClicked,
                     onDeleteClicked = onDeleteClicked,
+                    showDeleteAction = showDeleteAction,
                     onProgressChanged = onSeekPositionChanged,
                     onSeekTimestampClicked = onSeekTimestampClicked,
                     outputSelection = outputSelection,
@@ -332,6 +334,7 @@ private fun ExpandedAudioContent(
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
     modifier: Modifier = Modifier,
+    showDeleteAction: Boolean = true,
 ) {
     with(sharedTransitionScope) {
         val labelResolver = remember { AudioLabelResolver() }
@@ -353,29 +356,31 @@ private fun ExpandedAudioContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // Header with title and delete button
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                // Audio title or caption
-                Text(
-                    text = resolvedTitle,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-
-                // Delete button
-                IconButton(
-                    onClick = onDeleteClicked,
-                    modifier = Modifier.size(32.dp),
+            if (showDeleteAction) {
+                // Header with title and delete button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Icon(
-                        painter = PlatformIcons.delete(),
-                        contentDescription = stringResource(UiRes.string.common_delete),
-                        tint = MaterialTheme.colorScheme.error,
+                    // Audio title or caption
+                    Text(
+                        text = resolvedTitle,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
+
+                    // Delete button
+                    IconButton(
+                        onClick = onDeleteClicked,
+                        modifier = Modifier.size(32.dp),
+                    ) {
+                        Icon(
+                            painter = PlatformIcons.delete(),
+                            contentDescription = stringResource(UiRes.string.common_delete),
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             }
 

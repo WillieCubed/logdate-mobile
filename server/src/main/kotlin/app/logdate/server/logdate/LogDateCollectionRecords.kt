@@ -118,6 +118,9 @@ internal fun LogDateEntry.toRepoJson(): JsonObject =
         put("createdAt", createdAt)
         put("lastUpdated", lastUpdated)
         put("deviceId", deviceId.value)
+        if (photoPresentation != null) {
+            put("photoPresentation", photoPresentation)
+        }
         if (caption != null) {
             put("caption", caption)
         }
@@ -140,6 +143,9 @@ internal fun LogDateEntry.toEntryRepoJson(): JsonObject =
         put("createdAt", createdAt)
         put("lastUpdated", lastUpdated)
         put("deviceId", deviceId.value)
+        if (photoPresentation != null) {
+            put("photoPresentation", photoPresentation)
+        }
         if (caption != null) {
             put("caption", caption)
         }
@@ -163,6 +169,7 @@ internal fun JsonObject.toLogDateEntry(
         version = version,
         deviceId = deviceIdOrDefault(),
         caption = nullableStringValue("caption"),
+        photoPresentation = nullableStringValue("photoPresentation"),
         location = nullableStringValue("location"),
     )
 

@@ -60,6 +60,7 @@ data class SerializableImageBlock(
     override val altitude: Double? = null,
     val uri: String? = null,
     val caption: String = "",
+    val presentation: PhotoPresentation = PhotoPresentation.EdgeToEdge,
 ) : SerializableEntryBlock()
 
 @Serializable

@@ -47,6 +47,7 @@ data class ArchiveNote(
     /** How [text] is written, so a reader knows to render it. Present whenever [text] is. */
     val textFormat: ArchiveTextFormat? = null,
     val caption: String? = null,
+    val photoPresentation: String? = null,
     val media: ArchiveMediaRef? = null,
     val durationMs: Long? = null,
     val location: ArchiveLocation? = null,
@@ -127,6 +128,7 @@ data class ArchiveDraftBlock(
     val text: String? = null,
     val media: ArchiveMediaRef? = null,
     val caption: String? = null,
+    val photoPresentation: String? = null,
     val durationMs: Long? = null,
     val transcription: String? = null,
     val location: ArchiveLocation? = null,

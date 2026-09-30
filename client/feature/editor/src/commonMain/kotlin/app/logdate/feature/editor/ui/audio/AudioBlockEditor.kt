@@ -47,6 +47,8 @@ fun AudioBlockEditor(
     onDeleteRequested: () -> Unit,
     onResolverReady: (Uuid, PendingAudioResolver) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
+    inline: Boolean = false,
+    selected: Boolean = false,
 ) {
     val labelResolver = remember { AudioLabelResolver() }
     val labelResult =
@@ -168,7 +170,8 @@ fun AudioBlockEditor(
         if (existingAudioUri != null) {
             AudioBlockContent(
                 block = block,
-                isExpanded = true,
+                isExpanded = !inline || selected,
+                showDeleteAction = !inline,
                 isPlaying = audioUiState.isPlaying,
                 timedTranscript = audioUiState.timedTranscript,
                 playbackProgress = audioUiState.playbackProgress,
@@ -184,7 +187,7 @@ fun AudioBlockEditor(
                 onDeleteClicked = onDeleteRequested,
                 outputSelection = outputSelection,
                 onOutputDeviceSelected = audioRouteRepository::selectOutputDevice,
-                modifier = Modifier.fillMaxSize(),
+                modifier = if (inline) Modifier else Modifier.fillMaxSize(),
             )
         } else {
             AudioPermissionWrapper {

@@ -14,6 +14,7 @@ import app.logdate.client.domain.restore.RestoreArchiveBundle
 import app.logdate.client.domain.restore.RestoreArchiveReader
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.shared.model.PhotoPresentation
 import app.logdate.shared.model.Place
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
@@ -78,6 +79,7 @@ class V2ExportImportRoundTripTest : ArchiveExportFixture() {
                     .toSet(),
             )
             assertTrue((notes.getNoteById(imageNote.uid) as JournalNote.Image).mediaRef.startsWith("file:///restored/"))
+            assertEquals(PhotoPresentation.Framed, (notes.getNoteById(imageNote.uid) as JournalNote.Image).presentation)
             assertTrue(result.warnings.any { "not restored" in it || "Skipped" in it })
         }
 }

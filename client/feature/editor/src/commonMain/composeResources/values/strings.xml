@@ -140,4 +140,20 @@
     <string name="audio_label_period_recording">%1$s Recording</string>
     <string name="audio_label_period_at_location">%1$s at %2$s</string>
 
+    <string name="photo_framed">Framed</string>
+    <string name="photo_edge_to_edge">Edge to edge</string>
+    <string name="memory_edit">Edit</string>
+    <string name="memory_remove">Remove from entry</string>
+    <string name="memory_add">Add to entry</string>
+    <string name="memory_write">Write</string>
+    <string name="memory_add_photo">Add photo</string>
+    <string name="memory_record_audio">Record audio</string>
+    <string name="memory_add_video">Add video</string>
+    <string name="memory_take_photo">Take photo</string>
+    <string name="memory_text">Text</string>
+    <string name="memory_photo">Photo</string>
+    <string name="memory_audio">Audio</string>
+    <string name="memory_video">Video</string>
+    <string name="memory_camera">Camera</string>
+    <string name="memory_entry_contents">In this entry</string>
 </resources>

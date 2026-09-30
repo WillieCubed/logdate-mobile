@@ -1,5 +1,6 @@
 package app.logdate.feature.journals.ui.detail
 
+import app.logdate.shared.model.PhotoPresentation
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -55,6 +56,7 @@ sealed interface EntryDisplayData {
         override val timestamp: Instant,
         val mediaRef: String,
         val caption: String,
+        val presentation: PhotoPresentation = PhotoPresentation.EdgeToEdge,
         override val otherJournals: List<JournalReference> = emptyList(),
     ) : EntryDisplayData
 

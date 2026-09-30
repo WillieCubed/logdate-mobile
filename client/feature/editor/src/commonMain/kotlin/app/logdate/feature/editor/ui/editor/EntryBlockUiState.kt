@@ -4,6 +4,7 @@ import app.logdate.client.repository.journals.SystemCaptureTimeZone
 import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.feature.editor.ui.formatMediaDuration
 import app.logdate.shared.model.Location
+import app.logdate.shared.model.PhotoPresentation
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -64,6 +65,7 @@ data class ImageBlockUiState(
     override val location: Location? = null,
     override val uri: String? = null,
     override val caption: String = "",
+    val presentation: PhotoPresentation = PhotoPresentation.EdgeToEdge,
     override val timeZoneId: String? = SystemCaptureTimeZone.currentTimeZoneId(),
 ) : MediaBlockUiState {
     override fun hasContent(): Boolean = uri != null

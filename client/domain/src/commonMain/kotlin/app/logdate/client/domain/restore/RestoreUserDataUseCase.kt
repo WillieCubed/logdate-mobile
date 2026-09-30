@@ -32,6 +32,7 @@ import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
+import app.logdate.shared.model.PhotoPresentation
 import app.logdate.shared.model.Place
 import app.logdate.shared.model.SerializableAudioBlock
 import app.logdate.shared.model.SerializableCameraBlock
@@ -501,6 +502,7 @@ class RestoreUserDataUseCase(
                     lastUpdated = updatedAt,
                     mediaRef = resolvedMediaRef ?: return null,
                     caption = caption.orEmpty(),
+                    presentation = PhotoPresentation.entries.firstOrNull { it.name == photoPresentation } ?: PhotoPresentation.EdgeToEdge,
                     timeZoneId = timeZone,
                     syncVersion = syncVersion,
                     location = location,

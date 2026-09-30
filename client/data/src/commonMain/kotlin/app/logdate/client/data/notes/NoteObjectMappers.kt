@@ -9,6 +9,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
+import app.logdate.shared.model.PhotoPresentation
 
 /**
  * Converts entity location fields to a NoteLocation domain model.
@@ -77,6 +78,7 @@ fun ImageNoteEntity.toModel(
     uid = uid,
     mediaRef = contentUri,
     caption = caption,
+    presentation = PhotoPresentation.entries.firstOrNull { it.name == presentation } ?: PhotoPresentation.EdgeToEdge,
     creationTimestamp = created,
     lastUpdated = lastUpdated,
     syncVersion = syncVersion,
@@ -88,6 +90,7 @@ fun JournalNote.Image.toEntity() =
     ImageNoteEntity(
         uid = uid,
         contentUri = mediaRef,
+        presentation = presentation.name,
         created = creationTimestamp,
         lastUpdated = lastUpdated,
         syncVersion = syncVersion,

@@ -17,12 +17,12 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
@@ -31,9 +31,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
+import app.logdate.ui.foldable.FoldableSplitLayout
+import app.logdate.ui.foldable.calculateFoldableSplitLayout
+import app.logdate.ui.foldable.relativeTo
 import app.logdate.ui.foldable.rememberFoldableLayoutInfo
+import app.logdate.ui.foldable.rememberWindowOrigin
 import app.logdate.ui.theme.Spacing
 
 /**
@@ -71,46 +77,52 @@ fun ImmersiveEditorLayout(
     modifier: Modifier = Modifier,
     isImmersiveBlockActive: Boolean = false,
     immersiveExitProgress: Float = if (isImmersiveBlockActive) 0f else 1f,
+    bottomContentTopPadding: Dp = Spacing.sm,
 ) {
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+    val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val (windowOrigin, trackWindowOrigin) = rememberWindowOrigin()
+    BoxWithConstraints(modifier = modifier.fillMaxSize().then(trackWindowOrigin)) {
         val containerWidth = maxWidth
         val foldableLayoutInfo = rememberFoldableLayoutInfo()
+        val bookLayout =
+            calculateFoldableSplitLayout(
+                containerWidth = containerWidth,
+                containerHeight = maxHeight,
+                layoutInfo = foldableLayoutInfo.relativeTo(windowOrigin),
+                minPaneWidth = 320.dp,
+            ) as? FoldableSplitLayout.Vertical
         val hasSeparatingHinge = foldableLayoutInfo.hinge?.isSeparating == true
-        // Landscape phones are typically 360–430dp tall; portrait phones start at 667dp.
-        val isCompact = maxHeight < 500.dp
         val maxEditorWidth =
             when {
                 hasSeparatingHinge -> containerWidth
-                containerWidth < 600.dp -> containerWidth
-                containerWidth < 900.dp -> 600.dp
-                else -> 800.dp
+                else -> 1200.dp
             }
 
         val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         val topOffset = lerp(0.dp, statusBarTop + 40.dp, immersiveExitProgress)
         val horizontalPadding = lerp(0.dp, Spacing.sm, immersiveExitProgress)
         val innerTopPadding = lerp(0.dp, Spacing.sm, immersiveExitProgress)
-        CompositionLocalProvider(LocalEditorIsCompact provides isCompact) {
-            Box(
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surfaceDim),
+        ) {
+            BoxWithConstraints(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surfaceDim),
+                        .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
+                        .padding(top = topOffset)
+                        .windowInsetsPadding(WindowInsets.ime),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
-                            .padding(top = topOffset)
-                            .windowInsetsPadding(WindowInsets.ime),
-                    contentAlignment = Alignment.Center,
-                ) {
+                CompositionLocalProvider(LocalEditorIsCompact provides (maxHeight < 500.dp)) {
                     Column(
                         modifier =
                             Modifier
-                                .fillMaxSize()
                                 .widthIn(max = maxEditorWidth)
+                                .fillMaxSize()
                                 .padding(horizontal = horizontalPadding)
                                 .padding(top = innerTopPadding),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -119,20 +131,13 @@ fun ImmersiveEditorLayout(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .weight(1f)
-                                    .then(
-                                        if (!isImmersiveBlockActive) {
-                                            Modifier.heightIn(min = 300.dp)
-                                        } else {
-                                            Modifier
-                                        },
-                                    ),
+                                    .weight(1f),
                         ) {
                             editorContent()
                         }
 
                         AnimatedVisibility(
-                            visible = !isImmersiveBlockActive,
+                            visible = !isImmersiveBlockActive && !keyboardVisible,
                             enter = fadeIn(tween(200)) + expandVertically(tween(300, easing = FastOutSlowInEasing)),
                             exit = fadeOut(tween(150)) + shrinkVertically(tween(300, easing = FastOutSlowInEasing)),
                         ) {
@@ -141,25 +146,37 @@ fun ImmersiveEditorLayout(
                                     Modifier
                                         .fillMaxWidth()
                                         .windowInsetsPadding(WindowInsets.navigationBars)
-                                        .padding(top = Spacing.sm, bottom = Spacing.md),
+                                        .padding(top = bottomContentTopPadding, bottom = Spacing.md),
                             ) {
-                                bottomContent()
+                                Box(
+                                    modifier =
+                                        (
+                                            if (bookLayout != null) {
+                                                Modifier.width((bookLayout.leftPane.width - horizontalPadding).coerceAtLeast(0.dp))
+                                            } else {
+                                                Modifier.widthIn(max = 640.dp).fillMaxWidth()
+                                            }
+                                        ).align(if (bookLayout != null) Alignment.CenterStart else Alignment.Center)
+                                            .padding(horizontal = if (bookLayout != null || containerWidth < 656.dp) 8.dp else 0.dp),
+                                ) {
+                                    bottomContent()
+                                }
                             }
                         }
                     }
                 }
-
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.TopStart)
-                            .windowInsetsPadding(WindowInsets.statusBars),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    topBarContent()
-                }
             }
-        } // CompositionLocalProvider
+
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopStart)
+                        .windowInsetsPadding(WindowInsets.statusBars),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                topBarContent()
+            }
+        }
     }
 }

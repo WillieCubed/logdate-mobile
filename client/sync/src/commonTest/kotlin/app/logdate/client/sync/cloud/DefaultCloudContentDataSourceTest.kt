@@ -2,6 +2,7 @@ package app.logdate.client.sync.cloud
 
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.PhotoPresentation
 import app.logdate.shared.model.sync.VersionConstraint
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -107,6 +108,7 @@ class DefaultCloudContentDataSourceTest {
                     lastUpdated = Clock.System.now(),
                     mediaRef = "file:///test/image.jpg",
                     caption = "Sunset from the ridge",
+                    presentation = PhotoPresentation.Framed,
                 )
             mockApiClient.uploadContentResponse =
                 Result.success(
@@ -122,6 +124,8 @@ class DefaultCloudContentDataSourceTest {
             val (_, request) = mockApiClient.uploadCalls.first()
             assertEquals("Sunset from the ridge", request.caption, "caption must reach the server")
 
+            assertEquals("Framed", request.photoPresentation)
+
             // ...and come back on the device that did not write it.
             mockApiClient.contentChangesResponse =
                 Result.success(
@@ -136,6 +140,7 @@ class DefaultCloudContentDataSourceTest {
                                     lastUpdated = note.lastUpdated.toEpochMilliseconds(),
                                     serverVersion = 1,
                                     caption = "Sunset from the ridge",
+                                    photoPresentation = "Framed",
                                 ),
                             ),
                         deletions = emptyList(),
@@ -146,6 +151,7 @@ class DefaultCloudContentDataSourceTest {
             val downloaded = dataSource.getContentChanges("test-token", Instant.fromEpochMilliseconds(0)).getOrThrow()
             val image = downloaded.changes.single() as JournalNote.Image
             assertEquals("Sunset from the ridge", image.caption, "caption must survive download")
+            assertEquals(PhotoPresentation.Framed, image.presentation)
         }
 
     @Test

@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import app.logdate.shared.model.PhotoPresentation
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.common.noteDragSource
 import app.logdate.ui.theme.Spacing
@@ -119,37 +120,56 @@ private fun ImageNoteSnippet(uiState: ImageNoteUiState) {
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             modifier = Modifier.fillMaxWidth().noteDragSource(uiState.noteId.toString()),
         ) {
-            Box {
-                AsyncImage(
-                    model = uiState.uri,
-                    contentDescription =
-                        stringResource(
-                            Res.string.cd_photo_from_date,
-                            uiState.timestamp.toReadableDateShort(),
-                        ),
-                    contentScale = ContentScale.Crop,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(AspectRatios.TRADITIONAL),
-                )
-                if (uiState.caption.isNotBlank()) {
-                    Box(
+            if (uiState.presentation == PhotoPresentation.Framed) {
+                Column(Modifier.background(Color.White).padding(12.dp)) {
+                    AsyncImage(
+                        model = uiState.uri,
+                        contentDescription = uiState.caption,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxWidth().aspectRatio(AspectRatios.TRADITIONAL),
+                    )
+                    if (uiState.caption.isNotBlank()) {
+                        Text(
+                            uiState.caption,
+                            color = Color.Black,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(top = 16.dp, bottom = 12.dp),
+                        )
+                    }
+                }
+            } else {
+                Box {
+                    AsyncImage(
+                        model = uiState.uri,
+                        contentDescription =
+                            stringResource(
+                                Res.string.cd_photo_from_date,
+                                uiState.timestamp.toReadableDateShort(),
+                            ),
+                        contentScale = ContentScale.Crop,
                         modifier =
                             Modifier
-                                .align(Alignment.BottomStart)
                                 .fillMaxWidth()
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f)),
-                                    ),
-                                ).padding(horizontal = 16.dp, vertical = 12.dp),
-                    ) {
-                        Text(
-                            text = uiState.caption,
-                            color = Color.White,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+                                .aspectRatio(AspectRatios.TRADITIONAL),
+                    )
+                    if (uiState.caption.isNotBlank()) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomStart)
+                                    .fillMaxWidth()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f)),
+                                        ),
+                                    ).padding(horizontal = 16.dp, vertical = 12.dp),
+                        ) {
+                            Text(
+                                text = uiState.caption,
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
                     }
                 }
             }

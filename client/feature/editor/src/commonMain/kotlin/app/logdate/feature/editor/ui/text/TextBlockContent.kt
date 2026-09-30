@@ -1,7 +1,6 @@
 package app.logdate.feature.editor.ui.text
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.SpanStyle
@@ -62,6 +62,8 @@ fun TextBlockContent(
     onFocused: () -> Unit,
     readOnly: Boolean = false,
     modifier: Modifier = Modifier,
+    requestEditingFocus: Boolean = isExpanded,
+    focusRequestKey: Int = 0,
 ) {
     val focusRequester = remember { FocusRequester() }
     var fieldValue by
@@ -146,11 +148,11 @@ fun TextBlockContent(
             },
             modifier =
                 Modifier
-                    .widthIn(max = 840.dp)
+                    .widthIn(max = 640.dp)
                     .then(if (isExpanded) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
                     .testTag(LOGDATE_EDITOR_TEXT_INPUT_TAG)
-                    .focusable(enabled = !readOnly)
-                    .focusRequester(focusRequester),
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { if (it.isFocused) onFocused() },
             textStyle = typography.bodyLarge.copy(color = colors.onSurface),
             visualTransformation = markdownTransformation,
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
@@ -182,8 +184,8 @@ fun TextBlockContent(
     }
 
     // Request focus when specified
-    LaunchedEffect(block.id, isExpanded) {
-        if (isExpanded && !readOnly) {
+    LaunchedEffect(block.id, requestEditingFocus, focusRequestKey) {
+        if (requestEditingFocus && !readOnly) {
             try {
                 focusRequester.requestFocus()
                 onFocused()

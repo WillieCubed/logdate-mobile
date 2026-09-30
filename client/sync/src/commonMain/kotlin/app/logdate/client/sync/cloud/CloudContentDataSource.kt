@@ -3,6 +3,7 @@ package app.logdate.client.sync.cloud
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.sync.crypto.SyncPayloadCipher
+import app.logdate.shared.model.PhotoPresentation
 import app.logdate.shared.model.sync.VersionConstraint
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.json.Json
@@ -155,6 +156,7 @@ class DefaultCloudContentDataSource(
                     is JournalNote.Video -> caption.takeIf { it.isNotBlank() }
                     else -> null
                 },
+            photoPresentation = (this as? JournalNote.Image)?.presentation?.name,
             location = encryptNoteLocation(uid, location),
         )
 
@@ -191,6 +193,7 @@ class DefaultCloudContentDataSource(
                     is JournalNote.Video -> caption.takeIf { it.isNotBlank() }
                     else -> null
                 },
+            photoPresentation = (this as? JournalNote.Image)?.presentation?.name,
             location = encryptNoteLocation(uid, location),
         )
 
@@ -227,6 +230,7 @@ class DefaultCloudContentDataSource(
                     lastUpdated = lastUpdated,
                     mediaRef = mediaUri ?: "",
                     caption = caption.orEmpty(),
+                    presentation = PhotoPresentation.entries.firstOrNull { it.name == photoPresentation } ?: PhotoPresentation.EdgeToEdge,
                     location = decryptNoteLocation(uid, location),
                     syncVersion = serverVersion,
                 )

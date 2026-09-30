@@ -81,6 +81,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.audio.AudioLabelResolver
 import app.logdate.feature.editor.audio.formatAudioLabel
@@ -838,24 +839,9 @@ private fun ImageEntryCard(
         onRemoveFromJournal = onRemoveFromJournal,
         modifier = modifier,
         cardModifier = cardModifier,
+        contentPadding = 0.dp,
     ) {
-        AsyncImage(
-            model = entry.mediaRef,
-            contentDescription = stringResource(Res.string.image_note),
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(AspectRatios.RATIO_4_3)
-                    .clip(RoundedCornerShape(Spacing.sm)),
-            contentScale = ContentScale.Crop,
-        )
-        if (entry.caption.isNotBlank()) {
-            Text(
-                text = entry.caption,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = Spacing.sm),
-            )
-        }
+        JournalPhotoContent(entry)
     }
 }
 
@@ -1069,6 +1055,7 @@ private fun VerticalEntryCardShell(
     onRemoveFromJournal: () -> Unit,
     modifier: Modifier = Modifier,
     cardModifier: Modifier = Modifier,
+    contentPadding: Dp = Spacing.md,
     content: @Composable () -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -1085,7 +1072,7 @@ private fun VerticalEntryCardShell(
             onClick = onClick,
             modifier = cardModifier.fillMaxWidth(),
         ) {
-            Column(modifier = Modifier.padding(Spacing.md)) {
+            Column(modifier = Modifier.padding(contentPadding)) {
                 content()
                 Row(
                     modifier = Modifier.fillMaxWidth(),

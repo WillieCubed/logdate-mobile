@@ -62,6 +62,7 @@ data class ContentUploadRequest(
      * entry has no caption, not that the caption is unknown.
      */
     val caption: String? = null,
+    val photoPresentation: String? = null,
     /**
      * Encrypted note location, or null when the entry has none.
      *
@@ -95,6 +96,7 @@ data class ContentUpdateRequest(
      * entry has no caption, not that the caption is unknown.
      */
     val caption: String? = null,
+    val photoPresentation: String? = null,
     /**
      * Encrypted note location, or null when the entry has none.
      *
@@ -133,6 +135,7 @@ data class ContentChange(
     val isDeleted: Boolean = false,
     /** User-authored caption for an image or video; absent for entries without one. */
     val caption: String? = null,
+    val photoPresentation: String? = null,
     /** Encrypted note location; absent for entries without one. */
     val location: String? = null,
 )

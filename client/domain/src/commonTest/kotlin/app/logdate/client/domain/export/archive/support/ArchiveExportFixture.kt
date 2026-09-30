@@ -19,6 +19,7 @@ import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
+import app.logdate.shared.model.PhotoPresentation
 import app.logdate.shared.model.Place
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.profile.LogDateProfile
@@ -77,6 +78,7 @@ open class ArchiveExportFixture {
             lastUpdated = instantOf("2026-09-18T03:30:05Z"),
             mediaRef = imageReference,
             caption = "Sunset",
+            presentation = PhotoPresentation.Framed,
         )
     val audioNote =
         JournalNote.Audio(

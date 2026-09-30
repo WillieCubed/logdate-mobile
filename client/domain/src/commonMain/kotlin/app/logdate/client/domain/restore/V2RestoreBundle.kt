@@ -28,6 +28,7 @@ import app.logdate.client.domain.export.archive.ArchiveNoteFile
 import app.logdate.client.domain.export.archive.ArchivePlaceFile
 import app.logdate.client.domain.export.archive.ArchiveProfileFile
 import app.logdate.shared.model.Journal
+import app.logdate.shared.model.PhotoPresentation
 import app.logdate.shared.model.SerializableAudioBlock
 import app.logdate.shared.model.SerializableCameraBlock
 import app.logdate.shared.model.SerializableEntryBlock
@@ -142,6 +143,7 @@ private fun V2RestoreBundle.decodeAndMapNotes(): Pair<List<ExportNote>, List<Exp
                 type = note.type.name.lowercase(),
                 content = note.text,
                 caption = note.caption,
+                photoPresentation = note.photoPresentation,
                 mediaPath =
                     note.media
                         ?.path
@@ -273,6 +275,7 @@ private fun toSerializableBlock(
                 location?.altitudeMeters,
                 mediaPath,
                 block.caption.orEmpty(),
+                PhotoPresentation.entries.firstOrNull { it.name == block.photoPresentation } ?: PhotoPresentation.EdgeToEdge,
             )
         ArchiveBlockType.VIDEO ->
             SerializableVideoBlock(
