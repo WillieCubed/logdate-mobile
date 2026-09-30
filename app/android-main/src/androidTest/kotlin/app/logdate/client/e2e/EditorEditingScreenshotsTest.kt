@@ -9,24 +9,28 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.down
+import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.moveBy
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.isDisplayed
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeUp
-import androidx.compose.ui.test.swipeDown
-import androidx.compose.ui.test.performTextInputSelection
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextInputSelection
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.printToString
-import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.test.getBoundsInRoot
-import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.up
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.core.view.ViewCompat
@@ -52,13 +56,13 @@ import app.logdate.ui.foldable.FoldableOcclusionType
 import app.logdate.ui.foldable.FoldablePosture
 import app.logdate.ui.foldable.provideFoldableLayoutInfo
 import app.logdate.ui.theme.LogDateTheme
-import org.junit.Rule
-import org.junit.Test
 import java.io.File
 import kotlin.math.abs
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
+import org.junit.Rule
+import org.junit.Test
 
 /** Emulator-only capture of the production editing components and the Android IME. */
 class EditorEditingScreenshotsTest {
@@ -220,6 +224,12 @@ class EditorEditingScreenshotsTest {
                 capture(device, "$variant-pull-open")
                 assertTrue(addBounds.bottom >= expandedListBounds.bottom - 4.dp, "Expanded Add block leaves extra dead space: $addBounds in $expandedListBounds")
                 compose.onNodeWithTag("add_close").performClick()
+                waitForCompactAdd()
+                compose.onNodeWithTag("editor_block_list").performTouchInput {
+                    down(Offset(center.x, center.y + 80f))
+                    moveBy(Offset(0f, -80f))
+                    up()
+                }
                 waitForCompactAdd()
                 compose.onNodeWithTag("add_to_entry").performClick()
                 waitForExpandedAdd(listState)

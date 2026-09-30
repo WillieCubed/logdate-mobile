@@ -5,6 +5,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.BasicTextField
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.ui.theme.Spacing
@@ -64,6 +66,7 @@ fun TextBlockContent(
     modifier: Modifier = Modifier,
     requestEditingFocus: Boolean = isExpanded,
     focusRequestKey: Int = 0,
+    minEditorHeight: Dp = 0.dp,
 ) {
     val focusRequester = remember { FocusRequester() }
     var fieldValue by
@@ -150,6 +153,7 @@ fun TextBlockContent(
                 Modifier
                     .widthIn(max = 640.dp)
                     .then(if (isExpanded) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
+                    .heightIn(min = minEditorHeight)
                     .testTag(LOGDATE_EDITOR_TEXT_INPUT_TAG)
                     .focusRequester(focusRequester)
                     .onFocusChanged { if (it.isFocused) onFocused() },

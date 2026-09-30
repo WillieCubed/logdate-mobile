@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -53,6 +54,7 @@ internal fun EndOfEntryAddControl(
     modifier: Modifier = Modifier,
 ) {
     val fraction = progress.coerceIn(0f, 1f)
+    val gatedAdd: (BlockType) -> Unit = { type -> if (expanded && fraction > 0.95f) onAdd(type) }
     BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
         val wide = maxWidth >= 560.dp
         val choiceHeight = if (wide) 96.dp else 176.dp
@@ -74,136 +76,134 @@ internal fun EndOfEntryAddControl(
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         ) {
             Box(Modifier.fillMaxSize()) {
-                if (fraction > 0.42f) {
-                    Column(Modifier.alpha(((fraction - 0.42f) / 0.18f).coerceIn(0f, 1f))) {
-                        Box(Modifier.fillMaxWidth().height(8.dp), contentAlignment = Alignment.Center) {
-                            Box(
-                                Modifier
-                                    .width(32.dp)
-                                    .height(4.dp)
-                                    .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.4f), CircleShape),
-                            )
-                        }
-                        Row(
+                Column {
+                    Box(Modifier.fillMaxWidth().height(8.dp).alpha(fraction), contentAlignment = Alignment.Center) {
+                        Box(
                             Modifier
-                                .fillMaxWidth()
+                                .width(32.dp)
+                                .height(4.dp)
+                                .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.4f), CircleShape),
+                        )
+                    }
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("add_to_entry")
+                            .clickable(enabled = !expanded && fraction < 0.05f, onClick = onExpand)
+                            .padding(start = 16.dp, end = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(Modifier.width(24.dp * (1f - fraction)).height(24.dp).alpha(1f - fraction)) {
+                            Icon(PlatformIcons.add(), null)
+                        }
+                        Spacer(Modifier.width(8.dp * (1f - fraction)))
+                        Text(
+                            stringResource(Res.string.memory_add),
+                            modifier = Modifier.weight(1f).testTag("add_to_entry_label"),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Box(
+                            Modifier
+                                .width(48.dp * fraction)
                                 .height(48.dp)
-                                .testTag("add_header")
-                                .padding(start = 16.dp, end = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                                .clipToBounds()
+                                .alpha(fraction),
                         ) {
-                            Text(
-                                stringResource(Res.string.memory_add),
-                                modifier = Modifier.weight(1f).testTag("add_to_entry_label"),
-                                style = MaterialTheme.typography.titleSmall,
-                            )
-                            IconButton(onClick = onCollapse, modifier = Modifier.testTag("add_close")) {
+                            IconButton(
+                                onClick = onCollapse,
+                                enabled = expanded && fraction > 0.95f,
+                                modifier = Modifier.size(48.dp).testTag("add_close"),
+                            ) {
                                 Icon(PlatformIcons.close(), contentDescription = stringResource(Res.string.close))
                             }
                         }
-                        Box(Modifier.fillMaxWidth().alpha(((fraction - 0.45f) / 0.55f).coerceIn(0f, 1f))) {
-                            if (wide) {
-                                Row(
-                                    Modifier.fillMaxWidth().height(choiceHeight).padding(horizontal = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
+                    }
+                    Box(Modifier.fillMaxWidth().alpha(((fraction - 0.18f) / 0.72f).coerceIn(0f, 1f))) {
+                        if (wide) {
+                            Row(
+                                Modifier.fillMaxWidth().height(choiceHeight).padding(horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                CreationChoice(
+                                    BlockType.TEXT,
+                                    stringResource(Res.string.memory_write),
+                                    PlatformIcons.text(),
+                                    gatedAdd,
+                                    Modifier.weight(1f),
+                                )
+                                CreationChoice(
+                                    BlockType.IMAGE,
+                                    stringResource(Res.string.memory_add_photo),
+                                    PlatformIcons.photoLibrary(),
+                                    gatedAdd,
+                                    Modifier.weight(1f),
+                                )
+                                CreationChoice(
+                                    BlockType.AUDIO,
+                                    stringResource(Res.string.memory_record_audio),
+                                    PlatformIcons.mic(),
+                                    gatedAdd,
+                                    Modifier.weight(1f),
+                                )
+                                CreationChoice(
+                                    BlockType.VIDEO,
+                                    stringResource(Res.string.memory_add_video),
+                                    PlatformIcons.videoFile(),
+                                    gatedAdd,
+                                    Modifier.weight(1f),
+                                )
+                                CreationChoice(
+                                    BlockType.CAMERA,
+                                    stringResource(Res.string.memory_take_photo),
+                                    PlatformIcons.camera(),
+                                    gatedAdd,
+                                    Modifier.weight(1f),
+                                )
+                            }
+                        } else {
+                            Column(Modifier.fillMaxWidth().height(choiceHeight).padding(horizontal = 12.dp)) {
+                                Row(Modifier.fillMaxWidth().height(88.dp), verticalAlignment = Alignment.CenterVertically) {
                                     CreationChoice(
                                         BlockType.TEXT,
                                         stringResource(Res.string.memory_write),
                                         PlatformIcons.text(),
-                                        onAdd,
+                                        gatedAdd,
                                         Modifier.weight(1f),
                                     )
                                     CreationChoice(
                                         BlockType.IMAGE,
                                         stringResource(Res.string.memory_add_photo),
                                         PlatformIcons.photoLibrary(),
-                                        onAdd,
+                                        gatedAdd,
                                         Modifier.weight(1f),
                                     )
                                     CreationChoice(
                                         BlockType.AUDIO,
                                         stringResource(Res.string.memory_record_audio),
                                         PlatformIcons.mic(),
-                                        onAdd,
+                                        gatedAdd,
                                         Modifier.weight(1f),
                                     )
+                                }
+                                Row(Modifier.fillMaxWidth().height(88.dp), verticalAlignment = Alignment.CenterVertically) {
                                     CreationChoice(
                                         BlockType.VIDEO,
                                         stringResource(Res.string.memory_add_video),
                                         PlatformIcons.videoFile(),
-                                        onAdd,
+                                        gatedAdd,
                                         Modifier.weight(1f),
                                     )
                                     CreationChoice(
                                         BlockType.CAMERA,
                                         stringResource(Res.string.memory_take_photo),
                                         PlatformIcons.camera(),
-                                        onAdd,
+                                        gatedAdd,
                                         Modifier.weight(1f),
                                     )
                                 }
-                            } else {
-                                Column(Modifier.fillMaxWidth().height(choiceHeight).padding(horizontal = 12.dp)) {
-                                    Row(Modifier.fillMaxWidth().height(88.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        CreationChoice(
-                                            BlockType.TEXT,
-                                            stringResource(Res.string.memory_write),
-                                            PlatformIcons.text(),
-                                            onAdd,
-                                            Modifier.weight(1f),
-                                        )
-                                        CreationChoice(
-                                            BlockType.IMAGE,
-                                            stringResource(Res.string.memory_add_photo),
-                                            PlatformIcons.photoLibrary(),
-                                            onAdd,
-                                            Modifier.weight(1f),
-                                        )
-                                        CreationChoice(
-                                            BlockType.AUDIO,
-                                            stringResource(Res.string.memory_record_audio),
-                                            PlatformIcons.mic(),
-                                            onAdd,
-                                            Modifier.weight(1f),
-                                        )
-                                    }
-                                    Row(Modifier.fillMaxWidth().height(88.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        CreationChoice(
-                                            BlockType.VIDEO,
-                                            stringResource(Res.string.memory_add_video),
-                                            PlatformIcons.videoFile(),
-                                            onAdd,
-                                            Modifier.weight(1f),
-                                        )
-                                        CreationChoice(
-                                            BlockType.CAMERA,
-                                            stringResource(Res.string.memory_take_photo),
-                                            PlatformIcons.camera(),
-                                            onAdd,
-                                            Modifier.weight(1f),
-                                        )
-                                    }
-                                }
                             }
                         }
-                    }
-                }
-                if (fraction < 0.42f) {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .alpha(((0.42f - fraction) / 0.18f).coerceIn(0f, 1f))
-                            .testTag("add_to_entry")
-                            .clickable(enabled = !expanded, onClick = onExpand)
-                            .padding(horizontal = 20.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(PlatformIcons.add(), null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(Res.string.memory_add), style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }

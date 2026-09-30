@@ -6,10 +6,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
+import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.blocks.MemoryBlockSurface
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
@@ -107,5 +110,45 @@ class MemoryBlockSemanticsTest {
             onNodeWithTag("add_memory_TEXT").performClick()
             assertEquals(3, blocks.value.size)
             onNodeWithText("Add to entry").assertIsDisplayed()
+        }
+
+    @Test
+    fun `focusing a text memory opens a writing surface in the entry`() =
+        runDesktopComposeUiTest(width = 700, height = 900) {
+            val first = TextBlockUiState(content = "First memory")
+            val second = TextBlockUiState(content = "Second memory")
+            val selected = mutableStateOf(first.id)
+            setContent {
+                MaterialTheme {
+                    MainEditorContent(
+                        uiState =
+                            BlocksUiState(
+                                blocks = listOf(first, second),
+                                expandedBlockId = selected.value,
+                                availableJournals = emptyList(),
+                                selectedJournalIds = emptyList(),
+                                onBlockFocused = { selected.value = it },
+                                onJournalSelectionChanged = {},
+                                onUpdateBlock = {},
+                                onCreateBlock = { _, _ -> first },
+                                onDeleteBlock = {},
+                            ),
+                        shouldReturnToPickerOnBack = false,
+                        onDismissExpanded = {},
+                    )
+                }
+            }
+            waitForIdle()
+            val firstBounds = onNodeWithTag("memory_block_${first.id}").getUnclippedBoundsInRoot()
+            val secondBounds = onNodeWithTag("memory_block_${second.id}").getUnclippedBoundsInRoot()
+            val firstHeight = firstBounds.bottom - firstBounds.top
+            val secondHeight = secondBounds.bottom - secondBounds.top
+            assertTrue(firstHeight > secondHeight + 120.dp, "Focused text memory should expand for writing")
+            onNodeWithText("Second memory").performClick()
+            waitForIdle()
+            val focusedSecondBounds = onNodeWithTag("memory_block_${second.id}").getUnclippedBoundsInRoot()
+            val focusedSecondHeight = focusedSecondBounds.bottom - focusedSecondBounds.top
+            assertTrue(focusedSecondHeight > secondHeight + 120.dp, "Newly focused text memory should expand")
+            onAllNodesWithTag("editor_text_input")[1].assertIsFocused()
         }
 }

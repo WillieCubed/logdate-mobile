@@ -1,5 +1,10 @@
 package app.logdate.feature.editor.ui.blocks
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,23 +65,29 @@ internal fun MemoryBlockSurface(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val framed = block is ImageBlockUiState && block.presentation == PhotoPresentation.Framed
+    val surfaceColor by animateColorAsState(
+        if (framed) Color.White else MaterialTheme.colorScheme.surfaceContainer,
+        label = "memorySurfaceColor",
+    )
+    val photoTopInset by animateDpAsState(if (framed) 12.dp else 0.dp, label = "photoTopInset")
     Surface(
         modifier =
             modifier
+                .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
                 .fillMaxWidth()
                 .testTag(
                     "memory_block_${block.id}",
                 ).semantics { selected = isSelected }
                 .clickable(onClick = onSelect),
         shape = MaterialTheme.shapes.medium,
-        color = if (framed) Color.White else MaterialTheme.colorScheme.surfaceContainer,
+        color = surfaceColor,
         contentColor = if (framed) Color.Black else MaterialTheme.colorScheme.onSurface,
     ) {
         Box {
             val contentInsets =
                 when (block) {
                     is TextBlockUiState, is AudioBlockUiState -> Modifier.padding(end = 48.dp)
-                    is ImageBlockUiState -> if (framed) Modifier.padding(top = 12.dp) else Modifier
+                    is ImageBlockUiState -> Modifier.padding(top = photoTopInset)
                     else -> Modifier
                 }
             Column(contentInsets) { content() }

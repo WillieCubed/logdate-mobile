@@ -1,6 +1,7 @@
 package app.logdate.feature.editor.ui.blocks
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -115,24 +116,31 @@ internal fun EntryMemorySequence(
                     return Offset(0f, consumed)
                 }
 
-                override suspend fun onPostFling(
-                    consumed: Velocity,
-                    available: Velocity,
-                ): Velocity {
+                private suspend fun settleGesture(): Boolean {
                     if (isCollapsing) {
                         settledProgress.snapTo((1f - collapseDistance / collapseThreshold).coerceIn(0f, 1f))
                         addExpanded = collapseDistance < collapseThreshold
                         collapseDistance = 0f
                         isCollapsing = false
                         settleRequest++
-                        return Velocity.Zero
+                        return true
                     }
-                    if (!isPulling) return Velocity.Zero
+                    if (!isPulling) return false
                     settledProgress.snapTo((pullDistance / pullThreshold).coerceIn(0f, 1f))
                     addExpanded = pullDistance >= pullThreshold
                     pullDistance = 0f
                     isPulling = false
                     settleRequest++
+                    return true
+                }
+
+                override suspend fun onPreFling(available: Velocity): Velocity = if (settleGesture()) available else Velocity.Zero
+
+                override suspend fun onPostFling(
+                    consumed: Velocity,
+                    available: Velocity,
+                ): Velocity {
+                    settleGesture()
                     return Velocity.Zero
                 }
             }
@@ -186,6 +194,7 @@ internal fun EntryMemorySequence(
         Column(Modifier.widthIn(max = 720.dp).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().nestedScroll(pullConnection)) {
                 val availablePhotoHeight = maxHeight - 16.dp
+                val focusedTextHeight = (maxHeight * 0.62f).coerceIn(220.dp, 480.dp)
 
                 fun blockWidth(block: EntryBlockUiState): Dp {
                     val photo =
@@ -204,6 +213,7 @@ internal fun EntryMemorySequence(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     items(uiState.blocks, key = { it.id }) { block ->
+                        val animatedWidth by animateDpAsState(blockWidth(block), label = "memoryBlockWidth")
                         Box(Modifier.fillMaxWidth().animateItem(), contentAlignment = Alignment.TopCenter) {
                             MemoryBlockSurface(
                                 block = block,
@@ -216,7 +226,7 @@ internal fun EntryMemorySequence(
                                 },
                                 onUpdate = uiState.onUpdateBlock,
                                 onRemove = { uiState.onDeleteBlock(block.id) },
-                                modifier = Modifier.widthIn(max = blockWidth(block)),
+                                modifier = Modifier.widthIn(max = animatedWidth),
                             ) {
                                 MemoryBlockContent(
                                     block,
@@ -228,12 +238,16 @@ internal fun EntryMemorySequence(
                                     onRemove = { uiState.onDeleteBlock(block.id) },
                                     onAudioResolverReady = onAudioResolverReady,
                                     onPhotoAspectRatioLoaded = { id, ratio -> aspectRatios[id] = ratio },
+                                    focusedTextHeight = focusedTextHeight,
                                 )
                             }
                         }
                     }
                     item(key = "add_memory_footer") {
-                        val footerWidth = uiState.blocks.lastOrNull()?.let(::blockWidth) ?: 720.dp
+                        val footerWidth by animateDpAsState(
+                            uiState.blocks.lastOrNull()?.let(::blockWidth) ?: 720.dp,
+                            label = "addMemoryWidth",
+                        )
                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
                             EndOfEntryAddControl(
                                 progress = revealProgress,
