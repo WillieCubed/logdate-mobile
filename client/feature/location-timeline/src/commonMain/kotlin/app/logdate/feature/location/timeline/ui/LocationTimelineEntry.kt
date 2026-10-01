@@ -19,12 +19,13 @@ fun LocationTimelineScreen(
     modifier: Modifier = Modifier,
     onOpenNote: (Uuid) -> Unit = {},
     onAddMemory: (VisitMemoryContext) -> Unit = {},
+    embeddedInHome: Boolean = false,
     viewModel: LocationTimelineViewModel? = null,
 ) {
     val flags = koinInject<FeatureFlagStore>()
     val enabled by flags.observe(FeatureFlag.HUMAN_LOCATION_HISTORY).collectAsStateWithLifecycle(false)
     if (enabled) {
-        HumanLocationHistoryScreen(onOpenNote, onAddMemory, modifier)
+        HumanLocationHistoryScreen(onOpenNote, onAddMemory, modifier, showTitle = !embeddedInHome)
     } else {
         LegacyLocationTimelineScreen(modifier, onOpenNote, viewModel ?: koinViewModel())
     }

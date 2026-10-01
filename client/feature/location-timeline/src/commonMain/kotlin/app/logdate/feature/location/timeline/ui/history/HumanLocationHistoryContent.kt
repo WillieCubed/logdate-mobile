@@ -13,12 +13,14 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -86,38 +88,34 @@ fun HumanLocationHistoryContent(
     modifier: Modifier = Modifier,
     mapContent: @Composable (Modifier) -> Unit = {},
     toolbarActions: @Composable RowScope.() -> Unit = {},
+    showTitle: Boolean = true,
 ) {
-    Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer), contentAlignment = Alignment.TopCenter) {
+    BoxWithConstraints(
+        modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        val tabsInAppBar = !showTitle || maxWidth >= 600.dp
+        val tabWidth = (maxWidth - 80.dp).coerceAtMost(360.dp)
         Column(Modifier.widthIn(max = 1200.dp).fillMaxSize()) {
             TopAppBar(
-                title = { Text("Locations", style = MaterialTheme.typography.titleLarge) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (showTitle) {
+                            Text("Locations", style = MaterialTheme.typography.titleLarge)
+                        }
+                        if (tabsInAppBar) {
+                            if (showTitle) {
+                                Spacer(Modifier.weight(1f))
+                            }
+                            HistoryTabs(state, actions, Modifier.width(tabWidth))
+                        }
+                    }
+                },
                 actions = toolbarActions,
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             )
-            PrimaryTabRow(
-                selectedTabIndex = state.tab.ordinal,
-                modifier = Modifier.widthIn(max = 440.dp),
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            ) {
-                HistoryTab.entries.forEach { tab ->
-                    Tab(
-                        selected = state.tab == tab,
-                        onClick = { actions.onTab(tab) },
-                        text = {
-                            Text(
-                                stringResource(
-                                    if (tab ==
-                                        HistoryTab.Day
-                                    ) {
-                                        Res.string.history_your_day
-                                    } else {
-                                        Res.string.history_your_places
-                                    },
-                                ),
-                            )
-                        },
-                    )
-                }
+            if (!tabsInAppBar) {
+                HistoryTabs(state, actions, Modifier.fillMaxWidth())
             }
             state.recoveryMessage?.let { message ->
                 Surface(color = MaterialTheme.colorScheme.secondaryContainer) {
@@ -144,6 +142,29 @@ fun HumanLocationHistoryContent(
 }
 
 @Composable
+private fun HistoryTabs(
+    state: HumanLocationHistoryState,
+    actions: HumanLocationHistoryActions,
+    modifier: Modifier = Modifier,
+) {
+    PrimaryTabRow(
+        selectedTabIndex = state.tab.ordinal,
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        HistoryTab.entries.forEach { tab ->
+            Tab(
+                selected = state.tab == tab,
+                onClick = { actions.onTab(tab) },
+                text = {
+                    Text(stringResource(if (tab == HistoryTab.Day) Res.string.history_your_day else Res.string.history_your_places))
+                },
+            )
+        }
+    }
+}
+
+@Composable
 private fun HistoryDay(
     state: HumanLocationHistoryState,
     actions: HumanLocationHistoryActions,
@@ -162,15 +183,19 @@ private fun HistoryDay(
             paneSpacing = Spacing.lg,
             supportingPaneWidth = 360.dp,
             mainPane = { layout ->
-                HistoryDayPane {
-                    HistoryDateHeader(state, actions)
-                    HorizontalDivider(
-                        Modifier.padding(horizontal = Spacing.lg),
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                    )
-                    HistoryDayList(state, actions, Modifier.weight(1f)) {
-                        if (!layout.showSupportingPane && state.items.isNotEmpty()) {
-                            HistoryDayOverview(state, actions, mapContent)
+                if (layout.showSupportingPane && state.items.isNotEmpty()) {
+                    HistoryWideMap(state, actions, mapContent)
+                } else {
+                    HistoryDayPane {
+                        HistoryDateHeader(state, actions)
+                        HorizontalDivider(
+                            Modifier.padding(horizontal = Spacing.lg),
+                            color = MaterialTheme.colorScheme.outlineVariant,
+                        )
+                        HistoryDayList(state, actions, Modifier.weight(1f)) {
+                            if (state.items.isNotEmpty()) {
+                                HistoryDayOverview(state, actions, mapContent)
+                            }
                         }
                     }
                 }
@@ -178,14 +203,64 @@ private fun HistoryDay(
             supportingPane = {
                 if (state.items.isNotEmpty()) {
                     HistoryDayPane {
-                        Column(Modifier.padding(Spacing.lg)) {
-                            Text("Day overview", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                            HistoryDayOverview(state, actions, mapContent, expandedByDefault = true)
-                        }
+                        Text(
+                            "Visits and journeys",
+                            Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        HistoryDayList(state, actions, Modifier.weight(1f))
                     }
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun HistoryWideMap(
+    state: HumanLocationHistoryState,
+    actions: HumanLocationHistoryActions,
+    mapContent: @Composable (Modifier) -> Unit,
+) {
+    var replayVisible by remember(state.dateLabel) { mutableStateOf(false) }
+    HistoryDayPane {
+        HistoryDateHeader(state, actions)
+        HorizontalDivider(
+            Modifier.padding(horizontal = Spacing.lg),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+        Row(
+            Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.sm, top = Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Your route", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            TextButton(onClick = {
+                if (replayVisible) actions.onReplayPlaying?.invoke(false)
+                replayVisible = !replayVisible
+            }) {
+                Icon(Icons.Default.PlayArrow, null, Modifier.size(18.dp))
+                Text(
+                    stringResource(if (replayVisible) Res.string.history_hide_replay else Res.string.history_replay),
+                    Modifier.padding(start = 6.dp),
+                )
+            }
+        }
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(start = Spacing.lg, end = Spacing.lg, bottom = Spacing.lg)
+                .clip(RoundedCornerShape(Spacing.lg)),
+        ) {
+            mapContent(Modifier.fillMaxSize())
+        }
+        if (replayVisible) {
+            Box(Modifier.padding(Spacing.lg)) {
+                HistoryReplay(state, actions)
+            }
+        }
     }
 }
 
@@ -247,9 +322,8 @@ private fun HistoryDayOverview(
     state: HumanLocationHistoryState,
     actions: HumanLocationHistoryActions,
     mapContent: @Composable (Modifier) -> Unit,
-    expandedByDefault: Boolean = false,
 ) {
-    var mapVisible by remember(state.dateLabel) { mutableStateOf(expandedByDefault) }
+    var mapVisible by remember(state.dateLabel) { mutableStateOf(false) }
     var replayVisible by remember(state.dateLabel) { mutableStateOf(false) }
     Column {
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -273,7 +347,7 @@ private fun HistoryDayOverview(
         }
         if (mapVisible) {
             Box(Modifier.padding(horizontal = 4.dp).clip(RoundedCornerShape(16.dp)).animateContentSize()) {
-                mapContent(Modifier.fillMaxWidth().height(if (expandedByDefault) 240.dp else 168.dp))
+                mapContent(Modifier.fillMaxWidth().height(168.dp))
             }
         }
         if (replayVisible) {

@@ -124,6 +124,11 @@ private val historyDay =
 fun HumanLocationHistoryDayScreenshot() = HistoryScene(historyDay)
 
 @PreviewTest
+@Preview(name = "History Standalone", device = PHONE, showBackground = true)
+@Composable
+fun HumanLocationHistoryStandaloneScreenshot() = HistoryScene(historyDay, showTitle = true)
+
+@PreviewTest
 @Preview(name = "History Large Text", device = PHONE, fontScale = 1.8f, showBackground = true)
 @Composable
 fun HumanLocationHistoryLargeTextScreenshot() = HistoryScene(historyDay)
@@ -152,13 +157,14 @@ fun HumanLocationHistoryDetailScreenshot() = HistoryDetailScene("cafe-morning")
 fun HumanLocationHistoryAudioScreenshot() = HistoryDetailScene("library")
 
 @Composable
-private fun HistoryScene(state: HumanLocationHistoryState) {
+private fun HistoryScene(state: HumanLocationHistoryState, showTitle: Boolean = false) {
     ScreenshotTheme {
         HumanLocationHistoryContent(
             state,
             HumanLocationHistoryActions(),
             mapContent = { modifier -> HistoryMapFixture(modifier) },
             toolbarActions = { IconButton(onClick = {}) { Icon(Icons.Default.MoreVert, "More location options") } },
+            showTitle = showTitle,
         )
     }
 }
@@ -169,14 +175,36 @@ private fun HistoryMapFixture(modifier: Modifier) {
     val home = SemanticPlace("home", "Home", 36.1699, -115.1398)
     val cafe = SemanticPlace("cafe", "Mothership Coffee", 36.1662, -115.1431)
     val library = SemanticPlace("library", "Las Vegas Library", 36.1624, -115.1452)
-    val places = listOf(home, cafe, library)
-    val visits = places.map { PlaceVisit(it.id, time, time, listOf(it.id), it.latitude, it.longitude, true, it) }
-    val route = listOf(home, cafe).map {
-        LocationObservation(it.id, "fixture", "fixture", time, it.latitude, it.longitude)
+    val park = SemanticPlace("park", "Near Baker Park", 36.1595, -115.1500)
+    val visits = listOf(
+        "home-morning" to home,
+        "cafe-morning" to cafe,
+        "library" to library,
+        "cafe-afternoon" to cafe,
+        "brief" to park,
+        "home-evening" to home,
+    ).map { (id, place) ->
+        PlaceVisit(id, time, time, listOf(id), place.latitude, place.longitude, true, place)
     }
+    fun leg(id: String, mode: TravelMode, from: SemanticPlace, to: SemanticPlace): JourneyLeg =
+        JourneyLeg(
+            id,
+            time,
+            time,
+            listOf(from.id, to.id),
+            mode,
+            listOf(from, to).mapIndexed { index, place ->
+                LocationObservation("$id-$index", "fixture", "fixture", time, place.latitude, place.longitude)
+            },
+        )
     HumanHistoryMap(
-        visits + JourneyLeg("walk", time, time, listOf("home", "cafe"), TravelMode.WALKING, route),
-        "cafe",
+        visits +
+            listOf(
+                leg("walk-cafe", TravelMode.WALKING, home, cafe),
+                leg("walk-library", TravelMode.WALKING, cafe, library),
+                leg("bus", TravelMode.BUS, cafe, park),
+            ),
+        "cafe-morning",
         {},
         modifier,
         {},

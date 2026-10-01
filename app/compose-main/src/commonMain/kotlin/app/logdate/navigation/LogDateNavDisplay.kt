@@ -271,6 +271,7 @@ fun LogDateNavDisplay(
                                                     onAddMemory = { backStack.add(EntryEditorRoute(visitContext = it)) },
                                                     onOpenNote = { backStack.add(NoteDetailRoute(it)) },
                                                     modifier = modifier,
+                                                    embeddedInHome = true,
                                                 )
                                             },
                                         )

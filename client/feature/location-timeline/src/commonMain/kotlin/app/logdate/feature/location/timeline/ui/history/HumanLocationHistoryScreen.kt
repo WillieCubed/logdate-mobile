@@ -45,6 +45,7 @@ fun HumanLocationHistoryScreen(
     onOpenNote: (Uuid) -> Unit,
     onAddMemory: (VisitMemoryContext) -> Unit,
     modifier: Modifier = Modifier,
+    showTitle: Boolean = true,
     viewModel: HumanLocationHistoryViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -112,6 +113,7 @@ fun HumanLocationHistoryScreen(
                 },
             ),
             modifier = Modifier.weight(1f),
+            showTitle = showTitle,
             toolbarActions = {
                 IconButton(onClick = { moreMenu = true }) {
                     Icon(Icons.Default.MoreVert, "More location options", Modifier.size(20.dp))
