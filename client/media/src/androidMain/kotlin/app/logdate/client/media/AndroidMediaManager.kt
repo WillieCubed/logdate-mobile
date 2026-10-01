@@ -193,8 +193,24 @@ class AndroidMediaManager(
             mediaStoreInvalidations().collect {
                 try {
                     emit(getRecentMediaInternal(limit))
+                } catch (error: CancellationException) {
+                    throw error
                 } catch (error: Exception) {
                     Napier.e("Failed to refresh recent Android media after MediaStore change", error)
+                }
+            }
+        }
+
+    override suspend fun getRecentImages(limit: Int): Flow<List<MediaObject.Image>> =
+        flow {
+            emit(getRecentMediaInternal(limit, includeVideos = false).filterIsInstance<MediaObject.Image>())
+            mediaStoreInvalidations().collect {
+                try {
+                    emit(getRecentMediaInternal(limit, includeVideos = false).filterIsInstance<MediaObject.Image>())
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    Napier.e("Failed to refresh recent Android images", error)
                 }
             }
         }
@@ -402,7 +418,10 @@ class AndroidMediaManager(
             mediaItems
         }
 
-    private suspend fun getRecentMediaInternal(limit: Int): List<MediaObject> =
+    private suspend fun getRecentMediaInternal(
+        limit: Int,
+        includeVideos: Boolean = true,
+    ): List<MediaObject> =
         withContext(ioDispatcher) {
             val mediaItems = mutableListOf<MediaObject>()
 
@@ -461,36 +480,38 @@ class AndroidMediaManager(
                 )
             val videoSortOrder = "${MediaStore.Video.Media.DATE_TAKEN} DESC, ${MediaStore.Video.Media.DATE_ADDED} DESC"
 
-            requireQueryCursor(
-                collectionUri = videoCollection,
-                projection = videoProjection,
-                sortOrder = videoSortOrder,
-                limit = limit,
-                failureMessage = "Unable to query recent Android videos",
-            ).use { cursor ->
-                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
-                val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
-                val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
-                val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
-                val dateTakenColumn = cursor.getColumnIndex(MediaStore.Video.Media.DATE_TAKEN)
-                val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
+            if (includeVideos) {
+                requireQueryCursor(
+                    collectionUri = videoCollection,
+                    projection = videoProjection,
+                    sortOrder = videoSortOrder,
+                    limit = limit,
+                    failureMessage = "Unable to query recent Android videos",
+                ).use { cursor ->
+                    val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+                    val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+                    val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
+                    val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
+                    val dateTakenColumn = cursor.getColumnIndex(MediaStore.Video.Media.DATE_TAKEN)
+                    val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
 
-                while (cursor.moveToNext()) {
-                    try {
-                        mediaItems.add(
-                            videoFromCursor(
-                                collectionUri = videoCollection,
-                                cursor = cursor,
-                                idColumn = idColumn,
-                                nameColumn = nameColumn,
-                                sizeColumn = sizeColumn,
-                                durationColumn = durationColumn,
-                                dateTakenColumn = dateTakenColumn,
-                                dateAddedColumn = dateColumn,
-                            ),
-                        )
-                    } catch (error: Exception) {
-                        Napier.e("Unable to materialize Android video row even with fallbacks", error)
+                    while (cursor.moveToNext()) {
+                        try {
+                            mediaItems.add(
+                                videoFromCursor(
+                                    collectionUri = videoCollection,
+                                    cursor = cursor,
+                                    idColumn = idColumn,
+                                    nameColumn = nameColumn,
+                                    sizeColumn = sizeColumn,
+                                    durationColumn = durationColumn,
+                                    dateTakenColumn = dateTakenColumn,
+                                    dateAddedColumn = dateColumn,
+                                ),
+                            )
+                        } catch (error: Exception) {
+                            Napier.e("Unable to materialize Android video row even with fallbacks", error)
+                        }
                     }
                 }
             }

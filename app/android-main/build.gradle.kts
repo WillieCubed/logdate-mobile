@@ -577,12 +577,14 @@ dependencies {
     // drive a real Credential Manager ceremony. A project() dependency cannot be used here:
     // androidTestUtil requires every resolved file to be an APK, and a project dependency
     // brings the module's runtime classpath with it.
-    androidTestUtil(
-        files(
-            rootProject.layout.projectDirectory
-                .file("tools/passkey-test-provider/build/outputs/apk/debug/passkey-test-provider-debug.apk"),
-        ),
-    )
+    if (!providers.gradleProperty("logdate.skipPasskeyTestProvider").map(String::toBoolean).getOrElse(false)) {
+        androidTestUtil(
+            files(
+                rootProject.layout.projectDirectory
+                    .file("tools/passkey-test-provider/build/outputs/apk/debug/passkey-test-provider-debug.apk"),
+            ),
+        )
+    }
     androidTestImplementation(libs.androidx.window.testing)
     androidTestImplementation(libs.androidx.ui.test.junit4)
     androidTestImplementation(libs.androidx.activity.compose)
@@ -683,5 +685,7 @@ tasks.matching { it.name.startsWith("process") && it.name.endsWith("GoogleServic
 // The passkey provider APK is consumed by androidTestUtil as a plain file, so nothing in the
 // dependency graph builds it. Every instrumented-test task needs it on disk first.
 tasks.matching { it.name.endsWith("AndroidTest") }.configureEach {
-    dependsOn(":tools:passkey-test-provider:assembleDebug")
+    if (!providers.gradleProperty("logdate.skipPasskeyTestProvider").map(String::toBoolean).getOrElse(false)) {
+        dependsOn(":tools:passkey-test-provider:assembleDebug")
+    }
 }

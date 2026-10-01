@@ -26,8 +26,8 @@ import kotlin.time.Clock
  *
  * From the archive algorithm:
  * 1. Look at older notes outside the recent-history window
- * 2. Prefer the most recent day with visual media or multiple qualifying notes
- * 3. Fall back to the most recent day with any qualifying notes
+ * 2. Prefer days with visual media or multiple qualifying notes
+ * 3. Rotate the chosen day when a widget supplies [rotationDay]
  *
  * When an [AiRecallProvider] is injected, the AI provider is tried first,
  * falling back to the heuristic on failure.
@@ -52,9 +52,10 @@ class GetMemoryRecallUseCase(
         aiEnabled: Boolean = false,
         recallMode: RecallMode = RecallMode.ON_THIS_DAY,
         contentTypes: Set<WidgetContentType> = WidgetContentType.ALL,
+        rotationDay: LocalDate? = null,
     ): Flow<MemoryRecallData?> =
         flow {
-            if (aiEnabled && aiRecallProvider != null) {
+            if (aiEnabled && aiRecallProvider != null && (recallMode != RecallMode.REDISCOVER || rotationDay == null)) {
                 val aiResult =
                     runCatching { aiRecallProvider.suggestRecall() }
                         .onFailure { Napier.w("AI recall failed, falling back to heuristic", it) }
@@ -68,7 +69,7 @@ class GetMemoryRecallUseCase(
             val recallData =
                 when (recallMode) {
                     RecallMode.ON_THIS_DAY -> findOnThisDayEntries(contentTypes)
-                    RecallMode.REDISCOVER -> findFromArchiveEntries(contentTypes)
+                    RecallMode.REDISCOVER -> findFromArchiveEntries(contentTypes, rotationDay)
                 }
 
             emit(recallData)
@@ -84,7 +85,10 @@ class GetMemoryRecallUseCase(
         return findBestDayInWindow(targetDate, contentTypes)
     }
 
-    private suspend fun findFromArchiveEntries(contentTypes: Set<WidgetContentType>): MemoryRecallData? {
+    private suspend fun findFromArchiveEntries(
+        contentTypes: Set<WidgetContentType>,
+        rotationDay: LocalDate?,
+    ): MemoryRecallData? {
         val timezone = TimeZone.currentSystemDefault()
         val recentCutoff =
             currentLocalDate()
@@ -102,6 +106,18 @@ class GetMemoryRecallUseCase(
                 .groupBy { note -> note.creationTimestamp.toLocalDateTime(timezone).date }
                 .entries
                 .sortedByDescending { entry -> entry.key }
+
+        if (rotationDay != null) {
+            val notable =
+                notesByDay.mapNotNull { (day, notes) ->
+                    if (notes.isNotableArchiveDay(contentTypes)) notes.toRecallData(day, contentTypes) else null
+                }
+            val candidates =
+                notable.ifEmpty {
+                    notesByDay.mapNotNull { (day, notes) -> notes.toRecallData(day, contentTypes) }
+                }
+            return candidates.getOrNull(rotationDay.toEpochDays().mod(candidates.size.coerceAtLeast(1)))
+        }
 
         notesByDay
             .firstNotNullOfOrNull { (day, notes) ->
@@ -157,12 +173,11 @@ class GetMemoryRecallUseCase(
         if (eligibleNotes.isEmpty()) return null
 
         val summary =
-            eligibleNotes
-                .filterIsInstance<JournalNote.Text>()
-                .firstOrNull()
-                ?.content
-                ?.take(SUMMARY_MAX_LENGTH)
-                .orEmpty()
+            (
+                eligibleNotes.filterIsInstance<JournalNote.Text>().firstOrNull { it.content.isNotBlank() }?.content
+                    ?: eligibleNotes.filterIsInstance<JournalNote.Image>().firstOrNull { it.caption.isNotBlank() }?.caption
+                    ?: eligibleNotes.filterIsInstance<JournalNote.Video>().firstOrNull { it.caption.isNotBlank() }?.caption
+            )?.take(SUMMARY_MAX_LENGTH).orEmpty()
 
         val mediaUris =
             eligibleNotes.mapNotNull { note ->

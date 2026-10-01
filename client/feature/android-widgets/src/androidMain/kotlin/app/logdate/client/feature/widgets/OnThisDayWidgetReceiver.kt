@@ -3,35 +3,44 @@ package app.logdate.client.feature.widgets
 import android.content.Context
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
-import androidx.work.Constraints
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
 import java.util.Calendar
-import java.util.concurrent.TimeUnit
 
 /**
  * Broadcast receiver for the On This Day widget.
  *
- * Manages the daily [WorkManager] refresh schedule: the periodic job is enqueued
- * when the first widget instance is placed and cancelled when the last is removed.
+ * Schedules the shared daily refresh when placed or restored.
  */
 class OnThisDayWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = OnThisDayWidget()
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        schedulePeriodicRefresh(context)
-        enqueueImmediateRefresh(context)
+        enqueueWidgetRefresh(context)
     }
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
-        WorkManager
-            .getInstance(context)
-            .cancelUniqueWork(OnThisDayWidget.UNIQUE_WORK_NAME)
+        cancelWidgetRefreshIfUnused(context)
+    }
+
+    override fun onDeleted(
+        context: Context,
+        appWidgetIds: IntArray,
+    ) {
+        super.onDeleted(context, appWidgetIds)
+        val settings = WidgetInstanceSettings(context)
+        appWidgetIds.forEach(settings::remove)
+    }
+
+    override fun onRestored(
+        context: Context,
+        oldWidgetIds: IntArray,
+        newWidgetIds: IntArray,
+    ) {
+        super.onRestored(context, oldWidgetIds, newWidgetIds)
+        val settings = WidgetInstanceSettings(context)
+        settings.remap(oldWidgetIds, newWidgetIds)
+        enqueueWidgetRefresh(context)
     }
 
     override fun onUpdate(
@@ -40,39 +49,7 @@ class OnThisDayWidgetReceiver : GlanceAppWidgetReceiver() {
         appWidgetIds: IntArray,
     ) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
-        enqueueImmediateRefresh(context)
-    }
-
-    private fun schedulePeriodicRefresh(context: Context) {
-        val refreshRequest =
-            PeriodicWorkRequestBuilder<OnThisDayWidgetRefreshWorker>(
-                repeatInterval = 24,
-                repeatIntervalTimeUnit = TimeUnit.HOURS,
-            ).setInitialDelay(
-                calculateDelayUntilNextRefreshWindow(),
-                TimeUnit.MILLISECONDS,
-            ).setConstraints(
-                Constraints.Builder().build(),
-            ).build()
-
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            OnThisDayWidget.UNIQUE_WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
-            refreshRequest,
-        )
-    }
-
-    private fun enqueueImmediateRefresh(context: Context) {
-        val request = OneTimeWorkRequestBuilder<OnThisDayWidgetRefreshWorker>().build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            IMMEDIATE_WORK_NAME,
-            ExistingWorkPolicy.KEEP,
-            request,
-        )
-    }
-
-    private companion object {
-        const val IMMEDIATE_WORK_NAME = "logdate:widget:on_this_day:immediate"
+        enqueueWidgetRefresh(context)
     }
 }
 

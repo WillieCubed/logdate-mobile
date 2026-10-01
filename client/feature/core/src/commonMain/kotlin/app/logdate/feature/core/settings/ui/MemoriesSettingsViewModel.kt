@@ -166,10 +166,10 @@ class MemoriesSettingsViewModel(
         }
     }
 
-    fun addWidgetToHomeScreen() {
+    fun addWidgetToHomeScreen(kind: HomeWidgetKind = HomeWidgetKind.RECALL) {
         viewModelScope.launch {
             try {
-                widgetInstallController.requestAddToHomeScreen()
+                widgetInstallController.requestAddToHomeScreen(kind)
             } catch (e: Exception) {
                 Napier.e("Failed to request widget pinning", e)
             }

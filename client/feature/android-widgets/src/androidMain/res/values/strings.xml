@@ -2,14 +2,22 @@
 <resources>
     <string name="widget_name_on_this_day">Memories</string>
     <string name="widget_description_on_this_day">Rediscover moments from your past</string>
-    <string name="widget_header">MEMORIES</string>
     <string name="widget_loading_message">Looking for memories…</string>
     <string name="widget_new_user_message">Your memories will appear here once you\'ve been journaling for a while.</string>
-    <string name="widget_new_user_cta">Start journaling</string>
     <string name="widget_empty_message">Nothing to revisit today.</string>
-    <string name="widget_empty_cta">Write something</string>
-    <string name="widget_view_memory">View</string>
-    <string name="widget_fallback_summary">A memory from your past</string>
+    <string name="widget_choose_memory_message">Choose an entry to keep close</string>
+    <string name="widget_missing_memory_message">This entry is no longer available.</string>
+    <string name="widget_photo_prompt_description">Recent photo. Write an entry with this photo.</string>
+    <string name="widget_action_write">Write entry</string>
+    <string name="widget_action_record">Record entry</string>
+    <string name="widget_action_camera">Take photo</string>
+    <string name="widget_play_audio">Play recording</string>
+    <string name="widget_audio_title">LogDate recording</string>
+    <string name="widget_unlock_title">Unlock LogDate</string>
+    <string name="widget_name_fixed_memory">Pinned Memory</string>
+    <string name="widget_description_fixed_memory">Keep one journal entry on your home screen</string>
+    <string name="widget_name_new_entry">New Entry</string>
+    <string name="widget_description_new_entry">Start writing with an optional recent photo prompt</string>
 
     <!-- Configuration activity -->
     <string name="widget_config_title">Set up Memories</string>
@@ -18,7 +26,7 @@
     <string name="widget_config_recall_on_this_day">On This Day</string>
     <string name="widget_config_recall_on_this_day_desc">Entries near today\'s date from prior years</string>
     <string name="widget_config_recall_rediscover">From the archive</string>
-    <string name="widget_config_recall_rediscover_desc">The most recent notable older memory, regardless of date</string>
+    <string name="widget_config_recall_rediscover_desc">A different older memory each day</string>
     <string name="widget_config_content_types">What to show</string>
     <string name="widget_config_content_text">Text notes</string>
     <string name="widget_config_content_photos">Photos</string>

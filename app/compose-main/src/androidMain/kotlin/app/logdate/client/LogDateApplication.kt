@@ -12,6 +12,7 @@ import app.logdate.client.calendar.CalendarImportScheduler
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.domain.recommendation.AmbientPromptTriggerContext
 import app.logdate.client.events.EventInferenceScheduler
+import app.logdate.client.feature.widgets.publishWidgetPreviews
 import app.logdate.client.image.DataSaverImageInterceptor
 import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.client.networking.DataUsagePolicy
@@ -28,6 +29,10 @@ import coil3.memory.MemoryCache
 import coil3.request.crossfade
 import coil3.video.VideoFrameDecoder
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 
@@ -79,6 +84,9 @@ class LogdateApplication :
         Napier.base(CrashlyticsAntilog())
         initializeKoin()
         Napier.i("Application onCreate: Koin initialized", tag = APP_STARTUP_TAG)
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            publishWidgetPreviews(this@LogdateApplication)
+        }
         runCatching {
             LogDateNotificationRegistrar(this).registerAllPhoneChannels()
         }.onFailure { error ->

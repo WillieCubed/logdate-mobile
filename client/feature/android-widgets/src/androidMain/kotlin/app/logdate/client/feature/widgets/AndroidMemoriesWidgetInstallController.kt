@@ -1,9 +1,15 @@
 package app.logdate.client.feature.widgets
 
+import android.app.ActivityOptions
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.os.Build
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import androidx.glance.appwidget.GlanceAppWidgetManager
+import app.logdate.feature.core.settings.ui.HomeWidgetKind
 import app.logdate.feature.core.settings.ui.MemoriesWidgetInstallController
 import app.logdate.feature.core.settings.ui.MemoriesWidgetInstallUiState
 import io.github.aakira.napier.Napier
@@ -12,7 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Android implementation that requests launcher pinning for the Memories widget.
+ * Requests launcher pinning for each LogDate widget type.
  */
 class AndroidMemoriesWidgetInstallController(
     private val context: Context,
@@ -22,7 +28,9 @@ class AndroidMemoriesWidgetInstallController(
 
     override val uiState: StateFlow<MemoriesWidgetInstallUiState> = _uiState.asStateFlow()
 
-    override suspend fun requestAddToHomeScreen() {
+    override suspend fun requestAddToHomeScreen() = requestAddToHomeScreen(HomeWidgetKind.RECALL)
+
+    override suspend fun requestAddToHomeScreen(kind: HomeWidgetKind) {
         val appWidgetManager = AppWidgetManager.getInstance(appContext)
         if (!appWidgetManager.isRequestPinAppWidgetSupported) {
             _uiState.value = MemoriesWidgetInstallUiState.Unsupported
@@ -30,13 +38,32 @@ class AndroidMemoriesWidgetInstallController(
         }
 
         val successIntent =
-            MemoriesWidgetPinSuccessReceiver.createCallbackPendingIntent(appContext)
+            if (kind == HomeWidgetKind.NEW_ENTRY) null else MemoriesWidgetPinSuccessCallback.createPendingIntent(appContext, kind)
+        val manager = GlanceAppWidgetManager(appContext)
         val accepted =
-            appWidgetManager.requestPinAppWidget(
-                ComponentName(appContext, OnThisDayWidgetReceiver::class.java),
-                null,
-                successIntent,
-            )
+            when (kind) {
+                HomeWidgetKind.RECALL ->
+                    manager.requestPinGlanceAppWidget(
+                        receiver = OnThisDayWidgetReceiver::class.java,
+                        preview = OnThisDayWidget(),
+                        previewSize = DpSize(250.dp, 180.dp),
+                        successCallback = successIntent,
+                    )
+                HomeWidgetKind.FIXED_MEMORY ->
+                    manager.requestPinGlanceAppWidget(
+                        receiver = FixedMemoryWidgetReceiver::class.java,
+                        preview = FixedMemoryWidget(),
+                        previewSize = DpSize(250.dp, 180.dp),
+                        successCallback = successIntent,
+                    )
+                HomeWidgetKind.NEW_ENTRY ->
+                    manager.requestPinGlanceAppWidget(
+                        receiver = NewEntryWidgetReceiver::class.java,
+                        preview = NewEntryWidget(),
+                        previewSize = DpSize(250.dp, 180.dp),
+                        successCallback = successIntent,
+                    )
+            }
 
         if (!accepted) {
             Napier.w("Launcher rejected the Memories widget pin request")
@@ -57,16 +84,36 @@ class AndroidMemoriesWidgetInstallController(
     }
 }
 
-internal object MemoriesWidgetPinSuccessReceiver {
+internal object MemoriesWidgetPinSuccessCallback {
     private const val REQUEST_CODE = 7001
 
-    fun createCallbackPendingIntent(context: Context): PendingIntent {
-        val intent = android.content.Intent(context, WidgetPinnedReceiver::class.java)
-        return PendingIntent.getBroadcast(
+    fun createPendingIntent(
+        context: Context,
+        kind: HomeWidgetKind,
+    ): PendingIntent {
+        val configActivity =
+            when (kind) {
+                HomeWidgetKind.RECALL -> OnThisDayWidgetConfigActivity::class.java
+                HomeWidgetKind.FIXED_MEMORY -> FixedMemoryWidgetConfigActivity::class.java
+                HomeWidgetKind.NEW_ENTRY -> NewEntryWidgetConfigActivity::class.java
+            }
+        val intent = Intent(context, configActivity)
+        val options =
+            if (Build.VERSION.SDK_INT >= 35) {
+                ActivityOptions
+                    .makeBasic()
+                    .apply {
+                        pendingIntentCreatorBackgroundActivityStartMode = ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                    }.toBundle()
+            } else {
+                null
+            }
+        return PendingIntent.getActivity(
             context,
-            REQUEST_CODE,
+            REQUEST_CODE + kind.ordinal,
             intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+            options,
         )
     }
 }

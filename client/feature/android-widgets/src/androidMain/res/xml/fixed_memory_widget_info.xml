@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:configure="app.logdate.client.feature.widgets.FixedMemoryWidgetConfigActivity"
+    android:description="@string/widget_description_fixed_memory"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:previewImage="@drawable/fixed_memory_widget_preview"
+    android:previewLayout="@layout/fixed_memory_widget_preview"
+    android:minWidth="250dp"
+    android:minHeight="180dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="180dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:widgetFeatures="reconfigurable"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

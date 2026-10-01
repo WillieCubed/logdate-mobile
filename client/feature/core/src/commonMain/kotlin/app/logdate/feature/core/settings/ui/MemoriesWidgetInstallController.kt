@@ -11,7 +11,11 @@ interface MemoriesWidgetInstallController {
     val uiState: StateFlow<MemoriesWidgetInstallUiState>
 
     suspend fun requestAddToHomeScreen()
+
+    suspend fun requestAddToHomeScreen(kind: HomeWidgetKind) = requestAddToHomeScreen()
 }
+
+enum class HomeWidgetKind { RECALL, FIXED_MEMORY, NEW_ENTRY }
 
 sealed interface MemoriesWidgetInstallUiState {
     data object Hidden : MemoriesWidgetInstallUiState

@@ -14,12 +14,48 @@
         </receiver>
 
         <receiver
-            android:name="app.logdate.client.feature.widgets.WidgetPinnedReceiver"
-            android:exported="false" />
+            android:name="app.logdate.client.feature.widgets.FixedMemoryWidgetReceiver"
+            android:exported="false"
+            android:label="@string/widget_name_fixed_memory">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/fixed_memory_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name="app.logdate.client.feature.widgets.NewEntryWidgetReceiver"
+            android:exported="false"
+            android:label="@string/widget_name_new_entry">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/new_entry_widget_info" />
+        </receiver>
 
         <activity
             android:name="app.logdate.client.feature.widgets.OnThisDayWidgetConfigActivity"
             android:exported="true"
             android:theme="@style/Theme.LogDate" />
+
+        <activity
+            android:name="app.logdate.client.feature.widgets.FixedMemoryWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.LogDate" />
+
+        <activity
+            android:name="app.logdate.client.feature.widgets.NewEntryWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.LogDate" />
+
+        <activity
+            android:name="app.logdate.client.feature.widgets.WidgetAudioPlaybackActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
     </application>
 </manifest>

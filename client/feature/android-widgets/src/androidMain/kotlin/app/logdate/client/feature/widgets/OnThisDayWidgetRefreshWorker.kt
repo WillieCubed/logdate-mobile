@@ -8,26 +8,23 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
+import app.logdate.client.media.MediaManager
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.transcription.TranscriptionRepository
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atStartOfDayIn
-import kotlinx.datetime.minus
 import kotlinx.datetime.toLocalDateTime
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 /**
- * Background worker that fetches memory recall data and updates all widget instances.
- *
- * Produces one of four states:
- * - [OnThisDayWidgetState.HasMemory] — a past entry was found
- * - [OnThisDayWidgetState.NoMemoryToday] — user has history but no match today
- * - [OnThisDayWidgetState.NewUser] — user hasn't journaled long enough
- * - [OnThisDayWidgetState.Loading] is never produced (it's only the DataStore default)
+ * Refreshes each widget provider independently so one failing data source does
+ * not prevent the other widget types from updating.
  */
 class OnThisDayWidgetRefreshWorker(
     private val context: Context,
@@ -37,56 +34,133 @@ class OnThisDayWidgetRefreshWorker(
     private val getMemoryRecall: GetMemoryRecallUseCase by inject()
     private val memoriesSettingsRepository: MemoriesSettingsRepository by inject()
     private val notesRepository: JournalNotesRepository by inject()
+    private val mediaManager: MediaManager by inject()
+    private val transcriptionRepository: TranscriptionRepository by inject()
 
     override suspend fun doWork(): Result =
         try {
-            val settings = memoriesSettingsRepository.getSettings()
-
-            val widgetState =
-                if (!settings.contextualRecommendationsEnabled) {
-                    OnThisDayWidgetState.NoMemoryToday
-                } else {
-                    val recallData =
-                        getMemoryRecall(
-                            aiEnabled = settings.aiRecallEnabled,
-                            recallMode = settings.recallMode,
-                            contentTypes = settings.widgetContentTypes,
-                        ).firstOrNull()
-                    if (recallData != null) {
-                        val fallback = context.getString(R.string.widget_fallback_summary)
-                        recallData.toWidgetState(fallbackSummary = fallback)
-                    } else {
-                        resolveEmptyState()
+            val manager = GlanceAppWidgetManager(context)
+            val instanceSettings = WidgetInstanceSettings(context)
+            var failed = false
+            try {
+                val settings = memoriesSettingsRepository.getSettings()
+                manager.getGlanceIds(OnThisDayWidget::class.java).forEach { glanceId ->
+                    try {
+                        val appWidgetId = manager.getAppWidgetId(glanceId)
+                        instanceSettings.ensureRecallDefaults(appWidgetId, settings.recallMode, settings.widgetContentTypes)
+                        val recallData =
+                            getMemoryRecall(
+                                aiEnabled = settings.aiRecallEnabled,
+                                recallMode = instanceSettings.recallMode(appWidgetId, settings.recallMode),
+                                contentTypes = instanceSettings.contentTypes(appWidgetId, settings.widgetContentTypes),
+                                rotationDay =
+                                    Clock.System
+                                        .now()
+                                        .toLocalDateTime(TimeZone.currentSystemDefault())
+                                        .date,
+                            ).firstOrNull()
+                        val widgetState =
+                            if (recallData != null) {
+                                recallData.toWidgetStateWithAudio(
+                                    notesRepository,
+                                    transcriptionRepository,
+                                    instanceSettings.contentTypes(appWidgetId, settings.widgetContentTypes),
+                                )
+                            } else {
+                                resolveEmptyWidgetState(notesRepository)
+                            }
+                        updateAppWidgetState(context, OnThisDayWidgetStateDefinition, glanceId) { widgetState }
+                    } catch (error: Exception) {
+                        failed = true
+                        Napier.w("Unable to refresh a Memories widget", error)
                     }
                 }
-
-            val manager = GlanceAppWidgetManager(context)
-            manager.getGlanceIds(OnThisDayWidget::class.java).forEach { glanceId ->
-                updateAppWidgetState(context, OnThisDayWidgetStateDefinition, glanceId) {
-                    widgetState
-                }
+                OnThisDayWidget().updateAll(context)
+            } catch (error: Exception) {
+                failed = true
+                Napier.w("Unable to refresh Memories widgets", error)
             }
-            OnThisDayWidget().updateAll(context)
-            Napier.d("On This Day widget refreshed: $widgetState")
-            Result.success()
+            try {
+                manager.getGlanceIds(FixedMemoryWidget::class.java).forEach { glanceId ->
+                    try {
+                        val noteId = instanceSettings.chosenNoteId(manager.getAppWidgetId(glanceId))
+                        val state =
+                            if (noteId == null) {
+                                OnThisDayWidgetState.ChooseMemory
+                            } else {
+                                runCatching { notesRepository.getNoteById(Uuid.parse(noteId)) }
+                                    .getOrNull()
+                                    ?.let { note ->
+                                        val transcript =
+                                            if (note is JournalNote.Audio) {
+                                                runCatching {
+                                                    transcriptionRepository
+                                                        .getTranscription(
+                                                            note.uid,
+                                                        )?.displayText()
+                                                }.getOrNull()
+                                            } else {
+                                                null
+                                            }
+                                        note.toFixedWidgetState(transcript)
+                                    } ?: OnThisDayWidgetState.MissingMemory
+                            }
+                        updateAppWidgetState(context, OnThisDayWidgetStateDefinition, glanceId) { state }
+                    } catch (error: Exception) {
+                        failed = true
+                        Napier.w("Unable to refresh a pinned memory widget", error)
+                    }
+                }
+                FixedMemoryWidget().updateAll(context)
+            } catch (error: Exception) {
+                failed = true
+                Napier.w("Unable to refresh pinned memory widgets", error)
+            }
+            try {
+                val photoIds = manager.getGlanceIds(NewEntryWidget::class.java)
+                if (photoIds.isNotEmpty()) {
+                    val usePhoto = photoIds.any { instanceSettings.usePhotoPrompt(manager.getAppWidgetId(it)) }
+                    val photoState =
+                        if (usePhoto && hasWidgetImageAccess(context)) {
+                            runCatching {
+                                val today =
+                                    Clock.System
+                                        .now()
+                                        .toLocalDateTime(TimeZone.currentSystemDefault())
+                                        .date
+                                choosePhotoPrompt(mediaManager.getRecentImages(60).first(), today)
+                                    ?.let { OnThisDayWidgetState.PhotoPrompt(it.uri) }
+                            }.getOrNull() ?: OnThisDayWidgetState.PhotoUnavailable
+                        } else {
+                            OnThisDayWidgetState.PhotoUnavailable
+                        }
+                    photoIds.forEach { glanceId ->
+                        try {
+                            val state =
+                                if (instanceSettings.usePhotoPrompt(
+                                        manager.getAppWidgetId(glanceId),
+                                    )
+                                ) {
+                                    photoState
+                                } else {
+                                    OnThisDayWidgetState.NewEntryReady
+                                }
+                            updateAppWidgetState(context, OnThisDayWidgetStateDefinition, glanceId) { state }
+                        } catch (error: Exception) {
+                            failed = true
+                            Napier.w("Unable to refresh a New Entry widget", error)
+                        }
+                    }
+                    NewEntryWidget().updateAll(context)
+                }
+            } catch (error: Exception) {
+                failed = true
+                Napier.w("Unable to refresh New Entry widgets", error)
+            }
+            publishWidgetPreviews(context)
+            if (failed) Result.retry() else Result.success()
         } catch (e: Exception) {
             Napier.e("Failed to refresh On This Day widget", e)
             Result.retry()
         }
-
-    /**
-     * Determines whether the user is too new (no entries older than ~1 year)
-     * or simply has no matching memory for today.
-     */
-    private suspend fun resolveEmptyState(): OnThisDayWidgetState {
-        val today =
-            Clock.System
-                .now()
-                .toLocalDateTime(TimeZone.currentSystemDefault())
-                .date
-        val oneYearAgo = today.minus(1, DateTimeUnit.YEAR)
-        val cutoff = oneYearAgo.atStartOfDayIn(TimeZone.currentSystemDefault())
-        val hasOldEntries = notesRepository.hasNotesBefore(cutoff)
-        return if (hasOldEntries) OnThisDayWidgetState.NoMemoryToday else OnThisDayWidgetState.NewUser
-    }
 }

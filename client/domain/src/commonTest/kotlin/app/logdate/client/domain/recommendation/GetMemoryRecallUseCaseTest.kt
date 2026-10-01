@@ -17,6 +17,7 @@ import kotlinx.datetime.toLocalDateTime
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -87,6 +88,24 @@ class GetMemoryRecallUseCaseTest {
         }
 
     @Test
+    fun `widget archive recall rotates between eligible days and stays stable within a day`() =
+        runTest {
+            val today = currentLocalDate()
+            notesRepository.addImageNote(today.minus(45, DateTimeUnit.DAY), "content://media/one")
+            notesRepository.addImageNote(today.minus(90, DateTimeUnit.DAY), "content://media/two")
+
+            val first = useCase(recallMode = RecallMode.REDISCOVER, rotationDay = today).first()
+            val repeat = useCase(recallMode = RecallMode.REDISCOVER, rotationDay = today).first()
+            val next = useCase(recallMode = RecallMode.REDISCOVER, rotationDay = today.plus(1, DateTimeUnit.DAY)).first()
+
+            assertNotNull(first)
+            assertNotNull(repeat)
+            assertNotNull(next)
+            assertEquals(first.date, repeat.date)
+            kotlin.test.assertNotEquals(first.date, next.date)
+        }
+
+    @Test
     fun `REDISCOVER ignores notes inside the recent-history window`() =
         runTest {
             val today = currentLocalDate()
@@ -140,6 +159,18 @@ class GetMemoryRecallUseCaseTest {
                 listOf("content://media/photo", "content://media/video"),
                 result.mediaUris,
             )
+        }
+
+    @Test
+    fun `photo caption becomes the memory text when no text note exists`() =
+        runTest {
+            val targetDate = currentLocalDate().minus(1, DateTimeUnit.YEAR)
+            notesRepository.addImageNote(targetDate, "content://media/photo", "The yellow house at dusk")
+
+            val result = useCase(contentTypes = setOf(WidgetContentType.PHOTOS)).first()
+
+            assertNotNull(result)
+            assertEquals("The yellow house at dusk", result.summary)
         }
 
     @Test
@@ -241,6 +272,40 @@ class GetMemoryRecallUseCaseTest {
             assertEquals(aiResult, result)
         }
 
+    @Test
+    fun `widget archive rotation stays daily even when AI recall is enabled`() =
+        runTest {
+            val today = currentLocalDate()
+            notesRepository.addImageNote(today.minus(45, DateTimeUnit.DAY), "content://media/one")
+            notesRepository.addImageNote(today.minus(90, DateTimeUnit.DAY), "content://media/two")
+            val aiResult = MemoryRecallData(LocalDate(2021, 7, 14), "AI-selected memory", emptyList())
+            val aiUseCase =
+                GetMemoryRecallUseCase(
+                    notesRepository = notesRepository,
+                    aiRecallProvider =
+                        object : AiRecallProvider {
+                            override suspend fun suggestRecall(): MemoryRecallData = aiResult
+                        },
+                )
+
+            val first =
+                aiUseCase(aiEnabled = true, recallMode = RecallMode.REDISCOVER, rotationDay = today).first()
+            val repeat =
+                aiUseCase(aiEnabled = true, recallMode = RecallMode.REDISCOVER, rotationDay = today).first()
+            val next =
+                aiUseCase(
+                    aiEnabled = true,
+                    recallMode = RecallMode.REDISCOVER,
+                    rotationDay = today.plus(1, DateTimeUnit.DAY),
+                ).first()
+
+            assertNotNull(first)
+            assertNotNull(next)
+            assertNotEquals(aiResult, first)
+            assertEquals(first, repeat)
+            assertNotEquals(first.date, next.date)
+        }
+
     private fun currentLocalDate(): LocalDate =
         Clock.System
             .now()
@@ -273,12 +338,14 @@ private class FakeJournalNotesRepository : JournalNotesRepository {
     fun addImageNote(
         day: LocalDate,
         mediaRef: String,
+        caption: String = "",
     ) {
         val timestamp = day.atStartOfDayIn(timezone)
         notes +=
             JournalNote.Image(
                 uid = Uuid.random(),
                 mediaRef = mediaRef,
+                caption = caption,
                 creationTimestamp = timestamp,
                 lastUpdated = timestamp,
                 location = NoteLocation(),

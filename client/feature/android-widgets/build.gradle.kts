@@ -42,6 +42,7 @@ kotlin {
         }
         commonMain.dependencies {
             implementation(projects.client.domain)
+            implementation(projects.client.media)
             implementation(projects.client.repository)
             implementation(projects.shared.model)
             implementation(libs.kotlinx.serialization.json)
@@ -68,6 +69,7 @@ kotlin {
             implementation(libs.compose.foundation)
             implementation(libs.compose.material.icons.extended)
             implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.biometric)
 
             // WorkManager
             implementation(libs.androidx.work.runtime)

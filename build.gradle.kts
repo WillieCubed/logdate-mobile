@@ -661,6 +661,7 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                                 hardwareProfile = "Pixel 2",
                                 apiLevel = 30,
                                 systemImageSource = "google",
+                                pageAlignment = ManagedVirtualDevice.PageAlignment.FORCE_4KB_PAGES,
                             ),
                             ManagedVirtualDeviceConfig(
                                 deviceName = "flagshipPhoneApi36",

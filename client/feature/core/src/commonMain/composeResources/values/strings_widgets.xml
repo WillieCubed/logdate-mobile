@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Widget settings (settings screen) -->
-    <string name="widget_settings">Widget</string>
-    <string name="widget_add_to_home_screen">Add widget to home screen</string>
+    <string name="widget_settings">Home screen widgets</string>
+    <string name="widget_add_to_home_screen">Add rotating Memories</string>
+    <string name="widget_add_fixed_memory">Add pinned memory</string>
+    <string name="widget_add_new_entry">Add new entry prompt</string>
+    <string name="widget_setup_hint">Choose a widget to add. Each one can be configured after placement.</string>
     <string name="widget_content_types">Content to show</string>
     <string name="widget_content_type_text">Text notes</string>
     <string name="widget_content_type_text_description">Written entries and journal text</string>

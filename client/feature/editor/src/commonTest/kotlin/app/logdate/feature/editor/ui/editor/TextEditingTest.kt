@@ -267,6 +267,61 @@ class TextEditingTest {
         }
 
     @Test
+    fun `widget prompt places photo before text input without duplicating blocks`() =
+        testScope.runTest {
+            val photo = "content://media/external/images/media/42"
+            viewModel.initializePhotoPrompt(photo, record = false)
+            advanceUntilIdle()
+            assertTrue(viewModel.editorState.value.blocks[0] is ImageBlockUiState)
+            assertTrue(viewModel.editorState.value.blocks[1] is TextBlockUiState)
+            assertEquals(
+                photo,
+                (
+                    viewModel.editorState.value.blocks
+                        .first() as ImageBlockUiState
+                ).uri,
+            )
+            viewModel.initializePhotoPrompt(photo, record = false)
+            advanceUntilIdle()
+            assertEquals(2, viewModel.editorState.value.blocks.size)
+        }
+
+    @Test
+    fun `widget record prompt places photo before audio input`() =
+        testScope.runTest {
+            val photo = "content://media/external/images/media/42"
+            viewModel.initializePhotoPrompt(photo, record = true)
+            advanceUntilIdle()
+            assertTrue(viewModel.editorState.value.blocks[0] is ImageBlockUiState)
+            assertTrue(viewModel.editorState.value.blocks[1] is AudioBlockUiState)
+        }
+
+    @Test
+    fun `widget audio action starts one recording block without a photo`() =
+        testScope.runTest {
+            viewModel.initializeWidgetAudio()
+            viewModel.initializeWidgetAudio()
+            advanceUntilIdle()
+            assertEquals(1, viewModel.editorState.value.blocks.size)
+            assertTrue(
+                viewModel.editorState.value.blocks
+                    .single() is AudioBlockUiState,
+            )
+        }
+
+    @Test
+    fun `widget camera action opens one camera block`() =
+        testScope.runTest {
+            viewModel.initializeWidgetCamera()
+            viewModel.initializeWidgetCamera()
+            advanceUntilIdle()
+            val state = viewModel.editorState.value
+            assertEquals(1, state.blocks.size)
+            assertTrue(state.blocks.single() is CameraBlockUiState)
+            assertEquals(state.blocks.single().id, state.expandedBlockId)
+        }
+
+    @Test
     fun `existing entry edits are not overwritten when load effect replays`() =
         testScope.runTest {
             val noteId = Uuid.random()

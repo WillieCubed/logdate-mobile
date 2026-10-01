@@ -29,5 +29,33 @@ sealed interface OnThisDayWidgetState {
         val dateFormatted: String,
         val summary: String,
         val thumbnailUri: String?,
+        val audioNoteId: String? = null,
+        val audioUri: String? = null,
     ) : OnThisDayWidgetState
+
+    @Serializable
+    data class FixedMemory(
+        val noteId: String,
+        val dateFormatted: String,
+        val summary: String,
+        val thumbnailUri: String?,
+        val audioUri: String? = null,
+    ) : OnThisDayWidgetState
+
+    @Serializable
+    data object ChooseMemory : OnThisDayWidgetState
+
+    @Serializable
+    data object MissingMemory : OnThisDayWidgetState
+
+    @Serializable
+    data class PhotoPrompt(
+        val photoUri: String,
+    ) : OnThisDayWidgetState
+
+    @Serializable
+    data object PhotoUnavailable : OnThisDayWidgetState
+
+    @Serializable
+    data object NewEntryReady : OnThisDayWidgetState
 }

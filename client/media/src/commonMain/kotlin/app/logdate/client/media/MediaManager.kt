@@ -1,6 +1,7 @@
 package app.logdate.client.media
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.io.Buffer
 import kotlinx.io.RawSource
 import kotlin.time.Duration
@@ -43,6 +44,10 @@ interface MediaManager {
      *   strip never starves while keeping memory bounded on huge libraries.
      */
     suspend fun getRecentMedia(limit: Int = DEFAULT_RECENT_MEDIA_LIMIT): Flow<List<MediaObject>>
+
+    /** Recent photos without requiring permission to read the video collection. */
+    suspend fun getRecentImages(limit: Int = DEFAULT_RECENT_MEDIA_LIMIT): Flow<List<MediaObject.Image>> =
+        getRecentMedia(limit).map { media -> media.filterIsInstance<MediaObject.Image>() }
 
     /**
      * Retrieves all media objects between the given [start] and [end] timestamps.

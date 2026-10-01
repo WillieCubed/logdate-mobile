@@ -11,7 +11,13 @@ import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_DRAFT_ID
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_EVENT_ID
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_RECALL_DATE
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_TARGET
+import app.logdate.client.feature.widgets.EXTRA_WIDGET_CAMERA
+import app.logdate.client.feature.widgets.EXTRA_WIDGET_NOTE_ID
+import app.logdate.client.feature.widgets.EXTRA_WIDGET_PHOTO_URI
+import app.logdate.client.feature.widgets.EXTRA_WIDGET_RECORD
 import app.logdate.client.feature.widgets.EXTRA_WIDGET_TARGET_DATE
+import app.logdate.client.feature.widgets.NAV_SOURCE_FIXED_MEMORY_WIDGET
+import app.logdate.client.feature.widgets.NAV_SOURCE_NEW_ENTRY_WIDGET
 import app.logdate.client.feature.widgets.NAV_SOURCE_ON_THIS_DAY_WIDGET
 import app.logdate.client.location.tracking.NAV_SOURCE_LOCATION_HISTORY
 import app.logdate.client.media.audio.EXTRA_NAV_SOURCE
@@ -208,6 +214,19 @@ fun resolveMainActivityNavKey(intent: Intent?): NavKey? {
                 LocalDate.parse(dateStr)
                 TimelineDetailRoute(dateStr)
             }.getOrNull()
+        }
+
+        intent.getStringExtra(EXTRA_NAV_SOURCE) == NAV_SOURCE_FIXED_MEMORY_WIDGET -> {
+            val noteId = intent.getStringExtra(EXTRA_WIDGET_NOTE_ID) ?: return null
+            noteId.parseUuidTo(::NoteDetailRoute)
+        }
+
+        intent.getStringExtra(EXTRA_NAV_SOURCE) == NAV_SOURCE_NEW_ENTRY_WIDGET -> {
+            EntryEditorRoute(
+                widgetPhotoUri = intent.getStringExtra(EXTRA_WIDGET_PHOTO_URI),
+                widgetRecord = intent.getBooleanExtra(EXTRA_WIDGET_RECORD, false),
+                widgetCamera = intent.getBooleanExtra(EXTRA_WIDGET_CAMERA, false),
+            )
         }
 
         intent.getStringExtra(EXTRA_LOCATION_NAV_SOURCE) == NAV_SOURCE_LOCATION_HISTORY -> {

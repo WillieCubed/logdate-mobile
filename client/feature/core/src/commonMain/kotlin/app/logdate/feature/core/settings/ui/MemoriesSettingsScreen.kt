@@ -38,6 +38,8 @@ import logdate.client.feature.core.generated.resources.recommendations
 import logdate.client.feature.core.generated.resources.recommendations_privacy_note
 import logdate.client.feature.core.generated.resources.recommendations_summary_off
 import logdate.client.feature.core.generated.resources.recommendations_summary_on
+import logdate.client.feature.core.generated.resources.widget_add_fixed_memory
+import logdate.client.feature.core.generated.resources.widget_add_new_entry
 import logdate.client.feature.core.generated.resources.widget_add_to_home_screen
 import logdate.client.feature.core.generated.resources.widget_content_type_audio
 import logdate.client.feature.core.generated.resources.widget_content_type_audio_description
@@ -47,6 +49,7 @@ import logdate.client.feature.core.generated.resources.widget_content_type_text
 import logdate.client.feature.core.generated.resources.widget_content_type_text_description
 import logdate.client.feature.core.generated.resources.widget_content_types
 import logdate.client.feature.core.generated.resources.widget_settings
+import logdate.client.feature.core.generated.resources.widget_setup_hint
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -70,7 +73,8 @@ fun MemoriesSettingsScreen(
         recallMode = uiState.settings.recallMode,
         onSetRecallMode = viewModel::setRecallMode,
         widgetInstallUiState = uiState.widgetInstallUiState,
-        onAddWidgetToHomeScreen = viewModel::addWidgetToHomeScreen,
+        onAddWidgetToHomeScreen = { viewModel.addWidgetToHomeScreen() },
+        onAddWidgetKind = viewModel::addWidgetToHomeScreen,
         widgetContentTypes = uiState.settings.widgetContentTypes,
         onToggleContentType = viewModel::toggleWidgetContentType,
         modifier = modifier,
@@ -87,6 +91,7 @@ fun MemoriesSettingsContent(
     onSetRecallMode: (RecallMode) -> Unit,
     widgetInstallUiState: MemoriesWidgetInstallUiState,
     onAddWidgetToHomeScreen: () -> Unit,
+    onAddWidgetKind: (HomeWidgetKind) -> Unit = { onAddWidgetToHomeScreen() },
     widgetContentTypes: Set<WidgetContentType>,
     onToggleContentType: (WidgetContentType, Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -129,6 +134,7 @@ fun MemoriesSettingsContent(
                     onSetRecallMode = onSetRecallMode,
                     widgetInstallUiState = widgetInstallUiState,
                     onAddWidgetToHomeScreen = onAddWidgetToHomeScreen,
+                    onAddWidgetKind = onAddWidgetKind,
                     widgetContentTypes = widgetContentTypes,
                     onToggleContentType = onToggleContentType,
                 )
@@ -154,6 +160,7 @@ fun MemoriesSettingsContent(
                         onSetRecallMode = onSetRecallMode,
                         widgetInstallUiState = widgetInstallUiState,
                         onAddWidgetToHomeScreen = onAddWidgetToHomeScreen,
+                        onAddWidgetKind = onAddWidgetKind,
                         widgetContentTypes = widgetContentTypes,
                         onToggleContentType = onToggleContentType,
                     )
@@ -216,6 +223,7 @@ private fun MemoriesWidgetSection(
     onSetRecallMode: (RecallMode) -> Unit,
     widgetInstallUiState: MemoriesWidgetInstallUiState,
     onAddWidgetToHomeScreen: () -> Unit,
+    onAddWidgetKind: (HomeWidgetKind) -> Unit,
     widgetContentTypes: Set<WidgetContentType>,
     onToggleContentType: (WidgetContentType, Boolean) -> Unit,
 ) {
@@ -273,12 +281,25 @@ private fun MemoriesWidgetSection(
                             .padding(Spacing.md),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
+                    Text(
+                        text = stringResource(Res.string.widget_setup_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Button(
-                        onClick = onAddWidgetToHomeScreen,
+                        onClick = { onAddWidgetKind(HomeWidgetKind.RECALL) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(stringResource(Res.string.widget_add_to_home_screen))
                     }
+                    Button(
+                        onClick = { onAddWidgetKind(HomeWidgetKind.FIXED_MEMORY) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(Res.string.widget_add_fixed_memory)) }
+                    Button(
+                        onClick = { onAddWidgetKind(HomeWidgetKind.NEW_ENTRY) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(Res.string.widget_add_new_entry)) }
                 }
             }
         }

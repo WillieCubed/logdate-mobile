@@ -91,6 +91,7 @@ class EntryEditorViewModel(
     // already initialized this ViewModel so a replay cannot overwrite edits that survived the
     // configuration change. A failed load clears the request and remains retryable.
     private var activeLoadRequest: LoadRequest? = null
+    private var initializedPhotoPromptUri: String? = null
 
     init {
         viewModelScope.launch {
@@ -1092,12 +1093,31 @@ class EntryEditorViewModel(
         }
     }
 
-    /**
-     * Sets initial attachments for the note.
-     * This creates blocks for each attachment URI in the list.
-     *
-     * @param attachmentUris List of URI strings pointing to attachments.
-     */
+    /** Places the suggested photo first, followed by the chosen entry input. */
+    fun initializePhotoPrompt(
+        photoUri: String,
+        record: Boolean,
+    ) {
+        if (photoUri.isBlank() || initializedPhotoPromptUri == photoUri) return
+        initializedPhotoPromptUri = photoUri
+        if (mutableEditorState.value.blocks.none { (it as? MediaBlockUiState)?.uri == photoUri }) {
+            val photo = createNewBlock(BlockType.IMAGE) as ImageBlockUiState
+            updateBlock(photo.copy(uri = photoUri))
+        }
+        createNewBlock(if (record) BlockType.AUDIO else BlockType.TEXT)
+    }
+
+    fun initializeWidgetAudio() {
+        if (mutableEditorState.value.blocks.any { it is AudioBlockUiState }) return
+        createNewBlock(BlockType.AUDIO)
+    }
+
+    fun initializeWidgetCamera() {
+        if (mutableEditorState.value.blocks.any { it is CameraBlockUiState }) return
+        createNewBlock(BlockType.CAMERA)
+    }
+
+    /** Creates blocks for attachment URIs supplied when opening the editor. */
     fun setInitialAttachments(attachmentUris: List<String>) {
         if (attachmentUris.isEmpty()) return
 

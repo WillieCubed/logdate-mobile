@@ -55,6 +55,9 @@ fun NoteEditorScreen(
     journalIds: List<Uuid> = emptyList(),
     initialTextContent: String? = null,
     attachments: List<String> = emptyList(),
+    widgetPhotoUri: String? = null,
+    widgetRecord: Boolean = false,
+    widgetCamera: Boolean = false,
     viewModel: EntryEditorViewModel = koinViewModel(),
     visitContext: VisitMemoryContext? = null,
 ) {
@@ -104,6 +107,16 @@ fun NoteEditorScreen(
                 }
             } catch (e: Exception) {
                 Napier.e("Failed to set initial content", e)
+            }
+        }
+    }
+
+    LaunchedEffect(widgetPhotoUri, widgetRecord, widgetCamera, entryId) {
+        if (entryId == null) {
+            when {
+                widgetCamera -> viewModel.initializeWidgetCamera()
+                widgetPhotoUri != null -> viewModel.initializePhotoPrompt(widgetPhotoUri, record = widgetRecord)
+                widgetRecord -> viewModel.initializeWidgetAudio()
             }
         }
     }

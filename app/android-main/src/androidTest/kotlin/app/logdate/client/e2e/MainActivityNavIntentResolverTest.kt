@@ -12,6 +12,10 @@ import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_DRAFT_ID
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_EVENT_ID
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_RECALL_DATE
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_TARGET
+import app.logdate.client.feature.widgets.EXTRA_WIDGET_NOTE_ID
+import app.logdate.client.feature.widgets.EXTRA_NAV_SOURCE as EXTRA_WIDGET_NAV_SOURCE
+import app.logdate.client.feature.widgets.NAV_SOURCE_FIXED_MEMORY_WIDGET
+import app.logdate.client.feature.widgets.NAV_SOURCE_NEW_ENTRY_WIDGET
 import app.logdate.client.location.tracking.EXTRA_NAV_SOURCE as EXTRA_LOCATION_NAV_SOURCE
 import app.logdate.client.location.tracking.NAV_SOURCE_LOCATION_HISTORY
 import app.logdate.client.media.audio.EXTRA_NAV_SOURCE as EXTRA_AUDIO_NAV_SOURCE
@@ -43,6 +47,48 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class MainActivityNavIntentResolverTest {
+    @Test
+    fun `fixed memory widget opens the exact selected entry`() {
+        val noteId = Uuid.random()
+        assertEquals(
+            NoteDetailRoute(noteId),
+            resolveMainActivityNavKey(Intent().apply {
+                putExtra(EXTRA_WIDGET_NAV_SOURCE, NAV_SOURCE_FIXED_MEMORY_WIDGET)
+                putExtra(EXTRA_WIDGET_NOTE_ID, noteId.toString())
+            }),
+        )
+    }
+
+    @Test
+    fun `new entry widget opens photo first with the selected input`() {
+        val photoUri = "content://media/external/images/media/42"
+        assertEquals(
+            app.logdate.feature.editor.navigation.EntryEditorRoute(widgetPhotoUri = photoUri),
+            resolveMainActivityNavKey(Intent().apply {
+                putExtra(EXTRA_WIDGET_NAV_SOURCE, NAV_SOURCE_NEW_ENTRY_WIDGET)
+                putExtra(app.logdate.client.feature.widgets.EXTRA_WIDGET_PHOTO_URI, photoUri)
+            }),
+        )
+        assertEquals(
+            app.logdate.feature.editor.navigation.EntryEditorRoute(widgetPhotoUri = photoUri, widgetRecord = true),
+            resolveMainActivityNavKey(Intent().apply {
+                putExtra(EXTRA_WIDGET_NAV_SOURCE, NAV_SOURCE_NEW_ENTRY_WIDGET)
+                putExtra(app.logdate.client.feature.widgets.EXTRA_WIDGET_PHOTO_URI, photoUri)
+                putExtra(app.logdate.client.feature.widgets.EXTRA_WIDGET_RECORD, true)
+            }),
+        )
+    }
+
+    @Test
+    fun `new entry camera action opens camera capture`() {
+        assertEquals(
+            app.logdate.feature.editor.navigation.EntryEditorRoute(widgetCamera = true),
+            resolveMainActivityNavKey(Intent().apply {
+                putExtra(EXTRA_WIDGET_NAV_SOURCE, NAV_SOURCE_NEW_ENTRY_WIDGET)
+                putExtra(app.logdate.client.feature.widgets.EXTRA_WIDGET_CAMERA, true)
+            }),
+        )
+    }
     @Test
     fun `custom scheme journal intent resolves journal details route`() {
         val journalId = Uuid.random()
