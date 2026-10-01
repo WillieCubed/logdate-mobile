@@ -410,59 +410,59 @@ class HumanLocationHistoryViewModel(
         if (unresolved.isEmpty()) return
         enrichmentJob =
             viewModelScope.launch {
-                unresolved.forEach { visit ->
-                    try {
-                        val result =
-                            placeResolution.resolve(
-                                Location(visit.latitude, visit.longitude, LocationAltitude(0.0, AltitudeUnit.METERS)),
-                            )
-                        if (result is PlaceResolutionResult.UserDefinedPlace && data.places.any { it.id == result.place.uid.toString() }) {
-                            return@forEach
-                        }
-                        val name =
-                            when (result) {
-                                is PlaceResolutionResult.UserDefinedPlace -> result.place.name
-                                is PlaceResolutionResult.ExternalSuggestion -> "Near ${result.suggestion.name}"
-                                is PlaceResolutionResult.CoarseLocation ->
-                                    result.address.thoroughfare?.let { "Near $it" }
-                                        ?: result.address.locality?.let { "Somewhere in $it" }
-                                else -> null
-                            }
-                        if (name != null) {
-                            val place =
-                                when (result) {
-                                    is PlaceResolutionResult.UserDefinedPlace ->
-                                        SemanticPlace(
-                                            result.place.uid.toString(),
-                                            result.place.name,
-                                            result.place.latitude,
-                                            result.place.longitude,
-                                            userConfirmed = true,
-                                        )
-                                    is PlaceResolutionResult.ExternalSuggestion ->
-                                        SemanticPlace(
-                                            result.suggestion.externalId?.let {
-                                                resolvedExternalPlaces.getOrPut(
-                                                    it,
-                                                ) { Uuid.random().toString() }
-                                            }
-                                                ?: "evidence:${visit.evidenceIds.first()}",
-                                            name,
-                                            result.suggestion.latitude,
-                                            result.suggestion.longitude,
-                                            locality = result.suggestion.address,
-                                            externalId = result.suggestion.externalId,
-                                        )
-                                    else -> SemanticPlace("evidence:${visit.evidenceIds.first()}", name, visit.latitude, visit.longitude)
-                                }
-                            history.savePlace(place)
-                        }
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (error: Exception) {
-                        Napier.w("Place name unavailable; keeping the visit", error)
-                    }
-                }
+                unresolved.forEach { visit -> saveResolvedVisit(data, visit) }
             }
+    }
+
+    private suspend fun saveResolvedVisit(
+        data: LocationHistorySnapshot,
+        visit: PlaceVisit,
+    ) {
+        try {
+            val result =
+                placeResolution.resolve(
+                    Location(visit.latitude, visit.longitude, LocationAltitude(0.0, AltitudeUnit.METERS)),
+                )
+            if (result is PlaceResolutionResult.UserDefinedPlace && data.places.any { it.id == result.place.uid.toString() }) return
+            val name =
+                when (result) {
+                    is PlaceResolutionResult.UserDefinedPlace -> result.place.name
+                    is PlaceResolutionResult.ExternalSuggestion -> "Near ${result.suggestion.name}"
+                    is PlaceResolutionResult.CoarseLocation ->
+                        result.address.thoroughfare?.let { "Near $it" }
+                            ?: result.address.locality?.let { "Somewhere in $it" }
+                    else -> null
+                }
+            if (name != null) {
+                val place =
+                    when (result) {
+                        is PlaceResolutionResult.UserDefinedPlace ->
+                            SemanticPlace(
+                                result.place.uid.toString(),
+                                result.place.name,
+                                result.place.latitude,
+                                result.place.longitude,
+                                userConfirmed = true,
+                            )
+                        is PlaceResolutionResult.ExternalSuggestion ->
+                            SemanticPlace(
+                                result.suggestion.externalId?.let {
+                                    resolvedExternalPlaces.getOrPut(it) { Uuid.random().toString() }
+                                } ?: "evidence:${visit.evidenceIds.first()}",
+                                name,
+                                result.suggestion.latitude,
+                                result.suggestion.longitude,
+                                locality = result.suggestion.address,
+                                externalId = result.suggestion.externalId,
+                            )
+                        else -> SemanticPlace("evidence:${visit.evidenceIds.first()}", name, visit.latitude, visit.longitude)
+                    }
+                history.savePlace(place)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Napier.w("Place name unavailable; keeping the visit", error)
+        }
     }
 }

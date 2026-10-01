@@ -147,27 +147,7 @@ internal fun LocationHistorySnapshot.placeRows(): List<HistoryPlaceUi> {
         val placeId = placeAliases[oldId] ?: oldId
         memoriesByPlace.getOrPut(placeId) { mutableListOf() }.add(note)
     }
-    val groups = mutableListOf<MutableList<SemanticPlace>>()
-    val groupsByBucket = mutableMapOf<String, MutableList<MutableList<SemanticPlace>>>()
-    collectionPlaces().forEach { place ->
-        val bucket =
-            if (place.userConfirmed) {
-                "confirmed:${place.id}"
-            } else {
-                "${place.name.trim().lowercase()}:${(place.latitude * 1000).roundToInt()}:${(place.longitude * 1000).roundToInt()}"
-            }
-        val candidates = groupsByBucket.getOrPut(bucket) { mutableListOf() }
-        val group = candidates.firstOrNull { nearby(it.first(), place) }
-        if (group == null) {
-            mutableListOf(place).also {
-                candidates.add(it)
-                groups.add(it)
-            }
-        } else {
-            group.add(place)
-        }
-    }
-    return groups
+    return groupedCollectionPlaces()
         .map { group ->
             val place = group.first()
             val ids = group.mapTo(mutableSetOf()) { it.id }
@@ -196,6 +176,30 @@ internal fun LocationHistorySnapshot.placeRows(): List<HistoryPlaceUi> {
             row.sourceIds.flatMap { visitsByPlace[it].orEmpty() }.maxOfOrNull { it.start }
                 ?: row.sourceIds.flatMap { memoriesByPlace[it].orEmpty() }.maxOfOrNull { it.creationTimestamp }
         }
+}
+
+private fun LocationHistorySnapshot.groupedCollectionPlaces(): List<List<SemanticPlace>> {
+    val groups = mutableListOf<MutableList<SemanticPlace>>()
+    val groupsByBucket = mutableMapOf<String, MutableList<MutableList<SemanticPlace>>>()
+    collectionPlaces().forEach { place ->
+        val bucket =
+            if (place.userConfirmed) {
+                "confirmed:${place.id}"
+            } else {
+                "${place.name.trim().lowercase()}:${(place.latitude * 1000).roundToInt()}:${(place.longitude * 1000).roundToInt()}"
+            }
+        val candidates = groupsByBucket.getOrPut(bucket) { mutableListOf() }
+        val group = candidates.firstOrNull { nearby(it.first(), place) }
+        if (group == null) {
+            mutableListOf(place).also {
+                candidates.add(it)
+                groups.add(it)
+            }
+        } else {
+            group.add(place)
+        }
+    }
+    return groups
 }
 
 private fun nearby(

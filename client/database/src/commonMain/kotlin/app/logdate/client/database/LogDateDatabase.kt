@@ -383,9 +383,7 @@ fun getRoomDatabase(
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)
             .setQueryCoroutineContext(dispatcher)
 
-    if (driver != null) {
-        configured.setDriver(driver)
-    }
+    driver?.let { configured.setDriver(it) }
 
     return configured.build()
 }
