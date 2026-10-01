@@ -4,6 +4,7 @@ package app.logdate.feature.location.timeline.ui.history
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -40,6 +41,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.adaptivePanelShape
+import app.logdate.ui.theme.Spacing
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.history_empty_places
 import logdate.client.feature.location.timeline.generated.resources.history_empty_places_body
@@ -58,33 +61,42 @@ internal fun HistoryPlaces(
     mapContent: @Composable (Modifier) -> Unit,
 ) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        LazyColumn(
-            Modifier.widthIn(max = 680.dp).fillMaxHeight(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item { HistoryPlaceSearch(state, actions) }
-            if (state.placesMapVisible) {
-                item { mapContent(Modifier.fillMaxWidth().height(192.dp).clip(RoundedCornerShape(16.dp))) }
-            }
-            val places = state.filteredPlaces()
-            if (places.isEmpty()) {
-                item {
-                    val noResults = state.placesQuery.isNotBlank()
-                    Column(Modifier.padding(vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            stringResource(if (noResults) Res.string.history_no_matching_places else Res.string.history_empty_places),
-                            style = MaterialTheme.typography.titleLarge,
-                        )
-                        Text(
-                            stringResource(
-                                if (noResults) Res.string.history_no_matching_places_body else Res.string.history_empty_places_body,
-                            ),
-                        )
+        BoxWithConstraints(Modifier.widthIn(max = 720.dp).fillMaxWidth().fillMaxHeight()) {
+            Surface(
+                modifier = Modifier.fillMaxSize().padding(top = Spacing.sm),
+                color = MaterialTheme.colorScheme.surface,
+                shape = adaptivePanelShape(maxWidth, maxHeight),
+            ) {
+                LazyColumn(
+                    contentPadding = PaddingValues(Spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    item { HistoryPlaceSearch(state, actions) }
+                    if (state.placesMapVisible) {
+                        item { mapContent(Modifier.fillMaxWidth().height(192.dp).clip(RoundedCornerShape(16.dp))) }
                     }
+                    val places = state.filteredPlaces()
+                    if (places.isEmpty()) {
+                        item {
+                            val noResults = state.placesQuery.isNotBlank()
+                            Column(Modifier.padding(vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    stringResource(
+                                        if (noResults) Res.string.history_no_matching_places else Res.string.history_empty_places,
+                                    ),
+                                    style = MaterialTheme.typography.titleLarge,
+                                )
+                                Text(
+                                    stringResource(
+                                        if (noResults) Res.string.history_no_matching_places_body else Res.string.history_empty_places_body,
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                    items(places, key = { it.id }) { place -> HistoryPlaceRow(place) { actions.onOpenPlace(place.id) } }
                 }
             }
-            items(places, key = { it.id }) { place -> HistoryPlaceRow(place) { actions.onOpenPlace(place.id) } }
         }
     }
 }
