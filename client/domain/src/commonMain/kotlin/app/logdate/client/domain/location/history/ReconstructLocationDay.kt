@@ -17,9 +17,10 @@ import kotlin.math.sqrt
  *
  * Each recording device is reconstructed on its own. Its samples are first cut wherever the phone
  * stopped recording for longer than [HistoryReconstructionParameters.maximumGap]; those cuts are
- * shown as gaps rather than guessed across. Within each recorded stretch, [SegmentAssembler]
- * separates the time someone stayed put from the time they travelled, tolerating the position noise
- * real phones produce. Fixes without a reported accuracy only shape a stretch made mostly of them.
+ * shown as gaps rather than guessed across, unless the phone only went quiet briefly and resumed
+ * at the same spot. Within each recorded stretch, [SegmentAssembler] separates the time someone
+ * stayed put from the time they travelled, tolerating the position noise real phones produce.
+ * Fixes without a reported accuracy only shape a stretch made mostly of them.
  *
  * Item identity comes from evidence: a visit or journey is named after its first precise sample, so
  * the same recordings always produce the same ids, and edits keyed to a sample keep finding it.
@@ -70,7 +71,7 @@ class ReconstructLocationDay(
         val segments = mutableListOf<MutableList<LocationObservation>>()
         source.forEach { sample ->
             val current = segments.lastOrNull()
-            if (current == null || sample.timestamp - current.last().timestamp > parameters.maximumGap) {
+            if (current == null || parameters.isRecordingGap(current.last(), sample)) {
                 segments += mutableListOf(sample)
             } else {
                 current += sample

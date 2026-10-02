@@ -27,6 +27,22 @@ private const val MINIMUM_WEIGHT_ACCURACY_METERS = 5f
 /** A spike sits at least this far from both neighbours, however precise it claims to be. */
 private const val MINIMUM_SPIKE_METERS = 150.0
 
+/**
+ * True when nothing was recorded between two consecutive samples for long enough that the history
+ * cannot say what happened. A short quiet stretch that resumes at the same spot is not a gap: the
+ * phone simply had nothing new to report while the person stayed put.
+ */
+internal fun HistoryReconstructionParameters.isRecordingGap(
+    previous: LocationObservation,
+    next: LocationObservation,
+): Boolean {
+    val quiet = next.timestamp - previous.timestamp
+    if (quiet <= maximumGap) return false
+    if (quiet > maximumQuietStay) return true
+    val placeable = listOf(previous, next).all { sample -> sample.accuracyMeters?.let { it <= maximumPreciseAccuracyMeters } ?: true }
+    return !placeable || distanceMeters(previous, next) > stayRadiusMeters + accuracyAllowanceMeters
+}
+
 internal fun LocationObservation.hasValidCoordinates(): Boolean =
     latitude.isFinite() && longitude.isFinite() && latitude in -90.0..90.0 && longitude in -180.0..180.0
 

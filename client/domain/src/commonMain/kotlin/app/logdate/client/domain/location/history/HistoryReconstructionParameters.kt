@@ -13,6 +13,12 @@ import kotlin.time.Duration.Companion.minutes
 data class HistoryReconstructionParameters(
     /** Longer than this without any sample, the history shows "Not recorded" instead of guessing. */
     val maximumGap: Duration = 10.minutes,
+    /**
+     * A recording that goes quiet for at most this long and resumes at the same spot continues the
+     * visit instead of showing a gap. Phones that only report a fix after moving a few meters go
+     * quiet exactly when someone sits still.
+     */
+    val maximumQuietStay: Duration = 30.minutes,
     /** How long someone has to stay in one spot before it counts as a visit. */
     val minimumStay: Duration = 5.minutes,
     /** Samples within this distance of a visit's centre belong to the visit. */

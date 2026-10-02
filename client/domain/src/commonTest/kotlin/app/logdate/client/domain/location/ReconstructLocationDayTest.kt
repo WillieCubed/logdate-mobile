@@ -47,10 +47,24 @@ class ReconstructLocationDayTest {
 
     @Test
     fun `a gap is not turned into a stay or route`() {
-        val items = reconstruct(listOf(point(0), point(2), point(30)))
+        val items = reconstruct(listOf(point(0), point(2), point(40)))
         assertEquals(3, items.size)
         assertEquals(base + 2.minutes, (items[1] as HistoryGap).start)
-        assertEquals(base + 30.minutes, items[1].end)
+        assertEquals(base + 40.minutes, items[1].end)
+    }
+
+    @Test
+    fun `a short quiet stretch that resumes at the same spot continues the visit`() {
+        val visit = reconstruct(listOf(point(0), point(2), point(30), point(33))).single() as PlaceVisit
+        assertTrue(visit.confirmedStay)
+        assertEquals(base, visit.start)
+        assertEquals(base + 33.minutes, visit.end)
+    }
+
+    @Test
+    fun `a quiet stretch that resumes somewhere else stays a gap`() {
+        val items = reconstruct(listOf(point(0), point(2), point(20, offset = 0.01), point(23, offset = 0.01)))
+        assertEquals(1, items.count { it is HistoryGap })
     }
 
     @Test

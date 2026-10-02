@@ -175,7 +175,7 @@ internal class ContinuityTracker(
         previous: LocationObservation,
         next: LocationObservation,
     ): Boolean {
-        if (next.timestamp - previous.timestamp > parameters.maximumGap) return true
+        if (parameters.isRecordingGap(previous, next)) return true
         if (!previous.isPrecise()) return false
         if (hasCenter && center.value.distanceTo(previous) > parameters.neighborhoodMeters) {
             val since = awaySince ?: previous.timestamp.also { awaySince = it }
