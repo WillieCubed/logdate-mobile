@@ -31,6 +31,7 @@ Bring the phone and watch within range and confirm the watch's Settings screen s
 | Save a recording, then Undo within five seconds | The note is gone from the watch, and from the phone a few seconds later |
 | Record, then swipe back out of the app before stopping | The recording is saved, not lost, and appears in Voice memories |
 | Record, then press the side button, then reopen LogDate | The recording continued while the app was in the background, and the screen still shows it recording |
+| Record, press the side button, then tap Stop on the recording notification | The recording ends and is saved, and appears in Voice memories |
 | Undo a recording with the phone out of range, then bring it back | The note never appears on the phone |
 | Record for 5 minutes with the screen off | A full-length recording, with sound throughout |
 | Keep a recording going past 29 minutes | A haptic warning, then a save at 30 minutes |
