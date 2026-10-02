@@ -14,11 +14,17 @@ import app.logdate.client.domain.restore.RestoreOptions
 import app.logdate.client.domain.restore.RestoreResult
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.media.MediaManager
+import app.logdate.client.sync.diagnostics.DiagnosticSource
+import app.logdate.client.sync.metadata.UploadScope
+import app.logdate.shared.model.diagnostics.DiagnosticOutcome
+import app.logdate.shared.model.diagnostics.DiagnosticPhase
+import app.logdate.shared.model.diagnostics.SyncDiagnosticEvent
 import app.logdate.feature.core.restore.ImportOptions
 import app.logdate.feature.core.restore.RestoreLauncher
 import app.logdate.feature.core.restore.RestoreOutcome
 import app.logdate.feature.core.restore.RestoreProgressInfo
 import app.logdate.feature.core.restore.RestoreWorker
+import app.logdate.feature.core.restore.RestoreDiagnosticEvents
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +42,8 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import java.util.UUID
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -121,7 +129,9 @@ class RestoreWorkerTest {
                         } returns restoreResult
                     }
                 val recordingLauncher = RecordingRestoreLauncher()
-                setupKoin(mockUseCase, mockk(relaxed = true), recordingLauncher)
+                val diagnosticEvents = RecordingRestoreDiagnostics()
+                setupKoin(mockUseCase, mockk(relaxed = true), recordingLauncher, diagnosticEvents)
+                val operationId = UUID.randomUUID().toString()
 
                 val worker =
                     TestListenableWorkerBuilder<RestoreWorker>(context)
@@ -131,6 +141,7 @@ class RestoreWorkerTest {
                                 .putString(RestoreWorker.SOURCE_URI_KEY, Uri.fromFile(archiveFile).toString())
                                 .putBoolean(RestoreWorker.INCLUDE_DRAFTS_KEY, true)
                                 .putBoolean(RestoreWorker.INCLUDE_MEDIA_KEY, false)
+                                .putString(RestoreWorker.RESTORE_OPERATION_ID_KEY, operationId)
                                 .build(),
                         ).build()
 
@@ -145,6 +156,9 @@ class RestoreWorkerTest {
                     successOutcome.summary.journalsImported == 1,
                     "Expected 1 journal imported, got ${successOutcome.summary.journalsImported}",
                 )
+                val completed = diagnosticEvents.events.single { it.phase == DiagnosticPhase.RESTORE && it.outcome == DiagnosticOutcome.SUCCEEDED }
+                assertTrue(completed.operationId == operationId)
+                assertNotNull(completed.attemptId)
             } finally {
                 archiveFile.delete()
             }
@@ -158,7 +172,8 @@ class RestoreWorkerTest {
 
             try {
                 val recordingLauncher = RecordingRestoreLauncher()
-                setupKoin(mockk(relaxed = true), mockk(relaxed = true), recordingLauncher)
+                val diagnosticEvents = RecordingRestoreDiagnostics()
+                setupKoin(mockk(relaxed = true), mockk(relaxed = true), recordingLauncher, diagnosticEvents)
 
                 val worker =
                     TestListenableWorkerBuilder<RestoreWorker>(context)
@@ -176,15 +191,41 @@ class RestoreWorkerTest {
                     .filterIsInstance<RestoreOutcome.Failure>()
                     .lastOrNull()
                 assertNotNull(failureOutcome, "Expected completeRestore to be called with Failure")
+                assertTrue(diagnosticEvents.events.any { it.phase == DiagnosticPhase.RESTORE && it.outcome == DiagnosticOutcome.FAILED })
             } finally {
                 invalidFile.delete()
             }
         }
 
+    @Test
+    fun `invalid cloud archive is deleted before restore returns`() = runTest {
+        val cloudArchive = File.createTempFile("cloud-restore-test", ".zip", context.noBackupFilesDir)
+        cloudArchive.writeText("invalid zip")
+        val cachedBefore = context.cacheDir.listFiles().orEmpty().filter { it.name.startsWith("logdate_restore") }.toSet()
+        val recordingLauncher = RecordingRestoreLauncher()
+        setupKoin(mockk(relaxed = true), mockk(relaxed = true), recordingLauncher)
+        val worker = TestListenableWorkerBuilder<RestoreWorker>(context)
+            .setInputData(
+                androidx.work.Data.Builder()
+                    .putString(RestoreWorker.SOURCE_URI_KEY, Uri.fromFile(cloudArchive).toString())
+                    .putBoolean(RestoreWorker.DELETE_SOURCE_AFTER_RESTORE_KEY, true)
+                    .build(),
+            ).build()
+
+        try {
+            assertIs<ListenableWorker.Result.Failure>(worker.doWork())
+            assertFalse(cloudArchive.exists())
+            assertTrue(context.cacheDir.listFiles().orEmpty().filter { it.name.startsWith("logdate_restore") }.toSet() == cachedBefore)
+        } finally {
+            cloudArchive.delete()
+        }
+    }
+
     private fun setupKoin(
         restoreUseCase: RestoreUserDataUseCase,
         mediaManager: MediaManager,
         restoreLauncher: RestoreLauncher,
+        diagnostics: RestoreDiagnosticEvents? = null,
     ) {
         startKoin {
             modules(
@@ -192,9 +233,22 @@ class RestoreWorkerTest {
                     factory { restoreUseCase }
                     single<MediaManager> { mediaManager }
                     single<RestoreLauncher> { restoreLauncher }
+                    if (diagnostics != null) single<RestoreDiagnosticEvents> { diagnostics }
                 },
             )
         }
+    }
+}
+
+private class RecordingRestoreDiagnostics : RestoreDiagnosticEvents {
+    val events = mutableListOf<SyncDiagnosticEvent>()
+    private val source = DiagnosticSource(UploadScope("account", "https://first.example"), "epoch")
+
+    override fun source(): DiagnosticSource = source
+
+    override fun record(event: SyncDiagnosticEvent, source: DiagnosticSource?) {
+        assertTrue(source === this.source)
+        events += event
     }
 }
 

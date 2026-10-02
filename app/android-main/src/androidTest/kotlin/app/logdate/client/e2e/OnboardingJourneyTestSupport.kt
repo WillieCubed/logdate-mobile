@@ -150,13 +150,15 @@ internal class OnboardingJourneyEnvironment {
                     username = "tester",
                     displayName = "Test User",
                 )
-            sessionStorage.saveSession(
-                UserSession(
-                    accessToken = "token",
-                    refreshToken = "refresh",
-                    accountId = "account",
-                ),
-            )
+            runBlocking {
+                sessionStorage.saveSession(
+                    UserSession(
+                        accessToken = "token",
+                        refreshToken = "refresh",
+                        accountId = "account",
+                    ),
+                )
+            }
         }
         if (notificationsHandled) {
             runBlocking {
@@ -314,11 +316,11 @@ internal class OnboardingFakeSessionStorage : SessionStorage {
 
     override suspend fun hasValidSession(): Boolean = sessionFlow.value != null
 
-    override fun saveSession(session: UserSession) {
+    override suspend fun saveSession(session: UserSession) {
         sessionFlow.value = session
     }
 
-    override fun clearSession() {
+    override suspend fun clearSession() {
         sessionFlow.value = null
     }
 }

@@ -653,6 +653,35 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                             ),
                         ),
                 )
+            } else if (managedDeviceProfile == "recoveryAcceptance") {
+                ManagedDeviceProjectConfig(
+                    localDevices =
+                        listOf(
+                            ManagedVirtualDeviceConfig(
+                                deviceName = "recoveryAcceptancePhoneApi36",
+                                hardwareProfile = "Pixel 9 Pro",
+                                apiLevel = 36,
+                                systemImageSource = "google",
+                            ),
+                            ManagedVirtualDeviceConfig(
+                                deviceName = "recoveryAcceptanceTabletApi35",
+                                hardwareProfile = "Pixel Tablet",
+                                apiLevel = 35,
+                                systemImageSource = "google",
+                            ),
+                        ),
+                    groups =
+                        listOf(
+                            ManagedDeviceGroupConfig(
+                                groupName = "recoveryAcceptanceDevices",
+                                targetDeviceNames =
+                                    listOf(
+                                        "recoveryAcceptancePhoneApi36",
+                                        "recoveryAcceptanceTabletApi35",
+                                    ),
+                            ),
+                        ),
+                )
             } else {
                 ManagedDeviceProjectConfig(
                     localDevices =

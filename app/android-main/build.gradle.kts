@@ -22,6 +22,8 @@ val androidTestClassOverride = providers.gradleProperty("logdate.androidTestClas
 val androidTestPackageOverride = providers.gradleProperty("logdate.androidTestPackage").orNull
 // Runtime-only credentials for the staging sync probe. Never put tokens in source or Gradle files.
 val syncProbeArguments = providers.gradleProperty("logdate.syncProbeArguments").orNull
+val recoveryAcceptanceMode = providers.gradleProperty("logdate.recoveryAcceptanceMode").orNull
+val recoveryAcceptanceAssetsDir = providers.gradleProperty("logdate.recoveryAcceptanceAssetsDir").orNull
 val androidTestCoverageEnabled =
     providers
         .gradleProperty("logdate.androidTestCoverage")
@@ -202,6 +204,9 @@ extensions.configure<ApplicationExtension> {
             ":client:feature:remotedisplay",
             ":client:feature:speechrecognition",
         )
+    if (recoveryAcceptanceAssetsDir != null) {
+        sourceSets.getByName("androidTest").assets.srcDir(recoveryAcceptanceAssetsDir)
+    }
     defaultConfig {
         applicationId = baseApplicationId
         // Maps and Places use a dedicated Android-restricted credential. Never fall back to the
@@ -226,6 +231,9 @@ extensions.configure<ApplicationExtension> {
         }
         if (syncProbeArguments != null) {
             testInstrumentationRunnerArguments["logdate.syncProbeArguments"] = syncProbeArguments
+        }
+        if (recoveryAcceptanceMode != null) {
+            testInstrumentationRunnerArguments["logdate.recoveryAcceptanceMode"] = recoveryAcceptanceMode
         }
     }
 
