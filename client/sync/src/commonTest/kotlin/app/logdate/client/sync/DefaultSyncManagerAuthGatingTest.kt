@@ -91,9 +91,9 @@ class DefaultSyncManagerAuthGatingTest {
 
                     override suspend fun hasValidSession(): Boolean = true
 
-                    override fun saveSession(session: UserSession) = Unit
+                    override suspend fun saveSession(session: UserSession) = Unit
 
-                    override fun clearSession() = Unit
+                    override suspend fun clearSession() = Unit
                 }
             val metadata = fakeSyncMetadataService(session)
             val manager =

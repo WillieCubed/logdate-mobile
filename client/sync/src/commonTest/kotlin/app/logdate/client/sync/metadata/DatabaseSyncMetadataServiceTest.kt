@@ -18,6 +18,53 @@ import kotlin.time.Instant
 
 class DatabaseSyncMetadataServiceTest {
     @Test
+    fun `delete remains queued when a create may already have reached the server`() =
+        runTest {
+            val dao = InMemorySyncMetadataDao()
+            val metadata = service(dao, "owner", "https://first.example")
+            metadata.enqueuePending("note", EntityType.NOTE, PendingOperation.CREATE)
+            val transmittedCreate = metadata.getPendingUploads(EntityType.NOTE).single()
+            metadata.enqueuePending("note", EntityType.NOTE, PendingOperation.DELETE)
+            kotlin.test.assertFalse(metadata.settleIfCurrent(EntityType.NOTE, transmittedCreate, Instant.fromEpochMilliseconds(10), 1))
+            assertEquals(PendingOperation.DELETE, metadata.getPendingUploads(EntityType.NOTE).single().operation)
+        }
+
+    @Test
+    fun `pending operations retain ownership and stable retry identity across reopening`() =
+        runTest {
+            val dao = InMemorySyncMetadataDao()
+            val first = service(dao, "owner", "https://first.example")
+            first.enqueuePending("note", EntityType.NOTE, PendingOperation.UPDATE)
+            val captured = first.getPendingUploads(EntityType.NOTE).single()
+            assertEquals(UploadScope("owner", "https://first.example"), captured.scope)
+            assertNotNull(captured.operationId)
+            assertTrue(
+                app.logdate.shared.model.diagnostics.DiagnosticReportCodec
+                    .isCorrelationId(captured.operationId!!),
+            )
+            first.incrementRetryCount("note", EntityType.NOTE)
+            val reopened = service(dao, "owner", "https://first.example")
+            assertEquals(captured.operationId, reopened.getPendingUploads(EntityType.NOTE).single().operationId)
+            reopened.enqueuePending("note", EntityType.NOTE, PendingOperation.DELETE)
+            kotlin.test.assertNotEquals(captured.operationId, reopened.getPendingUploads(EntityType.NOTE).single().operationId)
+        }
+
+    @Test
+    fun `stale settlement cannot discard a newer deletion or work for another server`() =
+        runTest {
+            val dao = InMemorySyncMetadataDao()
+            val first = service(dao, "owner", "https://first.example")
+            val second = service(dao, "owner", "https://second.example")
+            first.enqueuePending("note", EntityType.NOTE, PendingOperation.UPDATE)
+            val captured = first.getPendingUploads(EntityType.NOTE).single()
+            first.enqueuePending("note", EntityType.NOTE, PendingOperation.DELETE)
+            second.enqueuePending("note", EntityType.NOTE, PendingOperation.UPDATE)
+            kotlin.test.assertFalse(second.settleIfCurrent(EntityType.NOTE, captured, Instant.fromEpochMilliseconds(10), 1))
+            assertEquals(PendingOperation.DELETE, first.getPendingUploads(EntityType.NOTE).single().operation)
+            assertEquals(PendingOperation.UPDATE, second.getPendingUploads(EntityType.NOTE).single().operation)
+        }
+
+    @Test
     fun `adopting matching legacy metadata retains the legacy rows`() =
         runTest {
             val ownerId = "2e10a582-197e-48fd-97df-5a1fc1669a9e"
@@ -127,6 +174,26 @@ class DatabaseSyncMetadataServiceTest {
             assertEquals(listOf<EntityType?>(null), queued.map { it.entityType })
         }
 
+    @Test
+    fun `repair preserves pending deletions and later deletion still reaches the server`() =
+        runTest {
+            val dao = InMemorySyncMetadataDao()
+            val service = service(dao, "owner", "https://cloud.logdate.app")
+            service.enqueuePending("deleted", EntityType.DRAFT, PendingOperation.DELETE)
+            service.enqueueRepairIfAbsent("deleted", EntityType.DRAFT)
+            assertEquals(PendingOperation.DELETE, service.getPendingUploads(EntityType.DRAFT).single().operation)
+
+            service.enqueueRepairIfAbsent("repaired", EntityType.DRAFT, expectedServerVersion = 2L)
+            assertEquals(2L, service.getPendingUploads(EntityType.DRAFT).single { it.entityId == "repaired" }.expectedServerVersion)
+            service.enqueuePending("repaired", EntityType.DRAFT, PendingOperation.UPDATE)
+            assertEquals(null, service.getPendingUploads(EntityType.DRAFT).single { it.entityId == "repaired" }.expectedServerVersion)
+            service.enqueuePending("repaired", EntityType.DRAFT, PendingOperation.DELETE)
+            assertEquals(
+                PendingOperation.DELETE,
+                service.getPendingUploads(EntityType.DRAFT).single { it.entityId == "repaired" }.operation,
+            )
+        }
+
     private fun service(
         dao: SyncMetadataDao,
         ownerId: String,
@@ -210,6 +277,36 @@ class DatabaseSyncMetadataServiceTest {
             }
 
         override suspend fun getAllPending(): List<PendingUploadEntity> = pendingRows.toList()
+
+        override suspend fun insertRepairIfAbsent(
+            ownerId: String,
+            serverOrigin: String,
+            entityType: String,
+            entityId: String,
+            createdAt: Long,
+            expectedServerVersion: Long?,
+            operationId: String,
+        ) {
+            if (pendingRows.none {
+                    (it.ownerId == ownerId || it.ownerId.isEmpty()) &&
+                        it.serverOrigin == serverOrigin &&
+                        it.entityType == entityType &&
+                        it.entityId == entityId
+                }
+            ) {
+                insertPending(
+                    PendingUploadEntity(
+                        ownerId,
+                        serverOrigin,
+                        entityType,
+                        entityId,
+                        "UPDATE",
+                        createdAt,
+                        expectedServerVersion = expectedServerVersion,
+                    ),
+                )
+            }
+        }
 
         override suspend fun insertPending(pending: PendingUploadEntity) {
             pendingRows.removeAll {

@@ -125,7 +125,9 @@ actual val dataModule: Module =
         // Real journal sync runs through SyncManager and the Cloud Run sync API.
         factory<RemoteJournalDataSource> { NoOpJournalDataSource }
         single<JournalUserDataRepository> { OfflineFirstJournalUserDataRepository(get()) }
-        single<DraftRepository> { LocalFirstDraftRepository(get(), get()) }
+        single<DraftRepository> {
+            LocalFirstDraftRepository(get(), get(), get<SessionStorage>(), get<app.logdate.shared.config.LogDateConfigRepository>())
+        }
         single<JournalRepository> {
             OfflineFirstJournalRepository(
                 get(),

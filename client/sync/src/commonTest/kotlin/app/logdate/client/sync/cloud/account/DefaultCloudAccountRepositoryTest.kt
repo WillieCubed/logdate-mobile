@@ -40,6 +40,34 @@ import kotlin.uuid.Uuid
  */
 class DefaultCloudAccountRepositoryTest {
     @Test
+    fun `production account module follows the selected server configuration`() =
+        runTest {
+            val config = DefaultLogDateConfigRepository(initialBackendUrl = "https://first.invalid")
+            val app =
+                org.koin.dsl.koinApplication {
+                    modules(
+                        org.koin.dsl.module {
+                            single<app.logdate.client.datastore.KeyValueStorage> { InMemoryKeyValueStorage() }
+                            single<app.logdate.shared.config.LogDateConfigRepository> { config }
+                            single<CloudApiClient> { FakeCloudApiClient() }
+                        },
+                        app.logdate.client.sync.cloud.di.cloudAccountModule,
+                    )
+                }
+            try {
+                val account =
+                    app.koin.get<app.logdate.shared.model.CloudAccountRepository>()
+                        as app.logdate.client.sync.cloud.CloudRequestLocationProvider
+                assertEquals("https://first.invalid", account.captureLocation().origin)
+                config.updateBackendUrl("https://second.invalid")
+                assertEquals("https://second.invalid", account.captureLocation().origin)
+                assertEquals("https://second.invalid/api/v1", account.captureLocation().apiBaseUrl)
+            } finally {
+                app.close()
+            }
+        }
+
+    @Test
     fun `complete account creation stores did and handle for later load`() =
         runTest {
             val storage = InMemoryKeyValueStorage()

@@ -54,6 +54,9 @@ interface JournalRepository {
      */
     suspend fun getAllDrafts(): List<EditorDraft>
 
+    /** Read every draft for sync, propagating storage failures so a repair sweep can retry. */
+    suspend fun getAllDraftsForSync(): List<EditorDraft> = getAllDrafts()
+
     /**
      * Gets a draft by ID
      */

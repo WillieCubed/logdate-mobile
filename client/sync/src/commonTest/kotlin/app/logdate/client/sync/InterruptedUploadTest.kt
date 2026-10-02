@@ -97,7 +97,7 @@ class InterruptedUploadTest {
             val record = deadLetters.list().singleOrNull()
             assertEquals(poison.toString(), record?.entityId, "the entry should be waiting in Sync Issues")
             assertTrue(
-                record!!.lastError.contains("closed while uploading"),
+                record!!.lastError == "APP_CLOSED",
                 "the record should say what happened: ${record.lastError}",
             )
             assertTrue(isQueued(poison), "an entry that never reached the server must still read as unsynced")

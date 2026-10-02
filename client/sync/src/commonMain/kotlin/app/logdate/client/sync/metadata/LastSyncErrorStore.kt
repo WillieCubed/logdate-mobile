@@ -5,8 +5,7 @@ import app.logdate.client.sync.SyncError
 import app.logdate.client.sync.SyncErrorType
 
 /**
- * Keeps the last sync error across app restarts. Only the type and message are kept; the cause is
- * for the log at the time it happened.
+ * Keeps the last sync error across app restarts. Only the category is retained; free-form messages and causes can contain private data.
  */
 interface LastSyncErrorStore {
     suspend fun load(): SyncError?
@@ -21,7 +20,7 @@ class InMemoryLastSyncErrorStore : LastSyncErrorStore {
     override suspend fun load(): SyncError? = error
 
     override suspend fun save(error: SyncError?) {
-        this.error = error?.copy(cause = null)
+        this.error = error?.copy(message = error.type.name, cause = null)
     }
 }
 
@@ -30,7 +29,8 @@ class KeyValueLastSyncErrorStore(
 ) : LastSyncErrorStore {
     override suspend fun load(): SyncError? {
         val type = storage.getString(KEY_TYPE)?.let { name -> SyncErrorType.entries.firstOrNull { it.name == name } } ?: return null
-        return SyncError(type = type, message = storage.getString(KEY_MESSAGE).orEmpty())
+        storage.remove(KEY_MESSAGE)
+        return SyncError(type = type, message = type.name)
     }
 
     override suspend fun save(error: SyncError?) {
@@ -40,7 +40,7 @@ class KeyValueLastSyncErrorStore(
             return
         }
         storage.putString(KEY_TYPE, error.type.name)
-        storage.putString(KEY_MESSAGE, error.message)
+        storage.remove(KEY_MESSAGE)
     }
 
     private companion object {

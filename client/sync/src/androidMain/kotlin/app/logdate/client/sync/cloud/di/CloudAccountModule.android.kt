@@ -16,6 +16,7 @@ actual val cloudAccountModule: Module =
             DefaultCloudAccountRepository(
                 apiClient = get(),
                 secureStorage = get<KeyValueStorage>(),
+                configRepository = get(),
             )
         }
     }

@@ -32,7 +32,7 @@ class MediaPayloadKeyProvider(
             // A stored key of the wrong length cannot decrypt anything that was encrypted with the
             // real one. Replacing it silently is how key loss turns into unreadable media with no
             // error, so say so before moving on.
-            Napier.e("Stored media key is ${existing.size} bytes, not $KEY_LENGTH_BYTES; deriving a fresh one")
+            Napier.e("Stored media key has the wrong length; deriving a fresh one")
         }
 
         identityKeyManager.ensureIdentityKey()

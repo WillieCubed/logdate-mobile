@@ -13,7 +13,10 @@ import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.client.sync.test.FakeCloudApiClient
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
+import app.logdate.shared.model.SerializableAudioBlock
+import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
+import app.logdate.shared.model.SerializableVideoBlock
 import app.logdate.shared.model.sync.DeviceId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -202,7 +205,7 @@ class EncryptedSyncPayloadDataSourceTest {
         runTest {
             val cipher = configuredCipher()
             val apiClient = RecordingPayloadCloudApiClient()
-            val dataSource = DefaultCloudDraftDataSource(apiClient, cipher)
+            val dataSource = DefaultCloudDraftDataSource(apiClient, cipher, supportsRichDrafts = { true })
             val draft =
                 EditorDraft(
                     id = Uuid.random(),
@@ -225,6 +228,9 @@ class EncryptedSyncPayloadDataSourceTest {
             val plaintext = "draft body"
             assertFalse(uploaded.content == plaintext, "Cloud API must not receive plaintext draft content")
             assertTrue(uploaded.content.startsWith("LDSE2:"))
+            assertEquals(1, uploaded.encryptedBlocksVersion)
+            assertTrue(uploaded.encryptedBlocks.orEmpty().startsWith("LDSE2:"))
+            assertFalse(uploaded.encryptedBlocks.orEmpty().contains(plaintext))
 
             apiClient.getDraftChangesResponse =
                 Result.success(
@@ -240,6 +246,8 @@ class EncryptedSyncPayloadDataSourceTest {
                                     lastUpdated = draft.lastModifiedAt.toEpochMilliseconds(),
                                     deviceId = DeviceId("device-a"),
                                     serverVersion = 1,
+                                    encryptedBlocksVersion = uploaded.encryptedBlocksVersion,
+                                    encryptedBlocks = uploaded.encryptedBlocks,
                                 ),
                             ),
                     ),
@@ -247,6 +255,78 @@ class EncryptedSyncPayloadDataSourceTest {
 
             val downloaded = dataSource.getDraftChanges("token", Clock.System.now()).getOrThrow()
             assertEquals(plaintext, downloaded.changes.single().content)
+            assertEquals(draft, downloaded.changes.single().richDraft)
+        }
+
+    @Test
+    fun `rich draft keeps block identity order attributes media and journals`() =
+        runTest {
+            val cipher = configuredCipher()
+            val apiClient = RecordingPayloadCloudApiClient()
+            val source = DefaultCloudDraftDataSource(apiClient, cipher, supportsRichDrafts = { true })
+            val now = Clock.System.now()
+            val draft =
+                EditorDraft(
+                    id = Uuid.random(),
+                    blocks =
+                        listOf(
+                            SerializableTextBlock(Uuid.random(), now, locationLat = 1.5, locationLng = -2.5, content = "first"),
+                            SerializableImageBlock(Uuid.random(), now, uri = "https://server/media/image", caption = "caption"),
+                            SerializableVideoBlock(
+                                Uuid.random(),
+                                now,
+                                uri = "https://server/media/video",
+                                thumbnailUri = "https://server/media/thumb",
+                            ),
+                            SerializableAudioBlock(
+                                Uuid.random(),
+                                now,
+                                uri = "https://server/media/audio",
+                                duration = 517L,
+                                transcription = "spoken",
+                            ),
+                            SerializableTextBlock(Uuid.random(), now, content = "last"),
+                        ),
+                    selectedJournalIds = listOf(Uuid.random(), Uuid.random()),
+                    createdAt = now,
+                    lastModifiedAt = now,
+                )
+            assertTrue(source.uploadDraft("token", draft, DeviceId("device-a")).isSuccess)
+            val wire = apiClient.uploadDraftCalls.single().second
+            apiClient.getDraftChangesResponse =
+                Result.success(
+                    DraftChangesResponse(
+                        drafts =
+                            listOf(
+                                DraftChange(
+                                    draft.id.toString(),
+                                    wire.content,
+                                    wire.blockTypes,
+                                    wire.journalIds,
+                                    wire.createdAt,
+                                    wire.lastUpdated,
+                                    wire.deviceId,
+                                    42L,
+                                    encryptedBlocksVersion = wire.encryptedBlocksVersion,
+                                    encryptedBlocks = wire.encryptedBlocks,
+                                ),
+                            ),
+                        lastTimestamp = 42L,
+                    ),
+                )
+            val result = source.getDraftChanges("token", now).getOrThrow()
+            assertEquals(draft, result.changes.single().richDraft)
+            assertEquals(42L, result.lastSyncTimestamp.toEpochMilliseconds())
+        }
+
+    @Test
+    fun `unsupported server leaves rich draft upload untouched`() =
+        runTest {
+            val apiClient = RecordingPayloadCloudApiClient()
+            val source = DefaultCloudDraftDataSource(apiClient, configuredCipher())
+            val result = source.uploadDraft("token", EditorDraft(), DeviceId("device-a"))
+            assertTrue(result.isFailure)
+            assertTrue(apiClient.uploadDraftCalls.isEmpty())
         }
 
     @Test

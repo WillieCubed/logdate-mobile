@@ -599,9 +599,9 @@ class SyncStatusViewModelTest {
 
         override suspend fun hasValidSession(): Boolean = session != null
 
-        override fun saveSession(session: UserSession) {}
+        override suspend fun saveSession(session: UserSession) {}
 
-        override fun clearSession() {}
+        override suspend fun clearSession() {}
     }
 
     private class FakeJournalRepository(

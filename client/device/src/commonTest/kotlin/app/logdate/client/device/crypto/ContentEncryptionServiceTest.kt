@@ -21,6 +21,40 @@ class ContentEncryptionServiceTest {
     private val service = ContentEncryptionService(identityKeyManager, keyDerivation, cryptoManager)
 
     @Test
+    fun `crypto logs and rejected envelopes do not expose identifiers or attacker values`() =
+        runTest {
+            val marker = "PRIVATE_CONTENT_IDENTIFIER_SENTINEL"
+            val captured = mutableListOf<String>()
+            val sink =
+                object : io.github.aakira.napier.Antilog() {
+                    override fun performLog(
+                        priority: io.github.aakira.napier.LogLevel,
+                        tag: String?,
+                        throwable: Throwable?,
+                        message: String?,
+                    ) {
+                        captured += listOfNotNull(tag, message, throwable?.message).joinToString()
+                    }
+                }
+            io.github.aakira.napier.Napier
+                .base(sink)
+            try {
+                identityKeyManager.setupNewIdentity()
+                val envelope = service.encryptContent(marker, marker)
+                service.decryptContent(marker, envelope)
+                val failure =
+                    assertFailsWith<IllegalArgumentException> {
+                        service.decryptContent(marker, envelope.copy(algorithm = marker))
+                    }
+                assertFalse(failure.message.orEmpty().contains(marker))
+                assertFalse(captured.any { it.contains(marker) })
+            } finally {
+                io.github.aakira.napier.Napier
+                    .takeLogarithm(sink)
+            }
+        }
+
+    @Test
     fun `encrypt decrypt roundtrip`() =
         runTest {
             identityKeyManager.setupNewIdentity()

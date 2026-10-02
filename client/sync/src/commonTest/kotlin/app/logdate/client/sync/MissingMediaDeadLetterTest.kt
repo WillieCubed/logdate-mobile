@@ -127,7 +127,7 @@ class MissingMediaDeadLetterTest {
             assertEquals(1, records.size, "a second consecutive miss should be set aside, not retried forever")
             assertEquals(note.uid.toString(), records.single().entityId)
             assertTrue(
-                records.single().lastError.contains("ENOENT"),
+                records.single().lastError == "MISSING_FILE",
                 "the record should say why it was set aside: ${records.single().lastError}",
             )
         }

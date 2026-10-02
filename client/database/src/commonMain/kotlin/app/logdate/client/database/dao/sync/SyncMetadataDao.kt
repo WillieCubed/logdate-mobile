@@ -4,9 +4,11 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import app.logdate.client.database.entities.sync.PendingUploadEntity
 import app.logdate.client.database.entities.sync.SyncCursorEntity
 import kotlinx.coroutines.flow.Flow
+import kotlin.uuid.Uuid
 
 /**
  * Data Access Object for sync metadata operations.
@@ -79,6 +81,25 @@ interface SyncMetadataDao {
     suspend fun insertPending(pending: PendingUploadEntity)
 
     @Query(
+        """INSERT OR IGNORE INTO pending_uploads
+        (ownerId, serverOrigin, entityType, entityId, operation, createdAt, retryCount, expectedServerVersion, operationId)
+        SELECT :ownerId, :serverOrigin, :entityType, :entityId, 'UPDATE', :createdAt, 0, :expectedServerVersion, :operationId
+        WHERE NOT EXISTS (
+            SELECT 1 FROM pending_uploads WHERE (ownerId = :ownerId OR ownerId = '')
+            AND serverOrigin = :serverOrigin AND entityType = :entityType AND entityId = :entityId
+        )""",
+    )
+    suspend fun insertRepairIfAbsent(
+        ownerId: String,
+        serverOrigin: String,
+        entityType: String,
+        entityId: String,
+        createdAt: Long,
+        expectedServerVersion: Long? = null,
+        operationId: String = Uuid.random().toString(),
+    )
+
+    @Query(
         "DELETE FROM pending_uploads WHERE ownerId = :ownerId AND serverOrigin = :serverOrigin AND entityType = :entityType AND entityId = :entityId",
     )
     suspend fun deletePending(
@@ -87,6 +108,36 @@ interface SyncMetadataDao {
         entityType: String,
         entityId: String,
     )
+
+    @Transaction
+    suspend fun incrementRetryIfCurrent(
+        ownerId: String,
+        serverOrigin: String,
+        entityType: String,
+        entityId: String,
+        operationId: String,
+    ): Boolean {
+        if (getPending(ownerId, serverOrigin, entityType, entityId)?.operationId != operationId) return false
+        incrementRetryCount(ownerId, serverOrigin, entityType, entityId)
+        return true
+    }
+
+    /** The read and deletion share one Room transaction, including legacy retirement. */
+    @Transaction
+    suspend fun deletePendingIfCurrent(
+        ownerId: String,
+        serverOrigin: String,
+        entityType: String,
+        entityId: String,
+        operationId: String,
+    ): Boolean {
+        val pending = getPending(ownerId, serverOrigin, entityType, entityId) ?: return false
+        if (pending.operationId != operationId) return false
+        deletePending(ownerId, serverOrigin, entityType, entityId)
+        // Owner-less rows are immutable upgrade shadows; new mutations always carry an owner.
+        deletePending("", serverOrigin, entityType, entityId)
+        return true
+    }
 
     @Query("DELETE FROM pending_uploads WHERE ownerId = :ownerId AND serverOrigin = :serverOrigin")
     suspend fun deletePendingForOrigin(

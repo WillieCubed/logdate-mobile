@@ -1,5 +1,7 @@
 package app.logdate.client.sync.di
 
+import app.logdate.client.database.LogDateDatabase
+import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.identity.DeviceIdProvider
@@ -27,7 +29,13 @@ import app.logdate.client.sync.crypto.StoredMediaPayloadCrypto
 import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.client.sync.location.LocationHistoryStager
 import app.logdate.client.sync.location.LocationHistorySyncEngine
+import app.logdate.client.sync.recovery.DownloadInbox
+import app.logdate.client.sync.recovery.DownloadScope
+import app.logdate.client.sync.recovery.DurableCloudApiClient
+import app.logdate.shared.config.LogDateConfigRepository
+import app.logdate.shared.model.ServerProtocolFeature
 import org.koin.dsl.module
+import kotlin.time.Clock
 
 /**
  * Koin module for Cloud API client dependencies.
@@ -39,12 +47,36 @@ val cloudModule =
     module {
         // API Client
         single<CloudApiClient> {
+            val recorder = get<app.logdate.client.sync.diagnostics.SyncDiagnosticRecorder>()
+            val sources = get<app.logdate.client.sync.diagnostics.DiagnosticSourceProvider>()
             LogDateCloudApiClient(
                 configRepository = get(),
                 httpClient = get(),
+                sessionStorage = get<SessionStorage>(),
+                diagnosticSource = { sources.current() },
+                scopedDiagnostics = { event, source -> recorder.record(event, source?.scope, source?.epoch) },
             )
         }
 
+        single {
+            val sessions = get<SessionStorage>()
+            val recorder = get<app.logdate.client.sync.diagnostics.SyncDiagnosticRecorder>()
+            val sources = get<app.logdate.client.sync.diagnostics.DiagnosticSourceProvider>()
+            DownloadInbox(
+                get<LogDateDatabase>().downloadInboxDao(),
+                get(),
+                {
+                    val bound = sessions.getOriginBoundSession()
+                    DownloadScope(bound?.session?.accountId.orEmpty(), bound?.origin.orEmpty())
+                },
+                { Clock.System.now().toEpochMilliseconds() },
+                diagnosticSource = sources::current,
+                diagnostics = { event, source -> recorder.record(event, source?.scope, source?.epoch) },
+            )
+        }
+        single { DurableCloudApiClient(get<CloudApiClient>(), get()) }
+
+        // Raw API remains available for identity emptiness checks; incremental inbox reads cannot prove emptiness.
         // Cloud Data Sources
         single { SyncPayloadCipher(get(), get(), get()) }
         single {
@@ -77,11 +109,16 @@ val cloudModule =
                 },
             )
         }
-        single<CloudContentDataSource> { DefaultCloudContentDataSource(get(), get()) }
-        single<CloudJournalDataSource> { DefaultCloudJournalDataSource(get(), get()) }
-        single<CloudAssociationDataSource> { DefaultCloudAssociationDataSource(get()) }
+        single<CloudContentDataSource> { DefaultCloudContentDataSource(get<DurableCloudApiClient>(), get()) }
+        single<CloudJournalDataSource> { DefaultCloudJournalDataSource(get<DurableCloudApiClient>(), get()) }
+        single<CloudAssociationDataSource> { DefaultCloudAssociationDataSource(get<DurableCloudApiClient>()) }
         single<CloudBackupDataSource> { DefaultCloudBackupDataSource(get()) }
-        single<CloudDraftDataSource> { DefaultCloudDraftDataSource(get(), get()) }
+        single<CloudDraftDataSource> {
+            val config = get<LogDateConfigRepository>()
+            DefaultCloudDraftDataSource(get<DurableCloudApiClient>(), get()) {
+                config.getCurrentServerDescriptor()?.hasProtocolFeature(ServerProtocolFeature.RICH_DRAFTS_V1) == true
+            }
+        }
         single { MediaPayloadKeyProvider(get(), get(), get(), get()) }
         single<MediaPayloadCrypto> { StoredMediaPayloadCrypto(get()) }
         single<CloudMediaDataSource> { DefaultCloudMediaDataSource(get(), get()) }

@@ -23,6 +23,9 @@ class SyncDeadLetterStoreTest {
                 )
             KeyValueSyncDeadLetterStore(storage).add(record)
 
-            assertEquals(listOf(record), KeyValueSyncDeadLetterStore(storage).observe().first())
+            assertEquals(
+                listOf(record.copy(lastError = "SERVER_UNAVAILABLE", reason = SyncDeadLetterReason.SERVER_UNAVAILABLE)),
+                KeyValueSyncDeadLetterStore(storage).observe().first(),
+            )
         }
 }

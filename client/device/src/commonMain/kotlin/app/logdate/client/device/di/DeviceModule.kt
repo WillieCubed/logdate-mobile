@@ -14,6 +14,16 @@ import org.koin.dsl.module
  */
 val deviceModule: Module =
     module {
+        single {
+            val secure = get<app.logdate.client.device.storage.SecureStorage>()
+            app.logdate.shared.config.PrivacyScopeEpoch(
+                object : app.logdate.shared.config.PrivacyEpochStorage {
+                    override suspend fun read(): String? = secure.getString("diagnostic_privacy_epoch")
+
+                    override suspend fun write(epoch: String) = secure.putString("diagnostic_privacy_epoch", epoch)
+                },
+            )
+        }
         // Include device identity components
         includes(deviceIdentityModule)
 

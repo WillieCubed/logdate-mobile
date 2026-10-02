@@ -56,6 +56,7 @@ internal class SyncStatusPublisher(
     private val conflictStore: SyncConflictStore,
     private val identityRecoveryNeededStore: IdentityRecoveryNeededStore,
     private val unreadableCloudRecordStore: UnreadableCloudRecordStore,
+    private val pendingRecoveryCount: suspend () -> Int = { 0 },
 ) {
     /**
      * Whether the last upload pass held a photo or video back for want of Wi-Fi.
@@ -89,10 +90,10 @@ internal class SyncStatusPublisher(
         // a backgrounded app freely -- so after each restart a sync that kept failing looked like
         // a calm backlog. Restore it unless this run already has one, then save every change.
         syncScope.launch {
-            val saved = runCatching { lastErrorStore.load() }.onFailure { Napier.e("Could not read the last sync error", it) }.getOrNull()
+            val saved = runCatching { lastErrorStore.load() }.onFailure { Napier.e("Could not read the last sync error") }.getOrNull()
             if (saved != null) lastErrorFlow.compareAndSet(null, saved)
             lastErrorFlow.collect { error ->
-                runCatching { lastErrorStore.save(error) }.onFailure { Napier.e("Could not save the last sync error", it) }
+                runCatching { lastErrorStore.save(error) }.onFailure { Napier.e("Could not save the last sync error") }
             }
         }
         // Republish status on each internal state/error transition so observers don't have to poll.
@@ -117,7 +118,7 @@ internal class SyncStatusPublisher(
                 .getSessionFlow()
                 .flatMapLatest { syncMetadataService.observePendingCount() }
                 .catch { error ->
-                    Napier.e("Could not follow the pending upload count", error)
+                    Napier.e("Could not follow the pending upload count")
                     queueObservationFailed.value = true
                     _syncStatusFlow.update { it.copy(queueReadable = false) }
                 }.collect { count ->
@@ -138,16 +139,18 @@ internal class SyncStatusPublisher(
         val authenticated = sessionStorage.getSession() != null
         val pendingCountResult =
             runCatching { syncMetadataService.getPendingCount() }
-                .onFailure { Napier.e("Could not read the pending upload count", it) }
+                .onFailure { Napier.e("Could not read the pending upload count") }
+        val recovery = runCatching { pendingRecoveryCount() }
         _syncStatusFlow.value =
             SyncStatus(
                 isEnabled = authenticated && isEnabled(),
                 lastSyncTime = latestSyncTime(),
                 pendingUploads = pendingCountResult.getOrDefault(0),
-                queueReadable = pendingCountResult.isSuccess && !queueObservationFailed.value,
+                queueReadable = pendingCountResult.isSuccess && recovery.isSuccess && !queueObservationFailed.value,
+                pendingDownloads = recovery.getOrDefault(0),
                 backgroundWorkLimited = backgroundWorkLimited(),
                 isSyncing = syncStateFlow.value is SyncState.Syncing,
-                hasErrors = lastErrorFlow.value != null,
+                hasErrors = lastErrorFlow.value != null || recovery.getOrDefault(0) > 0 || recovery.isFailure,
                 lastError = lastErrorFlow.value,
                 pausedReason = currentPausedReason(authenticated),
                 totalForRun = runTotal,
@@ -159,7 +162,7 @@ internal class SyncStatusPublisher(
 
     private suspend fun currentConflictCount(): Int =
         runCatching { conflictStore.list().size }
-            .onFailure { Napier.e("Could not read the conflict count", it) }
+            .onFailure { Napier.e("Could not read the conflict count") }
             .getOrDefault(0)
 
     /**
@@ -250,7 +253,7 @@ internal class SyncStatusPublisher(
     suspend fun refreshObservedQuotaFromServer(reason: String) {
         val manager = cloudQuotaManager ?: return
         runCatching { manager.syncWithServer() }
-            .onFailure { Napier.w("Failed to refresh quota after $reason", it) }
+            .onFailure { Napier.w("Failed to refresh quota") }
     }
 
     /** Helper to handle sync exceptions consistently. */
@@ -261,11 +264,10 @@ internal class SyncStatusPublisher(
         val error =
             SyncError(
                 type = SyncErrorType.UNKNOWN_ERROR,
-                message = "$operation: ${e.message}",
-                cause = e,
+                message = "Synchronization failed",
             )
         lastErrorFlow.value = error
-        Napier.e("$operation failed", e)
+        Napier.e("Synchronization failed")
         return SyncResult(success = false, errors = listOf(error))
     }
 
@@ -274,7 +276,7 @@ internal class SyncStatusPublisher(
      * Distinguishes 401 Unauthorized errors from other server errors.
      */
     fun handleCloudApiError(e: CloudApiException): SyncResult {
-        Napier.e("Sync failed with ${e.statusCode ?: "no"} status (${e.errorCode}): ${e.message}", e)
+        Napier.e("Sync request failed")
         val errorType =
             if (e.statusCode == 401) {
                 SyncErrorType.AUTHENTICATION_ERROR
@@ -285,7 +287,7 @@ internal class SyncStatusPublisher(
             success = false,
             errors =
                 listOf(
-                    SyncError(errorType, e.message, e),
+                    SyncError(errorType, errorType.name),
                 ),
         )
     }

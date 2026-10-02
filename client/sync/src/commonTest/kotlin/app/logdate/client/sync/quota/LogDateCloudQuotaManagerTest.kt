@@ -179,11 +179,11 @@ class LogDateCloudQuotaManagerTest {
 
         override suspend fun hasValidSession(): Boolean = state.value != null
 
-        override fun saveSession(session: UserSession) {
+        override suspend fun saveSession(session: UserSession) {
             state.value = session
         }
 
-        override fun clearSession() {
+        override suspend fun clearSession() {
             state.value = null
         }
     }

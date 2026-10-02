@@ -56,6 +56,7 @@ data class AssociationSyncResult(
     val deletions: List<JournalContentAssociation>,
     val lastSyncTimestamp: Instant,
     val hasMore: Boolean = false,
+    val failures: List<RemoteRecordFailure> = emptyList(),
 )
 
 /**
@@ -99,19 +100,35 @@ class DefaultCloudAssociationDataSource(
         since: Instant,
         limit: Int?,
     ): Result<AssociationSyncResult> =
-        cloudApiClient.getAssociationChanges(accessToken, since.toEpochMilliseconds(), limit).mapCatching { response ->
+        cloudApiClient.getAssociationChanges(accessToken, since.toEpochMilliseconds(), limit).mapRecordPage { response ->
+            val additions =
+                response.changes.filterNot { it.isDeleted }.readEach(
+                    idOf = { it.journalId + "::" + it.contentId },
+                    versionOf = { it.serverVersion },
+                ) { it.toAssociation() }
+            val removed =
+                response.deletions.readEach(
+                    idOf = { it.journalId + "::" + it.contentId },
+                    versionOf = { it.serverVersion },
+                ) {
+                    JournalContentAssociation(
+                        journalId = Uuid.parse(it.journalId),
+                        contentId = Uuid.parse(it.contentId),
+                        createdAt = Instant.fromEpochMilliseconds(it.deletedAt),
+                        syncVersion = it.serverVersion,
+                    )
+                }
+            val tombstones =
+                response.changes.filter { it.isDeleted }.readEach(
+                    idOf = { it.journalId + "::" + it.contentId },
+                    versionOf = { it.serverVersion },
+                ) { it.toAssociation() }
             AssociationSyncResult(
-                additions = response.changes.filter { !it.isDeleted }.map { it.toAssociation() },
-                deletions =
-                    response.deletions.map {
-                        JournalContentAssociation(
-                            journalId = Uuid.parse(it.journalId),
-                            contentId = Uuid.parse(it.contentId),
-                            createdAt = Instant.fromEpochMilliseconds(it.deletedAt),
-                        )
-                    },
+                additions = additions.readable,
+                deletions = removed.readable + tombstones.readable,
                 lastSyncTimestamp = Instant.fromEpochMilliseconds(response.lastTimestamp),
                 hasMore = response.hasMore,
+                failures = additions.failures + removed.failures + tombstones.failures,
             )
         }
 

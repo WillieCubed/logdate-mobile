@@ -37,7 +37,7 @@ class LastSyncErrorPersistenceTest {
             afterRestart.advanceUntilIdle()
 
             assertEquals(
-                SyncErrorType.UNKNOWN_ERROR,
+                SyncErrorType.SERVER_ERROR,
                 restarted.syncStatusFlow.value.lastError
                     ?.type,
             )

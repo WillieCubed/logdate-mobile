@@ -179,11 +179,11 @@ private class FakeSessionStorage(
 
     override suspend fun hasValidSession(): Boolean = sessions.value != null
 
-    override fun saveSession(session: UserSession) {
+    override suspend fun saveSession(session: UserSession) {
         sessions.value = session
     }
 
-    override fun clearSession() {
+    override suspend fun clearSession() {
         sessions.value = null
     }
 }

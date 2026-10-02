@@ -1,5 +1,6 @@
 package app.logdate.client.sync.cloud
 
+import app.logdate.client.datastore.SessionStorage
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.AccountTokens
 import app.logdate.shared.model.ApiErrorResponse
@@ -16,25 +17,27 @@ import app.logdate.shared.model.UsernameAvailabilityResponse
 import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.request.delete
 import io.ktor.client.request.forms.InputProvider
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
-import io.ktor.client.request.get
 import io.ktor.client.request.parameter
-import io.ktor.client.request.patch
-import io.ktor.client.request.post
-import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import io.ktor.utils.io.readRemaining
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.first
 import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.readByteArray
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.time.Instant
@@ -52,10 +55,60 @@ import kotlin.uuid.Uuid
 class LogDateCloudApiClient(
     private val configRepository: LogDateConfigRepository,
     private val httpClient: HttpClient,
+    private val sessionStorage: SessionStorage? = null,
+    diagnostics: (app.logdate.shared.model.diagnostics.SyncDiagnosticEvent) -> Unit = {},
+    diagnosticSource: suspend () -> app.logdate.client.sync.diagnostics.DiagnosticSource? = { null },
+    scopedDiagnostics: (
+        app.logdate.shared.model.diagnostics.SyncDiagnosticEvent,
+        app.logdate.client.sync.diagnostics.DiagnosticSource?,
+    ) -> Unit = { _, _ -> },
 ) : CloudApiClient {
+    private val transport = SafeCloudTransport(httpClient, diagnostics, diagnosticSource, scopedDiagnostics)
     private val errorJson = Json { ignoreUnknownKeys = true }
 
-    private suspend fun getBaseUrl(): String = configRepository.apiBaseUrl.first()
+    private suspend fun getBaseUrl(
+        accessToken: String? = null,
+        refreshToken: String? = null,
+    ): String {
+        val pinned = currentCoroutineContext()[CloudRequestBinding]
+        if (pinned != null) {
+            if ((accessToken != null && accessToken != pinned.authorizedAccessToken) ||
+                (refreshToken != null && refreshToken != pinned.session.refreshToken)
+            ) {
+                throw scopeChanged()
+            }
+            return pinned.location.apiBaseUrl
+        }
+
+        val origin = configRepository.getCurrentBackendUrl()
+        val selectedBaseUrl = configRepository.getCurrentApiBaseUrl()
+        val bound = if (accessToken != null || refreshToken != null) sessionStorage?.getOriginBoundSession() else null
+        if (sessionStorage != null &&
+            (accessToken != null || refreshToken != null) &&
+            (
+                bound?.origin != origin ||
+                    (accessToken != null && bound?.session?.accessToken != accessToken) ||
+                    (refreshToken != null && bound?.session?.refreshToken != refreshToken)
+            )
+        ) {
+            throw scopeChanged()
+        }
+        val baseUrl = configRepository.apiBaseUrl.first()
+        if (baseUrl != selectedBaseUrl ||
+            configRepository.getCurrentBackendUrl() != origin ||
+            (bound != null && sessionStorage?.getOriginBoundSession() != bound)
+        ) {
+            throw scopeChanged()
+        }
+        return baseUrl
+    }
+
+    private fun scopeChanged() =
+        CloudApiException(
+            "CLOUD_SCOPE_CHANGED",
+            "Cloud account changed during request",
+            statusCode = 401,
+        )
 
     /**
      * Checks if a username is available for registration using the availability endpoint.
@@ -67,7 +120,7 @@ class LogDateCloudApiClient(
     override suspend fun checkUsernameAvailability(username: String): Result<CheckUsernameAvailabilityResponse> =
         try {
             val baseUrl = getBaseUrl()
-            val response = httpClient.get("$baseUrl/auth/signup/username/$username/available")
+            val response = transport.get("$baseUrl/auth/signup/username/$username/available")
 
             when (response.status) {
                 HttpStatusCode.OK -> {
@@ -86,12 +139,12 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to check username availability", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to check username availability")
             Result.failure(
                 CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to check username availability: ${e.message}",
-                    cause = e,
+                    message = "Failed to check username availability",
                 ),
             )
         }
@@ -110,7 +163,7 @@ class LogDateCloudApiClient(
         try {
             val baseUrl = getBaseUrl()
             val response =
-                httpClient.post("$baseUrl/auth/signup/passkey/begin") {
+                transport.post("$baseUrl/auth/signup/passkey/begin") {
                     contentType(ContentType.Application.Json)
                     setBody(
                         SignupPasskeyBeginRequestDto(
@@ -144,12 +197,12 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to begin account creation", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to begin account creation")
             Result.failure(
                 CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to begin account creation: ${e.message}",
-                    cause = e,
+                    message = "Failed to begin account creation",
                 ),
             )
         }
@@ -168,7 +221,7 @@ class LogDateCloudApiClient(
         try {
             val baseUrl = getBaseUrl()
             val response =
-                httpClient.post("$baseUrl/auth/signup/passkey/complete") {
+                transport.post("$baseUrl/auth/signup/passkey/complete") {
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -194,12 +247,12 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to complete account creation", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to complete account creation")
             Result.failure(
                 CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to complete account creation: ${e.message}",
-                    cause = e,
+                    message = "Failed to complete account creation",
                 ),
             )
         }
@@ -213,9 +266,9 @@ class LogDateCloudApiClient(
      */
     override suspend fun refreshAccessToken(refreshToken: String): Result<String> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(refreshToken = refreshToken)
             val response =
-                httpClient.post("$baseUrl/auth/token/refresh") {
+                transport.post("$baseUrl/auth/token/refresh") {
                     contentType(ContentType.Application.Json)
                     setBody(RefreshTokenRequest(refreshToken))
                 }
@@ -232,12 +285,12 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to refresh access token", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to refresh access token")
             Result.failure(
                 CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to refresh access token: ${e.message}",
-                    cause = e,
+                    message = "Failed to refresh access token",
                 ),
             )
         }
@@ -251,22 +304,22 @@ class LogDateCloudApiClient(
      */
     override suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount> =
         try {
-            val baseUrl = getBaseUrl()
-            Napier.d("Getting account info with token: ${accessToken.take(5)}...")
+            val baseUrl = getBaseUrl(accessToken)
+            Napier.d("Requesting account info")
 
             val response =
-                httpClient.get("$baseUrl/auth/me") {
+                transport.get("$baseUrl/auth/me") {
                     // Add Authorization header with Bearer token scheme
                     headers.append("Authorization", "Bearer $accessToken")
                 }
 
-            Napier.d("Account info response received with status: ${response.status}")
+            Napier.d("Account info response received")
 
             when (response.status) {
                 HttpStatusCode.OK -> {
                     try {
                         val responseBody = response.body<AuthResponseDto>()
-                        Napier.d("Parsed response body with success=${responseBody.success}")
+                        Napier.d("Parsed account info response body")
 
                         if (responseBody.success) {
                             Result.success(responseBody.data.account.toLogDateAccount())
@@ -274,12 +327,12 @@ class LogDateCloudApiClient(
                             handleApiError(response)
                         }
                     } catch (e: Exception) {
-                        Napier.e("Failed to parse account info response", e)
+                        if (e is CancellationException) throw e
+                        Napier.e("Failed to parse account info response")
                         Result.failure(
                             CloudApiException(
                                 errorCode = "PARSE_ERROR",
-                                message = "Failed to parse account info response: ${e.message}",
-                                cause = e,
+                                message = "Failed to parse account info response",
                             ),
                         )
                     }
@@ -287,12 +340,12 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to get account info", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to get account info")
             Result.failure(
                 CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to get account info: ${e.message}",
-                    cause = e,
+                    message = "Failed to get account info",
                 ),
             )
         }
@@ -307,17 +360,16 @@ class LogDateCloudApiClient(
         val statusCode = response.status.value
         val errorPayload =
             runCatching { response.bodyAsText() }
-                .onFailure { Napier.w("Could not read error body for HTTP $statusCode", it) }
+                .onFailure { Napier.w("Could not read error body for HTTP") }
                 .getOrDefault("")
-        // Every HTTP failure used to be built here silently, so a server rejecting an upload left
-        // no trace anywhere -- the one thing that would have explained months of failed syncs.
-        Napier.w("HTTP $statusCode from sync API: ${errorPayload.take(512)}")
+        // Response bodies are untrusted and can echo journal content or credentials.
+        Napier.w("Sync API request failed: HTTP")
         val parsedError = parseErrorPayload(errorPayload)
         return if (parsedError != null) {
             Result.failure(
                 CloudApiException(
-                    errorCode = parsedError.code,
-                    message = parsedError.message,
+                    errorCode = safeCloudErrorCode(parsedError.code),
+                    message = "Request failed (HTTP $statusCode)",
                     statusCode = statusCode,
                 ),
             )
@@ -325,7 +377,7 @@ class LogDateCloudApiClient(
             Result.failure(
                 CloudApiException(
                     errorCode = "UNKNOWN_ERROR",
-                    message = "An unknown error occurred: ${response.status.description}",
+                    message = "Request failed (HTTP $statusCode)",
                     statusCode = statusCode,
                 ),
             )
@@ -359,9 +411,9 @@ class LogDateCloudApiClient(
         content: ContentUploadRequest,
     ): Result<ContentUploadResponse> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val response =
-                httpClient.put("$baseUrl/contents/${content.id}") {
+                transport.put("$baseUrl/contents/${content.id}") {
                     headers.append("Authorization", "Bearer $accessToken")
                     contentType(ContentType.Application.Json)
                     setBody(content)
@@ -375,12 +427,12 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to upload content", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to upload content")
             Result.failure(
                 CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to upload content: ${e.message}",
-                    cause = e,
+                    message = "Failed to upload content",
                 ),
             )
         }
@@ -391,10 +443,10 @@ class LogDateCloudApiClient(
         limit: Int?,
     ): Result<ContentChangesResponse> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val limitParam = limit?.let { "&limit=$it" }.orEmpty()
             val response =
-                httpClient.get("$baseUrl/contents?since=$since$limitParam") {
+                transport.get("$baseUrl/contents?since=$since$limitParam") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
 
@@ -406,12 +458,12 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to get content changes", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to get content changes")
             Result.failure(
                 CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to get content changes: ${e.message}",
-                    cause = e,
+                    message = "Failed to get content changes",
                 ),
             )
         }
@@ -422,9 +474,9 @@ class LogDateCloudApiClient(
         content: ContentUpdateRequest,
     ): Result<ContentUpdateResponse> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val response =
-                httpClient.patch("$baseUrl/contents/$contentId") {
+                transport.patch("$baseUrl/contents/$contentId") {
                     headers.append("Authorization", "Bearer $accessToken")
                     contentType(ContentType.Application.Json)
                     setBody(content)
@@ -438,12 +490,12 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to update content", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to update content")
             Result.failure(
                 CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to update content: ${e.message}",
-                    cause = e,
+                    message = "Failed to update content",
                 ),
             )
         }
@@ -453,9 +505,9 @@ class LogDateCloudApiClient(
         contentId: String,
     ): Result<Unit> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val response =
-                httpClient.delete("$baseUrl/contents/$contentId") {
+                transport.delete("$baseUrl/contents/$contentId") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
 
@@ -464,12 +516,12 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to delete content", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to delete content")
             Result.failure(
                 CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to delete content: ${e.message}",
-                    cause = e,
+                    message = "Failed to delete content",
                 ),
             )
         }
@@ -480,9 +532,9 @@ class LogDateCloudApiClient(
         journal: JournalUploadRequest,
     ): Result<JournalUploadResponse> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val response =
-                httpClient.put("$baseUrl/journals/${journal.id}") {
+                transport.put("$baseUrl/journals/${journal.id}") {
                     headers.append("Authorization", "Bearer $accessToken")
                     contentType(ContentType.Application.Json)
                     setBody(journal)
@@ -496,12 +548,12 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to upload journal", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to upload journal")
             Result.failure(
                 CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to upload journal: ${e.message}",
-                    cause = e,
+                    message = "Failed to upload journal",
                 ),
             )
         }
@@ -512,10 +564,10 @@ class LogDateCloudApiClient(
         limit: Int?,
     ): Result<JournalChangesResponse> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val limitParam = limit?.let { "&limit=$it" }.orEmpty()
             val response =
-                httpClient.get("$baseUrl/journals?since=$since$limitParam") {
+                transport.get("$baseUrl/journals?since=$since$limitParam") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
 
@@ -527,12 +579,12 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to get journal changes", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to get journal changes")
             Result.failure(
                 CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to get journal changes: ${e.message}",
-                    cause = e,
+                    message = "Failed to get journal changes",
                 ),
             )
         }
@@ -543,9 +595,9 @@ class LogDateCloudApiClient(
         journal: JournalUpdateRequest,
     ): Result<JournalUpdateResponse> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val response =
-                httpClient.patch("$baseUrl/journals/$journalId") {
+                transport.patch("$baseUrl/journals/$journalId") {
                     headers.append("Authorization", "Bearer $accessToken")
                     contentType(ContentType.Application.Json)
                     setBody(journal)
@@ -559,12 +611,12 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to update journal", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to update journal")
             Result.failure(
                 CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to update journal: ${e.message}",
-                    cause = e,
+                    message = "Failed to update journal",
                 ),
             )
         }
@@ -574,9 +626,9 @@ class LogDateCloudApiClient(
         journalId: String,
     ): Result<Unit> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val response =
-                httpClient.delete("$baseUrl/journals/$journalId") {
+                transport.delete("$baseUrl/journals/$journalId") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
 
@@ -585,12 +637,12 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to delete journal", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to delete journal")
             Result.failure(
                 CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to delete journal: ${e.message}",
-                    cause = e,
+                    message = "Failed to delete journal",
                 ),
             )
         }
@@ -601,9 +653,9 @@ class LogDateCloudApiClient(
         associations: AssociationUploadRequest,
     ): Result<AssociationUploadResponse> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val response =
-                httpClient.post("$baseUrl/associations") {
+                transport.post("$baseUrl/associations") {
                     headers.append("Authorization", "Bearer $accessToken")
                     contentType(ContentType.Application.Json)
                     setBody(associations)
@@ -617,12 +669,12 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to upload associations", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to upload associations")
             Result.failure(
                 CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to upload associations: ${e.message}",
-                    cause = e,
+                    message = "Failed to upload associations",
                 ),
             )
         }
@@ -633,10 +685,10 @@ class LogDateCloudApiClient(
         limit: Int?,
     ): Result<AssociationChangesResponse> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val limitParam = limit?.let { "&limit=$it" }.orEmpty()
             val response =
-                httpClient.get("$baseUrl/associations?since=$since$limitParam") {
+                transport.get("$baseUrl/associations?since=$since$limitParam") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
 
@@ -648,12 +700,12 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to get association changes", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to get association changes")
             Result.failure(
                 CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to get association changes: ${e.message}",
-                    cause = e,
+                    message = "Failed to get association changes",
                 ),
             )
         }
@@ -663,9 +715,9 @@ class LogDateCloudApiClient(
         associations: AssociationDeleteRequest,
     ): Result<Unit> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val response =
-                httpClient.delete("$baseUrl/associations") {
+                transport.delete("$baseUrl/associations") {
                     headers.append("Authorization", "Bearer $accessToken")
                     contentType(ContentType.Application.Json)
                     setBody(associations)
@@ -676,12 +728,12 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to delete associations", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to delete associations")
             Result.failure(
                 CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to delete associations: ${e.message}",
-                    cause = e,
+                    message = "Failed to delete associations",
                 ),
             )
         }
@@ -692,9 +744,9 @@ class LogDateCloudApiClient(
         draft: DraftUploadRequest,
     ): Result<DraftUploadResponse> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val response =
-                httpClient.put("$baseUrl/drafts/${draft.id}") {
+                transport.put("$baseUrl/drafts/${draft.id}") {
                     headers.append("Authorization", "Bearer $accessToken")
                     contentType(ContentType.Application.Json)
                     setBody(draft)
@@ -705,8 +757,9 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to upload draft", e)
-            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to upload draft: ${e.message}", cause = e))
+            if (e is CancellationException) throw e
+            Napier.e("Failed to upload draft")
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to upload draft"))
         }
 
     override suspend fun getDraftChanges(
@@ -715,9 +768,9 @@ class LogDateCloudApiClient(
         limit: Int?,
     ): Result<DraftChangesResponse> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val response =
-                httpClient.get("$baseUrl/drafts/changes") {
+                transport.get("$baseUrl/drafts/changes") {
                     headers.append("Authorization", "Bearer $accessToken")
                     parameter("since", since)
                     limit?.let { parameter("limit", it) }
@@ -728,8 +781,9 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to get draft changes", e)
-            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to get draft changes: ${e.message}", cause = e))
+            if (e is CancellationException) throw e
+            Napier.e("Failed to get draft changes")
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to get draft changes"))
         }
 
     override suspend fun deleteDraft(
@@ -737,9 +791,9 @@ class LogDateCloudApiClient(
         draftId: String,
     ): Result<Unit> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val response =
-                httpClient.delete("$baseUrl/drafts/$draftId") {
+                transport.delete("$baseUrl/drafts/$draftId") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
             when (response.status) {
@@ -747,8 +801,9 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to delete draft", e)
-            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to delete draft: ${e.message}", cause = e))
+            if (e is CancellationException) throw e
+            Napier.e("Failed to delete draft")
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to delete draft"))
         }
 
     // Media Operations
@@ -757,9 +812,9 @@ class LogDateCloudApiClient(
         media: MediaUpload,
     ): Result<MediaUploadResponse> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val response =
-                httpClient.post("$baseUrl/media") {
+                transport.post("$baseUrl/media") {
                     headers.append("Authorization", "Bearer $accessToken")
                     setBody(
                         MultiPartFormDataContent(
@@ -793,7 +848,8 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to upload media", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to upload media")
             // The body is read from disk while the request is written, so a failure there reaches
             // this catch too. It is the media's fault, not the network's, and retrying it as a
             // network error would hide that.
@@ -801,8 +857,7 @@ class LogDateCloudApiClient(
             Result.failure(
                 mediaFailure ?: CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to upload media: ${e.message}",
-                    cause = e,
+                    message = "Failed to upload media",
                 ),
             )
         }
@@ -812,9 +867,9 @@ class LogDateCloudApiClient(
         mediaId: String,
     ): Result<MediaDownloadResponse> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val metadataResponse =
-                httpClient.get("$baseUrl/media/$mediaId") {
+                transport.get("$baseUrl/media/$mediaId") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
 
@@ -822,7 +877,7 @@ class LogDateCloudApiClient(
                 HttpStatusCode.OK -> {
                     val metadata = metadataResponse.body<MediaMetadataResponse>()
                     val binaryResponse =
-                        httpClient.get("$baseUrl/media/$mediaId/binary") {
+                        transport.get("$baseUrl/media/$mediaId/binary") {
                             headers.append("Authorization", "Bearer $accessToken")
                         }
                     when (binaryResponse.status) {
@@ -843,24 +898,98 @@ class LogDateCloudApiClient(
                 else -> handleApiError(metadataResponse)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to download media", e)
+            if (e is CancellationException) throw e
+            Napier.e("Failed to download media")
             Result.failure(
                 CloudApiException(
                     errorCode = "NETWORK_ERROR",
-                    message = "Failed to download media: ${e.message}",
-                    cause = e,
+                    message = "Failed to download media",
                 ),
             )
         }
+
+    override suspend fun uploadBackupFile(
+        accessToken: String,
+        backup: BackupUploadFileRequest,
+    ): Result<BackupUploadResponse> =
+        try {
+            val response =
+                transport.post("${getBaseUrl(accessToken)}/backups") {
+                    headers.append(HttpHeaders.Authorization, "Bearer $accessToken")
+                    setBody(
+                        MultiPartFormDataContent(
+                            formData {
+                                append("deviceId", backup.deviceId)
+                                append("manifest", backup.manifest)
+                                append(
+                                    "data",
+                                    InputProvider(backup.sizeBytes) { SystemFileSystem.source(backup.sourcePath).buffered() },
+                                    Headers.build {
+                                        append(HttpHeaders.ContentDisposition, "filename=\"backup.bin\"")
+                                        append(HttpHeaders.ContentType, ContentType.Application.OctetStream.toString())
+                                    },
+                                )
+                            },
+                        ),
+                    )
+                }
+            if (response.status == HttpStatusCode.Created) Result.success(response.body()) else handleApiError(response)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            Result.failure(CloudApiException("NETWORK_ERROR", "Backup upload failed"))
+        }
+
+    override suspend fun downloadBackupToFile(
+        accessToken: String,
+        backupId: String,
+        destination: Path,
+    ): Result<BackupInfoResponse> {
+        var complete = false
+        try {
+            val baseUrl = getBaseUrl(accessToken)
+            val metadataResponse =
+                transport.get("$baseUrl/backups/$backupId") {
+                    headers.append(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
+            if (metadataResponse.status != HttpStatusCode.OK) return handleApiError(metadataResponse)
+            val metadata = metadataResponse.body<BackupInfoResponse>()
+            require(metadata.sizeBytes >= 0)
+            return transport.streamGet("$baseUrl/backups/$backupId/binary", {
+                headers.append(HttpHeaders.Authorization, "Bearer $accessToken")
+            }) { response ->
+                if (response.status != HttpStatusCode.OK) return@streamGet handleApiError<BackupInfoResponse>(response)
+                var transferred = 0L
+                SystemFileSystem.sink(destination).buffered().use { sink ->
+                    val channel = response.bodyAsChannel()
+                    while (!channel.isClosedForRead) {
+                        val bytes = channel.readRemaining(64 * 1024L).readByteArray()
+                        transferred += bytes.size
+                        require(transferred <= metadata.sizeBytes) { "Backup length mismatch" }
+                        sink.write(bytes)
+                    }
+                }
+                require(transferred == metadata.sizeBytes) { "Backup length mismatch" }
+                complete = true
+                Result.success(metadata)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            return Result.failure(CloudApiException("NETWORK_ERROR", "Backup download failed"))
+        } finally {
+            if (!complete) runCatching { SystemFileSystem.delete(destination) }
+        }
+    }
 
     override suspend fun uploadBackup(
         accessToken: String,
         backup: BackupUploadRequest,
     ): Result<BackupUploadResponse> =
         try {
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val response =
-                httpClient.post("$baseUrl/backups") {
+                transport.post("$baseUrl/backups") {
                     headers.append("Authorization", "Bearer $accessToken")
                     setBody(
                         MultiPartFormDataContent(
@@ -886,14 +1015,15 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to upload backup", e)
-            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to upload backup: ${e.message}", cause = e))
+            if (e is CancellationException) throw e
+            Napier.e("Failed to upload backup")
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to upload backup"))
         }
 
     override suspend fun listBackups(accessToken: String): Result<BackupListResponse> =
         try {
             val response =
-                httpClient.get("${getBaseUrl()}/backups") {
+                transport.get("${getBaseUrl(accessToken)}/backups") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
             when (response.status) {
@@ -901,8 +1031,9 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to list backups", e)
-            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to list backups: ${e.message}", cause = e))
+            if (e is CancellationException) throw e
+            Napier.e("Failed to list backups")
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to list backups"))
         }
 
     override suspend fun getBackup(
@@ -911,7 +1042,7 @@ class LogDateCloudApiClient(
     ): Result<BackupInfoResponse> =
         try {
             val response =
-                httpClient.get("${getBaseUrl()}/backups/$backupId") {
+                transport.get("${getBaseUrl(accessToken)}/backups/$backupId") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
             when (response.status) {
@@ -919,8 +1050,9 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to get backup metadata", e)
-            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to get backup metadata: ${e.message}", cause = e))
+            if (e is CancellationException) throw e
+            Napier.e("Failed to get backup metadata")
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to get backup metadata"))
         }
 
     override suspend fun downloadBackup(
@@ -930,9 +1062,9 @@ class LogDateCloudApiClient(
         try {
             // Resolve the backend once so a user changing server settings cannot combine metadata
             // from one server with bytes from another during this two-request operation.
-            val baseUrl = getBaseUrl()
+            val baseUrl = getBaseUrl(accessToken)
             val metadataResponse =
-                httpClient.get("$baseUrl/backups/$backupId") {
+                transport.get("$baseUrl/backups/$backupId") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
             if (metadataResponse.status != HttpStatusCode.OK) {
@@ -940,7 +1072,7 @@ class LogDateCloudApiClient(
             }
             val metadata = metadataResponse.body<BackupInfoResponse>()
             val binaryResponse =
-                httpClient.get("$baseUrl/backups/$backupId/binary") {
+                transport.get("$baseUrl/backups/$backupId/binary") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
             when (binaryResponse.status) {
@@ -948,8 +1080,9 @@ class LogDateCloudApiClient(
                 else -> handleApiError(binaryResponse)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to download backup", e)
-            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to download backup: ${e.message}", cause = e))
+            if (e is CancellationException) throw e
+            Napier.e("Failed to download backup")
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to download backup"))
         }
 
     override suspend fun deleteBackup(
@@ -958,7 +1091,7 @@ class LogDateCloudApiClient(
     ): Result<Unit> =
         try {
             val response =
-                httpClient.delete("${getBaseUrl()}/backups/$backupId") {
+                transport.delete("${getBaseUrl(accessToken)}/backups/$backupId") {
                     headers.append("Authorization", "Bearer $accessToken")
                 }
             when (response.status) {
@@ -966,8 +1099,9 @@ class LogDateCloudApiClient(
                 else -> handleApiError(response)
             }
         } catch (e: Exception) {
-            Napier.e("Failed to delete backup", e)
-            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to delete backup: ${e.message}", cause = e))
+            if (e is CancellationException) throw e
+            Napier.e("Failed to delete backup")
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to delete backup"))
         }
 
     // No custom HttpClient needed as we use the app's shared httpClient

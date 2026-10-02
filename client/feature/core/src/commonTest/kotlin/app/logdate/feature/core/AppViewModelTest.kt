@@ -285,9 +285,9 @@ class AppViewModelTest {
 
         override suspend fun hasValidSession(): Boolean = hasValidSession
 
-        override fun saveSession(session: UserSession) {}
+        override suspend fun saveSession(session: UserSession) {}
 
-        override fun clearSession() {}
+        override suspend fun clearSession() {}
     }
 
     private class FakePasskeyAccountRepository(

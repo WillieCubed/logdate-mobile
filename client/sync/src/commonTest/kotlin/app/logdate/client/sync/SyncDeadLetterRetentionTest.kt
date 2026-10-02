@@ -2,11 +2,10 @@ package app.logdate.client.sync
 
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
-import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncBackoff
+import app.logdate.client.sync.test.FakeSyncMetadataService
 import app.logdate.client.sync.test.InMemorySyncDeadLetterStore
 import app.logdate.client.sync.test.InMemorySyncRetryScheduleStore
-import app.logdate.client.sync.test.fakeSyncMetadataService
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,7 +24,7 @@ import kotlin.uuid.Uuid
 class SyncDeadLetterRetentionTest {
     private val retryScheduleStore = InMemorySyncRetryScheduleStore()
     private val deadLetterStore = InMemorySyncDeadLetterStore()
-    private val metadataService = fakeSyncMetadataService()
+    private val metadataService = FakeSyncMetadataService(trackOperationIdentity = true)
 
     private val coordinator =
         SyncRetryCoordinator(
@@ -39,13 +38,13 @@ class SyncDeadLetterRetentionTest {
     private val entityId = Uuid.random().toString()
 
     /** Fails uploads until the coordinator gives up, so the test never restates the retry budget. */
-    private suspend fun exhaustRetries() {
-        metadataService.enqueuePending(entityId, EntityType.NOTE, PendingOperation.CREATE)
+    private suspend fun exhaustRetries(operation: PendingOperation = PendingOperation.CREATE) {
+        metadataService.enqueuePending(entityId, EntityType.NOTE, operation)
         val deadLettered =
             (0 until 100).any { attempt ->
                 coordinator.handleRetryFailure(
                     entityType = EntityType.NOTE,
-                    pending = PendingUpload(entityId, PendingOperation.CREATE, retryCount = attempt),
+                    pending = metadataService.getPendingUploads(EntityType.NOTE).single().copy(retryCount = attempt),
                     error = IllegalStateException("No identity key found"),
                 )
             }
@@ -80,7 +79,7 @@ class SyncDeadLetterRetentionTest {
         runTest {
             exhaustRetries()
 
-            coordinator.discardDeadLetter("${EntityType.NOTE.name}:$entityId")
+            coordinator.discardDeadLetter(deadLetterStore.list().single().id)
 
             assertTrue(deadLetterStore.list().isEmpty())
             assertFalse(
@@ -94,12 +93,58 @@ class SyncDeadLetterRetentionTest {
         runTest {
             exhaustRetries()
 
-            coordinator.retryDeadLetter("${EntityType.NOTE.name}:$entityId")
+            coordinator.retryDeadLetter(deadLetterStore.list().single().id)
 
             assertTrue(
                 coordinator.shouldAttempt(EntityType.NOTE, entityId),
                 "Asking for a retry means asking for it now, not in a day",
             )
+        }
+
+    @Test
+    fun `discard cannot remove a newer deletion after an earlier update failed`() =
+        runTest {
+            exhaustRetries(PendingOperation.UPDATE)
+            val oldIssue = deadLetterStore.list().single().id
+            metadataService.enqueuePending(entityId, EntityType.NOTE, PendingOperation.DELETE)
+            coordinator.discardDeadLetter(oldIssue)
+            assertEquals(PendingOperation.DELETE, metadataService.getPendingUploads(EntityType.NOTE).single().operation)
+        }
+
+    @Test
+    fun `retry preserves a newer deletion instead of replaying the failed update`() =
+        runTest {
+            exhaustRetries(PendingOperation.UPDATE)
+            metadataService.enqueuePending(entityId, EntityType.NOTE, PendingOperation.DELETE)
+
+            coordinator.retryDeadLetter(deadLetterStore.list().single().id)
+
+            assertEquals(PendingOperation.DELETE, metadataService.getPendingUploads(EntityType.NOTE).single().operation)
+            assertTrue(coordinator.shouldAttempt(EntityType.NOTE, entityId))
+        }
+
+    @Test
+    fun `retry preserves a repair compare and set constraint`() =
+        runTest {
+            metadataService.enqueueRepairIfAbsent(entityId, EntityType.NOTE, expectedServerVersion = 42)
+            val pending = metadataService.getPendingUploads(EntityType.NOTE).single()
+            coordinator.handleRetryFailure(EntityType.NOTE, pending, IllegalStateException("failure"), permanent = true)
+
+            coordinator.retryDeadLetter(deadLetterStore.list().single().id)
+
+            assertEquals(42L, metadataService.getPendingUploads(EntityType.NOTE).single().expectedServerVersion)
+            assertTrue(coordinator.shouldAttempt(EntityType.NOTE, entityId))
+        }
+
+    @Test
+    fun `retry does not recreate an operation that has already settled`() =
+        runTest {
+            exhaustRetries()
+            metadataService.clearPending()
+
+            coordinator.retryDeadLetter(deadLetterStore.list().single().id)
+
+            assertTrue(metadataService.getPendingUploads(EntityType.NOTE).isEmpty())
         }
 
     @Test

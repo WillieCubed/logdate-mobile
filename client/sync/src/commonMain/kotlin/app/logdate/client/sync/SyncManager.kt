@@ -162,6 +162,8 @@ data class SyncStatus(
     val requestState: BackupRequestState = BackupRequestState.NONE,
     /** Automatic background work may wait on metered data; manual backup remains available. */
     val backgroundWorkLimited: Boolean = false,
+    /** Records and attachments not yet recovered, independent of upload progress. */
+    val pendingDownloads: Int = 0,
 )
 
 enum class BackupRequestState {

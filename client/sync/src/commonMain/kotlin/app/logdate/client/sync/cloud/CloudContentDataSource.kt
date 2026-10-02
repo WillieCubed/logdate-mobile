@@ -5,7 +5,6 @@ import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.shared.model.PhotoPresentation
 import app.logdate.shared.model.sync.VersionConstraint
-import io.github.aakira.napier.Napier
 import kotlinx.serialization.json.Json
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -61,6 +60,8 @@ data class ContentSyncResult(
     val hasMore: Boolean = false,
     /** Records on this page this device cannot read. See [UnreadablePayloadException]. */
     val unreadable: List<Uuid> = emptyList(),
+    val failures: List<RemoteRecordFailure> = emptyList(),
+    val unreadableVersions: Map<Uuid, Long> = emptyMap(),
 )
 
 /**
@@ -116,7 +117,7 @@ class DefaultCloudContentDataSource(
         since: Instant,
         limit: Int?,
     ): Result<ContentSyncResult> =
-        cloudApiClient.getContentChanges(accessToken, since.toEpochMilliseconds(), limit).mapCatching { response ->
+        cloudApiClient.getContentChanges(accessToken, since.toEpochMilliseconds(), limit).mapRecordPage { response ->
             response.toContentSyncResult()
         }
 
@@ -198,13 +199,16 @@ class DefaultCloudContentDataSource(
         )
 
     private suspend fun ContentChangesResponse.toContentSyncResult(): ContentSyncResult {
-        val (readable, unreadable) = changes.readEach(idOf = { it.id }) { it.toJournalNote() }
+        val records = changes.readEach(idOf = { it.id }, versionOf = { it.serverVersion }) { it.toJournalNote() }
+        val removed = deletions.readEach(idOf = { it.id }, versionOf = { it.serverVersion }) { Uuid.parse(it.id) }
         return ContentSyncResult(
-            changes = readable,
-            deletions = deletions.map { Uuid.parse(it.id) },
+            changes = records.readable,
+            deletions = removed.readable,
             lastSyncTimestamp = Instant.fromEpochMilliseconds(lastTimestamp),
             hasMore = hasMore,
-            unreadable = unreadable,
+            unreadable = records.unreadable,
+            unreadableVersions = records.unreadableVersions,
+            failures = records.failures + removed.failures,
         )
     }
 
@@ -254,7 +258,7 @@ class DefaultCloudContentDataSource(
                     location = decryptNoteLocation(uid, location),
                     syncVersion = serverVersion,
                 )
-            else -> throw IllegalArgumentException("Unknown content type: $type")
+            else -> throw UnsupportedRemoteFormatException()
         }
     }
 
@@ -292,15 +296,8 @@ class DefaultCloudContentDataSource(
         payload: String?,
     ): NoteLocation? {
         if (payload.isNullOrBlank()) return null
-        return runCatching {
-            val plaintext =
-                syncPayloadCipher?.decryptString(noteLocationFieldId(noteId), payload) ?: payload
-            locationJson.decodeFromString(NoteLocation.serializer(), plaintext)
-        }.getOrElse {
-            // A location that cannot be decoded must not cost the user the entry itself.
-            Napier.w("Failed to decode synced location for note $noteId", it)
-            null
-        }
+        val plaintext = syncPayloadCipher?.decryptString(noteLocationFieldId(noteId), payload) ?: payload
+        return locationJson.decodeFromString(NoteLocation.serializer(), plaintext)
     }
 
     private fun noteLocationFieldId(noteId: Uuid): String = "sync:note:$noteId:location"

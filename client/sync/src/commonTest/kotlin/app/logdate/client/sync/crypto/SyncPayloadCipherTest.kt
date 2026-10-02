@@ -30,6 +30,17 @@ class SyncPayloadCipherTest {
         }
 
     @Test
+    fun `literal text that resembles an envelope is still encrypted as user content`() =
+        runTest {
+            val cipher = cipherFor("seed")
+            for (literal in listOf("LDSE1:literal text", "LDSE2:literal text", "LDSE3:literal text")) {
+                val encrypted = cipher.encryptString("field", literal)
+                assertEquals(literal, cipher.decryptString("field", encrypted))
+                kotlin.test.assertNotEquals(literal, encrypted)
+            }
+        }
+
+    @Test
     fun `encrypting always writes the current envelope version`() =
         runTest {
             val cipher = cipherFor("seed")

@@ -50,6 +50,7 @@ import app.logdate.client.database.dao.people.PersonResolutionDecisionDao
 import app.logdate.client.database.dao.rewind.CachedRewindDao
 import app.logdate.client.database.dao.rewind.ReflectionPromptResponseDao
 import app.logdate.client.database.dao.rewind.RewindGenerationRequestDao
+import app.logdate.client.database.dao.sync.DownloadInboxDao
 import app.logdate.client.database.dao.sync.SyncMetadataDao
 import app.logdate.client.database.entities.AudioNoteEntity
 import app.logdate.client.database.entities.AudioTagEntity
@@ -91,6 +92,8 @@ import app.logdate.client.database.entities.rewind.RewindGenerationRequestEntity
 import app.logdate.client.database.entities.rewind.RewindImageContentEntity
 import app.logdate.client.database.entities.rewind.RewindTextContentEntity
 import app.logdate.client.database.entities.rewind.RewindVideoContentEntity
+import app.logdate.client.database.entities.sync.DownloadCheckpointEntity
+import app.logdate.client.database.entities.sync.DownloadInboxEntity
 import app.logdate.client.database.entities.sync.PendingUploadEntity
 import app.logdate.client.database.entities.sync.SyncCursorEntity
 import app.logdate.client.database.migrations.MIGRATION_10_11
@@ -135,6 +138,7 @@ import app.logdate.client.database.migrations.MIGRATION_45_46
 import app.logdate.client.database.migrations.MIGRATION_46_47
 import app.logdate.client.database.migrations.MIGRATION_47_48
 import app.logdate.client.database.migrations.MIGRATION_48_49
+import app.logdate.client.database.migrations.MIGRATION_49_50
 import app.logdate.client.database.migrations.MIGRATION_4_5
 import app.logdate.client.database.migrations.MIGRATION_5_6
 import app.logdate.client.database.migrations.MIGRATION_6_7
@@ -180,6 +184,8 @@ import kotlinx.coroutines.CoroutineDispatcher
         // Sync metadata entities
         SyncCursorEntity::class,
         PendingUploadEntity::class,
+        DownloadInboxEntity::class,
+        DownloadCheckpointEntity::class,
         // Others
         TranscriptionEntity::class,
         TranscriptionSegmentEntity::class,
@@ -206,7 +212,7 @@ import kotlinx.coroutines.CoroutineDispatcher
         PersonLinkEntity::class,
         PersonResolutionDecisionEntity::class,
     ],
-    version = 49,
+    version = 50,
     exportSchema = true,
 )
 @TypeConverters(
@@ -256,6 +262,8 @@ abstract class LogDateDatabase : RoomDatabase() {
     abstract fun transcriptionDao(): TranscriptionDao
 
     abstract fun searchDao(): SearchDao
+
+    abstract fun downloadInboxDao(): DownloadInboxDao
 
     abstract fun syncMetadataDao(): SyncMetadataDao
 
@@ -378,6 +386,7 @@ fun getRoomDatabase(
                 MIGRATION_46_47,
                 MIGRATION_47_48,
                 MIGRATION_48_49,
+                MIGRATION_49_50,
             ).addCallback(FtsTableCallback)
             .fallbackToDestructiveMigration(destroyTablesOnUpgrade)
             .fallbackToDestructiveMigrationOnDowngrade(destroyTablesOnDowngrade)

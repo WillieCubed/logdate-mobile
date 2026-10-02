@@ -2,6 +2,7 @@ package app.logdate.client.database.entities.sync
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import kotlin.uuid.Uuid
 
 /**
  * Tracks entities that have been modified locally and need to be uploaded.
@@ -20,6 +21,9 @@ data class PendingUploadEntity(
     val operation: String,
     val createdAt: Long,
     val retryCount: Int = 0,
+    val expectedServerVersion: Long? = null,
+    @ColumnInfo(defaultValue = "''")
+    val operationId: String = Uuid.random().toString(),
 )
 
 /**

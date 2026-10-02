@@ -116,7 +116,14 @@ actual val dataModule: Module =
         // Journals
         factory<RemoteJournalDataSource> { NoOpJournalDataSource }
         single<JournalUserDataRepository> { OfflineFirstJournalUserDataRepository(get()) }
-        single<DraftRepository> { LocalFirstDraftRepository(get(), get()) }
+        single<DraftRepository> {
+            LocalFirstDraftRepository(
+                get(),
+                get(),
+                get<app.logdate.client.datastore.SessionStorage>(),
+                get<app.logdate.shared.config.LogDateConfigRepository>(),
+            )
+        }
         single<JournalRepository> {
             OfflineFirstJournalRepository(
                 get(),

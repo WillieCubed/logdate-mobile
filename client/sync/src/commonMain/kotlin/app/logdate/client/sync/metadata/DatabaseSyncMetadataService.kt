@@ -5,8 +5,10 @@ import app.logdate.client.database.entities.sync.PendingUploadEntity
 import app.logdate.client.database.entities.sync.SyncCursorEntity
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.shared.config.LogDateConfigRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -37,9 +39,23 @@ class DatabaseSyncMetadataService(
                     entityId = entity.entityId,
                     operation = PendingOperation.fromStorage(entity.operation),
                     retryCount = entity.retryCount,
+                    expectedServerVersion = entity.expectedServerVersion,
+                    scope = UploadScope(entity.ownerId, entity.serverOrigin),
+                    operationId = entity.operationId,
                 )
             }
         }
+
+    override suspend fun hasPending(
+        entityType: EntityType,
+        entityId: String,
+    ): Boolean {
+        val origin = currentOrigin()
+        val owner = currentOwnerId()
+        // A read inside a Room apply transaction must not invert the metadataMutex/Room lock order.
+        return dao.getPending(owner, origin, entityType.name, entityId) != null ||
+            dao.getPending(LEGACY_OWNER_ID, origin, entityType.name, entityId) != null
+    }
 
     override suspend fun markAsSynced(
         entityId: String,
@@ -56,6 +72,41 @@ class DatabaseSyncMetadataService(
             // has to retire both.
             dao.deletePending(LEGACY_OWNER_ID, serverOrigin, entityType.name, entityId)
         }
+    }
+
+    override suspend fun settleIfCurrent(
+        entityType: EntityType,
+        pending: PendingUpload,
+        syncedAt: Instant,
+        version: Long,
+    ): Boolean {
+        val scope = pending.scope ?: return false
+        val operationId = pending.operationId ?: return false
+        return dao.deletePendingIfCurrent(
+            scope.ownerId,
+            scope.serverOrigin,
+            entityType.name,
+            pending.entityId,
+            operationId,
+        )
+    }
+
+    override suspend fun isCurrentOperation(
+        entityType: EntityType,
+        pending: PendingUpload,
+    ): Boolean {
+        val scope = pending.scope ?: return false
+        val operationId = pending.operationId ?: return false
+        return dao.getPending(scope.ownerId, scope.serverOrigin, entityType.name, pending.entityId)?.operationId == operationId
+    }
+
+    override suspend fun incrementRetryIfCurrent(
+        entityType: EntityType,
+        pending: PendingUpload,
+    ): Boolean {
+        val scope = pending.scope ?: return false
+        val operationId = pending.operationId ?: return false
+        return dao.incrementRetryIfCurrent(scope.ownerId, scope.serverOrigin, entityType.name, pending.entityId, operationId)
     }
 
     override suspend fun getLastSyncTime(entityType: EntityType): Instant? {
@@ -104,10 +155,23 @@ class DatabaseSyncMetadataService(
                     entityId = entityId,
                     operation = resolvedOperation.name,
                     createdAt = existing?.createdAt ?: Clock.System.now().toEpochMilliseconds(),
-                    retryCount = existing?.retryCount ?: 0,
+                    retryCount = 0,
                 ),
             )
         }
+    }
+
+    override suspend fun enqueueRepairIfAbsent(
+        entityId: String,
+        entityType: EntityType,
+        expectedServerVersion: Long?,
+        serverOrigin: String?,
+    ) {
+        val origin = serverOrigin ?: currentOrigin()
+        val owner = currentOwnerId()
+        check(origin == currentOrigin()) { "Sync scope changed" }
+        // One SQL statement protects both scoped and legacy mutations without a Room/mutex inversion.
+        dao.insertRepairIfAbsent(owner, origin, entityType.name, entityId, Clock.System.now().toEpochMilliseconds(), expectedServerVersion)
     }
 
     override suspend fun resetSyncStatus(
@@ -125,29 +189,37 @@ class DatabaseSyncMetadataService(
             dao.getPendingCount(ownerId, serverOrigin)
         }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observePendingCount(): Flow<Int> =
-        flow {
-            getPendingCount()
-            emitAll(dao.observePendingCount(currentOwnerId(), currentOrigin()))
+        configRepository.backendUrl.flatMapLatest {
+            flow {
+                getPendingCount()
+                emitAll(dao.observePendingCount(currentOwnerId(), currentOrigin()))
+            }
         }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observePendingUploads(): Flow<List<QueuedUpload>> =
-        flow {
-            // Promotes any legacy rows first, the same way observePendingCount does, so the list
-            // and the count agree.
-            getPendingCount()
-            emitAll(
-                dao.observePending(currentOwnerId(), currentOrigin()).map { rows ->
-                    rows.map { row ->
-                        QueuedUpload(
-                            entityType = EntityType.entries.firstOrNull { it.name == row.entityType },
-                            entityId = row.entityId,
-                            operation = PendingOperation.fromStorage(row.operation),
-                            retryCount = row.retryCount,
-                        )
-                    }
-                },
-            )
+        configRepository.backendUrl.flatMapLatest {
+            flow {
+                // Promotes any legacy rows first, the same way observePendingCount does, so the list
+                // and the count agree.
+                getPendingCount()
+                emitAll(
+                    dao.observePending(currentOwnerId(), currentOrigin()).map { rows ->
+                        rows.map { row ->
+                            QueuedUpload(
+                                entityType = EntityType.entries.firstOrNull { it.name == row.entityType },
+                                entityId = row.entityId,
+                                operation = PendingOperation.fromStorage(row.operation),
+                                retryCount = row.retryCount,
+                                scope = UploadScope(row.ownerId, row.serverOrigin),
+                                operationId = row.operationId,
+                            )
+                        }
+                    },
+                )
+            }
         }
 
     override suspend fun clearPending() {

@@ -2,7 +2,6 @@
 
 package app.logdate.client.device.crypto
 
-import io.github.aakira.napier.Napier
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.io.encoding.Base64
@@ -49,9 +48,7 @@ class ContentEncryptionService(
             iv = iv.encodeBase64(),
             ciphertext = ciphertext.encodeBase64(),
             aad = aad.encodeBase64(),
-        ).also {
-            Napier.d("Content encrypted: $contentId (${plaintext.length} bytes → ${it.ciphertext.length} bytes)")
-        }
+        )
     }
 
     /**
@@ -69,10 +66,10 @@ class ContentEncryptionService(
         envelope: EncryptedEnvelope,
     ): String {
         require(envelope.version == ENVELOPE_VERSION) {
-            "Unsupported envelope version: ${envelope.version}"
+            "Unsupported envelope version"
         }
         require(envelope.algorithm == ALGORITHM_AES_GCM) {
-            "Unsupported algorithm: ${envelope.algorithm}"
+            "Unsupported envelope algorithm"
         }
 
         val identityKey = identityKeyManager.getIdentityKey()
@@ -84,9 +81,7 @@ class ContentEncryptionService(
 
         val plaintext = cryptoManager.aesGcmDecrypt(contentKey, iv, aad, ciphertext)
 
-        return plaintext.decodeToString().also {
-            Napier.d("Content decrypted: $contentId (${envelope.ciphertext.length} bytes → ${it.length} bytes)")
-        }
+        return plaintext.decodeToString()
     }
 
     /**

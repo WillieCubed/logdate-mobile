@@ -33,6 +33,38 @@ import kotlin.time.Instant
  */
 class IdentityKeyProvisioningTest {
     @Test
+    fun `draft only accounts and failed draft checks never mint a different identity`() =
+        runTest {
+            val draft =
+                app.logdate.shared.model.sync.DraftChange(
+                    id = "00000000-0000-4000-8000-000000000001",
+                    content = "encrypted",
+                    blockTypes = emptyList(),
+                    journalIds = emptyList(),
+                    createdAt = 1,
+                    lastUpdated = 1,
+                    deviceId = app.logdate.shared.model.sync.DeviceId.UNKNOWN,
+                    serverVersion = 1,
+                )
+            for (response in listOf(
+                Result.success(
+                    app.logdate.shared.model.sync
+                        .DraftChangesResponse(listOf(draft)),
+                ),
+                Result.success(
+                    app.logdate.shared.model.sync
+                        .DraftChangesResponse(listOf(draft.copy(isDeleted = true))),
+                ),
+                Result.failure(IllegalStateException("unavailable")),
+            )) {
+                val identity = IdentityKeyManager(InMemorySecureStorage(), TestCryptoManager())
+                val api = fakeCloudApiClient { getDraftChangesResponse = response }
+                testDefaultSyncManager(identityKeyManager = identity, cloudApiClient = api).uploadPendingChanges()
+                assertFalse(identity.hasIdentityKey())
+            }
+        }
+
+    @Test
     fun `no key plus an account with existing cloud data never mints a new key`() =
         runTest {
             val identityKeyManager = IdentityKeyManager(InMemorySecureStorage(), TestCryptoManager())
@@ -109,6 +141,7 @@ class IdentityKeyProvisioningTest {
             val mediaKeyProvider =
                 MediaPayloadKeyProvider(InMemorySecureStorage(), cryptoManager, identityKeyManager, KeyDerivation(cryptoManager))
             val unreadableStore = InMemoryUnreadableCloudRecordStore()
+            unreadableStore.record(EntityType.NOTE, listOf(kotlin.uuid.Uuid.random()))
             val useCase = RecoverIdentityUseCase(identityKeyManager, metadata, mediaKeyProvider, recoveryStore, unreadableStore)
 
             val result = useCase((1..12).map { "recovered-$it" })
@@ -116,6 +149,7 @@ class IdentityKeyProvisioningTest {
             assertTrue(result.isSuccess)
             assertFalse(recoveryStore.isNeeded())
             assertNull(metadata.getLastSyncTime(EntityType.JOURNAL))
+            assertEquals(1, unreadableStore.count(), "Recovering a key does not prove unreadable content recovered")
         }
 
     @Test

@@ -48,7 +48,6 @@ class SyncPayloadCipher(
         fieldId: String,
         plaintext: String,
     ): String {
-        if (plaintext.startsWith(SYNC_PAYLOAD_PREFIX_V1) || plaintext.startsWith(SYNC_PAYLOAD_PREFIX_V2)) return plaintext
         val envelope = contentEncryptionService.encryptContent(fieldId, plaintext)
         val fingerprinted = FingerprintedPayload(keyFingerprint = currentKeyFingerprint(), envelope = envelope)
         return SYNC_PAYLOAD_PREFIX_V2 + json.encodeToString(fingerprinted)
@@ -61,6 +60,7 @@ class SyncPayloadCipher(
         when {
             value.startsWith(SYNC_PAYLOAD_PREFIX_V2) -> decryptV2(fieldId, value.removePrefix(SYNC_PAYLOAD_PREFIX_V2))
             value.startsWith(SYNC_PAYLOAD_PREFIX_V1) -> decryptV1(fieldId, value.removePrefix(SYNC_PAYLOAD_PREFIX_V1))
+            ENVELOPE_PREFIX.containsMatchIn(value) -> throw UnsupportedPayloadVersionException()
             else -> value
         }
 
@@ -80,7 +80,7 @@ class SyncPayloadCipher(
         } catch (e: IdentityKeyNotFoundException) {
             throw e
         } catch (e: WrongKeyPayloadException) {
-            Napier.w("Setting aside synced value $fieldId: it was made with a different identity key")
+            Napier.w("Setting aside synced value: it was made with a different identity key")
             throw UnreadablePayloadException(fieldId, e)
         } catch (e: Exception) {
             throw UnreadablePayloadException(fieldId, e)
@@ -113,6 +113,7 @@ class SyncPayloadCipher(
     }
 
     private companion object {
+        val ENVELOPE_PREFIX = Regex("^LDSE[0-9]+:")
         val FINGERPRINT_CONTEXT = "sync-payload-fingerprint".encodeToByteArray()
         const val FINGERPRINT_BYTES = 8
     }
@@ -132,3 +133,5 @@ class UnreadablePayloadException(
     val fieldId: String,
     cause: Throwable,
 ) : Exception("Cannot read synced value $fieldId", cause)
+
+class UnsupportedPayloadVersionException : Exception("Unsupported encrypted payload version")

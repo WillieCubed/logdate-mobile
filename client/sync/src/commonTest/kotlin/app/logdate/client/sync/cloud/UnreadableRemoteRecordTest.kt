@@ -18,7 +18,7 @@ import app.logdate.shared.model.sync.ContentChangesResponse
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -31,6 +31,87 @@ import kotlin.uuid.Uuid
  * backed up at all. The phone holds the originals, so it repairs the cloud copy instead.
  */
 class UnreadableRemoteRecordTest {
+    @Test
+    fun `corrupt location does not silently become a successfully recovered note`() =
+        runTest {
+            val broken = Uuid.random()
+            val readable = Uuid.random()
+            val api =
+                fakeCloudApiClient {
+                    getContentChangesResponse =
+                        Result.success(
+                            ContentChangesResponse(
+                                listOf(textChange(broken, "text").copy(location = "corrupt-location-marker"), textChange(readable, "text")),
+                                emptyList(),
+                                10,
+                            ),
+                        )
+                }
+
+            val page =
+                DefaultCloudContentDataSource(api)
+                    .getContentChanges("token", Instant.fromEpochMilliseconds(0))
+                    .getOrThrow()
+
+            assertEquals(listOf(readable), page.changes.map { it.uid })
+            assertTrue(page.unreadable.isEmpty(), "Malformed location must not trigger key-recovery repair")
+            assertEquals(broken.toString(), page.failures.single().entityId)
+            assertEquals(app.logdate.shared.model.diagnostics.DiagnosticReason.CORRUPT_PAYLOAD, page.failures.single().reason)
+        }
+
+    @Test
+    fun `an unsupported note type does not block the rest of the page`() =
+        runTest {
+            val unsupported = Uuid.random()
+            val readable = Uuid.random()
+            val api =
+                fakeCloudApiClient {
+                    getContentChangesResponse =
+                        Result.success(
+                            ContentChangesResponse(
+                                listOf(textChange(unsupported, "text").copy(type = "FUTURE_TYPE"), textChange(readable, "text")),
+                                emptyList(),
+                                10,
+                            ),
+                        )
+                }
+
+            val page =
+                DefaultCloudContentDataSource(api)
+                    .getContentChanges("token", Instant.fromEpochMilliseconds(0))
+                    .getOrThrow()
+
+            assertEquals(listOf(readable), page.changes.map { it.uid })
+            assertTrue(page.unreadable.isEmpty(), "Unknown formats must not trigger a destructive repair upload")
+            assertEquals(app.logdate.shared.model.diagnostics.DiagnosticReason.UNSUPPORTED_FORMAT, page.failures.single().reason)
+        }
+
+    @Test
+    fun `future encryption versions remain queued rather than becoming plaintext`() =
+        runTest {
+            val future = Uuid.random()
+            val readable = Uuid.random()
+            val api =
+                fakeCloudApiClient {
+                    getContentChangesResponse =
+                        Result.success(
+                            ContentChangesResponse(
+                                listOf(textChange(future, "LDSE3:private-marker"), textChange(readable, "text")),
+                                emptyList(),
+                                10,
+                            ),
+                        )
+                }
+            val page =
+                DefaultCloudContentDataSource(api, cipherFor("current"))
+                    .getContentChanges("token", Instant.fromEpochMilliseconds(0))
+                    .getOrThrow()
+            assertEquals(listOf(readable), page.changes.map { it.uid })
+            assertTrue(page.unreadable.isEmpty())
+            assertEquals(future.toString(), page.failures.single().entityId)
+            assertEquals(app.logdate.shared.model.diagnostics.DiagnosticReason.UNSUPPORTED_FORMAT, page.failures.single().reason)
+        }
+
     @Test
     fun `a record made with another key is set aside and the rest of the page still arrives`() =
         runTest {
@@ -105,10 +186,13 @@ class UnreadableRemoteRecordTest {
             val result = manager.downloadRemoteChanges()
 
             assertTrue(result.success, "An unreadable cloud copy is not a failed sync: ${result.errors}")
-            assertNotNull(metadata.getLastSyncTime(EntityType.NOTE), "The feed moves past the page")
+            assertNull(
+                metadata.getLastSyncTime(EntityType.NOTE),
+                "Without a durable inbox the feed must not advance past an unreadable record",
+            )
             assertEquals(
                 listOf(heldHere.toString()),
-                metadata.getPendingUploads(EntityType.NOTE).filter { it.operation == PendingOperation.CREATE }.map { it.entityId },
+                metadata.getPendingUploads(EntityType.NOTE).filter { it.operation == PendingOperation.UPDATE }.map { it.entityId },
                 "Only the record this phone holds is re-uploaded; nothing is invented for the other",
             )
             assertEquals(1, unreadableCloudRecordStore.count(), "The cloud-only record is tracked so Backup status can report it")

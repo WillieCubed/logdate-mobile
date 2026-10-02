@@ -16,6 +16,9 @@ interface DraftRepository {
      */
     suspend fun saveDraft(draft: EditorDraft)
 
+    /** Persist a downloaded draft without changing its remote modification time or hiding write failures. */
+    suspend fun saveDraftFromSync(draft: EditorDraft) = saveDraft(draft)
+
     /**
      * Get the most recent draft
      */
@@ -25,6 +28,9 @@ interface DraftRepository {
      * Get all drafts
      */
     suspend fun getAllDrafts(): List<EditorDraft>
+
+    /** Read every draft for sync, propagating storage failures so a repair sweep can retry. */
+    suspend fun getAllDraftsForSync(): List<EditorDraft> = getAllDrafts()
 
     /**
      * Observe all drafts

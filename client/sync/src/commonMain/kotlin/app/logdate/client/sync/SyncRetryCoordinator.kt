@@ -2,8 +2,8 @@ package app.logdate.client.sync
 
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.MediaTooLargeException
+import app.logdate.client.sync.diagnostics.DiagnosticSource
 import app.logdate.client.sync.metadata.EntityType
-import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncBackoff
 import app.logdate.client.sync.metadata.SyncDeadLetterReason
@@ -11,11 +11,18 @@ import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
+import app.logdate.client.sync.metadata.retryKey
+import app.logdate.shared.model.diagnostics.DiagnosticAction
+import app.logdate.shared.model.diagnostics.DiagnosticOutcome
+import app.logdate.shared.model.diagnostics.DiagnosticPhase
+import app.logdate.shared.model.diagnostics.DiagnosticReason
+import app.logdate.shared.model.diagnostics.SyncDiagnosticEvent
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * Every upload function's shared retry/dead-letter/settlement bookkeeping: whether an entity is
@@ -41,6 +48,8 @@ internal class SyncRetryCoordinator(
         localUpdatedAt: Instant?,
         remoteUpdatedAt: Instant?,
     ) -> Unit,
+    private val diagnosticSource: () -> DiagnosticSource? = { null },
+    private val diagnostics: (SyncDiagnosticEvent, DiagnosticSource?) -> Unit = { _, _ -> },
 ) {
     /**
      * Lets every waiting entry be attempted on the next pass, for when the user asks to back up
@@ -48,12 +57,12 @@ internal class SyncRetryCoordinator(
      * the user has been shown, and retrying them there is the user's call.
      */
     suspend fun releaseBackoff() {
-        val setAside = deadLetterStore.list().map { it.id }.toSet()
+        val setAside = deadLetterStore.list()
         for (entityType in EntityType.entries) {
             for (pending in syncMetadataService.getPendingUploads(entityType)) {
-                if ("${entityType.name}:${pending.entityId}" in setAside) continue
-                if (retryScheduleStore.nextAttemptAt(entityType, pending.entityId) != null) {
-                    retryScheduleStore.setNextAttemptAt(entityType, pending.entityId, 0L)
+                if (setAside.any { it.entityType == entityType.name && it.matches(pending) }) continue
+                if (retryScheduleStore.nextAttemptAt(entityType, pending.retryKey()) != null) {
+                    retryScheduleStore.setNextAttemptAt(entityType, pending.retryKey(), 0L)
                 }
             }
         }
@@ -63,7 +72,15 @@ internal class SyncRetryCoordinator(
         entityType: EntityType,
         entityId: String,
     ): Boolean {
-        val nextAttemptAt = retryScheduleStore.nextAttemptAt(entityType, entityId) ?: return true
+        val pending = syncMetadataService.getPendingUploads(entityType).firstOrNull { it.entityId == entityId } ?: return true
+        return shouldAttempt(entityType, pending)
+    }
+
+    suspend fun shouldAttempt(
+        entityType: EntityType,
+        pending: PendingUpload,
+    ): Boolean {
+        val nextAttemptAt = retryScheduleStore.nextAttemptAt(entityType, pending.retryKey()) ?: return true
         return Clock.System.now().toEpochMilliseconds() >= nextAttemptAt
     }
 
@@ -80,22 +97,36 @@ internal class SyncRetryCoordinator(
         entityType: EntityType,
         pending: PendingUpload,
     ): SyncError? {
-        val unfinished = retryScheduleStore.beginAttempt(entityType, pending.entityId)
+        if (!syncMetadataService.isCurrentOperation(entityType, pending)) {
+            return SyncError(
+                SyncErrorType.UNKNOWN_ERROR,
+                "Queued operation changed",
+                retryable = true,
+            )
+        }
+        val unfinished = retryScheduleStore.beginAttempt(entityType, pending.retryKey())
+        val key = PendingEntityKey(entityType, pending.retryKey())
+        val source =
+            try {
+                diagnosticSource()?.takeIf { it.scope == pending.scope }
+            } catch (_: Exception) {
+                null
+            }
+        attemptsInFlight[key] = UploadAttempt(pending.operationId, Uuid.random().toString(), source)
         if (unfinished < MAX_UNFINISHED_ATTEMPTS) {
             if (unfinished > 0) {
-                Napier.w("The last upload of ${entityType.name} ${pending.entityId} never finished; trying it again")
+                Napier.w("The last upload of never finished; trying it again")
             }
-            attemptsInFlight.add(PendingEntityKey(entityType, pending.entityId))
+            report(DiagnosticOutcome.STARTED, attemptsInFlight[key])
             return null
         }
 
         val error = InterruptedUploadException(unfinished)
         handleRetryFailure(entityType, pending, error, permanent = true)
-        Napier.e("Set aside ${entityType.name} ${pending.entityId}", error)
+        Napier.e("Set aside")
         return SyncError(
             SyncErrorType.UNKNOWN_ERROR,
-            "Set aside ${entityType.name.lowercase()} ${pending.entityId}: ${error.message}",
-            error,
+            "Upload set aside after repeated interruption",
             retryable = false,
         )
     }
@@ -107,7 +138,10 @@ internal class SyncRetryCoordinator(
      */
     suspend fun abandonAttemptsInFlight() {
         withContext(NonCancellable) {
-            attemptsInFlight.forEach { retryScheduleStore.endAttempt(it.entityType, it.entityId) }
+            attemptsInFlight.forEach { (key, attempt) ->
+                retryScheduleStore.endAttempt(key.entityType, key.entityId)
+                report(DiagnosticOutcome.INTERRUPTED, attempt)
+            }
             attemptsInFlight.clear()
         }
     }
@@ -115,9 +149,9 @@ internal class SyncRetryCoordinator(
     private suspend fun endAttempt(
         entityType: EntityType,
         entityId: String,
-    ) {
+    ): UploadAttempt? {
         retryScheduleStore.endAttempt(entityType, entityId)
-        attemptsInFlight.remove(PendingEntityKey(entityType, entityId))
+        return attemptsInFlight.remove(PendingEntityKey(entityType, entityId))
     }
 
     suspend fun handleRetryFailure(
@@ -126,24 +160,30 @@ internal class SyncRetryCoordinator(
         error: Throwable,
         permanent: Boolean = false,
     ): Boolean {
-        endAttempt(entityType, pending.entityId)
+        val attempt = endAttempt(entityType, pending.retryKey())
+        if (!syncMetadataService.incrementRetryIfCurrent(entityType, pending)) {
+            report(DiagnosticOutcome.INTERRUPTED, attempt)
+            return false
+        }
         val nextRetryCount = pending.retryCount + 1
-        syncMetadataService.incrementRetryCount(pending.entityId, entityType)
         // Record *after* the caller has already read the prior state to compute [permanent] --
         // this call is what the *next* attempt for this entity will see as "the previous failure".
-        recordFailureKind(entityType, pending.entityId, error)
+        recordFailureKind(entityType, pending.retryKey(), error)
 
         // A permanent failure will fail identically every time, so spending the retry budget on it
         // only keeps the queue blocked for longer.
         if (permanent || nextRetryCount >= MAX_RETRY_ATTEMPTS) {
             deadLetterStore.add(
                 SyncDeadLetterRecord(
-                    id = "${entityType.name}:${pending.entityId}",
+                    id = pending.operationId ?: "${entityType.name}:${pending.entityId}",
                     entityType = entityType.name,
                     entityId = pending.entityId,
                     operation = pending.operation.name,
                     retryCount = nextRetryCount,
-                    lastError = error.message ?: "Unknown error",
+                    lastError = classifySyncFailure(error).name,
+                    scope = pending.scope,
+                    operationId = pending.operationId,
+                    expectedServerVersion = pending.expectedServerVersion,
                     failedAt = Clock.System.now().toEpochMilliseconds(),
                     reason = classifySyncFailure(error),
                 ),
@@ -154,20 +194,90 @@ internal class SyncRetryCoordinator(
             // recovers on its own once whatever broke it is fixed.
             retryScheduleStore.setNextAttemptAt(
                 entityType,
-                pending.entityId,
+                pending.retryKey(),
                 Clock.System.now().toEpochMilliseconds() + DEAD_LETTER_RETRY_INTERVAL_MS,
             )
-            clearFailureKind(entityType, pending.entityId)
+            clearFailureKind(entityType, pending.retryKey())
+            report(DiagnosticOutcome.PAUSED, attempt, error)
             return true
         }
 
         val delayMs = computeBackoffMs(nextRetryCount)
         retryScheduleStore.setNextAttemptAt(
             entityType,
-            pending.entityId,
+            pending.retryKey(),
             Clock.System.now().toEpochMilliseconds() + delayMs,
         )
+        report(DiagnosticOutcome.RETRY_SCHEDULED, attempt, error, nextRetryCount)
         return false
+    }
+
+    private data class UploadAttempt(
+        val operationId: String?,
+        val attemptId: String,
+        val source: DiagnosticSource?,
+    )
+
+    private fun report(
+        outcome: DiagnosticOutcome,
+        attempt: UploadAttempt?,
+        error: Throwable? = null,
+        attemptCount: Int = 0,
+    ) {
+        if (attempt == null) return
+        if (error == null) {
+            safelyReport(
+                SyncDiagnosticEvent(
+                    DiagnosticPhase.UPLOAD,
+                    outcome,
+                    operationId = attempt.operationId,
+                    attemptId = attempt.attemptId,
+                ),
+                attempt.source,
+            )
+            return
+        }
+        val reason =
+            when (classifySyncFailure(error)) {
+                SyncDeadLetterReason.MISSING_FILE -> DiagnosticReason.MISSING_MEDIA
+                SyncDeadLetterReason.APP_CLOSED -> DiagnosticReason.UNKNOWN
+                SyncDeadLetterReason.SERVER_UNAVAILABLE -> DiagnosticReason.SERVER_UNAVAILABLE
+                SyncDeadLetterReason.SIGN_IN_REQUIRED -> DiagnosticReason.SIGN_IN_REQUIRED
+                SyncDeadLetterReason.NETWORK_UNAVAILABLE -> DiagnosticReason.OFFLINE
+                SyncDeadLetterReason.FILE_TOO_LARGE -> DiagnosticReason.QUOTA_EXCEEDED
+                SyncDeadLetterReason.UNKNOWN -> DiagnosticReason.UNKNOWN
+            }
+        val action =
+            when (reason) {
+                DiagnosticReason.OFFLINE -> DiagnosticAction.CONNECT
+                DiagnosticReason.SIGN_IN_REQUIRED -> DiagnosticAction.SIGN_IN
+                DiagnosticReason.MISSING_MEDIA -> DiagnosticAction.RETRY
+                else -> DiagnosticAction.RETRY
+            }
+        safelyReport(
+            SyncDiagnosticEvent(
+                DiagnosticPhase.UPLOAD,
+                outcome,
+                reason,
+                action,
+                operationId = attempt.operationId,
+                attemptId = attempt.attemptId,
+                attemptCount = attemptCount,
+                retryable = outcome == DiagnosticOutcome.RETRY_SCHEDULED,
+            ),
+            attempt.source,
+        )
+    }
+
+    private fun safelyReport(
+        event: SyncDiagnosticEvent,
+        source: DiagnosticSource?,
+    ) {
+        try {
+            diagnostics(event, source)
+        } catch (_: Exception) {
+            // Diagnostics cannot change sync.
+        }
     }
 
     private data class PendingEntityKey(
@@ -199,13 +309,18 @@ internal class SyncRetryCoordinator(
     private val entitiesLastFailedOnMissingMedia = mutableSetOf<PendingEntityKey>()
 
     /** Attempts [beginUpload] started in this process that have not finished yet. */
-    private val attemptsInFlight = mutableSetOf<PendingEntityKey>()
+    private val attemptsInFlight = mutableMapOf<PendingEntityKey, UploadAttempt>()
 
     /** Whether the failure immediately preceding this one for [entityId] was [MissingMediaException]. */
     fun previousFailureWasMissingMedia(
         entityType: EntityType,
         entityId: String,
     ): Boolean = PendingEntityKey(entityType, entityId) in entitiesLastFailedOnMissingMedia
+
+    fun previousFailureWasMissingMedia(
+        entityType: EntityType,
+        pending: PendingUpload,
+    ): Boolean = previousFailureWasMissingMedia(entityType, pending.retryKey())
 
     private fun recordFailureKind(
         entityType: EntityType,
@@ -231,22 +346,51 @@ internal class SyncRetryCoordinator(
     private fun computeBackoffMs(retryCount: Int): Long = backoff.nextDelayMs(retryCount)
 
     /**
-     * An upload attempt for [entityId] is done and should not be retried: marks it synced and
+     * An upload attempt for [pending] is done and should not be retried: marks it synced and
      * forgets whatever retry/failure-kind state it had accumulated. Used identically whether the
      * item actually succeeded or a conflict was recorded in its place -- both are terminal outcomes
      * for this attempt, differing only in what [syncedAt]/[version] the caller has to report.
      */
     suspend fun markUploadSettled(
         entityType: EntityType,
+        pending: PendingUpload,
+        syncedAt: Instant,
+        version: Long,
+        outcome: DiagnosticOutcome = DiagnosticOutcome.SUCCEEDED,
+    ) {
+        val settled = syncMetadataService.settleIfCurrent(entityType, pending, syncedAt, version)
+        retryScheduleStore.clear(entityType, pending.retryKey())
+        deadLetterStore.remove(pending.operationId ?: "${entityType.name}:${pending.entityId}")
+        val attempt = attemptsInFlight.remove(PendingEntityKey(entityType, pending.retryKey()))
+        clearFailureKind(entityType, pending.retryKey())
+        if (settled) {
+            val reason = if (outcome == DiagnosticOutcome.CONFLICT) DiagnosticReason.CONFLICT else DiagnosticReason.NONE
+            val action = if (outcome == DiagnosticOutcome.CONFLICT) DiagnosticAction.REVIEW_CONFLICT else DiagnosticAction.NONE
+            if (attempt != null) {
+                safelyReport(
+                    SyncDiagnosticEvent(
+                        DiagnosticPhase.UPLOAD,
+                        outcome,
+                        reason,
+                        action,
+                        operationId = attempt.operationId,
+                        attemptId = attempt.attemptId,
+                    ),
+                    attempt.source,
+                )
+            }
+        }
+    }
+
+    /** Compatibility for local callers that have not started any asynchronous operation. */
+    suspend fun markUploadSettled(
+        entityType: EntityType,
         entityId: String,
         syncedAt: Instant,
         version: Long,
     ) {
-        syncMetadataService.markAsSynced(entityId, entityType, syncedAt, version)
-        retryScheduleStore.clear(entityType, entityId)
-        deadLetterStore.remove("${entityType.name}:$entityId")
-        attemptsInFlight.remove(PendingEntityKey(entityType, entityId))
-        clearFailureKind(entityType, entityId)
+        val pending = syncMetadataService.getPendingUploads(entityType).firstOrNull { it.entityId == entityId } ?: return
+        markUploadSettled(entityType, pending, syncedAt, version)
     }
 
     /**
@@ -256,11 +400,11 @@ internal class SyncRetryCoordinator(
      */
     suspend fun recordUnparsableOutboxEntry(
         entityType: EntityType,
-        entityId: String,
+        pending: PendingUpload,
         description: String,
     ): SyncError {
-        syncMetadataService.markAsSynced(entityId, entityType, Clock.System.now(), 0L)
-        return SyncError(SyncErrorType.UNKNOWN_ERROR, "Invalid $description in outbox: $entityId", retryable = false)
+        markUploadSettled(entityType, pending, Clock.System.now(), 0L, DiagnosticOutcome.FAILED)
+        return SyncError(SyncErrorType.UNKNOWN_ERROR, "Invalid queued upload", retryable = false)
     }
 
     /**
@@ -271,65 +415,62 @@ internal class SyncRetryCoordinator(
      */
     suspend fun handleUploadConflict(
         entityType: EntityType,
-        entityId: String,
+        pending: PendingUpload,
         itemLabel: String,
         conflictLabel: String,
         error: Throwable,
         localVersion: Long,
         localUpdatedAt: Instant,
     ): SyncError {
+        if (!syncMetadataService.isCurrentOperation(entityType, pending)) {
+            return SyncError(
+                SyncErrorType.CONFLICT_ERROR,
+                "Queued operation changed",
+                retryable = true,
+            )
+        }
         recordConflict(
             entityType,
-            entityId,
-            error.message.orEmpty().ifBlank { "$conflictLabel conflict" },
+            pending.entityId,
+            "Queued upload conflict",
             localVersion,
             null,
             localUpdatedAt,
             null,
         )
-        markUploadSettled(entityType, entityId, Clock.System.now(), localVersion)
-        Napier.w("Queued conflict for $itemLabel", error)
+        markUploadSettled(entityType, pending, Clock.System.now(), localVersion, DiagnosticOutcome.CONFLICT)
+        Napier.w("Queued conflict for")
         return SyncError(
             SyncErrorType.CONFLICT_ERROR,
-            "Conflict uploading $itemLabel: ${error.message}",
-            error,
+            "Queued upload conflict",
             retryable = false,
         )
     }
 
-    /** Re-queues a dead-lettered entity for upload, forgetting it was ever dead-lettered. */
+    /** Legacy global issues cannot be attached to new scoped operations by entity ID. */
     suspend fun retryDeadLetter(id: String) {
         val record = deadLetterStore.list().firstOrNull { it.id == id } ?: return
-        val entityType = runCatching { EntityType.valueOf(record.entityType) }.getOrNull()
-        val operation = runCatching { PendingOperation.valueOf(record.operation) }.getOrNull()
-        if (entityType == null || operation == null) {
-            Napier.w("Cannot retry dead-letter $id with type=${record.entityType} op=${record.operation}")
-            deadLetterStore.remove(id)
-            return
-        }
-        syncMetadataService.enqueuePending(record.entityId, entityType, operation)
-        // Dead-lettering parked this entity behind a day-long backoff. Asking for a retry means
-        // asking for it now, so the schedule has to go with the dead-letter record.
-        retryScheduleStore.clear(entityType, record.entityId)
+        val type = EntityType.entries.firstOrNull { it.name == record.entityType } ?: return
+        val pending = syncMetadataService.getPendingUploads(type).firstOrNull { record.matches(it) } ?: return
+        retryScheduleStore.clear(type, pending.retryKey())
         deadLetterStore.remove(id)
     }
 
-    /**
-     * Abandons a dead-lettered entity: drops the queued upload along with the record of why it
-     * failed. The pending row outlives dead-lettering so the entry stays visibly unsynced, which
-     * makes this the only way to clear one.
-     */
     suspend fun discardDeadLetter(id: String) {
-        val record = deadLetterStore.list().firstOrNull { it.id == id }
+        val record = deadLetterStore.list().firstOrNull { it.id == id } ?: return
+        val type = EntityType.entries.firstOrNull { it.name == record.entityType } ?: return
+        val pending = syncMetadataService.getPendingUploads(type).firstOrNull { record.matches(it) } ?: return
+        if (!syncMetadataService.settleIfCurrent(type, pending, Clock.System.now(), 0L)) return
+        retryScheduleStore.clear(type, pending.retryKey())
         deadLetterStore.remove(id)
-        if (record == null) return
-        val entityType =
-            runCatching { EntityType.valueOf(record.entityType) }.getOrNull() ?: run {
-                Napier.w("Cannot discard dead-letter $id with type=${record.entityType}")
-                return
-            }
-        markUploadSettled(entityType, record.entityId, Clock.System.now(), 0L)
     }
+
+    private fun SyncDeadLetterRecord.matches(pending: PendingUpload): Boolean =
+        entityId == pending.entityId &&
+            scope == pending.scope &&
+            operationId == pending.operationId &&
+            operation == pending.operation.name &&
+            expectedServerVersion == pending.expectedServerVersion
 
     private companion object {
         const val MAX_RETRY_ATTEMPTS = 9

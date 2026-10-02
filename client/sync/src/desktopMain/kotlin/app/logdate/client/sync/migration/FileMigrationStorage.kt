@@ -27,7 +27,7 @@ class FileMigrationStorage(
             val stateJson = json.encodeToString(state)
             migrationStateFile.writeText(stateJson)
         } catch (e: Exception) {
-            Napier.e("Failed to store migration state", e)
+            Napier.e("Failed to store migration state")
         }
     }
 
@@ -40,7 +40,7 @@ class FileMigrationStorage(
             val stateJson = migrationStateFile.readText()
             json.decodeFromString<MigrationState>(stateJson)
         } catch (e: Exception) {
-            Napier.e("Failed to parse migration state", e)
+            Napier.e("Failed to parse migration state")
             null
         }
     }

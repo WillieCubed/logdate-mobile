@@ -43,6 +43,7 @@ actual val deviceInstanceModule: Module =
             SecureSessionStorage(
                 secureStorage = get(),
                 configRepository = get<LogDateConfigRepository>(),
+                privacyEpoch = get(),
                 scope = get<CoroutineScope>(),
             )
         }

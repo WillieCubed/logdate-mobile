@@ -18,6 +18,7 @@ import app.logdate.client.sync.cloud.CloudMediaDataSource
 import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
+import app.logdate.client.sync.diagnostics.SyncRunDiagnostics
 import app.logdate.client.sync.location.LocationHistorySyncEngine
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.FirstSyncEnqueueStore
@@ -38,11 +39,15 @@ import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.CloudQuotaManager
 import app.logdate.shared.model.Journal
+import app.logdate.shared.model.diagnostics.DiagnosticOutcome
+import app.logdate.shared.model.diagnostics.DiagnosticPhase
+import app.logdate.shared.model.diagnostics.SyncDiagnosticEvent
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -100,6 +105,10 @@ class DefaultSyncManager(
     private val identityRecoveryNeededStore: IdentityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
     private val unreadableCloudRecordStore: UnreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
     private val locationHistorySyncEngine: LocationHistorySyncEngine? = null,
+    private val downloadInbox: app.logdate.client.sync.recovery.DownloadInbox? = null,
+    private val supportsRichDrafts: () -> Boolean = { false },
+    private val diagnostics: app.logdate.client.sync.diagnostics.SyncDiagnosticRecorder? = null,
+    private val diagnosticSource: () -> app.logdate.client.sync.diagnostics.DiagnosticSource? = { null },
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     private val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -123,6 +132,7 @@ class DefaultSyncManager(
             conflictStore = conflictStore,
             identityRecoveryNeededStore = identityRecoveryNeededStore,
             unreadableCloudRecordStore = unreadableCloudRecordStore,
+            pendingRecoveryCount = { downloadInbox?.count() ?: 0 },
         )
     override val syncStatusFlow: StateFlow<SyncStatus> = statusPublisher.syncStatusFlow
 
@@ -134,6 +144,9 @@ class DefaultSyncManager(
             mapCloudApiError = statusPublisher::handleCloudApiError,
             mapException = statusPublisher::handleSyncException,
             unreadableCloudRecordStore = unreadableCloudRecordStore,
+            downloadInbox = downloadInbox,
+            diagnosticSource = diagnosticSource,
+            diagnostics = { event, source -> diagnostics?.record(event, source?.scope, source?.epoch) },
         )
 
     /**
@@ -191,14 +204,14 @@ class DefaultSyncManager(
             mediaPayloadKeyProvider?.clearCachedKey()
             syncMetadataService.resetAllCursors()
             identityRecoveryNeededStore.setNeeded(false)
-            unreadableCloudRecordStore.clear()
+            downloadInbox?.release()
             return
         }
 
         val client = cloudApiClient
         if (client == null) {
             runCatching { manager.setupNewIdentity() }
-                .onFailure { Napier.e("Could not provision an identity key; uploads will fail", it) }
+                .onFailure { Napier.e("Could not provision an identity key; uploads will fail") }
             return
         }
 
@@ -212,7 +225,7 @@ class DefaultSyncManager(
             }
             false -> {
                 runCatching { manager.setupNewIdentity() }
-                    .onFailure { Napier.e("Could not provision an identity key; uploads will fail", it) }
+                    .onFailure { Napier.e("Could not provision an identity key; uploads will fail") }
             }
             null -> {
                 // Could not tell (offline, a server error). Leave things as they are; the next
@@ -230,11 +243,13 @@ class DefaultSyncManager(
             val journals = client.getJournalChanges(accessToken, since = 0L, limit = 1).getOrThrow()
             if (journals.changes.isNotEmpty() || journals.deletions.isNotEmpty()) return@runCatching true
             val content = client.getContentChanges(accessToken, since = 0L, limit = 1).getOrThrow()
-            content.changes.isNotEmpty() ||
-                content.deletions.isNotEmpty() ||
+            if (content.changes.isNotEmpty() || content.deletions.isNotEmpty()) return@runCatching true
+            val drafts = client.getDraftChanges(accessToken, since = 0L, limit = 1).getOrThrow()
+            drafts.drafts.isNotEmpty() ||
+                drafts.deletions.isNotEmpty() ||
                 locationHistorySyncEngine?.hasRemoteRecords(accessToken) == true
         }.getOrElse {
-            Napier.w("Could not check whether the account already has cloud data", it)
+            Napier.w("Could not check whether the account already has cloud data")
             null
         }
 
@@ -264,7 +279,7 @@ class DefaultSyncManager(
             }
 
             if (!tokenRefresher.isAuthenticated()) {
-                Napier.w("$operationName attempted without authentication")
+                Napier.w("attempted without authentication")
                 return SyncResult(
                     success = false,
                     errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "Not authenticated. Please sign in to sync.")),
@@ -358,6 +373,7 @@ class DefaultSyncManager(
             val contentResult = downloader.downloadContent(accessToken, contentSince)
             val associationResult = downloader.downloadAssociations(accessToken, associationSince)
             val historyResult = locationHistorySyncEngine?.download(accessToken) ?: SyncResult(success = true)
+            recoverMedia(accessToken, EntityType.NOTE)
             val totalDownloaded =
                 journalResult.downloadedItems +
                     contentResult.downloadedItems +
@@ -432,8 +448,10 @@ class DefaultSyncManager(
                     return@withLock SyncResult(success = false)
                 }
 
+                if (entityType == EntityType.DRAFT) uploader.enqueueDraftsForRichSync()
                 val since = cursorFor(entityType)
                 val downloadResult = download(accessToken, since)
+                recoverMedia(accessToken, entityType)
 
                 statusPublisher.beginRunForPending(entityType)
                 val uploadResult = upload(accessToken)
@@ -457,6 +475,7 @@ class DefaultSyncManager(
                     lastSyncTime = latestSyncTime(),
                 )
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 if (onException != null) onException(e) else throw e
             } finally {
                 syncStateFlow.value = SyncState.Idle
@@ -515,64 +534,73 @@ class DefaultSyncManager(
             upload = uploader::uploadDrafts,
             updatesGlobalSyncState = false,
             onException = { e ->
-                Napier.e("Draft sync failed", e)
+                Napier.e("Draft sync failed")
                 SyncResult(
                     success = false,
-                    errors = listOf(SyncError(SyncErrorType.UNKNOWN_ERROR, "Draft sync failed: ${e.message}")),
+                    errors = listOf(SyncError(SyncErrorType.UNKNOWN_ERROR, "Draft sync failed")),
                 )
             },
         )
 
     override suspend fun fullSync(): SyncResult {
-        uploader.enqueueEverythingOnFirstSync()
-        val downloadResult = downloadRemoteChanges()
-        val uploadResult = uploadPendingChanges()
-        val draftResult = syncDrafts()
+        val run = SyncRunDiagnostics(diagnostics, diagnosticSource())
+        return run.phase(DiagnosticPhase.RECOVERY) {
+            uploader.enqueueEverythingOnFirstSync()
+            val downloadResult = run.phase(DiagnosticPhase.FETCH) { downloadRemoteChanges() }
+            val uploadResult = run.phase(DiagnosticPhase.UPLOAD) { uploadPendingChanges() }
+            val draftResult = run.phase(DiagnosticPhase.RECOVERY) { syncDrafts() }
 
-        val errors = downloadResult.errors + uploadResult.errors + draftResult.errors
-        // Each phase updates the shared last error. A successful upload must not erase a failed
-        // download from the same full run, or the worker retries with no visible reason.
-        lastErrorFlow.value = errors.mostSevere()
+            val errors = downloadResult.errors + uploadResult.errors + draftResult.errors
+            // Each phase updates the shared last error. A successful upload must not erase a failed
+            // download from the same full run, or the worker retries with no visible reason.
+            lastErrorFlow.value = errors.mostSevere()
 
-        return SyncResult(
-            success = uploadResult.success && downloadResult.success && draftResult.success,
-            uploadedItems = uploadResult.uploadedItems + draftResult.uploadedItems,
-            downloadedItems = downloadResult.downloadedItems + draftResult.downloadedItems,
-            conflictsResolved = downloadResult.conflictsResolved,
-            errors = errors,
-            lastSyncTime = latestSyncTime(),
-            hasMorePending = downloadResult.hasMorePending || uploadResult.hasMorePending || draftResult.hasMorePending,
-        )
+            SyncResult(
+                success =
+                    uploadResult.success &&
+                        downloadResult.success &&
+                        draftResult.success &&
+                        (downloadInbox?.count() ?: 0) == 0,
+                uploadedItems = uploadResult.uploadedItems + draftResult.uploadedItems,
+                downloadedItems = downloadResult.downloadedItems + draftResult.downloadedItems,
+                conflictsResolved = downloadResult.conflictsResolved,
+                errors = errors,
+                lastSyncTime = latestSyncTime(),
+                hasMorePending =
+                    downloadResult.hasMorePending ||
+                        uploadResult.hasMorePending ||
+                        draftResult.hasMorePending ||
+                        (downloadInbox?.count() ?: 0) > 0,
+            )
+        }
     }
 
     suspend fun isLocationHistorySyncEnabled(): Boolean = locationHistorySyncEngine?.isEnabled() == true
 
     override suspend fun getSyncStatus(): SyncStatus {
-        val pendingCountResult =
-            runCatching { syncMetadataService.getPendingCount() }
-                .onFailure { Napier.e("Could not read the pending upload count", it) }
-        val authenticated = sessionStorage.getSession() != null
-        return SyncStatus(
-            isEnabled = authenticated && isEnabled,
-            lastSyncTime = latestSyncTime(),
-            pendingUploads = pendingCountResult.getOrDefault(0),
-            queueReadable = pendingCountResult.isSuccess && statusPublisher.isQueueObservationHealthy(),
-            backgroundWorkLimited = statusPublisher.backgroundWorkLimited(),
-            isSyncing = syncStateFlow.value is SyncState.Syncing,
-            hasErrors = lastErrorFlow.value != null,
-            lastError = lastErrorFlow.value,
-            pausedReason = statusPublisher.currentPausedReason(authenticated),
-            totalForRun = statusPublisher.runTotal,
-            completedInRun = statusPublisher.runCompleted,
-            conflictCount = runCatching { conflictStore.list().size }.getOrDefault(0),
-            unreadableCloudCount = runCatching { unreadableCloudRecordStore.count() }.getOrDefault(0),
-        )
+        statusPublisher.publish()
+        return statusPublisher.syncStatusFlow.value
     }
 
-    override fun observeDeadLetters(): Flow<List<SyncDeadLetterRecord>> = deadLetterStore.observe()
+    override fun observeDeadLetters(): Flow<List<SyncDeadLetterRecord>> =
+        combine(deadLetterStore.observe(), syncMetadataService.observePendingUploads()) { issues, pending ->
+            issues.filter { issue ->
+                pending.any { queued ->
+                    issue.entityType == queued.entityType?.name &&
+                        issue.entityId == queued.entityId &&
+                        issue.scope == queued.scope &&
+                        issue.operationId == queued.operationId &&
+                        issue.operation == queued.operation.name
+                }
+            }
+        }
 
     /** See [SyncRetryCoordinator.releaseBackoff]. Called when the user asks to back up now. */
-    suspend fun releaseUploadBackoff() = retryCoordinator.releaseBackoff()
+    suspend fun releaseUploadBackoff() {
+        diagnostics?.record(SyncDiagnosticEvent(DiagnosticPhase.SCHEDULING, DiagnosticOutcome.QUEUED))
+        retryCoordinator.releaseBackoff()
+        downloadInbox?.release()
+    }
 
     override suspend fun retryDeadLetter(id: String) = retryCoordinator.retryDeadLetter(id)
 
@@ -612,6 +640,34 @@ class DefaultSyncManager(
         return times.maxOrNull()
     }
 
+    private suspend fun recoverMedia(
+        accessToken: String,
+        entityType: EntityType,
+    ) {
+        val inbox = downloadInbox ?: return
+        when (entityType) {
+            EntityType.NOTE ->
+                app.logdate.client.sync.recovery
+                    .SyncMediaRecovery(
+                        inbox,
+                        journalNotesRepository,
+                        mediaTransfer,
+                        mediaSyncRefStore,
+                        transactionManager,
+                    ).recover(accessToken)
+            EntityType.DRAFT ->
+                app.logdate.client.sync.recovery
+                    .SyncDraftMediaRecovery(
+                        inbox,
+                        journalRepository,
+                        mediaTransfer,
+                        mediaSyncRefStore,
+                        transactionManager,
+                    ).recover(accessToken)
+            else -> Unit
+        }
+    }
+
     private val mediaTransfer =
         SyncMediaTransfer(
             mediaManager = mediaManager,
@@ -626,6 +682,8 @@ class DefaultSyncManager(
             deadLetterStore = deadLetterStore,
             backoff = backoff,
             recordConflict = downloadEngine::recordConflict,
+            diagnosticSource = diagnosticSource,
+            diagnostics = { event, source -> diagnostics?.record(event, source?.scope, source?.epoch) },
         )
 
     private val downloader =
@@ -647,6 +705,7 @@ class DefaultSyncManager(
             tokenRefresher = tokenRefresher,
             mapCloudApiError = statusPublisher::handleCloudApiError,
             mapException = statusPublisher::handleSyncException,
+            downloadInbox = downloadInbox,
         )
 
     private val uploader =
@@ -665,6 +724,8 @@ class DefaultSyncManager(
             mediaTransfer = mediaTransfer,
             retryCoordinator = retryCoordinator,
             firstSyncEnqueueStore = firstSyncEnqueueStore,
+            supportsRichDrafts = supportsRichDrafts,
+            draftRepairScope = { downloadInbox?.currentScope() },
             mapCloudApiError = statusPublisher::handleCloudApiError,
             mapException = statusPublisher::handleSyncException,
             recordProgress = statusPublisher::recordProgress,

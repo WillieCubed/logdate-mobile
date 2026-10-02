@@ -20,7 +20,7 @@ class InMemoryMigrationStorage(
             val stateJson = json.encodeToString(state)
             storage[migrationStateKey] = stateJson
         } catch (e: Exception) {
-            Napier.e("Failed to store migration state", e)
+            Napier.e("Failed to store migration state")
         }
     }
 
@@ -30,7 +30,7 @@ class InMemoryMigrationStorage(
         return try {
             json.decodeFromString<MigrationState>(stateJson)
         } catch (e: Exception) {
-            Napier.e("Failed to parse migration state", e)
+            Napier.e("Failed to parse migration state")
             null
         }
     }

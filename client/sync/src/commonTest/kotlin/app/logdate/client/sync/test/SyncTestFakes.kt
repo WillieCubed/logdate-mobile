@@ -132,8 +132,7 @@ fun failingCloudApiClient(): FakeCloudApiClient =
 fun fakeAccountRepository(authenticated: Boolean = true): FakeCloudAccountRepository =
     FakeCloudAccountRepository().apply { setAuthenticated(authenticated) }
 
-fun fakeSessionStorage(authenticated: Boolean = true): FakeSessionStorage =
-    FakeSessionStorage().apply { if (!authenticated) clearSession() }
+fun fakeSessionStorage(authenticated: Boolean = true): FakeSessionStorage = FakeSessionStorage(authenticated)
 
 fun fakeSyncMetadataService(): FakeSyncMetadataService = FakeSyncMetadataService()
 
@@ -158,11 +157,11 @@ private object AlwaysAuthenticatedSessionStorage : SessionStorage {
 
     override suspend fun hasValidSession(): Boolean = true
 
-    override fun saveSession(session: UserSession) {
+    override suspend fun saveSession(session: UserSession) {
         flow.value = session
     }
 
-    override fun clearSession() {
+    override suspend fun clearSession() {
         flow.value = null
     }
 }
@@ -225,6 +224,9 @@ fun testDefaultSyncManager(
     identityRecoveryNeededStore: IdentityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
     unreadableCloudRecordStore: UnreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
     locationHistorySyncEngine: LocationHistorySyncEngine? = null,
+    downloadInbox: app.logdate.client.sync.recovery.DownloadInbox? = null,
+    supportsRichDrafts: () -> Boolean = { false },
+    diagnostics: app.logdate.client.sync.diagnostics.SyncDiagnosticRecorder? = null,
 ): DefaultSyncManager =
     if (syncScope == null) {
         DefaultSyncManager(
@@ -257,6 +259,9 @@ fun testDefaultSyncManager(
             identityRecoveryNeededStore = identityRecoveryNeededStore,
             unreadableCloudRecordStore = unreadableCloudRecordStore,
             locationHistorySyncEngine = locationHistorySyncEngine,
+            downloadInbox = downloadInbox,
+            supportsRichDrafts = supportsRichDrafts,
+            diagnostics = diagnostics,
         )
     } else {
         DefaultSyncManager(
@@ -289,6 +294,9 @@ fun testDefaultSyncManager(
             identityRecoveryNeededStore = identityRecoveryNeededStore,
             unreadableCloudRecordStore = unreadableCloudRecordStore,
             locationHistorySyncEngine = locationHistorySyncEngine,
+            downloadInbox = downloadInbox,
+            supportsRichDrafts = supportsRichDrafts,
+            diagnostics = diagnostics,
             syncScope = syncScope,
         )
     }
@@ -303,6 +311,8 @@ internal fun testSyncUploader(
     journalNotesRepository: JournalNotesRepository = FakeJournalNotesRepository(),
     syncMetadataService: SyncMetadataService = fakeSyncMetadataService(),
     firstSyncEnqueueStore: FirstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
+    supportsRichDrafts: () -> Boolean = { false },
+    draftRepairScope: () -> app.logdate.client.sync.recovery.DownloadScope? = { null },
 ): SyncUploader {
     val cloudApiClient = fakeCloudApiClient()
     val mediaSyncRefStore: MediaSyncRefStore = InMemoryMediaSyncRefStore()
@@ -341,6 +351,8 @@ internal fun testSyncUploader(
         mapException = { _, _ -> SyncResult(success = false) },
         recordProgress = {},
         setMediaDeferredForNetwork = {},
+        supportsRichDrafts = supportsRichDrafts,
+        draftRepairScope = draftRepairScope,
     )
 }
 
@@ -734,27 +746,45 @@ class FakeCloudAccountRepository : CloudAccountRepository {
 /**
  * Fake SessionStorage for testing.
  */
-class FakeSessionStorage : SessionStorage {
+class FakeSessionStorage(
+    authenticated: Boolean = true,
+) : SessionStorage {
+    var currentOrigin: String = app.logdate.shared.config.DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL
     private var sessionState: UserSession? =
         UserSession(
             accessToken = "test-access-token",
             refreshToken = "test-refresh-token",
             accountId = "test-account-id",
-        )
+        ).takeIf { authenticated }
     private val sessionStateFlow = MutableStateFlow(sessionState)
 
     override fun getSession(): UserSession? = sessionState
+
+    override fun getOriginBoundSession(): app.logdate.client.datastore.OriginBoundSession? =
+        sessionState?.let {
+            app.logdate.client.datastore
+                .OriginBoundSession(currentOrigin, it)
+        }
+
+    override suspend fun replaceSessionIfCurrent(
+        expected: app.logdate.client.datastore.OriginBoundSession,
+        updated: UserSession,
+    ): Boolean {
+        if (getOriginBoundSession() != expected) return false
+        saveSession(updated)
+        return true
+    }
 
     override fun getSessionFlow(): Flow<UserSession?> = sessionStateFlow.asStateFlow()
 
     override suspend fun hasValidSession(): Boolean = sessionState != null
 
-    override fun saveSession(session: UserSession) {
+    override suspend fun saveSession(session: UserSession) {
         sessionState = session
         sessionStateFlow.value = session
     }
 
-    override fun clearSession() {
+    override suspend fun clearSession() {
         sessionState = null
         sessionStateFlow.value = null
     }
@@ -765,8 +795,12 @@ class FakeSessionStorage : SessionStorage {
  */
 class FakeSyncMetadataService(
     private val sessionStorage: SessionStorage = AlwaysAuthenticatedSessionStorage,
+    private val trackOperationIdentity: Boolean = false,
 ) : SyncMetadataService {
+    private val operationIds = mutableMapOf<Pair<EntityType, String>, String>()
+    private val queuedFlow = MutableStateFlow<List<QueuedUpload>>(emptyList())
     private val pendingUploads = mutableMapOf<EntityType, MutableMap<String, PendingOperation>>()
+    private val repairVersions = mutableMapOf<Pair<EntityType, String>, Long>()
     private val retryCounts = mutableMapOf<EntityType, MutableMap<String, Int>>()
     private val syncTimes = mutableMapOf<EntityType, Instant>()
     private val pendingCountFlow = MutableStateFlow(0)
@@ -783,7 +817,22 @@ class FakeSyncMetadataService(
         pendingUploads[entityType]
             ?.map { (entityId, operation) ->
                 val retryCount = retryCounts[entityType]?.get(entityId) ?: 0
-                PendingUpload(entityId, operation, retryCount)
+                PendingUpload(
+                    entityId,
+                    operation,
+                    retryCount,
+                    repairVersions[entityType to entityId],
+                    scope =
+                        if (trackOperationIdentity) {
+                            app.logdate.client.sync.metadata.UploadScope(
+                                "fixture-owner",
+                                "fixture-server",
+                            )
+                        } else {
+                            null
+                        },
+                    operationId = operationIds[entityType to entityId],
+                )
             }
             ?: emptyList()
 
@@ -794,6 +843,8 @@ class FakeSyncMetadataService(
         version: Long,
     ) {
         pendingUploads[entityType]?.remove(entityId)
+        operationIds.remove(entityType to entityId)
+        repairVersions.remove(entityType to entityId)
         retryCounts[entityType]?.remove(entityId)
         updatePendingCount()
     }
@@ -812,6 +863,8 @@ class FakeSyncMetadataService(
         entityType: EntityType,
         operation: PendingOperation,
     ) {
+        if (trackOperationIdentity) operationIds[entityType to entityId] = Uuid.random().toString()
+        repairVersions.remove(entityType to entityId)
         enqueuePendingCalls += entityType to entityId
         val existing = pendingUploads[entityType]?.get(entityId)
         val resolved = PendingOperation.coalesce(existing, operation)
@@ -821,11 +874,22 @@ class FakeSyncMetadataService(
         } else {
             pendingUploads.getOrPut(entityType) { mutableMapOf() }[entityId] = resolved
             val counts = retryCounts.getOrPut(entityType) { mutableMapOf() }
-            if (counts[entityId] == null) {
+            if (counts[entityId] == null || trackOperationIdentity) {
                 counts[entityId] = 0
             }
         }
         updatePendingCount()
+    }
+
+    override suspend fun enqueueRepairIfAbsent(
+        entityId: String,
+        entityType: EntityType,
+        expectedServerVersion: Long?,
+        serverOrigin: String?,
+    ) {
+        if (hasPending(entityType, entityId)) return
+        enqueuePending(entityId, entityType, PendingOperation.UPDATE)
+        expectedServerVersion?.let { repairVersions[entityType to entityId] = it }
     }
 
     override suspend fun resetSyncStatus(
@@ -843,11 +907,14 @@ class FakeSyncMetadataService(
 
     override fun observePendingCount(): Flow<Int> = pendingCountFlow
 
-    override fun observePendingUploads(): Flow<List<QueuedUpload>> = flowOf(emptyList())
+    override fun observePendingUploads(): Flow<List<QueuedUpload>> = queuedFlow
 
     override suspend fun clearPending() {
         clearPendingCalls += 1
         pendingUploads.clear()
+        operationIds.clear()
+        queuedFlow.value = emptyList()
+        repairVersions.clear()
         retryCounts.clear()
         pendingCountFlow.value = 0
     }
@@ -866,6 +933,27 @@ class FakeSyncMetadataService(
 
     private fun updatePendingCount() {
         pendingCountFlow.value = pendingUploads.values.sumOf { it.size }
+        queuedFlow.value =
+            pendingUploads.flatMap { (type, values) ->
+                values.map { (id, operation) ->
+                    QueuedUpload(
+                        type,
+                        id,
+                        operation,
+                        retryCounts[type]?.get(id) ?: 0,
+                        scope =
+                            if (trackOperationIdentity) {
+                                app.logdate.client.sync.metadata.UploadScope(
+                                    "fixture-owner",
+                                    "fixture-server",
+                                )
+                            } else {
+                                null
+                            },
+                        operationId = operationIds[type to id],
+                    )
+                }
+            }
     }
 
     fun addPending(
@@ -879,6 +967,9 @@ class FakeSyncMetadataService(
 
     fun clear() {
         pendingUploads.clear()
+        operationIds.clear()
+        queuedFlow.value = emptyList()
+        repairVersions.clear()
         retryCounts.clear()
         syncTimes.clear()
         pendingCountFlow.value = 0

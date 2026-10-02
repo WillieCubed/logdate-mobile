@@ -1,9 +1,11 @@
 package app.logdate.client.sync.cloud
 
+import app.logdate.client.device.crypto.IdentityKeyNotFoundException
 import app.logdate.client.media.MediaFileSource
 import app.logdate.client.sync.crypto.MediaPayloadCrypto
 import app.logdate.client.sync.crypto.NoOpMediaPayloadCrypto
 import app.logdate.client.sync.crypto.isClientEncryptedMedia
+import kotlinx.coroutines.CancellationException
 import kotlinx.io.Buffer
 import kotlinx.io.RawSource
 import kotlin.time.Instant
@@ -164,17 +166,27 @@ class DefaultCloudMediaDataSource(
         return responseResult.fold(
             onSuccess = { response ->
                 try {
-                    val decrypted = mediaPayloadCrypto.decrypt(response.data)
+                    val decrypted =
+                        try {
+                            mediaPayloadCrypto.decrypt(response.data)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (missing: IdentityKeyNotFoundException) {
+                            throw missing
+                        } catch (_: Exception) {
+                            throw MediaDecryptionException()
+                        }
                     Result.success(
                         MediaFile(
                             contentId = Uuid.parse(response.contentId),
                             fileName = response.fileName,
                             mimeType = response.mimeType,
-                            sizeBytes = response.sizeBytes,
+                            sizeBytes = decrypted.size.toLong(),
                             data = decrypted,
                         ),
                     )
                 } catch (error: Exception) {
+                    if (error is CancellationException) throw error
                     Result.failure(error)
                 }
             },
@@ -235,3 +247,5 @@ private class SizeCheckedSource(
             throw MediaReadException("Could not read ${media.fileName}: ${error.message}", error)
         }
 }
+
+class MediaDecryptionException : Exception("MEDIA_DECRYPTION_FAILED")

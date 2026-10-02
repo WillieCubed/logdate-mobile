@@ -53,7 +53,7 @@ class KeyValueSyncConflictStore(
     private suspend fun readAll(): List<SyncConflictRecord> {
         val raw = storage.getString(CONFLICT_KEY) ?: return emptyList()
         return runCatching { json.decodeFromString<List<SyncConflictRecord>>(raw) }
-            .onFailure { Napier.w("Failed to decode sync conflicts store", it) }
+            .onFailure { Napier.w("Failed to decode sync conflicts store") }
             .getOrElse { emptyList() }
     }
 

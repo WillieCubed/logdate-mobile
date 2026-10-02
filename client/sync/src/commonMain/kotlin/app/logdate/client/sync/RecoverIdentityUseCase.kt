@@ -22,6 +22,7 @@ class RecoverIdentityUseCase(
     private val mediaPayloadKeyProvider: MediaPayloadKeyProvider,
     private val identityRecoveryNeededStore: IdentityRecoveryNeededStore,
     private val unreadableCloudRecordStore: UnreadableCloudRecordStore,
+    private val downloadInbox: app.logdate.client.sync.recovery.DownloadInbox? = null,
 ) {
     suspend operator fun invoke(words: List<String>): Result<Unit> =
         runCatching {
@@ -29,6 +30,6 @@ class RecoverIdentityUseCase(
             mediaPayloadKeyProvider.clearCachedKey()
             syncMetadataService.resetAllCursors()
             identityRecoveryNeededStore.setNeeded(false)
-            unreadableCloudRecordStore.clear()
+            downloadInbox?.release()
         }
 }

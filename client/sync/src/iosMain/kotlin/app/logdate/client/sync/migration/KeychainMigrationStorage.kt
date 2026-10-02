@@ -23,7 +23,7 @@ class KeychainMigrationStorage(
             val stateJson = json.encodeToString(state)
             defaults.setObject(stateJson, migrationStateKey)
         } catch (e: Exception) {
-            Napier.e("Failed to store migration state", e)
+            Napier.e("Failed to store migration state")
         }
     }
 
@@ -33,7 +33,7 @@ class KeychainMigrationStorage(
         return try {
             json.decodeFromString<MigrationState>(stateJson)
         } catch (e: Exception) {
-            Napier.e("Failed to parse migration state", e)
+            Napier.e("Failed to parse migration state")
             null
         }
     }

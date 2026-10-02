@@ -13,6 +13,17 @@ import app.logdate.shared.model.LogDateAccount
  * account management, authentication, and data synchronization.
  */
 interface CloudApiClient {
+    suspend fun uploadBackupFile(
+        accessToken: String,
+        backup: BackupUploadFileRequest,
+    ): Result<BackupUploadResponse> = Result.failure(UnsupportedOperationException("Streaming backup uploads are not supported"))
+
+    suspend fun downloadBackupToFile(
+        accessToken: String,
+        backupId: String,
+        destination: kotlinx.io.files.Path,
+    ): Result<BackupInfoResponse> = Result.failure(UnsupportedOperationException("Streaming backup downloads are not supported"))
+
     /**
      * Checks if a username is available for registration.
      *

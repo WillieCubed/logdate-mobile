@@ -2,13 +2,17 @@ package app.logdate.client.sync
 
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.PendingOperation
+import app.logdate.client.sync.recovery.DownloadScope
 import app.logdate.client.sync.test.FakeJournalNotesRepository
 import app.logdate.client.sync.test.fakeFirstSyncEnqueueStore
 import app.logdate.client.sync.test.fakeJournalNotesRepository
 import app.logdate.client.sync.test.fakeJournalRepository
 import app.logdate.client.sync.test.fakeSyncMetadataService
 import app.logdate.client.sync.test.testSyncUploader
+import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
@@ -16,6 +20,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -29,6 +34,83 @@ import kotlin.test.assertTrue
  * per entity type.
  */
 class FirstSyncEnqueueOnceTest {
+    @Test
+    fun `failed draft read leaves scoped sweep unmarked for retry`() =
+        runTest {
+            val delegate = fakeJournalRepository()
+            val draft = EditorDraft()
+            delegate.saveDraft(draft)
+            val journalRepository =
+                object : JournalRepository by delegate {
+                    var failNextSyncRead = true
+
+                    override suspend fun getAllDraftsForSync(): List<EditorDraft> {
+                        if (failNextSyncRead) {
+                            failNextSyncRead = false
+                            error("Simulated draft storage failure")
+                        }
+                        return delegate.getAllDrafts()
+                    }
+                }
+            val metadata = fakeSyncMetadataService()
+            val marker = fakeFirstSyncEnqueueStore()
+            val scope = DownloadScope("account-a", "https://server.example")
+            val uploader =
+                testSyncUploader(
+                    journalRepository = journalRepository,
+                    syncMetadataService = metadata,
+                    firstSyncEnqueueStore = marker,
+                    supportsRichDrafts = { true },
+                    draftRepairScope = { scope },
+                )
+
+            assertFailsWith<IllegalStateException> { uploader.enqueueDraftsForRichSync() }
+            assertFalse(marker.hasEnqueuedDraftScope(scope.owner, scope.origin))
+            assertTrue(metadata.getPendingUploads(EntityType.DRAFT).isEmpty())
+
+            uploader.enqueueDraftsForRichSync()
+            assertTrue(marker.hasEnqueuedDraftScope(scope.owner, scope.origin))
+            assertEquals(
+                PendingOperation.UPDATE,
+                metadata.getPendingUploads(EntityType.DRAFT).single().operation,
+            )
+        }
+
+    @Test
+    fun `draft sweep is scoped and preserves queued deletion`() =
+        runTest {
+            val journalRepository = fakeJournalRepository()
+            val deleted = EditorDraft()
+            val unsent = EditorDraft()
+            journalRepository.saveDraft(deleted)
+            journalRepository.saveDraft(unsent)
+            val metadata = fakeSyncMetadataService()
+            metadata.enqueuePending(deleted.id.toString(), EntityType.DRAFT, PendingOperation.DELETE)
+            val marker = fakeFirstSyncEnqueueStore()
+            var scope = DownloadScope("account-a", "https://server-a.example")
+            val uploader =
+                testSyncUploader(
+                    journalRepository = journalRepository,
+                    syncMetadataService = metadata,
+                    firstSyncEnqueueStore = marker,
+                    supportsRichDrafts = { true },
+                    draftRepairScope = { scope },
+                )
+
+            uploader.enqueueEverythingOnFirstSync()
+            val pending = metadata.getPendingUploads(EntityType.DRAFT).associateBy { it.entityId }
+            assertEquals(PendingOperation.DELETE, pending[deleted.id.toString()]?.operation)
+            assertEquals(PendingOperation.UPDATE, pending[unsent.id.toString()]?.operation)
+            assertTrue(marker.hasEnqueuedDraftScope(scope.owner, scope.origin))
+            val calls = metadata.enqueuePendingCalls.size
+            uploader.enqueueEverythingOnFirstSync()
+            assertEquals(calls, metadata.enqueuePendingCalls.size)
+
+            scope = DownloadScope("account-a", "https://server-b.example")
+            uploader.enqueueEverythingOnFirstSync()
+            assertTrue(marker.hasEnqueuedDraftScope(scope.owner, scope.origin))
+        }
+
     /** Throws once from [allNotesObserved] the first time it's collected, then behaves normally. */
     private class FlakyOnceJournalNotesRepository(
         private val delegate: FakeJournalNotesRepository,

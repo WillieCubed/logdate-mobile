@@ -2,6 +2,9 @@ package app.logdate.client.sync.cloud.account
 
 import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.sync.cloud.CloudApiClient
+import app.logdate.client.sync.cloud.CloudRequestBinding
+import app.logdate.client.sync.cloud.CloudRequestLocation
+import app.logdate.client.sync.cloud.CloudRequestLocationProvider
 import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
@@ -17,7 +20,9 @@ import app.logdate.shared.model.PasskeyAuthenticatorResponse
 import app.logdate.shared.model.PasskeyCredential
 import app.logdate.shared.model.PasskeyCredentialResponse
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,7 +46,17 @@ class DefaultCloudAccountRepository(
     private val secureStorage: KeyValueStorage,
     private val configRepository: LogDateConfigRepository = DefaultLogDateConfigRepository(),
     private val coroutineScope: CoroutineScope = CoroutineScope(platformIODispatcher),
-) : CloudAccountRepository {
+) : CloudAccountRepository,
+    CloudRequestLocationProvider {
+    override fun captureLocation(): CloudRequestLocation {
+        val origin = configRepository.getCurrentBackendUrl()
+        val apiBaseUrl = configRepository.getCurrentApiBaseUrl()
+        check(configRepository.getCurrentBackendUrl() == origin) { "Cloud request origin changed" }
+        return CloudRequestLocation(origin, apiBaseUrl)
+    }
+
+    override fun isCurrentOrigin(origin: String): Boolean = configRepository.getCurrentBackendUrl() == origin
+
     private val accountFlow = MutableStateFlow<CloudAccount?>(null)
 
     /**
@@ -136,12 +151,12 @@ class DefaultCloudAccountRepository(
                     )
 
                 accountFlow.value = account
-                Napier.d("Loaded stored account: $username")
+                Napier.d("Loaded stored account")
             } else {
                 accountFlow.value = null
             }
         } catch (e: Exception) {
-            Napier.e("Failed to load stored account", e)
+            Napier.e("Failed to load stored account")
             // If loading fails, we just keep the account as null
         }
     }
@@ -161,7 +176,7 @@ class DefaultCloudAccountRepository(
                 response.available
             }
         } catch (e: Exception) {
-            Napier.e("Error checking username availability", e)
+            Napier.e("Error checking username availability")
             Result.failure(e)
         }
 
@@ -205,7 +220,7 @@ class DefaultCloudAccountRepository(
                 )
             }
         } catch (e: Exception) {
-            Napier.e("Error beginning account creation", e)
+            Napier.e("Error beginning account creation")
             Result.failure(e)
         }
 
@@ -289,7 +304,7 @@ class DefaultCloudAccountRepository(
                 }
             }
         } catch (e: Exception) {
-            Napier.e("Error completing account creation", e)
+            Napier.e("Error completing account creation")
             Result.failure(e)
         }
 
@@ -315,16 +330,22 @@ class DefaultCloudAccountRepository(
      */
     override suspend fun refreshAccessToken(refreshToken: String): Result<String> =
         try {
+            val binding = currentCoroutineContext()[CloudRequestBinding]
+            if (binding != null && binding.session.refreshToken != refreshToken) {
+                error("Cloud request session changed")
+            }
+            val origin = binding?.location?.origin ?: configRepository.getCurrentBackendUrl()
             val result = apiClient.refreshAccessToken(refreshToken)
 
             result.onSuccess { newToken ->
-                // Update the stored token
-                secureStorage.putString(scopedKey(StorageKeys.ACCESS_TOKEN, configRepository.getCurrentBackendUrl()), newToken)
+                check(isCurrentOrigin(origin)) { "Cloud request origin changed" }
+                secureStorage.putString(scopedKey(StorageKeys.ACCESS_TOKEN, origin), newToken)
             }
 
             result
         } catch (e: Exception) {
-            Napier.e("Error refreshing access token", e)
+            if (e is CancellationException) throw e
+            Napier.e("Error refreshing access token")
             Result.failure(e)
         }
 
@@ -356,7 +377,7 @@ class DefaultCloudAccountRepository(
 
             Result.success(true)
         } catch (e: Exception) {
-            Napier.e("Error signing out", e)
+            Napier.e("Error signing out")
             Result.failure(e)
         }
 
@@ -385,7 +406,7 @@ class DefaultCloudAccountRepository(
                 Result.failure(IllegalStateException("Not authenticated"))
             }
         } catch (e: Exception) {
-            Napier.e("Error getting passkey credentials", e)
+            Napier.e("Error getting passkey credentials")
             Result.failure(e)
         }
     }
@@ -407,7 +428,7 @@ class DefaultCloudAccountRepository(
             secureStorage.putString(scopedKey(StorageKeys.USER_ID, configRepository.getCurrentBackendUrl()), userId.toString())
             Result.success(true)
         } catch (e: Exception) {
-            Napier.e("Error associating user identity", e)
+            Napier.e("Error associating user identity")
             Result.failure(e)
         }
     }

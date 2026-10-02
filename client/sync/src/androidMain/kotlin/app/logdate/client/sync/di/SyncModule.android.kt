@@ -35,11 +35,14 @@ import org.koin.dsl.module
  */
 actual val syncModule: Module =
     module {
-        single { RecoverIdentityUseCase(get(), get(), get(), get(), get()) }
+        includes(diagnosticsModule)
+        single { RecoverIdentityUseCase(get(), get(), get(), get(), get(), get()) }
         single<SyncConflictStore> { KeyValueSyncConflictStore(get()) }
         single<MediaSyncRefStore> {
             val configRepository = get<LogDateConfigRepository>()
-            KeyValueMediaSyncRefStore(get(), currentOrigin = { configRepository.getCurrentBackendUrl() })
+            KeyValueMediaSyncRefStore(get(), currentOrigin = {
+                configRepository.getCurrentBackendUrl()
+            }, currentOwnerId = { get<app.logdate.client.datastore.SessionStorage>().getSession()?.accountId.orEmpty() })
         }
         single<SyncDeadLetterStore> { KeyValueSyncDeadLetterStore(get()) }
         single<SyncRetryScheduleStore> { KeyValueSyncRetryScheduleStore(get()) }
@@ -76,6 +79,15 @@ actual val syncModule: Module =
                 mediaPayloadKeyProvider = get(),
                 cloudQuotaManager = get(),
                 cloudApiClient = get(),
+                downloadInbox = get(),
+                diagnostics = get(),
+                diagnosticSource = get<app.logdate.client.sync.diagnostics.DiagnosticSourceProvider>()::current,
+                supportsRichDrafts = {
+                    get<LogDateConfigRepository>().getCurrentServerDescriptor()?.hasProtocolFeature(
+                        app.logdate.shared.model.ServerProtocolFeature.RICH_DRAFTS_V1,
+                    ) ==
+                        true
+                },
                 identityRecoveryNeededStore = KeyValueIdentityRecoveryNeededStore(get()),
                 unreadableCloudRecordStore = KeyValueUnreadableCloudRecordStore(get()),
                 locationHistorySyncEngine = get(),

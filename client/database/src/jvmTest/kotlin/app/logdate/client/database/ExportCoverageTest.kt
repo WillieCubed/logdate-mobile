@@ -80,6 +80,8 @@ class ExportCoverageTest {
             "media_images" to bookkeeping("Legacy media table; nothing reads it."),
             "sync_cursors" to bookkeeping("Sync progress markers."),
             "pending_uploads" to bookkeeping("Sync upload queue."),
+            "sync_download_inbox" to bookkeeping("Encrypted remote work awaiting application; not local journal content."),
+            "sync_download_checkpoints" to bookkeeping("Account-scoped download cursors and replay progress."),
             "search_index_metadata" to bookkeeping("Search index version."),
             "storage_metadata" to bookkeeping("Storage quota footprint."),
             "user_devices" to bookkeeping("Registry of devices signed in to the account."),

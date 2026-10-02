@@ -245,7 +245,7 @@ class SyncMetadataServiceTest {
         }
 
     @Test
-    fun `create then delete clears pending entry`() =
+    fun `create then delete retains a tombstone for a possibly transmitted create`() =
         runTest {
             val service = InMemorySyncMetadataService()
             val entityId = Uuid.random().toString()
@@ -253,8 +253,8 @@ class SyncMetadataServiceTest {
             service.enqueuePending(entityId, EntityType.NOTE, PendingOperation.CREATE)
             service.enqueuePending(entityId, EntityType.NOTE, PendingOperation.DELETE)
 
-            assertTrue(service.getPendingUploads(EntityType.NOTE).isEmpty())
-            assertEquals(0, service.getPendingCount())
+            assertEquals(PendingOperation.DELETE, service.getPendingUploads(EntityType.NOTE).single().operation)
+            assertEquals(1, service.getPendingCount())
         }
 
     @Test
@@ -267,7 +267,7 @@ class SyncMetadataServiceTest {
                 Triple(null, PendingOperation.DELETE, PendingOperation.DELETE),
                 Triple(PendingOperation.CREATE, PendingOperation.CREATE, PendingOperation.CREATE),
                 Triple(PendingOperation.CREATE, PendingOperation.UPDATE, PendingOperation.CREATE),
-                Triple(PendingOperation.CREATE, PendingOperation.DELETE, null),
+                Triple(PendingOperation.CREATE, PendingOperation.DELETE, PendingOperation.DELETE),
                 Triple(PendingOperation.UPDATE, PendingOperation.CREATE, PendingOperation.CREATE),
                 Triple(PendingOperation.UPDATE, PendingOperation.UPDATE, PendingOperation.UPDATE),
                 Triple(PendingOperation.UPDATE, PendingOperation.DELETE, PendingOperation.DELETE),

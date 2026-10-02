@@ -136,6 +136,11 @@ class OfflineFirstJournalRepository(
             draftRepository.getAllDrafts()
         }
 
+    override suspend fun getAllDraftsForSync(): List<EditorDraft> =
+        withContext(dispatcher) {
+            draftRepository.getAllDraftsForSync()
+        }
+
     override suspend fun getDraft(id: Uuid): EditorDraft? =
         withContext(dispatcher) {
             draftRepository.getDraft(id)
@@ -154,7 +159,7 @@ class OfflineFirstJournalRepository(
 
     override suspend fun saveDraftFromSync(draft: EditorDraft) =
         withContext(dispatcher) {
-            draftRepository.saveDraft(draft)
+            draftRepository.saveDraftFromSync(draft)
         }
 
     override suspend fun deleteDraftFromSync(id: Uuid) =

@@ -326,9 +326,9 @@ class CloudAccountOnboardingViewModelTest {
 
         override suspend fun hasValidSession(): Boolean = false
 
-        override fun saveSession(session: UserSession) {}
+        override suspend fun saveSession(session: UserSession) {}
 
-        override fun clearSession() {}
+        override suspend fun clearSession() {}
     }
 
     private class FakePasskeyManager : PasskeyManager {

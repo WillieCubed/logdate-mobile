@@ -2,6 +2,7 @@ package app.logdate.client.sync.metadata
 
 import app.logdate.client.datastore.KeyValueStorage
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +25,9 @@ data class SyncDeadLetterRecord(
     val lastError: String,
     val failedAt: Long,
     val reason: SyncDeadLetterReason = SyncDeadLetterReason.UNKNOWN,
+    val scope: UploadScope? = null,
+    val operationId: String? = null,
+    val expectedServerVersion: Long? = null,
 )
 
 @Serializable
@@ -84,7 +88,7 @@ class KeyValueSyncDeadLetterStore(
     override suspend fun list(): List<SyncDeadLetterRecord> = ensureLoaded()
 
     override suspend fun add(record: SyncDeadLetterRecord) {
-        mutate { current -> current.filterNot { it.id == record.id } + record }
+        mutate { current -> current.filterNot { it.id == record.id } + record.sanitized() }
     }
 
     override suspend fun remove(id: String) {
@@ -96,12 +100,21 @@ class KeyValueSyncDeadLetterStore(
             storage.remove(DEAD_LETTER_KEY)
             recordsFlow.value = emptyList()
             loaded = true
+            corrupted = false
         }
     }
 
     private suspend fun mutate(update: (List<SyncDeadLetterRecord>) -> List<SyncDeadLetterRecord>) {
         mutex.withLock {
-            val current = if (loaded) recordsFlow.value else readFromStorage().also { loaded = true }
+            val current =
+                if (loaded) {
+                    recordsFlow.value
+                } else {
+                    readFromStorage().also {
+                        recordsFlow.value = it
+                        loaded = true
+                    }
+                }
             if (corrupted) {
                 Napier.w("Refusing to overwrite an undecodable dead-letter store")
                 return
@@ -123,15 +136,32 @@ class KeyValueSyncDeadLetterStore(
 
     private suspend fun readFromStorage(): List<SyncDeadLetterRecord> {
         val raw = storage.getString(DEAD_LETTER_KEY) ?: return emptyList()
-        return runCatching { json.decodeFromString<List<SyncDeadLetterRecord>>(raw) }
-            .getOrElse { error ->
-                // Reading an unparseable blob as "no records" is not harmless: the next write
-                // persists that empty list and destroys every record of what failed -- the one
-                // thing that could explain a queue that will not drain. Keep the raw blob.
-                Napier.e("Sync dead-letter store could not be decoded; preserving it unread", error)
+        val records =
+            try {
+                json.decodeFromString<List<SyncDeadLetterRecord>>(raw)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                Napier.e("Sync dead-letter store could not be decoded; preserving it unread")
                 corrupted = true
-                emptyList()
+                return emptyList()
             }
+        val sanitized = records.map { it.sanitized() }
+        if (sanitized != records) {
+            try {
+                storage.putString(DEAD_LETTER_KEY, json.encodeToString(sanitized))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                Napier.w("Dead-letter privacy migration will retry on the next write")
+            }
+        }
+        return sanitized
+    }
+
+    private fun SyncDeadLetterRecord.sanitized(): SyncDeadLetterRecord {
+        val category = effectiveReason()
+        return copy(lastError = category.name, reason = category)
     }
 
     private companion object {

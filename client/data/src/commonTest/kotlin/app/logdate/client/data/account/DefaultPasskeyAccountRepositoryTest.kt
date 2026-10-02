@@ -1398,12 +1398,12 @@ class DefaultPasskeyAccountRepositoryTest {
 
         override suspend fun hasValidSession(): Boolean = session != null
 
-        override fun saveSession(session: UserSession) {
+        override suspend fun saveSession(session: UserSession) {
             this.session = session
             sessionFlow.value = session
         }
 
-        override fun clearSession() {
+        override suspend fun clearSession() {
             session = null
             sessionFlow.value = null
         }

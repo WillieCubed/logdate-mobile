@@ -65,7 +65,7 @@ class HttpClientLoggingTest {
             }
 
             val logged = antilog.messages.joinToString("\n")
-            assertTrue(logged.contains("https://api.logdate.test/media"), "The request itself should still be logged")
+            assertFalse(logged.contains("https://api.logdate.test/media"), "Server origins must not be logged")
             assertFalse(logged.contains(marker), "Request bodies must not be logged")
             assertTrue(logged.length < PAYLOAD_SIZE, "Logged ${logged.length} chars for a $PAYLOAD_SIZE-byte upload")
         }
@@ -89,8 +89,22 @@ class HttpClientLoggingTest {
             }
 
             val logged = antilog.messages.joinToString("\n")
-            assertTrue(logged.contains(HttpHeaders.Authorization), "The header name should still be logged")
+            assertFalse(logged.contains("Bearer"), "Credential-bearing headers must not be logged")
             assertFalse(logged.contains("secret-access-token"), "Access tokens must not be logged")
+        }
+
+    @Test
+    fun `URLs cookies and server errors never enter HTTP logs`() =
+        runTest {
+            client().post("https://private-host.test/media/private-record?signature=private-signature") {
+                headers {
+                    append(HttpHeaders.Cookie, "session=private-cookie")
+                    append("X-Api-Key", "private-api-key")
+                }
+                setBody("private-body")
+            }
+            val logged = antilog.messages.joinToString("\n")
+            assertFalse(logged.contains("private-"), logged)
         }
 
     private fun client(): HttpClient =

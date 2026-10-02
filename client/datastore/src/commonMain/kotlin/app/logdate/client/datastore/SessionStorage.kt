@@ -28,6 +28,12 @@ data class UserSession(
     val accountId: String,
 )
 
+/** An atomic credential snapshot; the origin must travel with the session, never be inferred later. */
+data class OriginBoundSession(
+    val origin: String,
+    val session: UserSession,
+)
+
 /**
  * Interface for session storage
  */
@@ -36,6 +42,15 @@ interface SessionStorage {
      * Gets the current session synchronously from the latest cached value.
      */
     fun getSession(): UserSession?
+
+    /** Implementations without origin provenance cannot authorize destination-bound requests. */
+    fun getOriginBoundSession(): OriginBoundSession? = null
+
+    /** Conditional refresh must persist to the captured origin, even if configuration changes next. */
+    suspend fun replaceSessionIfCurrent(
+        expected: OriginBoundSession,
+        updated: UserSession,
+    ): Boolean = false
 
     /**
      * Observes session changes as a Flow.
@@ -51,12 +66,12 @@ interface SessionStorage {
     /**
      * Saves a new session.
      */
-    fun saveSession(session: UserSession)
+    suspend fun saveSession(session: UserSession)
 
     /**
      * Clears the current session.
      */
-    fun clearSession()
+    suspend fun clearSession()
 }
 
 /**
@@ -99,7 +114,7 @@ class DataStoreSessionStorage(
 
     override fun getSession(): UserSession? = sessionState.value
 
-    override fun saveSession(session: UserSession) {
+    override suspend fun saveSession(session: UserSession) {
         sessionState.value = session
         val backendUrl = configRepository.getCurrentBackendUrl()
         scope.launch {
@@ -111,7 +126,7 @@ class DataStoreSessionStorage(
         }
     }
 
-    override fun clearSession() {
+    override suspend fun clearSession() {
         sessionState.value = null
         val backendUrl = configRepository.getCurrentBackendUrl()
         scope.launch {

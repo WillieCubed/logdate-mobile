@@ -1,5 +1,14 @@
 package app.logdate.client.sync.metadata
 
+import kotlinx.serialization.Serializable
+
+/** Operational ownership is never copied into diagnostic events. */
+@Serializable
+data class UploadScope(
+    val ownerId: String,
+    val serverOrigin: String,
+)
+
 /**
  * Represents a pending sync operation for an entity.
  */
@@ -7,6 +16,9 @@ data class PendingUpload(
     val entityId: String,
     val operation: PendingOperation,
     val retryCount: Int = 0,
+    val expectedServerVersion: Long? = null,
+    val scope: UploadScope? = null,
+    val operationId: String? = null,
 )
 
 /**
@@ -20,6 +32,8 @@ data class QueuedUpload(
     val entityId: String,
     val operation: PendingOperation,
     val retryCount: Int,
+    val scope: UploadScope? = null,
+    val operationId: String? = null,
 )
 
 /**
@@ -36,9 +50,7 @@ enum class PendingOperation {
 
         /**
          * Collapse the queued op for an entity given an [existing] outbox state and an [incoming]
-         * write. Returns the operation that should be persisted, or `null` to indicate the
-         * pending entry should be removed entirely (e.g. CREATE followed by DELETE never needs
-         * to round-trip through the server).
+         * write. A deletion remains queued because a create may already be in flight.
          */
         fun coalesce(
             existing: PendingOperation?,
@@ -49,7 +61,7 @@ enum class PendingOperation {
                 CREATE ->
                     when (incoming) {
                         CREATE, UPDATE -> CREATE
-                        DELETE -> null
+                        DELETE -> DELETE
                     }
                 UPDATE ->
                     when (incoming) {
@@ -65,3 +77,20 @@ enum class PendingOperation {
             }
     }
 }
+
+/** Scope and operation identity stay captured across suspending work. */
+internal fun PendingUpload.isSameOperation(other: PendingUpload): Boolean =
+    entityId == other.entityId &&
+        scope == other.scope &&
+        operationId == other.operationId &&
+        operation == other.operation &&
+        expectedServerVersion == other.expectedServerVersion
+
+internal fun PendingUpload.retryKey(): String =
+    if (operationId == null) {
+        entityId
+    } else {
+        val owner = scope?.ownerId.orEmpty()
+        val origin = scope?.serverOrigin.orEmpty()
+        "operation:${owner.length}:$owner:${origin.length}:$origin:$operationId"
+    }

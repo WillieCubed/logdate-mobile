@@ -95,8 +95,8 @@ class VerifyEmailUseCaseTest {
 
         override suspend fun hasValidSession(): Boolean = session != null
 
-        override fun saveSession(session: UserSession) = Unit
+        override suspend fun saveSession(session: UserSession) = Unit
 
-        override fun clearSession() = Unit
+        override suspend fun clearSession() = Unit
     }
 }

@@ -13,7 +13,6 @@ import app.logdate.shared.config.PinnedLogDateConfigRepository
 import app.logdate.shared.model.PasskeyAuthenticationOptions
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.ServerDescriptor
-import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +21,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 
 /**
  * An account on one particular server, reached without changing which server the app is
@@ -122,18 +120,14 @@ internal class OriginPinnedSessionStorage(
 
     override suspend fun hasValidSession(): Boolean = state.value != null
 
-    override fun saveSession(session: UserSession) {
+    override suspend fun saveSession(session: UserSession) {
+        vault.write(origin, session)
         state.value = session
-        scope.launch {
-            runCatching { vault.write(origin, session) }.onFailure { Napier.e("Failed to save the sign-in for $origin", it) }
-        }
     }
 
-    override fun clearSession() {
+    override suspend fun clearSession() {
+        vault.clear(origin)
         state.value = null
-        scope.launch {
-            runCatching { vault.clear(origin) }.onFailure { Napier.e("Failed to clear the sign-in for $origin", it) }
-        }
     }
 }
 

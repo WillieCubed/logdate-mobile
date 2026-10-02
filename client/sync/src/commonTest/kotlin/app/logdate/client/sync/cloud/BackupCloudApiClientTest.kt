@@ -15,14 +15,110 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.buffered
+import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
+import kotlinx.io.files.SystemTemporaryDirectory
+import kotlinx.io.readByteArray
+import kotlinx.io.write
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.uuid.Uuid
 
 class BackupCloudApiClientTest {
     private val baseUrl = "https://api.logdate.example.com/api/v1"
+
+    @Test
+    fun `file upload sends authenticated multipart without reading archive into model`() =
+        runTest {
+            val path = Path(SystemTemporaryDirectory, "backup-upload-${Uuid.random()}.bin")
+            try {
+                SystemFileSystem.sink(path).buffered().use { it.write(byteArrayOf(1, 2, 3)) }
+                val client =
+                    createClient(
+                        MockEngine { request ->
+                            assertEquals("Bearer access-token", request.headers[HttpHeaders.Authorization])
+                            assertTrue(request.body is MultiPartFormDataContent)
+                            respond(
+                                """{"id":"backup-1","createdAt":1234,"sizeBytes":3}""",
+                                HttpStatusCode.Created,
+                                headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                            )
+                        },
+                    )
+                val result = client.uploadBackupFile("access-token", BackupUploadFileRequest("device-1", "{}", path, 3)).getOrThrow()
+                assertEquals(3, result.sizeBytes)
+            } finally {
+                SystemFileSystem.delete(path)
+            }
+        }
+
+    @Test
+    fun `file download streams authenticated binary into destination`() =
+        runTest {
+            val path = Path(SystemTemporaryDirectory, "backup-download-${Uuid.random()}.bin")
+            try {
+                var requests = 0
+                val client =
+                    createClient(
+                        MockEngine { request ->
+                            requests++
+                            assertEquals("Bearer access-token", request.headers[HttpHeaders.Authorization])
+                            if (requests ==
+                                1
+                            ) {
+                                respond(
+                                    """{"id":"backup-1","deviceId":"device-1","manifest":"{}","createdAt":1234,"sizeBytes":3,"downloadUrl":"/api/v1/backups/backup-1/binary"}""",
+                                    HttpStatusCode.OK,
+                                    headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                                )
+                            } else {
+                                respond(
+                                    byteArrayOf(4, 5, 6),
+                                    HttpStatusCode.OK,
+                                    headersOf(HttpHeaders.ContentType, ContentType.Application.OctetStream.toString()),
+                                )
+                            }
+                        },
+                    )
+                val result = client.downloadBackupToFile("access-token", "backup-1", path).getOrThrow()
+                assertEquals("device-1", result.deviceId)
+                assertContentEquals(byteArrayOf(4, 5, 6), SystemFileSystem.source(path).buffered().use { it.readByteArray() })
+            } finally {
+                if (SystemFileSystem.exists(path)) SystemFileSystem.delete(path)
+            }
+        }
+
+    @Test
+    fun `cancelled file download removes incomplete destination`() =
+        runTest {
+            val path = Path(SystemTemporaryDirectory, "backup-cancelled-${Uuid.random()}.bin")
+            var requests = 0
+            val client =
+                createClient(
+                    MockEngine {
+                        requests++
+                        if (requests ==
+                            1
+                        ) {
+                            respond(
+                                """{"id":"backup-1","deviceId":"device-1","manifest":"{}","createdAt":1234,"sizeBytes":3,"downloadUrl":"/api/v1/backups/backup-1/binary"}""",
+                                HttpStatusCode.OK,
+                                headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                            )
+                        } else {
+                            throw CancellationException("download cancelled")
+                        }
+                    },
+                )
+            assertFailsWith<CancellationException> { client.downloadBackupToFile("access-token", "backup-1", path) }
+            assertTrue(!SystemFileSystem.exists(path))
+        }
 
     @Test
     fun `upload backup sends authenticated multipart payload`() =

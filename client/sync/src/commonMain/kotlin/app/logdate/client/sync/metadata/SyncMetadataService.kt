@@ -15,6 +15,11 @@ interface SyncMetadataService {
      */
     suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload>
 
+    suspend fun hasPending(
+        entityType: EntityType,
+        entityId: String,
+    ): Boolean = getPendingUploads(entityType).any { it.entityId == entityId }
+
     /**
      * Marks an entity as successfully synced by removing it from the pending queue.
      */
@@ -24,6 +29,32 @@ interface SyncMetadataService {
         syncedAt: Instant,
         version: Long,
     )
+
+    /** Settle the captured operation only; a later local mutation remains queued. */
+    suspend fun settleIfCurrent(
+        entityType: EntityType,
+        pending: PendingUpload,
+        syncedAt: Instant,
+        version: Long,
+    ): Boolean {
+        if (!isCurrentOperation(entityType, pending)) return false
+        markAsSynced(pending.entityId, entityType, syncedAt, version)
+        return true
+    }
+
+    suspend fun isCurrentOperation(
+        entityType: EntityType,
+        pending: PendingUpload,
+    ): Boolean = getPendingUploads(entityType).any { pending.isSameOperation(it) }
+
+    suspend fun incrementRetryIfCurrent(
+        entityType: EntityType,
+        pending: PendingUpload,
+    ): Boolean {
+        if (!isCurrentOperation(entityType, pending)) return false
+        incrementRetryCount(pending.entityId, entityType)
+        return true
+    }
 
     /**
      * Gets the last sync time for a specific entity type.
@@ -46,6 +77,17 @@ interface SyncMetadataService {
         entityType: EntityType,
         operation: PendingOperation,
     )
+
+    /** Enqueues recovery of a surviving local copy without replacing a user mutation. */
+    suspend fun enqueueRepairIfAbsent(
+        entityId: String,
+        entityType: EntityType,
+        expectedServerVersion: Long? = null,
+        serverOrigin: String? = null,
+    ) {
+        check(expectedServerVersion == null) { "Versioned repair requires durable metadata" }
+        if (!hasPending(entityType, entityId)) enqueuePending(entityId, entityType, PendingOperation.UPDATE)
+    }
 
     /**
      * Resets sync metadata for an entity (forces re-sync).

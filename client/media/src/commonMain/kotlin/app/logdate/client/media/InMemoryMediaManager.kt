@@ -10,6 +10,7 @@ import kotlin.time.Instant
  */
 open class InMemoryMediaManager : MediaManager {
     private val deletedOwnedMedia = mutableSetOf<String>()
+    private val payloads = mutableMapOf<String, MediaPayload>()
 
     /** The URIs [deleteOwnedMedia] was asked to remove, in call order. */
     val deletedOwnedMediaUris: Set<String> get() = deletedOwnedMedia
@@ -23,9 +24,12 @@ open class InMemoryMediaManager : MediaManager {
             duration = 30.seconds,
         )
 
-    override suspend fun deleteOwnedMedia(uri: String): Boolean = deletedOwnedMedia.add(uri)
+    override suspend fun deleteOwnedMedia(uri: String): Boolean {
+        payloads.remove(uri)
+        return deletedOwnedMedia.add(uri)
+    }
 
-    override suspend fun exists(mediaId: String): Boolean = false
+    override suspend fun exists(mediaId: String): Boolean = payloads.containsKey(mediaId)
 
     override suspend fun getRecentMedia(limit: Int): Flow<List<MediaObject>> = flowOf(emptyList())
 
@@ -38,14 +42,18 @@ open class InMemoryMediaManager : MediaManager {
     }
 
     override suspend fun readMedia(uri: String): MediaPayload =
-        MediaPayload(
+        payloads[uri] ?: MediaPayload(
             fileName = "memory.bin",
             mimeType = "application/octet-stream",
             sizeBytes = 0,
             data = ByteArray(0),
         )
 
-    override suspend fun saveMedia(payload: MediaPayload): String = "file:///tmp/${payload.fileName}"
+    override suspend fun saveMedia(payload: MediaPayload): String {
+        val uri = "file:///tmp/${payload.fileName}"
+        payloads[uri] = payload.copy(data = payload.data.copyOf())
+        return uri
+    }
 
     override suspend fun saveMediaFromFile(
         sourceFilePath: String,

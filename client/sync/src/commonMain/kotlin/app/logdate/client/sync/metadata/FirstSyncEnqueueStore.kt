@@ -19,15 +19,38 @@ interface FirstSyncEnqueueStore {
 
     /** Marks [entityType]'s sweep complete. Call only after it actually finished without error. */
     suspend fun markEnqueued(entityType: EntityType)
+
+    suspend fun hasEnqueuedDraftScope(
+        ownerId: String,
+        serverOrigin: String,
+    ): Boolean
+
+    suspend fun markEnqueuedDraftScope(
+        ownerId: String,
+        serverOrigin: String,
+    )
 }
 
 class InMemoryFirstSyncEnqueueStore : FirstSyncEnqueueStore {
     private val enqueued = mutableSetOf<EntityType>()
+    private val draftScopes = mutableSetOf<Pair<String, String>>()
 
     override suspend fun hasEnqueued(entityType: EntityType): Boolean = entityType in enqueued
 
     override suspend fun markEnqueued(entityType: EntityType) {
         enqueued += entityType
+    }
+
+    override suspend fun hasEnqueuedDraftScope(
+        ownerId: String,
+        serverOrigin: String,
+    ): Boolean = (ownerId to serverOrigin) in draftScopes
+
+    override suspend fun markEnqueuedDraftScope(
+        ownerId: String,
+        serverOrigin: String,
+    ) {
+        draftScopes += ownerId to serverOrigin
     }
 }
 
@@ -40,7 +63,24 @@ class KeyValueFirstSyncEnqueueStore(
         storage.putBoolean(key(entityType), true)
     }
 
+    override suspend fun hasEnqueuedDraftScope(
+        ownerId: String,
+        serverOrigin: String,
+    ): Boolean = storage.getBoolean(draftKey(ownerId, serverOrigin), false)
+
+    override suspend fun markEnqueuedDraftScope(
+        ownerId: String,
+        serverOrigin: String,
+    ) {
+        storage.putBoolean(draftKey(ownerId, serverOrigin), true)
+    }
+
     private fun key(entityType: EntityType) = "$KEY_PREFIX${entityType.name}"
+
+    private fun draftKey(
+        ownerId: String,
+        serverOrigin: String,
+    ): String = "${KEY_PREFIX}DRAFT_${ownerId.length}:$ownerId:${serverOrigin.length}:$serverOrigin"
 
     private companion object {
         const val KEY_PREFIX = "sync_first_enqueue_done_"

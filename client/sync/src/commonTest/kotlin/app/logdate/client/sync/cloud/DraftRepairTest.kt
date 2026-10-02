@@ -75,12 +75,13 @@ class DraftRepairTest {
             metadata.clearPending()
             val manager: DefaultSyncManager =
                 testDefaultSyncManager(
-                    cloudDraftDataSource = DefaultCloudDraftDataSource(api, currentKey),
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(api, currentKey, supportsRichDrafts = { true }),
                     journalRepository = journalRepository,
                     syncMetadataService = metadata,
+                    supportsRichDrafts = { true },
                 )
 
-            // syncDrafts() downloads (which repairs by enqueueing a CREATE) and then uploads
+            // syncDrafts() downloads (which repairs by enqueueing an UPDATE) and then uploads
             // (which drains that same queue) in one call, so the queue itself is empty again by
             // the time this returns -- the upload the repair caused is what proves it happened.
             manager.syncDrafts()

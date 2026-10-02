@@ -67,7 +67,7 @@ class AndroidLogDateSyncWorker(
             // fatal (the permission may be denied); the sync just goes back to being cancellable.
             val promoted =
                 runCatching { setForeground(getForegroundInfo()) }
-                    .onFailure { Napier.w("Backup running without a foreground notification", it) }
+                    .onFailure { Napier.w("Backup running without a foreground notification") }
                     .isSuccess
 
             val syncType = inputData.getString(KEY_SYNC_TYPE) ?: SYNC_TYPE_FULL
@@ -83,8 +83,7 @@ class AndroidLogDateSyncWorker(
                 Napier.i("Sync completed successfully: $uploaded uploaded, $downloaded downloaded, $conflicts conflicts resolved")
                 Result.success()
             } else {
-                val errorMessages = result.errors.joinToString { it.message }
-                Napier.w("Sync failed: $errorMessages")
+                Napier.w("Sync did not complete")
 
                 // Retry on transient errors, fail permanently on auth errors
                 val hasAuthError = result.errors.any { it.type == SyncErrorType.AUTHENTICATION_ERROR }
@@ -101,7 +100,7 @@ class AndroidLogDateSyncWorker(
             // being reported as a retry and accidentally resurrected by the scheduler.
             throw e
         } catch (e: Exception) {
-            Napier.e("Unexpected error in sync worker", e)
+            Napier.e("Unexpected error in sync worker")
             Result.retry()
         }
 
@@ -120,7 +119,7 @@ class AndroidLogDateSyncWorker(
                 syncManager.fullSync()
             }
             else -> {
-                Napier.w("Unknown sync type: $syncType, defaulting to full sync")
+                Napier.w("Unknown sync type, defaulting to full sync")
                 syncManager.fullSync()
             }
         }
@@ -160,7 +159,7 @@ class AndroidLogDateSyncWorker(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Napier.w("Could not show backup progress in the notification", e)
+            Napier.w("Could not show backup progress in the notification")
             false
         }
 
@@ -272,7 +271,7 @@ class AndroidSyncManager(
 
         // Only retry if last error was transient (not auth)
         if (lastError != null && lastError.type != SyncErrorType.AUTHENTICATION_ERROR) {
-            Napier.d("Previous sync failed transiently (${lastError.type}), triggering immediate retry after network restoration")
+            Napier.d("Retrying after network restoration")
             scheduleImmediateSync(AndroidLogDateSyncWorker.SYNC_TYPE_FULL)
         } else if (lastError == null) {
             Napier.d("No previous sync error or last sync succeeded, skipping retry")
@@ -285,7 +284,7 @@ class AndroidSyncManager(
         if (startNow) {
             scope.launch {
                 runCatching { requestBackup() }
-                    .onFailure { Napier.e("Could not request a manual backup", it) }
+                    .onFailure { Napier.e("Could not request a manual backup") }
             }
         } else {
             // The auth/policy observer above owns the periodic schedule.
@@ -307,7 +306,7 @@ class AndroidSyncManager(
      */
     private suspend fun backUpNow(): Operation {
         runCatching { defaultSyncManager.releaseUploadBackoff() }
-            .onFailure { Napier.e("Could not release upload backoff for a manual backup", it) }
+            .onFailure { Napier.e("Could not release upload backoff for a manual backup") }
         val running =
             runCatching {
                 workManager
@@ -360,7 +359,7 @@ class AndroidSyncManager(
                 policy,
                 request,
             )
-        Napier.d("Scheduled immediate sync: $syncType")
+        Napier.d("Scheduled immediate sync")
         return operation
     }
 
@@ -415,7 +414,7 @@ class AndroidSyncManager(
             periodicRequest,
         )
 
-        Napier.d("Setup periodic sync work (networkType=$networkType)")
+        Napier.d("Scheduled periodic sync")
     }
 
     /**

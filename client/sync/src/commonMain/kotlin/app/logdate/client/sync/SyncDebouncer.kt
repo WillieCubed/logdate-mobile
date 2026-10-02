@@ -40,7 +40,7 @@ class SyncDebouncer(
                 .debounce(debounceWindow)
                 .collect {
                     runCatching { action() }
-                        .onFailure { Napier.w("SyncDebouncer action failed", it) }
+                        .onFailure { Napier.w("SyncDebouncer action failed") }
                 }
         }
     }

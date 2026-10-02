@@ -3,6 +3,7 @@ package app.logdate.client.sync
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.shouldSyncMedia
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
@@ -13,16 +14,14 @@ import app.logdate.client.sync.cloud.CloudAssociationDataSource
 import app.logdate.client.sync.cloud.CloudContentDataSource
 import app.logdate.client.sync.cloud.CloudDraftDataSource
 import app.logdate.client.sync.cloud.CloudJournalDataSource
-import app.logdate.client.sync.cloud.JournalContentAssociation
 import app.logdate.client.sync.cloud.MediaTooLargeException
-import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.FirstSyncEnqueueStore
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncMetadataService
-import app.logdate.shared.model.sync.DeviceId
+import app.logdate.client.sync.recovery.DownloadScope
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.first
 import kotlin.coroutines.cancellation.CancellationException
@@ -47,12 +46,12 @@ internal class SyncUploader(
     private val journalNotesRepository: JournalNotesRepository,
     private val cloudJournalDataSource: CloudJournalDataSource,
     private val cloudContentDataSource: CloudContentDataSource,
-    private val cloudAssociationDataSource: CloudAssociationDataSource,
-    private val cloudDraftDataSource: CloudDraftDataSource,
+    cloudAssociationDataSource: CloudAssociationDataSource,
+    cloudDraftDataSource: CloudDraftDataSource,
     private val mediaSyncRefStore: MediaSyncRefStore,
     private val syncMetadataService: SyncMetadataService,
     private val dataUsagePolicy: DataUsagePolicy,
-    private val deviceIdProvider: DeviceIdProvider?,
+    deviceIdProvider: DeviceIdProvider?,
     private val tokenRefresher: SyncTokenRefresher,
     private val mediaTransfer: SyncMediaTransfer,
     private val retryCoordinator: SyncRetryCoordinator,
@@ -61,14 +60,32 @@ internal class SyncUploader(
     private val mapException: (Exception, String) -> SyncResult,
     private val recordProgress: (Int) -> Unit,
     private val setMediaDeferredForNetwork: (Boolean) -> Unit,
+    supportsRichDrafts: () -> Boolean = { false },
+    draftRepairScope: () -> DownloadScope? = { null },
 ) {
-    /**
-     * Drops entries still inside their retry backoff before callers decide whether there is any
-     * work. Dead-lettered entries stay queued indefinitely, so without this an entry that can
-     * never upload keeps every sync run loading a whole table to do nothing with.
-     */
-    private suspend fun List<PendingUpload>.dueNow(entityType: EntityType): List<PendingUpload> =
-        filter { retryCoordinator.shouldAttempt(entityType, it.entityId) }
+    private val associationUploader =
+        AssociationUploader(
+            cloudAssociationDataSource = cloudAssociationDataSource,
+            syncMetadataService = syncMetadataService,
+            tokenRefresher = tokenRefresher,
+            retryCoordinator = retryCoordinator,
+            recordProgress = recordProgress,
+        )
+
+    private val draftUploader =
+        DraftUploader(
+            journalRepository = journalRepository,
+            cloudDraftDataSource = cloudDraftDataSource,
+            syncMetadataService = syncMetadataService,
+            deviceIdProvider = deviceIdProvider,
+            tokenRefresher = tokenRefresher,
+            mediaTransfer = mediaTransfer,
+            retryCoordinator = retryCoordinator,
+            firstSyncEnqueueStore = firstSyncEnqueueStore,
+            recordProgress = recordProgress,
+            supportsRichDrafts = supportsRichDrafts,
+            draftRepairScope = draftRepairScope,
+        )
 
     /**
      * Runs one upload pass, reporting an unexpected failure as a [SyncResult] for [operation]. A pass
@@ -94,7 +111,7 @@ internal class SyncUploader(
         return uploadPass("Upload journals") {
             var uploadedCount = 0
             val errors = mutableListOf<SyncError>()
-            val pendingUploads = syncMetadataService.getPendingUploads(EntityType.JOURNAL).dueNow(EntityType.JOURNAL)
+            val pendingUploads = syncMetadataService.getPendingUploads(EntityType.JOURNAL).dueNow(EntityType.JOURNAL, retryCoordinator)
             if (pendingUploads.isEmpty()) {
                 return SyncResult(success = true, uploadedItems = 0)
             }
@@ -108,7 +125,7 @@ internal class SyncUploader(
             for (pending in pendingUploads) {
                 val journalId = runCatching { Uuid.parse(pending.entityId) }.getOrNull()
                 if (journalId == null) {
-                    errors.add(retryCoordinator.recordUnparsableOutboxEntry(EntityType.JOURNAL, pending.entityId, "journal ID"))
+                    errors.add(retryCoordinator.recordUnparsableOutboxEntry(EntityType.JOURNAL, pending, "journal ID"))
                     continue
                 }
 
@@ -119,12 +136,13 @@ internal class SyncUploader(
                             tokenRefresher.withFreshToken(
                                 { token -> cloudJournalDataSource.deleteJournal(token, journalId) },
                                 "deleteJournal($journalId)",
+                                expectedScope = pending.scope,
                             )
                         if (result.isSuccess) {
                             uploadedCount++
                             recordProgress(1)
-                            retryCoordinator.markUploadSettled(EntityType.JOURNAL, pending.entityId, Clock.System.now(), 0L)
-                            Napier.d("Successfully deleted journal: $journalId")
+                            retryCoordinator.markUploadSettled(EntityType.JOURNAL, pending, Clock.System.now(), 0L)
+                            Napier.d("Deleted journal")
                         } else {
                             val error = result.exceptionOrNull() ?: Exception("Unknown delete error")
                             val movedToDeadLetter =
@@ -141,7 +159,7 @@ internal class SyncUploader(
                                     retryable = !movedToDeadLetter,
                                 ),
                             )
-                            Napier.w("Failed to delete journal $journalId", error)
+                            Napier.w("Failed to delete journal")
                             if (movedToDeadLetter) {
                                 continue
                             }
@@ -155,10 +173,10 @@ internal class SyncUploader(
                             // Queued for upload but absent locally. Settling it is right -- there is
                             // nothing left to send -- but it must not happen silently: the entry
                             // never reached the server and this is the only trace it existed.
-                            Napier.w("Dropping queued journal ${pending.entityId}: no longer present locally")
-                            syncMetadataService.markAsSynced(
-                                pending.entityId,
+                            Napier.w("Dropping queued journal: no longer present locally")
+                            retryCoordinator.markUploadSettled(
                                 EntityType.JOURNAL,
+                                pending,
                                 Clock.System.now(),
                                 0L,
                             )
@@ -171,11 +189,21 @@ internal class SyncUploader(
                                 tokenRefresher.withFreshToken(
                                     { token -> cloudJournalDataSource.uploadJournal(token, journal) },
                                     "uploadJournal(${journal.id})",
+                                    expectedScope = pending.scope,
                                 )
                             } else {
                                 tokenRefresher.withFreshToken(
-                                    { token -> cloudJournalDataSource.updateJournal(token, journal) },
+                                    { token ->
+                                        cloudJournalDataSource.updateJournal(
+                                            token,
+                                            journal.copy(
+                                                syncVersion =
+                                                    pending.expectedServerVersion ?: journal.syncVersion,
+                                            ),
+                                        )
+                                    },
                                     "updateJournal(${journal.id})",
+                                    expectedScope = pending.scope,
                                 )
                             }
 
@@ -184,15 +212,15 @@ internal class SyncUploader(
                             uploadedCount++
                             recordProgress(1)
                             syncableRepository?.updateSyncMetadata(journalId, upload.serverVersion, upload.syncedAt)
-                            retryCoordinator.markUploadSettled(EntityType.JOURNAL, pending.entityId, upload.syncedAt, upload.serverVersion)
-                            Napier.d("Successfully uploaded journal: ${journal.id}")
+                            retryCoordinator.markUploadSettled(EntityType.JOURNAL, pending, upload.syncedAt, upload.serverVersion)
+                            Napier.d("Uploaded journal")
                         } else {
                             val error = result.exceptionOrNull() ?: Exception("Unknown upload error")
                             if ((error as? CloudApiException)?.statusCode == 409) {
                                 errors.add(
                                     retryCoordinator.handleUploadConflict(
                                         entityType = EntityType.JOURNAL,
-                                        entityId = journal.id.toString(),
+                                        pending = pending,
                                         itemLabel = "journal ${journal.id}",
                                         conflictLabel = "Journal",
                                         error = error,
@@ -220,7 +248,7 @@ internal class SyncUploader(
                                     retryable = !movedToDeadLetter,
                                 ),
                             )
-                            Napier.w("Failed to upload journal ${journal.id}", error)
+                            Napier.w("Failed to upload journal")
                             if (movedToDeadLetter) {
                                 continue
                             }
@@ -239,7 +267,7 @@ internal class SyncUploader(
             val errors = mutableListOf<SyncError>()
             setMediaDeferredForNetwork(false)
 
-            val pendingUploads = syncMetadataService.getPendingUploads(EntityType.NOTE).dueNow(EntityType.NOTE)
+            val pendingUploads = syncMetadataService.getPendingUploads(EntityType.NOTE).dueNow(EntityType.NOTE, retryCoordinator)
             if (pendingUploads.isEmpty()) {
                 return SyncResult(success = true, uploadedItems = 0)
             }
@@ -253,7 +281,7 @@ internal class SyncUploader(
             for (pending in pendingUploads) {
                 val noteId = runCatching { Uuid.parse(pending.entityId) }.getOrNull()
                 if (noteId == null) {
-                    errors.add(retryCoordinator.recordUnparsableOutboxEntry(EntityType.NOTE, pending.entityId, "note ID"))
+                    errors.add(retryCoordinator.recordUnparsableOutboxEntry(EntityType.NOTE, pending, "note ID"))
                     continue
                 }
 
@@ -264,6 +292,7 @@ internal class SyncUploader(
                             tokenRefresher.withFreshToken(
                                 { token -> cloudContentDataSource.deleteNote(token, noteId) },
                                 "deleteNote($noteId)",
+                                expectedScope = pending.scope,
                             )
                         if (result.isSuccess) {
                             uploadedCount++
@@ -272,9 +301,9 @@ internal class SyncUploader(
                             // stay pending so the next attempt retries the ref-store cleanup too,
                             // rather than being marked settled with a stale mediaSyncRefStore entry
                             // that nothing will ever clean up again.
-                            mediaSyncRefStore.delete(noteId)
-                            retryCoordinator.markUploadSettled(EntityType.NOTE, pending.entityId, Clock.System.now(), 0L)
-                            Napier.d("Successfully deleted content: $noteId")
+                            mediaSyncRefStore.deleteScoped(noteId, pending.scope)
+                            retryCoordinator.markUploadSettled(EntityType.NOTE, pending, Clock.System.now(), 0L)
+                            Napier.d("Deleted content")
                         } else {
                             val error = result.exceptionOrNull() ?: Exception("Unknown delete error")
                             val movedToDeadLetter =
@@ -291,7 +320,7 @@ internal class SyncUploader(
                                     retryable = !movedToDeadLetter,
                                 ),
                             )
-                            Napier.w("Failed to delete content $noteId", error)
+                            Napier.w("Failed to delete content")
                             if (movedToDeadLetter) {
                                 continue
                             }
@@ -302,10 +331,10 @@ internal class SyncUploader(
                     -> {
                         val note = notesById[pending.entityId]
                         if (note == null) {
-                            Napier.w("Dropping queued note ${pending.entityId}: no longer present locally")
-                            syncMetadataService.markAsSynced(
-                                pending.entityId,
+                            Napier.w("Dropping queued note: no longer present locally")
+                            retryCoordinator.markUploadSettled(
                                 EntityType.NOTE,
+                                pending,
                                 Clock.System.now(),
                                 0L,
                             )
@@ -315,14 +344,19 @@ internal class SyncUploader(
                         val needsMediaUpload = mediaRef != null && !mediaTransfer.isRemoteRef(mediaRef)
                         if (needsMediaUpload && !dataUsagePolicy.currentMode().shouldSyncMedia()) {
                             setMediaDeferredForNetwork(true)
-                            Napier.d("Deferring media upload for note ${note.uid} — data usage policy restricts media sync")
+                            Napier.d("Deferring media upload for note — data usage policy restricts media sync")
                             continue
                         }
 
                         if (!retryCoordinator.beginAttempt(EntityType.NOTE, pending, errors)) continue
                         val uploadReadyNote =
                             if (needsMediaUpload) {
-                                val mediaUpload = mediaTransfer.uploadIfNeeded(accessToken, note)
+                                val mediaUpload =
+                                    tokenRefresher.withFreshToken(
+                                        { token -> mediaTransfer.uploadIfNeeded(token, note) },
+                                        "uploadNoteMedia",
+                                        expectedScope = pending.scope,
+                                    )
                                 if (mediaUpload.isFailure) {
                                     val error =
                                         mediaUpload.exceptionOrNull()
@@ -354,7 +388,7 @@ internal class SyncUploader(
                                                         error is MissingMediaException &&
                                                             retryCoordinator.previousFailureWasMissingMedia(
                                                                 EntityType.NOTE,
-                                                                pending.entityId,
+                                                                pending,
                                                             )
                                                     ),
                                         )
@@ -375,7 +409,7 @@ internal class SyncUploader(
                                             retryable = !movedToDeadLetter,
                                         ),
                                     )
-                                    Napier.w("Skipping note ${note.uid} sync; media upload failed", error)
+                                    Napier.w("Skipping note sync; media upload failed")
                                     continue
                                 }
                                 mediaUpload.getOrThrow()
@@ -388,11 +422,18 @@ internal class SyncUploader(
                                 tokenRefresher.withFreshToken(
                                     { token -> cloudContentDataSource.uploadNote(token, uploadReadyNote) },
                                     "uploadNote(${note.uid})",
+                                    expectedScope = pending.scope,
                                 )
                             } else {
                                 tokenRefresher.withFreshToken(
-                                    { token -> cloudContentDataSource.updateNote(token, uploadReadyNote) },
+                                    { token ->
+                                        cloudContentDataSource.updateNote(
+                                            token,
+                                            uploadReadyNote.withRepairVersion(pending.expectedServerVersion),
+                                        )
+                                    },
                                     "updateNote(${note.uid})",
+                                    expectedScope = pending.scope,
                                 )
                             }
 
@@ -401,15 +442,15 @@ internal class SyncUploader(
                             uploadedCount++
                             recordProgress(1)
                             syncableRepository?.updateSyncMetadata(note, upload.serverVersion, upload.syncedAt)
-                            retryCoordinator.markUploadSettled(EntityType.NOTE, pending.entityId, upload.syncedAt, upload.serverVersion)
-                            Napier.d("Successfully uploaded content: ${note.uid}")
+                            retryCoordinator.markUploadSettled(EntityType.NOTE, pending, upload.syncedAt, upload.serverVersion)
+                            Napier.d("Uploaded content")
                         } else {
                             val error = result.exceptionOrNull() ?: Exception("Unknown upload error")
                             if ((error as? CloudApiException)?.statusCode == 409) {
                                 errors.add(
                                     retryCoordinator.handleUploadConflict(
                                         entityType = EntityType.NOTE,
-                                        entityId = note.uid.toString(),
+                                        pending = pending,
                                         itemLabel = "content ${note.uid}",
                                         conflictLabel = "Content",
                                         error = error,
@@ -437,7 +478,7 @@ internal class SyncUploader(
                                     retryable = !movedToDeadLetter,
                                 ),
                             )
-                            Napier.w("Failed to upload content ${note.uid}", error)
+                            Napier.w("Failed to upload content")
                             if (movedToDeadLetter) {
                                 continue
                             }
@@ -450,216 +491,10 @@ internal class SyncUploader(
         }
     }
 
-    suspend fun uploadAssociations(accessToken: String): SyncResult {
-        return uploadPass("Upload associations") {
-            var uploadedCount = 0
-            val errors = mutableListOf<SyncError>()
+    suspend fun uploadAssociations(accessToken: String): SyncResult =
+        uploadPass("Upload associations") { associationUploader.uploadPending() }
 
-            val pendingUploads = syncMetadataService.getPendingUploads(EntityType.ASSOCIATION)
-            if (pendingUploads.isEmpty()) {
-                return SyncResult(success = true, uploadedItems = 0)
-            }
-
-            val pendingById = pendingUploads.associateBy { it.entityId }
-            val createAssociations = mutableListOf<JournalContentAssociation>()
-            val createIds = mutableListOf<String>()
-            val deleteAssociations = mutableListOf<JournalContentAssociation>()
-            val deleteIds = mutableListOf<String>()
-
-            pendingUploads.forEach { pending ->
-                if (!retryCoordinator.shouldAttempt(EntityType.ASSOCIATION, pending.entityId)) {
-                    return@forEach
-                }
-                val key = AssociationPendingKey.fromPendingId(pending.entityId)
-                if (key == null) {
-                    errors.add(retryCoordinator.recordUnparsableOutboxEntry(EntityType.ASSOCIATION, pending.entityId, "association key"))
-                    return@forEach
-                }
-                if (!retryCoordinator.beginAttempt(EntityType.ASSOCIATION, pending, errors)) return@forEach
-
-                val association =
-                    JournalContentAssociation(
-                        journalId = key.journalId,
-                        contentId = key.contentId,
-                        createdAt = Clock.System.now(),
-                    )
-
-                when (pending.operation) {
-                    PendingOperation.DELETE -> {
-                        deleteAssociations.add(association)
-                        deleteIds.add(pending.entityId)
-                    }
-                    PendingOperation.CREATE,
-                    PendingOperation.UPDATE,
-                    -> {
-                        createAssociations.add(association)
-                        createIds.add(pending.entityId)
-                    }
-                }
-            }
-
-            if (createAssociations.isNotEmpty()) {
-                val result =
-                    tokenRefresher.withFreshToken(
-                        { token -> cloudAssociationDataSource.uploadAssociations(token, createAssociations) },
-                        "uploadAssociations(${createAssociations.size} items)",
-                    )
-                if (result.isSuccess) {
-                    val uploadedAt = result.getOrThrow()
-                    createIds.forEach { id -> retryCoordinator.markUploadSettled(EntityType.ASSOCIATION, id, uploadedAt, 0L) }
-                    uploadedCount += createAssociations.size
-                    recordProgress(createAssociations.size)
-                    Napier.d("Successfully uploaded associations: ${createAssociations.size}")
-                } else {
-                    val error = result.exceptionOrNull() ?: Exception("Unknown upload error")
-                    var movedToDeadLetter = false
-                    createIds.forEach { id ->
-                        val pending = pendingById[id] ?: return@forEach
-                        if (retryCoordinator.handleRetryFailure(EntityType.ASSOCIATION, pending, error)) {
-                            movedToDeadLetter = true
-                        }
-                    }
-                    errors.add(
-                        SyncError(
-                            SyncErrorType.SERVER_ERROR,
-                            "Failed to upload associations: ${error.message}",
-                            error,
-                            retryable = !movedToDeadLetter,
-                        ),
-                    )
-                    Napier.w("Failed to upload associations", error)
-                }
-            }
-
-            if (deleteAssociations.isNotEmpty()) {
-                val result =
-                    tokenRefresher.withFreshToken(
-                        { token -> cloudAssociationDataSource.deleteAssociations(token, deleteAssociations) },
-                        "deleteAssociations(${deleteAssociations.size} items)",
-                    )
-                if (result.isSuccess) {
-                    val deletedAt = Clock.System.now()
-                    deleteIds.forEach { id -> retryCoordinator.markUploadSettled(EntityType.ASSOCIATION, id, deletedAt, 0L) }
-                    uploadedCount += deleteAssociations.size
-                    recordProgress(deleteAssociations.size)
-                    Napier.d("Successfully deleted associations: ${deleteAssociations.size}")
-                } else {
-                    val error = result.exceptionOrNull() ?: Exception("Unknown delete error")
-                    var movedToDeadLetter = false
-                    deleteIds.forEach { id ->
-                        val pending = pendingById[id] ?: return@forEach
-                        if (retryCoordinator.handleRetryFailure(EntityType.ASSOCIATION, pending, error)) {
-                            movedToDeadLetter = true
-                        }
-                    }
-                    errors.add(
-                        SyncError(
-                            SyncErrorType.SERVER_ERROR,
-                            "Failed to delete associations: ${error.message}",
-                            error,
-                            retryable = !movedToDeadLetter,
-                        ),
-                    )
-                    Napier.w("Failed to delete associations", error)
-                }
-            }
-
-            SyncResult(success = errors.isEmpty(), uploadedItems = uploadedCount, errors = errors)
-        }
-    }
-
-    suspend fun uploadDrafts(accessToken: String): SyncResult {
-        return uploadPass("Upload drafts") {
-            var uploadedCount = 0
-            val errors = mutableListOf<SyncError>()
-            val pendingUploads = syncMetadataService.getPendingUploads(EntityType.DRAFT).dueNow(EntityType.DRAFT)
-            if (pendingUploads.isEmpty()) {
-                return SyncResult(success = true, uploadedItems = 0)
-            }
-
-            val draftsById = journalRepository.getAllDrafts().associateBy { it.id.toString() }
-            val deviceId = currentDeviceId()
-
-            for (pending in pendingUploads) {
-                val draftId = runCatching { Uuid.parse(pending.entityId) }.getOrNull()
-                if (draftId == null) {
-                    errors.add(retryCoordinator.recordUnparsableOutboxEntry(EntityType.DRAFT, pending.entityId, "draft ID"))
-                    continue
-                }
-
-                when (pending.operation) {
-                    PendingOperation.DELETE -> {
-                        if (!retryCoordinator.beginAttempt(EntityType.DRAFT, pending, errors)) continue
-                        val result =
-                            tokenRefresher.withFreshToken(
-                                { token -> cloudDraftDataSource.deleteDraft(token, draftId) },
-                                "deleteDraft($draftId)",
-                            )
-                        if (result.isSuccess) {
-                            uploadedCount++
-                            recordProgress(1)
-                            retryCoordinator.markUploadSettled(EntityType.DRAFT, pending.entityId, Clock.System.now(), 0L)
-                        } else {
-                            val error = result.exceptionOrNull() ?: Exception("Unknown draft delete error")
-                            val movedToDeadLetter = retryCoordinator.handleRetryFailure(EntityType.DRAFT, pending, error)
-                            errors.add(
-                                SyncError(
-                                    SyncErrorType.SERVER_ERROR,
-                                    "Failed to delete draft $draftId: ${error.message}",
-                                    error,
-                                    retryable = !movedToDeadLetter,
-                                ),
-                            )
-                        }
-                    }
-                    PendingOperation.CREATE,
-                    PendingOperation.UPDATE,
-                    -> {
-                        val draft = draftsById[pending.entityId]
-                        if (draft == null) {
-                            Napier.w("Dropping queued draft ${pending.entityId}: no longer present locally")
-                            syncMetadataService.markAsSynced(pending.entityId, EntityType.DRAFT, Clock.System.now(), 0L)
-                            continue
-                        }
-
-                        if (!retryCoordinator.beginAttempt(EntityType.DRAFT, pending, errors)) continue
-                        val result =
-                            tokenRefresher.withFreshToken(
-                                { token -> cloudDraftDataSource.uploadDraft(token, draft, deviceId) },
-                                "uploadDraft(${draft.id})",
-                            )
-                        if (result.isSuccess) {
-                            val upload = result.getOrThrow()
-                            uploadedCount++
-                            recordProgress(1)
-                            retryCoordinator.markUploadSettled(EntityType.DRAFT, pending.entityId, upload.syncedAt, upload.serverVersion)
-                        } else {
-                            val error = result.exceptionOrNull() ?: Exception("Unknown draft upload error")
-                            val movedToDeadLetter = retryCoordinator.handleRetryFailure(EntityType.DRAFT, pending, error)
-                            errors.add(
-                                SyncError(
-                                    SyncErrorType.SERVER_ERROR,
-                                    "Failed to upload draft ${draft.id}: ${error.message}",
-                                    error,
-                                    retryable = !movedToDeadLetter,
-                                ),
-                            )
-                        }
-                    }
-                }
-            }
-
-            SyncResult(success = errors.isEmpty(), uploadedItems = uploadedCount, errors = errors)
-        }
-    }
-
-    private fun currentDeviceId(): DeviceId =
-        deviceIdProvider
-            ?.getDeviceId()
-            ?.value
-            ?.toString()
-            ?.let(::DeviceId)
-            ?: DeviceId.UNKNOWN
+    suspend fun uploadDrafts(accessToken: String): SyncResult = uploadPass("Upload drafts") { draftUploader.uploadPending() }
 
     /**
      * Queues everything already on this device the first time it syncs with a server.
@@ -684,10 +519,6 @@ internal class SyncUploader(
             entityTypes.filter { entityType ->
                 !firstSyncEnqueueStore.hasEnqueued(entityType) && syncMetadataService.getLastSyncTime(entityType) == null
             }
-        if (neverSynced.isEmpty()) {
-            return
-        }
-
         runCatching {
             if (EntityType.JOURNAL in neverSynced) {
                 val journals = journalRepository.allJournalsObserved.first()
@@ -701,7 +532,7 @@ internal class SyncUploader(
                 // Marked only once the loop above has fully succeeded -- if it throws partway,
                 // this line never runs and the next attempt retries the whole type from scratch.
                 firstSyncEnqueueStore.markEnqueued(EntityType.JOURNAL)
-                Napier.i("First sync: queued ${journals.size} journals already on this device")
+                Napier.i("First sync: queued journals already on this device")
             }
             if (EntityType.NOTE in neverSynced) {
                 val notes = journalNotesRepository.allNotesObserved.first()
@@ -713,20 +544,34 @@ internal class SyncUploader(
                     )
                 }
                 firstSyncEnqueueStore.markEnqueued(EntityType.NOTE)
-                Napier.i("First sync: queued ${notes.size} entries already on this device")
+                Napier.i("First sync: queued entries already on this device")
             }
+            enqueueDraftsForRichSync()
         }.onFailure { error ->
-            Napier.w("Could not queue existing entries for the first sync", error)
+            Napier.w("Could not queue existing entries for the first sync")
         }
     }
+
+    /** Queues pre-existing drafts once per signed-in owner/server, preserving pending deletions. */
+    suspend fun enqueueDraftsForRichSync() = draftUploader.enqueueForRichSync()
 }
+
+/**
+ * Drops entries still inside their retry backoff before callers decide whether there is any
+ * work. Dead-lettered entries stay queued indefinitely, so without this an entry that can
+ * never upload keeps every sync run loading a whole table to do nothing with.
+ */
+internal suspend fun List<PendingUpload>.dueNow(
+    entityType: EntityType,
+    retryCoordinator: SyncRetryCoordinator,
+): List<PendingUpload> = filter { retryCoordinator.shouldAttempt(entityType, it) }
 
 /**
  * Records that an upload of [pending] is starting, before anything that could take the app down with
  * it. Returns false when earlier attempts never finished and the entry has been set aside instead,
  * with the reason added to [errors].
  */
-private suspend fun SyncRetryCoordinator.beginAttempt(
+internal suspend fun SyncRetryCoordinator.beginAttempt(
     entityType: EntityType,
     pending: PendingUpload,
     errors: MutableList<SyncError>,
@@ -735,3 +580,15 @@ private suspend fun SyncRetryCoordinator.beginAttempt(
     errors.add(setAside)
     return false
 }
+
+private fun JournalNote.withRepairVersion(version: Long?): JournalNote =
+    if (version == null) {
+        this
+    } else {
+        when (this) {
+            is JournalNote.Text -> copy(syncVersion = version)
+            is JournalNote.Image -> copy(syncVersion = version)
+            is JournalNote.Video -> copy(syncVersion = version)
+            is JournalNote.Audio -> copy(syncVersion = version)
+        }
+    }

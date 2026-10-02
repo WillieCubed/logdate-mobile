@@ -1,5 +1,7 @@
 package app.logdate.client.sync.cloud
 
+import kotlinx.io.files.Path
+
 /**
  * Authenticated remote backup operations.
  *
@@ -8,6 +10,20 @@ package app.logdate.client.sync.cloud
  * only through an authenticated download. Older server-encrypted ZIP backups remain restorable.
  */
 interface CloudBackupDataSource {
+    suspend fun refreshAccessToken(refreshToken: String): Result<String> =
+        Result.failure(UnsupportedOperationException("Token refresh is not supported"))
+
+    suspend fun uploadBackupFile(
+        accessToken: String,
+        backup: BackupUploadFileRequest,
+    ): Result<BackupUploadResult> = Result.failure(UnsupportedOperationException("Streaming backup uploads are not supported"))
+
+    suspend fun downloadBackupToFile(
+        accessToken: String,
+        backupId: String,
+        destination: Path,
+    ): Result<BackupMetadata> = Result.failure(UnsupportedOperationException("Streaming backup downloads are not supported"))
+
     suspend fun uploadBackup(
         accessToken: String,
         backup: BackupFile,
@@ -64,6 +80,22 @@ data class BackupMetadata(
 class DefaultCloudBackupDataSource(
     private val cloudApiClient: CloudApiClient,
 ) : CloudBackupDataSource {
+    override suspend fun refreshAccessToken(refreshToken: String): Result<String> = cloudApiClient.refreshAccessToken(refreshToken)
+
+    override suspend fun uploadBackupFile(
+        accessToken: String,
+        backup: BackupUploadFileRequest,
+    ): Result<BackupUploadResult> =
+        cloudApiClient.uploadBackupFile(accessToken, backup).map { response ->
+            BackupUploadResult(response.id, response.createdAt, response.sizeBytes)
+        }
+
+    override suspend fun downloadBackupToFile(
+        accessToken: String,
+        backupId: String,
+        destination: Path,
+    ): Result<BackupMetadata> = cloudApiClient.downloadBackupToFile(accessToken, backupId, destination).map { it.toMetadata() }
+
     override suspend fun uploadBackup(
         accessToken: String,
         backup: BackupFile,

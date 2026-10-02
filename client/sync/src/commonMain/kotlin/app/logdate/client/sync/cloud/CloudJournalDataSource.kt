@@ -58,6 +58,8 @@ data class JournalSyncResult(
     val hasMore: Boolean = false,
     /** Records on this page this device cannot read. See [UnreadablePayloadException]. */
     val unreadable: List<Uuid> = emptyList(),
+    val failures: List<RemoteRecordFailure> = emptyList(),
+    val unreadableVersions: Map<Uuid, Long> = emptyMap(),
 )
 
 /**
@@ -113,7 +115,7 @@ class DefaultCloudJournalDataSource(
         since: Instant,
         limit: Int?,
     ): Result<JournalSyncResult> =
-        cloudApiClient.getJournalChanges(accessToken, since.toEpochMilliseconds(), limit).mapCatching { response ->
+        cloudApiClient.getJournalChanges(accessToken, since.toEpochMilliseconds(), limit).mapRecordPage { response ->
             response.toJournalSyncResult()
         }
 
@@ -142,13 +144,16 @@ class DefaultCloudJournalDataSource(
         )
 
     private suspend fun JournalChangesResponse.toJournalSyncResult(): JournalSyncResult {
-        val (readable, unreadable) = changes.readEach(idOf = { it.id }) { it.toJournal() }
+        val records = changes.readEach(idOf = { it.id }, versionOf = { it.serverVersion }) { it.toJournal() }
+        val removed = deletions.readEach(idOf = { it.id }, versionOf = { it.serverVersion }) { Uuid.parse(it.id) }
         return JournalSyncResult(
-            changes = readable,
-            deletions = deletions.map { Uuid.parse(it.id) },
+            changes = records.readable,
+            deletions = removed.readable,
             lastSyncTimestamp = Instant.fromEpochMilliseconds(lastTimestamp),
             hasMore = hasMore,
-            unreadable = unreadable,
+            unreadable = records.unreadable,
+            unreadableVersions = records.unreadableVersions,
+            failures = records.failures + removed.failures,
         )
     }
 

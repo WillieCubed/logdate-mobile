@@ -19,8 +19,13 @@ interface UnreadableCloudRecordStore {
 
     suspend fun count(): Int
 
-    /** Forgets every recorded id. Call after recovering a different identity, since a fresh
-     * download with the right key may now read records this device previously could not. */
+    /** Clear one warning only after that record successfully applies or its deletion settles. */
+    suspend fun resolved(
+        entityType: EntityType,
+        id: Uuid,
+    ) {}
+
+    /** Explicit operational reset; key recovery alone must not clear unreadable warnings. */
     suspend fun clear()
 }
 
@@ -35,6 +40,13 @@ class InMemoryUnreadableCloudRecordStore : UnreadableCloudRecordStore {
     }
 
     override suspend fun count(): Int = ids.size
+
+    override suspend fun resolved(
+        entityType: EntityType,
+        id: Uuid,
+    ) {
+        ids.remove(key(entityType, id))
+    }
 
     override suspend fun clear() {
         ids.clear()
@@ -53,6 +65,13 @@ class KeyValueUnreadableCloudRecordStore(
     }
 
     override suspend fun count(): Int = current().size
+
+    override suspend fun resolved(
+        entityType: EntityType,
+        id: Uuid,
+    ) {
+        storage.putString(KEY, (current() - key(entityType, id)).joinToString(","))
+    }
 
     override suspend fun clear() {
         storage.remove(KEY)

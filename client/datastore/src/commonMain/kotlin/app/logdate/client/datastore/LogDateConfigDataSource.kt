@@ -80,6 +80,11 @@ class LogDateConfigDataSource(
         configRepository.updateServerDescriptor(serverDescriptor)
     }
 
+    /** Wait until persisted configuration has been applied to the repository. */
+    suspend fun awaitConfigurationLoaded() {
+        configurationLoaded.await()
+    }
+
     /**
      * Save backend URL to persistent storage
      */
