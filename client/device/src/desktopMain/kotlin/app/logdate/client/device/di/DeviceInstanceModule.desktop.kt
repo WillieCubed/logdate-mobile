@@ -4,8 +4,8 @@ import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.datastore.OriginSessionVault
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.AppInfoProvider
-import app.logdate.client.device.BuildConfigAppInfoProvider
 import app.logdate.client.device.DesktopAccountManager
+import app.logdate.client.device.DesktopAppInfoProvider
 import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.device.identity.DefaultDeviceIdProvider
 import app.logdate.client.device.identity.di.deviceIdentityModule
@@ -57,16 +57,11 @@ actual val deviceInstanceModule: Module =
 
         // Provide desktop-specific app info provider
         single<AppInfoProvider> {
-            BuildConfigAppInfoProvider()
+            DesktopAppInfoProvider()
         }
 
         // Provide desktop-specific account manager
         single<PlatformAccountManager> {
             DesktopAccountManager()
-        }
-
-        // Provide the BuildConfig-based app info provider
-        single<BuildConfigAppInfoProvider> {
-            BuildConfigAppInfoProvider()
         }
     }

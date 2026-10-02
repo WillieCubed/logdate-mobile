@@ -30,11 +30,3 @@ interface AppInfoProvider {
      */
     fun getAppInfo(): AppInfo
 }
-
-/**
- * Implementation of AppInfoProvider that uses default values.
- * Each platform should override this with appropriate implementations.
- */
-expect class BuildConfigAppInfoProvider() : AppInfoProvider {
-    override fun getAppInfo(): AppInfo
-}

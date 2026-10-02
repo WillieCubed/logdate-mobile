@@ -6,7 +6,6 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.AndroidAccountManager
 import app.logdate.client.device.AndroidAppInfoProvider
 import app.logdate.client.device.AppInfoProvider
-import app.logdate.client.device.BuildConfigAppInfoProvider
 import app.logdate.client.device.PlatformAccountManager
 import app.logdate.client.device.identity.DefaultDeviceIdProvider
 import app.logdate.client.device.identity.di.deviceIdentityModule
@@ -68,10 +67,5 @@ actual val deviceInstanceModule: Module =
         // Provide the Android-specific account manager
         single<PlatformAccountManager> {
             AndroidAccountManager(get())
-        }
-
-        // Provide the BuildConfig-based app info provider
-        single<BuildConfigAppInfoProvider> {
-            BuildConfigAppInfoProvider()
         }
     }

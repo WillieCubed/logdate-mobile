@@ -1,7 +1,5 @@
 package app.logdate.client.device.di
 
-import app.logdate.client.device.AppInfoProvider
-import app.logdate.client.device.BuildConfigAppInfoProvider
 import app.logdate.client.device.crypto.cryptoModule
 import app.logdate.client.device.crypto.platformCryptoModule
 import app.logdate.client.device.identity.di.deviceIdentityModule
@@ -33,7 +31,4 @@ val deviceModule: Module =
         // Crypto primitives and identity key management
         includes(cryptoModule)
         includes(platformCryptoModule())
-
-        // Provide the default app info provider if not already provided by platform
-        single<AppInfoProvider> { BuildConfigAppInfoProvider() }
     }

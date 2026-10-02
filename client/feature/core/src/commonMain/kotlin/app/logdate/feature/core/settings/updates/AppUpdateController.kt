@@ -1,6 +1,8 @@
 package app.logdate.feature.core.settings.updates
 
 import app.logdate.client.device.AppInfoProvider
+import app.logdate.client.device.AppInfoRetrievalException
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -113,12 +115,9 @@ interface AppUpdateController {
 class UnsupportedAppUpdateController(
     appInfoProvider: AppInfoProvider,
 ) : AppUpdateController {
-    private val appInfo = appInfoProvider.getAppInfo()
     private val _uiState =
         MutableStateFlow(
-            AppUpdateUiState(
-                currentVersionName = appInfo.versionName,
-                currentVersionCode = appInfo.versionCode,
+            installedVersion(appInfoProvider).copy(
                 status = AppUpdateStatus.Unsupported,
                 message = "In-app updates are only available on Android builds installed from Google Play.",
                 lastCheckedAt = Clock.System.now(),
@@ -133,3 +132,12 @@ class UnsupportedAppUpdateController(
     /** No-op because non-Android platforms do not support Play-managed updates. */
     override suspend fun completeUpdate() = Unit
 }
+
+private fun installedVersion(appInfoProvider: AppInfoProvider): AppUpdateUiState =
+    try {
+        val appInfo = appInfoProvider.getAppInfo()
+        AppUpdateUiState(currentVersionName = appInfo.versionName, currentVersionCode = appInfo.versionCode)
+    } catch (e: AppInfoRetrievalException) {
+        Napier.w("The installed app version could not be read", e)
+        AppUpdateUiState()
+    }

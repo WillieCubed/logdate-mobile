@@ -4,7 +4,6 @@ import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.datastore.OriginSessionVault
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.AppInfoProvider
-import app.logdate.client.device.BuildConfigAppInfoProvider
 import app.logdate.client.device.IosAccountManager
 import app.logdate.client.device.IosAppInfoProvider
 import app.logdate.client.device.PlatformAccountManager
@@ -65,10 +64,5 @@ actual val deviceInstanceModule: Module =
         // Provide iOS-specific account manager
         single<PlatformAccountManager> {
             IosAccountManager(KeychainWrapperImpl(serviceName = "accounts"))
-        }
-
-        // Provide the BuildConfig-based app info provider
-        single<BuildConfigAppInfoProvider> {
-            BuildConfigAppInfoProvider()
         }
     }
