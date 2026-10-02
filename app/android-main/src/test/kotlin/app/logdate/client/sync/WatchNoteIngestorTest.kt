@@ -311,6 +311,35 @@ class WatchNoteIngestorTest {
         }
 
     @Test
+    fun `a note's lock is released once its ingestion finishes`() =
+        runTest {
+            val notes = List(3) { watchAudioNote() }
+            notes.forEach { note ->
+                ingestor.onNoteMetadata(mapper.toDataMap(note))
+                ingestor.onAudioBytes(note.uid, bytes("m4a"))
+                ingestor.onNoteDeleted(note.uid)
+            }
+
+            assertEquals(0, ingestor.activeNoteLockCount)
+        }
+
+    @Test
+    fun `a lock stays while a transfer for its note is running and goes when it ends`() =
+        runTest {
+            val note = watchAudioNote()
+            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            store.writeGate = gate
+            val transfer = async { ingestor.onAudioBytes(note.uid, bytes("m4a")) }
+            runCurrent()
+            assertEquals(1, ingestor.activeNoteLockCount)
+
+            gate.complete(Unit)
+            transfer.await()
+
+            assertEquals(0, ingestor.activeNoteLockCount)
+        }
+
+    @Test
     fun `metadata without a note payload is rejected`() = runTest {
         assertFailsWith<IllegalArgumentException> { ingestor.onNoteMetadata(emptyMap()) }
     }

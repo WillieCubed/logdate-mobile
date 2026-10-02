@@ -120,7 +120,7 @@ class FileWatchAudioStore(
         directory
             .listFiles()
             .orEmpty()
-            .filter { it.isFile && matches(it) && it.lastModified() < cutoff }
+            .filter { matches(it) && it.isFile && it.lastModified() < cutoff }
             .forEach { stale ->
                 if (stale.delete()) Napier.d("Cleared abandoned watch file ${stale.name}")
             }

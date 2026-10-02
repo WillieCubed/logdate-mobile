@@ -8,7 +8,6 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.InputStream
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.uuid.Uuid
 
 /**
@@ -77,12 +76,28 @@ class WatchNoteIngestor(
     private val notifier: WatchNoteNotifier,
     private val noteDataMapper: NoteDataMapper = NoteDataMapper(),
 ) {
-    private val noteLocks = ConcurrentHashMap<Uuid, Mutex>()
+    private class NoteLock {
+        val mutex = Mutex()
+        var holders = 0
+    }
 
+    private val noteLocks = HashMap<Uuid, NoteLock>()
+
+    /** How many notes currently have a lock, which is zero once nothing is being ingested. */
+    val activeNoteLockCount: Int get() = synchronized(noteLocks) { noteLocks.size }
+
+    /** A note's lock lives only while someone holds or waits for it, so the map never outgrows the work in flight. */
     private suspend fun <T> withNoteLock(
         noteId: Uuid,
         block: suspend () -> T,
-    ): T = noteLocks.getOrPut(noteId) { Mutex() }.withLock { block() }
+    ): T {
+        val lock = synchronized(noteLocks) { noteLocks.getOrPut(noteId) { NoteLock() }.also { it.holders++ } }
+        try {
+            return lock.mutex.withLock { block() }
+        } finally {
+            synchronized(noteLocks) { if (--lock.holders == 0) noteLocks.remove(noteId) }
+        }
+    }
 
     /** @throws IllegalArgumentException if [data] carries no decodable note. */
     suspend fun onNoteMetadata(data: Map<String, String>) {
