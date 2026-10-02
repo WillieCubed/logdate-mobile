@@ -73,21 +73,30 @@ already exercised on the phone.
 
 ### File lifecycle
 
-1. The service writes to `filesDir/audio_notes/recording_<id>.m4a`.
-2. On save, a `JournalNote.Audio` is created in Room with that path and the duration read back from the
-   file.
-3. Discarding, an Undo, and a too-short recording delete the file. A file that a saved note references is
-   never deleted.
-4. The note reaches the phone over the Data Layer, and the watch keeps it pending until the phone
+1. The service writes raw AAC to `filesDir/audio_notes/recording_<id>.aac`. Raw AAC frames can be played up
+   to the moment of a cut, which an MPEG-4 file cannot, because it keeps its index at the end.
+2. On stop, the service wraps the raw file into `recording_<id>.m4a`, the file the rest of the app plays
+   and uploads. The raw file stays beside it.
+3. On save, a `JournalNote.Audio` is created in Room with the m4a path and the duration read back from
+   the file, and then the raw file is deleted. Until then the raw file marks the recording as unsaved.
+4. Discarding, an Undo, and a too-short recording delete the m4a and the raw file. A file that a saved
+   note references is never deleted.
+5. The note reaches the phone over the Data Layer, and the watch keeps it pending until the phone
    acknowledges it. See the sync notes in [`app/wear/README.md`](../../app/wear/README.md).
 5. An Undo also tells the phone. A note that is still pending is dropped from the watch's queue before
    it is ever sent, so the watch sends the phone an explicit delete, and the phone records that the note
    was deleted. Data items and channels are not ordered against each other, so a delete can arrive
    before the note it removes, and without that record the late note and audio would be stored anyway.
 
-**Not covered yet:** a recording in progress when the watch app is killed leaves an unfinalized file that
-nothing recovers. An MPEG-4 file has no index until the recorder finishes it, so it cannot be played
-back, and recovering it would need a crash-safe output format.
+### Recovery after the app is killed
+
+`WearRecordingRecovery` runs at every launch, on a background thread, over raw files written before the
+process started. It wraps a raw file that has no m4a, saves a note for any recording whose note is
+missing, and removes the raw file once the note exists. A raw file that cannot be wrapped yet stays for
+the next launch. An m4a with no raw file beside it is never adopted, because it was saved, deleted, or
+pulled from the phone. A raw file a note references is audio pulled from the phone and is left alone.
+
+Starting a recording needs room for the raw file and the m4a together, about twice the recording.
 
 ## Haptics
 

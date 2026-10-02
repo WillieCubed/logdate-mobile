@@ -33,6 +33,7 @@ Bring the phone and watch within range and confirm the watch's Settings screen s
 | Record, then press the side button, then reopen LogDate | The recording continued while the app was in the background, and the screen still shows it recording |
 | Record, press the side button, then tap Stop on the recording notification | The recording ends and is saved, and appears in Voice memories |
 | Undo a recording with the phone out of range, then bring it back | The note never appears on the phone |
+| Record 10 seconds, force-stop LogDate from the watch's settings, then open it again | The recording appears in Voice memories, about 10 seconds long |
 | Record for 5 minutes with the screen off | A full-length recording, with sound throughout |
 | Keep a recording going past 29 minutes | A haptic warning, then a save at 30 minutes |
 
@@ -64,6 +65,5 @@ Bring the phone and watch within range and confirm the watch's Settings screen s
 
 These are known and should not be reported again as new bugs:
 
-- A recording that is in progress when the watch app is killed is lost.
 - The tile's Mic and Rec buttons both open the home recorder.
 - Activity-aware location in Settings does not run on the watch.

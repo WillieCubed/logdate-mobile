@@ -3,6 +3,7 @@ package app.logdate.wear.presentation.recording
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.media.audio.AudioDurationResolver
+import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SystemCaptureTimeZone
@@ -287,6 +288,8 @@ class WearRecordingViewModel(
                 timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
             )
         notesRepository.create(note)
+        // The raw file marks a recording as unsaved for startup recovery, so it goes once the note exists.
+        deleteRawRecording(path)
         noteHealthAnnotator.annotate(note.uid)
         return note
     }
@@ -304,7 +307,7 @@ class WearRecordingViewModel(
     private suspend fun saveDetached(path: String) {
         val durationMs = recordedDurationMs(path)
         if (durationMs < MIN_DURATION_MS) {
-            deleteFile(path)
+            deleteRecording(path)
             return
         }
         try {
@@ -355,9 +358,19 @@ class WearRecordingViewModel(
             }
     }
 
+    private fun deleteRecording(path: String) {
+        deleteFile(path)
+        deleteRawRecording(path)
+    }
+
+    private fun deleteRawRecording(path: String) {
+        val raw = CrashSafeRecording.inFlightFile(File(path))
+        if (raw.isFile) deleteFile(raw.path)
+    }
+
     private suspend fun discardTooShort(path: String) {
         unsavedPath = null
-        deleteFile(path)
+        deleteRecording(path)
         haptics.rejection()
         _uiState.update { it.copy(phase = RecordingPhase.TOO_SHORT) }
         delay(TOO_SHORT_DISPLAY_MS)

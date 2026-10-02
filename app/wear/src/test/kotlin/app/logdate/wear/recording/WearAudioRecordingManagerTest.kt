@@ -2,6 +2,7 @@ package app.logdate.wear.recording
 
 import app.logdate.client.media.audio.AudioRecordingTarget
 import app.logdate.client.media.audio.AudioStorage
+import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.media.audio.RecordingServiceController
 import app.logdate.client.media.audio.RecordingServiceState
 import app.logdate.client.media.device.AudioRouteRepository
@@ -132,6 +133,18 @@ class WearAudioRecordingManagerTest {
             val manager = manager()
 
             manager.start()
+
+            assertEquals(RecordingStartFailure.NOT_ENOUGH_STORAGE, manager.lastStartFailure)
+        }
+
+    @Test
+    fun `start needs room for the raw recording and the wrapped copy`() =
+        runTest {
+            val oneCopy = WearAudioRecordingManager.MAX_RECORDING_DURATION.inWholeSeconds * 128_000L / 8
+            coEvery { storageChecker.getAvailableStorageSpace() } returns oneCopy + 8L * 1024 * 1024
+            val manager = manager()
+
+            assertFalse(manager.start())
 
             assertEquals(RecordingStartFailure.NOT_ENOUGH_STORAGE, manager.lastStartFailure)
         }
@@ -334,6 +347,20 @@ class WearAudioRecordingManagerTest {
             manager.discard()
 
             assertFalse(recordingFile.exists())
+        }
+
+    @Test
+    fun `discard also deletes the raw recording a crash-safe session leaves when it could not be wrapped`() =
+        runTest {
+            confirmRecorderStarts()
+            controller.stopPath = null
+            val inFlight = CrashSafeRecording.inFlightFile(recordingFile).apply { writeText("raw audio") }
+            val manager = manager()
+            manager.start()
+
+            manager.discard()
+
+            assertFalse(inFlight.exists(), "a discarded recording must not come back at the next launch")
         }
 
     @Test

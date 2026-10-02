@@ -64,11 +64,14 @@ interface RecordingServiceController {
  *   or never when 0.
  * @property pauseOnInterruption Pause when another app or a call takes audio focus.
  * @property holdWakeLock Keep the CPU awake while recording so a dozing device does not drop audio.
+ * @property crashSafe Write the recording as raw AAC and wrap it into the requested m4a when it
+ *   ends, so a process killed mid-recording leaves audio that [CrashSafeRecording] can recover.
  */
 data class RecordingSessionOptions(
     val maxDurationMs: Long = 0L,
     val pauseOnInterruption: Boolean = false,
     val holdWakeLock: Boolean = false,
+    val crashSafe: Boolean = false,
 )
 
 /**

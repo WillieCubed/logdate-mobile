@@ -45,6 +45,7 @@ fun Context.startAudioRecordingService(
             putExtra(AudioRecordingService.EXTRA_MAX_DURATION_MS, options.maxDurationMs)
             putExtra(AudioRecordingService.EXTRA_PAUSE_ON_INTERRUPTION, options.pauseOnInterruption)
             putExtra(AudioRecordingService.EXTRA_HOLD_WAKE_LOCK, options.holdWakeLock)
+            putExtra(AudioRecordingService.EXTRA_CRASH_SAFE, options.crashSafe)
         }
     startForegroundService(intent)
 }
@@ -83,6 +84,7 @@ class AudioRecordingService : Service() {
         const val EXTRA_MAX_DURATION_MS = "app.logdate.extra.MAX_DURATION_MS"
         const val EXTRA_PAUSE_ON_INTERRUPTION = "app.logdate.extra.PAUSE_ON_INTERRUPTION"
         const val EXTRA_HOLD_WAKE_LOCK = "app.logdate.extra.HOLD_WAKE_LOCK"
+        const val EXTRA_CRASH_SAFE = "app.logdate.extra.CRASH_SAFE"
         private const val WAKE_LOCK_TAG = "LogDate:AudioRecordingWakeLock"
         private const val WAKE_LOCK_HEADROOM_MS = 60_000L
         private const val DEFAULT_WAKE_LOCK_TIMEOUT_MS = 35 * 60_000L
@@ -115,6 +117,10 @@ class AudioRecordingService : Service() {
 
     @Volatile
     private var destroyed: Boolean = false
+
+    /** Counts start requests, so a stop that finishes late can tell a newer session now owns the service. */
+    @Volatile
+    private var sessionGeneration: Int = 0
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var focusRequest: AudioFocusRequest? = null
@@ -153,15 +159,24 @@ class AudioRecordingService : Service() {
                         maxDurationMs = intent.getLongExtra(EXTRA_MAX_DURATION_MS, 0L),
                         pauseOnInterruption = intent.getBooleanExtra(EXTRA_PAUSE_ON_INTERRUPTION, false),
                         holdWakeLock = intent.getBooleanExtra(EXTRA_HOLD_WAKE_LOCK, false),
+                        crashSafe = intent.getBooleanExtra(EXTRA_CRASH_SAFE, false),
                     )
+                sessionGeneration++
                 startForegroundRecording(outputPath, inputDeviceId)
             }
             SERVICE_ACTION_STOP -> {
                 Napier.d("Stopping audio recording service")
-                stopRecording()
-                releaseSessionResources()
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+                val session = sessionGeneration
+                // Finishing a crash-safe recording copies the whole file, which must not block the main thread.
+                serviceScope.launch {
+                    if (sessionGeneration != session) return@launch
+                    stopRecording()
+                    // A start that arrived while the file was being finished owns the service now.
+                    if (sessionGeneration != session) return@launch
+                    releaseSessionResources()
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf(startId)
+                }
             }
             SERVICE_ACTION_PAUSE -> {
                 Napier.d("Pausing audio recording")
@@ -181,8 +196,17 @@ class AudioRecordingService : Service() {
     override fun onDestroy() {
         Napier.d("Audio recording service destroyed")
         destroyed = true
-        stopRecording()
-        releaseSessionResources()
+        if (options.crashSafe && _recordingState.value.isRecording) {
+            // Wrapping a long recording must not block the main thread. The thread outlives the service
+            // and drops the wake lock only once the file is finished.
+            Thread({
+                stopRecording()
+                releaseSessionResources()
+            }, "recording-finalizer").start()
+        } else {
+            stopRecording()
+            releaseSessionResources()
+        }
         stopForeground(STOP_FOREGROUND_REMOVE)
         serviceScope.cancel() // Cancel all coroutines
         super.onDestroy()
@@ -306,7 +330,7 @@ class AudioRecordingService : Service() {
             try {
                 val file = resolveOutputFile(outputPath)
                 outputFile = file
-                recorder = createRecorder(file, inputDeviceId)
+                recorder = createRecorder(recordingFileFor(file), inputDeviceId)
                 recorder.prepare()
                 recorder.start()
                 mediaRecorder = recorder
@@ -346,6 +370,10 @@ class AudioRecordingService : Service() {
             File.createTempFile("audio_recording_", ".m4a", applicationContext.cacheDir)
         }
 
+    /** The file the recorder writes: the m4a itself, or the raw AAC that is wrapped into it when it ends. */
+    private fun recordingFileFor(finalFile: File): File =
+        if (options.crashSafe) CrashSafeRecording.inFlightFile(finalFile).also { it.delete() } else finalFile
+
     private fun createRecorder(
         file: File,
         inputDeviceId: String?,
@@ -359,7 +387,7 @@ class AudioRecordingService : Service() {
             }
         return recorder.apply {
             setAudioSource(MediaRecorder.AudioSource.MIC)
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            setOutputFormat(if (options.crashSafe) MediaRecorder.OutputFormat.AAC_ADTS else MediaRecorder.OutputFormat.MPEG_4)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
             setOutputFile(file.absolutePath)
             setAudioEncodingBitRate(128000)
@@ -381,8 +409,10 @@ class AudioRecordingService : Service() {
                 what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_FILESIZE_REACHED
         if (!limitReached) return
         Napier.d("Recorder reached its limit ($what); finalizing the recording")
-        stopRecording()
-        releaseSessionResources()
+        serviceScope.launch {
+            stopRecording()
+            releaseSessionResources()
+        }
     }
 
     private fun onRecorderError(
@@ -390,9 +420,11 @@ class AudioRecordingService : Service() {
         extra: Int,
     ) {
         Napier.e("Recorder error what=$what extra=$extra")
-        stopRecording()
-        releaseSessionResources()
-        _recordingState.update { it.copy(error = "Recording stopped unexpectedly (error $what)") }
+        serviceScope.launch {
+            stopRecording()
+            releaseSessionResources()
+            _recordingState.update { it.copy(error = "Recording stopped unexpectedly (error $what)") }
+        }
     }
 
     private fun acquireSessionResources() {
@@ -505,7 +537,7 @@ class AudioRecordingService : Service() {
         return try {
             recorder?.stop()
             recorder?.release()
-            val path = outputFile?.absolutePath
+            val path = finalizeOutputFile()
             _recordingState.update {
                 it.copy(isRecording = false, isPaused = false, pausedByInterruption = false, recordedFilePath = path)
             }
@@ -524,6 +556,21 @@ class AudioRecordingService : Service() {
             }
             null
         }
+    }
+
+    /**
+     * Wraps a crash-safe recording into its m4a. The raw AAC file stays beside it: its owner deletes it
+     * once the recording is saved, and until then it marks the recording as unsaved for startup recovery.
+     * A recording that cannot be wrapped is reported as a failed stop and recovered from the raw file at
+     * the next launch.
+     */
+    private fun finalizeOutputFile(): String? {
+        val finalFile = outputFile ?: return null
+        if (!options.crashSafe) return finalFile.absolutePath
+        check(AdtsToM4aRemuxer.remuxToM4a(CrashSafeRecording.inFlightFile(finalFile), finalFile)) {
+            "Could not finish the recording file"
+        }
+        return finalFile.absolutePath
     }
 
     private fun releaseQuietly(recorder: MediaRecorder?) {

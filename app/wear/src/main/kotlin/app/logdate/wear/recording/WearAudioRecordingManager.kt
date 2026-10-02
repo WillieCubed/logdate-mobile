@@ -2,6 +2,7 @@ package app.logdate.wear.recording
 
 import app.logdate.client.media.audio.AudioRecordingTarget
 import app.logdate.client.media.audio.AudioStorage
+import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.media.audio.RecordingServiceController
 import app.logdate.client.media.audio.RecordingServiceState
 import app.logdate.client.media.device.AudioRouteRepository
@@ -57,7 +58,9 @@ class WearAudioRecordingManager(
         private val DEFAULT_START_TIMEOUT = 10.seconds
         private const val BYTES_PER_SECOND = 128_000L / 8
         private const val STORAGE_HEADROOM_BYTES = 8L * 1024 * 1024
-        val REQUIRED_STORAGE_BYTES: Long = MAX_RECORDING_DURATION.inWholeSeconds * BYTES_PER_SECOND + STORAGE_HEADROOM_BYTES
+
+        /** The raw recording and the m4a it is wrapped into exist side by side until the note is saved. */
+        val REQUIRED_STORAGE_BYTES: Long = 2 * MAX_RECORDING_DURATION.inWholeSeconds * BYTES_PER_SECOND + STORAGE_HEADROOM_BYTES
     }
 
     private val scope = CoroutineScope(SupervisorJob() + workDispatcher)
@@ -297,8 +300,16 @@ class WearAudioRecordingManager(
         interruptedFlow.value = false
     }
 
+    /**
+     * Deletes the recording and the raw file a crash-safe session writes before it is wrapped, which
+     * remains when wrapping failed. Left behind, that raw file would be recovered as a note at the
+     * next launch.
+     */
     private fun deleteQuietly(path: String) {
-        runCatching { File(path).delete() }
-            .onFailure { error -> Napier.w("Could not delete $path", error) }
+        val file = File(path)
+        listOf(file, CrashSafeRecording.inFlightFile(file)).forEach { target ->
+            runCatching { target.delete() }
+                .onFailure { error -> Napier.w("Could not delete ${target.path}", error) }
+        }
     }
 }

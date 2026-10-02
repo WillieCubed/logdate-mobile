@@ -6,15 +6,21 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import app.logdate.client.media.audio.AdtsToM4aRemuxer
 import app.logdate.client.media.audio.AndroidAudioDurationResolver
 import app.logdate.client.media.audio.AndroidAudioStorage
 import app.logdate.client.media.audio.AndroidRecordingServiceController
+import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.media.audio.RecordingSessionOptions
 import app.logdate.client.media.device.AndroidAudioRouteRepository
+import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.data.storage.StorageSpaceChecker
 import app.logdate.wear.presentation.MainActivity
 import app.logdate.wear.recording.WearAudioRecordingManager
+import app.logdate.wear.recording.WearRecordingRecovery
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -26,6 +32,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import kotlin.uuid.Uuid
 
 /**
  * Records through the real foreground service on a Wear OS device, the path the unit tests fake.
@@ -39,6 +46,7 @@ import java.io.File
 class WearRecorderServiceE2ETest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private lateinit var manager: WearAudioRecordingManager
+    private lateinit var controller: AndroidRecordingServiceController
     private lateinit var activity: ActivityScenario<MainActivity>
     private val recordedFiles = mutableListOf<File>()
 
@@ -51,21 +59,23 @@ class WearRecorderServiceE2ETest {
         listOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS).forEach { permission ->
             automation.grantRuntimePermission(context.packageName, permission)
         }
+        controller =
+            AndroidRecordingServiceController(
+                context = context,
+                options =
+                    RecordingSessionOptions(
+                        maxDurationMs = WearAudioRecordingManager.MAX_RECORDING_DURATION.inWholeMilliseconds,
+                        pauseOnInterruption = true,
+                        holdWakeLock = true,
+                        crashSafe = true,
+                    ),
+            )
         manager =
             WearAudioRecordingManager(
                 storageChecker = StorageSpaceChecker(context),
                 audioStorage = AndroidAudioStorage(context),
                 audioRouteRepository = AndroidAudioRouteRepository(context),
-                serviceController =
-                    AndroidRecordingServiceController(
-                        context = context,
-                        options =
-                            RecordingSessionOptions(
-                                maxDurationMs = WearAudioRecordingManager.MAX_RECORDING_DURATION.inWholeMilliseconds,
-                                pauseOnInterruption = true,
-                                holdWakeLock = true,
-                            ),
-                    ),
+                serviceController = controller,
                 microphonePermission = { true },
             )
     }
@@ -74,7 +84,10 @@ class WearRecorderServiceE2ETest {
     fun tearDown() =
         runBlocking {
             if (manager.isRecording.value) manager.discard()
-            recordedFiles.forEach { it.delete() }
+            recordedFiles.forEach {
+                it.delete()
+                CrashSafeRecording.inFlightFile(it).delete()
+            }
             activity.close()
         }
 
@@ -144,6 +157,125 @@ class WearRecorderServiceE2ETest {
             assertNotNull(second)
             recordedFiles += File(second!!)
             assertEquals(2, recordedFiles.distinct().size)
+        }
+
+    @Test
+    fun a_finished_recording_is_wrapped_and_its_raw_file_stays_until_it_is_saved() =
+        runBlocking {
+            assertTrue(manager.start())
+            delay(1_500)
+
+            val path = manager.stop()
+
+            val file = File(requireNotNull(path)).also { recordedFiles += it }
+            assertEquals("m4a", file.extension)
+            assertNotNull(AndroidAudioDurationResolver(context).resolveDurationMs(path!!))
+            assertTrue(
+                "The raw file marks the recording as unsaved until its note exists",
+                CrashSafeRecording.inFlightFile(file).isFile,
+            )
+        }
+
+    @Test
+    fun a_recording_cut_short_can_be_wrapped_from_what_was_written() =
+        runBlocking {
+            val audioDirectory = File(context.filesDir, "audio_notes")
+            val before = audioDirectory.listFiles().orEmpty().map { it.name }.toSet()
+            assertTrue(manager.start())
+            delay(2_500)
+
+            val inFlight =
+                audioDirectory
+                    .listFiles()
+                    .orEmpty()
+                    .single { it.extension == CrashSafeRecording.IN_FLIGHT_EXTENSION && it.name !in before }
+            assertTrue("The raw recording should be growing while recording", inFlight.length() > 0)
+            // What a killed process leaves: the raw file as it stands, possibly cut mid-frame.
+            val cut = File(audioDirectory, "recording_cut_${inFlight.name}").also { recordedFiles += it }
+            inFlight.copyTo(cut, overwrite = true)
+            java.io.RandomAccessFile(cut, "rw").use { it.setLength(cut.length() - 5) }
+            val recovered = File(audioDirectory, "recording_cut.m4a").also { recordedFiles += it }
+
+            val wrapped = AdtsToM4aRemuxer.remuxToM4a(cut, recovered)
+
+            assertTrue("The cut recording should be wrapped", wrapped)
+            val durationMs = AndroidAudioDurationResolver(context).resolveDurationMs(recovered.absolutePath)
+            assertNotNull("The recovered file should read as audio", durationMs)
+            assertTrue("Expected about 2.5 s but was $durationMs ms", durationMs!! in 1_000L..4_000L)
+            recordedFiles += File(requireNotNull(manager.stop()))
+        }
+
+    @Test
+    fun destroying_the_service_mid_recording_still_wraps_the_file() =
+        runBlocking {
+            val audioDirectory = File(context.filesDir, "audio_notes")
+            val before = audioDirectory.listFiles().orEmpty().map { it.name }.toSet()
+            assertTrue(manager.start())
+            delay(2_000)
+            val raw =
+                audioDirectory
+                    .listFiles()
+                    .orEmpty()
+                    .single { it.extension == CrashSafeRecording.IN_FLIGHT_EXTENSION && it.name !in before }
+            val final = CrashSafeRecording.finalFile(raw).also { recordedFiles += it }
+
+            controller.shutdown()
+
+            val deadline = System.currentTimeMillis() + 10_000
+            while (!final.isFile && System.currentTimeMillis() < deadline) delay(100)
+            assertTrue("The recording should be wrapped after the service is destroyed", final.isFile)
+            assertNotNull(AndroidAudioDurationResolver(context).resolveDurationMs(final.absolutePath))
+        }
+
+    @Test
+    fun recovery_from_the_app_graph_turns_a_cut_recording_into_a_note() =
+        runBlocking {
+            val audioDirectory = File(context.filesDir, "audio_notes")
+            val before = audioDirectory.listFiles().orEmpty().map { it.name }.toSet()
+            assertTrue(manager.start())
+            delay(2_500)
+            val live =
+                audioDirectory
+                    .listFiles()
+                    .orEmpty()
+                    .single { it.extension == CrashSafeRecording.IN_FLIGHT_EXTENSION && it.name !in before }
+            // What a killed process leaves: a raw recording, copied under its own name.
+            val orphan = File(audioDirectory, "recording_${Uuid.random()}.${CrashSafeRecording.IN_FLIGHT_EXTENSION}")
+            live.copyTo(orphan)
+            val recovered = CrashSafeRecording.finalFile(orphan).also { recordedFiles += it }
+            recordedFiles += File(audioDirectory, orphan.name)
+            manager.discard()
+
+            val koin = org.koin.java.KoinJavaComponent.getKoin()
+            val count = koin.get<WearRecordingRecovery>().recover()
+
+            val repository = koin.get<JournalNotesRepository>()
+            val note =
+                repository.allNotesObserved
+                    .first()
+                    .filterIsInstance<JournalNote.Audio>()
+                    .singleOrNull { it.mediaRef == recovered.absolutePath }
+            try {
+                assertEquals("One note should be recovered", 1, count)
+                assertNotNull("The recovered recording should be a note", note)
+                assertFalse("The raw file should go once the note exists", orphan.exists())
+            } finally {
+                note?.let { repository.removeById(it.uid) }
+            }
+        }
+
+    @Test
+    fun a_discarded_recording_leaves_no_raw_file() =
+        runBlocking {
+            val audioDirectory = File(context.filesDir, "audio_notes")
+            val before = audioDirectory.listFiles().orEmpty().map { it.name }.toSet()
+            assertTrue(manager.start())
+            delay(1_000)
+
+            manager.discard()
+
+            val after = audioDirectory.listFiles().orEmpty().map { it.name }.toSet()
+            assertEquals("A discarded recording should leave no raw file behind", before, after)
         }
 
     @Test

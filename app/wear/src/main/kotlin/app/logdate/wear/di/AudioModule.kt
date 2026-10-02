@@ -8,6 +8,7 @@ import androidx.core.content.ContextCompat
 import app.logdate.client.media.audio.AndroidAudioDurationResolver
 import app.logdate.client.media.audio.AndroidAudioPlaybackManager
 import app.logdate.client.media.audio.AndroidAudioStorage
+import app.logdate.client.media.audio.AdtsToM4aRemuxer
 import app.logdate.client.media.audio.AndroidRecordingServiceController
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioDurationResolver
@@ -45,10 +46,13 @@ import app.logdate.wear.presentation.timeline.WearTimelineViewModel
 import app.logdate.wear.recording.MicrophonePermissionChecker
 import app.logdate.wear.recording.WearAudioRecordingManager
 import app.logdate.wear.recording.WearRecorder
+import app.logdate.wear.recording.WearRecordingRecovery
 import app.logdate.wear.sync.WearDataLayerClient
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import java.io.File
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
@@ -77,6 +81,7 @@ val wearAudioModule =
                         maxDurationMs = WearAudioRecordingManager.MAX_RECORDING_DURATION.inWholeMilliseconds,
                         pauseOnInterruption = true,
                         holdWakeLock = true,
+                        crashSafe = true,
                     ),
             )
         }
@@ -95,6 +100,14 @@ val wearAudioModule =
             )
         }
         single<WearRecorder> { get<WearAudioRecordingManager>() }
+        single {
+            WearRecordingRecovery(
+                audioDirectory = File(get<Context>().filesDir, "audio_notes"),
+                notesRepository = get(),
+                durationResolver = get(),
+                remuxer = AdtsToM4aRemuxer,
+            )
+        }
         single<RecordingHintStore> { SharedPreferencesRecordingHintStore(get()) }
 
         // Audio playback — reuses the phone's AndroidAudioPlaybackManager + AudioPlaybackService
@@ -106,6 +119,16 @@ val wearAudioModule =
         single<WearPlaybackEngine> { AndroidWearPlaybackEngine(get<AndroidAudioPlaybackManager>(), get<CoroutineScope>()) }
         single<AudioRouteRepository> { AndroidAudioRouteRepository(get()) }
         single<CoroutineDispatcher>(wearIoDispatcherQualifier) { Dispatchers.IO }
+        // One player for every screen: they share one playback engine, so a second player would never
+        // learn that the first one's note was replaced. Its scope matches a view model's.
+        single {
+            WearVoiceNotePlayer(
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+                engine = get(),
+                outputs = get(),
+                resolver = get(),
+            )
+        }
         single<WearSyncedAudioResolver> {
             PhoneSyncedAudioResolver(
                 context = get(),
@@ -144,12 +167,10 @@ val wearAudioModule =
             )
         }
         viewModel {
-            val engine = get<WearPlaybackEngine>()
-            val outputs = get<WearAudioOutputs>()
-            val resolver = get<WearSyncedAudioResolver>()
+            val player = get<WearVoiceNotePlayer>()
             WearTimelineViewModel(
                 notesRepository = get(),
-                playerFactory = { scope -> WearVoiceNotePlayer(scope, engine, outputs, resolver) },
+                playerFactory = { player },
                 dataLayerClient = get(),
             )
         }
@@ -160,12 +181,10 @@ val wearAudioModule =
             )
         }
         viewModel {
-            val engine = get<WearPlaybackEngine>()
-            val outputs = get<WearAudioOutputs>()
-            val resolver = get<WearSyncedAudioResolver>()
+            val player = get<WearVoiceNotePlayer>()
             WearMemoryPlayerViewModel(
                 notesRepository = get(),
-                playerFactory = { scope -> WearVoiceNotePlayer(scope, engine, outputs, resolver) },
+                playerFactory = { player },
             )
         }
         viewModel {

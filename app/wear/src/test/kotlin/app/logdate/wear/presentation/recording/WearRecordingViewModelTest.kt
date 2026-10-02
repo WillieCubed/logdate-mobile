@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import app.logdate.client.media.audio.AudioDurationResolver
+import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.NoteCoordinates
@@ -39,6 +40,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import java.io.File
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -532,6 +534,57 @@ class WearRecordingViewModelTest {
             assertEquals(RecordingError.SAVE_FAILED, viewModel.uiState.value.error)
             assertEquals(1, recorder.starts)
         }
+
+    @Test
+    fun `saving a recording removes the raw file its session left`() =
+        runTest {
+            val recording = recordingWithRawFile("saved")
+            recorder.stopPath = recording.first.path
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            press(viewModel)
+
+            assertEquals(RecordingPhase.SAVED, viewModel.uiState.value.phase)
+            assertEquals(listOf(recording.second.path), deletedFiles)
+        }
+
+    @Test
+    fun `a save that fails leaves the raw file so the recording can be recovered`() =
+        runTest {
+            val recording = recordingWithRawFile("unsaved")
+            recorder.stopPath = recording.first.path
+            coEvery { notesRepository.create(any<JournalNote>()) } throws IllegalStateException("database closed")
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            press(viewModel)
+
+            assertEquals(RecordingError.SAVE_FAILED, viewModel.uiState.value.error)
+            assertTrue(deletedFiles.isEmpty())
+        }
+
+    @Test
+    fun `a recording too short is discarded together with its raw file`() =
+        runTest {
+            val recording = recordingWithRawFile("blip")
+            coEvery { durationResolver.resolveDurationMs(any()) } returns 300L
+            recorder.stopPath = recording.first.path
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            press(viewModel)
+
+            assertEquals(listOf(recording.first.path, recording.second.path), deletedFiles)
+        }
+
+    /** A finished recording and the raw file a crash-safe session leaves beside it, as real files. */
+    private fun recordingWithRawFile(name: String): Pair<File, File> {
+        val directory = java.nio.file.Files.createTempDirectory("wear-vm").toFile().also { it.deleteOnExit() }
+        val finished = File(directory, "recording_$name.m4a").apply { writeText("audio") }
+        val raw = CrashSafeRecording.inFlightFile(finished).apply { writeText("raw audio") }
+        return finished to raw
+    }
 
     @Test
     fun `a recording shorter than the minimum is discarded as too short`() =
