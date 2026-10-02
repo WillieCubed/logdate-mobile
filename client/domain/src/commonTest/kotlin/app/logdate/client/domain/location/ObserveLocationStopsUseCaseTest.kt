@@ -13,7 +13,9 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /**
@@ -74,15 +76,17 @@ class ObserveLocationStopsUseCaseTest {
         }
 
     @Test
-    fun `invoke splits stops when distance exceeds threshold`() =
+    fun `invoke keeps stays at two places as separate stops`() =
         runTest {
             val baseTime = Instant.fromEpochMilliseconds(1_000)
             val repository =
                 FakeLocationHistoryRepository(
-                    listOf(
-                        historyItem(timestamp = baseTime, latitude = 37.7749, longitude = -122.4194),
-                        historyItem(timestamp = baseTime + 5.minutes, latitude = 37.8044, longitude = -122.2711),
-                    ),
+                    listOf(0, 5, 10).map { historyItem(timestamp = baseTime + it.minutes, latitude = 37.7749, longitude = -122.4194) } +
+                        listOf(
+                            20,
+                            25,
+                            30,
+                        ).map { historyItem(timestamp = baseTime + it.minutes, latitude = 37.8044, longitude = -122.2711) },
                 )
 
             val useCase = ObserveLocationStopsUseCase(ObserveLocationHistoryUseCase(repository))
@@ -90,10 +94,41 @@ class ObserveLocationStopsUseCaseTest {
             val result = useCase().first()
 
             assertEquals(2, result.size)
-            assertEquals(1, result.first().sampleCount)
-            assertEquals(1, result.last().sampleCount)
-            assertEquals(LocationStopEvidenceKind.OBSERVATION, result.first().evidenceKind)
-            assertEquals(false, result.first().hasReliableDuration)
+            assertEquals(listOf(3, 3), result.map { it.sampleCount })
+            assertTrue(result.all { it.evidenceKind == LocationStopEvidenceKind.STAY })
+        }
+
+    @Test
+    fun `invoke does not turn a drive into stops`() =
+        runTest {
+            val baseTime = Instant.fromEpochMilliseconds(1_000)
+            val drive =
+                (0..90).map {
+                    historyItem(timestamp = baseTime + (it * 10).seconds, latitude = 37.7749 + it * 0.0009, longitude = -122.4194)
+                        .copy(accuracyMeters = 8f, speedMetersPerSecond = 10f, activityType = "IN_VEHICLE")
+                }
+            val useCase = ObserveLocationStopsUseCase(ObserveLocationHistoryUseCase(FakeLocationHistoryRepository(drive)))
+
+            assertTrue(useCase().first().isEmpty())
+        }
+
+    @Test
+    fun `invoke keeps a stay with noisy fixes as one stop`() =
+        runTest {
+            val baseTime = Instant.fromEpochMilliseconds(1_000)
+            val offsets = listOf(0.0, 0.0006, -0.0004, 0.0035, 0.0002, -0.0007, 0.0001, 0.0005, -0.0003, 0.0)
+            val stay =
+                offsets.mapIndexed { index, offset ->
+                    historyItem(timestamp = baseTime + (index * 3).minutes, latitude = 37.7749 + offset, longitude = -122.4194)
+                        .copy(accuracyMeters = if (index == 3) 30f else 60f)
+                }
+            val useCase = ObserveLocationStopsUseCase(ObserveLocationHistoryUseCase(FakeLocationHistoryRepository(stay)))
+
+            val result = useCase().first()
+
+            assertEquals(1, result.size)
+            assertEquals(offsets.size, result.single().sampleCount)
+            assertEquals(LocationStopEvidenceKind.STAY, result.single().evidenceKind)
         }
 
     @Test
