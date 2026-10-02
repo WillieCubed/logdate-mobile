@@ -144,13 +144,13 @@ val wearAudioModule =
             )
         }
         viewModel {
+            val engine = get<WearPlaybackEngine>()
+            val outputs = get<WearAudioOutputs>()
+            val resolver = get<WearSyncedAudioResolver>()
             WearTimelineViewModel(
-                get<JournalNotesRepository>(),
-                get<AudioPlaybackManager>(),
-                get<AudioPlaybackStatusProvider>(),
-                get<WearAudioOutputMonitor>(),
-                get<WearSyncedAudioResolver>(),
-                get<WearDataLayerClient>(),
+                notesRepository = get(),
+                playerFactory = { scope -> WearVoiceNotePlayer(scope, engine, outputs, resolver) },
+                dataLayerClient = get(),
             )
         }
         viewModel {

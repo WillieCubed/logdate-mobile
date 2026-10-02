@@ -2,19 +2,15 @@ package app.logdate.wear.presentation.timeline
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import app.logdate.client.media.audio.AudioPlaybackManager
-import app.logdate.client.media.audio.AudioPlaybackMetadata
-import app.logdate.client.media.audio.AudioPlaybackStatusProvider
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import app.logdate.wear.playback.AudioOutputState
-import app.logdate.wear.playback.WearAudioOutputMonitor
-import app.logdate.wear.playback.WearSyncedAudioResolver
+import app.logdate.wear.playback.WearVoiceNotePlayer
 import app.logdate.wear.sync.WearDataLayerClient
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -74,12 +70,11 @@ sealed interface WearPlaybackUiState {
 @OptIn(ExperimentalCoroutinesApi::class)
 class WearTimelineViewModel(
     private val notesRepository: JournalNotesRepository,
-    private val audioPlaybackManager: AudioPlaybackManager,
-    private val audioPlaybackStatusProvider: AudioPlaybackStatusProvider,
-    private val audioOutputMonitor: WearAudioOutputMonitor,
-    private val syncedAudioResolver: WearSyncedAudioResolver,
+    playerFactory: (CoroutineScope) -> WearVoiceNotePlayer,
     private val dataLayerClient: WearDataLayerClient,
 ) : ViewModel() {
+    private val player = playerFactory(viewModelScope)
+
     val uiState: StateFlow<WearTimelineUiState> =
         notesRepository
             .observeRecentNotes()
@@ -100,11 +95,9 @@ class WearTimelineViewModel(
                 }
             }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    private val _playbackState = MutableStateFlow<WearPlaybackUiState>(WearPlaybackUiState.Idle)
-    val playbackState: StateFlow<WearPlaybackUiState> = _playbackState
+    val playbackState: StateFlow<WearPlaybackUiState> = player.state
 
-    val audioOutputState: StateFlow<AudioOutputState> = audioOutputMonitor.outputState
-    private var resolveJob: Job? = null
+    val audioOutputState: StateFlow<AudioOutputState> = player.outputState
 
     init {
         viewModelScope.launch {
@@ -113,95 +106,22 @@ class WearTimelineViewModel(
                 Napier.w { "Failed to request phone note sync from Wear timeline" }
             }
         }
-
-        viewModelScope.launch {
-            audioPlaybackStatusProvider.playbackStatus.collect { status ->
-                val state = _playbackState.value
-                if (state is WearPlaybackUiState.Active && status.isSuppressedForUnsuitableOutput) {
-                    audioPlaybackManager.stopPlayback()
-                    _playbackState.value = WearPlaybackUiState.BlockedOutput(state.noteId)
-                }
-            }
-        }
     }
 
-    /**
-     * Toggles playback: plays the note if idle or a different note is active,
-     * stops if this note is already playing.
-     */
+    /** Plays [note], or stops it when it is the note already playing or being prepared. */
     fun toggleNote(note: JournalNote.Audio) {
-        val current = _playbackState.value
-        if (current.noteIdOrNull() == note.uid &&
-            (current is WearPlaybackUiState.Active || current is WearPlaybackUiState.Preparing)
-        ) {
-            stopPlayback()
+        val current = player.state.value
+        val isThisNote = current.noteIdOrNull() == note.uid
+        if (isThisNote && (current is WearPlaybackUiState.Active || current is WearPlaybackUiState.Preparing)) {
+            player.stop()
             return
         }
-
-        if (audioOutputMonitor.outputState.value is AudioOutputState.Unavailable) {
-            Napier.w { "No audio output available, cannot play note" }
-            _playbackState.value = WearPlaybackUiState.BlockedOutput(note.uid)
-            return
-        }
-
-        resolveJob?.cancel()
-        if (current is WearPlaybackUiState.Active) {
-            audioPlaybackManager.stopPlayback()
-        }
-
-        _playbackState.value = WearPlaybackUiState.Preparing(note.uid)
-        resolveJob =
-            viewModelScope.launch {
-                val playableUri =
-                    syncedAudioResolver.resolvePlayableUri(note).getOrElse {
-                        _playbackState.value = WearPlaybackUiState.Error(note.uid)
-                        return@launch
-                    }
-
-                val latest = _playbackState.value
-                if (latest !is WearPlaybackUiState.Preparing || latest.noteId != note.uid) {
-                    return@launch
-                }
-
-                _playbackState.value =
-                    WearPlaybackUiState.Active(
-                        noteId = note.uid,
-                        progress = 0f,
-                        durationMs = note.durationMs,
-                    )
-
-                audioPlaybackManager.startPlayback(
-                    uri = playableUri,
-                    metadata = AudioPlaybackMetadata(noteId = note.uid),
-                    onProgressUpdated = { progress ->
-                        val state = _playbackState.value
-                        if (state is WearPlaybackUiState.Active && state.noteId == note.uid) {
-                            _playbackState.value = state.copy(progress = progress)
-                        }
-                    },
-                    onPlaybackCompleted = {
-                        _playbackState.value = WearPlaybackUiState.Idle
-                    },
-                )
-            }
+        player.play(note)
     }
 
-    /**
-     * Stops playback and resets to idle.
-     */
-    fun stopPlayback() {
-        resolveJob?.cancel()
-        resolveJob = null
-        audioPlaybackManager.stopPlayback()
-        _playbackState.value = WearPlaybackUiState.Idle
-    }
+    fun stopPlayback() = player.stop()
 
-    /**
-     * Opens Bluetooth settings so the user can connect audio devices.
-     */
-    fun openBluetoothSettings() {
-        audioOutputMonitor.launchBluetoothSettings()
-    }
+    fun openBluetoothSettings() = player.openBluetoothSettings()
 
     fun selectDay(date: LocalDate) {
         _selectedDate.value = date
@@ -212,13 +132,8 @@ class WearTimelineViewModel(
     }
 
     override fun onCleared() {
+        player.stop()
         super.onCleared()
-        // AudioPlaybackManager is a process-lifetime singleton on the
-        // Wear app too — stop the current track so it doesn't keep
-        // playing after this view model goes away, but never call
-        // release() on the singleton itself.
-        audioPlaybackManager.stopPlayback()
-        audioOutputMonitor.unregister()
     }
 
     private fun groupNotesIntoDays(notes: List<JournalNote>): WearTimelineUiState {
