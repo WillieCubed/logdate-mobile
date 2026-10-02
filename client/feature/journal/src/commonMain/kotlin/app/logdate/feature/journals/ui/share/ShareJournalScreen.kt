@@ -2,16 +2,20 @@
 
 package app.logdate.feature.journals.ui.share
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -41,8 +45,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -51,10 +58,10 @@ import app.logdate.feature.journals.ui.deriveCoverColor
 import app.logdate.shared.model.Journal
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.AspectRatios
-import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.applyStandardContentWidth
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.toReadableDateShort
+import coil3.compose.AsyncImage
 import logdate.client.feature.journal.generated.resources.*
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.ui.generated.resources.common_go_back
@@ -107,6 +114,7 @@ fun ShareJournalScreenContent(
     onShareQrCode: (Journal) -> Unit,
     onShareJournal: (Journal) -> Unit,
     modifier: Modifier = Modifier,
+    previewCoverPainter: Painter? = null,
 ) {
     Scaffold(
         modifier = modifier,
@@ -148,6 +156,7 @@ fun ShareJournalScreenContent(
                     onShareQrCode = { onShareQrCode(state.journal) },
                     onShareJournal = { onShareJournal(state.journal) },
                     modifier = Modifier.padding(paddingValues),
+                    previewCoverPainter = previewCoverPainter,
                 )
             }
         }
@@ -172,6 +181,7 @@ fun ShareJournalContent(
     onShareQrCode: () -> Unit,
     onShareJournal: () -> Unit,
     modifier: Modifier = Modifier,
+    previewCoverPainter: Painter? = null,
 ) {
     FoldableBookLayout(
         modifier = modifier.fillMaxSize(),
@@ -180,6 +190,7 @@ fun ShareJournalContent(
             ShareJournalPrimaryPane(
                 journal = journal,
                 modifier = Modifier.fillMaxSize(),
+                previewCoverPainter = previewCoverPainter,
             )
         },
         endPane = {
@@ -197,6 +208,7 @@ fun ShareJournalContent(
                 onShareQrCode = onShareQrCode,
                 onShareJournal = onShareJournal,
                 modifier = Modifier.fillMaxSize(),
+                previewCoverPainter = previewCoverPainter,
             )
         },
     )
@@ -209,32 +221,57 @@ private fun ShareJournalStandardContent(
     onShareQrCode: () -> Unit,
     onShareJournal: () -> Unit,
     modifier: Modifier = Modifier,
+    previewCoverPainter: Painter? = null,
 ) {
-    Column(
-        modifier =
-            modifier
-                .verticalScroll(rememberScrollState())
-                .padding(Spacing.lg)
-                .applyStandardContentWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.xl),
-    ) {
-        ShareJournalCard(
-            journal = journal,
-            modifier = Modifier.widthIn(max = 240.dp),
-        )
+    BoxWithConstraints(modifier = modifier) {
+        if (maxWidth >= 840.dp || (maxWidth >= 700.dp && maxWidth > maxHeight)) {
+            Row(
+                modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xl),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ShareJournalPrimaryPane(
+                    journal = journal,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    previewCoverPainter = previewCoverPainter,
+                )
+                ShareJournalActionPane(
+                    onShareToInstagram = onShareToInstagram,
+                    onShareQrCode = onShareQrCode,
+                    onShareJournal = onShareJournal,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
+            }
+        } else {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(Spacing.lg)
+                        .applyStandardContentWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Spacing.xl),
+            ) {
+                ShareJournalCard(
+                    journal = journal,
+                    modifier = Modifier.widthIn(max = 240.dp),
+                    previewCoverPainter = previewCoverPainter,
+                )
 
-        ShareJournalDescription()
+                ShareJournalDescription()
 
-        ShareJournalActions(
-            onShareQrCode = onShareQrCode,
-            onShareJournal = onShareJournal,
-            onShareToInstagram = onShareToInstagram,
-        )
+                ShareJournalActions(
+                    onShareQrCode = onShareQrCode,
+                    onShareJournal = onShareJournal,
+                    onShareToInstagram = onShareToInstagram,
+                )
 
-        Spacer(modifier = Modifier.height(Spacing.lg))
+                Spacer(modifier = Modifier.height(Spacing.lg))
 
-        NearbySharingInfo()
+                NearbySharingInfo()
+            }
+        }
     }
 }
 
@@ -242,21 +279,29 @@ private fun ShareJournalStandardContent(
 private fun ShareJournalPrimaryPane(
     journal: Journal,
     modifier: Modifier = Modifier,
+    previewCoverPainter: Painter? = null,
 ) {
-    Column(
-        modifier =
-            modifier
-                .verticalScroll(rememberScrollState())
-                .padding(Spacing.lg),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.xl),
-    ) {
-        ShareJournalCard(
-            journal = journal,
-            modifier = Modifier.widthIn(max = 360.dp),
-        )
-
-        ShareJournalDescription()
+    BoxWithConstraints(modifier = modifier) {
+        val verticalPadding = if (maxHeight < 520.dp) Spacing.sm else Spacing.lg
+        val maxCardWidth =
+            minOf(480.dp, maxOf(100.dp, (maxHeight - verticalPadding * 2 - 8.dp) * AspectRatios.JOURNAL_COVER))
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .heightIn(min = maxHeight)
+                    .padding(horizontal = Spacing.lg, vertical = verticalPadding),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            ShareJournalCard(
+                journal = journal,
+                modifier = Modifier.widthIn(max = maxCardWidth),
+                previewCoverPainter = previewCoverPainter,
+                showInfoStrip = false,
+            )
+        }
     }
 }
 
@@ -267,44 +312,47 @@ private fun ShareJournalActionPane(
     onShareJournal: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier =
-            modifier
-                .verticalScroll(rememberScrollState())
-                .padding(Spacing.lg),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.xl),
-    ) {
-        ShareJournalActions(
-            onShareQrCode = onShareQrCode,
-            onShareJournal = onShareJournal,
-            onShareToInstagram = onShareToInstagram,
-        )
+    BoxWithConstraints(modifier = modifier) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .heightIn(min = maxHeight)
+                    .padding(Spacing.lg),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.xl, Alignment.CenterVertically),
+        ) {
+            ShareJournalDescription()
 
-        NearbySharingInfo()
+            ShareJournalActions(
+                onShareQrCode = onShareQrCode,
+                onShareJournal = onShareJournal,
+                onShareToInstagram = onShareToInstagram,
+            )
+
+            NearbySharingInfo()
+        }
     }
 }
 
 @Composable
 private fun ShareJournalDescription() {
-    MaterialContainer {
-        SurfaceItem {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
-            ) {
-                Icon(
-                    Icons.Rounded.Public,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = stringResource(Res.string.share_journal_description),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+    Row(
+        modifier = Modifier.fillMaxWidth().testTag("share_journal_access"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        Icon(
+            Icons.Rounded.Public,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = stringResource(Res.string.share_journal_description),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -400,17 +448,22 @@ private fun NearbySharingInfo() {
 
 /**
  * A share-specific journal card that renders the journal cover shape
- * with an info strip below showing the title and last updated date.
+ * with an optional info strip showing the title and last updated date.
  */
 @Composable
 private fun ShareJournalCard(
     journal: Journal,
     modifier: Modifier = Modifier,
+    previewCoverPainter: Painter? = null,
+    showInfoStrip: Boolean = true,
 ) {
     val coverColor = remember(journal.id) { deriveCoverColor(journal.id) }
+    val hasCoverImage = journal.coverImageUri != null
     val coverTextColor =
-        remember(coverColor) {
-            if (coverColor.luminance() > 0.5f) {
+        remember(coverColor, hasCoverImage) {
+            if (hasCoverImage) {
+                Color.White.copy(alpha = 0.95f)
+            } else if (coverColor.luminance() > 0.5f) {
                 Color.Black.copy(alpha = 0.87f)
             } else {
                 Color.White.copy(alpha = 0.95f)
@@ -419,7 +472,9 @@ private fun ShareJournalCard(
 
     Surface(
         modifier =
-            modifier.shadow(elevation = 4.dp, shape = JournalShape),
+            modifier
+                .shadow(elevation = 4.dp, shape = JournalShape)
+                .testTag("share_journal_preview"),
         shape = JournalShape,
     ) {
         Column {
@@ -432,6 +487,41 @@ private fun ShareJournalCard(
                         .background(coverColor),
                 contentAlignment = Alignment.BottomStart,
             ) {
+                journal.coverImageUri?.let { uri ->
+                    if (previewCoverPainter == null) {
+                        AsyncImage(
+                            model = uri,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .testTag("share_journal_cover_image"),
+                        )
+                    } else {
+                        Image(
+                            painter = previewCoverPainter,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .testTag("share_journal_cover_image"),
+                        )
+                    }
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        0f to Color.Transparent,
+                                        0.45f to Color.Transparent,
+                                        1f to Color.Black.copy(alpha = 0.7f),
+                                    ),
+                                ),
+                    )
+                }
                 Text(
                     text = journal.title,
                     modifier = Modifier.padding(Spacing.lg),
@@ -440,25 +530,26 @@ private fun ShareJournalCard(
                 )
             }
 
-            // Info strip below the cover
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                        .padding(Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-            ) {
-                Text(
-                    text = journal.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = stringResource(Res.string.last_updated_prefix, journal.lastUpdated.toReadableDateShort()),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            if (showInfoStrip) {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                            .padding(Spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
+                    Text(
+                        text = journal.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = stringResource(Res.string.last_updated_prefix, journal.lastUpdated.toReadableDateShort()),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }

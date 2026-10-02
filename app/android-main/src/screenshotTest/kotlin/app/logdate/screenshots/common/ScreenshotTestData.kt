@@ -40,6 +40,13 @@ object ScreenshotTestData {
         lastUpdated = baseTimestamp,
     )
 
+    val sharedJournal =
+        sampleJournal.copy(
+            title = "Life with Milo",
+            description = "Camping together",
+            coverImageUri = "android.resource://studio.hypertext.logdate.debug/drawable/sample_note_photo",
+        )
+
     val sampleJournal2 = Journal(
         id = Uuid.parse("00000000-0000-0000-0000-000000000002"),
         title = "Travel Log",

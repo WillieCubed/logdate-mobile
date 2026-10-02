@@ -746,13 +746,14 @@ fun A47_ShareJournalBookPosture() {
             ShareJournalScreenContent(
                 uiState =
                     ShareJournalUiState.Success(
-                        journal = ScreenshotTestData.sampleJournal,
+                        journal = ScreenshotTestData.sharedJournal,
                         lastUpdatedDisplay = "Last updated Feb 20, 2025",
                     ),
                 onGoBack = {},
                 onShareToInstagram = {},
                 onShareQrCode = {},
                 onShareJournal = {},
+                previewCoverPainter = painterResource(R.drawable.sample_note_photo),
             )
         }
     }

@@ -1,7 +1,9 @@
 package app.logdate.screenshots.flows.flow05_journals
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
+import app.logdate.client.R
 import app.logdate.feature.journals.ui.creation.JournalCreationScreenContent
 import app.logdate.feature.journals.ui.detail.EntryDisplayData
 import app.logdate.feature.journals.ui.detail.JournalDetailScreenContent
@@ -242,13 +244,14 @@ fun S13_ShareJournalSuccess() {
         ShareJournalScreenContent(
             uiState =
                 ShareJournalUiState.Success(
-                    journal = ScreenshotTestData.sampleJournal,
+                    journal = ScreenshotTestData.sharedJournal,
                     lastUpdatedDisplay = "Last updated Feb 20, 2025",
                 ),
             onGoBack = {},
             onShareToInstagram = {},
             onShareQrCode = {},
             onShareJournal = {},
+            previewCoverPainter = painterResource(R.drawable.sample_note_photo),
         )
     }
 }
