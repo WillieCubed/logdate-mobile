@@ -2,6 +2,7 @@ package app.logdate.client.domain.location.history.replay
 
 import app.logdate.client.domain.export.ExportLocationHistoryItem
 import app.logdate.client.domain.export.LocationHistoryPayload
+import app.logdate.client.domain.export.archive.ArchiveLocationSample
 import app.logdate.client.domain.location.history.HistoryReconstructionParameters
 import app.logdate.client.domain.location.history.ReconstructLocationDay
 import app.logdate.shared.model.location.JourneyLeg
@@ -21,10 +22,11 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 /**
- * Replays an exported `location_history.json` through the day reconstruction, old and current,
+ * Replays exported location history through the day reconstruction, old and current,
  * so changes to it can be judged against real recordings instead of tidy fixtures.
  *
- * Skipped unless `LOCATION_REPLAY_JSON` names the file; run it through `./run location-replay`.
+ * Skipped unless `LOCATION_REPLAY_JSON` names the file (`location_history.json` from a v1 archive
+ * or `location-history.jsonl` from a v2 one); run it through `./run location-replay`.
  * Everything it writes stays under `LOCATION_REPLAY_OUT`, which defaults to a `replay` folder next
  * to the input. The input is private location history, so keep both out of the repository.
  */
@@ -60,11 +62,36 @@ class LocationReplayTool {
     private fun withMinimumStay(minimumStay: Duration) =
         ReconstructLocationDay(parameters = HistoryReconstructionParameters(minimumStay = minimumStay))
 
-    private fun decode(file: File): List<LocationObservation> =
-        Json { ignoreUnknownKeys = true }
+    /** Reads either archive format: v1 `location_history.json` or v2 `location-history.jsonl`. */
+    private fun decode(file: File): List<LocationObservation> {
+        val json = Json { ignoreUnknownKeys = true }
+        if (file.name.endsWith(".jsonl")) {
+            return file
+                .readLines()
+                .filter { it.isNotBlank() }
+                .mapIndexed { index, line -> json.decodeFromString(ArchiveLocationSample.serializer(), line).toObservation(index) }
+        }
+        return json
             .decodeFromString(LocationHistoryPayload.serializer(), file.readText())
             .locationHistory
             .map { it.toObservation() }
+    }
+
+    /** v2 archives keep no sample, owner or device ids, so each line gets a stable stand-in. */
+    private fun ArchiveLocationSample.toObservation(line: Int) =
+        LocationObservation(
+            id = "line-${line.toString().padStart(6, '0')}",
+            ownerId = "owner",
+            deviceId = "device",
+            timestamp = timestamp,
+            latitude = latitude,
+            longitude = longitude,
+            accuracyMeters = accuracyMeters?.toFloat(),
+            speedMetersPerSecond = speedMetersPerSecond?.toFloat(),
+            bearingDegrees = bearingDegrees?.toFloat(),
+            source = captureSource,
+            isMock = isMock,
+        )
 
     private fun ExportLocationHistoryItem.toObservation() =
         LocationObservation(

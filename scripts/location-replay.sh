@@ -4,7 +4,7 @@
 # the samples behind them (capture source, accuracy, cadence).
 #
 # Usage:
-#   ./run location-replay <export.zip | location_history.json> [time-zone]
+#   ./run location-replay <export.zip | location_history.json | location-history.jsonl> [time-zone]
 #
 # The export holds private location history. Everything is copied under tmp/location-replay/,
 # which git ignores; never commit the input or the report.
@@ -12,28 +12,31 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-readonly INPUT="${1:?usage: location-replay <export.zip | location_history.json> [time-zone]}"
+readonly INPUT="${1:?usage: location-replay <export.zip | location_history.json | location-history.jsonl> [time-zone]}"
 readonly ZONE="${2:-}"
 readonly NAME="$(basename "${INPUT%.*}")"
 readonly WORK_DIR="tmp/location-replay/${NAME}"
 
 mkdir -p "$WORK_DIR"
 
+# v1 archives hold location_history.json; v2 archives hold data/location-history.jsonl.
 case "$INPUT" in
-    *.json)
-        cp "$INPUT" "$WORK_DIR/location_history.json"
+    *.json | *.jsonl)
+        samples="$WORK_DIR/$(basename "$INPUT")"
+        cp "$INPUT" "$samples"
         ;;
     *)
-        entry="$(unzip -Z1 "$INPUT" | grep -m1 'location_history\.json$' || true)"
+        entry="$(unzip -Z1 "$INPUT" | grep -m1 -E '(location_history\.json|location-history\.jsonl)$' || true)"
         if [[ -z "$entry" ]]; then
-            echo "No location_history.json inside $INPUT" >&2
+            echo "No location history inside $INPUT" >&2
             exit 1
         fi
-        unzip -p "$INPUT" "$entry" >"$WORK_DIR/location_history.json"
+        samples="$WORK_DIR/$(basename "$entry")"
+        unzip -p "$INPUT" "$entry" >"$samples"
         ;;
 esac
 
-LOCATION_REPLAY_JSON="$PWD/$WORK_DIR/location_history.json" \
+LOCATION_REPLAY_JSON="$PWD/$samples" \
     LOCATION_REPLAY_OUT="$PWD/$WORK_DIR/replay" \
     LOCATION_REPLAY_ZONE="$ZONE" \
     ./gradlew :client:domain:jvmTest \
