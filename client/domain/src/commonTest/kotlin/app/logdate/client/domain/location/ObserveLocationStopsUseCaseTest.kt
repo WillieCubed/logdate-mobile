@@ -132,6 +132,23 @@ class ObserveLocationStopsUseCaseTest {
         }
 
     @Test
+    fun `invoke joins samples recorded before the owner was known`() =
+        runTest {
+            val baseTime = Instant.fromEpochMilliseconds(1_000)
+            val history =
+                (0..10).map {
+                    historyItem(timestamp = baseTime + (it * 3).minutes, latitude = 37.7749, longitude = -122.4194)
+                        .copy(userId = if (it % 2 == 0) "default_user" else "user")
+                }
+            val useCase = ObserveLocationStopsUseCase(ObserveLocationHistoryUseCase(FakeLocationHistoryRepository(history)))
+
+            val result = useCase().first()
+
+            assertEquals(1, result.size)
+            assertEquals(history.size, result.single().sampleCount)
+        }
+
+    @Test
     fun `invoke excludes timeline review captures from activity stops`() =
         runTest {
             val baseTime = Instant.fromEpochMilliseconds(1_000)

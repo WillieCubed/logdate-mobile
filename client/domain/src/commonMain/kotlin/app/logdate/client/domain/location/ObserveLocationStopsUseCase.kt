@@ -8,7 +8,10 @@ import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
 import app.logdate.shared.model.location.PlaceVisit
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlin.time.Duration
 
@@ -21,13 +24,16 @@ import kotlin.time.Duration
 class ObserveLocationStopsUseCase(
     private val observeLocationHistoryUseCase: ObserveLocationHistoryUseCase,
     private val reconstruct: ReconstructLocationDay = ReconstructLocationDay(),
+    private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
-    operator fun invoke(): Flow<List<LocationStop>> = observeLocationHistoryUseCase().map(::aggregateStops)
+    /** Reconstruction is heavy over long history, so it never runs on the collector's (often main) thread. */
+    operator fun invoke(): Flow<List<LocationStop>> = observeLocationHistoryUseCase().map(::aggregateStops).flowOn(dispatcher)
 
     internal fun aggregateStops(history: List<LocationHistoryItem>): List<LocationStop> {
         val samples = history.filter { item -> item.countsTowardActivityStops() }
         val samplesById = samples.associateBy { it.sampleId }
-        return reconstruct(samples.map { it.toObservation(it.userId) })
+        val owners = ownersByDevice(samples)
+        return reconstruct(samples.map { it.toObservation(if (it.userId == LEGACY_OWNER) owners[it.deviceId] ?: it.userId else it.userId) })
             .filterIsInstance<PlaceVisit>()
             .map { visit -> toStop(visit, visit.evidenceIds.mapNotNull(samplesById::get).sortedBy { it.timestamp }) }
             .sortedByDescending { it.endTime }
@@ -63,7 +69,21 @@ class ObserveLocationStopsUseCase(
         )
     }
 
+    /**
+     * Samples recorded before the account owner was known carry a placeholder owner. They belong to
+     * the same person as the device's other samples, so they are reconstructed together.
+     */
+    private fun ownersByDevice(samples: List<LocationHistoryItem>): Map<String, String> =
+        samples
+            .filter { it.userId != LEGACY_OWNER }
+            .groupBy { it.deviceId }
+            .mapValues { (_, items) -> items.maxBy { it.timestamp }.userId }
+
     private fun LocationHistoryItem.countsTowardActivityStops(): Boolean =
         captureSource != LocationCaptureSource.TIMELINE_REVIEW &&
             captureSource != LocationCaptureSource.JOURNAL_ENTRY
+
+    private companion object {
+        const val LEGACY_OWNER = "default_user"
+    }
 }

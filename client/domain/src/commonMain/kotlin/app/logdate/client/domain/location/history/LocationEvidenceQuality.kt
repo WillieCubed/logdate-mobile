@@ -32,6 +32,11 @@ private const val MINIMUM_SPIKE_METERS = 150.0
  * cannot say what happened. A short quiet stretch that resumes at the same spot is not a gap: the
  * phone simply had nothing new to report while the person stayed put.
  */
+internal fun HistoryReconstructionParameters.isPrecise(
+    sample: LocationObservation,
+    acceptUnrated: Boolean = false,
+): Boolean = sample.accuracyMeters?.let { it in 0f..maximumPreciseAccuracyMeters } ?: acceptUnrated
+
 internal fun HistoryReconstructionParameters.isRecordingGap(
     previous: LocationObservation,
     next: LocationObservation,
@@ -39,7 +44,7 @@ internal fun HistoryReconstructionParameters.isRecordingGap(
     val quiet = next.timestamp - previous.timestamp
     if (quiet <= maximumGap) return false
     if (quiet > maximumQuietStay) return true
-    val placeable = listOf(previous, next).all { sample -> sample.accuracyMeters?.let { it <= maximumPreciseAccuracyMeters } ?: true }
+    val placeable = isPrecise(previous, acceptUnrated = true) && isPrecise(next, acceptUnrated = true)
     return !placeable || distanceMeters(previous, next) > stayRadiusMeters + accuracyAllowanceMeters
 }
 
@@ -59,10 +64,7 @@ internal fun preciseSamples(
     parameters: HistoryReconstructionParameters,
     acceptUnrated: Boolean = false,
 ): Set<String> {
-    val candidates =
-        samples.filter { sample ->
-            sample.accuracyMeters?.let { it in 0f..parameters.maximumPreciseAccuracyMeters } ?: acceptUnrated
-        }
+    val candidates = samples.filter { parameters.isPrecise(it, acceptUnrated) }
     return candidates
         .filterIndexed { index, sample ->
             val previous = candidates.getOrNull(index - 1)
@@ -112,7 +114,8 @@ internal fun weightedCenter(samples: List<LocationObservation>): Pair<Double, Do
 
 /**
  * A running [weightedCenter], for growing a visit one sample at a time. Offsets are summed from the
- * first sample, so samples at one exact spot give back exactly that spot.
+ * first sample, so samples at one exact spot give back exactly that spot, and longitude offsets
+ * take the short way across the antimeridian.
  */
 internal class CenterAccumulator {
     private var origin: Pair<Double, Double>? = null
@@ -123,7 +126,7 @@ internal class CenterAccumulator {
     val value: Pair<Double, Double>
         get() {
             val (latitude, longitude) = checkNotNull(origin) { "A centre needs at least one sample" }
-            return latitude + latitudeOffset / total to longitude + longitudeOffset / total
+            return latitude + latitudeOffset / total to wrapLongitude(longitude + longitudeOffset / total)
         }
 
     fun add(sample: LocationObservation) {
@@ -131,10 +134,18 @@ internal class CenterAccumulator {
         val accuracy = (sample.accuracyMeters ?: UNKNOWN_ACCURACY_METERS).coerceAtLeast(MINIMUM_WEIGHT_ACCURACY_METERS)
         val weight = 1.0 / (accuracy * accuracy)
         latitudeOffset += (sample.latitude - latitude) * weight
-        longitudeOffset += (sample.longitude - longitude) * weight
+        longitudeOffset += wrapLongitude(sample.longitude - longitude) * weight
         total += weight
     }
 }
+
+/** Brings a longitude or longitude difference into (-180, 180]. */
+private fun wrapLongitude(degrees: Double): Double =
+    when {
+        degrees > 180.0 -> degrees - 360.0
+        degrees <= -180.0 -> degrees + 360.0
+        else -> degrees
+    }
 
 internal fun Pair<Double, Double>.distanceTo(sample: LocationObservation): Double =
     geographicDistance(first, second, sample.latitude, sample.longitude)

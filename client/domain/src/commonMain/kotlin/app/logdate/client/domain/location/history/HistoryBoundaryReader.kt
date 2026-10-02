@@ -166,8 +166,11 @@ internal class ContinuityTracker(
     private val center = CenterAccumulator()
     private var hasCenter = false
     private var awaySince: Instant? = null
+    private var rated = 0
+    private var unrated = 0
 
     init {
+        count(first)
         include(first)
     }
 
@@ -176,6 +179,7 @@ internal class ContinuityTracker(
         next: LocationObservation,
     ): Boolean {
         if (parameters.isRecordingGap(previous, next)) return true
+        count(previous)
         if (!previous.isPrecise()) return false
         if (hasCenter && center.value.distanceTo(previous) > parameters.neighborhoodMeters) {
             val since = awaySince ?: previous.timestamp.also { awaySince = it }
@@ -186,11 +190,16 @@ internal class ContinuityTracker(
         return false
     }
 
+    private fun count(sample: LocationObservation) {
+        if (sample.accuracyMeters == null) unrated++ else rated++
+    }
+
     private fun include(sample: LocationObservation) {
         if (!sample.isPrecise()) return
         center.add(sample)
         hasCenter = true
     }
 
-    private fun LocationObservation.isPrecise() = accuracyMeters?.let { it in 0f..parameters.maximumPreciseAccuracyMeters } == true
+    /** Unrated fixes count while they are most of what was recorded, as in [ReconstructLocationDay]. */
+    private fun LocationObservation.isPrecise() = parameters.isPrecise(this, acceptUnrated = unrated >= rated)
 }

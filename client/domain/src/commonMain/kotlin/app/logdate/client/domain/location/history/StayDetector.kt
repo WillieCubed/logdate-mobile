@@ -31,13 +31,17 @@ internal class StayDetector(
         val stays = mutableListOf<DetectedStay>()
         var start = 0
         while (start < points.size) {
-            val stay = grow(points, start)?.let { trim(points, it) }?.takeIf { qualifies(points, it) }
-            if (stay == null) {
-                start++
-            } else {
-                stays += stay
-                start = stay.range.last + 1
-            }
+            val candidate = grow(points, start)
+            val stay = candidate?.let { trim(points, it) }?.takeIf { qualifies(points, it) }
+            start =
+                when {
+                    stay != null -> stay.range.last + 1
+                    // A long candidate that failed (riding, drifting) would fail again from its next
+                    // sample, so halve the distance to its end rather than regrowing it from every one.
+                    candidate != null -> maxOf(start + 1, (start + candidate.range.last) / 2)
+                    else -> start + 1
+                }
+            stay?.let(stays::add)
         }
         return stays
     }
@@ -55,34 +59,44 @@ internal class StayDetector(
     ): DetectedStay? {
         val anchors = mutableListOf(start)
         val center = CenterAccumulator().apply { add(points[start]) }
+        // Fixed once the stay first lasts long enough, so a centre that creeps with a slow drift
+        // ends the stay instead of following the drift until the whole stretch is rejected.
+        var settled: Pair<Double, Double>? = null
+        val fits = { sample: LocationObservation -> belongs(center.value, sample) && settled?.let { belongs(it, sample) } != false }
         var index = start + 1
         while (index < points.size) {
-            if (belongs(center.value, points[index])) {
+            if (fits(points[index])) {
                 anchors += index
                 center.add(points[index])
+                if (settled == null && points[index].timestamp - points[start].timestamp >= parameters.minimumStay) settled = center.value
                 index++
                 continue
             }
-            index = returnAfterDrift(points, center.value, index) ?: break
+            index = returnAfterDrift(points, center.value, index, fits) ?: break
         }
         return DetectedStay(start..anchors.last(), anchors).takeIf { lasts(points, it) }
     }
 
     /**
      * The index where samples come back to the stay, provided the ones away from it span no longer
-     * than the excursion tolerance. One stray fix between two at-home fixes spans no time at all,
-     * however far apart the phone happened to sample.
+     * than the excursion tolerance and look like noise rather than a trip. One stray fix between two
+     * at-home fixes spans no time at all, however far apart the phone happened to sample; two or more
+     * fixes beyond the neighbourhood, or a recorded ride, are a real outing.
      */
     private fun returnAfterDrift(
         points: List<LocationObservation>,
         center: Pair<Double, Double>,
         firstAway: Int,
+        fits: (LocationObservation) -> Boolean,
     ): Int? {
         val leftAt = points[firstAway].timestamp
-        var index = firstAway + 1
+        var farAway = 0
+        var index = firstAway
         while (index < points.size) {
-            if (belongs(center, points[index])) return index
-            if (points[index].timestamp - leftAt > parameters.excursionTolerance) return null
+            val sample = points[index]
+            if (index > firstAway && fits(sample)) return index
+            if (sample.timestamp - leftAt > parameters.excursionTolerance || sample.activity in RIDING_MODES) return null
+            if (center.distanceTo(sample) > parameters.neighborhoodMeters && ++farAway > 1) return null
             index++
         }
         return null

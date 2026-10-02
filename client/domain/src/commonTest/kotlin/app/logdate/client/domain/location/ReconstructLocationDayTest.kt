@@ -194,6 +194,79 @@ class ReconstructLocationDayTest {
     }
 
     @Test
+    fun `a long stay whose fixes slowly shift is still a visit`() {
+        val venue =
+            (0..180).map {
+                sample(
+                    "venue-$it",
+                    40.minutes + it.minutes,
+                    northMeters = 6_000.0 + it * (150.0 / 180),
+                    mode = TravelMode.STILL,
+                )
+            }
+        val items =
+            reconstruct(
+                stayAt(0.0, 0.minutes, 30.minutes) + drive(30.minutes, 40.minutes, fromMeters = 0.0) + venue +
+                    drive(221.minutes, 231.minutes, fromMeters = 6_150.0).map {
+                        it.moved(
+                            northMeters =
+                                -2 * (it.timestamp - base - 221.minutes).inWholeSeconds * 10.0,
+                        )
+                    },
+            )
+        val middle = base + 130.minutes
+        assertTrue(items.filter { it.start <= middle && it.end >= middle }.all { it is PlaceVisit }, items.describe())
+        assertTrue(items.any { it is PlaceVisit && it.start <= middle && it.end >= middle }, items.describe())
+    }
+
+    @Test
+    fun `a short drive out and back is a trip rather than drift`() {
+        val outAndBack =
+            (1..24).map {
+                sample(
+                    "trip-$it",
+                    20.minutes + (it * 10).seconds,
+                    northMeters =
+                        if (it <=
+                            12
+                        ) {
+                            it * 170.0
+                        } else {
+                            (24 - it) * 170.0
+                        },
+                    mode = TravelMode.VEHICLE,
+                )
+            }
+        val items = reconstruct(stayAt(0.0, 0.minutes, 20.minutes) + outAndBack + stayAt(0.0, 25.minutes, 45.minutes))
+        assertTrue(items.any { it is JourneyLeg && it.route.isNotEmpty() }, items.describe())
+    }
+
+    @Test
+    fun `a stay across the antimeridian stays where it is`() {
+        val samples =
+            (0..10).map {
+                LocationObservation(
+                    "dateline-$it",
+                    "user",
+                    "phone",
+                    base + it.minutes,
+                    -17.0,
+                    if (it % 2 ==
+                        0
+                    ) {
+                        179.9995
+                    } else {
+                        -179.9995
+                    },
+                    10f,
+                )
+            }
+        val visit = reconstruct(samples).single() as PlaceVisit
+        assertTrue(visit.confirmedStay)
+        assertTrue(kotlin.math.abs(visit.longitude) > 179.9)
+    }
+
+    @Test
     fun `a brief drift away is absorbed into the stay`() {
         val samples =
             stayAt(0.0, 0.minutes, 40.minutes).map {

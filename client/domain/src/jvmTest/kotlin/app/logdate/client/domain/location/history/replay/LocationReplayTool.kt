@@ -47,8 +47,6 @@ class LocationReplayTool {
                 output.resolve("${day.date}-${name.slug()}.geojson").writeText(geoJson(items).toString())
             }
         }
-        println(report)
-        println("Replay written to ${output.absolutePath}")
     }
 
     private fun algorithms(): List<ReplayAlgorithm> =
