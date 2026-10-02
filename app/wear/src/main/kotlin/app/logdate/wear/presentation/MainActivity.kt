@@ -122,6 +122,7 @@ fun WearApp(initialRouteName: String? = null) {
                     entry<WearMoodCheckInRoute> {
                         MoodCheckInScreen(
                             onNavigateBack = navigateBack,
+                            // The recorder is the Home screen; it never starts recording on its own.
                             onNavigateToVoiceNote = navigateBack,
                         )
                     }
