@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -160,6 +161,18 @@ class FeatureFlagStoreTest {
 
         assertEquals(keys.size, keys.toSet().size)
     }
+
+    @Test
+    fun `the watch experience flag starts off and can be turned on`() =
+        runTest {
+            val flag = assertNotNull(FeatureFlag.forKey("watch_experience_v2_enabled"))
+
+            assertFalse(store.isEnabled(flag))
+
+            store.setEnabled(flag, enabled = true)
+
+            assertTrue(store.isEnabled(flag), "testers turn this flag on in release builds")
+        }
 }
 
 private class TestPreferencesDataStore : DataStore<Preferences> {

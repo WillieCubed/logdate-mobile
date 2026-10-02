@@ -90,6 +90,15 @@ enum class FeatureFlag(
 
     /** Android Handoff for the editor, so an unfinished entry continues on another Android device. */
     EDITOR_HANDOFF(key = "editor_handoff_enabled", defaultEnabled = false),
+
+    /**
+     * The redesigned watch experience and its phone companion: the watch app, and the phone
+     * screens that set up and manage the watch.
+     *
+     * Off by default while the redesign is built. Once it ships to everyone, delete this flag
+     * together with every branch that reads it and the watch screens it replaces.
+     */
+    WATCH_EXPERIENCE_V2(key = "watch_experience_v2_enabled", defaultEnabled = false),
     ;
 
     companion object {
