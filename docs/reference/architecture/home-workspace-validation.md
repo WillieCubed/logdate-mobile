@@ -1,6 +1,6 @@
 # Home workspace validation
 
-Validated October 2, 2026. `HOME_WORKSPACE_V2` remains disabled. This is a presentation migration; it introduces no server or storage migration.
+Validated October 2, 2026. `HOME_WORKSPACE_V2` is enabled for the requested internal-testing delivery; native-map acceptance remains unresolved. This is a presentation migration; it introduces no server or storage migration.
 
 ## Automated checks
 
@@ -66,7 +66,7 @@ The two focused Managed Device scenarios pass on both phone API 36 and tablet AP
 
 ## Release boundaries
 
-GitHub supplies the existing debug Maps configuration for native acceptance. The workspace remains disabled until both managed targets pass native-map interactions and unobscured runtime captures are inspected. Map failure must continue to leave history browsing available.
+GitHub supplies the existing debug Maps configuration for native acceptance. Native-map acceptance remains required before production promotion; it has not passed on the managed targets. Map failure must continue to leave history browsing available.
 
 This validation does not establish field recording reliability or battery life. No physical device was used. Apple presentation changes remain outside this delivery.
 
@@ -85,3 +85,9 @@ The [initial configured run](https://github.com/WillieCubed/logdate-mobile/actio
 The exported phone Rewind capture is obscured by a System UI ANR and is not accepted as visual proof. The native-map test did not complete, so activation remains blocked pending the repaired run. Desktop CI renders, static analysis, Android release assembly, and server/client integration passed. Unit-test and Android/Wear screenshot runners received simultaneous shutdown signals; the former was restarted. The screenshot log also reported older Wear/adaptive mismatches and missing references before shutdown; those reports are not a passing gate.
 
 The [repaired orchestrated run](https://github.com/WillieCubed/logdate-mobile/actions/runs/37058215099) still crashed during per-test process handling and produced an incomplete native result. The focused native-map/Rewind workflow now uses the repository's existing `logdate.androidTestOrchestrator=false` mode, matching earlier local Managed Device acceptance. This does not remove either test or relax the no-skip assertion.
+
+## Expedited internal activation
+
+The user reprioritized immediate access to the new UI after the delayed deployment. The default is now enabled for internal testing, with explicit saved opt-outs and the presentation rollback switch preserved. This does not change data, tracking preferences, or production promotion. The default/rollback regression first failed with the old disabled default, then passed after activation. Affected datastore/core tests, scoped lint and Detekt, architecture enforcement, and debug assembly pass.
+
+The [standard-instrumentation run](https://github.com/WillieCubed/logdate-mobile/actions/runs/37059421218) completes both targets without skips: Rewind interaction passes, but native map loading times out after 30 seconds on both. This is an unresolved map/configuration/runtime issue, not a passing native acceptance result. Historical browsing and the map-unavailable recovery path have earlier Managed Device acceptance. Native maps, unobscured captures for both targets, and the broad inherited screenshot failures remain release evidence limitations; no production promotion or physical-device acceptance is claimed.

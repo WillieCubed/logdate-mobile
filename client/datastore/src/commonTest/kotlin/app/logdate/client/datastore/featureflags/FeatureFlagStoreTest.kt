@@ -29,6 +29,16 @@ class FeatureFlagStoreTest {
         }
 
     @Test
+    fun `Home workspace is enabled unless explicitly disabled`() =
+        runTest {
+            assertTrue(store.isEnabled(FeatureFlag.HOME_WORKSPACE_V2))
+
+            store.setEnabled(FeatureFlag.HOME_WORKSPACE_V2, enabled = false)
+
+            assertFalse(store.isEnabled(FeatureFlag.HOME_WORKSPACE_V2))
+        }
+
+    @Test
     fun `setting a flag persists it and overrides the default`() =
         runTest {
             store.setEnabled(FeatureFlag.LIBRARY, enabled = false)
