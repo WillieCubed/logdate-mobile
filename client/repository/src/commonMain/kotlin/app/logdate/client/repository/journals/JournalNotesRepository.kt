@@ -66,25 +66,6 @@ interface JournalNotesRepository {
         }
 
     /**
-     * Fetches audio notes older than [beforeExclusive], newest first.
-     */
-    suspend fun getAudioNotesBefore(
-        beforeExclusive: Instant,
-        limit: Int,
-    ): List<JournalNote.Audio> =
-        allNotesObserved
-            .first()
-            .filterIsInstance<JournalNote.Audio>()
-            .filter { note -> note.creationTimestamp < beforeExclusive }
-            .sortedByDescending(JournalNote::creationTimestamp)
-            .take(limit)
-
-    /**
-     * Whether any audio note is older than [beforeExclusive].
-     */
-    suspend fun hasAudioNotesBefore(beforeExclusive: Instant): Boolean = getAudioNotesBefore(beforeExclusive, limit = 1).isNotEmpty()
-
-    /**
      * Observes the notes for a single calendar day.
      */
     fun observeNotesForDay(day: LocalDate): Flow<List<JournalNote>> =

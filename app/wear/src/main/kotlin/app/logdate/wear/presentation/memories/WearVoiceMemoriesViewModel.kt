@@ -12,7 +12,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -35,8 +36,8 @@ data class VoiceMemoriesUiState(
 )
 
 /**
- * The watch's newest-first list of voice memories. The newest [PAGE_SIZE] stay live as recordings
- * arrive or go; older ones are paged in on request.
+ * The watch's newest-first list of voice memories. The whole list is one live query that widens by
+ * [PAGE_SIZE] on request, so a recording that arrives or is deleted anywhere in it shows up at once.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WearVoiceMemoriesViewModel(
@@ -47,21 +48,29 @@ class WearVoiceMemoriesViewModel(
         const val PAGE_SIZE = 30
     }
 
-    private val olderNotes = MutableStateFlow<List<JournalNote.Audio>>(emptyList())
-    private val loadingMore = MutableStateFlow(false)
+    /** How many memories the list is asked to show. */
+    private val requested = MutableStateFlow(PAGE_SIZE)
+
+    private class Window(
+        val limit: Int,
+        val notes: List<JournalNote.Audio>,
+    )
 
     val uiState: StateFlow<VoiceMemoriesUiState> =
-        combine(notesRepository.observeRecentAudioNotes(PAGE_SIZE), olderNotes, loadingMore) { recent, older, loading ->
-            Triple(recent, older, loading)
-        }.mapLatest { (recent, older, loading) ->
-            val notes = (recent + older).distinctBy { it.uid }.sortedByDescending { it.creationTimestamp }
-            VoiceMemoriesUiState(
-                memories = notes.map { VoiceMemoryItem(it.uid, it.creationTimestamp, it.durationMs) },
-                isLoaded = true,
-                hasMore = notes.lastOrNull()?.let { notesRepository.hasAudioNotesBefore(it.creationTimestamp) } ?: false,
-                isLoadingMore = loading,
-            )
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, VoiceMemoriesUiState())
+        requested
+            .flatMapLatest { limit ->
+                // One extra row tells whether older recordings exist, without a cursor that recordings
+                // sharing a creation time could fall between.
+                notesRepository.observeRecentAudioNotes(limit + 1).map { Window(limit, it) }
+            }.combine(requested) { window, wanted ->
+                val notes = window.notes.sortedByDescending { it.creationTimestamp }
+                VoiceMemoriesUiState(
+                    memories = notes.take(window.limit).map { VoiceMemoryItem(it.uid, it.creationTimestamp, it.durationMs) },
+                    isLoaded = true,
+                    hasMore = notes.size > window.limit,
+                    isLoadingMore = wanted > window.limit,
+                )
+            }.stateIn(viewModelScope, SharingStarted.Eagerly, VoiceMemoriesUiState())
 
     init {
         viewModelScope.launch {
@@ -72,16 +81,8 @@ class WearVoiceMemoriesViewModel(
     }
 
     fun loadMore() {
-        val oldest = uiState.value.memories.lastOrNull() ?: return
-        if (loadingMore.value) return
-        loadingMore.value = true
-        viewModelScope.launch {
-            try {
-                val page = notesRepository.getAudioNotesBefore(oldest.createdAt, PAGE_SIZE)
-                olderNotes.update { it + page }
-            } finally {
-                loadingMore.value = false
-            }
-        }
+        val state = uiState.value
+        if (!state.hasMore || state.isLoadingMore) return
+        requested.update { it + PAGE_SIZE }
     }
 }

@@ -4,13 +4,14 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import app.logdate.wear.sync.WearDataLayerClient
-import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -28,11 +29,11 @@ import kotlin.uuid.Uuid
 
 /**
  * Tests [WearVoiceMemoriesViewModel]: the newest-first list of voice memories on the watch, the way
- * older ones are paged in, and the request that asks the phone for any it has not sent yet.
+ * the list widens a page at a time, and the request that asks the phone for any it has not sent yet.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WearVoiceMemoriesViewModelTest {
-    private val recent = MutableStateFlow<List<JournalNote.Audio>>(emptyList())
+    private val all = MutableStateFlow<List<JournalNote.Audio>>(emptyList())
     private val notesRepository = mockk<JournalNotesRepository>()
     private val dataLayerClient = mockk<WearDataLayerClient>(relaxed = true)
     private val base = Instant.fromEpochMilliseconds(1_710_000_000_000)
@@ -40,9 +41,10 @@ class WearVoiceMemoriesViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
-        every { notesRepository.observeRecentAudioNotes(any()) } returns recent
-        coEvery { notesRepository.hasAudioNotesBefore(any()) } returns false
-        coEvery { notesRepository.getAudioNotesBefore(any(), any()) } returns emptyList()
+        every { notesRepository.observeRecentAudioNotes(any()) } answers {
+            val limit = firstArg<Int>()
+            all.map { notes -> notes.sortedByDescending { it.creationTimestamp }.take(limit) }
+        }
     }
 
     @After
@@ -75,7 +77,7 @@ class WearVoiceMemoriesViewModelTest {
         runTest {
             val older = audioNote(base - 2.hours, durationMs = 12_000)
             val newer = audioNote(base - 1.hours, durationMs = 65_000)
-            recent.value = listOf(older, newer)
+            all.value = listOf(older, newer)
 
             val memories = viewModel().uiState.value.memories
 
@@ -88,92 +90,103 @@ class WearVoiceMemoriesViewModelTest {
     fun `a new recording appears at the top`() =
         runTest {
             val existing = audioNote(base - 2.hours)
-            recent.value = listOf(existing)
+            all.value = listOf(existing)
             val viewModel = viewModel()
 
             val fresh = audioNote(base)
-            recent.value = listOf(fresh, existing)
+            all.value = listOf(fresh, existing)
             runCurrent()
 
             assertEquals(listOf(fresh.uid, existing.uid), viewModel.uiState.value.memories.map { it.noteId })
         }
 
     @Test
-    fun `has more is true when an older recording exists`() =
+    fun `the live list asks for one more than a page to know whether older recordings exist`() =
         runTest {
-            val note = audioNote(base)
-            recent.value = listOf(note)
-            coEvery { notesRepository.hasAudioNotesBefore(note.creationTimestamp) } returns true
+            viewModel()
 
-            assertTrue(viewModel().uiState.value.hasMore)
+            verify { notesRepository.observeRecentAudioNotes(WearVoiceMemoriesViewModel.PAGE_SIZE + 1) }
         }
 
     @Test
-    fun `loading more appends the older page`() =
+    fun `has more is true when more than a page of recordings exists`() =
         runTest {
-            val newest = audioNote(base)
-            val olderA = audioNote(base - 1.hours)
-            val olderB = audioNote(base - 2.hours)
-            recent.value = listOf(newest)
-            coEvery { notesRepository.hasAudioNotesBefore(newest.creationTimestamp) } returns true
-            coEvery { notesRepository.getAudioNotesBefore(newest.creationTimestamp, WearVoiceMemoriesViewModel.PAGE_SIZE) } returns
-                listOf(olderA, olderB)
+            all.value = recordings(WearVoiceMemoriesViewModel.PAGE_SIZE + 1)
+
+            val state = viewModel().uiState.value
+
+            assertEquals(WearVoiceMemoriesViewModel.PAGE_SIZE, state.memories.size)
+            assertTrue(state.hasMore)
+        }
+
+    @Test
+    fun `has more is false when exactly a page of recordings exists`() =
+        runTest {
+            all.value = recordings(WearVoiceMemoriesViewModel.PAGE_SIZE)
+
+            val state = viewModel().uiState.value
+
+            assertEquals(WearVoiceMemoriesViewModel.PAGE_SIZE, state.memories.size)
+            assertFalse(state.hasMore)
+        }
+
+    @Test
+    fun `loading more widens the live list by a page`() =
+        runTest {
+            val extra = 5
+            all.value = recordings(WearVoiceMemoriesViewModel.PAGE_SIZE + extra)
             val viewModel = viewModel()
 
             viewModel.loadMore()
             runCurrent()
 
             val state = viewModel.uiState.value
-            assertEquals(listOf(newest.uid, olderA.uid, olderB.uid), state.memories.map { it.noteId })
-            assertFalse(state.isLoadingMore)
+            assertEquals(WearVoiceMemoriesViewModel.PAGE_SIZE + extra, state.memories.size)
             assertFalse(state.hasMore)
+            assertFalse(state.isLoadingMore)
         }
 
     @Test
-    fun `loading more keeps paging from the oldest memory shown`() =
+    fun `a recording deleted from an older page leaves the list`() =
         runTest {
-            val newest = audioNote(base)
-            val older = audioNote(base - 1.hours)
-            val oldest = audioNote(base - 2.hours)
-            recent.value = listOf(newest)
-            coEvery { notesRepository.hasAudioNotesBefore(any()) } returns true
-            coEvery { notesRepository.getAudioNotesBefore(newest.creationTimestamp, any()) } returns listOf(older)
-            coEvery { notesRepository.getAudioNotesBefore(older.creationTimestamp, any()) } returns listOf(oldest)
+            val notes = recordings(WearVoiceMemoriesViewModel.PAGE_SIZE + 5)
+            all.value = notes
+            val viewModel = viewModel()
+            viewModel.loadMore()
+            runCurrent()
+            val deleted = notes.last()
+
+            all.value = notes - deleted
+            runCurrent()
+
+            assertFalse(deleted.uid in viewModel.uiState.value.memories.map { it.noteId })
+            assertEquals(notes.size - 1, viewModel.uiState.value.memories.size)
+        }
+
+    @Test
+    fun `recordings sharing a creation time across a page boundary are all reachable`() =
+        runTest {
+            val total = WearVoiceMemoriesViewModel.PAGE_SIZE + 2
+            all.value = List(total) { audioNote(base) }
+            val viewModel = viewModel()
+            assertTrue(viewModel.uiState.value.hasMore)
+
+            viewModel.loadMore()
+            runCurrent()
+
+            assertEquals(total, viewModel.uiState.value.memories.size)
+        }
+
+    @Test
+    fun `loading more with nothing more does nothing`() =
+        runTest {
+            all.value = recordings(3)
             val viewModel = viewModel()
 
             viewModel.loadMore()
             runCurrent()
-            viewModel.loadMore()
-            runCurrent()
 
-            assertEquals(listOf(newest.uid, older.uid, oldest.uid), viewModel.uiState.value.memories.map { it.noteId })
-        }
-
-    @Test
-    fun `loading more with no memories does nothing`() =
-        runTest {
-            val viewModel = viewModel()
-
-            viewModel.loadMore()
-            runCurrent()
-
-            coVerify(exactly = 0) { notesRepository.getAudioNotesBefore(any(), any()) }
-        }
-
-    @Test
-    fun `a memory in both the live list and an older page is shown once`() =
-        runTest {
-            val newest = audioNote(base)
-            val other = audioNote(base - 1.hours)
-            recent.value = listOf(newest, other)
-            coEvery { notesRepository.hasAudioNotesBefore(any()) } returns true
-            coEvery { notesRepository.getAudioNotesBefore(other.creationTimestamp, any()) } returns listOf(other)
-            val viewModel = viewModel()
-
-            viewModel.loadMore()
-            runCurrent()
-
-            assertEquals(listOf(newest.uid, other.uid), viewModel.uiState.value.memories.map { it.noteId })
+            verify(exactly = 0) { notesRepository.observeRecentAudioNotes(2 * WearVoiceMemoriesViewModel.PAGE_SIZE + 1) }
         }
 
     @Test
@@ -183,6 +196,9 @@ class WearVoiceMemoriesViewModelTest {
 
             coVerify(exactly = 1) { dataLayerClient.sendMessage(WearAudioRequestPaths.SYNC_REQUEST_PATH, any()) }
         }
+
+    /** [count] recordings, each an hour apart, newest first. */
+    private fun recordings(count: Int) = List(count) { index -> audioNote(base - index.hours) }
 
     private fun audioNote(
         created: Instant,
