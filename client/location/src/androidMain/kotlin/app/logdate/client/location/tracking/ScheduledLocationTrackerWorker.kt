@@ -32,12 +32,16 @@ class ScheduledLocationTrackerWorker(
         Napier.i("ScheduledLocationTrackerWorker: Starting scheduled location tracking")
 
         try {
+            val settings = settingsRepository.getSettings()
+            if (!shouldRecordPeriodicSample(settings, ActivityAwareLocationService.captureStatus.value)) {
+                Napier.i("ScheduledLocationTrackerWorker: Activity-aware stream is recording; skipping this sample")
+                return Result.success()
+            }
             try {
                 val fix =
                     withTimeout(30.seconds) {
                         locationProvider.getCurrentFix()
                     }
-                val settings = settingsRepository.getSettings()
                 val pipeline =
                     if (settings.captureMode == LocationCaptureMode.ACTIVE) {
                         LocationCapturePipeline.OPTIMIZED_BACKGROUND

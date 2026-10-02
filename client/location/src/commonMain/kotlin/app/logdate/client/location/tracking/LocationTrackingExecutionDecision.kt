@@ -35,6 +35,16 @@ internal fun computeLocationTrackingExecutionDecision(settings: LocationTracking
     )
 }
 
+/**
+ * Whether the periodic background capture should record a sample. While the activity-aware stream
+ * is recording it already covers the period with better fixes, and an extra balanced-power fix in
+ * between would only add a coarser position to the same moment.
+ */
+internal fun shouldRecordPeriodicSample(
+    settings: LocationTrackingSettings,
+    streamStatus: LocationCaptureStatus,
+): Boolean = settings.captureMode != LocationCaptureMode.ACTIVE || streamStatus != LocationCaptureStatus.Running
+
 internal class ForegroundActivityCounter {
     private var resumedActivityCount = 0
 

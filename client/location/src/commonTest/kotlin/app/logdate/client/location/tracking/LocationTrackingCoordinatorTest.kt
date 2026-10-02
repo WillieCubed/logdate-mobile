@@ -111,4 +111,16 @@ class ForegroundActivityCounterTest {
 
         assertFalse(counter.hasForegroundActivities())
     }
+
+    @Test
+    fun `periodic samples pause only while the active stream is recording`() {
+        val active = LocationTrackingSettings(backgroundTrackingEnabled = true, captureMode = LocationCaptureMode.ACTIVE)
+        val passive = active.copy(captureMode = LocationCaptureMode.PASSIVE)
+
+        assertFalse(shouldRecordPeriodicSample(active, LocationCaptureStatus.Running))
+        assertTrue(shouldRecordPeriodicSample(active, LocationCaptureStatus.Starting))
+        assertTrue(shouldRecordPeriodicSample(active, LocationCaptureStatus.Failed))
+        assertTrue(shouldRecordPeriodicSample(active, LocationCaptureStatus.Stopped))
+        assertTrue(shouldRecordPeriodicSample(passive, LocationCaptureStatus.Running))
+    }
 }
