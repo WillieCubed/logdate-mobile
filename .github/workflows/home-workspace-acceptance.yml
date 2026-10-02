@@ -52,7 +52,7 @@ jobs:
           ./gradlew :app:android-main:smokeDevicesGroupDebugAndroidTest
           -Plogdate.androidTestClass=app.logdate.client.e2e.HomeWorkspaceE2ETest#nativeMapRemainsAvailableWhileBrowsingAndReturningFromFocusedContent,app.logdate.client.e2e.HomeWorkspaceE2ETest#rewindStoriesRemainDistinctWhileBrowsing
           -Pandroid.experimental.testOptions.managedDevices.maxConcurrentDevices=1
-          --max-workers=2 --console=plain
+          --max-workers=2 --continue --console=plain
       - name: Reject skipped native map acceptance
         shell: python
         run: |
