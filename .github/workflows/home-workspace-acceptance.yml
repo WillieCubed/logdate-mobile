@@ -1,0 +1,75 @@
+name: Home workspace acceptance
+run-name: Home workspace acceptance for ${{ github.sha }}
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'client/ui/**/workspace/**'
+      - 'client/feature/location-timeline/**'
+      - 'app/android-main/src/androidTest/**/HomeWorkspaceE2ETest.kt'
+      - '.github/workflows/home-workspace-acceptance.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  native-map:
+    name: Native map on managed phone and tablet
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+      - name: Materialize debug configuration
+        uses: ./.github/actions/setup-firebase-configs
+        with:
+          android-google-services-json-base64: ${{ secrets.LOGDATE_ANDROID_GOOGLE_SERVICES_JSON_DEBUG_BASE64 }}
+          android-maps-api-key: ${{ secrets.LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG }}
+          google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG }}
+      - name: Require native map configuration
+        shell: bash
+        run: test -n "$LOGDATE_GOOGLE_MAPS_API_KEY"
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+      - name: Run workspace acceptance on managed emulators
+        run: >-
+          ./gradlew :app:android-main:smokeDevicesGroupDebugAndroidTest
+          -Plogdate.androidTestClass=app.logdate.client.e2e.HomeWorkspaceE2ETest#nativeMapRemainsAvailableWhileBrowsingAndReturningFromFocusedContent,app.logdate.client.e2e.HomeWorkspaceE2ETest#rewindStoriesRemainDistinctWhileBrowsing
+          -Pandroid.experimental.testOptions.managedDevices.maxConcurrentDevices=1
+          --max-workers=2 --console=plain
+      - name: Reject skipped native map acceptance
+        shell: python
+        run: |
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          reports = list(Path('app/android-main/build/outputs/androidTest-results/managedDevice/debug').rglob('TEST-*.xml'))
+          native = [test for report in reports for test in ET.parse(report).getroot().iter('testcase')
+                    if test.get('name') == 'nativeMapRemainsAvailableWhileBrowsingAndReturningFromFocusedContent']
+          assert len(native) == 2, 'Both managed devices must report native map acceptance'
+          assert all(not list(test) for test in native), 'Native map acceptance must pass without skips'
+      - name: Upload acceptance results and rendered maps
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: home-workspace-acceptance-${{ github.sha }}
+          path: |
+            app/android-main/build/outputs/androidTest-results/managedDevice/debug/**/TEST-*.xml
+            app/android-main/build/outputs/managed_device_android_test_additional_output/**/*.png
+          if-no-files-found: warn
+          retention-days: 14

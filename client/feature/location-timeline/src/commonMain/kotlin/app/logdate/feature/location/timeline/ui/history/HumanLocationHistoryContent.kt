@@ -31,22 +31,24 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,8 +60,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.adaptive.AdaptivePaneLayout
+import app.logdate.ui.common.PlatformBackHandler
 import app.logdate.ui.common.adaptivePanelShape
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
+import app.logdate.ui.workspace.PanelContainment
+import app.logdate.ui.workspace.PanelGroup
+import app.logdate.ui.workspace.WorkspaceSearchScope
+import app.logdate.ui.workspace.WorkspaceSectionSwitch
+import app.logdate.ui.workspace.WorkspaceSupportingSheet
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.history_add_visit
 import logdate.client.feature.location.timeline.generated.resources.history_collapse_map
@@ -76,6 +85,7 @@ import logdate.client.feature.location.timeline.generated.resources.history_prev
 import logdate.client.feature.location.timeline.generated.resources.history_previous_stop
 import logdate.client.feature.location.timeline.generated.resources.history_recover
 import logdate.client.feature.location.timeline.generated.resources.history_replay
+import logdate.client.feature.location.timeline.generated.resources.history_search
 import logdate.client.feature.location.timeline.generated.resources.history_your_day
 import logdate.client.feature.location.timeline.generated.resources.history_your_places
 import org.jetbrains.compose.resources.stringResource
@@ -89,7 +99,13 @@ fun HumanLocationHistoryContent(
     mapContent: @Composable (Modifier) -> Unit = {},
     toolbarActions: @Composable RowScope.() -> Unit = {},
     showTitle: Boolean = true,
+    supportingDetail: (@Composable () -> Unit)? = null,
+    initialSupportingExtent: app.logdate.ui.workspace.SupportingExtent = app.logdate.ui.workspace.SupportingExtent.Peek,
 ) {
+    if (LocalWorkspaceEnabled.current) {
+        HumanHistoryWorkspace(state, actions, modifier, mapContent, toolbarActions, supportingDetail, initialSupportingExtent)
+        return
+    }
     BoxWithConstraints(
         modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer),
         contentAlignment = Alignment.TopCenter,
@@ -101,7 +117,7 @@ fun HumanLocationHistoryContent(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (showTitle) {
-                            Text("Locations", style = MaterialTheme.typography.titleLarge)
+                            Text("Places", style = MaterialTheme.typography.titleLarge)
                         }
                         if (tabsInAppBar) {
                             if (showTitle) {
@@ -141,25 +157,31 @@ fun HumanLocationHistoryContent(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun HistoryTabs(
     state: HumanLocationHistoryState,
     actions: HumanLocationHistoryActions,
     modifier: Modifier = Modifier,
 ) {
-    PrimaryTabRow(
-        selectedTabIndex = state.tab.ordinal,
+    Row(
         modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
-        HistoryTab.entries.forEach { tab ->
-            Tab(
-                selected = state.tab == tab,
-                onClick = { actions.onTab(tab) },
-                text = {
-                    Text(stringResource(if (tab == HistoryTab.Day) Res.string.history_your_day else Res.string.history_your_places))
-                },
-            )
+        HistoryTab.entries.forEachIndexed { index, tab ->
+            ToggleButton(
+                checked = state.tab == tab,
+                onCheckedChange = { actions.onTab(tab) },
+                modifier = Modifier.weight(1f),
+                shapes =
+                    if (index == 0) {
+                        ButtonGroupDefaults.connectedLeadingButtonShapes()
+                    } else {
+                        ButtonGroupDefaults.connectedTrailingButtonShapes()
+                    },
+            ) {
+                Text(stringResource(if (tab == HistoryTab.Day) Res.string.history_your_day else Res.string.history_your_places))
+            }
         }
     }
 }
@@ -323,7 +345,7 @@ private fun HistoryDayOverview(
     actions: HumanLocationHistoryActions,
     mapContent: @Composable (Modifier) -> Unit,
 ) {
-    var mapVisible by remember(state.dateLabel) { mutableStateOf(false) }
+    var mapVisible by remember(state.dateLabel) { mutableStateOf(true) }
     var replayVisible by remember(state.dateLabel) { mutableStateOf(false) }
     Column {
         FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -361,9 +383,12 @@ private fun HistoryDayList(
     state: HumanLocationHistoryState,
     actions: HumanLocationHistoryActions,
     modifier: Modifier,
+    listState: androidx.compose.foundation.lazy.LazyListState =
+        androidx.compose.foundation.lazy
+            .rememberLazyListState(),
     header: @Composable () -> Unit = {},
 ) {
-    LazyColumn(modifier, contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(modifier, state = listState, contentPadding = PaddingValues(bottom = 24.dp)) {
         item { header() }
         if (state.items.isEmpty()) {
             item {
@@ -437,6 +462,100 @@ private fun HistoryReplay(
                     Text(stringResource(Res.string.history_details))
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun HumanHistoryWorkspace(
+    state: HumanLocationHistoryState,
+    actions: HumanLocationHistoryActions,
+    modifier: Modifier,
+    mapContent: @Composable (Modifier) -> Unit,
+    toolbarActions: @Composable RowScope.() -> Unit,
+    supportingDetail: (@Composable () -> Unit)?,
+    initialSupportingExtent: app.logdate.ui.workspace.SupportingExtent,
+) {
+    WorkspaceSearchScope(
+        state.placesQuery,
+        stringResource(Res.string.history_search),
+        actions.onPlacesQuery,
+        enabled = state.tab == HistoryTab.Places && supportingDetail == null && !state.detailVisible,
+    )
+    var replayVisible by rememberSaveable { mutableStateOf(false) }
+    val listState =
+        androidx.compose.foundation.lazy
+            .rememberLazyListState()
+    val placesState =
+        androidx.compose.foundation.lazy
+            .rememberLazyListState()
+    PlatformBackHandler(enabled = state.detailVisible) { actions.onCloseDetail() }
+    WorkspaceSupportingSheet(
+        initialExtent = initialSupportingExtent,
+        supportingContainment =
+            if (state.tab == HistoryTab.Day ||
+                supportingDetail != null ||
+                state.detailVisible
+            ) {
+                PanelContainment.Working
+            } else {
+                PanelContainment.Collection
+            },
+        summary = state.recoveryMessage ?: if (state.tab == HistoryTab.Day) state.dateLabel else "${state.places.size} places",
+        modifier = modifier.fillMaxSize(),
+        header = {
+            WorkspaceSectionSwitch(
+                HistoryTab.entries.map {
+                    stringResource(
+                        if (it ==
+                            HistoryTab.Day
+                        ) {
+                            Res.string.history_your_day
+                        } else {
+                            Res.string.history_your_places
+                        },
+                    )
+                },
+                state.tab.ordinal,
+                { actions.onTab(HistoryTab.entries[it]) },
+            )
+        },
+        headerActions = toolbarActions,
+        summaryDetail = state.daySummary.takeIf { state.tab == HistoryTab.Day },
+        supportingContextKey = if (supportingDetail != null) "place" else state.selectedItemId.takeIf { state.detailVisible },
+        focus = { mapContent(Modifier.fillMaxSize()) },
+        supporting = {
+            when {
+                supportingDetail != null -> supportingDetail()
+                state.detailVisible && state.selectedItem != null -> HistoryDetail(state.selectedItem!!, actions, embedded = true)
+                state.tab == HistoryTab.Places -> HistoryPlacesList(state, actions, placesState) { HistoryRecovery(state, actions) }
+                else ->
+                    HistoryDayList(state, actions, Modifier.fillMaxSize(), listState = listState) {
+                        HistoryRecovery(state, actions)
+                        HistoryDateHeader(state, actions)
+                        TextButton(
+                            onClick = {
+                                replayVisible = !replayVisible
+                                actions.onReplayPlaying?.invoke(false)
+                            },
+                            modifier = Modifier.padding(horizontal = Spacing.lg),
+                        ) { Text(if (replayVisible) "Close replay" else "Replay your day") }
+                        if (replayVisible) HistoryReplay(state, actions)
+                    }
+            }
+        },
+    )
+}
+
+@Composable
+private fun HistoryRecovery(
+    state: HumanLocationHistoryState,
+    actions: HumanLocationHistoryActions,
+) {
+    state.recoveryMessage?.let { message ->
+        PanelGroup(Modifier.fillMaxWidth().padding(Spacing.lg)) {
+            Text(message)
+            state.recoveryActionLabel?.let { label -> actions.onRecover?.let { TextButton(onClick = it) { Text(label) } } }
         }
     }
 }

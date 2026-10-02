@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -42,6 +41,8 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.theme.Spacing
+import app.logdate.ui.workspace.PanelGroup
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.history_add_memory
 import logdate.client.feature.location.timeline.generated.resources.history_add_visit
@@ -63,10 +64,15 @@ import org.jetbrains.compose.resources.stringResource
 internal fun HistoryDetail(
     item: HistoryItemUi,
     actions: HumanLocationHistoryActions,
+    embedded: Boolean = false,
 ) {
     var confirmDelete by remember(item.id) { mutableStateOf(false) }
-    ModalBottomSheet(onDismissRequest = actions.onCloseDetail) {
+    if (embedded) {
         HumanLocationHistoryDetailContent(item, actions, onRequestDelete = { confirmDelete = true })
+    } else {
+        ModalBottomSheet(onDismissRequest = actions.onCloseDetail) {
+            HumanLocationHistoryDetailContent(item, actions, onRequestDelete = { confirmDelete = true })
+        }
     }
     if (confirmDelete) {
         AlertDialog(
@@ -94,7 +100,7 @@ fun HumanLocationHistoryDetailContent(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 12.dp),
+        modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -107,9 +113,7 @@ fun HumanLocationHistoryDetailContent(
             IconButton(onClick = actions.onCloseDetail) { Icon(Icons.Default.Close, stringResource(Res.string.history_close)) }
         }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
-                Text(item.timeLabel, Modifier.padding(horizontal = 12.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
-            }
+            Text(item.timeLabel, style = MaterialTheme.typography.labelLarge)
             if (item.supportingText.isNotBlank()) {
                 Text(
                     item.supportingText,
@@ -150,7 +154,7 @@ private fun HistoryDetailActions(
             HistoryItemKind.Journey -> listOf(HistoryEditAction.ChangeActivity, HistoryEditAction.ChangeTime)
             HistoryItemKind.Gap -> listOf(HistoryEditAction.AddVisit)
         }
-    Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+    PanelGroup {
         Column {
             edits.forEachIndexed { index, action ->
                 if (index > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)

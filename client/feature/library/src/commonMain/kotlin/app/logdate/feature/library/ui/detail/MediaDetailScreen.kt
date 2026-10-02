@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.StopScreenShare
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Share
@@ -50,7 +52,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -59,6 +60,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -82,7 +84,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.media.device.AudioRouteRepository
@@ -95,6 +96,10 @@ import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
+import app.logdate.ui.workspace.PanelHeader
+import app.logdate.ui.workspace.WorkspacePanel
+import app.logdate.ui.workspace.WorkspaceSupportingSheet
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
@@ -153,36 +158,35 @@ fun MediaDetailScreen(
         }
     }
 
-    val isExpanded =
-        currentWindowAdaptiveInfoV2()
-            .windowSizeClass
-            .isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND)
+    BoxWithConstraints(modifier) {
+        val isExpanded = maxWidth >= 840.dp
 
-    MediaDetailContent(
-        state = uiState,
-        viewerState = viewerState,
-        presenterState = presenterState,
-        outputSelection = outputSelection,
-        onOutputDeviceSelected = audioRouteRepository::selectOutputDevice,
-        isExpanded = isExpanded,
-        onBack = {
-            viewModel.stopPresenting()
-            onBack()
-        },
-        onSelectMedia = viewModel::selectMedia,
-        onNavigateToJournal = onNavigateToJournal,
-        onShare = onShare,
-        onStartPresenting = viewModel::startPresenting,
-        onStopPresenting = viewModel::stopPresenting,
-        onPresentItem = viewModel::presentItem,
-        audioProgress = audioProgress,
-        isAudioPlaying = { it == playingAudioUri },
-        onToggleAudio = ::toggleAudio,
-        onSeekAudio = { uri, position, duration ->
-            if (playingAudioUri == uri && duration > 0L) audioPlaybackManager.seekTo(position)
-        },
-        modifier = modifier,
-    )
+        MediaDetailContent(
+            state = uiState,
+            viewerState = viewerState,
+            presenterState = presenterState,
+            outputSelection = outputSelection,
+            onOutputDeviceSelected = audioRouteRepository::selectOutputDevice,
+            isExpanded = isExpanded,
+            onBack = {
+                viewModel.stopPresenting()
+                onBack()
+            },
+            onSelectMedia = viewModel::selectMedia,
+            onNavigateToJournal = onNavigateToJournal,
+            onShare = onShare,
+            onStartPresenting = viewModel::startPresenting,
+            onStopPresenting = viewModel::stopPresenting,
+            onPresentItem = viewModel::presentItem,
+            audioProgress = audioProgress,
+            isAudioPlaying = { it == playingAudioUri },
+            onToggleAudio = ::toggleAudio,
+            onSeekAudio = { uri, position, duration ->
+                if (playingAudioUri == uri && duration > 0L) audioPlaybackManager.seekTo(position)
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
 }
 
 /**
@@ -213,6 +217,29 @@ fun MediaDetailContent(
     onSeekAudio: (String, Float, Long) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier,
 ) {
+    if (LocalWorkspaceEnabled.current && state !is MediaDetailUiState.ImageContent && state !is MediaDetailUiState.VideoContent) {
+        WorkspacePanel(modifier) {
+            Column(Modifier.fillMaxSize()) {
+                PanelHeader("Memory", actions = { IconButton(onClick = onBack) { Icon(PlatformIcons.back(), "Back to library") } })
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    when (state) {
+                        MediaDetailUiState.Loading -> CircularProgressIndicator()
+                        is MediaDetailUiState.Error -> Text(state.message, Modifier.padding(Spacing.lg))
+                        is MediaDetailUiState.AudioContent ->
+                            AudioMediaDetailContent(
+                                state,
+                                audioProgress,
+                                isAudioPlaying(state.mediaRef),
+                                { onToggleAudio(state.mediaRef, state.durationMs, state.mediaId) },
+                                { onSeekAudio(state.mediaRef, it, state.durationMs) },
+                                onBack,
+                            )
+                    }
+                }
+            }
+        }
+        return
+    }
     when (state) {
         is MediaDetailUiState.Loading -> {
             Box(
@@ -313,15 +340,26 @@ private fun AudioMediaDetailContent(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface),
+        modifier =
+            modifier.fillMaxSize().then(
+                if (LocalWorkspaceEnabled.current) {
+                    Modifier.verticalScroll(
+                        rememberScrollState(),
+                    )
+                } else {
+                    Modifier.background(MaterialTheme.colorScheme.surface)
+                },
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier.align(Alignment.Start).padding(Spacing.md),
-        ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+        if (!LocalWorkspaceEnabled.current) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.align(Alignment.Start).padding(Spacing.md),
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
         }
         Icon(
             painter = PlatformIcons.audioFile(),
@@ -390,6 +428,80 @@ private fun MediaDetailLayout(
     onPresentItem: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    if (LocalWorkspaceEnabled.current) {
+        var immersive by rememberSaveable { mutableStateOf(false) }
+        val stateHolder =
+            androidx.compose.runtime.saveable
+                .rememberSaveableStateHolder()
+        if (immersive) {
+            stateHolder.SaveableStateProvider("immersive") {
+                CompactMediaDetailViewer(
+                    mediaRef,
+                    isVideo,
+                    createdAt,
+                    locationDisplayName,
+                    journals,
+                    exif,
+                    viewerState,
+                    presenterState,
+                    outputSelection,
+                    onOutputDeviceSelected,
+                    onBack = { immersive = false },
+                    onSelectMedia = onSelectMedia,
+                    onNavigateToJournal = onNavigateToJournal,
+                    onShare = onShare,
+                    onStartPresenting = onStartPresenting,
+                    onStopPresenting = onStopPresenting,
+                    onPresentItem = onPresentItem,
+                    modifier = modifier,
+                )
+            }
+            return
+        }
+        stateHolder.SaveableStateProvider("workspace") {
+            WorkspaceSupportingSheet(
+                "Memory details",
+                modifier,
+                focus = {
+                    Column(Modifier.fillMaxSize()) {
+                        PanelHeader("Memory", actions = {
+                            IconButton(onClick = onBack) { Icon(PlatformIcons.back(), "Back to library") }
+                            IconButton(onClick = onShare) { Icon(PlatformIcons.share(), "Share memory") }
+                            IconButton(onClick = { immersive = true }) { Icon(Icons.Default.Fullscreen, "View full screen") }
+                        })
+                        WorkspaceMediaViewer(
+                            mediaRef,
+                            isVideo,
+                            viewerState,
+                            onSelectMedia,
+                            onBack,
+                            { immersive = true },
+                            Modifier.weight(1f).fillMaxWidth(),
+                        )
+                    }
+                },
+                supporting = {
+                    MediaDetailTabletopControls(
+                        createdAt = createdAt,
+                        locationDisplayName = locationDisplayName,
+                        isVideo = isVideo,
+                        journals = journals,
+                        exif = exif,
+                        presenterState = presenterState,
+                        outputSelection = outputSelection,
+                        onBack = onBack,
+                        onShare = onShare,
+                        onNavigateToJournal = onNavigateToJournal,
+                        onOutputDeviceSelected = onOutputDeviceSelected,
+                        onStartPresenting = onStartPresenting,
+                        onStopPresenting = onStopPresenting,
+                        modifier = Modifier.fillMaxSize().padding(Spacing.lg),
+                    )
+                },
+            )
+        }
+        return
+    }
     FoldableTabletopLayout(
         modifier = modifier,
         minPaneHeight = 240.dp,
@@ -1089,6 +1201,7 @@ private fun ZoomableMediaImage(
                     translationY = offset.y
                 }.transformable(
                     state = transformableState,
+                    canPan = { scale > 1f },
                 ).pointerInput(mediaRef) {
                     detectTapGestures(
                         onTap = { onTap() },
@@ -1175,6 +1288,43 @@ private fun PresenterNavigationStrip(
                 }
             }
         }
+    }
+}
+
+@Composable
+internal fun WorkspaceMediaViewer(
+    mediaRef: String,
+    isVideo: Boolean,
+    state: MediaViewerState,
+    onSelect: (Int) -> Unit,
+    onBack: () -> Unit,
+    onImmersive: () -> Unit,
+    modifier: Modifier,
+) {
+    val items = state.mediaItems.ifEmpty { listOf(MediaViewerItem(Uuid.parse("00000000-0000-0000-0000-000000000000"), mediaRef, isVideo)) }
+    val pager = rememberPagerState(initialPage = state.currentIndex.coerceIn(items.indices), pageCount = { items.size })
+    var zoomed by remember { mutableStateOf(false) }
+    LaunchedEffect(state.currentIndex) {
+        if (state.currentIndex in items.indices &&
+            state.currentIndex != pager.currentPage
+        ) {
+            pager.scrollToPage(state.currentIndex)
+        }
+    }
+    val currentIndex by rememberUpdatedState(state.currentIndex)
+    val selectCurrent by rememberUpdatedState(onSelect)
+    LaunchedEffect(pager) { snapshotFlow { pager.settledPage }.collect { if (it != currentIndex) selectCurrent(it) } }
+    HorizontalPager(pager, modifier, userScrollEnabled = !zoomed) { page ->
+        MediaViewerPage(
+            items[page],
+            enableSwipeToDismiss = false,
+            onToggleChrome = onImmersive,
+            onZoomChanged = { zoomed = it },
+            onSheetDrag = { false },
+            onSheetDragEnd = {},
+            onDismiss = onBack,
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 }
 

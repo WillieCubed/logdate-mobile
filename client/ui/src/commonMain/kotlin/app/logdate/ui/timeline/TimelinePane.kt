@@ -38,6 +38,8 @@ import app.logdate.ui.platform.currentPlatform
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.newstuff.EndOfTimelineUiState
 import app.logdate.ui.timeline.newstuff.TimelineList
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
+import app.logdate.ui.workspace.WorkspacePanel
 import app.logdate.util.now
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
@@ -96,6 +98,35 @@ fun TimelinePane(
         }
     }
 
+    if (LocalWorkspaceEnabled.current) {
+        WorkspacePanel(modifier) {
+            Column {
+                Box(Modifier.fillMaxWidth().weight(1f)) {
+                    TimelineList(
+                        uiState.items,
+                        endOfTimelineState,
+                        onOpenDay,
+                        Modifier,
+                        uiState.loadingState,
+                        uiState.isLoadingMore,
+                        uiState.hasMoreOlderContent,
+                        uiState.appendError,
+                        onLoadMoreOlder,
+                        timelineSuggestion,
+                        onStartWriting,
+                        onOpenDraft,
+                        onOpenDay,
+                        onShareMemory,
+                        onVisibleAudioNoteIdsChanged,
+                        onImportBackup,
+                        listState,
+                    )
+                    ScrollToTopButton(listState, Modifier.align(Alignment.BottomCenter).padding(bottom = Spacing.lg))
+                }
+            }
+        }
+        return
+    }
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,

@@ -174,6 +174,9 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
+      - name: Check Home workspace ownership
+        run: ./gradlew checkHomeWorkspaceContract
+
       - name: Check hardcoded Compose literals
         run: ./scripts/check_hardcoded_compose_literals.sh
 

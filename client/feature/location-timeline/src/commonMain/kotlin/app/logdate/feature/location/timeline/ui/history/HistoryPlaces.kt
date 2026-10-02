@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.adaptivePanelShape
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import logdate.client.feature.location.timeline.generated.resources.Res
 import logdate.client.feature.location.timeline.generated.resources.history_empty_places
 import logdate.client.feature.location.timeline.generated.resources.history_empty_places_body
@@ -107,16 +108,18 @@ private fun HistoryPlaceSearch(
     actions: HumanLocationHistoryActions,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextField(
-            value = state.placesQuery,
-            onValueChange = actions.onPlacesQuery,
-            placeholder = { Text(stringResource(Res.string.history_search)) },
-            leadingIcon = { Icon(Icons.Default.Search, null) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = TextFieldDefaults.colors(focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
-        )
+        if (!LocalWorkspaceEnabled.current) {
+            TextField(
+                value = state.placesQuery,
+                onValueChange = actions.onPlacesQuery,
+                placeholder = { Text(stringResource(Res.string.history_search)) },
+                leadingIcon = { Icon(Icons.Default.Search, null) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = TextFieldDefaults.colors(focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
+            )
+        }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(selected = !state.placesMapVisible, onClick = {
                 actions.onPlacesMapVisible(false)
@@ -190,5 +193,44 @@ private fun HistoryPlaceRow(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+internal fun HistoryPlacesList(
+    state: HumanLocationHistoryState,
+    actions: HumanLocationHistoryActions,
+    listState: androidx.compose.foundation.lazy.LazyListState =
+        androidx.compose.foundation.lazy
+            .rememberLazyListState(),
+    header: @Composable () -> Unit = {},
+) {
+    LazyColumn(
+        state = listState,
+        contentPadding = PaddingValues(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        item { header() }
+        item { HistoryPlaceSearch(state, actions) }
+        val places = state.filteredPlaces()
+        if (places.isEmpty()) {
+            item {
+                val noResults = state.placesQuery.isNotBlank()
+                Column(Modifier.padding(vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(
+                            if (noResults) Res.string.history_no_matching_places else Res.string.history_empty_places,
+                        ),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Text(
+                        stringResource(
+                            if (noResults) Res.string.history_no_matching_places_body else Res.string.history_empty_places_body,
+                        ),
+                    )
+                }
+            }
+        }
+        items(places, key = { it.id }) { place -> HistoryPlaceRow(place) { actions.onOpenPlace(place.id) } }
     }
 }

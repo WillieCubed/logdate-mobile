@@ -1,0 +1,3 @@
+# path|function|rule|reviewed reason; exceptions must name a single function and rule.
+# Flag-off legacy branches are excluded by PSI scope, not by an unrestricted file allowlist.
+client/feature/rewind/src/commonMain/kotlin/app/logdate/feature/rewind/ui/detail/RewindStoryView.kt|RewindStoryView|raw-frame-style|Reviewed immersive exception: animated story media clipping and the flag-off black playback backdrop. Ordinary workspace panel framing remains shared.

@@ -59,6 +59,8 @@ import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.PlatformPredictiveBackHandler
 import app.logdate.ui.platform.rememberScreenCornerRadius
 import app.logdate.ui.platform.rememberSystemReduceMotion
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
+import app.logdate.ui.workspace.WorkspacePlaybackLayout
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import logdate.client.feature.rewind.generated.resources.*
@@ -141,7 +143,8 @@ fun RewindStoryView(
         return
     }
 
-    var currentPanelIndex by remember { mutableIntStateOf(0) }
+    var currentPanelIndex by androidx.compose.runtime.saveable
+        .rememberSaveable { mutableIntStateOf(0) }
     var isPaused by remember { mutableStateOf(false) }
     // Tracks navigation direction for animation: true = forward, false = backward
     var navigatingForward by remember { mutableStateOf(true) }
@@ -554,100 +557,112 @@ fun RewindStoryView(
                     )
                 },
     ) {
-        FoldableTabletopLayout(
-            modifier = Modifier.fillMaxSize(),
-            minPaneHeight = 220.dp,
-            topPane = {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    StoryPanel(
+        if (LocalWorkspaceEnabled.current) {
+            WorkspacePlaybackLayout(focus = {
+                StoryPanel(Modifier.fillMaxSize())
+                TapNavigationLayer(Modifier.fillMaxSize())
+            }, controls = { separated ->
+                StoryChrome(
+                    showNavigationButtons = separated,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+            })
+        } else {
+            FoldableTabletopLayout(
+                modifier = Modifier.fillMaxSize(),
+                minPaneHeight = 220.dp,
+                topPane = {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        StoryPanel(
+                            modifier =
+                                Modifier
+                                    .widthIn(max = maxRewindStoryWidth)
+                                    .fillMaxSize(),
+                        )
+                    }
+                    TapNavigationLayer(modifier = Modifier.fillMaxSize())
+                },
+                bottomPane = {
+                    StoryChrome(
+                        showNavigationButtons = true,
                         modifier =
                             Modifier
+                                .align(Alignment.Center)
+                                .fillMaxSize()
                                 .widthIn(max = maxRewindStoryWidth)
-                                .fillMaxSize(),
+                                .navigationBarsPadding()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
                     )
-                }
-                TapNavigationLayer(modifier = Modifier.fillMaxSize())
-            },
-            bottomPane = {
-                StoryChrome(
-                    showNavigationButtons = true,
-                    modifier =
-                        Modifier
-                            .align(Alignment.Center)
-                            .fillMaxSize()
-                            .widthIn(max = maxRewindStoryWidth)
-                            .navigationBarsPadding()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                )
-            },
-            standardContent = {
-                FoldableBookLayout(
-                    modifier = Modifier.fillMaxSize(),
-                    minPaneWidth = 320.dp,
-                    startPane = {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .navigationBarsPadding(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            StoryPanel(
+                },
+                standardContent = {
+                    FoldableBookLayout(
+                        modifier = Modifier.fillMaxSize(),
+                        minPaneWidth = 320.dp,
+                        startPane = {
+                            Box(
                                 modifier =
                                     Modifier
-                                        .widthIn(max = maxRewindStoryWidth)
-                                        .fillMaxSize(),
-                            )
-                        }
-                        TapNavigationLayer(modifier = Modifier.fillMaxSize())
-                    },
-                    endPane = {
-                        StoryChrome(
-                            showNavigationButtons = true,
-                            modifier =
-                                Modifier
-                                    .align(Alignment.Center)
-                                    .widthIn(max = maxRewindStoryWidth)
-                                    .fillMaxSize()
-                                    .navigationBarsPadding()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                        )
-                    },
-                    standardContent = {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .navigationBarsPadding(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            StoryPanel(
+                                        .fillMaxSize()
+                                        .navigationBarsPadding(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                StoryPanel(
+                                    modifier =
+                                        Modifier
+                                            .widthIn(max = maxRewindStoryWidth)
+                                            .fillMaxSize(),
+                                )
+                            }
+                            TapNavigationLayer(modifier = Modifier.fillMaxSize())
+                        },
+                        endPane = {
+                            StoryChrome(
+                                showNavigationButtons = true,
                                 modifier =
                                     Modifier
+                                        .align(Alignment.Center)
                                         .widthIn(max = maxRewindStoryWidth)
-                                        .fillMaxSize(),
+                                        .fillMaxSize()
+                                        .navigationBarsPadding()
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
                             )
-                        }
-                        // Tap layer must render below the chrome buttons, otherwise its
-                        // full-screen tap catcher intercepts taps meant for share/reply/
-                        // delete/close before they reach the icons drawn on top of it.
-                        TapNavigationLayer(modifier = Modifier.fillMaxSize())
-                        StoryChrome(
-                            showNavigationButtons = false,
-                            modifier =
-                                Modifier
-                                    .align(Alignment.TopCenter)
-                                    .fillMaxWidth()
-                                    .widthIn(max = maxRewindStoryWidth)
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                        )
-                    },
-                )
-            },
-        )
+                        },
+                        standardContent = {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .fillMaxSize()
+                                        .navigationBarsPadding(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                StoryPanel(
+                                    modifier =
+                                        Modifier
+                                            .widthIn(max = maxRewindStoryWidth)
+                                            .fillMaxSize(),
+                                )
+                            }
+                            // Tap layer must render below the chrome buttons, otherwise its
+                            // full-screen tap catcher intercepts taps meant for share/reply/
+                            // delete/close before they reach the icons drawn on top of it.
+                            TapNavigationLayer(modifier = Modifier.fillMaxSize())
+                            StoryChrome(
+                                showNavigationButtons = false,
+                                modifier =
+                                    Modifier
+                                        .align(Alignment.TopCenter)
+                                        .fillMaxWidth()
+                                        .widthIn(max = maxRewindStoryWidth)
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                            )
+                        },
+                    )
+                },
+            )
+        }
     }
 }
 

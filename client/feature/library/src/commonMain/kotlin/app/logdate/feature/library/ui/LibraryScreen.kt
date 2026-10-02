@@ -4,6 +4,7 @@ package app.logdate.feature.library.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -21,11 +22,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
+import app.logdate.ui.workspace.PanelContainment
+import app.logdate.ui.workspace.WorkspacePanel
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 
@@ -43,6 +48,20 @@ fun LibraryScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    if (LocalWorkspaceEnabled.current) {
+        BoxWithConstraints(modifier) {
+            LibraryScreenContent(
+                state,
+                (maxWidth / 140.dp).toInt().coerceAtLeast(2),
+                onOpenMediaDetail,
+                onOpenSearch,
+                onOpenPostcards,
+                viewModel::retry,
+                Modifier.fillMaxSize(),
+            )
+        }
+        return
+    }
     val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
     val columnCount =
         when {
@@ -50,16 +69,7 @@ fun LibraryScreen(
             windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND) -> 4
             else -> 3
         }
-
-    LibraryScreenContent(
-        state = state,
-        columnCount = columnCount,
-        onItemClick = onOpenMediaDetail,
-        onOpenSearch = onOpenSearch,
-        onOpenPostcards = onOpenPostcards,
-        onRetry = viewModel::retry,
-        modifier = modifier,
-    )
+    LibraryScreenContent(state, columnCount, onOpenMediaDetail, onOpenSearch, onOpenPostcards, viewModel::retry, modifier)
 }
 
 /**
@@ -79,6 +89,21 @@ fun LibraryScreenContent(
     onRetry: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    if (LocalWorkspaceEnabled.current) {
+        WorkspacePanel(modifier, containment = PanelContainment.Collection) {
+            Column(Modifier.fillMaxSize()) {
+                if (onOpenPostcards != null) {
+                    AssistChip(
+                        onClick = onOpenPostcards,
+                        label = { Text("Postcards") },
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+                LibraryPanel(state, columnCount, onItemClick, onRetry, Modifier.weight(1f).fillMaxWidth())
+            }
+        }
+        return
+    }
     Scaffold(
         modifier = modifier,
         containerColor = Color.Transparent,

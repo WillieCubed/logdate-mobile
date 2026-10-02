@@ -50,6 +50,9 @@ enum class FeatureFlag(
      */
     CAMPFIRE_STREAKS(key = "campfire_streaks_enabled", defaultEnabled = true),
 
+    /** Shared adaptive Home presentation; disabled until runtime and visual acceptance pass. */
+    HOME_WORKSPACE_V2(key = "home_workspace_v2_enabled", defaultEnabled = false),
+
     /** Human history browsing and encrypted sync; complete-day recording still requires explicit opt-in. */
     HUMAN_LOCATION_HISTORY(key = "human_location_history_enabled", defaultEnabled = true),
     ;

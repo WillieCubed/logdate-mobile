@@ -10,11 +10,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -41,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,7 +52,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -65,10 +67,15 @@ import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.content.ImageScrimOverlay
 import app.logdate.ui.platform.PlatformIcons
+import app.logdate.ui.platform.rememberSystemReduceMotion
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
+import app.logdate.ui.workspace.PanelContainment
+import app.logdate.ui.workspace.WorkspacePanel
 import app.logdate.util.getLocaleFirstDayOfWeek
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -188,6 +195,27 @@ fun RewindScreenContent(
             if (hasWeeklyInPreviousYear && !annualAlreadyExists) previousYear else null
         }
 
+    if (LocalWorkspaceEnabled.current) {
+        val reduceMotion by rememberSystemReduceMotion()
+        WorkspacePanel(modifier, containment = PanelContainment.Collection) {
+            Column(Modifier.fillMaxSize()) {
+                RewindCardScrollPane(
+                    rewinds = uniqueRewindPreviews(rewindItems),
+                    onOpenRewind = onOpenRewind,
+                    annualRewindYear = annualRewindYear,
+                    onGenerateAnnualRewind = onGenerateAnnualRewind,
+                    animateCards = !reduceMotion,
+                    modifier = Modifier.weight(1f),
+                )
+                if (state is RewindOverviewScreenUiState.NotReady && !state.isGeneratingRewind && onRetryRewind != null) {
+                    Button(onClick = onRetryRewind, modifier = Modifier.padding(Spacing.lg)) {
+                        Text(if (state.generationFailed) "Try Rewind again" else "Create this week's Rewind")
+                    }
+                }
+            }
+        }
+        return
+    }
     Scaffold(
         topBar = {
             // Use our new collapsing app bar component
@@ -304,30 +332,23 @@ private fun RewindCardScrollPane(
     animateCards: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    val density = LocalDensity.current
     val listState = rememberLazyListState()
     val snapFlingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
 
-    // Simple fixed card dimensions
-    val cardWidth = 360.dp
-    val cardHeight = cardWidth * AspectRatios.RATIO_3_2 // 3:2 aspect ratio for rewind cards
-
-    Box(modifier = modifier.fillMaxSize()) {
-        // Background gradient for depth
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors =
-                                listOf(
-                                    MaterialTheme.colorScheme.surface,
-                                    MaterialTheme.colorScheme.surfaceContainer,
-                                ),
-                        ),
-                    ),
-        )
+    val workspace = LocalWorkspaceEnabled.current
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val coverLayout = rewindCoverLayout(maxWidth, maxHeight)
+        val cardWidth = if (workspace) coverLayout.width else 360.dp
+        val cardHeight = if (workspace) coverLayout.height else cardWidth * AspectRatios.RATIO_3_2
+        val framing = if (workspace) coverLayout.framing else 200.dp
+        val indicatorBottom = if (workspace) (framing - Spacing.xxxl).coerceAtLeast(Spacing.lg) else Spacing.lg
+        if (!workspace) {
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surfaceContainer)),
+                ),
+            )
+        }
 
         // Track which card indices have already played their entrance animation,
         // so scrolling away and back doesn't replay it. This intentionally does
@@ -340,10 +361,10 @@ private fun RewindCardScrollPane(
             flingBehavior = snapFlingBehavior,
             contentPadding =
                 PaddingValues(
-                    top = 200.dp, // Simple top padding to center first card
-                    bottom = 300.dp,
+                    top = framing,
+                    bottom = if (workspace) framing else 300.dp,
                 ),
-            verticalArrangement = Arrangement.spacedBy(32.dp),
+            verticalArrangement = Arrangement.spacedBy(if (workspace) Spacing.xxxl else Spacing.xxl),
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxSize(),
         ) {
@@ -371,10 +392,11 @@ private fun RewindCardScrollPane(
                         index = index,
                         cardHeight = cardHeight,
                         modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp)
-                                .widthIn(max = cardWidth),
+                            if (workspace) {
+                                Modifier.widthIn(max = cardWidth).fillMaxWidth()
+                            } else {
+                                Modifier.fillMaxWidth().padding(horizontal = 24.dp).widthIn(max = cardWidth)
+                            },
                     )
                 }
             }
@@ -424,10 +446,11 @@ private fun RewindCardScrollPane(
                         itemCount = rewinds.size,
                         cardHeight = cardHeight,
                         modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp)
-                                .widthIn(max = cardWidth),
+                            if (workspace) {
+                                Modifier.widthIn(max = cardWidth).fillMaxWidth()
+                            } else {
+                                Modifier.fillMaxWidth().padding(horizontal = 24.dp).widthIn(max = cardWidth)
+                            },
                     )
                 }
             }
@@ -440,8 +463,8 @@ private fun RewindCardScrollPane(
                 itemCount = rewinds.size,
                 modifier =
                     Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(Spacing.lg),
+                        .align(if (workspace) Alignment.BottomCenter else Alignment.BottomEnd)
+                        .padding(start = Spacing.lg, end = Spacing.lg, bottom = indicatorBottom, top = Spacing.lg),
             )
         }
     }
@@ -599,10 +622,32 @@ fun FloatingRewindCard(
     cardHeight: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
 ) {
-    val density = LocalDensity.current
+    if (LocalWorkspaceEnabled.current) {
+        val reduceMotion by rememberSystemReduceMotion()
+        val elevation by remember(listState, index, reduceMotion) {
+            derivedStateOf {
+                val layout = listState.layoutInfo
+                val item = layout.visibleItemsInfo.firstOrNull { it.index == index }
+                val viewportCenter = (layout.viewportStartOffset + layout.viewportEndOffset) / 2f
+                val viewportHalfHeight = (layout.viewportEndOffset - layout.viewportStartOffset) / 2f
+                val distance = item?.let { (it.offset + it.size / 2f - viewportCenter) / viewportHalfHeight.coerceAtLeast(1f) } ?: 1f
+                rewindCoverElevation(distance, reduceMotion)
+            }
+        }
+        RewindCoverContent(rewind, onOpenRewind, cardHeight, elevation, modifier)
+    } else {
+        RewindCoverContent(rewind, onOpenRewind, cardHeight, 0.dp, modifier)
+    }
+}
 
-    // No scaling or visual effects - keep cards at consistent size
-
+@Composable
+private fun RewindCoverContent(
+    rewind: RewindPreviewUiState,
+    onOpenRewind: RewindOpenCallback,
+    cardHeight: androidx.compose.ui.unit.Dp,
+    elevation: androidx.compose.ui.unit.Dp,
+    modifier: Modifier,
+) {
     val isMilestone = rewind.milestone != null
     val shape = MaterialTheme.shapes.extraLarge
 
@@ -614,7 +659,7 @@ fun FloatingRewindCard(
         },
         modifier =
             modifier
-                .height(cardHeight)
+                .then(if (LocalWorkspaceEnabled.current) Modifier.heightIn(min = cardHeight) else Modifier.height(cardHeight))
                 .then(
                     // Milestone weeks get a visibly different frame — the "special pull"
                     // of the set, not just a small badge bolted onto an ordinary card.
@@ -645,13 +690,11 @@ fun FloatingRewindCard(
                     },
             ),
         elevation =
-            if (isMilestone) {
-                CardDefaults.cardElevation(defaultElevation = 8.dp)
-            } else {
-                CardDefaults.cardElevation()
-            },
+            CardDefaults.cardElevation(
+                defaultElevation = if (isMilestone) elevation + (if (LocalWorkspaceEnabled.current) 2.dp else 8.dp) else elevation,
+            ),
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = if (LocalWorkspaceEnabled.current) Modifier.fillMaxWidth().heightIn(min = cardHeight) else Modifier.fillMaxSize()) {
             // Every available card is built from that week's real content — a real
             // photo first, falling back to a per-rewind accent gradient (never flat
             // decorative color as the primary treatment). Pending cards stay neutral.
@@ -660,16 +703,20 @@ fun FloatingRewindCard(
                     AsyncImage(
                         model = rewind.heroImageUri,
                         contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.matchParentSize(),
                         contentScale = ContentScale.Crop,
                     )
-                    ImageScrimOverlay(topAlpha = 0.15f, bottomAlpha = 0.8f)
+                    ImageScrimOverlay(
+                        topAlpha = if (LocalWorkspaceEnabled.current) 0.5f else 0.15f,
+                        bottomAlpha = 0.8f,
+                        modifier = Modifier.matchParentSize(),
+                    )
                 } else {
                     val accent = rewindAccentColor(rewind.dominantActivity, rewind.rewindId.hashCode())
                     Box(
                         modifier =
                             Modifier
-                                .fillMaxSize()
+                                .matchParentSize()
                                 .background(
                                     Brush.verticalGradient(
                                         colors =
@@ -684,14 +731,24 @@ fun FloatingRewindCard(
                                     ),
                                 ),
                     )
+                    if (LocalWorkspaceEnabled.current) {
+                        ImageScrimOverlay(topAlpha = 0.55f, bottomAlpha = 0.25f, modifier = Modifier.matchParentSize())
+                    }
                 }
             }
             RewindCoverCard(
                 rewind = rewind,
                 modifier =
                     Modifier
-                        .fillMaxSize()
-                        .padding(Spacing.lg),
+                        .then(
+                            if (LocalWorkspaceEnabled.current) {
+                                Modifier.fillMaxWidth().heightIn(
+                                    min = cardHeight,
+                                )
+                            } else {
+                                Modifier.fillMaxSize()
+                            },
+                        ).padding(Spacing.lg),
             )
         }
     }
@@ -734,6 +791,8 @@ fun NextCardIndicator(
     itemCount: Int,
     modifier: Modifier = Modifier,
 ) {
+    val scope = rememberCoroutineScope()
+    val reduceMotion by rememberSystemReduceMotion()
     val currentIndex by remember {
         derivedStateOf {
             val layoutInfo = listState.layoutInfo
@@ -744,7 +803,7 @@ fun NextCardIndicator(
             val viewportHeight = layoutInfo.viewportSize.height
             if (viewportHeight == 0) return@derivedStateOf 0
 
-            val center = viewportHeight / 2f
+            val center = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2f
 
             // Find item closest to center with optimized calculation
             var closestIndex = 0
@@ -767,6 +826,11 @@ fun NextCardIndicator(
 
     if (hasNext) {
         Surface(
+            onClick = {
+                scope.launch {
+                    if (reduceMotion) listState.scrollToItem(currentIndex + 1) else listState.animateScrollToItem(currentIndex + 1)
+                }
+            },
             modifier =
                 modifier
                     .size(48.dp)

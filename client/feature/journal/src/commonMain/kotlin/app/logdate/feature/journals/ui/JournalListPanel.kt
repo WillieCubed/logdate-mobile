@@ -4,7 +4,6 @@ package app.logdate.feature.journals.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,77 +14,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.platform.LocalInspectionMode
-import androidx.compose.ui.unit.dp
-import androidx.window.core.layout.WindowSizeClass.Companion.HEIGHT_DP_MEDIUM_LOWER_BOUND
-import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_LOWER_BOUND
-import app.logdate.ui.theme.Spacing
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
+import app.logdate.ui.workspace.WorkspacePanel
 
-/**
- * Returns an animated [Shape] for the journal list panel surface.
- *
- * - **Portrait phone**: Rounded top corners, flat bottom (panel extends to screen edge).
- * - **Landscape phone**: All corners rounded (panel sits inside a padded two-pane layout).
- * - **Tablet / desktop**: All corners flat (panel fills the containing pane, which clips).
- */
-@Composable
-private fun adaptivePanelShape(
-    fallbackWidth: androidx.compose.ui.unit.Dp,
-    fallbackHeight: androidx.compose.ui.unit.Dp,
-): Shape {
-    val isInspectionMode = LocalInspectionMode.current
-    val windowSizeClass =
-        if (isInspectionMode) {
-            null
-        } else {
-            currentWindowAdaptiveInfoV2().windowSizeClass
-        }
-    val isWide =
-        windowSizeClass?.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND)
-            ?: (fallbackWidth >= WIDTH_DP_EXPANDED_LOWER_BOUND.dp)
-    val isTall =
-        windowSizeClass?.isHeightAtLeastBreakpoint(HEIGHT_DP_MEDIUM_LOWER_BOUND)
-            ?: (fallbackHeight >= HEIGHT_DP_MEDIUM_LOWER_BOUND.dp)
-
-    val topCorner by animateDpAsState(
-        targetValue = if (isWide && isTall) 0.dp else Spacing.lg,
-        animationSpec = tween(300),
-        label = "PanelTopCornerRadius",
-    )
-    val bottomCorner by animateDpAsState(
-        targetValue = if (isWide && !isTall) Spacing.lg else 0.dp,
-        animationSpec = tween(300),
-        label = "PanelBottomCornerRadius",
-    )
-
-    return RoundedCornerShape(
-        topStart = topCorner,
-        topEnd = topCorner,
-        bottomStart = bottomCorner,
-        bottomEnd = bottomCorner,
-    )
-}
-
-/**
- * The main content surface for the journals overview.
- *
- * Uses `surface` color (not `surfaceContainer`) so the panel sits visually above the shell
- * background. The top corners animate between rounded (compact, to separate from the
- * background) and square (expanded, where the panel fills the containing pane).
- *
- * System navigation bar insets are handled by the inner content column's `navigationBarsPadding()`,
- * which covers bottom insets on phones. The parent shell layout handles side insets for tablets.
- */
 @Composable
 fun JournalListPanel(
     journals: List<JournalListItemUiState>,
@@ -102,12 +38,7 @@ fun JournalListPanel(
     showLoading: Boolean = false,
 ) {
     BoxWithConstraints(modifier = modifier) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            shape = adaptivePanelShape(maxWidth, maxHeight),
-        ) {
+        WorkspacePanel(Modifier.fillMaxSize()) {
             JournalListPlaceholder(isVisible = showLoading)
             AnimatedVisibility(
                 visible = showLoading.not(),
@@ -163,7 +94,7 @@ private fun JournalListContent(
 
     // Handles bottom nav bar inset on phones. The parent shell layout handles
     // side insets for tablets and landscape.
-    Column(modifier = modifier.navigationBarsPadding()) {
+    Column(modifier = if (LocalWorkspaceEnabled.current) modifier else modifier.navigationBarsPadding()) {
         JournalFilterBar(
             layoutMode = layoutMode,
             sortOption = sortOption,

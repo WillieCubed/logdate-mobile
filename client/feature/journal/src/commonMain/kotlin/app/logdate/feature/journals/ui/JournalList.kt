@@ -3,6 +3,8 @@
 package app.logdate.feature.journals.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -15,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import app.logdate.shared.model.Journal
 import app.logdate.ui.common.centeredGridPadding
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -32,24 +35,25 @@ fun JournalList(
     modifier: Modifier = Modifier,
     gridState: LazyGridState = rememberLazyGridState(),
 ) {
-    LazyVerticalGrid(
-        modifier = modifier,
-        state = gridState,
-        columns = GridCells.Adaptive(minSize = 172.dp),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
-        contentPadding = centeredGridPadding(),
-    ) {
-        items(journals) { item ->
-            when (item) {
-                is JournalListItemUiState.ExistingJournal -> {
-                    JournalCover(item.data, onClick = onOpenJournal)
-                }
+    BoxWithConstraints(modifier) {
+        LazyVerticalGrid(
+            state = gridState,
+            columns = GridCells.Adaptive(minSize = if (LocalWorkspaceEnabled.current) journalGridMinimumCoverWidth(maxWidth) else 172.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+            contentPadding = if (LocalWorkspaceEnabled.current) PaddingValues(Spacing.lg) else centeredGridPadding(),
+        ) {
+            items(journals) { item ->
+                when (item) {
+                    is JournalListItemUiState.ExistingJournal -> {
+                        JournalCover(item.data, onClick = onOpenJournal)
+                    }
 
-                is JournalListItemUiState.CreateJournalPlaceholder -> {
-                    CreateJournalPlaceholder(
-                        onClick = onCreateJournal,
-                    )
+                    is JournalListItemUiState.CreateJournalPlaceholder -> {
+                        CreateJournalPlaceholder(
+                            onClick = onCreateJournal,
+                        )
+                    }
                 }
             }
         }

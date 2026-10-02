@@ -107,6 +107,11 @@ kotlin {
             implementation(libs.androidx.datastore.preferences)
             implementation(projects.client.healthConnect)
         }
+        val desktopTest by getting
+        desktopTest.dependencies {
+            implementation(libs.compose.ui.test)
+            implementation(compose.desktop.currentOs)
+        }
 
         androidMain.dependencies {
             implementation(libs.compose.ui.tooling.preview)

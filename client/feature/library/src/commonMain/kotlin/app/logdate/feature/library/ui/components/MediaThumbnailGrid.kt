@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.feature.library.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +22,7 @@ import app.logdate.ui.common.rememberMultiSelectState
 import app.logdate.ui.foldable.FoldableSplitLayout
 import app.logdate.ui.foldable.calculateFoldableSplitLayout
 import app.logdate.ui.foldable.rememberFoldableLayoutInfo
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.uuid.Uuid
@@ -39,6 +42,18 @@ fun MediaThumbnailGrid(
     modifier: Modifier = Modifier,
     multiSelectState: MultiSelectState = rememberMultiSelectState(),
 ) {
+    if (LocalWorkspaceEnabled.current) {
+        BoxWithConstraints(modifier.fillMaxSize()) {
+            MediaThumbnailGridPane(
+                groups,
+                (maxWidth / 140.dp).toInt().coerceAtLeast(2),
+                onItemClick,
+                multiSelectState,
+                Modifier.fillMaxSize(),
+            )
+        }
+        return
+    }
     val foldableLayoutInfo = rememberFoldableLayoutInfo()
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         when (

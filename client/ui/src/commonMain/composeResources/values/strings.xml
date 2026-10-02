@@ -81,4 +81,6 @@
     <string name="search_type_label_postcard">Postcard</string>
     <string name="search_type_label_soundscape">Soundscape</string>
     <string name="search_type_label_person">Person</string>
+    <string name="workspace_search_hint">Search your log</string>
+    <string name="workspace_account_label">Account, backup and settings</string>
 </resources>

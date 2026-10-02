@@ -5,7 +5,10 @@ package app.logdate.feature.rewind.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -28,6 +31,7 @@ import app.logdate.feature.rewind.ui.overview.RewindPreviewUiState
 import app.logdate.shared.model.ActivityType
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.util.formatDateLocalized
 import app.logdate.util.toReadableDateShort
 import logdate.client.feature.rewind.generated.resources.*
@@ -58,23 +62,61 @@ fun RewindCoverCard(
     val isNew = rewind.rewindAvailable && !rewind.isViewed
     val onBackground = if (rewind.rewindAvailable) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
 
-    Box(modifier = modifier) {
-        // Date range at top start
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.align(Alignment.TopStart),
-        ) {
-            val dateColor = onBackground.copy(alpha = if (rewind.rewindAvailable) 0.85f else 1f)
-            val dominantActivity = rewind.dominantActivity
-            if (rewind.rewindAvailable && dominantActivity != null) {
-                Icon(
-                    painter = activityTypeIcon(dominantActivity),
-                    contentDescription = null,
-                    tint = dateColor,
-                    modifier = Modifier.size(18.dp),
-                )
+    if (LocalWorkspaceEnabled.current) {
+        val typographicCover = rewind.rewindAvailable && rewind.heroImageUri == null
+        Column(modifier, verticalArrangement = if (typographicCover) Arrangement.spacedBy(Spacing.xl) else Arrangement.SpaceBetween) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                RewindCoverDates(rewind, onBackground)
+                if (rewind.milestone != null) {
+                    MilestoneBadge(summary = rewind.milestone.summary)
+                } else if (isNew) {
+                    NewRewindBadge()
+                }
             }
+            if (typographicCover) Spacer(Modifier.height(Spacing.xxxl))
+            RewindCoverStory(rewind, onBackground)
+        }
+    } else {
+        Box(modifier) {
+            RewindCoverDates(rewind, onBackground, Modifier.align(Alignment.TopStart))
+            if (rewind.milestone != null) {
+                MilestoneBadge(summary = rewind.milestone.summary, modifier = Modifier.align(Alignment.TopEnd))
+            } else if (isNew) {
+                NewRewindBadge(Modifier.align(Alignment.TopEnd))
+            }
+            RewindCoverStory(rewind, onBackground, Modifier.align(Alignment.BottomStart))
+        }
+    }
+}
+
+@Composable
+private fun RewindCoverDates(
+    rewind: RewindPreviewUiState,
+    onBackground: Color,
+    modifier: Modifier = Modifier,
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        modifier = modifier,
+    ) {
+        val dateColor = onBackground.copy(alpha = if (rewind.rewindAvailable) 0.85f else 1f)
+        val dominantActivity = rewind.dominantActivity
+        if (rewind.rewindAvailable && dominantActivity != null) {
+            Icon(
+                painter = activityTypeIcon(dominantActivity),
+                contentDescription = null,
+                tint = dateColor,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        if (LocalWorkspaceEnabled.current) {
+            Text(
+                text = "${rewind.start.toReadableDateShort()} – ${formatDateLocalized(rewind.end)}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = dateColor,
+            )
+        } else {
             Text(
                 text = rewind.start.toReadableDateShort(),
                 style = MaterialTheme.typography.bodyMedium,
@@ -86,61 +128,55 @@ fun RewindCoverCard(
                 color = dateColor,
             )
         }
+    }
+}
 
-        // Milestone badge takes priority over "NEW" in the top-end slot — it's the
-        // rarer, more special signal.
-        when {
-            rewind.milestone != null ->
-                MilestoneBadge(summary = rewind.milestone.summary, modifier = Modifier.align(Alignment.TopEnd))
-            isNew -> NewRewindBadge(modifier = Modifier.align(Alignment.TopEnd))
-        }
-
-        // Title and subtitle at bottom start
-        Column(
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            modifier = Modifier.align(Alignment.BottomStart),
+@Composable
+private fun RewindCoverStory(
+    rewind: RewindPreviewUiState,
+    onBackground: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        modifier = modifier,
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Label row
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = rewind.label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (rewind.rewindAvailable) onBackground else MaterialTheme.colorScheme.outline,
-                )
-                if (!rewind.rewindAvailable) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(6.dp),
-                    ) {}
-                }
-            }
-
-            // Title
             Text(
-                text = rewind.title,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = if (rewind.rewindAvailable) FontWeight.Bold else FontWeight.Medium,
-                color = onBackground,
+                text = rewind.label,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (rewind.rewindAvailable) onBackground else MaterialTheme.colorScheme.outline,
             )
-
-            if (rewind.rewindAvailable && hasMetadata(rewind)) {
-                RewindStatChipsRow(rewind = rewind, color = onBackground.copy(alpha = 0.85f))
+            if (!rewind.rewindAvailable) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.size(6.dp),
+                ) {}
             }
-
-            // A real quote from the week reads as far more alive than a generic
-            // message — prefer it when one exists.
-            val quote = rewind.highlightedQuote
-            Text(
-                text = if (quote != null) "“$quote”" else rewind.message,
-                style = MaterialTheme.typography.bodyLarge,
-                fontStyle = if (quote != null) FontStyle.Italic else FontStyle.Normal,
-                color = onBackground.copy(alpha = if (rewind.rewindAvailable) 0.9f else 1f),
-            )
         }
+
+        Text(
+            text = rewind.title,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = if (rewind.rewindAvailable) FontWeight.Bold else FontWeight.Medium,
+            color = onBackground,
+        )
+
+        if (rewind.rewindAvailable && hasMetadata(rewind)) {
+            RewindStatChipsRow(rewind = rewind, color = onBackground.copy(alpha = 0.85f))
+        }
+
+        val quote = rewind.highlightedQuote
+        Text(
+            text = if (quote != null) "“$quote”" else rewind.message,
+            style = MaterialTheme.typography.bodyLarge,
+            fontStyle = if (quote != null) FontStyle.Italic else FontStyle.Normal,
+            color = onBackground.copy(alpha = if (rewind.rewindAvailable) 0.9f else 1f),
+        )
     }
 }
 
@@ -181,9 +217,9 @@ private fun RewindStatChipsRow(
     color: Color,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    FlowRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         modifier = modifier,
     ) {
         if (rewind.entryCount > 0) {

@@ -32,6 +32,7 @@ import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import androidx.navigation3.ui.NavDisplay
 import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.ui.LockableContent
@@ -94,6 +95,7 @@ import app.logdate.ui.audio.AudioPlaybackProvider
 import app.logdate.ui.foldable.FoldableSplitLayout
 import app.logdate.ui.foldable.calculateFoldableSplitLayout
 import app.logdate.ui.foldable.rememberFoldableLayoutInfo
+import app.logdate.ui.navigation.routeClass
 import app.logdate.ui.navigation.taggedEntry
 import app.logdate.ui.platform.DefaultLogDateHaptics
 import app.logdate.ui.platform.LocalLogDateHaptics
@@ -103,10 +105,13 @@ import app.logdate.ui.platform.iosEdgeSwipeBack
 import app.logdate.ui.platform.rememberPlatformHapticsController
 import app.logdate.ui.platform.rememberSystemReduceMotion
 import app.logdate.ui.theme.LogDateTheme
+import app.logdate.ui.workspace.LocalWorkspaceDismissDetail
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import io.github.aakira.napier.Napier
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import org.koin.compose.koinInject
 import kotlin.uuid.Uuid
 
 /**
@@ -133,6 +138,9 @@ fun LogDateNavDisplay(
     onCloudSignIn: () -> Unit = {},
     sceneStrategy: SceneStrategy<NavKey> = rememberHomeSceneStrategy(),
 ) {
+    val workspaceFlags: FeatureFlagStore = koinInject()
+    val workspaceEnabled by remember(workspaceFlags) { workspaceFlags.observe(FeatureFlag.HOME_WORKSPACE_V2) }
+        .collectAsState(initial = FeatureFlag.HOME_WORKSPACE_V2.defaultEnabled)
     val backStack = rememberNavBackStack(appNavSavedStateConfiguration, BaseRoute)
     var hasRequestedUnlock by remember { mutableStateOf(false) }
 
@@ -192,6 +200,9 @@ fun LogDateNavDisplay(
         SharedTransitionLayout {
             CompositionLocalProvider(
                 LocalSharedTransitionScope provides this,
+                LocalWorkspaceEnabled provides workspaceEnabled,
+                app.logdate.ui.workspace.LocalWorkspaceSearchAction provides { backStack.add(SearchRoute()) },
+                LocalWorkspaceDismissDetail provides { if (backStack.lastOrNull() != HomeRoute) backStack.removeLastOrNull() },
                 LocalPlatformHaptics provides haptics,
                 LocalLogDateHaptics provides logDateHaptics,
             ) {
@@ -227,6 +238,7 @@ fun LogDateNavDisplay(
                                     rememberSaveableStateHolderNavEntryDecorator(),
                                     rememberPerVisitViewModelsDecorator(),
                                     rememberNavAnimatedVisibilityScopeEntryDecorator(),
+                                    rememberWorkspaceRouteDecorator(),
                                 ),
                             entryProvider =
                                 entryProvider {
@@ -442,6 +454,9 @@ private fun <T : Any> rememberNavAnimatedVisibilityScopeEntryDecorator(): NavEnt
  */
 @Composable
 private fun rememberHomeSceneStrategy(): SceneStrategy<NavKey> {
+    val flags: FeatureFlagStore = koinInject()
+    val workspaceEnabled by remember(flags) { flags.observe(FeatureFlag.HOME_WORKSPACE_V2) }
+        .collectAsState(initial = FeatureFlag.HOME_WORKSPACE_V2.defaultEnabled)
     val windowSize = LocalWindowInfo.current.containerSize
     val isIpad = currentPlatform.isIpad
     val foldableLayoutInfo = rememberFoldableLayoutInfo()
@@ -475,9 +490,9 @@ private fun rememberHomeSceneStrategy(): SceneStrategy<NavKey> {
             is FoldableSplitLayout.Horizontal,
             -> FoldableSplitLayout.None
         }
-    return remember(supportsDualPane, sceneSplitLayout) {
+    return remember(workspaceEnabled, supportsDualPane, sceneSplitLayout) {
         HomeSceneStrategy(
-            supportsDualPane = { supportsDualPane },
+            supportsDualPane = { workspaceEnabled || supportsDualPane },
             foldableSplitLayout = { sceneSplitLayout },
         )
     }
@@ -564,3 +579,28 @@ private fun searchResultDayRoute(result: SearchResult): TimelineDetailRoute {
             .date
     return TimelineDetailRoute(date.toString(), entryId = result.uid.toString())
 }
+
+@Composable
+private fun <T : Any> rememberWorkspaceRouteDecorator(): NavEntryDecorator<T> =
+    remember {
+        NavEntryDecorator { entry ->
+            val route = entry.routeClass()
+            val workspaceRoute =
+                route in
+                    setOf(
+                        app.logdate.feature.journals.navigation.JournalsOverviewRoute::class,
+                        app.logdate.feature.journals.navigation.JournalDetailsRoute::class,
+                        app.logdate.feature.journals.navigation.NoteDetailRoute::class,
+                        app.logdate.feature.library.navigation.LibraryOverviewRoute::class,
+                        app.logdate.feature.library.navigation.MediaDetailRoute::class,
+                        TimelineDetailRoute::class,
+                        app.logdate.feature.rewind.navigation.RewindDetailRoute::class,
+                    )
+            if (workspaceRoute) {
+                app.logdate.ui.workspace
+                    .WorkspaceRouteFrame { entry.Content() }
+            } else {
+                entry.Content()
+            }
+        }
+    }

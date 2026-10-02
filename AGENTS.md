@@ -182,3 +182,64 @@ repository.
 - **State**: Sealed classes/interfaces for UI state.
 - **Error handling**: try-catch with Napier. Prefer nullable returns over exceptions.
 - **Imports**: `kotlin.*` > `androidx.*`/`kotlinx.*` > `app.logdate.*`. No wildcards.
+
+## Home workspace visual contract
+
+Home destinations and their immediate details compose independently responsive panels. Use
+`WorkspaceScaffold`, `AdaptiveWorkspaceLayout`, `WorkspacePanel`, `PanelHeader`, `PanelGroup`,
+`WorkspaceSupportingSheet`, and `WorkspacePlaybackLayout` from `client/ui/.../workspace`.
+Surface tokens belong to `client/theme/WorkspaceTokens.kt`.
+
+| Meaning | Token |
+| --- | --- |
+| Workspace canvas/navigation | surfaceContainer |
+| Working panel | surface/onSurface |
+| Subordinate meaningful group | surfaceContainerLow |
+| Raised control/transient surface | surfaceContainerHigh |
+| Selected item | secondaryContainer/onSecondaryContainer |
+
+The shell owns destination identity, navigation, global status, system insets, and contextual creation.
+Composition owns fit, ordering, hinges translated into content coordinates, and panel placement.
+Panels own surface, placement-aware corners, framing, and measured local bounds. Features own
+content/actions/state and must respond to panel bounds, never global window classes or hinge splits.
+Headers inherit their panel. Focus does not recolor a whole panel. Use 16dp framing/gutters,
+24dp sections, 8dp related elements, and 12dp groups through existing `Spacing` tokens.
+Do not wrap a whole Home route/navigation shell in another panel or add a competing destination app bar.
+Extend the shared primitive for new visual behavior; narrowly document reviewed exceptions in
+`config/workspace/home-allowlist.txt`. Register new route/panel roots in `home-roots.txt`.
+
+`HOME_WORKSPACE_V2` gates migration presentation only; it must not change data or recording settings.
+Keep it disabled until populated shared-shell scenes and runtime acceptance pass. Preserve the
+flag-off presentation until rollout is accepted. Run `checkHomeWorkspaceContract` for relevant changes.
+
+UI acceptance requires inspecting populated renders at matching phone/tablet sizes and a consolidated
+comparison sheet, plus compact phone, landscape, book/tabletop, dark/dynamic colors, RTL, 200% text,
+and reduced motion. Empty media fixtures or successful render tasks with reported render errors are
+not acceptance. Native Google Maps must be verified on an emulator/Managed Device; deterministic
+preview geometry proves layout only. Required map attribution must remain visible above supporting content.
+
+WorkspaceRouteFrame supplies shared safe insets and adaptive placement for direct links and nested immediate details. Inside WorkspaceScaffold it is a pass-through; route decorators must not create a second host. LocalWorkspaceHosted indicates actual ownership, separately from feature enablement.
+
+Workspace search uses `WorkspaceAppBar` and `WorkspaceSearchBar` outside the panels. Search aligns with the leading content edge on phones and wider workspaces; the account action stays at the trailing edge. Navigation and the accessible pane title identify the destination without a competing header label. The default search action opens the existing unified search route. Collection filters remain panel content; never add another destination search bar inside a collection or viewer. Omit redundant headings such as “Your days,” “Your latest story,” and “Previous stories”; retain meaningful dates and individual story titles.
+
+Use `WorkspaceSearchScope` for a bounded contextual search in the single shared header (Your places),
+and release it on disposal; do not introduce a second panel field. Default search opens unified search.
+Keep search and account actions on one app-bar row, including compact screens and large text.
+Use `WorkspaceSectionSwitch` as a compact selector in the supporting panel header. Use the shared
+`WorkspaceSupportingSheet` header/actions slots; never put day/place modes in a separate row above
+the map or stretch them into full-width tabs. The Home destination label is Places; preserve its
+existing location-history route keys. `PanelContainment.Collection` supplies measured panel bounds without painting
+another surface behind already contained objects. Retain a working surface for Locations > Your day,
+for reading, and for phone sheets over maps. `workspaceControlBackdrop` paints a raised sticky-control background only while
+content overlaps it. Expanded navigation uses a 240dp sidebar from 1200dp in standard posture;
+intermediate widths use the rail, phones/tabletop use bottom navigation, and book posture retains
+compact navigation. Standalone Timeline uses `PanelConstraints.ReadingCollection` (560dp maximum);
+beside an opened day it uses the shared browse constraints. Composition must enforce panel maxima,
+including hinge-safe regions, instead of leaving an oversized empty surface around bounded content.
+
+Use `WorkspaceAccountAction` for the shared account target and quiet status marker. Backup status,
+recovery actions, streak, and settings belong to its on-demand menu. Do not add separate streak/sync
+buttons or permanent backup banners to the shared header. Visual/supporting composition must fit
+both minimum widths and a useful dominant visual area; medium portrait should use the transforming
+supporting sheet rather than forcing two narrow columns. Grid/media sizes respond to panel-local
+bounds. Preserve each destination's established browsing and playback interactions while migrating framing.

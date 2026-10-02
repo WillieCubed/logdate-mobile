@@ -10,10 +10,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -43,6 +44,7 @@ import app.logdate.ui.common.focusableWithRing
 import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.util.toReadableDateShort
 import coil3.compose.AsyncImage
 import kotlin.time.Clock
@@ -73,6 +75,33 @@ fun JournalCover(
     enabled: Boolean = true,
     elevation: Dp = 0.dp,
 ) {
+    if (LocalWorkspaceEnabled.current) {
+        BoxWithConstraints(modifier) {
+            JournalCoverFace(
+                journal,
+                Modifier.heightIn(min = maxWidth / AspectRatios.JOURNAL_COVER),
+                onClick,
+                contextMenuItems,
+                enabled,
+                elevation,
+                responsive = true,
+            )
+        }
+    } else {
+        JournalCoverFace(journal, modifier, onClick, contextMenuItems, enabled, elevation)
+    }
+}
+
+@Composable
+private fun JournalCoverFace(
+    journal: Journal,
+    modifier: Modifier,
+    onClick: JournalClickCallback?,
+    contextMenuItems: List<ContextMenuItem>,
+    enabled: Boolean,
+    elevation: Dp,
+    responsive: Boolean = false,
+) {
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
     val sharedTransitionScope = LocalSharedTransitionScope.current
 
@@ -80,7 +109,7 @@ fun JournalCover(
 
     val baseModifier =
         modifier
-            .aspectRatio(AspectRatios.JOURNAL_COVER)
+            .let { if (responsive) it else it.aspectRatio(AspectRatios.JOURNAL_COVER) }
             .shadow(
                 elevation = elevation,
                 shape = JournalShape,
@@ -146,14 +175,14 @@ private fun BoxScope.JournalCoverContent(
             contentScale = ContentScale.Crop,
             modifier =
                 Modifier
-                    .fillMaxSize()
+                    .matchParentSize()
                     .clip(JournalShape),
         )
         val scrimColor = MaterialTheme.colorScheme.scrim
         Box(
             modifier =
                 Modifier
-                    .fillMaxSize()
+                    .matchParentSize()
                     .background(
                         Brush.verticalGradient(
                             colorStops =

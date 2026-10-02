@@ -36,7 +36,7 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 private val cafeMemory = HistoryMemoryUi("coffee-note", "A quiet table, a good book, and nowhere to rush.", HistoryMemoryKind.Text)
-private val historyDay =
+internal val historyDay =
     HumanLocationHistoryState(
         dateLabel = "Tuesday, September 29",
         daySummary = "6 visits in your day",
@@ -170,7 +170,7 @@ private fun HistoryScene(state: HumanLocationHistoryState, showTitle: Boolean = 
 }
 
 @Composable
-private fun HistoryMapFixture(modifier: Modifier) {
+internal fun HistoryMapFixture(modifier: Modifier) {
     val time = Instant.parse("2026-09-29T10:00:00Z")
     val home = SemanticPlace("home", "Home", 36.1699, -115.1398)
     val cafe = SemanticPlace("cafe", "Mothership Coffee", 36.1662, -115.1431)

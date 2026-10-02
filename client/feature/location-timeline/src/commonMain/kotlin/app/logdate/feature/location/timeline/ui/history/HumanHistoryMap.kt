@@ -19,12 +19,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.logdate.shared.model.location.JourneyLeg
 import app.logdate.shared.model.location.LocationDayItem
 import app.logdate.shared.model.location.PlaceVisit
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -127,7 +129,12 @@ fun HumanHistoryMap(
     onSelect: (String) -> Unit,
     modifier: Modifier,
     onInteraction: () -> Unit,
+    historyKey: String? = null,
 ) {
+    if (LocalWorkspaceEnabled.current && !LocalInspectionMode.current) {
+        NativeHistoryMap(items, selectedId, onSelect, modifier, onInteraction, historyKey)
+        return
+    }
     val geometry = remember(items) { historyMapGeometry(items) }
     val colors = MaterialTheme.colorScheme
     BoxWithConstraints(
@@ -200,3 +207,13 @@ fun HumanHistoryMap(
         }
     }
 }
+
+@Composable
+internal expect fun NativeHistoryMap(
+    items: List<LocationDayItem>,
+    selectedId: String?,
+    onSelect: (String) -> Unit,
+    modifier: Modifier,
+    onInteraction: () -> Unit,
+    historyKey: String?,
+)

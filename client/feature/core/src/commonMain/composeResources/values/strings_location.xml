@@ -5,9 +5,9 @@
     <string name="location_services">Location Services</string>
     <string name="location_settings">Location Settings</string>
     <string name="location_settings_description">Manage location tracking and history settings</string>
-    <string name="location_timeline">Locations</string>
+    <string name="location_timeline">Places</string>
     <string name="location_timeline_description">See your saved places and recent movement</string>
-    <string name="view_location_timeline">View Locations</string>
+    <string name="view_location_timeline">View Places</string>
     <string name="manage_location_tracking_and_privacy_preferences">Location tracking and privacy preferences</string>
     <string name="navigate_to_location_settings">Navigate to Location Settings</string>
 

@@ -3,10 +3,13 @@
 package app.logdate.feature.timeline.ui.details
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -19,6 +22,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
@@ -30,6 +37,9 @@ import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.profiles.PersonUiState
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.TimelineDayUiState
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
+import app.logdate.ui.workspace.PanelHeader
+import app.logdate.ui.workspace.WorkspacePanel
 import app.logdate.util.toReadableDateShort
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -78,7 +88,9 @@ fun TimelineDayDetailPanel(
             }
         }
 
-    LaunchedEffect(uiState, scrollToEntryId) {
+    var initialTargetConsumed by rememberSaveable(uiState.date, scrollToEntryId) { mutableStateOf(false) }
+    LaunchedEffect(uiState.date, scrollToEntryId) {
+        if (initialTargetConsumed) return@LaunchedEffect
         val targetIndex =
             scrollToEntryId?.let { id ->
                 targetSectionIndex(id, uiState, resolvedVisitedLocations)
@@ -88,8 +100,35 @@ fun TimelineDayDetailPanel(
         } else {
             scrollState.scrollToTop()
         }
+        initialTargetConsumed = true
     }
 
+    if (LocalWorkspaceEnabled.current) {
+        WorkspacePanel(modifier) {
+            Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.TopCenter) {
+                Column(Modifier.widthIn(max = 720.dp).fillMaxSize()) {
+                    PanelHeader(timestamp.toReadableDateShort(), actions = {
+                        IconButton(onClick = onExit) { Icon(PlatformIcons.back(), "Back to your days") }
+                        onDecorate?.let { IconButton(onClick = it) { Icon(PlatformIcons.brush(), "Decorate") } }
+                        onOpenRewind?.let { IconButton(onClick = it) { Icon(PlatformIcons.history(), "Rewind") } }
+                    })
+                    TimelineDayDetailList(
+                        uiState,
+                        people,
+                        resolvedVisitedLocations,
+                        onOpenEvent,
+                        onAttachNoteToEvent,
+                        onOpenLocations,
+                        onJournalClick,
+                        onNoteClick,
+                        scrollState,
+                        PaddingValues(Spacing.lg),
+                    )
+                }
+            }
+        }
+        return
+    }
     Scaffold(
         modifier = modifier,
         topBar = {

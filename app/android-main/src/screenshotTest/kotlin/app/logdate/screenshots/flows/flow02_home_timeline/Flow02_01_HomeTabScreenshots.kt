@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.screenshots.flows.flow02_home_timeline
 
 import androidx.compose.foundation.lazy.LazyListState
@@ -48,7 +50,7 @@ private val routeNoteId = Uuid.parse("00000000-0000-0000-0000-000000000032")
 private val ferryAudioNoteId = Uuid.parse("00000000-0000-0000-0000-000000000033")
 private val ferryNoteId = Uuid.parse("00000000-0000-0000-0000-000000000034")
 
-private val timelineDays =
+internal val timelineDays =
     listOf(
         createSemanticTimelineDayUiState(
             summary = "Wrapped up the route inventory and started wiring screenshot helpers.",
@@ -132,7 +134,7 @@ private val timelineDays =
         ),
     )
 
-private val timelineDetailState =
+internal val timelineDetailState =
     TimelineDayUiState(
         summary = "Shipped route-level screenshot coverage and closed the biggest gaps in the Android graph.",
         date = LocalDate(2025, 2, 20),
@@ -186,13 +188,13 @@ private val timelineNoPeopleState =
     )
 
 private val rewindId = Uuid.parse("00000000-0000-0000-0000-000000000051")
-private val pastRewinds =
+internal val pastRewinds =
     listOf(
         RewindHistoryUiState(uid = rewindId, title = "Week of Feb 17", label = "Week 8", startDate = LocalDate(2025, 2, 17), endDate = LocalDate(2025, 2, 23), message = "Your week, captured"),
         RewindHistoryUiState(uid = Uuid.parse("00000000-0000-0000-0000-000000000052"), title = "Week of Feb 10", label = "Week 7", startDate = LocalDate(2025, 2, 10), endDate = LocalDate(2025, 2, 16), message = "Moments worth remembering"),
     )
 
-private val mostRecentRewind =
+internal val mostRecentRewind =
     RewindPreviewUiState(
         message = "Your week in review",
         rewindId = rewindId,

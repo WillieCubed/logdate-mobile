@@ -642,6 +642,7 @@ dependencies {
     screenshotTestImplementation(projects.client.theme)
     screenshotTestImplementation(projects.shared.model)
     screenshotTestImplementation(projects.app.composeMain)
+    screenshotTestImplementation(libs.coil.compose)
     screenshotTestImplementation(libs.kotlinx.datetime)
     screenshotTestImplementation(libs.nav3.runtime)
 }

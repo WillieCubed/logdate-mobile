@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -37,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,6 +51,7 @@ import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOW
 import app.logdate.client.awareness.daylight.DaylightClassifier
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.events.LinkNoteToEventUseCase
 import app.logdate.client.domain.recommendation.GetHomeRecommendationUseCase
 import app.logdate.client.domain.recommendation.HomeRecommendation
@@ -109,6 +112,11 @@ import app.logdate.ui.timeline.TimelineUiState
 import app.logdate.ui.timeline.VideoNoteUiState
 import app.logdate.ui.timeline.createSemanticTimelineDayUiState
 import app.logdate.ui.timeline.toDayEventUiState
+import app.logdate.ui.workspace.AdaptiveWorkspaceLayout
+import app.logdate.ui.workspace.LocalWorkspaceDetail
+import app.logdate.ui.workspace.LocalWorkspaceDismissDetail
+import app.logdate.ui.workspace.WorkspaceDestination
+import app.logdate.ui.workspace.WorkspaceScaffold
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -128,6 +136,7 @@ import kotlinx.datetime.LocalDate
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.create_new_entry
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 
@@ -218,6 +227,97 @@ fun HomeScreen(
                 modifier = Modifier.padding(end = 4.dp),
             )
         }
+    }
+    val flags: FeatureFlagStore = koinInject()
+    val workspaceEnabled by remember(flags) { flags.observe(FeatureFlag.HOME_WORKSPACE_V2) }
+        .collectAsStateWithLifecycle(initialValue = FeatureFlag.HOME_WORKSPACE_V2.defaultEnabled)
+    if (workspaceEnabled) {
+        val detail = LocalWorkspaceDetail.current
+        val dismissDetail = LocalWorkspaceDismissDetail.current
+        val sourceState = rememberSaveableStateHolder()
+        WorkspaceScaffold(
+            destinations = visibleDestinations.map { WorkspaceDestination(it.name, it.label, it.selectedIcon) },
+            selectedKey = currentDestination.name,
+            onSelect = {
+                if (detail != null) dismissDetail()
+                currentDestination = HomeRouteDestination.valueOf(it)
+            },
+            onCreate =
+                if (currentDestination == HomeRouteDestination.LocationHistory) {
+                    null
+                } else {
+                    { if (currentDestination == HomeRouteDestination.Journals) onCreateJournal() else onNewEntry() }
+                },
+            createLabel = if (currentDestination == HomeRouteDestination.Journals) "Create journal" else "Add a memory",
+            onSearch = onOpenSearch,
+            actions = {
+                HomeWorkspaceAccountAction(syncPresentation.value, campfire.value, onOpenSettings, onOpenStreak, onSyncAction)
+            },
+            modifier = modifier,
+        ) {
+            val destinationContent: @Composable () -> Unit = {
+                sourceState.SaveableStateProvider(currentDestination.name) {
+                    when (currentDestination) {
+                        HomeRouteDestination.Timeline -> {
+                            val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+                            val transcriptionState by viewModel.transcriptionState.collectAsStateWithLifecycle()
+                            TranscriptionProvider(transcriptionState) {
+                                TimelinePane(
+                                    uiState =
+                                        TimelineUiState(
+                                            uiState.items,
+                                            uiState.loadingState,
+                                            uiState.isLoadingMore,
+                                            uiState.hasMoreOlderContent,
+                                            uiState.appendError,
+                                        ),
+                                    onNewEntry = onNewEntry,
+                                    onOpenDay = onOpenDay,
+                                    onVisibleAudioNoteIdsChanged = viewModel::updateVisibleAudioNoteIds,
+                                    onLoadMoreOlder = viewModel::loadMoreOlder,
+                                    onProfileClick = onOpenSettings,
+                                    onSearchClick = onOpenSearch,
+                                    onOpenDraft = onOpenDraft,
+                                    onImportBackup = onImportBackup,
+                                    timelineSuggestion = uiState.timelineSuggestion,
+                                )
+                            }
+                        }
+                        HomeRouteDestination.LocationHistory -> locationContent(Modifier.fillMaxSize())
+                        HomeRouteDestination.Journals ->
+                            JournalsOverviewScreen(
+                                onOpenJournal,
+                                onBrowseJournals,
+                                onCreateJournal,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        HomeRouteDestination.Library -> libraryContent(Modifier.fillMaxSize())
+                        HomeRouteDestination.Rewind -> RewindOverviewScreen(onOpenRewind, modifier = Modifier.fillMaxSize())
+                    }
+                }
+            }
+            if (detail == null && currentDestination == HomeRouteDestination.LocationHistory) {
+                destinationContent()
+            } else {
+                AdaptiveWorkspaceLayout(
+                    modifier = Modifier.fillMaxSize(),
+                    browseOnStart = true,
+                    focusConstraints =
+                        if (detail == null && currentDestination == HomeRouteDestination.Timeline) {
+                            app.logdate.ui.workspace.PanelConstraints.ReadingCollection
+                        } else if (currentDestination ==
+                            HomeRouteDestination.Library
+                        ) {
+                            app.logdate.ui.workspace.PanelConstraints.Visual
+                        } else {
+                            app.logdate.ui.workspace.PanelConstraints.Reading
+                        },
+                    browse = destinationContent.takeIf { detail != null },
+                    focus = detail ?: destinationContent,
+                )
+            }
+        }
+        return
     }
     val adaptiveInfo = currentWindowAdaptiveInfoV2()
     val navLayoutType =

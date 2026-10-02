@@ -28,6 +28,9 @@ import app.logdate.client.domain.journals.JournalSuggestion
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
+import app.logdate.ui.workspace.PanelContainment
+import app.logdate.ui.workspace.WorkspacePanel
 import kotlinx.datetime.LocalDate
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.suggestion_create_journal
@@ -101,6 +104,27 @@ fun JournalsOverviewScreenContent(
     onNavigationClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    if (LocalWorkspaceEnabled.current) {
+        WorkspacePanel(modifier, containment = PanelContainment.Collection) {
+            Column(Modifier.fillMaxSize()) {
+                if (suggestions.isNotEmpty()) SuggestionRow(suggestions, onCreateJournal)
+                JournalListPanel(
+                    journals,
+                    layoutMode,
+                    sortOption,
+                    activeFilters,
+                    onOpenJournal,
+                    onBrowseJournals,
+                    onCreateJournal,
+                    onToggleLayoutMode,
+                    onSortOptionSelected,
+                    onToggleFilter,
+                    Modifier.weight(1f).fillMaxWidth(),
+                )
+            }
+        }
+        return
+    }
     FoldableBookLayout(
         modifier = modifier,
         minPaneWidth = 320.dp,

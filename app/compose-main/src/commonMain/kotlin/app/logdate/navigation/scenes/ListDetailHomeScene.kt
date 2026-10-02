@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package app.logdate.navigation.scenes
 
 import androidx.compose.foundation.layout.Arrangement
@@ -12,14 +14,20 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.scene.Scene
+import app.logdate.feature.core.main.HomeRoute
 import app.logdate.ui.foldable.FoldableSplitLayout
+import app.logdate.ui.navigation.routeClass
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.workspace.AdaptiveWorkspaceLayout
+import app.logdate.ui.workspace.LocalWorkspaceDetail
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
 
 /**
  * Two-pane Surface row that places the main (list-style) entry on the left and the detail
@@ -36,88 +44,119 @@ class ListDetailHomeScene<T : NavKey>(
     override val entries: List<NavEntry<T>> = listOf(mainEntry, detailEntry)
 
     override val content: @Composable (() -> Unit) = {
-        val panelShape = MaterialTheme.shapes.extraLarge
-        when (val splitLayout = foldableSplitLayout) {
-            is FoldableSplitLayout.Vertical -> {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .testTag(HOME_TWO_PANE_LAYOUT_TEST_TAG)
-                            .statusBarsPadding()
-                            .padding(top = Spacing.sm),
-                ) {
-                    Surface(
+        if (LocalWorkspaceEnabled.current) {
+            HomeWorkspaceSceneContent(mainEntry, detailEntry)
+        } else {
+            val panelShape = MaterialTheme.shapes.extraLarge
+            when (val splitLayout = foldableSplitLayout) {
+                is FoldableSplitLayout.Vertical -> {
+                    Row(
                         modifier =
                             Modifier
-                                .width(splitLayout.leftPane.width)
-                                .widthIn(min = 320.dp)
-                                .fillMaxHeight()
-                                .padding(start = 8.dp, end = 4.dp, bottom = 8.dp),
-                        shape = panelShape,
-                        color = MaterialTheme.colorScheme.surface,
+                                .fillMaxSize()
+                                .testTag(HOME_TWO_PANE_LAYOUT_TEST_TAG)
+                                .statusBarsPadding()
+                                .padding(top = Spacing.sm),
                     ) {
-                        mainEntry.Content()
-                    }
-                    Spacer(
-                        modifier =
-                            Modifier
-                                .width(splitLayout.hingeBounds.width)
-                                .fillMaxHeight(),
-                    )
-                    Surface(
-                        modifier =
-                            Modifier
-                                .width(splitLayout.rightPane.width)
-                                .widthIn(min = 320.dp)
-                                .fillMaxHeight()
-                                .padding(start = 4.dp, end = 8.dp, bottom = 8.dp),
-                        shape = panelShape,
-                        color = MaterialTheme.colorScheme.surface,
-                    ) {
-                        detailEntry.Content()
+                        Surface(
+                            modifier =
+                                Modifier
+                                    .width(splitLayout.leftPane.width)
+                                    .widthIn(min = 320.dp)
+                                    .fillMaxHeight()
+                                    .padding(start = 8.dp, end = 4.dp, bottom = 8.dp),
+                            shape = panelShape,
+                            color = MaterialTheme.colorScheme.surface,
+                        ) {
+                            mainEntry.Content()
+                        }
+                        Spacer(
+                            modifier =
+                                Modifier
+                                    .width(splitLayout.hingeBounds.width)
+                                    .fillMaxHeight(),
+                        )
+                        Surface(
+                            modifier =
+                                Modifier
+                                    .width(splitLayout.rightPane.width)
+                                    .widthIn(min = 320.dp)
+                                    .fillMaxHeight()
+                                    .padding(start = 4.dp, end = 8.dp, bottom = 8.dp),
+                            shape = panelShape,
+                            color = MaterialTheme.colorScheme.surface,
+                        ) {
+                            detailEntry.Content()
+                        }
                     }
                 }
-            }
-            FoldableSplitLayout.None,
-            is FoldableSplitLayout.Horizontal,
-            -> {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .testTag(HOME_TWO_PANE_LAYOUT_TEST_TAG)
-                            .statusBarsPadding()
-                            .padding(top = Spacing.sm)
-                            .padding(horizontal = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Surface(
+                FoldableSplitLayout.None,
+                is FoldableSplitLayout.Horizontal,
+                -> {
+                    Row(
                         modifier =
                             Modifier
-                                .weight(1f)
-                                .widthIn(min = 320.dp, max = 420.dp)
-                                .fillMaxHeight()
-                                .padding(bottom = 8.dp),
-                        shape = panelShape,
-                        color = MaterialTheme.colorScheme.surface,
+                                .fillMaxSize()
+                                .testTag(HOME_TWO_PANE_LAYOUT_TEST_TAG)
+                                .statusBarsPadding()
+                                .padding(top = Spacing.sm)
+                                .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        mainEntry.Content()
-                    }
+                        Surface(
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .widthIn(min = 320.dp, max = 420.dp)
+                                    .fillMaxHeight()
+                                    .padding(bottom = 8.dp),
+                            shape = panelShape,
+                            color = MaterialTheme.colorScheme.surface,
+                        ) {
+                            mainEntry.Content()
+                        }
 
-                    Surface(
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .padding(bottom = 8.dp),
-                        shape = panelShape,
-                        color = MaterialTheme.colorScheme.surface,
-                    ) {
-                        detailEntry.Content()
+                        Surface(
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .padding(bottom = 8.dp),
+                            shape = panelShape,
+                            color = MaterialTheme.colorScheme.surface,
+                        ) {
+                            detailEntry.Content()
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun <T : NavKey> HomeWorkspaceSceneContent(
+    mainEntry: NavEntry<T>,
+    detailEntry: NavEntry<T>,
+) {
+    if (mainEntry.routeClass() == HomeRoute::class) {
+        CompositionLocalProvider(LocalWorkspaceDetail provides { detailEntry.Content() }) { mainEntry.Content() }
+    } else {
+        app.logdate.ui.workspace.WorkspaceRouteFrame(composePanels = false) {
+            AdaptiveWorkspaceLayout(
+                Modifier.fillMaxSize(),
+                browseOnStart = true,
+                focusConstraints =
+                    if (mainEntry.routeClass() ==
+                        app.logdate.feature.library.navigation.LibraryOverviewRoute::class
+                    ) {
+                        app.logdate.ui.workspace.PanelConstraints.Visual
+                    } else {
+                        app.logdate.ui.workspace.PanelConstraints.Reading
+                    },
+                browse = { mainEntry.Content() },
+                focus = { detailEntry.Content() },
+            )
         }
     }
 }

@@ -26,8 +26,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.library.ui.components.MediaThumbnailGrid
-import app.logdate.ui.common.adaptivePanelShape
 import app.logdate.ui.platform.PlatformIcons
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
+import app.logdate.ui.workspace.PanelContainment
+import app.logdate.ui.workspace.WorkspacePanel
 import kotlin.uuid.Uuid
 
 /**
@@ -46,12 +48,7 @@ fun LibraryPanel(
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            shape = adaptivePanelShape(maxWidth, maxHeight),
-        ) {
+        WorkspacePanel(Modifier.fillMaxSize(), containment = PanelContainment.Collection) {
             val showLoading = state is LibraryUiState.Loading
             LibraryLoadingPlaceholder(isVisible = showLoading)
             AnimatedVisibility(
@@ -59,7 +56,14 @@ fun LibraryPanel(
                 enter = fadeIn(animationSpec = tween(200)),
                 exit = fadeOut(animationSpec = tween(200)),
             ) {
-                Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
+                Column(
+                    modifier =
+                        if (LocalWorkspaceEnabled.current) {
+                            Modifier.fillMaxSize()
+                        } else {
+                            Modifier.fillMaxSize().navigationBarsPadding()
+                        },
+                ) {
                     when (state) {
                         is LibraryUiState.Loading -> {
                             // Handled by placeholder above

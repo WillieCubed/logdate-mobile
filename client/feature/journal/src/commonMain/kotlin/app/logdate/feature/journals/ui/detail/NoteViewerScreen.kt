@@ -75,6 +75,8 @@ import app.logdate.ui.common.MarkdownText
 import app.logdate.ui.common.MessageBanner
 import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
+import app.logdate.ui.workspace.WorkspacePanel
 import app.logdate.util.toReadableDateTimeShort
 import coil3.compose.AsyncImage
 import logdate.client.feature.journal.generated.resources.Res
@@ -248,7 +250,7 @@ fun TextNoteViewerContent(
                 Column(
                     modifier =
                         Modifier
-                            .widthIn(max = 840.dp)
+                            .widthIn(max = if (LocalWorkspaceEnabled.current) 720.dp else 840.dp)
                             .fillMaxWidth()
                             .padding(Spacing.xl),
                     verticalArrangement = Arrangement.SpaceBetween,
@@ -418,6 +420,17 @@ fun NoteViewerScaffoldContent(
             remember(it.journalId) { deriveCoverColor(it.journalId) }
         }
 
+    if (LocalWorkspaceEnabled.current) {
+        WorkspacePanel(modifier) {
+            Column(Modifier.fillMaxSize()) {
+                NoteViewerToolbar(onGoBack, journalContext, accentColor, onNavigateToNote, onShowAddToJournal, onShare)
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    NoteViewerContent(shared, onOpenLocationTimeline, noteContent = noteContent)
+                }
+            }
+        }
+        return
+    }
     FoldableTabletopLayout(
         modifier = modifier,
         minPaneHeight = 220.dp,

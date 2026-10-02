@@ -2,6 +2,9 @@ name: Screenshot Tests
 run-name: Screenshot tests for ${{ github.ref_name }} by ${{ github.actor }}
 
 on:
+  push:
+    branches: [main]
+    paths: ['app/android-main/**', 'client/feature/**', 'client/ui/**', 'client/theme/**', 'app/compose-main/**', 'config/workspace/**', 'build-logic/**']
   pull_request:
     branches: [main, develop]
     paths:

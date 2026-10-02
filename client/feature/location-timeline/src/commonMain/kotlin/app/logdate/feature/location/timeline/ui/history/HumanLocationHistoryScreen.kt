@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -32,6 +33,8 @@ import app.logdate.shared.model.location.HistoryField
 import app.logdate.shared.model.location.PlaceVisit
 import app.logdate.shared.model.location.TravelMode
 import app.logdate.shared.model.location.VisitMemoryContext
+import app.logdate.ui.common.PlatformBackHandler
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
@@ -49,6 +52,7 @@ fun HumanLocationHistoryScreen(
     viewModel: HumanLocationHistoryViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val mapSnapshot by viewModel.mapSnapshot.collectAsStateWithLifecycle()
     val snapshot by viewModel.snapshot.collectAsStateWithLifecycle()
     val access = rememberHistoryRecordingAccess()
     val recordingEnabled by viewModel.recordingEnabled.collectAsStateWithLifecycle()
@@ -61,10 +65,33 @@ fun HumanLocationHistoryScreen(
     var recording by remember { mutableStateOf(false) }
     var edit by remember { mutableStateOf<Pair<String?, HistoryEditAction>?>(null) }
     var reviewingChanges by remember { mutableStateOf(false) }
-    var openedPlace by remember { mutableStateOf<String?>(null) }
+    var openedPlace by rememberSaveable { mutableStateOf<String?>(null) }
     var linkingVisit by remember { mutableStateOf<String?>(null) }
     var moreMenu by remember { mutableStateOf(false) }
     Column(modifier) {
+        val workspace = LocalWorkspaceEnabled.current
+        val placeDetail: (@Composable () -> Unit)? =
+            openedPlace?.let { placeId ->
+                snapshot?.let { data ->
+                    {
+                        HumanPlaceDetail(
+                            placeId,
+                            data,
+                            onVisit = { visit ->
+                                viewModel.setDate(visit.start.toLocalDateTime(TimeZone.currentSystemDefault()).date)
+                                viewModel.select(visit.id, true)
+                                openedPlace = null
+                            },
+                            onMemory = { Uuid.parseOrNull(it)?.let(onOpenNote) },
+                            onMerge = viewModel::mergePlace,
+                            onDismiss = { openedPlace = null },
+                            embedded = true,
+                        )
+                    }
+                }
+            }
+        app.logdate.ui.common
+            .PlatformBackHandler(enabled = workspace && openedPlace != null) { openedPlace = null }
         HumanLocationHistoryContent(
             when {
                 state.recoveryActionLabel == "Try again" -> state
@@ -84,7 +111,10 @@ fun HumanLocationHistoryScreen(
                 onCloseDetail = viewModel::dismiss,
                 onDayOffset = viewModel::changeDay,
                 onCalendar = { calendar = true },
-                onTab = viewModel::setTab,
+                onTab = {
+                    openedPlace = null
+                    viewModel.setTab(it)
+                },
                 onPlacesQuery = viewModel::setQuery,
                 onPlacesMapVisible = viewModel::setMapVisible,
                 onPlacesFilter = viewModel::cycleRange,
@@ -114,9 +144,10 @@ fun HumanLocationHistoryScreen(
             ),
             modifier = Modifier.weight(1f),
             showTitle = showTitle,
+            supportingDetail = placeDetail.takeIf { workspace },
             toolbarActions = {
                 IconButton(onClick = { moreMenu = true }) {
-                    Icon(Icons.Default.MoreVert, "More location options", Modifier.size(20.dp))
+                    Icon(Icons.Default.MoreVert, "More place options", Modifier.size(20.dp))
                 }
                 DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
                     DropdownMenuItem(text = { Text("Recording settings") }, onClick = {
@@ -147,7 +178,8 @@ fun HumanLocationHistoryScreen(
                 val mapItems =
                     if (state.tab == HistoryTab.Places) {
                         val visiblePlaceIds = state.filteredPlaces().flatMapTo(mutableSetOf()) { it.sourceIds }
-                        snapshot
+                        mapSnapshot
+                            ?.second
                             ?.collectionPlaces()
                             .orEmpty()
                             .filter { place -> place.id in visiblePlaceIds }
@@ -164,16 +196,17 @@ fun HumanLocationHistoryScreen(
                                 )
                             }
                     } else {
-                        snapshot?.items.orEmpty()
+                        mapSnapshot?.second?.items.orEmpty()
                     }
                 HumanHistoryMap(
                     mapItems,
-                    state.selectedItemId,
+                    if (state.tab == HistoryTab.Places) openedPlace else state.selectedItemId,
                     {
                         if (state.tab == HistoryTab.Places) openedPlace = it else viewModel.select(it)
                     },
                     mapModifier,
                     viewModel::pauseReplay,
+                    historyKey = mapSnapshot?.first,
                 )
             },
         )
@@ -260,20 +293,22 @@ fun HumanLocationHistoryScreen(
             onDismiss = { edit = null },
         )
     }
-    openedPlace?.let { placeId ->
-        snapshot?.let { data ->
-            HumanPlaceDetail(
-                placeId,
-                data,
-                onVisit = { visit ->
-                    viewModel.setDate(visit.start.toLocalDateTime(TimeZone.currentSystemDefault()).date)
-                    viewModel.select(visit.id, true)
-                    openedPlace = null
-                },
-                onMemory = { Uuid.parseOrNull(it)?.let(onOpenNote) },
-                onMerge = viewModel::mergePlace,
-                onDismiss = { openedPlace = null },
-            )
+    if (!LocalWorkspaceEnabled.current) {
+        openedPlace?.let { placeId ->
+            snapshot?.let { data ->
+                HumanPlaceDetail(
+                    placeId,
+                    data,
+                    onVisit = { visit ->
+                        viewModel.setDate(visit.start.toLocalDateTime(TimeZone.currentSystemDefault()).date)
+                        viewModel.select(visit.id, true)
+                        openedPlace = null
+                    },
+                    onMemory = { Uuid.parseOrNull(it)?.let(onOpenNote) },
+                    onMerge = viewModel::mergePlace,
+                    onDismiss = { openedPlace = null },
+                )
+            }
         }
     }
     if (reviewingChanges) {

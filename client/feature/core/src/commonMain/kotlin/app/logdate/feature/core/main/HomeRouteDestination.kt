@@ -30,7 +30,7 @@ enum class HomeRouteDestination(
         unselectedIcon = Icons.Outlined.History,
     ),
     LocationHistory(
-        label = "Locations",
+        label = "Places",
         selectedIcon = Icons.Filled.LocationOn,
         unselectedIcon = Icons.Outlined.LocationOn,
     ),

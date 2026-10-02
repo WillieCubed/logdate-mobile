@@ -39,6 +39,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.workspace.LocalWorkspaceEnabled
+import app.logdate.ui.workspace.workspaceControlBackdrop
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.cd_switch_to_carousel
 import logdate.client.feature.journal.generated.resources.cd_switch_to_grid
@@ -86,8 +88,7 @@ fun JournalFilterBar(
 
     Row(
         modifier =
-            modifier
-                .background(backgroundColor)
+            (if (LocalWorkspaceEnabled.current) modifier.workspaceControlBackdrop(isScrolled) else modifier.background(backgroundColor))
                 .horizontalScroll(rememberScrollState())
                 .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
                 .testTag("JournalFilterBar"),
