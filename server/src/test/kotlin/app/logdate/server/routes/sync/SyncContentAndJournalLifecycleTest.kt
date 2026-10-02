@@ -7,6 +7,7 @@ import app.logdate.server.routes.support.contentUploadBody
 import app.logdate.server.routes.support.journalUpdateBody
 import app.logdate.server.routes.support.journalUploadBody
 import io.ktor.client.request.delete
+import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.patch
 import io.ktor.client.request.put
@@ -29,6 +30,97 @@ import kotlin.test.assertTrue
  * full and partial (PATCH) updates for both content and journal collections.
  */
 class SyncContentAndJournalLifecycleTest {
+    @Test
+    fun `conditional journal creation preserves a newer title`() =
+        testApplication {
+            val tokenService = configureInMemorySyncApp()
+            val auth = authHeader(tokenService)
+            val path = "/api/v1/journals/conditional-mac-journal"
+
+            val first =
+                client.put(path) {
+                    header(HttpHeaders.Authorization, auth)
+                    header(HttpHeaders.IfNoneMatch, "*")
+                    contentType(ContentType.Application.Json)
+                    setBody(journalUploadBody(id = "conditional-mac-journal", title = "Mac title"))
+                }
+            assertEquals(HttpStatusCode.Created, first.status)
+
+            val newer =
+                client.put(path) {
+                    header(HttpHeaders.Authorization, auth)
+                    contentType(ContentType.Application.Json)
+                    setBody(journalUploadBody(id = "conditional-mac-journal", title = "Phone title"))
+                }
+            assertEquals(HttpStatusCode.OK, newer.status)
+
+            val retry =
+                client.put(path) {
+                    header(HttpHeaders.Authorization, auth)
+                    header(HttpHeaders.IfNoneMatch, "*")
+                    contentType(ContentType.Application.Json)
+                    setBody(journalUploadBody(id = "conditional-mac-journal", title = "Mac title"))
+                }
+            assertEquals(HttpStatusCode.PreconditionFailed, retry.status)
+            assertTrue(client.get(path) { header(HttpHeaders.Authorization, auth) }.bodyAsText().contains("\"title\":\"Phone title\""))
+
+            assertEquals(HttpStatusCode.NoContent, client.delete(path) { header(HttpHeaders.Authorization, auth) }.status)
+            val recreate =
+                client.put(path) {
+                    header(HttpHeaders.Authorization, auth)
+                    header(HttpHeaders.IfNoneMatch, "*")
+                    contentType(ContentType.Application.Json)
+                    setBody(journalUploadBody(id = "conditional-mac-journal", title = "Keep my Mac journal"))
+                }
+            assertEquals(HttpStatusCode.Created, recreate.status)
+        }
+
+    @Test
+    fun `conditional content creation preserves a newer edit and permits recreation after deletion`() =
+        testApplication {
+            val tokenService = configureInMemorySyncApp()
+            val auth = authHeader(tokenService)
+            val path = "/api/v1/contents/conditional-mac-entry"
+
+            val first =
+                client.put(path) {
+                    header(HttpHeaders.Authorization, auth)
+                    header(HttpHeaders.IfNoneMatch, "*")
+                    contentType(ContentType.Application.Json)
+                    setBody(contentUploadBody(id = "conditional-mac-entry", content = "Mac text"))
+                }
+            assertEquals(HttpStatusCode.Created, first.status)
+
+            val newer =
+                client.put(path) {
+                    header(HttpHeaders.Authorization, auth)
+                    contentType(ContentType.Application.Json)
+                    setBody(contentUploadBody(id = "conditional-mac-entry", content = "Phone edit"))
+                }
+            assertEquals(HttpStatusCode.OK, newer.status)
+
+            val retry =
+                client.put(path) {
+                    header(HttpHeaders.Authorization, auth)
+                    header(HttpHeaders.IfNoneMatch, "*")
+                    contentType(ContentType.Application.Json)
+                    setBody(contentUploadBody(id = "conditional-mac-entry", content = "Mac text"))
+                }
+            assertEquals(HttpStatusCode.PreconditionFailed, retry.status)
+            assertTrue(client.get(path) { header(HttpHeaders.Authorization, auth) }.bodyAsText().contains("\"content\":\"Phone edit\""))
+
+            val deletion = client.delete(path) { header(HttpHeaders.Authorization, auth) }
+            assertEquals(HttpStatusCode.NoContent, deletion.status)
+            val recreate =
+                client.put(path) {
+                    header(HttpHeaders.Authorization, auth)
+                    header(HttpHeaders.IfNoneMatch, "*")
+                    contentType(ContentType.Application.Json)
+                    setBody(contentUploadBody(id = "conditional-mac-entry", content = "Keep my Mac edit"))
+                }
+            assertEquals(HttpStatusCode.Created, recreate.status)
+        }
+
     @Test
     fun `content and journal endpoints enforce id consistency and version conflict behavior`() =
         testApplication {
@@ -143,6 +235,30 @@ class SyncContentAndJournalLifecycleTest {
                     .delete("/api/v1/journals/journal-branch-1") {
                         header(HttpHeaders.Authorization, auth)
                     }.status,
+            )
+
+            val staleContentEdit =
+                client.patch("/api/v1/contents/content-branch-1") {
+                    header(HttpHeaders.Authorization, auth)
+                    contentType(ContentType.Application.Json)
+                    setBody(contentUpdateBody(content = "offline Mac edit", knownVersion = 1L))
+                }
+            assertEquals(HttpStatusCode.Conflict, staleContentEdit.status)
+            assertEquals(
+                HttpStatusCode.NotFound,
+                client.get("/api/v1/contents/content-branch-1") { header(HttpHeaders.Authorization, auth) }.status,
+            )
+
+            val staleJournalEdit =
+                client.patch("/api/v1/journals/journal-branch-1") {
+                    header(HttpHeaders.Authorization, auth)
+                    contentType(ContentType.Application.Json)
+                    setBody(journalUpdateBody(title = "offline title", knownVersion = 1L))
+                }
+            assertEquals(HttpStatusCode.Conflict, staleJournalEdit.status)
+            assertEquals(
+                HttpStatusCode.NotFound,
+                client.get("/api/v1/journals/journal-branch-1") { header(HttpHeaders.Authorization, auth) }.status,
             )
         }
 }

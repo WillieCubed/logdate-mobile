@@ -329,6 +329,51 @@ class RepoBackedLogDateCollectionsRepositoryTest {
             assertTrue(repository.listAssociations(userId).isEmpty(), "no association should be visible after a failed batch upsert")
         }
 
+    @Test
+    fun `failed association batch preserves an existing journal link`() =
+        runTest {
+            val accountRepository = InMemoryAccountRepository()
+            val identityService = identityService(accountRepository)
+            val account =
+                identityService.ensureIdentity(
+                    accountRepository.save(
+                        Account(
+                            id = Uuid.random(),
+                            username = "existing-link",
+                            displayName = "Existing Link",
+                            createdAt = Clock.System.now(),
+                        ),
+                    ),
+                )
+            val blockStore = InMemoryRepoBlockStore()
+            val failingKey = associationRecordKey(journalId = "journal-1", entryId = "entry-2").toString()
+            val repository =
+                RepoBackedLogDateCollectionsRepository(
+                    accountRepository = accountRepository,
+                    identityService = identityService,
+                    signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
+                    blockStore = blockStore,
+                    metadataStore = FailingBatchMetadataStore(InMemoryLogDateCollectionsMetadataStore(), failingKey),
+                )
+            val userId = account.id.toJavaUUID()
+            val repoDid = AtprotoDid.require(requireNotNull(account.did))
+            val existing = LogDateAssociation("journal-1", "entry-1", 10L, 0L, DeviceId("device-a"))
+            repository.upsertAssociations(userId, listOf(existing))
+            val recordID = associationRecordId(repoDid, existing.journalId, existing.entryId)
+            val before = assertNotNull(DefaultRepoEngine(blockStore).getRecord(recordID).getOrThrow())
+            val newLink = LogDateAssociation("journal-1", "entry-2", 20L, 0L, DeviceId("device-b"))
+
+            assertFailsWith<IllegalStateException> {
+                repository.upsertAssociations(userId, listOf(existing.copy(createdAt = 30L), newLink))
+            }
+
+            val after = assertNotNull(DefaultRepoEngine(blockStore).getRecord(recordID).getOrThrow())
+            assertEquals(before.value, after.value)
+            assertEquals(listOf(existing.entryId), repository.listAssociations(userId).map { it.entryId })
+            val newRecordID = associationRecordId(repoDid, newLink.journalId, newLink.entryId)
+            assertNull(DefaultRepoEngine(blockStore).getRecord(newRecordID).getOrThrow())
+        }
+
     private fun entry(id: String) =
         LogDateEntry(
             id = id,

@@ -51,6 +51,16 @@ class SyncPayloadCipherTest {
         }
 
     @Test
+    fun `user text that begins with an envelope prefix still round trips`() =
+        runTest {
+            val cipher = cipherFor("seed")
+            for (text in listOf("LDSE1:my day", "LDSE2:my day")) {
+                val encrypted = cipher.encryptString("field", text)
+                assertEquals(text, cipher.decryptString("field", encrypted))
+            }
+        }
+
+    @Test
     fun `a value made with a different identity key is unreadable not silently wrong`() =
         runTest {
             val writer = cipherFor("device-a")

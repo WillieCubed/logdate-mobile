@@ -1,7 +1,9 @@
 package app.logdate.server.database
 
 import app.logdate.server.database.support.withH2Database
+import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
 import app.logdate.server.logdate.LogDateCollectionKind
+import app.logdate.server.logdate.LogDateCollectionsMetadataStore
 import kotlinx.coroutines.runBlocking
 import studio.hypertext.atproto.identity.AtprotoDid
 import java.util.UUID
@@ -26,6 +28,37 @@ import kotlin.test.assertTrue
  *   database growth.
  */
 class PostgreSQLLogDateCollectionsMetadataStoreTest {
+    @Test
+    fun `mixed changes and deletions fit one cursor page without skipping records`() {
+        withH2Database(LogDateCollectionStatesTable, LogDateCollectionRecordsTable) {
+            runBlocking {
+                assertMixedPagesAreLossless(PostgreSQLLogDateCollectionsMetadataStore())
+                assertMixedPagesAreLossless(InMemoryLogDateCollectionsMetadataStore())
+            }
+        }
+    }
+
+    private suspend fun assertMixedPagesAreLossless(store: LogDateCollectionsMetadataStore) {
+        val userId = UUID.randomUUID()
+        val repoDid = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
+        store.upsert(userId, repoDid, LogDateCollectionKind.ENTRY, "deleted")
+        store.upsert(userId, repoDid, LogDateCollectionKind.ENTRY, "first")
+        store.upsert(userId, repoDid, LogDateCollectionKind.ENTRY, "second")
+        store.delete(userId, repoDid, LogDateCollectionKind.ENTRY, "deleted", System.currentTimeMillis())
+
+        var cursor = 0L
+        val received = mutableListOf<String>()
+        repeat(3) {
+            val page = store.changes(userId, LogDateCollectionKind.ENTRY, since = cursor, limit = 1)
+            assertEquals(1, page.changes.size + page.deletions.size)
+            assertTrue(page.lastTimestamp > cursor)
+            received += page.changes.map { it.recordKey } + page.deletions.map { it.recordKey }
+            cursor = page.lastTimestamp
+        }
+        assertEquals(listOf("first", "second", "deleted"), received)
+        assertTrue(!store.changes(userId, LogDateCollectionKind.ENTRY, since = cursor, limit = 1).hasMore)
+    }
+
     @Test
     fun `metadata store tracks versions changes and purge counts by collection`() {
         withH2Database(

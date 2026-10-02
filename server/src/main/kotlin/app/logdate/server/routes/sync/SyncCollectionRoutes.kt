@@ -46,6 +46,7 @@ import io.github.smiley4.ktoropenapi.put
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
+import io.ktor.server.request.header
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -88,6 +89,12 @@ private fun Route.contentRoutes(
                     )
                 }
                 val wasCreated = !collectionsRepository.entryExists(userId, contentId)
+                if (call.request.header(HttpHeaders.IfNoneMatch) == "*" && !wasCreated) {
+                    return@put call.respond(
+                        HttpStatusCode.PreconditionFailed,
+                        error("CONTENT_EXISTS", "Content already exists"),
+                    )
+                }
                 Napier.d("Content upsert completed")
                 val stored =
                     collectionsRepository.upsertEntry(
@@ -174,7 +181,7 @@ private fun Route.contentRoutes(
                 val contentId = call.requiredPathParam("contentId")
                 val req = call.receive<ContentUpdateRequest>()
                 val existing = collectionsRepository.getEntry(userId, contentId)
-                if (existing != null && req.isOutdated(existing.version)) {
+                if (req.isOutdated(existing?.version)) {
                     metrics.recordConflict()
                     return@patch call.respond(
                         HttpStatusCode.Conflict,
@@ -243,6 +250,12 @@ private fun Route.journalRoutes(
                     )
                 }
                 val wasCreated = !collectionsRepository.journalExists(userId, journalId)
+                if (call.request.header(HttpHeaders.IfNoneMatch) == "*" && !wasCreated) {
+                    return@put call.respond(
+                        HttpStatusCode.PreconditionFailed,
+                        error("JOURNAL_EXISTS", "Journal already exists"),
+                    )
+                }
                 Napier.d("Journal upsert completed")
                 val stored =
                     collectionsRepository.upsertJournal(
@@ -319,7 +332,7 @@ private fun Route.journalRoutes(
                 val journalId = call.requiredPathParam("journalId")
                 val req = call.receive<JournalUpdateRequest>()
                 val existing = collectionsRepository.getJournal(userId, journalId)
-                if (existing != null && req.isOutdated(existing.version)) {
+                if (req.isOutdated(existing?.version)) {
                     metrics.recordConflict()
                     return@patch call.respond(
                         HttpStatusCode.Conflict,
@@ -604,8 +617,8 @@ private fun io.ktor.server.application.ApplicationCall.resolvePageSize(): Int =
     (request.queryParameters["limit"]?.toIntOrNull() ?: DEFAULT_SYNC_PAGE_SIZE)
         .coerceIn(1, MAX_SYNC_PAGE_SIZE)
 
-private fun ContentUpdateRequest.isOutdated(currentVersion: Long): Boolean =
-    (versionConstraint as? VersionConstraint.Known)?.serverVersion?.let { it < currentVersion } == true
+private fun ContentUpdateRequest.isOutdated(currentVersion: Long?): Boolean =
+    (versionConstraint as? VersionConstraint.Known)?.serverVersion?.let { it != currentVersion } == true
 
-private fun JournalUpdateRequest.isOutdated(currentVersion: Long): Boolean =
-    (versionConstraint as? VersionConstraint.Known)?.serverVersion?.let { it < currentVersion } == true
+private fun JournalUpdateRequest.isOutdated(currentVersion: Long?): Boolean =
+    (versionConstraint as? VersionConstraint.Known)?.serverVersion?.let { it != currentVersion } == true

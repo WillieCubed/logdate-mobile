@@ -321,13 +321,12 @@ internal class SyncMediaTransfer(
                     .substringBefore('#')
                     .substringBefore('?')
                     .trim()
-                    .removeSuffix("/binary")
-
-            val lastSlashIndex = normalized.lastIndexOf('/')
-            if (lastSlashIndex == -1 || lastSlashIndex == normalized.lastIndex) {
-                null
+            val segments = normalized.split('/')
+            val mediaIndex = segments.indexOfLast { it == "media" }
+            if (mediaIndex >= 0) {
+                segments.getOrNull(mediaIndex + 1)?.takeIf { it.isNotBlank() }
             } else {
-                normalized.substring(lastSlashIndex + 1).takeIf { it.isNotBlank() }
+                segments.lastOrNull()?.takeIf { it.isNotBlank() }
             }
         }.getOrNull()
 

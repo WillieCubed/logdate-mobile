@@ -254,19 +254,23 @@ internal class RepoBackedLogDateCollectionsRepository(
     ): List<LogDateAssociation> {
         val repoDid = canonicalRepoDid(userId)
         if (associations.isEmpty()) return emptyList()
+        val recordIds = associations.map { associationRecordId(repoDid, it.journalId, it.entryId) }
+        val previousRecords = repoEngine.getRecords(recordIds).getOrThrow()
 
         // One commit for the whole list. This used to put each record separately, so an endpoint
         // that accepts a list cost exactly as much as the client sending them one at a time -
         // a full read-rebuild-write of the repo per link.
-        repoEngine
-            .putRecords(
-                associations.map { association ->
-                    BatchRecordWrite(
-                        recordId = associationRecordId(repoDid, association.journalId, association.entryId),
-                        value = association.toRepoJson(),
-                    )
-                },
-            ).getOrThrow()
+        val writtenRecords =
+            repoEngine
+                .putRecords(
+                    associations.mapIndexed { index, association ->
+                        BatchRecordWrite(
+                            recordId = recordIds[index],
+                            value = association.toRepoJson(),
+                            swapRecord = previousRecords[index]?.cid,
+                        )
+                    },
+                ).getOrThrow()
 
         val metadataResults =
             try {
@@ -277,16 +281,18 @@ internal class RepoBackedLogDateCollectionsRepository(
                     recordKeys = associations.map { associationRecordKey(it.journalId, it.entryId).toString() },
                 )
             } catch (failure: Throwable) {
-                // upsertBatch is all-or-nothing, so on failure NONE of this batch has a metadata
-                // row. The repo commit above already landed every record in one atomic commit
-                // though, so without this the repo would be left holding "phantom" records:
-                // present in commit history but invisible to listAssociations/associationChanges,
-                // which read from metadataStore rather than the tree. Delete the whole batch back
-                // out of the repo so the two stores stay in lockstep and the caller sees a clean
-                // failure rather than a partial one.
-                associations.forEach { association ->
+                // Restore the repo state this batch replaced. A retry can contain existing links,
+                // so deleting every record would erase a link that predates the failed request.
+                associations.forEachIndexed { index, association ->
                     runCatching {
-                        repoEngine.deleteRecord(associationRecordId(repoDid, association.journalId, association.entryId)).getOrThrow()
+                        val recordId = recordIds[index]
+                        val writtenCid = writtenRecords[index].cid
+                        val previous = previousRecords[index]
+                        if (previous == null) {
+                            repoEngine.deleteRecord(recordId, swapRecord = writtenCid).getOrThrow()
+                        } else {
+                            repoEngine.putRecord(recordId, previous.value, swapRecord = writtenCid).getOrThrow()
+                        }
                     }.onFailure { compensationFailure ->
                         Napier.e(
                             "Failed to compensate association repo record " +

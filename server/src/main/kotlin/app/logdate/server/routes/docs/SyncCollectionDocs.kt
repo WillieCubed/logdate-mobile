@@ -41,8 +41,9 @@ internal object SyncCollectionDocs {
             exists. Sending the same request twice is safe, which makes it the correct call to retry after a
             dropped connection.
 
-            The first save answers `201 Created` with a `Location` header; later saves answer `200 OK`. Either
-            way the response carries the `serverVersion` the server assigned, which is what change feeds use to
+            The first save answers `201 Created` with a `Location` header; later saves answer `200 OK`. Send
+            `If-None-Match: *` when creating an entry written offline so a retry cannot replace a newer copy; an
+            existing entry then answers `412 Precondition Failed`. Either way the response carries the `serverVersion` the server assigned, which is what change feeds use to
             order this write relative to others. Whatever `syncVersion` you send is ignored; the server owns
             versions.
 
@@ -89,6 +90,14 @@ internal object SyncCollectionDocs {
                     "VALIDATION_ERROR",
                     "`id` in the body differs from `contentId` in the path. Make them the same.",
                     "Request body id must match path contentId",
+                ),
+            )
+            syncError(
+                HttpStatusCode.PreconditionFailed,
+                ErrorCase(
+                    "CONTENT_EXISTS",
+                    "An entry already exists when `If-None-Match: *` is sent.",
+                    "Content already exists",
                 ),
             )
             syncUnauthorized()
@@ -219,8 +228,10 @@ internal object SyncCollectionDocs {
             ApiTags.JOURNALS,
             "Create or replace a journal",
             """
-            Saves a journal under the ID in the path, creating it if new and replacing it if it exists. Safe to
-            retry. The first save answers `201 Created` with a `Location` header; later saves answer `200 OK`.
+            Saves a journal under the ID in the path, creating it if new and replacing it if it exists.
+            Send `If-None-Match: *` when creating an offline journal so a retry cannot replace a newer copy;
+            an existing journal then answers `412 Precondition Failed`. Without that header, the first save
+            answers `201 Created` with a `Location` header and later saves answer `200 OK`.
             The `id` in the body must equal the `journalId` in the path, and any `syncVersion` you send is
             ignored: the server assigns versions.
             """,
@@ -263,6 +274,14 @@ internal object SyncCollectionDocs {
                     "VALIDATION_ERROR",
                     "`id` in the body differs from `journalId` in the path. Make them the same.",
                     "Request body id must match path journalId",
+                ),
+            )
+            syncError(
+                HttpStatusCode.PreconditionFailed,
+                ErrorCase(
+                    "JOURNAL_EXISTS",
+                    "A journal already exists when `If-None-Match: *` is sent.",
+                    "Journal already exists",
                 ),
             )
             syncUnauthorized()

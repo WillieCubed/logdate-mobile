@@ -82,7 +82,7 @@ class AutomaticDownloadIntegrationTest {
                                     id = Uuid.random().toString(),
                                     type = "IMAGE",
                                     content = null,
-                                    mediaUri = "https://example.com/media/image-media",
+                                    mediaUri = "https://example.com/api/v1/media/image-media/binary",
                                     createdAt = now.toEpochMilliseconds(),
                                     lastUpdated = now.toEpochMilliseconds(),
                                     serverVersion = 1,
@@ -91,7 +91,7 @@ class AutomaticDownloadIntegrationTest {
                                     id = Uuid.random().toString(),
                                     type = "VIDEO",
                                     content = null,
-                                    mediaUri = "https://example.com/media/video-media",
+                                    mediaUri = "https://storage.example.com/users/account/media/video-media/clip.mp4?signature=abc",
                                     createdAt = now.toEpochMilliseconds(),
                                     lastUpdated = now.toEpochMilliseconds(),
                                     serverVersion = 1,
@@ -100,7 +100,7 @@ class AutomaticDownloadIntegrationTest {
                                     id = Uuid.random().toString(),
                                     type = "AUDIO",
                                     content = null,
-                                    mediaUri = "https://example.com/media/audio-media",
+                                    mediaUri = "https://example.com/api/v1/media/audio-media/binary",
                                     durationMs = 12_000,
                                     createdAt = now.toEpochMilliseconds(),
                                     lastUpdated = now.toEpochMilliseconds(),
@@ -220,11 +220,9 @@ class AutomaticDownloadIntegrationTest {
             assertTrue(result.success, "Download should succeed")
             assertTrue(result.downloadedItems > 0, "Should have downloaded items")
             assertTrue(mockApiClient.wasMethodCalled("getContentChanges"), "Should have called getContentChanges")
-
-            // And: The remote content should be added to local repository
-            // Note: In the real implementation, this would be verified by checking the repository
-            // Here we verify the API calls were made correctly
-            assertTrue(mockApiClient.getContentChangesCalls.isNotEmpty(), "Should have content change calls")
+            val savedNote = mockJournalNotesRepository.allNotesObserved.first().single() as JournalNote.Text
+            assertEquals(remoteNote.uid, savedNote.uid)
+            assertEquals(remoteNote.content, savedNote.content)
         }
 
     @Test
