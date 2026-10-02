@@ -137,19 +137,52 @@ class LocationHistoryServiceTest {
         }
 
     @Test
-    fun backwardBoundaryStopsAtSeparateWalkAndReturnWithoutApplyingOlderEdits() =
+    fun noisyExtendedStayIsOneVisitWithOneIdentityAcrossDayAndMonthViews() =
         runTest {
             val fixture = Fixture()
             for (i in 0..900) {
+                val sample = observation("s$i", start - 74.hours + (i * 5).minutes)
+                val noisy =
+                    when {
+                        i % 37 == 0 -> sample.copy(latitude = 36.0036, accuracyMeters = 30f)
+                        i % 53 == 0 -> sample.copy(latitude = 36.0027, accuracyMeters = null)
+                        else -> sample.copy(latitude = 36.0 + (i % 7 - 3) * 0.0002, accuracyMeters = 40f)
+                    }
+                fixture.save("observation:s$i", HistoryPayload.Observation(noisy))
+            }
+            val day = fixture.snapshot().items.single() as PlaceVisit
+            val month =
+                fixture.service
+                    .observeRange(LocalDate.parse("2026-08-30"), date, zone = TimeZone.UTC)
+                    .first()
+                    .items
+                    .single() as PlaceVisit
+            assertTrue(day.confirmedStay)
+            assertEquals(month.id, day.id)
+            assertEquals("s1", day.evidenceIds.first())
+        }
+
+    @Test
+    fun backwardBoundaryStopsAtSeparateWalkAndReturnWithoutApplyingOlderEdits() =
+        runTest {
+            val fixture = Fixture()
+            val walk = (start - 24.hours)..(start - 24.hours + 10.minutes)
+            for (i in 0..900) {
+                val time = start - 74.hours + (i * 5).minutes
+                if (time in walk) continue
+                fixture.save("observation:s$i", HistoryPayload.Observation(observation("s$i", time)))
+            }
+            for (minute in 1..10) {
                 fixture.save(
-                    "observation:s$i",
-                    HistoryPayload.Observation(observation("s$i", start - 74.hours + (i * 5).minutes)),
+                    "observation:walk$minute",
+                    HistoryPayload.Observation(
+                        observation(
+                            "walk$minute",
+                            start - 24.hours + minute.minutes,
+                        ).copy(latitude = 36.006, activity = TravelMode.WALKING),
+                    ),
                 )
             }
-            fixture.save(
-                "observation:walk",
-                HistoryPayload.Observation(observation("walk", start - 24.hours + 1.minutes).copy(activity = TravelMode.WALKING)),
-            )
             fixture.service.savePlace(place("old").copy(latitude = 35.0))
             fixture.service.correct("s0", HistoryField.PLACE, "old")
             val visit =

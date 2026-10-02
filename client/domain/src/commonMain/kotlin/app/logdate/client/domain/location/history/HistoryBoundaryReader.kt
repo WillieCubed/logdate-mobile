@@ -8,12 +8,12 @@ import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.shared.model.location.ActivityObservation
 import app.logdate.shared.model.location.HistoryPayload
 import app.logdate.shared.model.location.LocationObservation
-import app.logdate.shared.model.location.TravelMode
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 internal data class BoundaryEvidence(
     val observations: List<LocationObservation>,
@@ -24,12 +24,16 @@ internal data class BoundaryEvidence(
 /**
  * Pages only the uninterrupted component preceding a window, never assuming continuity across missing evidence.
  * A pathological uninterrupted component can still be large; truncating it would discard correction anchors.
+ *
+ * Paging stops where [ReconstructLocationDay] could not join older samples to the window: at a
+ * recording gap, or once precise samples show the person was somewhere else for longer than drift.
  */
 internal class HistoryBoundaryReader(
     private val raw: LocationHistoryRepository,
     private val store: HistoryRecordStore,
     private val activity: ActivityHistoryRepository?,
     private val decode: (HistoryRecord) -> HistoryPayload?,
+    private val parameters: HistoryReconstructionParameters = HistoryReconstructionParameters(),
 ) {
     suspend fun read(
         owner: String,
@@ -47,6 +51,7 @@ internal class HistoryBoundaryReader(
             val validPoints = points.filter { it.validCoordinates() }
             if (validPoints.isEmpty()) continue
             var next = applyActivityEvidence(validPoints, allActivities).minWith(compareBy({ it.timestamp }, { it.id }))
+            val continuity = ContinuityTracker(parameters, next)
             var cursorTime = next.timestamp
             var cursorId = next.id
             while (true) {
@@ -67,7 +72,7 @@ internal class HistoryBoundaryReader(
                     next = enriched.last()
                     var reset = false
                     for (previous in enriched.dropLast(1)) {
-                        if (provesBoundary(previous, next)) {
+                        if (continuity.separates(previous, next)) {
                             reset = true
                             break
                         }
@@ -90,7 +95,7 @@ internal class HistoryBoundaryReader(
         origin: String,
         localDevice: String,
         device: String,
-        cursorTime: kotlin.time.Instant,
+        cursorTime: Instant,
         cursorId: String,
     ): List<LocationObservation> {
         val local =
@@ -117,8 +122,8 @@ internal class HistoryBoundaryReader(
         owner: String,
         origin: String,
         device: String,
-        from: kotlin.time.Instant,
-        until: kotlin.time.Instant,
+        from: Instant,
+        until: Instant,
         deletedActivities: Set<String>,
     ): List<ActivityObservation> {
         val localEvents =
@@ -142,25 +147,50 @@ internal class HistoryBoundaryReader(
         }
     }
 
-    private fun provesBoundary(
-        previous: LocationObservation,
-        next: LocationObservation,
-    ): Boolean {
-        if (next.timestamp - previous.timestamp > 10.minutes) return true
-        if (!previous.credible() || !next.credible()) return true
-        if (previous.moving() != next.moving()) return true
-        if (previous.moving()) return previous.activity != next.activity
-        return geographicDistance(previous.latitude, previous.longitude, next.latitude, next.longitude) > 200
-    }
-
-    private fun LocationObservation.credible() = accuracyMeters?.let { it in 0f..100f } ?: true
-
-    private fun LocationObservation.moving() = activity !in setOf(TravelMode.STILL, TravelMode.UNKNOWN) || (speedMetersPerSecond ?: 0f) > 1f
-
-    private fun LocationObservation.validCoordinates() =
-        latitude.isFinite() && longitude.isFinite() && latitude in -90.0..90.0 && longitude in -180.0..180.0
+    private fun LocationObservation.validCoordinates() = hasValidCoordinates()
 
     private companion object {
         const val PAGE_SIZE = 256
     }
+}
+
+/**
+ * Walks backwards from a window's first sample and reports where the reconstruction can no longer
+ * join older samples to it: a recording gap, or a departure (precise fixes outside the
+ * neighbourhood for longer than the excursion tolerance). Single stray fixes never end a stay.
+ */
+internal class ContinuityTracker(
+    private val parameters: HistoryReconstructionParameters,
+    first: LocationObservation,
+) {
+    private val center = CenterAccumulator()
+    private var hasCenter = false
+    private var awaySince: Instant? = null
+
+    init {
+        include(first)
+    }
+
+    fun separates(
+        previous: LocationObservation,
+        next: LocationObservation,
+    ): Boolean {
+        if (next.timestamp - previous.timestamp > parameters.maximumGap) return true
+        if (!previous.isPrecise()) return false
+        if (hasCenter && center.value.distanceTo(previous) > parameters.neighborhoodMeters) {
+            val since = awaySince ?: previous.timestamp.also { awaySince = it }
+            return since - previous.timestamp > parameters.excursionTolerance
+        }
+        awaySince = null
+        include(previous)
+        return false
+    }
+
+    private fun include(sample: LocationObservation) {
+        if (!sample.isPrecise()) return
+        center.add(sample)
+        hasCenter = true
+    }
+
+    private fun LocationObservation.isPrecise() = accuracyMeters?.let { it in 0f..parameters.maximumPreciseAccuracyMeters } == true
 }

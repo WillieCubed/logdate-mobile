@@ -2,6 +2,7 @@ package app.logdate.client.domain.location.history.replay
 
 import app.logdate.client.domain.export.ExportLocationHistoryItem
 import app.logdate.client.domain.export.LocationHistoryPayload
+import app.logdate.client.domain.location.history.HistoryReconstructionParameters
 import app.logdate.client.domain.location.history.ReconstructLocationDay
 import app.logdate.shared.model.location.JourneyLeg
 import app.logdate.shared.model.location.LocationDayItem
@@ -16,6 +17,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.File
 import kotlin.test.Test
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Replays an exported `location_history.json` through the day reconstruction, old and current,
@@ -49,8 +52,13 @@ class LocationReplayTool {
     private fun algorithms(): List<ReplayAlgorithm> =
         listOf(
             ReplayAlgorithm("before (v2)") { LegacyReconstructLocationDay()(it) },
-            ReplayAlgorithm("current") { ReconstructLocationDay()(it) },
+            ReplayAlgorithm("current (5 min)") { ReconstructLocationDay()(it) },
+            ReplayAlgorithm("3 min stays") { withMinimumStay(3.minutes)(it) },
+            ReplayAlgorithm("10 min stays") { withMinimumStay(10.minutes)(it) },
         )
+
+    private fun withMinimumStay(minimumStay: Duration) =
+        ReconstructLocationDay(parameters = HistoryReconstructionParameters(minimumStay = minimumStay))
 
     private fun decode(file: File): List<LocationObservation> =
         Json { ignoreUnknownKeys = true }

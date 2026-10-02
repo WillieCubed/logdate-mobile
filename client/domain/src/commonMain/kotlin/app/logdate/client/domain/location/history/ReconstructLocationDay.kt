@@ -11,110 +11,115 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
-import kotlin.time.Duration.Companion.minutes
 
+/**
+ * Rebuilds a day of visits and journeys from raw location samples.
+ *
+ * Each recording device is reconstructed on its own. Its samples are first cut wherever the phone
+ * stopped recording for longer than [HistoryReconstructionParameters.maximumGap]; those cuts are
+ * shown as gaps rather than guessed across. Within each recorded stretch, [SegmentAssembler]
+ * separates the time someone stayed put from the time they travelled, tolerating the position noise
+ * real phones produce. Fixes without a reported accuracy only shape a stretch that has no
+ * precise fixes at all.
+ *
+ * Item identity comes from evidence: a visit or journey is named after its first precise sample, so
+ * the same recordings always produce the same ids, and edits keyed to a sample keep finding it.
+ */
 class ReconstructLocationDay(
     private val inference: TravelModeInferenceProvider = RecordedTravelModeInferenceProvider(),
+    private val parameters: HistoryReconstructionParameters = HistoryReconstructionParameters(),
 ) {
+    private val assembler = SegmentAssembler(parameters)
+
     operator fun invoke(observations: List<LocationObservation>): List<LocationDayItem> =
         observations
-            .filter {
-                it.latitude.isFinite() &&
-                    it.longitude.isFinite() &&
-                    it.latitude in -90.0..90.0 &&
-                    it.longitude in -180.0..180.0
-            }.distinctBy { Triple(it.ownerId, it.deviceId, it.id) }
+            .filter { it.hasValidCoordinates() }
+            .distinctBy { Triple(it.ownerId, it.deviceId, it.id) }
             .groupBy { it.ownerId to it.deviceId }
             .flatMap { (_, source) -> reconstructSource(source.sortedWith(compareBy({ it.timestamp }, { it.id }))) }
             .sortedWith(compareBy({ it.start }, { it.id }))
 
     private fun reconstructSource(source: List<LocationObservation>): List<LocationDayItem> {
-        if (source.isEmpty()) return emptyList()
-        val groups = mutableListOf<MutableList<LocationObservation>>()
-        source.forEach { sample ->
-            val previous = groups.lastOrNull()
-            if (previous != null && belongsTo(previous, sample)) {
-                previous.add(sample)
-            } else {
-                groups.add(mutableListOf(sample))
-            }
-        }
+        val preciseIds = preciseSamples(source, parameters)
+        val segments = splitAtGaps(source)
         return buildList {
-            groups.forEachIndexed { index, group ->
+            segments.forEachIndexed { index, segment ->
                 if (index > 0) {
-                    val previous = groups[index - 1].last()
-                    val next = group.first()
-                    if (next.timestamp - previous.timestamp > 10.minutes) {
-                        add(HistoryGap("gap:${previous.id}:${next.id}", previous.timestamp, next.timestamp))
-                    } else if (!isMoving(previous) && !isMoving(next) && distanceMeters(previous, next) > 75) {
-                        val connectorId = "journey:${previous.ownerId}:${previous.deviceId}:${previous.id}:${next.id}"
-                        add(
-                            JourneyLeg(
-                                connectorId,
-                                previous.timestamp,
-                                next.timestamp,
-                                // The inferred relation is editable without editing either endpoint visit.
-                                listOf("derived:$connectorId"),
-                                TravelMode.UNKNOWN,
-                                emptyList(),
-                            ),
-                        )
-                    }
+                    val previous = segments[index - 1].last()
+                    val next = segment.first()
+                    add(HistoryGap("gap:${previous.id}:${next.id}", previous.timestamp, next.timestamp))
                 }
-                add(toItem(group))
+                addAll(withConnectors(assembler.assemble(segment, usableSamples(segment, preciseIds))))
             }
         }
     }
 
-    private fun belongsTo(
-        group: List<LocationObservation>,
-        next: LocationObservation,
-    ): Boolean {
-        val anchor = group.first()
-        val previous = group.last()
-        if (next.timestamp - previous.timestamp > 10.minutes) return false
-        if (!credible(next) || !credible(previous)) return false
-        if (isMoving(anchor) != isMoving(next)) return false
-        return if (isMoving(anchor)) {
-            anchor.activity == next.activity
-        } else {
-            distanceMeters(anchor, next) <= 75.0 + minOf(anchor.accuracyMeters ?: 0f, next.accuracyMeters ?: 0f, 25f)
+    /** Unrated fixes only shape a stretch when nothing more precise was recorded during it. */
+    private fun usableSamples(
+        segment: List<LocationObservation>,
+        preciseIds: Set<String>,
+    ): Set<String> = if (segment.any { it.id in preciseIds }) preciseIds else preciseSamples(segment, parameters, acceptUnrated = true)
+
+    private fun splitAtGaps(source: List<LocationObservation>): List<List<LocationObservation>> {
+        val segments = mutableListOf<MutableList<LocationObservation>>()
+        source.forEach { sample ->
+            val current = segments.lastOrNull()
+            if (current == null || sample.timestamp - current.last().timestamp > parameters.maximumGap) {
+                segments += mutableListOf(sample)
+            } else {
+                current += sample
+            }
         }
+        return segments
     }
 
-    private fun toItem(group: List<LocationObservation>): LocationDayItem {
-        val first = group.first()
-        val last = group.last()
-        val evidence = group.map { it.id }
+    private fun toItem(part: SegmentPart): LocationDayItem {
+        val timed = part.timed
+        val first = timed.first()
         val id = "${first.ownerId}:${first.deviceId}:${first.id}"
-        if (isMoving(first)) {
-            return JourneyLeg(
-                id,
-                first.timestamp,
-                last.timestamp,
-                evidence,
-                inference.infer(group).firstOrNull()?.mode ?: TravelMode.UNKNOWN,
-                group,
-            )
+        val evidence = (part.precise + part.vague).map { it.id }
+        if (!part.isVisit) {
+            val route = part.precise.ifEmpty { part.vague }
+            val mode = inference.infer(route).firstOrNull()?.mode ?: TravelMode.UNKNOWN
+            return JourneyLeg(id, first.timestamp, timed.last().timestamp, evidence, mode, route)
         }
-        return PlaceVisit(
-            id,
-            first.timestamp,
-            last.timestamp,
-            evidence,
-            group.map { it.latitude }.average(),
-            group.map { it.longitude }.average(),
-            group.size >= 2 && last.timestamp - first.timestamp >= 2.minutes && group.all(::credible),
-        )
+        val (latitude, longitude) = weightedCenter(part.anchors)
+        return PlaceVisit(id, first.timestamp, timed.last().timestamp, evidence, latitude, longitude, part.confirmed)
     }
 
-    private fun credible(point: LocationObservation): Boolean = point.accuracyMeters?.let { it in 0f..100f } ?: true
+    /** Two visits with nothing recorded between them were still joined by some trip. */
+    private fun withConnectors(parts: List<SegmentPart>): List<LocationDayItem> =
+        buildList {
+            parts.forEachIndexed { index, part ->
+                val previous = parts.getOrNull(index - 1)
+                val item = toItem(part)
+                val previousItem = lastOrNull()
+                if (previous != null &&
+                    previous.isVisit &&
+                    part.isVisit &&
+                    previousItem is PlaceVisit &&
+                    item is PlaceVisit &&
+                    previousItem.distanceTo(item) > parameters.stayRadiusMeters
+                ) {
+                    add(connector(previous.timed.last(), part.timed.first()))
+                }
+                add(item)
+            }
+        }
 
-    private fun isMoving(point: LocationObservation): Boolean =
-        point.activity !in setOf(TravelMode.STILL, TravelMode.UNKNOWN) || (point.speedMetersPerSecond ?: 0f) > 1f
+    private fun connector(
+        previous: LocationObservation,
+        next: LocationObservation,
+    ): JourneyLeg {
+        val connectorId = "journey:${previous.ownerId}:${previous.deviceId}:${previous.id}:${next.id}"
+        // The inferred relation is editable without editing either endpoint visit.
+        return JourneyLeg(connectorId, previous.timestamp, next.timestamp, listOf("derived:$connectorId"), TravelMode.UNKNOWN, emptyList())
+    }
+
+    private fun PlaceVisit.distanceTo(other: PlaceVisit): Double = geographicDistance(latitude, longitude, other.latitude, other.longitude)
 
     companion object {
-        const val VERSION = 2
+        const val VERSION = 3
     }
 }
 
