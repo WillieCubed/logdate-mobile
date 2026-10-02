@@ -50,6 +50,7 @@ jobs:
       - name: Run workspace acceptance on managed emulators
         run: >-
           ./gradlew :app:android-main:smokeDevicesGroupDebugAndroidTest
+          -Plogdate.androidTestOrchestrator=false
           -Plogdate.androidTestClass=app.logdate.client.e2e.HomeWorkspaceE2ETest#nativeMapRemainsAvailableWhileBrowsingAndReturningFromFocusedContent,app.logdate.client.e2e.HomeWorkspaceE2ETest#rewindStoriesRemainDistinctWhileBrowsing
           -Pandroid.experimental.testOptions.managedDevices.maxConcurrentDevices=1
           --max-workers=2 --continue --console=plain
