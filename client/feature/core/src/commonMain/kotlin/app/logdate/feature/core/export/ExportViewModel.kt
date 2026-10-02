@@ -132,7 +132,7 @@ class UserDataExportViewModel(
                         }
                     }
                 }.onFailure { error ->
-                    Napier.e("Failed to load export counts", error)
+                    Napier.e("Failed to load export counts")
                 }
         }
     }

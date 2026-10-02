@@ -29,6 +29,7 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipFile
 import kotlin.coroutines.cancellation.CancellationException
@@ -49,7 +50,7 @@ import kotlin.coroutines.cancellation.CancellationException
  *    worker is killed before it can call [completeRestore].
  *
  * [restoreCompleted] gates the callback via compare-and-set so only the first path to
- * arrive fires it. It is reset each time [startRestore] is called.
+ * arrive fires it. It is reset for each WorkManager restore ID.
  *
  * ## File selection
  *
@@ -71,10 +72,13 @@ class AndroidRestoreLauncher(
 
     /**
      * Guards the completion callback so it fires at most once per restore operation.
-     * Reset in [startRestore]; set atomically in [completeRestore] and the WorkManager
+     * Reset in [beginRestoreWork]; set atomically in [completeRestore] and the WorkManager
      * fallback observer.
      */
     private val restoreCompleted = AtomicBoolean(false)
+    private val workCompletionLock = Any()
+
+    @Volatile private var activeWorkId: UUID? = null
 
     /** The active metadata extraction job, if any. Cancelled before starting a new one. */
     private var metadataExtractionJob: Job? = null
@@ -116,46 +120,48 @@ class AndroidRestoreLauncher(
 
         workInfoObserver =
             Observer { workInfoList ->
-                if (workInfoList.isEmpty()) return@Observer
-                val workInfo = workInfoList[0]
+                synchronized(workCompletionLock) {
+                    val currentWorkId = activeWorkId ?: return@Observer
+                    val workInfo = workInfoList.firstOrNull { it.id == currentWorkId } ?: return@Observer
 
-                when (workInfo.state) {
-                    WorkInfo.State.SUCCEEDED -> {
-                        _restoreProgress.value = RestoreProgressInfo.Idle
-                        if (restoreCompleted.compareAndSet(false, true)) {
-                            val summaryJson = workInfo.outputData.getString(RestoreWorker.SUMMARY_JSON_KEY)
-                            val summary =
-                                summaryJson?.let {
-                                    runCatching { json.decodeFromString<RestoreSummary>(it) }.getOrNull()
-                                }
-                            completionCallback?.invoke(
-                                if (summary != null) {
-                                    RestoreOutcome.Success(summary)
-                                } else {
-                                    RestoreOutcome.Failure(
-                                        if (summaryJson != null) {
-                                            RestoreError.INVALID_SUMMARY
-                                        } else {
-                                            RestoreError.NO_SUMMARY_RETURNED
-                                        },
-                                    )
-                                },
-                            )
+                    when (workInfo.state) {
+                        WorkInfo.State.SUCCEEDED -> {
+                            _restoreProgress.value = RestoreProgressInfo.Idle
+                            if (restoreCompleted.compareAndSet(false, true)) {
+                                val summaryJson = workInfo.outputData.getString(RestoreWorker.SUMMARY_JSON_KEY)
+                                val summary =
+                                    summaryJson?.let {
+                                        runCatching { json.decodeFromString<RestoreSummary>(it) }.getOrNull()
+                                    }
+                                completionCallback?.invoke(
+                                    if (summary != null) {
+                                        RestoreOutcome.Success(summary)
+                                    } else {
+                                        RestoreOutcome.Failure(
+                                            if (summaryJson != null) {
+                                                RestoreError.INVALID_SUMMARY
+                                            } else {
+                                                RestoreError.NO_SUMMARY_RETURNED
+                                            },
+                                        )
+                                    },
+                                )
+                            }
                         }
-                    }
-                    WorkInfo.State.FAILED -> {
-                        _restoreProgress.value = RestoreProgressInfo.Idle
-                        if (restoreCompleted.compareAndSet(false, true)) {
-                            completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
+                        WorkInfo.State.FAILED -> {
+                            _restoreProgress.value = RestoreProgressInfo.Idle
+                            if (restoreCompleted.compareAndSet(false, true)) {
+                                completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
+                            }
                         }
-                    }
-                    WorkInfo.State.CANCELLED -> {
-                        _restoreProgress.value = RestoreProgressInfo.Idle
-                        if (restoreCompleted.compareAndSet(false, true)) {
-                            completionCallback?.invoke(RestoreOutcome.Cancelled)
+                        WorkInfo.State.CANCELLED -> {
+                            _restoreProgress.value = RestoreProgressInfo.Idle
+                            if (restoreCompleted.compareAndSet(false, true)) {
+                                completionCallback?.invoke(RestoreOutcome.Cancelled)
+                            }
                         }
+                        else -> Unit
                     }
-                    else -> Unit
                 }
             }
 
@@ -190,6 +196,27 @@ class AndroidRestoreLauncher(
         }
     }
 
+    /** Every WorkManager restore gets its own completion gate, including queued cloud restores. */
+    fun beginRestoreWork(workId: UUID) {
+        synchronized(workCompletionLock) {
+            if (activeWorkId != workId) {
+                activeWorkId = workId
+                restoreCompleted.set(false)
+            }
+        }
+    }
+
+    /** An older queued worker cannot report completion after a newer restore has started. */
+    fun completeRestoreForWork(
+        workId: UUID,
+        outcome: RestoreOutcome,
+    ) {
+        synchronized(workCompletionLock) {
+            if (activeWorkId != workId) return
+            completeRestore(outcome)
+        }
+    }
+
     override fun startFileSelection() {
         val intent =
             Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -204,7 +231,7 @@ class AndroidRestoreLauncher(
                 completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.FILE_PICKER_UNAVAILABLE))
             }
         } catch (e: Exception) {
-            Napier.e("Error launching restore file picker", e)
+            Napier.e("Error launching restore file picker")
             completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.FILE_PICKER_FAILED))
         }
     }
@@ -217,7 +244,6 @@ class AndroidRestoreLauncher(
                 return
             }
 
-        restoreCompleted.set(false)
         completionCallback?.invoke(RestoreOutcome.Started)
         _restoreProgress.value = RestoreProgressInfo.Idle
 
@@ -233,6 +259,7 @@ class AndroidRestoreLauncher(
             OneTimeWorkRequestBuilder<RestoreWorker>()
                 .setInputData(inputData)
                 .build()
+        beginRestoreWork(workRequest.id)
 
         WorkManager
             .getInstance(context)
@@ -280,7 +307,7 @@ class AndroidRestoreLauncher(
                 Intent.FLAG_GRANT_READ_URI_PERMISSION,
             )
         } catch (e: Exception) {
-            Napier.e("Failed to take persistent URI permission", e)
+            Napier.e("Failed to take persistent URI permission")
             completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.FILE_NOT_ACCESSIBLE))
             return
         }
@@ -330,7 +357,7 @@ class AndroidRestoreLauncher(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (e: Exception) {
-            Napier.e("Failed to extract metadata from archive", e)
+            Napier.e("Failed to extract metadata from archive")
             null
         }
 

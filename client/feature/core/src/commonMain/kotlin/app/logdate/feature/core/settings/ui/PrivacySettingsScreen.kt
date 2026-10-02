@@ -20,6 +20,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -70,8 +71,12 @@ fun PrivacySettingsScreen(
     onBack: () -> Unit,
     onNavigateToLocationSettings: () -> Unit = {},
     viewModel: PrivacySettingsViewModel = koinViewModel(),
+    diagnosticsViewModel: LocalDiagnosticsViewModel = koinViewModel(),
+    reporting: app.logdate.client.sync.diagnostics.DiagnosticReportingController = org.koin.compose.koinInject(),
 ) {
     val state by viewModel.state.collectAsState()
+    val diagnosticsState by diagnosticsViewModel.state.collectAsState()
+    LaunchedEffect(diagnosticsViewModel) { diagnosticsViewModel.refresh() }
 
     PrivacySettingsContent(
         onBack = onBack,
@@ -81,6 +86,12 @@ fun PrivacySettingsScreen(
         isSystemSearchVisibilityEnabled = state.isSystemSearchVisibilityEnabled,
         showSystemSearchVisibilityToggle = state.showSystemSearchVisibilityToggle,
         onNavigateToLocationSettings = onNavigateToLocationSettings,
+        diagnosticsState = diagnosticsState,
+        onPreviewDiagnostics = diagnosticsViewModel::refresh,
+        onExportDiagnostics = diagnosticsViewModel::export,
+        onClearDiagnostics = diagnosticsViewModel::clear,
+        onSetVerboseDiagnostics = diagnosticsViewModel::setVerboseEnabled,
+        reportingContent = { AutomaticDiagnosticReportingSection(reporting) },
     )
 }
 
@@ -93,6 +104,12 @@ fun PrivacySettingsContent(
     isSystemSearchVisibilityEnabled: Boolean = false,
     showSystemSearchVisibilityToggle: Boolean = false,
     onNavigateToLocationSettings: () -> Unit = {},
+    diagnosticsState: LocalDiagnosticsState = LocalDiagnosticsState(),
+    onPreviewDiagnostics: () -> Unit = {},
+    onExportDiagnostics: () -> Unit = {},
+    onClearDiagnostics: () -> Unit = {},
+    onSetVerboseDiagnostics: (Boolean) -> Unit = {},
+    reportingContent: @Composable () -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var showDisableBiometricsDialog by remember { mutableStateOf(false) }
@@ -185,6 +202,15 @@ fun PrivacySettingsContent(
                         modifier = Modifier.clickable(onClick = onNavigateToLocationSettings),
                     )
                 }
+                LocalDiagnosticsSettingsSection(
+                    state = diagnosticsState,
+                    onPreview = onPreviewDiagnostics,
+                    onExport = onExportDiagnostics,
+                    onClear = onClearDiagnostics,
+                    onSetVerboseEnabled = onSetVerboseDiagnostics,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+                reportingContent()
             }
         },
         standardContent = {
@@ -267,6 +293,17 @@ fun PrivacySettingsContent(
                         )
                     }
                 }
+                item {
+                    LocalDiagnosticsSettingsSection(
+                        state = diagnosticsState,
+                        onPreview = onPreviewDiagnostics,
+                        onExport = onExportDiagnostics,
+                        onClear = onClearDiagnostics,
+                        onSetVerboseEnabled = onSetVerboseDiagnostics,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+                item { reportingContent() }
             }
         },
     )

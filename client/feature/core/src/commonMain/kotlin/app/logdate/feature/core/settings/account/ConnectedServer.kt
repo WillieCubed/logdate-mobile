@@ -56,12 +56,13 @@ class DefaultConnectedServer(
 ) : ConnectedServer {
     override val info: Flow<ConnectedServerInfo> =
         combine(configRepository.backendUrl, configRepository.serverDescriptor) { backendUrl, descriptor ->
+            val currentDescriptor = descriptor?.takeIf { it.serverOrigin.trimEnd('/') == backendUrl }
             ConnectedServerInfo(
                 origin = backendUrl,
-                displayName = descriptor?.displayName,
+                displayName = currentDescriptor?.displayName,
                 isLogDateCloud = backendUrl == DefaultLogDateConfigRepository.DEFAULT_BACKEND_URL,
                 publishesIdentityChanges =
-                    descriptor?.hasProtocolFeature(ServerProtocolFeature.ATPROTO_PLC_PUBLISHING_V1) == true,
+                    currentDescriptor?.hasProtocolFeature(ServerProtocolFeature.ATPROTO_PLC_PUBLISHING_V1) == true,
             )
         }
 
@@ -72,14 +73,20 @@ class DefaultConnectedServer(
                 discoveryClient
                     .discoverServer(origin)
                     .onSuccess { descriptor -> configRepository.updateServerDescriptor(descriptor) }
-                    .onFailure { error -> Napier.w("Could not refresh the description of $origin", error) }
+                    .onFailure { Napier.w("Server description refresh failed") }
             }
             healthChecker
                 .checkServerHealth(origin)
                 .fold(
-                    onSuccess = { ServerHealth.Reachable(it.version) },
-                    onFailure = { error ->
-                        Napier.w("$origin did not answer a health check", error)
+                    onSuccess = {
+                        if (origin == configRepository.getCurrentBackendUrl()) {
+                            ServerHealth.Reachable(it.version)
+                        } else {
+                            ServerHealth.Unreachable
+                        }
+                    },
+                    onFailure = {
+                        Napier.w("Server health check failed")
                         ServerHealth.Unreachable
                     },
                 )

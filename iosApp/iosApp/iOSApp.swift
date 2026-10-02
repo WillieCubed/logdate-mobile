@@ -44,15 +44,10 @@ struct iOSApp: App {
     }
 
     private func syncCrashReportingUserId() {
-        #if canImport(FirebaseCrashlytics)
-        // The Kotlin side mirrors the signed-in account ID into UserDefaults under this key
-        // (see IosCrashReportingUserBridge in compose-main). Read it back here so crash
-        // reports are tagged with the same anonymized account ID as on Android.
-        if let id = UserDefaults.standard.string(forKey: crashReportingUserIdKey) {
-            Crashlytics.crashlytics().setUserID(id)
-        } else {
-            Crashlytics.crashlytics().setUserID("")
-        }
+        UserDefaults.standard.removeObject(forKey: crashReportingUserIdKey)
+        #if canImport(FirebaseCrashlytics) && canImport(FirebaseCore)
+        guard FirebaseApp.app() != nil else { return }
+        Crashlytics.crashlytics().setUserID("")
         #endif
     }
 }

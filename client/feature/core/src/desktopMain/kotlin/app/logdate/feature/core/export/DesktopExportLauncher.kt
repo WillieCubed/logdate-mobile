@@ -57,12 +57,12 @@ class DesktopExportLauncher :
                         return@launch
                     }
 
-                    Napier.i("Desktop: Starting export to ${selectedFile.absolutePath}")
+                    Napier.i("Desktop: Starting export")
                     runArchiveExport(selectedFile, options)
                 } catch (cancellation: CancellationException) {
                     throw cancellation
                 } catch (failure: Exception) {
-                    Napier.e("Desktop: Export process failed", failure)
+                    Napier.e("Desktop: Export process failed")
                     showExportErrorDialog("Export could not be completed.")
                     completionCallback?.invoke(ExportOutcome.Failed("Export could not be completed."))
                 }
@@ -94,7 +94,7 @@ class DesktopExportLauncher :
                 } catch (cancellation: CancellationException) {
                     throw cancellation
                 } catch (failure: Exception) {
-                    Napier.e("Desktop: Archive export failed", failure)
+                    Napier.e("Desktop: Archive export failed")
                     ArchiveFileOutcome.Failed("Could not write the export archive.")
                 }
             when (outcome) {
@@ -105,7 +105,7 @@ class DesktopExportLauncher :
                 }
                 is ArchiveFileOutcome.Completed -> {
                     completed = true
-                    Napier.i("Desktop: Archive export completed to ${zipFile.absolutePath}")
+                    Napier.i("Desktop: Archive export completed")
                     showExportSuccessDialog(zipFile.absolutePath)
                     updateProgress(
                         ExportProgressInfo(
@@ -146,7 +146,7 @@ class DesktopExportLauncher :
         }
 
     private fun showExportSuccessDialog(filePath: String) {
-        Napier.i("Desktop: Export completed successfully to $filePath")
+        Napier.i("Desktop: Export completed successfully")
         try {
             val dialog = java.awt.Dialog(null as Frame?, "Export Successful", true)
             dialog.layout = java.awt.BorderLayout()
@@ -160,12 +160,12 @@ class DesktopExportLauncher :
             dialog.setBounds(100, 100, 400, 100)
             dialog.isVisible = true
         } catch (failure: Exception) {
-            Napier.e("Desktop: Failed to show success dialog", failure)
+            Napier.e("Desktop: Failed to show success dialog")
         }
     }
 
     private fun showExportErrorDialog(errorMessage: String) {
-        Napier.e("Desktop: Export failed: $errorMessage")
+        Napier.e("Desktop: Export failed")
         try {
             val dialog = java.awt.Dialog(null as Frame?, "Export Failed", true)
             dialog.layout = java.awt.BorderLayout()
@@ -179,7 +179,7 @@ class DesktopExportLauncher :
             dialog.setBounds(100, 100, 400, 100)
             dialog.isVisible = true
         } catch (failure: Exception) {
-            Napier.e("Desktop: Failed to show error dialog", failure)
+            Napier.e("Desktop: Failed to show error dialog")
         }
     }
 }

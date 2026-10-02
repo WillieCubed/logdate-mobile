@@ -1,6 +1,7 @@
 package app.logdate.client
 
 import android.util.Log
+import app.logdate.client.sync.diagnostics.PrivateLocalAntilog
 import io.github.aakira.napier.Antilog
 import io.github.aakira.napier.LogLevel
 
@@ -19,22 +20,29 @@ import io.github.aakira.napier.LogLevel
 class LogcatAntilog(
     private val isDebuggable: Boolean,
 ) : Antilog() {
+    private val privateSink = PrivateLocalAntilog { priority, text -> writeSafeLog(priority, text) }
+
     override fun performLog(
         priority: LogLevel,
         tag: String?,
         throwable: Throwable?,
         message: String?,
     ) {
+        privateSink.log(priority, tag, throwable, message)
+    }
+
+    private fun writeSafeLog(
+        priority: LogLevel,
+        text: String,
+    ) {
         if (!isDebuggable && priority < LogLevel.WARNING) return
-        val text = message ?: throwable?.message ?: return
-        val resolvedTag = tag ?: DEFAULT_TAG
         when (priority) {
-            LogLevel.VERBOSE -> Log.v(resolvedTag, text, throwable)
-            LogLevel.DEBUG -> Log.d(resolvedTag, text, throwable)
-            LogLevel.INFO -> Log.i(resolvedTag, text, throwable)
-            LogLevel.WARNING -> Log.w(resolvedTag, text, throwable)
-            LogLevel.ERROR -> Log.e(resolvedTag, text, throwable)
-            LogLevel.ASSERT -> Log.wtf(resolvedTag, text, throwable)
+            LogLevel.VERBOSE -> Log.v(DEFAULT_TAG, text)
+            LogLevel.DEBUG -> Log.d(DEFAULT_TAG, text)
+            LogLevel.INFO -> Log.i(DEFAULT_TAG, text)
+            LogLevel.WARNING -> Log.w(DEFAULT_TAG, text)
+            LogLevel.ERROR -> Log.e(DEFAULT_TAG, text)
+            LogLevel.ASSERT -> Log.wtf(DEFAULT_TAG, text)
         }
     }
 

@@ -45,8 +45,11 @@ import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
 import app.logdate.feature.core.settings.ui.DataSettingsViewModel
 import app.logdate.feature.core.settings.ui.DayBoundarySettingsViewModel
 import app.logdate.feature.core.settings.ui.DeviceEraser
+import app.logdate.feature.core.settings.ui.DiagnosticArchiveExporter
 import app.logdate.feature.core.settings.ui.HiddenMemoriesWidgetInstallController
+import app.logdate.feature.core.settings.ui.IosDiagnosticArchiveExporter
 import app.logdate.feature.core.settings.ui.LibrarySettingsViewModel
+import app.logdate.feature.core.settings.ui.LocalDiagnosticsViewModel
 import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.MemoriesSettingsViewModel
 import app.logdate.feature.core.settings.ui.MemoriesWidgetInstallController
@@ -179,6 +182,13 @@ actual val coreFeatureModule: Module =
                 supportsSystemSearchVisibilityToggle = false,
             )
         }
+        single<DiagnosticArchiveExporter>(createdAtStart = true) {
+            IosDiagnosticArchiveExporter {
+                UIApplication.sharedApplication.keyWindow?.rootViewController
+                    ?: throw IllegalStateException("No root view controller available")
+            }
+        }
+        viewModel { LocalDiagnosticsViewModel(get(), get(), get()) }
         viewModel {
             SignInMethodsViewModel(
                 accountRepository = get(),
@@ -230,7 +240,7 @@ actual val coreFeatureModule: Module =
         viewModel { PeopleDirectoryViewModel(get(), get()) }
         viewModel { PeopleInboxViewModel(get()) }
         viewModel { PersonDetailViewModel(get(), get()) }
-        viewModel { SyncIssuesViewModel(get(), get(), get()) }
+        viewModel { SyncIssuesViewModel(get(), get(), get(), get()) }
         viewModel { SyncPresentationViewModel(syncManager = get(), sessionStorage = get()) }
         viewModel {
             SyncStatusViewModel(

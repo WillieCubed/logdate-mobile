@@ -1,15 +1,13 @@
 package app.logdate.client
 
+import app.logdate.client.sync.diagnostics.PrivateCrashAntilog
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import io.github.aakira.napier.Antilog
 import io.github.aakira.napier.LogLevel
 
-/**
- * Forwards Napier logs into Firebase Crashlytics so each crash report includes the recent
- * log timeline as breadcrumbs and any error-level throwable is recorded as a non-fatal event.
- */
+/** Only finite severity categories cross the crash-report boundary. */
 class CrashlyticsAntilog : Antilog() {
-    private val crashlytics by lazy { FirebaseCrashlytics.getInstance() }
+    private val safeSink = PrivateCrashAntilog { category -> FirebaseCrashlytics.getInstance().log(category) }
 
     override fun performLog(
         priority: LogLevel,
@@ -17,12 +15,6 @@ class CrashlyticsAntilog : Antilog() {
         throwable: Throwable?,
         message: String?,
     ) {
-        if (priority < LogLevel.INFO) return
-        val text = message ?: throwable?.message ?: return
-        val tagged = if (tag != null) "[$tag] $text" else text
-        crashlytics.log("${priority.name.first()}/$tagged")
-        if (priority >= LogLevel.ERROR && throwable != null) {
-            crashlytics.recordException(throwable)
-        }
+        safeSink.log(priority, tag, throwable, message)
     }
 }

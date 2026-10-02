@@ -91,7 +91,7 @@ class UserDataRestoreViewModel(
                     )
                 }
             } catch (e: Exception) {
-                Napier.e("Failed to parse archive metadata", e)
+                Napier.e("Failed to parse archive metadata")
                 _restoreState.update {
                     RestoreState.Failed(RestoreError.INVALID_ARCHIVE)
                 }

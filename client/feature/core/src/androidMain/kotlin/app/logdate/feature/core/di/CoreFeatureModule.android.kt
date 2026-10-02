@@ -33,6 +33,8 @@ import app.logdate.feature.core.profile.ui.ProfileViewModel
 import app.logdate.feature.core.restore.AndroidRestoreLauncher
 import app.logdate.feature.core.restore.CloudRestoreScheduler
 import app.logdate.feature.core.restore.CloudRestoreWorker
+import app.logdate.feature.core.restore.DefaultRestoreDiagnosticEvents
+import app.logdate.feature.core.restore.RestoreDiagnosticEvents
 import app.logdate.feature.core.restore.RestoreLauncher
 import app.logdate.feature.core.restore.RestoreWorker
 import app.logdate.feature.core.restore.UserDataRestoreViewModel
@@ -50,12 +52,15 @@ import app.logdate.feature.core.settings.account.recovery.RecoveryPhraseViewMode
 import app.logdate.feature.core.settings.account.signin.SignInMethodsViewModel
 import app.logdate.feature.core.settings.ui.AdvancedSettingsViewModel
 import app.logdate.feature.core.settings.ui.AndroidCloudArchiveStatusSource
+import app.logdate.feature.core.settings.ui.AndroidDiagnosticArchiveExporter
 import app.logdate.feature.core.settings.ui.CloudArchiveStatusSource
 import app.logdate.feature.core.settings.ui.DangerZoneSettingsViewModel
 import app.logdate.feature.core.settings.ui.DataSettingsViewModel
 import app.logdate.feature.core.settings.ui.DayBoundarySettingsViewModel
 import app.logdate.feature.core.settings.ui.DeviceEraser
+import app.logdate.feature.core.settings.ui.DiagnosticArchiveExporter
 import app.logdate.feature.core.settings.ui.LibrarySettingsViewModel
+import app.logdate.feature.core.settings.ui.LocalDiagnosticsViewModel
 import app.logdate.feature.core.settings.ui.LocationSettingsViewModel
 import app.logdate.feature.core.settings.ui.MemoriesSettingsViewModel
 import app.logdate.feature.core.settings.ui.MemoriesWidgetInstallController
@@ -116,6 +121,7 @@ actual val coreFeatureModule: Module =
         single<RestoreLauncher> { get<AndroidRestoreLauncher>() }
         workerOf(::RestoreWorker)
         workerOf(::CloudRestoreWorker)
+        single<RestoreDiagnosticEvents> { DefaultRestoreDiagnosticEvents(get(), get()) }
 
         factory { ServerConfigurationCoordinator(get(), get(), get()) }
 
@@ -186,6 +192,8 @@ actual val coreFeatureModule: Module =
                 supportsSystemSearchVisibilityToggle = true,
             )
         }
+        single<DiagnosticArchiveExporter> { AndroidDiagnosticArchiveExporter(androidContext()) }
+        viewModel { LocalDiagnosticsViewModel(get(), get(), get()) }
         viewModel {
             SignInMethodsViewModel(
                 accountRepository = get(),
@@ -239,7 +247,7 @@ actual val coreFeatureModule: Module =
         viewModel { PeopleDirectoryViewModel(get(), get()) }
         viewModel { PeopleInboxViewModel(get()) }
         viewModel { PersonDetailViewModel(get(), get()) }
-        viewModel { SyncIssuesViewModel(get(), get(), get()) }
+        viewModel { SyncIssuesViewModel(get(), get(), get(), get()) }
         viewModel { SyncPresentationViewModel(syncManager = get(), sessionStorage = get()) }
         viewModel {
             SyncStatusViewModel(

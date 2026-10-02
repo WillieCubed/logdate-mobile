@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.sync.SyncManager
+import app.logdate.client.sync.diagnostics.SyncDiagnosticRecorder
 import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.shared.model.textContent
 import io.github.aakira.napier.Napier
@@ -20,7 +21,29 @@ class SyncIssuesViewModel(
     private val syncManager: SyncManager,
     private val journalRepository: JournalRepository,
     private val journalNotesRepository: JournalNotesRepository,
+    private val diagnosticRecorder: SyncDiagnosticRecorder? = null,
 ) : ViewModel() {
+    private val _diagnosticSummary = MutableStateFlow<DiagnosticUiSummary?>(null)
+    val diagnosticSummary: StateFlow<DiagnosticUiSummary?> = _diagnosticSummary
+
+    init {
+        refreshDiagnostics()
+    }
+
+    fun refreshDiagnostics() {
+        val recorder = diagnosticRecorder ?: return
+        viewModelScope.launch {
+            try {
+                val report = recorder.report()
+                _diagnosticSummary.value = if (report.events.isEmpty()) null else summarizeDiagnostics(report)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _diagnosticSummary.value = null
+            }
+        }
+    }
+
     private val _retryFeedback = MutableStateFlow<SyncIssueRetryFeedback?>(null)
     val retryFeedback: StateFlow<SyncIssueRetryFeedback?> = _retryFeedback
     val labels: StateFlow<Map<String, String>> =
@@ -31,7 +54,7 @@ class SyncIssuesViewModel(
                     .mapNotNull { record ->
                         val label =
                             runCatching { resolveLabel(record) }
-                                .onFailure { Napier.w("Could not read a local label for a sync issue", it) }
+                                .onFailure { Napier.w("SYNC_ISSUE_LABEL_UNAVAILABLE") }
                                 .getOrNull()
                         label?.let { record.id to it }
                     }.toMap()
@@ -71,8 +94,34 @@ class SyncIssuesViewModel(
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
-                initialValue = 0,
+                initialValue = syncManager.syncStatusFlow.value.pendingUploads,
             )
+
+    val pendingDownloads: StateFlow<Int> =
+        syncManager.syncStatusFlow
+            .map { it.pendingDownloads }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), syncManager.syncStatusFlow.value.pendingDownloads)
+
+    val queueReadable: StateFlow<Boolean> =
+        syncManager.syncStatusFlow
+            .map { it.queueReadable }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), syncManager.syncStatusFlow.value.queueReadable)
+
+    fun retryRecovery() {
+        viewModelScope.launch {
+            _retryFeedback.value = null
+            try {
+                syncManager.requestBackup()
+                _retryFeedback.value = SyncIssueRetryFeedback.REQUESTED
+                refreshDiagnostics()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                Napier.e("SYNC_RETRY_REQUEST_FAILED")
+                _retryFeedback.value = SyncIssueRetryFeedback.COULD_NOT_START
+            }
+        }
+    }
 
     fun retry(id: String) {
         viewModelScope.launch {
@@ -82,8 +131,9 @@ class SyncIssuesViewModel(
                 syncManager.requestBackup()
             }.onSuccess {
                 _retryFeedback.value = SyncIssueRetryFeedback.REQUESTED
-            }.onFailure { error ->
-                Napier.e("Could not request a retry for a sync issue", error)
+                refreshDiagnostics()
+            }.onFailure { _ ->
+                Napier.e("SYNC_RETRY_REQUEST_FAILED")
                 _retryFeedback.value = SyncIssueRetryFeedback.COULD_NOT_START
             }
         }

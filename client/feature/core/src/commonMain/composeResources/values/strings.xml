@@ -168,4 +168,21 @@
     <string name="text_1_of_3">1 of 3</string>
     <string name="text_2_of_3">2 of 3</string>
     <string name="text_3_of_3">3 of 3</string>
+    <string name="diagnostics_local_title">Sync Diagnostics</string>
+    <string name="diagnostics_local_description">Review a local report before sharing it. The report contains sync steps and counts, not journal content.</string>
+    <string name="diagnostics_preview">Preview report</string>
+    <string name="diagnostics_empty">No sync history has been recorded yet.</string>
+    <string name="diagnostics_export_description">A ZIP of the same report, ready to send to support.</string>
+    <string name="diagnostics_clear_description">Removes this history only. Your journal and pending backups are not touched.</string>
+    <string name="diagnostics_export">Share diagnostic ZIP</string>
+    <string name="diagnostics_clear">Clear local history</string>
+    <string name="diagnostics_clear_title">Clear sync history?</string>
+    <string name="diagnostics_clear_message">This removes the local diagnostic history. It does not delete your journal, pending backups, or saved reports you shared.</string>
+    <string name="diagnostics_verbose_title">Detailed sync history</string>
+    <string name="diagnostics_verbose_description">Records every sync step for 30 minutes. Never includes journal content.</string>
+    <string name="diagnostics_verbose_remaining">Detailed history has about %1$d minutes left.</string>
+    <string name="diagnostics_exported">Diagnostic ZIP is ready to share.</string>
+    <string name="diagnostics_export_failed">Could not create the diagnostic ZIP.</string>
+    <string name="diagnostics_cleared">Local sync history cleared.</string>
+    <string name="diagnostics_clear_failed">Could not change local diagnostic history.</string>
 </resources>

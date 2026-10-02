@@ -106,13 +106,13 @@ class AndroidExportLauncher(
                         currentWorkId = null
                         _exportProgress.value = ExportProgressInfo()
                         val reason = workInfo.outputData.getString(ExportWorker.ERROR_KEY)
-                        Napier.i("Export terminal: state=FAILED stopReason=${workInfo.stopReason} error=$reason")
+                        Napier.i("Export failed")
                         completionCallback?.invoke(ExportOutcome.Failed(reason))
                     }
                     WorkInfo.State.CANCELLED -> {
                         currentWorkId = null
                         _exportProgress.value = ExportProgressInfo()
-                        Napier.i("Export terminal: state=CANCELLED stopReason=${workInfo.stopReason}")
+                        Napier.i("Export cancelled")
                         completionCallback?.invoke(ExportOutcome.Cancelled)
                     }
                     else -> Unit
@@ -126,7 +126,7 @@ class AndroidExportLauncher(
     }
 
     override fun updateProgress(info: ExportProgressInfo) {
-        Napier.d("Export progress: ${info.progressPercent}% - ${info.message}")
+        Napier.d("Export progress changed")
         _exportProgress.value = info
     }
 
@@ -160,7 +160,7 @@ class AndroidExportLauncher(
                 startExportWorker(null)
             }
         } catch (e: Exception) {
-            Napier.e("Error launching file picker", e)
+            Napier.e("Error launching file picker")
             startExportWorker(null)
         }
     }
@@ -188,10 +188,10 @@ class AndroidExportLauncher(
                     uri,
                     Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
                 )
-                Napier.i("User selected export destination: $uri")
+                Napier.i("Export destination selected")
                 pendingExportCallback?.invoke()
             } catch (e: Exception) {
-                Napier.e("Failed to take persistent URI permission", e)
+                Napier.e("Failed to take persistent URI permission")
                 completionCallback?.invoke(ExportOutcome.Failed("Could not access the selected location."))
             }
         } else {

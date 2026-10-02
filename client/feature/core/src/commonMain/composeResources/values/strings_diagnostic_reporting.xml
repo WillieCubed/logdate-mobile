@@ -1,0 +1,15 @@
+<resources>
+    <string name="diagnostic_reporting_title">Automatic diagnostic reports</string>
+    <string name="diagnostic_reporting_description">Send new failure reports to your configured LogDate server. Off by default.</string>
+    <string name="diagnostic_reporting_destination">Destination: %1$s</string>
+    <string name="diagnostic_reporting_unavailable">Automatic reporting is unavailable for this account or server. Local export remains available.</string>
+    <string name="diagnostic_reporting_pending">Reports waiting to send: %1$d</string>
+    <string name="diagnostic_reporting_consent_title">Enable automatic reports?</string>
+    <string name="diagnostic_reporting_consent_body">Send only new diagnostic events to %1$s. Reports include phase and result codes, retry counts, timings, byte counts, and random operation/request references. They exclude journal content, titles, transcripts, media, filenames, paths, private hostnames, credentials, and keys. Historical local events are not uploaded. Reports expire from online server storage after 7 days. Infrastructure backup retention is separate.</string>
+    <string name="diagnostic_reporting_logs_notice">Turning this off stops optional client reports and removes unsent reports. The server still records the operational information needed to process requests.</string>
+    <string name="diagnostic_reporting_delete">Delete uploaded reports</string>
+    <string name="diagnostic_reporting_delete_title">Delete your uploaded reports?</string>
+    <string name="diagnostic_reporting_delete_body">Remove your diagnostic reports from online storage at %1$s. This does not delete journal content or copies you shared. Infrastructure backup retention is separate.</string>
+    <string name="diagnostic_reporting_failed">The change could not be saved. Reporting settings have not been confirmed. Retry when local storage and your server are available.</string>
+    <string name="diagnostic_reporting_deleted">Uploaded reports deleted.</string>
+</resources>

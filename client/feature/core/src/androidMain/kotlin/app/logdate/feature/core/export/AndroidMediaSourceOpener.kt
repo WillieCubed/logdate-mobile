@@ -75,7 +75,7 @@ class AndroidMediaSourceOpener(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (failure: Exception) {
-            Napier.w("A media file could not be opened for export", failure)
+            Napier.w("A media file could not be opened for export")
             null
         }
 }

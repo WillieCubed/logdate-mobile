@@ -109,14 +109,14 @@ class ExportWorker(
             try {
                 DocumentsContract.deleteDocument(context.contentResolver, uri)
             } catch (failure: Exception) {
-                Napier.w("Could not delete the partly written export", failure)
+                Napier.w("Could not delete the partly written export")
                 false
             }
         if (deleted) return
         try {
             context.contentResolver.openOutputStream(uri, "wt")?.close()
         } catch (failure: Exception) {
-            Napier.e("Could not remove or empty the partly written export", failure)
+            Napier.e("Could not remove or empty the partly written export")
         }
     }
 
@@ -132,7 +132,7 @@ class ExportWorker(
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (failure: Exception) {
-                Napier.e("Could not open the export destination", failure)
+                Napier.e("Could not open the export destination")
                 null
             } ?: run {
                 trySetForeground(notificationHelper.createErrorInfo(ARCHIVE_WRITE_FAILED_MESSAGE))
@@ -173,7 +173,7 @@ class ExportWorker(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (exception: Throwable) {
-            Napier.e("Archive export failed", exception)
+            Napier.e("Archive export failed")
             trySetForeground(notificationHelper.createErrorInfo(ARCHIVE_WRITE_FAILED_MESSAGE))
             return failureResult(ARCHIVE_WRITE_FAILED_MESSAGE)
         } finally {
@@ -232,7 +232,7 @@ class ExportWorker(
         try {
             setForeground(foregroundInfo)
         } catch (e: Exception) {
-            Napier.w("Could not show foreground notification, export continues without it", e)
+            Napier.w("Could not show foreground notification, export continues without it")
         }
     }
 

@@ -55,7 +55,7 @@ class DesktopRestoreLauncher :
     override fun completeRestore(outcome: RestoreOutcome) {
         _restoreProgress.value = RestoreProgressInfo.Idle
         completionCallback?.invoke(outcome)
-        Napier.i("Desktop: Restore completed via direct signal: $outcome")
+        Napier.i("Restore completion received")
     }
 
     override fun startFileSelection() {
@@ -114,7 +114,7 @@ class DesktopRestoreLauncher :
                     _restoreProgress.value = RestoreProgressInfo.Idle
                     completionCallback?.invoke(RestoreOutcome.Success(summary))
                 } catch (e: Exception) {
-                    Napier.e("Desktop: Restore failed", e)
+                    Napier.e("Desktop: Restore failed")
                     _restoreProgress.value = RestoreProgressInfo.Idle
                     completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
                 }
@@ -140,7 +140,7 @@ class DesktopRestoreLauncher :
                 }
             }
         } catch (e: Exception) {
-            Napier.e("Desktop: Failed to extract metadata", e)
+            Napier.e("Desktop: Failed to extract metadata")
             null
         }
     }
@@ -205,11 +205,11 @@ class DesktopRestoreLauncher :
         val normalizedPath = exportPath.trimStart('/')
         val entry = zipFile.getEntry(root + normalizedPath)
         if (entry == null) {
-            Napier.w("Desktop: Media file not found in archive at path: $exportPath")
+            Napier.w("Restore attachment missing")
             return null
         }
         if (entry.isDirectory) {
-            Napier.w("Desktop: Expected file but found directory in archive at path: $exportPath")
+            Napier.w("Restore attachment is a directory")
             return null
         }
         return runCatching {
@@ -223,9 +223,9 @@ class DesktopRestoreLauncher :
                     data = data,
                 )
             val savedPath = mediaManager.saveMedia(payload)
-            Napier.d("Desktop: Successfully imported media from archive: $exportPath")
+            Napier.d("Restore attachment imported")
             savedPath
-        }.onFailure { Napier.e("Desktop: Exception importing media from archive at path: $exportPath", it) }
+        }.onFailure { Napier.e("Restore attachment import failed") }
             .getOrNull()
     }
 

@@ -19,7 +19,12 @@ fun main() =
     application {
         SingletonImageLoader.setSafe { context -> buildLogDateImageLoader(context) }
         KoinApplication(koinConfiguration { modules(appModule) }) {
-            Napier.base(DebugAntilog())
+            val console = DebugAntilog()
+            Napier.base(
+                app.logdate.client.sync.diagnostics.PrivateLocalAntilog { priority, message ->
+                    console.log(priority, "LogDate", null, message)
+                },
+            )
             LogDateApplication(rememberApplicationState())
         }
     }

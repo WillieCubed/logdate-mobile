@@ -13,6 +13,12 @@ import app.logdate.client.domain.restore.RestoreArchiveReader
 import app.logdate.client.domain.restore.RestoreOptions
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.media.MediaManager
+import app.logdate.client.sync.diagnostics.DiagnosticSource
+import app.logdate.shared.model.diagnostics.DiagnosticOutcome
+import app.logdate.shared.model.diagnostics.DiagnosticPhase
+import app.logdate.shared.model.diagnostics.DiagnosticReason
+import app.logdate.shared.model.diagnostics.DiagnosticReportCodec
+import app.logdate.shared.model.diagnostics.SyncDiagnosticEvent
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -40,11 +46,13 @@ class RestoreWorker(
         const val DELETE_SOURCE_AFTER_RESTORE_KEY = "restore_delete_source_after_restore"
         const val SUMMARY_JSON_KEY = "restore_summary_json"
         const val ERROR_KEY = "restore_error"
+        const val RESTORE_OPERATION_ID_KEY = "restore_diagnostic_operation_id"
     }
 
     private val restoreUserDataUseCase: RestoreUserDataUseCase by inject()
     private val mediaManager: MediaManager by inject()
     private val restoreLauncher: RestoreLauncher by inject()
+    private val diagnosticEvents: RestoreDiagnosticEvents? by lazy { getKoin().getOrNull() }
     private val json = Json { ignoreUnknownKeys = true }
     private val notificationHelper = RestoreNotificationHelper(context, Uuid.parse(id.toString()))
 
@@ -57,19 +65,30 @@ class RestoreWorker(
     override suspend fun getForegroundInfo(): ForegroundInfo = notificationHelper.createForegroundInfo(RestoreStage.PREPARING)
 
     override suspend fun doWork(): Result {
+        val source = runCatching { diagnosticEvents?.source() }.getOrNull()
+        val attemptId = Uuid.random().toString()
+        reportDiagnostic(DiagnosticOutcome.STARTED, source, attemptId)
+        (restoreLauncher as? AndroidRestoreLauncher)?.beginRestoreWork(id)
         trySetForeground(getForegroundInfo())
         emitProgress(RestoreStage.PREPARING, 0)
 
         val restoreUri =
             sourceUri
-                ?: return failure("Missing restore source")
+                ?: run {
+                    reportDiagnostic(DiagnosticOutcome.FAILED, source, attemptId, DiagnosticReason.LOCAL_STORAGE)
+                    return failure(RestoreError.MISSING_SOURCE)
+                }
 
         val sourceLabel = context.contentResolver.resolveDisplayName(restoreUri) ?: restoreUri.toString()
 
         emitProgress(RestoreStage.COPYING_ARCHIVE, 5)
         val tempFile =
             copyToCache(restoreUri)
-                ?: return failure("Unable to read restore archive")
+                ?: run {
+                    deleteOwnedSource(restoreUri)
+                    reportDiagnostic(DiagnosticOutcome.FAILED, source, attemptId, DiagnosticReason.LOCAL_STORAGE)
+                    return failure(RestoreError.FILE_NOT_ACCESSIBLE)
+                }
 
         emitProgress(RestoreStage.OPENING_ARCHIVE, 10)
 
@@ -77,8 +96,10 @@ class RestoreWorker(
             runCatching { ZipFile(tempFile) }
                 .getOrElse { error ->
                     tempFile.delete()
-                    restoreLauncher.completeRestore(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
-                    return failure("Unable to open restore archive: ${error.message}")
+                    deleteOwnedSource(restoreUri)
+                    completeRestore(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
+                    reportDiagnostic(DiagnosticOutcome.FAILED, source, attemptId, DiagnosticReason.CORRUPT_PAYLOAD)
+                    return failure(RestoreError.INVALID_ARCHIVE)
                 }
 
         return try {
@@ -126,7 +147,8 @@ class RestoreWorker(
             val summary = result.toSummary(source = sourceLabel)
 
             trySetForeground(notificationHelper.createCompletionInfo())
-            restoreLauncher.completeRestore(RestoreOutcome.Success(summary))
+            completeRestore(RestoreOutcome.Success(summary))
+            reportDiagnostic(DiagnosticOutcome.SUCCEEDED, source, attemptId)
 
             Result.success(
                 workDataOf(
@@ -134,18 +156,58 @@ class RestoreWorker(
                 ),
             )
         } catch (e: Exception) {
-            Napier.e("Restore failed", e)
-            trySetForeground(notificationHelper.createErrorInfo(e.message ?: "Restore failed"))
-            restoreLauncher.completeRestore(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
-            failure(e.message ?: "Restore failed")
+            if (e is kotlinx.coroutines.CancellationException) {
+                reportDiagnostic(DiagnosticOutcome.INTERRUPTED, source, attemptId)
+                throw e
+            }
+            Napier.e("Restore failed")
+            trySetForeground(notificationHelper.createErrorInfo("Unable to restore this archive"))
+            completeRestore(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
+            reportDiagnostic(DiagnosticOutcome.FAILED, source, attemptId, DiagnosticReason.UNKNOWN)
+            failure(RestoreError.RESTORE_FAILED)
         } finally {
             restoreLauncher.updateProgress(RestoreProgressInfo.Idle)
             zipFile.close()
             tempFile.delete()
-            if (deleteSourceAfterRestore && restoreUri.scheme == "file") {
-                runCatching { File(restoreUri.path ?: "").delete() }
-                    .onFailure { Napier.w("Failed to delete temporary cloud restore archive", it) }
-            }
+            deleteOwnedSource(restoreUri)
+        }
+    }
+
+    private fun reportDiagnostic(
+        outcome: DiagnosticOutcome,
+        source: DiagnosticSource?,
+        attemptId: String,
+        reason: DiagnosticReason = DiagnosticReason.NONE,
+    ) {
+        val operationId =
+            inputData
+                .getString(RESTORE_OPERATION_ID_KEY)
+                ?.takeIf(DiagnosticReportCodec::isCorrelationId)
+                ?: id.toString()
+        val event =
+            SyncDiagnosticEvent(
+                DiagnosticPhase.RESTORE,
+                outcome,
+                reason,
+                operationId = operationId,
+                attemptId = attemptId,
+            )
+        runCatching { diagnosticEvents?.record(event, source) }
+    }
+
+    private fun completeRestore(outcome: RestoreOutcome) {
+        val androidLauncher = restoreLauncher as? AndroidRestoreLauncher
+        if (androidLauncher != null) {
+            androidLauncher.completeRestoreForWork(id, outcome)
+        } else {
+            restoreLauncher.completeRestore(outcome)
+        }
+    }
+
+    private fun deleteOwnedSource(uri: Uri) {
+        if (deleteSourceAfterRestore && uri.scheme == "file") {
+            runCatching { File(uri.path ?: "").delete() }
+                .onFailure { Napier.w("Failed to delete temporary cloud restore archive") }
         }
     }
 
@@ -165,23 +227,28 @@ class RestoreWorker(
         try {
             setForeground(foregroundInfo)
         } catch (e: Exception) {
-            Napier.w("Could not show foreground notification, restore continues without it", e)
+            Napier.w("Could not show foreground notification, restore continues without it")
         }
     }
 
-    private fun failure(message: String): Result = Result.failure(workDataOf(ERROR_KEY to message))
+    private fun failure(error: RestoreError): Result = Result.failure(workDataOf(ERROR_KEY to error.name))
 
     private fun copyToCache(uri: Uri): File? {
         val tempFile = File.createTempFile("logdate_restore", ".zip", context.cacheDir)
         return try {
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                FileOutputStream(tempFile).use { output ->
-                    input.copyTo(output)
+            val input =
+                context.contentResolver.openInputStream(uri) ?: run {
+                    tempFile.delete()
+                    return null
                 }
-            } ?: return null
+            input.use {
+                FileOutputStream(tempFile).use { output ->
+                    it.copyTo(output)
+                }
+            }
             tempFile
         } catch (e: Exception) {
-            Napier.e("Failed to copy restore archive to cache", e)
+            Napier.e("Failed to copy restore archive to cache")
             tempFile.delete()
             null
         }
@@ -205,11 +272,11 @@ class RestoreWorker(
         val normalizedPath = exportPath.trimStart('/')
         val entry = zipFile.getEntry(root + normalizedPath)
         if (entry == null) {
-            Napier.w("Media file not found in archive at path: $exportPath")
+            Napier.w("Restore attachment missing")
             return null
         }
         if (entry.isDirectory) {
-            Napier.w("Expected file but found directory in archive at path: $exportPath")
+            Napier.w("Restore attachment is a directory")
             return null
         }
         val fileName = normalizedPath.substringAfterLast('/')
@@ -228,17 +295,14 @@ class RestoreWorker(
                 when {
                     fromExtension == "application/octet-stream" -> {
                         if (fromBytes != "application/octet-stream") {
-                            Napier.d("Detected MIME type from magic bytes for $fileName: $fromBytes")
+                            Napier.d("Restore attachment type detected")
                         }
                         fromBytes
                     }
                     fromBytes != "application/octet-stream" && fromBytes != fromExtension -> {
                         // Extension may be inferred (e.g. .jpg for a HEIC file from a bare
                         // MediaStore content URI). Magic bytes win when they disagree.
-                        Napier.w(
-                            "MIME mismatch for $fileName: extension says $fromExtension " +
-                                "but magic bytes say $fromBytes — using $fromBytes",
-                        )
+                        Napier.w("Restore attachment type mismatch")
                         fromBytes
                     }
                     else -> fromExtension
@@ -253,10 +317,10 @@ class RestoreWorker(
                         mimeType = mimeType,
                     )
                 }
-            Napier.d("Successfully imported media from archive: $exportPath")
+            Napier.d("Restore attachment imported")
             return savedPath
         } catch (e: Exception) {
-            Napier.e("Exception importing media from archive at path: $exportPath - file: $fileName - error: ${e.message}", e)
+            Napier.e("Restore attachment import failed")
             return null
         } finally {
             tempFile.delete()
@@ -324,7 +388,7 @@ class RestoreWorker(
                 else -> "application/octet-stream"
             }
         } catch (e: Exception) {
-            Napier.w("Failed to detect MIME type from magic bytes: ${file.name}", e)
+            Napier.w("Restore attachment type detection failed")
             "application/octet-stream"
         }
 }

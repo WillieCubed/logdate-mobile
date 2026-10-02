@@ -71,7 +71,7 @@ class IosExportLauncher(
                 } catch (cancellation: CancellationException) {
                     throw cancellation
                 } catch (failure: Exception) {
-                    Napier.e("iOS: Export process failed", failure)
+                    Napier.e("iOS: Export process failed")
                     showAlert("Export Failed", "Could not write the export archive.")
                     completionCallback?.invoke(ExportOutcome.Failed("Could not write the export archive."))
                 } finally {

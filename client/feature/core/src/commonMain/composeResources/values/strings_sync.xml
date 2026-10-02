@@ -206,4 +206,35 @@
     <string name="first_sync_timed_out">Signed in. Backup hasn't finished yet. Check Backup status for progress.</string>
     <string name="first_sync_timed_out_progress">Signed in. %1$d of %2$d backed up so far. Check Backup status for the rest.</string>
     <string name="first_sync_failed">Signed in, but the first backup didn't finish. LogDate will try again.</string>
+    <plurals name="sync_recovery_waiting">
+        <item quantity="one">%1$d item still needs to download</item>
+        <item quantity="other">%1$d items still need to download</item>
+    </plurals>
+    <string name="sync_recovery_waiting_description">Available entries are ready to read. Recovery is not complete until the remaining entries and attachments are saved on this device.</string>
+    <string name="sync_recovery_unavailable">Recovery status is unavailable. Retry to check what still needs to download.</string>
+    <string name="sync_diagnostic_history_title">Recent sync history</string>
+    <string name="sync_diagnostic_last_success">Last completed step: %1$s</string>
+    <string name="sync_diagnostic_blocker">Last interruption: %1$s</string>
+    <string name="sync_diagnostic_next_action">Next step: %1$s</string>
+    <string name="sync_diagnostic_unknown">Not established</string>
+    <string name="sync_diagnostic_refresh">Refresh history</string>
+    <string name="sync_diagnostic_phase_scheduling">Starting backup</string>
+    <string name="sync_diagnostic_phase_identity">Checking account</string>
+    <string name="sync_diagnostic_phase_upload">Uploading entries</string>
+    <string name="sync_diagnostic_phase_fetch">Checking for updates</string>
+    <string name="sync_diagnostic_phase_persist">Saving updates</string>
+    <string name="sync_diagnostic_phase_apply">Adding updates to your journal</string>
+    <string name="sync_diagnostic_phase_media">Saving attachments</string>
+    <string name="sync_diagnostic_phase_archive">Creating backup</string>
+    <string name="sync_diagnostic_phase_restore">Restoring backup</string>
+    <string name="sync_diagnostic_phase_recovery">Finishing recovery</string>
+    <string name="sync_diagnostic_action_retry">Try syncing again</string>
+    <string name="sync_diagnostic_action_connect">Connect to the internet</string>
+    <string name="sync_diagnostic_action_sign_in">Sign in again</string>
+    <string name="sync_diagnostic_action_free_space">Free space on this device</string>
+    <string name="sync_diagnostic_action_recover_key">Enter your recovery phrase</string>
+    <string name="sync_diagnostic_action_update_server">Ask your server administrator to update the server</string>
+    <string name="sync_diagnostic_action_update_app">Update LogDate</string>
+    <string name="sync_diagnostic_action_review_conflict">Review the affected entry</string>
+    <string name="sync_diagnostic_action_contact_support">Contact support</string>
 </resources>

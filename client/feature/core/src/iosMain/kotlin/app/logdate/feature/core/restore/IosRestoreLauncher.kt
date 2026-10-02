@@ -77,7 +77,7 @@ class IosRestoreLauncher(
     override fun completeRestore(outcome: RestoreOutcome) {
         _restoreProgress.value = RestoreProgressInfo.Idle
         completionCallback?.invoke(outcome)
-        Napier.i("iOS: Restore completed via direct signal: $outcome")
+        Napier.i("Restore completion received")
     }
 
     override fun startFileSelection() {
@@ -120,7 +120,7 @@ class IosRestoreLauncher(
                     _restoreProgress.value = RestoreProgressInfo.Idle
                     completionCallback?.invoke(RestoreOutcome.Success(summary))
                 } catch (e: Exception) {
-                    Napier.e("iOS: Restore failed", e)
+                    Napier.e("iOS: Restore failed")
                     _restoreProgress.value = RestoreProgressInfo.Idle
                     completionCallback?.invoke(RestoreOutcome.Failure(RestoreError.RESTORE_FAILED))
                 }
@@ -169,7 +169,7 @@ class IosRestoreLauncher(
             val entryNames = archiveEntryNames(zipFileSystem)
             RestoreArchiveReader.previewJson(entryNames) { readOptionalEntry(zipFileSystem, it) }
         } catch (e: Exception) {
-            Napier.e("iOS: Failed to extract metadata", e)
+            Napier.e("iOS: Failed to extract metadata")
             null
         }
 
@@ -242,11 +242,11 @@ class IosRestoreLauncher(
         val entryPath = (root + normalizedPath).toPath()
         val metadata = zipFileSystem.metadataOrNull(entryPath)
         if (metadata == null) {
-            Napier.w("iOS: Media file not found in archive at path: $exportPath")
+            Napier.w("Restore attachment missing")
             return null
         }
         if (metadata.isDirectory) {
-            Napier.w("iOS: Expected file but found directory in archive at path: $exportPath")
+            Napier.w("Restore attachment is a directory")
             return null
         }
         return runCatching {
@@ -259,9 +259,9 @@ class IosRestoreLauncher(
                     data = bytes,
                 )
             val savedPath = mediaManager.saveMedia(payload)
-            Napier.d("iOS: Successfully imported media from archive: $exportPath")
+            Napier.d("Restore attachment imported")
             savedPath
-        }.onFailure { Napier.e("iOS: Exception importing media from archive at path: $exportPath", it) }
+        }.onFailure { Napier.e("Restore attachment import failed") }
             .getOrNull()
     }
 }

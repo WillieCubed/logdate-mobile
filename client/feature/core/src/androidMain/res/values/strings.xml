@@ -28,4 +28,5 @@
     <string name="restore_notification_stage_places">Restoring places...</string>
     <string name="restore_notification_stage_location_history">Restoring location history...</string>
     <string name="restore_notification_stage_media">Importing media...</string>
+    <string name="share_diagnostic_report">Share sync diagnostic report</string>
 </resources>
