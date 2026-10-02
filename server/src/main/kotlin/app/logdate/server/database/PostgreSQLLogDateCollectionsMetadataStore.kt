@@ -17,6 +17,7 @@ import org.jetbrains.exposed.v1.core.greater
 import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.insertIgnore
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
@@ -120,17 +121,17 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
                         }.orderBy(LogDateCollectionRecordsTable.serverVersion to SortOrder.ASC)
                         .limit(limit + 1)
                         .toList()
-                val limitedChanges = changeRows.take(limit)
-                val limitedDeletions = deletionRows.take(limit)
+                val page =
+                    (changeRows + deletionRows)
+                        .sortedBy { it[LogDateCollectionRecordsTable.serverVersion] }
+                        .take(limit.coerceAtLeast(1))
+                val limitedChanges = page.filter { !it[LogDateCollectionRecordsTable.deleted] }
+                val limitedDeletions = page.filter { it[LogDateCollectionRecordsTable.deleted] }
                 LogDateCollectionChangesMetadata(
                     changes = limitedChanges.map(ResultRow::toCollectionMetadata),
                     deletions = limitedDeletions.map(ResultRow::toCollectionMetadata),
-                    lastTimestamp =
-                        listOfNotNull(
-                            limitedChanges.maxOfOrNull { it[LogDateCollectionRecordsTable.serverVersion] },
-                            limitedDeletions.maxOfOrNull { it[LogDateCollectionRecordsTable.serverVersion] },
-                        ).maxOrNull() ?: since,
-                    hasMore = changeRows.size > limit || deletionRows.size > limit,
+                    lastTimestamp = page.lastOrNull()?.get(LogDateCollectionRecordsTable.serverVersion) ?: since,
+                    hasMore = changeRows.size + deletionRows.size > page.size,
                 )
             }
         }
@@ -320,25 +321,24 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
         userId: UUID,
         preferredRepoDid: AtprotoDid,
     ): LogDateCollectionsState {
+        // Create the lock row even for concurrent first writes, then allocate under its lock.
+        LogDateCollectionStatesTable.insertIgnore {
+            it[LogDateCollectionStatesTable.userId] = userId
+            it[repoDid] = preferredRepoDid.toString()
+            it[lastVersion] = 0L
+            it[updatedAt] = Clock.System.now()
+        }
         val existing =
             LogDateCollectionStatesTable
                 .selectAll()
                 .where { LogDateCollectionStatesTable.userId eq userId }
-                .singleOrNull()
-        val repoDid = existing?.get(LogDateCollectionStatesTable.repoDid) ?: preferredRepoDid.toString()
-        val version = nextVersion(existing?.get(LogDateCollectionStatesTable.lastVersion))
-        if (existing == null) {
-            LogDateCollectionStatesTable.insert {
-                it[LogDateCollectionStatesTable.userId] = userId
-                it[LogDateCollectionStatesTable.repoDid] = repoDid
-                it[lastVersion] = version
-                it[updatedAt] = Clock.System.now()
-            }
-        } else {
-            LogDateCollectionStatesTable.update({ LogDateCollectionStatesTable.userId eq userId }) {
-                it[lastVersion] = version
-                it[updatedAt] = Clock.System.now()
-            }
+                .forUpdate()
+                .single()
+        val repoDid = existing[LogDateCollectionStatesTable.repoDid]
+        val version = nextVersion(existing[LogDateCollectionStatesTable.lastVersion])
+        LogDateCollectionStatesTable.update({ LogDateCollectionStatesTable.userId eq userId }) {
+            it[lastVersion] = version
+            it[updatedAt] = Clock.System.now()
         }
         return LogDateCollectionsState(
             repoDid = AtprotoDid.require(repoDid),

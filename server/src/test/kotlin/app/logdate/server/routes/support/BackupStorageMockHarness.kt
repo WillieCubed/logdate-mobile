@@ -1,11 +1,13 @@
 package app.logdate.server.routes.support
 
+import app.logdate.server.logdate.LogDateBlobFileWriteRequest
 import app.logdate.server.logdate.LogDateBlobNamespace
 import app.logdate.server.logdate.LogDateBlobWriteRequest
 import app.logdate.server.sync.GcsMediaStorage
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import java.nio.file.Files
 
 /**
  * A test harness for mocking GCS-based backup storage.
@@ -29,7 +31,18 @@ fun createBackupStorageMock(
         check(uploadedRequest.captured.namespace == LogDateBlobNamespace.BACKUP)
         storagePath
     }
+    every { storage.putBlobFile(any()) } answers {
+        val req = firstArg<LogDateBlobFileWriteRequest>()
+        uploadedRequest.captured =
+            LogDateBlobWriteRequest(req.ownerId, req.namespace, req.blobId, req.fileName, req.contentType, Files.readAllBytes(req.path))
+        check(req.namespace == LogDateBlobNamespace.BACKUP)
+        storagePath
+    }
     every { storage.getBlob(any()) } returns downloadedPayload
+    every { storage.getBlobFile(any(), any(), any()) } answers {
+        Files.write(secondArg(), downloadedPayload)
+        true
+    }
     every { storage.getSignedDownloadUrl(any(), any()) } returns "https://signed-url.com"
     return BackupStorageMockHarness(storage, uploadedRequest)
 }

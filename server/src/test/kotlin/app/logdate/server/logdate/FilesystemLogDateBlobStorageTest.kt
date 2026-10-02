@@ -1,10 +1,12 @@
 package app.logdate.server.logdate
 
+import java.io.RandomAccessFile
 import java.nio.file.Files
 import java.util.UUID
 import kotlin.io.path.exists
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -17,6 +19,67 @@ import kotlin.test.assertTrue
  * retrieval, and deletion—as well as environment-based initialization logic.
  */
 class FilesystemLogDateBlobStorageTest {
+    @Test
+    fun `backup file streams through storage without a byte array request`() {
+        val root = Files.createTempDirectory("logdate-blob-file-test")
+        val source = Files.createTempFile("logdate-blob-source-", ".bin")
+        val destination = Files.createTempFile("logdate-blob-destination-", ".bin")
+        try {
+            Files.write(source, byteArrayOf(1, 2, 3, 4))
+            val storage = FilesystemLogDateBlobStorage(root)
+            val path =
+                storage.putBlobFile(
+                    LogDateBlobFileWriteRequest(
+                        ownerId = UUID.randomUUID(),
+                        namespace = LogDateBlobNamespace.BACKUP,
+                        blobId = "backup-file",
+                        contentType = "application/octet-stream",
+                        path = source,
+                    ),
+                )
+            assertTrue(storage.getBlobFile(path, destination))
+            kotlin.test.assertContentEquals(Files.readAllBytes(source), Files.readAllBytes(destination))
+        } finally {
+            Files.deleteIfExists(source)
+            Files.deleteIfExists(destination)
+            Files.walk(root).use { paths -> paths.sorted(Comparator.reverseOrder()).forEach(Files::deleteIfExists) }
+        }
+    }
+
+    @Test
+    fun `cancelled backup file copy leaves no committed blob or partial download`() {
+        val root = Files.createTempDirectory("logdate-blob-cancel-test")
+        val source = Files.createTempFile("logdate-blob-cancel-source-", ".bin")
+        val destination = Files.createTempFile("logdate-blob-cancel-destination-", ".bin")
+        try {
+            RandomAccessFile(source.toFile(), "rw").use { it.setLength(1024L * 1024) }
+            val storage = FilesystemLogDateBlobStorage(root)
+            val request =
+                LogDateBlobFileWriteRequest(
+                    UUID.randomUUID(),
+                    LogDateBlobNamespace.BACKUP,
+                    "cancelled",
+                    contentType = "application/octet-stream",
+                    path = source,
+                    checkActive = { throw kotlin.coroutines.cancellation.CancellationException("cancelled") },
+                )
+            assertFailsWith<kotlin.coroutines.cancellation.CancellationException> { storage.putBlobFile(request) }
+            assertTrue(Files.walk(root).use { paths -> paths.filter { Files.isRegularFile(it) }.count() == 0L })
+
+            val path = storage.putBlobFile(request.copy(checkActive = {}))
+            assertFailsWith<kotlin.coroutines.cancellation.CancellationException> {
+                storage.getBlobFile(path, destination) {
+                    throw kotlin.coroutines.cancellation.CancellationException("cancelled")
+                }
+            }
+            assertFalse(Files.exists(destination))
+        } finally {
+            Files.deleteIfExists(source)
+            Files.deleteIfExists(destination)
+            Files.walk(root).use { paths -> paths.sorted(Comparator.reverseOrder()).forEach(Files::deleteIfExists) }
+        }
+    }
+
     @Test
     fun `round-trips bytes through disk`() {
         val root = Files.createTempDirectory("logdate-blob-test")

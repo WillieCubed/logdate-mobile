@@ -17,6 +17,7 @@ data class ServerDescriptorConfig(
         identityConfig: AtprotoIdentityConfig,
         webAuthnRpId: String,
         webAuthnRpName: String,
+        diagnosticReportsEnabled: Boolean = false,
     ): ServerDescriptor {
         val serverOrigin = identityConfig.pdsServiceEndpoint.trimEnd('/')
         val capabilities =
@@ -45,6 +46,10 @@ data class ServerDescriptorConfig(
             protocolFeatures =
                 buildList {
                     add(ServerProtocolFeature.CANONICAL_OWNER_BINDING_V1)
+                    add(ServerProtocolFeature.RICH_DRAFTS_V1)
+                    if (diagnosticReportsEnabled) {
+                        add(ServerProtocolFeature.DIAGNOSTIC_REPORTS_V1)
+                    }
                     if (identityConfig.publishesPlcOperations) {
                         add(ServerProtocolFeature.ATPROTO_PLC_PUBLISHING_V1)
                     }

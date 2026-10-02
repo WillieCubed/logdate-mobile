@@ -68,11 +68,13 @@ data class LogDateChangeSet<T, D>(
 data class LogDateEntryDeletion(
     val id: String,
     val deletedAt: Long,
+    val serverVersion: Long = deletedAt,
 )
 
 data class LogDateJournalDeletion(
     val id: String,
     val deletedAt: Long,
+    val serverVersion: Long = deletedAt,
 )
 
 data class LogDateAssociationRef(
@@ -83,6 +85,7 @@ data class LogDateAssociationRef(
 data class LogDateAssociationDeletion(
     val association: LogDateAssociationRef,
     val deletedAt: Long,
+    val serverVersion: Long = deletedAt,
 )
 
 data class LogDateDraft(
@@ -94,12 +97,17 @@ data class LogDateDraft(
     val lastUpdated: Long,
     val version: Long,
     val deviceId: DeviceId,
+    val encryptedBlocksVersion: Int? = null,
+    val encryptedBlocks: String? = null,
 )
 
 data class LogDateDraftDeletion(
     val id: String,
     val deletedAt: Long,
+    val serverVersion: Long = 0L,
 )
+
+class DraftFormatUpgradeRequiredException : IllegalStateException("Draft was upgraded by a newer client")
 
 /**
  * Internal collection repository boundary for the LogDate data model.

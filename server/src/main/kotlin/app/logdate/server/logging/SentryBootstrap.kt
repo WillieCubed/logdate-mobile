@@ -26,6 +26,7 @@ internal fun initializeSentry(
         options.dsn = dsn
         options.environment = profile.name.lowercase()
         options.release = release
+        configureSentryPrivacy(options, release, profile.name.lowercase())
     }
     Napier.i("Sentry initialised for ${profile.name.lowercase()} (release=$release)")
 }

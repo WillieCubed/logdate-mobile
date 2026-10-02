@@ -1,7 +1,8 @@
 <configuration>
+    <conversionRule conversionWord="safeEvent" class="app.logdate.server.logging.SafeServerMessageConverter"/>
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{YYYY-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level %safeEvent%n%nopex</pattern>
         </encoder>
     </appender>
     <!--

@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Repository for managing LogDate configuration that can be updated at runtime
@@ -41,6 +43,7 @@ class DefaultLogDateConfigRepository(
     initialBackendUrl: String = DEFAULT_BACKEND_URL,
     initialApiVersion: String = DEFAULT_API_VERSION,
     initialLocalServerAddress: String = DEFAULT_LOCAL_SERVER_ADDRESS,
+    private val privacyEpoch: PrivacyScopeEpoch? = null,
 ) : LogDateConfigRepository {
     companion object {
         /**
@@ -59,6 +62,7 @@ class DefaultLogDateConfigRepository(
         val GOOGLE_SERVER_CLIENT_ID: String = BuildConfig.GOOGLE_SERVER_CLIENT_ID
     }
 
+    private val selectionMutex = Mutex()
     private val _backendUrl = MutableStateFlow(initialBackendUrl)
     private val _apiVersion = MutableStateFlow(initialApiVersion)
     private val _localServerAddress = MutableStateFlow(initialLocalServerAddress)
@@ -85,9 +89,11 @@ class DefaultLogDateConfigRepository(
             } else {
                 "https://$cleanUrl"
             }
-        _backendUrl.value = normalizedUrl
-        if (_serverDescriptor.value?.serverOrigin != normalizedUrl) {
-            _serverDescriptor.value = null
+        selectionMutex.withLock {
+            changeSelection(_backendUrl.value != normalizedUrl) {
+                if (_serverDescriptor.value?.serverOrigin != normalizedUrl) _serverDescriptor.value = null
+                _backendUrl.value = normalizedUrl
+            }
         }
     }
 
@@ -100,19 +106,35 @@ class DefaultLogDateConfigRepository(
     }
 
     override suspend fun updateServerDescriptor(descriptor: ServerDescriptor?) {
-        _serverDescriptor.value = descriptor
+        selectionMutex.withLock {
+            if (descriptor == null || descriptor.serverOrigin.trimEnd('/') == _backendUrl.value) {
+                _serverDescriptor.value = descriptor
+            }
+        }
     }
 
-    override suspend fun resetToDefaults() {
-        _backendUrl.value = DEFAULT_BACKEND_URL
-        _apiVersion.value = DEFAULT_API_VERSION
-        _localServerAddress.value = DEFAULT_LOCAL_SERVER_ADDRESS
-        _serverDescriptor.value = null
+    override suspend fun resetToDefaults() =
+        selectionMutex.withLock {
+            changeSelection(_backendUrl.value != DEFAULT_BACKEND_URL) {
+                _serverDescriptor.value = null
+                _backendUrl.value = DEFAULT_BACKEND_URL
+                _apiVersion.value = DEFAULT_API_VERSION
+                _localServerAddress.value = DEFAULT_LOCAL_SERVER_ADDRESS
+            }
+        }
+
+    private suspend fun changeSelection(
+        changed: Boolean,
+        publish: suspend () -> Unit,
+    ) {
+        val epoch = privacyEpoch
+        if (epoch == null) publish() else epoch.transition(changed, publish)
     }
 
     override fun getCurrentBackendUrl(): String = _backendUrl.value
 
     override fun getCurrentApiBaseUrl(): String = "${getCurrentBackendUrl()}/api/${_apiVersion.value}"
 
-    override fun getCurrentServerDescriptor(): ServerDescriptor? = _serverDescriptor.value
+    override fun getCurrentServerDescriptor(): ServerDescriptor? =
+        _serverDescriptor.value?.takeIf { it.serverOrigin.trimEnd('/') == _backendUrl.value }
 }

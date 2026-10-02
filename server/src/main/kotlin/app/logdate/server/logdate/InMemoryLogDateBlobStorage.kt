@@ -1,15 +1,71 @@
 package app.logdate.server.logdate
 
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * In-memory blob storage implementation for tests and non-database server runs.
+ * Ephemeral blob storage for tests and non-database server runs. Backup files remain on disk so
+ * the fallback does not force a large archive into heap memory.
  */
 class InMemoryLogDateBlobStorage : LogDateBlobStorage {
     private val blobs = ConcurrentHashMap<String, StoredBlob>()
+    private val fileBlobs = ConcurrentHashMap<String, Path>()
+
+    override fun putBlobFile(request: LogDateBlobFileWriteRequest): String {
+        val storagePath =
+            storagePathFor(
+                LogDateBlobWriteRequest(
+                    request.ownerId,
+                    request.namespace,
+                    request.blobId,
+                    request.fileName,
+                    request.contentType,
+                    ByteArray(0),
+                ),
+            )
+        val privateCopy = Files.createTempFile("logdate-memory-blob-", ".bin")
+        try {
+            Files.newInputStream(request.path).use { source ->
+                Files.newOutputStream(privateCopy).use { destination ->
+                    copyBackupFile(source, destination, request.checkActive)
+                }
+            }
+            fileBlobs.put(storagePath, privateCopy)?.let { Files.deleteIfExists(it) }
+            blobs.remove(storagePath)
+            return storagePath
+        } catch (error: Exception) {
+            Files.deleteIfExists(privateCopy)
+            throw error
+        }
+    }
+
+    override fun getBlobFile(
+        storagePath: String,
+        destination: Path,
+        checkActive: () -> Unit,
+    ): Boolean {
+        val file = fileBlobs[storagePath]
+        if (file != null) {
+            try {
+                Files.newInputStream(file).use { source ->
+                    Files.newOutputStream(destination).use { output -> copyBackupFile(source, output, checkActive) }
+                }
+            } catch (error: Exception) {
+                Files.deleteIfExists(destination)
+                throw error
+            }
+            return true
+        }
+        val bytes = blobs[storagePath]?.bytes ?: return false
+        checkActive()
+        Files.write(destination, bytes)
+        return true
+    }
 
     override fun putBlob(request: LogDateBlobWriteRequest): String {
         val storagePath = storagePathFor(request)
+        fileBlobs.remove(storagePath)?.let { Files.deleteIfExists(it) }
         blobs[storagePath] =
             StoredBlob(
                 bytes = request.bytes,
@@ -18,9 +74,14 @@ class InMemoryLogDateBlobStorage : LogDateBlobStorage {
         return storagePath
     }
 
-    override fun getBlob(storagePath: String): ByteArray? = blobs[storagePath]?.bytes
+    override fun getBlob(storagePath: String): ByteArray? =
+        blobs[storagePath]?.bytes ?: fileBlobs[storagePath]?.let { Files.readAllBytes(it) }
 
-    override fun deleteBlob(storagePath: String): Boolean = blobs.remove(storagePath) != null
+    override fun deleteBlob(storagePath: String): Boolean {
+        val file = fileBlobs.remove(storagePath)
+        file?.let { Files.deleteIfExists(it) }
+        return blobs.remove(storagePath) != null || file != null
+    }
 
     override fun getSignedDownloadUrl(
         storagePath: String,

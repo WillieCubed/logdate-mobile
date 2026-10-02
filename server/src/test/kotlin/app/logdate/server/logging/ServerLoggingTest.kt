@@ -3,7 +3,6 @@ package app.logdate.server.logging
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
-import ch.qos.logback.classic.spi.ThrowableProxy
 import ch.qos.logback.core.read.ListAppender
 import io.github.aakira.napier.LogLevel
 import io.github.aakira.napier.Napier
@@ -12,7 +11,6 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -27,6 +25,32 @@ import kotlin.test.assertTrue
  * sizes its copy with `-1`.
  */
 class ServerLoggingTest {
+    @Test
+    fun `production encoder excludes library messages context and nested exceptions`() {
+        val marker = "PRIVATE_LIBRARY_TOKEN_PATH_SENTINEL"
+        val library = LoggerFactory.getLogger(marker) as Logger
+        val root = LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME) as Logger
+
+        @Suppress("UNCHECKED_CAST")
+        val stdout = root.getAppender("STDOUT") as ch.qos.logback.core.OutputStreamAppender<ILoggingEvent>
+        val event =
+            ch.qos.logback.classic.spi
+                .LoggingEvent(
+                    marker,
+                    library,
+                    Level.ERROR,
+                    marker,
+                    IllegalStateException(marker, RuntimeException(marker)),
+                    arrayOf(marker),
+                ).apply {
+                    mdcPropertyMap = mapOf(marker to marker)
+                    threadName = marker
+                }
+        val encoded = stdout.encoder.encode(event).decodeToString()
+        assertTrue(!encoded.contains(marker))
+        assertTrue(encoded.contains("SERVER_LIBRARY_EVENT"))
+    }
+
     private lateinit var logger: Logger
     private lateinit var appender: ListAppender<ILoggingEvent>
     private val antilog = Slf4jAntilog()
@@ -49,12 +73,34 @@ class ServerLoggingTest {
     }
 
     @Test
+    fun `arbitrary messages tags and nested causes cannot cross the logging boundary`() {
+        val secret = "PRIVATE_CONTENT_TOKEN_PATH_SENTINEL"
+        antilog.log(LogLevel.ERROR, secret, IllegalStateException(secret, RuntimeException(secret)), secret)
+        val event = appender.list.single()
+        assertTrue(!event.formattedMessage.contains(secret))
+        assertTrue(!event.loggerName.contains(secret))
+        assertEquals(null, event.throwableProxy)
+    }
+
+    @Test
     fun `warnings reach slf4j so the in-memory fallback is visible`() {
         antilog.log(LogLevel.WARNING, null, null, "Database not available, using in-memory repositories")
 
         val event = appender.list.single()
         assertEquals(Level.WARN, event.level)
-        assertEquals("Database not available, using in-memory repositories", event.formattedMessage)
+        assertEquals("SERVER_DATABASE_IN_MEMORY", event.formattedMessage)
+    }
+
+    @Test
+    fun `current database fallback warning remains actionable after sanitization`() {
+        antilog.log(
+            LogLevel.WARNING,
+            null,
+            RuntimeException("private connection detail"),
+            "LOGDATE_ALLOW_INMEMORY_FALLBACK is set: running on in-memory repositories. Nothing is " +
+                "persisted and every record is lost when the process exits.",
+        )
+        assertEquals("SERVER_DATABASE_IN_MEMORY", appender.list.single().formattedMessage)
     }
 
     @Test
@@ -68,21 +114,21 @@ class ServerLoggingTest {
     }
 
     @Test
-    fun `throwables are forwarded so the sentry appender can capture them`() {
+    fun `throwables are excluded before downstream appenders`() {
         val cause = IllegalStateException("Database credential missing")
 
         antilog.log(LogLevel.ERROR, null, cause, "Production database unavailable")
 
         val event = appender.list.single()
         assertEquals(Level.ERROR, event.level)
-        assertSame(cause, (event.throwableProxy as ThrowableProxy).throwable)
+        assertEquals(null, event.throwableProxy)
     }
 
     @Test
-    fun `a record with no message falls back to the throwable`() {
+    fun `a record with no message uses a finite failure code`() {
         antilog.log(LogLevel.ERROR, null, IllegalStateException("only on the throwable"), null)
 
-        assertEquals("only on the throwable", appender.list.single().formattedMessage)
+        assertEquals("SERVER_ERROR", appender.list.single().formattedMessage)
     }
 
     @Test
@@ -93,10 +139,10 @@ class ServerLoggingTest {
     }
 
     @Test
-    fun `a tag selects the logger so logback config can target a subsystem`() {
+    fun `arbitrary tags cannot become logger names`() {
         antilog.log(LogLevel.INFO, "$SERVER_LOG_NAME.sync", null, "tagged")
 
-        assertEquals("$SERVER_LOG_NAME.sync", appender.list.single().loggerName)
+        assertEquals(SERVER_LOG_NAME, appender.list.single().loggerName)
     }
 
     @Test

@@ -2,6 +2,7 @@ package app.logdate.server.routes
 
 import app.logdate.server.auth.TokenService
 import app.logdate.server.crypto.EncryptionService
+import app.logdate.server.diagnostics.DiagnosticReportService
 import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateBlobStorage
@@ -9,6 +10,7 @@ import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.logdate.LogDateMediaBlobRepository
 import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.routes.sync.SyncRouteConfig
+import app.logdate.server.routes.sync.diagnosticReportRoutes
 import app.logdate.server.routes.sync.syncBackupRoutes
 import app.logdate.server.routes.sync.syncCollectionRoutes
 import app.logdate.server.routes.sync.syncMaintenanceRoutes
@@ -46,6 +48,7 @@ fun Route.syncRoutes(
     backupRepository: LogDateBackupRepository,
     entitlementEnforcer: EntitlementEnforcer? = null,
     rateLimiter: SlidingWindowRateLimiter? = SlidingWindowRateLimiter(),
+    diagnosticReportService: DiagnosticReportService? = null,
 ) {
     val config = SyncRouteConfig(mediaAccessPolicy = mediaAccessPolicy)
     syncStatusRoutes(tokenService, metrics, collectionsRepository)
@@ -71,4 +74,5 @@ fun Route.syncRoutes(
         config = config,
     )
     syncMaintenanceRoutes(tokenService, mediaStorage, metrics, collectionsRepository, backupRepository)
+    diagnosticReportRoutes(tokenService, diagnosticReportService)
 }

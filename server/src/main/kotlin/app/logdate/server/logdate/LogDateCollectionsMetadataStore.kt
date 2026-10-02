@@ -146,20 +146,15 @@ internal class InMemoryLogDateCollectionsMetadataStore : LogDateCollectionsMetad
             metadataForUser(userId)
                 .values
                 .filter { it.collection == collection && it.version > since }
-        val changeRows = rows.filterNot(LogDateCollectionRow::deleted).sortedBy { it.version }
-        val deletionRows = rows.filter(LogDateCollectionRow::deleted).sortedBy { it.version }
-        val limitedChanges = changeRows.take(limit)
-        val limitedDeletions = deletionRows.take(limit)
-        val lastTimestamp =
-            listOfNotNull(
-                limitedChanges.maxOfOrNull { it.version },
-                limitedDeletions.maxOfOrNull { it.version },
-            ).maxOrNull() ?: since
+        val page = rows.sortedBy { it.version }.take(limit.coerceAtLeast(1))
+        val limitedChanges = page.filterNot(LogDateCollectionRow::deleted)
+        val limitedDeletions = page.filter(LogDateCollectionRow::deleted)
+        val lastTimestamp = page.lastOrNull()?.version ?: since
         return LogDateCollectionChangesMetadata(
             changes = limitedChanges.map(LogDateCollectionRow::toMetadata),
             deletions = limitedDeletions.map(LogDateCollectionRow::toMetadata),
             lastTimestamp = lastTimestamp,
-            hasMore = changeRows.size > limit || deletionRows.size > limit,
+            hasMore = rows.size > page.size,
         )
     }
 

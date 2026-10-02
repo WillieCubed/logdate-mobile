@@ -156,6 +156,8 @@ internal fun Application.contentApiRoutes() {
     val usageCalculator by inject<UsageCalculator>()
     val locationHistoryRepository by inject<LocationHistoryRepository>()
     val syncMetrics by inject<SyncMetricsRegistry>()
+    val diagnosticReportAvailability by inject<app.logdate.server.diagnostics.DiagnosticReportAvailability>()
+    val diagnosticReportStore by inject<app.logdate.server.diagnostics.DiagnosticReportStore>()
     val blobStorage by inject<LogDateBlobStorage>()
     val logDateCollectionsRepository by inject<RepoBackedLogDateCollectionsRepository>()
     val logDateMediaBlobRepository by inject<CompositeLogDateMediaBlobRepository>()
@@ -176,6 +178,13 @@ internal fun Application.contentApiRoutes() {
                 backupRepository = logDateBackupRepository,
                 entitlementEnforcer = entitlementEnforcer,
                 rateLimiter = syncRateLimiter,
+                diagnosticReportService =
+                    diagnosticReportAvailability.keyring
+                        ?.takeIf { diagnosticReportAvailability.enabled }
+                        ?.let {
+                            app.logdate.server.diagnostics
+                                .DiagnosticReportService(diagnosticReportStore, it)
+                        },
             )
             quotaRoutes(
                 tokenService = tokenService,
@@ -201,4 +210,5 @@ private fun Application.serverDescriptor() =
         identityConfig = inject<AtprotoIdentityConfig>().value,
         webAuthnRpId = inject<WebAuthnConfig>().value.relyingPartyId,
         webAuthnRpName = inject<WebAuthnConfig>().value.relyingPartyName,
+        diagnosticReportsEnabled = inject<app.logdate.server.diagnostics.DiagnosticReportAvailability>().value.enabled,
     )

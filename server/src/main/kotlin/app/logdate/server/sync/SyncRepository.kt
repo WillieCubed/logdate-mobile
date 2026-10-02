@@ -202,11 +202,13 @@ data class SyncStatus(
 data class ContentDeletionMarker(
     val id: String,
     val deletedAt: Long,
+    val serverVersion: Long = deletedAt,
 )
 
 data class JournalDeletionMarker(
     val id: String,
     val deletedAt: Long,
+    val serverVersion: Long = deletedAt,
 )
 
 data class AssociationKey(
@@ -217,6 +219,7 @@ data class AssociationKey(
 data class AssociationDeletionMarker(
     val key: AssociationKey,
     val deletedAt: Long,
+    val serverVersion: Long = deletedAt,
 )
 
 data class SyncPurgeResult(

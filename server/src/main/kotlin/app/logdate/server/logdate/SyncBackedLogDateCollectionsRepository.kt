@@ -257,7 +257,10 @@ private fun AssociationRecord.toAssociation(): LogDateAssociation =
 private fun ChangeSet<ContentRecord, ContentDeletionMarker>.toEntryChanges(): LogDateChangeSet<LogDateEntry, LogDateEntryDeletion> =
     LogDateChangeSet(
         changes = changes.map(ContentRecord::toEntry),
-        deletions = deletions.map { deletion -> LogDateEntryDeletion(id = deletion.id, deletedAt = deletion.deletedAt) },
+        deletions =
+            deletions.map { deletion ->
+                LogDateEntryDeletion(id = deletion.id, deletedAt = deletion.deletedAt, serverVersion = deletion.serverVersion)
+            },
         lastTimestamp = lastTimestamp,
         hasMore = hasMore,
     )
@@ -265,7 +268,10 @@ private fun ChangeSet<ContentRecord, ContentDeletionMarker>.toEntryChanges(): Lo
 private fun ChangeSet<JournalRecord, JournalDeletionMarker>.toJournalChanges(): LogDateChangeSet<LogDateJournal, LogDateJournalDeletion> =
     LogDateChangeSet(
         changes = changes.map(JournalRecord::toJournal),
-        deletions = deletions.map { deletion -> LogDateJournalDeletion(id = deletion.id, deletedAt = deletion.deletedAt) },
+        deletions =
+            deletions.map { deletion ->
+                LogDateJournalDeletion(id = deletion.id, deletedAt = deletion.deletedAt, serverVersion = deletion.serverVersion)
+            },
         lastTimestamp = lastTimestamp,
         hasMore = hasMore,
     )
@@ -283,6 +289,7 @@ private fun ChangeSet<AssociationRecord, AssociationDeletionMarker>.toAssociatio
                             entryId = deletion.key.contentId,
                         ),
                     deletedAt = deletion.deletedAt,
+                    serverVersion = deletion.serverVersion,
                 )
             },
         lastTimestamp = lastTimestamp,

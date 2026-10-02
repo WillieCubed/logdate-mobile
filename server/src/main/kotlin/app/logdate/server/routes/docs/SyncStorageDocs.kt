@@ -29,7 +29,7 @@ import io.ktor.http.HttpStatusCode
 internal object SyncStorageDocs {
     private const val MEDIA_DOWNLOAD_URL = "https://cloud.logdate.app/api/v1/media/${SyncExamples.MEDIA_ID}/binary"
     private const val BACKUP_DOWNLOAD_URL = "https://cloud.logdate.app/api/v1/backups/${SyncExamples.BACKUP_ID}/binary"
-    private const val BACKUP_MANIFEST = """{"format":"logdate-cloud-backup","encryption":"identity-aes-gcm-v1"}"""
+    private const val BACKUP_MANIFEST = """{"format":"logdate-cloud-backup","encryption":"identity-aes-gcm-chunked-v2"}"""
 
     private val mediaMetadata =
         MediaMetadataResponse(

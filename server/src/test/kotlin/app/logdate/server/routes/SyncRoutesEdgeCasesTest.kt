@@ -26,6 +26,8 @@ import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import io.mockk.every
 import io.mockk.mockk
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -245,8 +247,11 @@ class SyncRoutesEdgeCasesTest {
         testApplication {
             val userId = UUID.randomUUID()
             val storage = mockk<GcsMediaStorage>()
-            every { storage.getBlob("backup-missing") } returns null
-            every { storage.getBlob("backup-bad-cipher") } returns (PayloadPrefixes.SERVER_BACKUP + byteArrayOf(1, 2, 3))
+            every { storage.getBlobFile("backup-missing", any(), any()) } returns false
+            every { storage.getBlobFile("backup-bad-cipher", any(), any()) } answers {
+                Files.write(secondArg<Path>(), PayloadPrefixes.SERVER_BACKUP + byteArrayOf(1, 2, 3))
+                true
+            }
             every { storage.deleteBlob(any()) } returns true
 
             val env = configureSyncTestApp(mediaStorage = storage)

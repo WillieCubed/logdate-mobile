@@ -214,14 +214,29 @@ public class DefaultRepoEngine(
             }
         }
 
+    /** Atomically creates a record only while its key is absent, including across head retries. */
+    public suspend fun putRecordIfAbsent(
+        recordId: RepoRecordId,
+        value: JsonObject,
+    ): Result<RepoWriteResult> =
+        runCatching {
+            retryingOnHeadConflict {
+                putRecordOnce(recordId, value, swapRecord = null, expectedAbsent = true)
+            }
+        }
+
     private suspend fun putRecordOnce(
         recordId: RepoRecordId,
         value: JsonObject,
         swapRecord: String?,
+        expectedAbsent: Boolean = false,
     ): RepoWriteResult =
         run {
             val snapshot = loadSnapshot(recordId.repo)
             val previousCid = snapshot.tree.get(recordId.collection, recordId.recordKey)?.toString()
+            if (expectedAbsent && previousCid != null) {
+                throw InvalidSwapException(expectedCid = previousCid, providedCid = "<absent>")
+            }
             if (swapRecord != null && previousCid != swapRecord) {
                 throw InvalidSwapException(expectedCid = previousCid, providedCid = swapRecord)
             }

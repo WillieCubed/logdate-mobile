@@ -1,3 +1,4 @@
+import org.gradle.api.tasks.testing.Test
 import org.gradle.jvm.tasks.Jar
 
 plugins {
@@ -93,6 +94,7 @@ dependencies {
 
     // Google Cloud Storage
     implementation(libs.google.cloud.storage)
+    implementation(libs.bouncycastle.bcprov)
 
     // Koin DI
     implementation(platform(libs.koin.bom))
@@ -191,4 +193,10 @@ tasks.register<JavaExec>("validateOpenApi") {
 tasks.named("check") {
     dependsOn("validateOpenApi")
     dependsOn("jacocoTestCoverageVerification")
+}
+
+tasks.withType<Test>().configureEach {
+    if (System.getenv("LOGDATE_LARGE_BACKUP_TEST") == "1") {
+        maxHeapSize = "512m"
+    }
 }

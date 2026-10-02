@@ -92,12 +92,6 @@ internal data class ParsedMediaMultipartUpload(
     val deviceId: String,
 )
 
-internal data class ParsedBackupMultipartUpload(
-    val deviceId: String,
-    val manifest: String,
-    val data: ByteArray,
-)
-
 internal suspend fun ApplicationCall.respondMissingMultipartField(field: String) {
     respond(
         HttpStatusCode.BadRequest,
@@ -198,67 +192,6 @@ internal suspend fun ApplicationCall.receiveMediaMultipartUpload(): ParsedMediaM
     )
 }
 
-internal suspend fun ApplicationCall.receiveBackupMultipartUpload(): ParsedBackupMultipartUpload? {
-    val multipart =
-        runCatching { receiveMultipart() }.getOrElse {
-            respond(
-                HttpStatusCode.BadRequest,
-                error("VALIDATION_ERROR", "Expected multipart/form-data body"),
-            )
-            return null
-        }
-
-    var deviceId: String? = null
-    var manifest: String? = null
-    var data: ByteArray? = null
-
-    multipart.forEachPart { part ->
-        when (part) {
-            is PartData.FormItem -> {
-                when (part.name) {
-                    "deviceId" -> deviceId = part.value.trim()
-                    "manifest" -> manifest = part.value
-                }
-            }
-
-            is PartData.FileItem -> {
-                if (part.name == "data") {
-                    data = part.provider().readRemaining().readByteArray()
-                }
-            }
-
-            else -> Unit
-        }
-        part.dispose()
-    }
-
-    val requiredDeviceId =
-        deviceId?.takeIf { it.isNotBlank() } ?: run {
-            respondMissingMultipartField("deviceId")
-            return null
-        }
-    val requiredManifest =
-        manifest?.takeIf { it.isNotBlank() } ?: run {
-            respondMissingMultipartField("manifest")
-            return null
-        }
-    val requiredData =
-        data ?: run {
-            respondMissingMultipartField("data")
-            return null
-        }
-    if (requiredData.isEmpty()) {
-        respond(HttpStatusCode.BadRequest, error("VALIDATION_ERROR", "Backup payload must not be empty"))
-        return null
-    }
-
-    return ParsedBackupMultipartUpload(
-        deviceId = requiredDeviceId,
-        manifest = requiredManifest,
-        data = requiredData,
-    )
-}
-
 // --- Auth helpers -------------------------------------------------------------------------------
 
 /**
@@ -299,7 +232,7 @@ internal suspend fun extractUserId(
     return try {
         UUID.fromString(accountId)
     } catch (e: IllegalArgumentException) {
-        Napier.e("Invalid account ID format in token: $accountId", e)
+        Napier.e("Account reference validation failed")
         call.respond(
             HttpStatusCode.Unauthorized,
             error("UNAUTHORIZED", "Invalid token payload"),
@@ -383,7 +316,7 @@ internal fun resolveMediaDownloadUrl(
         return runCatching {
             mediaStorage.getSignedDownloadUrl(record.storagePath, accessPolicy.signedUrlTtlHours)
         }.getOrElse { error ->
-            Napier.e("Failed to generate signed URL for ${record.mediaId}", error)
+            Napier.e("Media download authorization failed")
             buildMediaDownloadUrl(call, record.mediaId)
         }
     }
@@ -399,8 +332,8 @@ internal fun resolveBackupDownloadUrl(
     if (accessPolicy.useSignedUrls && mediaStorage != null) {
         return runCatching {
             mediaStorage.getSignedDownloadUrl(record.storagePath, accessPolicy.signedUrlTtlHours)
-        }.getOrElse { error ->
-            Napier.e("Failed to generate signed URL for backup ${record.id}", error)
+        }.getOrElse {
+            Napier.e("Failed to generate signed URL for backup")
             buildBackupDownloadUrl(call, record.id.toString())
         }
     }
@@ -422,6 +355,8 @@ internal fun SyncMetricsSnapshot.toPrometheus(): String {
     builder.appendLine("# TYPE logdate_sync_operation_duration_ms_total counter")
     builder.appendLine("# HELP logdate_sync_operation_bytes_total Total bytes processed by operation type.")
     builder.appendLine("# TYPE logdate_sync_operation_bytes_total counter")
+    builder.appendLine("# HELP logdate_sync_operation_duration_ms Sync operation duration in milliseconds.")
+    builder.appendLine("# TYPE logdate_sync_operation_duration_ms histogram")
 
     operations.forEach { operation ->
         val label = escapeLabelValue(operation.name)
@@ -429,7 +364,26 @@ internal fun SyncMetricsSnapshot.toPrometheus(): String {
         builder.appendLine("logdate_sync_operation_error_total{operation=\"$label\"} ${operation.errorCount}")
         builder.appendLine("logdate_sync_operation_duration_ms_total{operation=\"$label\"} ${operation.totalDurationMs}")
         builder.appendLine("logdate_sync_operation_bytes_total{operation=\"$label\"} ${operation.totalBytes}")
+        operation.durationBuckets.forEach { bucket ->
+            val bound = if (bucket.upperBoundMs == Long.MAX_VALUE) "+Inf" else bucket.upperBoundMs.toString()
+            builder.appendLine("logdate_sync_operation_duration_ms_bucket{operation=\"$label\",le=\"$bound\"} ${bucket.count}")
+        }
+        builder.appendLine("logdate_sync_operation_duration_ms_sum{operation=\"$label\"} ${operation.totalDurationMs}")
+        builder.appendLine(
+            "logdate_sync_operation_duration_ms_count{operation=\"$label\"} ${operation.successCount + operation.errorCount}",
+        )
     }
+
+    builder.appendLine("# HELP logdate_sync_diagnostic_events_total Safe diagnostic transitions by classification.")
+    builder.appendLine("# TYPE logdate_sync_diagnostic_events_total counter")
+    diagnostics.forEach { event ->
+        builder.appendLine(
+            "logdate_sync_diagnostic_events_total{phase=\"${event.phase.name}\",outcome=\"${event.outcome.name}\",reason=\"${event.reason.name}\",protocol_version=\"1\"} ${event.count}",
+        )
+    }
+    builder.appendLine("# HELP logdate_sync_diagnostic_drops_total Rejected diagnostic measurements.")
+    builder.appendLine("# TYPE logdate_sync_diagnostic_drops_total counter")
+    builder.appendLine("logdate_sync_diagnostic_drops_total $diagnosticDrops")
 
     return builder.toString()
 }

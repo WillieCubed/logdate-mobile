@@ -1,5 +1,6 @@
 package app.logdate.server.logdate
 
+import java.nio.file.Path
 import java.util.UUID
 
 /**
@@ -37,6 +38,14 @@ interface LogDateBlobStorage {
     fun putBlob(request: LogDateBlobWriteRequest): String
 
     fun getBlob(storagePath: String): ByteArray?
+
+    fun putBlobFile(request: LogDateBlobFileWriteRequest): String
+
+    fun getBlobFile(
+        storagePath: String,
+        destination: Path,
+        checkActive: () -> Unit = {},
+    ): Boolean
 
     fun deleteBlob(storagePath: String): Boolean
 
@@ -83,3 +92,13 @@ interface LogDateBlobStorage {
 
     fun deleteMedia(storagePath: String): Boolean = deleteBlob(storagePath)
 }
+
+data class LogDateBlobFileWriteRequest(
+    val ownerId: UUID,
+    val namespace: LogDateBlobNamespace,
+    val blobId: String,
+    val fileName: String? = null,
+    val contentType: String,
+    val path: Path,
+    val checkActive: () -> Unit = {},
+)

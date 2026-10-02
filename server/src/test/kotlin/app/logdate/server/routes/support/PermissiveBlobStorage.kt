@@ -1,9 +1,11 @@
 package app.logdate.server.routes.support
 
+import app.logdate.server.logdate.LogDateBlobFileWriteRequest
 import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateBlobWriteRequest
 import io.mockk.every
 import io.mockk.mockk
+import java.nio.file.Files
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -22,6 +24,17 @@ fun createPermissiveBlobStorage(): LogDateBlobStorage {
         path
     }
     every { storage.getBlob(any()) } answers { blobs[firstArg<String>()] }
+    every { storage.putBlobFile(any()) } answers {
+        val req = firstArg<LogDateBlobFileWriteRequest>()
+        val path = "ns/${req.namespace.name.lowercase()}/${req.ownerId}/${req.blobId}"
+        blobs[path] = Files.readAllBytes(req.path)
+        path
+    }
+    every { storage.getBlobFile(any(), any(), any()) } answers {
+        val bytes = blobs[firstArg<String>()] ?: return@answers false
+        Files.write(secondArg(), bytes)
+        true
+    }
     every { storage.deleteBlob(any()) } answers { blobs.remove(firstArg<String>()) != null }
     every { storage.getSignedDownloadUrl(any(), any()) } returns "https://signed-url.example.com"
     return storage

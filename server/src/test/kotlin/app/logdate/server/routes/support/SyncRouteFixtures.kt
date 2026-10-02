@@ -188,6 +188,7 @@ fun backupUploadMultipartContent(
     manifest: String,
     data: ByteArray,
     fileName: String = "backup.bin",
+    duplicateData: Boolean = false,
 ): MultiPartFormDataContent =
     MultiPartFormDataContent(
         formData {
@@ -202,6 +203,17 @@ fun backupUploadMultipartContent(
                         append(HttpHeaders.ContentType, "application/octet-stream")
                     },
             )
+            if (duplicateData) {
+                append(
+                    key = "data",
+                    value = data,
+                    headers =
+                        Headers.build {
+                            append(HttpHeaders.ContentDisposition, "filename=\"duplicate.bin\"")
+                            append(HttpHeaders.ContentType, "application/octet-stream")
+                        },
+                )
+            }
         },
     )
 

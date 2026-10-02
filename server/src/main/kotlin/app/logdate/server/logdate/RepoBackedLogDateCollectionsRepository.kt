@@ -132,6 +132,7 @@ internal class RepoBackedLogDateCollectionsRepository(
                     LogDateEntryDeletion(
                         id = deletion.recordKey,
                         deletedAt = requireNotNull(deletion.deletedAt),
+                        serverVersion = deletion.version,
                     )
                 },
             lastTimestamp = metadata.lastTimestamp,
@@ -226,6 +227,7 @@ internal class RepoBackedLogDateCollectionsRepository(
                     LogDateJournalDeletion(
                         id = deletion.recordKey,
                         deletedAt = requireNotNull(deletion.deletedAt),
+                        serverVersion = deletion.version,
                     )
                 },
             lastTimestamp = metadata.lastTimestamp,
@@ -354,6 +356,7 @@ internal class RepoBackedLogDateCollectionsRepository(
                                 entryId = entryIdFromAssociationRecordKey(RecordKey.require(deletion.recordKey)),
                             ),
                         deletedAt = requireNotNull(deletion.deletedAt),
+                        serverVersion = deletion.version,
                     )
                 },
             lastTimestamp = metadata.lastTimestamp,
@@ -366,7 +369,33 @@ internal class RepoBackedLogDateCollectionsRepository(
         draft: LogDateDraft,
     ): LogDateDraft {
         val repoDid = canonicalRepoDid(userId)
-        repoEngine.putRecord(draftRecordId(repoDid, draft.id), draft.toRepoJson()).getOrThrow()
+        val recordId = draftRecordId(repoDid, draft.id)
+        val prior = repoEngine.getRecord(recordId).getOrThrow()
+        if (draft.encryptedBlocks == null && prior?.value?.stringValue("encryptedBlocks") != null) {
+            throw DraftFormatUpgradeRequiredException()
+        }
+        val result =
+            if (draft.encryptedBlocks == null && prior == null) {
+                repoEngine.putRecordIfAbsent(recordId, draft.toRepoJson())
+            } else {
+                repoEngine.putRecord(
+                    recordId,
+                    draft.toRepoJson(),
+                    swapRecord = if (draft.encryptedBlocks == null) prior?.cid else null,
+                )
+            }
+        result.exceptionOrNull()?.let { failure ->
+            if (draft.encryptedBlocks == null &&
+                repoEngine
+                    .getRecord(recordId)
+                    .getOrThrow()
+                    ?.value
+                    ?.stringValue("encryptedBlocks") != null
+            ) {
+                throw DraftFormatUpgradeRequiredException()
+            }
+            throw failure
+        }
         val metadata =
             metadataStore.upsert(
                 userId = userId,
@@ -430,6 +459,7 @@ internal class RepoBackedLogDateCollectionsRepository(
                     LogDateDraftDeletion(
                         id = deletion.recordKey,
                         deletedAt = requireNotNull(deletion.deletedAt),
+                        serverVersion = deletion.version,
                     )
                 },
             lastTimestamp = metadata.lastTimestamp,

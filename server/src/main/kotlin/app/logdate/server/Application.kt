@@ -5,16 +5,20 @@ import app.logdate.server.config.ProductionConfigValidator
 import app.logdate.server.config.RuntimeProfile
 import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.installServerKoin
+import app.logdate.server.diagnostics.installDiagnosticReportMaintenance
 import app.logdate.server.logging.initializeSentry
+import app.logdate.server.logging.installRequestDiagnostics
 import app.logdate.server.logging.installServerLogging
 import app.logdate.server.routes.accountApiRoutes
 import app.logdate.server.routes.atprotoRoutes
 import app.logdate.server.routes.contentApiRoutes
 import app.logdate.server.routes.serverMetaRoutes
+import app.logdate.server.sync.SyncMetricsRegistry
 import io.ktor.server.application.Application
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.routing.routing
+import org.koin.ktor.ext.inject
 
 private const val HEALTH_TOKEN_ENV = "HEALTH_INTERNAL_TOKEN"
 
@@ -58,10 +62,15 @@ fun Application.module(
     healthInternalToken: String = System.getenv(HEALTH_TOKEN_ENV).orEmpty(),
     releaseVersion: String = System.getenv("RELEASE_VERSION").orEmpty(),
 ) {
+    installRequestDiagnostics { event ->
+        val metrics by inject<SyncMetricsRegistry>()
+        metrics.recordDiagnostic(event)
+    }
     val openApiSpec = installOpenApi()
     installNetworkEdge()
     installServerKoin(isDatabaseAvailable)
     installSyncMaintenance(isDatabaseAvailable)
+    installDiagnosticReportMaintenance()
     installJsonSerialization()
 
     routing {

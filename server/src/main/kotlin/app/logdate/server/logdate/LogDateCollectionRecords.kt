@@ -1,10 +1,14 @@
 package app.logdate.server.logdate
 
 import app.logdate.shared.model.sync.DeviceId
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
@@ -266,6 +270,10 @@ internal fun LogDateDraft.toRepoJson(): JsonObject =
         put(TYPE_FIELD_NAME, LogDateCollectionKind.DRAFT.nsid.toString())
         put("id", id)
         put("content", content)
+        put("blockTypes", JsonArray(blockTypes.map(::JsonPrimitive)))
+        put("journalIds", JsonArray(journalIds.map(::JsonPrimitive)))
+        if (encryptedBlocksVersion != null) put("encryptedBlocksVersion", encryptedBlocksVersion)
+        if (encryptedBlocks != null) put("encryptedBlocks", encryptedBlocks)
         put("createdAt", createdAt)
         put("lastUpdated", lastUpdated)
         put("deviceId", deviceId.value)
@@ -278,12 +286,14 @@ internal fun JsonObject.toLogDateDraft(
     LogDateDraft(
         id = stringValue("id") ?: recordKey.toString(),
         content = stringValue("content").orEmpty(),
-        blockTypes = emptyList(),
-        journalIds = emptyList(),
+        blockTypes = this["blockTypes"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty(),
+        journalIds = this["journalIds"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty(),
         createdAt = longValue("createdAt") ?: 0L,
         lastUpdated = longValue("lastUpdated") ?: 0L,
         version = version,
         deviceId = deviceIdOrDefault(),
+        encryptedBlocksVersion = this["encryptedBlocksVersion"]?.jsonPrimitive?.intOrNull,
+        encryptedBlocks = stringValue("encryptedBlocks"),
     )
 
 internal fun draftToRecord(draft: LogDateDraft): JsonObject = draft.toRepoJson()

@@ -12,6 +12,26 @@ import kotlin.test.assertTrue
 
 class ServerDescriptorConfigTest {
     @Test
+    fun `diagnostic reports use an additive protocol flag without changing known capabilities`() {
+        val identity = AtprotoIdentityConfig()
+        val config = ServerDescriptorConfig(deploymentKind = DeploymentKind.FIRST_PARTY)
+        val baseline = config.toDescriptor(identity, "logdate.app", "LogDate")
+        val enabled = config.toDescriptor(identity, "logdate.app", "LogDate", diagnosticReportsEnabled = true)
+        val selfHosted =
+            ServerDescriptorConfig().toDescriptor(
+                identity,
+                "logdate.app",
+                "LogDate",
+                diagnosticReportsEnabled = true,
+            )
+
+        assertFalse(baseline.hasProtocolFeature(ServerProtocolFeature.DIAGNOSTIC_REPORTS_V1))
+        assertTrue(enabled.hasProtocolFeature(ServerProtocolFeature.DIAGNOSTIC_REPORTS_V1))
+        assertTrue(selfHosted.hasProtocolFeature(ServerProtocolFeature.DIAGNOSTIC_REPORTS_V1))
+        assertEquals(baseline.capabilities, enabled.capabilities)
+    }
+
+    @Test
     fun `first-party environment advertises LogDate Cloud defaults`() {
         val config = ServerDescriptorConfig.fromEnvironment(deploymentKind = "first_party")
 

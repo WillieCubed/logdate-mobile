@@ -15,6 +15,9 @@ private const val HAS_MORE =
         "are cut to `limit` separately but share this one cursor, so when it is `true` a record with a lower version than " +
         "`lastTimestamp` can still be waiting in the list that was cut short. Use a `limit` large enough that pages are " +
         "rarely full, or re-page from your previous cursor rather than from `lastTimestamp` when it is `true`."
+private const val DELETION_VERSION =
+    "The version the server assigned to the deletion. Deletions share one version sequence with changes, so compare it " +
+        "with a record's `serverVersion` to tell whether the record was re-created afterwards."
 private const val IS_DELETED_ALWAYS_FALSE = "Always `false`. Deletions are delivered in the `deletions` list, not here."
 private const val ENCRYPTED_BY_APPS = "The LogDate apps send this encrypted; the server never reads it."
 
@@ -156,7 +159,11 @@ internal object SyncSchemaDocs {
             "ContentDeletion" to
                 SchemaDoc(
                     "A tombstone: an entry that was deleted.",
-                    mapOf("id" to "The deleted entry's ID.", "deletedAt" to "When it was deleted. $EPOCH_MS"),
+                    mapOf(
+                        "id" to "The deleted entry's ID.",
+                        "deletedAt" to "When it was deleted. $EPOCH_MS",
+                        "serverVersion" to DELETION_VERSION,
+                    ),
                 ),
             // ---- Journals -------------------------------------------------------------------------
             "JournalUploadRequest" to
@@ -228,7 +235,11 @@ internal object SyncSchemaDocs {
             "JournalDeletion" to
                 SchemaDoc(
                     "A tombstone: a journal that was deleted.",
-                    mapOf("id" to "The deleted journal's ID.", "deletedAt" to "When it was deleted. $EPOCH_MS"),
+                    mapOf(
+                        "id" to "The deleted journal's ID.",
+                        "deletedAt" to "When it was deleted. $EPOCH_MS",
+                        "serverVersion" to DELETION_VERSION,
+                    ),
                 ),
             // ---- Associations ---------------------------------------------------------------------
             "AssociationUploadRequest" to SchemaDoc("Links to create or refresh in bulk.", mapOf("associations" to "The links.")),
@@ -284,6 +295,7 @@ internal object SyncSchemaDocs {
                         "journalId" to "The journal's ID.",
                         "contentId" to "The entry's ID.",
                         "deletedAt" to "When the link was removed. $EPOCH_MS",
+                        "serverVersion" to DELETION_VERSION,
                     ),
                 ),
             "AssociationDeleteRequest" to
@@ -303,6 +315,13 @@ internal object SyncSchemaDocs {
                         "createdAt" to "When the draft was started on the device. $EPOCH_MS",
                         "lastUpdated" to "When it was last edited on the device. $EPOCH_MS",
                         "deviceId" to DEVICE_ID,
+                        "encryptedBlocksVersion" to
+                            "The format of `encryptedBlocks`: `1`, or `null` for a text-only draft. Send it together with " +
+                            "`encryptedBlocks` or not at all; anything else answers `400 INVALID_DRAFT_FORMAT`.",
+                        "encryptedBlocks" to
+                            "The draft's blocks (text, photos, audio, video) as one `LDSE2:` encrypted value, or `null`. " +
+                            "$ENCRYPTED_BY_APPS Saving a text-only draft over a draft that has blocks answers " +
+                            "`409 DRAFT_FORMAT_UPGRADE_REQUIRED`, so an older app cannot silently drop them.",
                     ),
                 ),
             "DraftUploadResponse" to
@@ -316,10 +335,22 @@ internal object SyncSchemaDocs {
                 ),
             "DraftChangesResponse" to
                 SchemaDoc(
-                    "Drafts changed since a cursor. Unlike the other feeds there is no `hasMore` or `lastTimestamp`; use the highest `serverVersion` in `drafts` as your next `since`.",
+                    "Drafts changed or deleted since a cursor.",
                     mapOf(
-                        "drafts" to "Drafts created or updated after `since`. Deleted drafts are omitted, not flagged.",
+                        "drafts" to "Drafts created or updated after `since`.",
                         "cursor" to "Reserved; currently always absent.",
+                        "deletions" to "Drafts deleted after `since`.",
+                        "lastTimestamp" to CURSOR_LAST_TIMESTAMP,
+                        "hasMore" to HAS_MORE,
+                    ),
+                ),
+            "DraftDeletion" to
+                SchemaDoc(
+                    "A tombstone: a draft that was deleted, usually because it became an entry.",
+                    mapOf(
+                        "id" to "The deleted draft's ID.",
+                        "deletedAt" to "When it was deleted. $EPOCH_MS",
+                        "serverVersion" to SERVER_VERSION_ASSIGNED,
                     ),
                 ),
             "DraftChange" to
@@ -334,7 +365,9 @@ internal object SyncSchemaDocs {
                         "lastUpdated" to "When it was last edited on the device. $EPOCH_MS",
                         "deviceId" to "Which device last saved it.",
                         "serverVersion" to SERVER_VERSION_ASSIGNED,
-                        "is_deleted" to "Always `false` today; deleted drafts are omitted from the feed rather than flagged.",
+                        "encryptedBlocksVersion" to "The format of `encryptedBlocks`: `1`, or `null` for a text-only draft.",
+                        "encryptedBlocks" to "The draft's blocks as one `LDSE2:` encrypted value, or `null`. $ENCRYPTED_BY_APPS",
+                        "is_deleted" to "Always `false`; deleted drafts arrive in `deletions` instead.",
                     ),
                 ),
             // ---- Media ----------------------------------------------------------------------------

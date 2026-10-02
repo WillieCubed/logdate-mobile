@@ -23,6 +23,8 @@ enum class ServerCapability {
 /** Additive protocol flags that old clients can safely ignore. */
 object ServerProtocolFeature {
     const val CANONICAL_OWNER_BINDING_V1 = "canonicalOwnerBindingV1"
+    const val RICH_DRAFTS_V1 = "richDraftsV1"
+    const val DIAGNOSTIC_REPORTS_V1 = "diagnosticReportsV1"
 
     /**
      * The server publishes hosted `did:plc` operations to the PLC directory, so identity changes

@@ -31,7 +31,10 @@ data class ServerClientE2EHarness(
     }
 }
 
-suspend fun <T> withServerClientHarness(block: suspend ServerClientE2EHarness.() -> T): T {
+suspend fun <T> withServerClientHarness(
+    serverPort: Int? = null,
+    block: suspend ServerClientE2EHarness.() -> T,
+): T {
     val json =
         Json {
             prettyPrint = false
@@ -39,7 +42,8 @@ suspend fun <T> withServerClientHarness(block: suspend ServerClientE2EHarness.()
             ignoreUnknownKeys = true
         }
 
-    val port = ServerSocket(0).use { it.localPort }
+    require(serverPort == null || serverPort in 1..65535) { "serverPort must be between 1 and 65535" }
+    val port = serverPort ?: ServerSocket(0).use { it.localPort }
     val host = "127.0.0.1"
     val databaseConfigured = !System.getenv("DATABASE_URL").isNullOrBlank()
     val databaseAvailable = databaseConfigured && initializeDatabase()

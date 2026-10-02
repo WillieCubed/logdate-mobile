@@ -95,7 +95,7 @@ internal fun Route.syncMaintenanceRoutes(
                 var deletedCount = 0
                 toPurge.forEach { backup ->
                     if (!storage.deleteBlob(backup.storagePath)) {
-                        Napier.w("Failed to delete backup blob for ${backup.id} at ${backup.storagePath}")
+                        Napier.w("Backup blob cleanup failed")
                         return@post call.respond(
                             HttpStatusCode.InternalServerError,
                             error("BACKUP_DELETE_FAILED", "Failed to delete backup blob"),

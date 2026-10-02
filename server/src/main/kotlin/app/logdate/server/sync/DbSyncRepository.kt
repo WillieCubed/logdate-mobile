@@ -167,6 +167,7 @@ class DbSyncRepository : SyncRepository {
                     ContentDeletionMarker(
                         row[ContentSyncTable.id],
                         row[ContentSyncTable.deletedAt] ?: row[ContentSyncTable.lastUpdated],
+                        row[ContentSyncTable.serverVersion],
                     )
                 }
             val deletionVersionMax =
@@ -291,6 +292,7 @@ class DbSyncRepository : SyncRepository {
                     JournalDeletionMarker(
                         row[JournalSyncTable.id],
                         row[JournalSyncTable.deletedAt] ?: row[JournalSyncTable.lastUpdated],
+                        row[JournalSyncTable.serverVersion],
                     )
                 }
             val deletionVersionMax =
@@ -416,6 +418,7 @@ class DbSyncRepository : SyncRepository {
                             row[AssociationSyncTable.contentId],
                         ),
                         row[AssociationSyncTable.deletedAt] ?: row[AssociationSyncTable.createdAt],
+                        row[AssociationSyncTable.serverVersion],
                     )
                 }
             val deletionVersionMax =

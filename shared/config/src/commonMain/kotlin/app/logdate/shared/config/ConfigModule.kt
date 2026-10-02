@@ -6,6 +6,6 @@ import org.koin.dsl.module
 val configModule: Module =
     module {
         single<LogDateConfigRepository> {
-            DefaultLogDateConfigRepository()
+            DefaultLogDateConfigRepository(privacyEpoch = getOrNull())
         }
     }

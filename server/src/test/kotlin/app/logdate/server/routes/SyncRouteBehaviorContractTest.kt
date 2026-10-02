@@ -46,7 +46,7 @@ class SyncRouteBehaviorContractTest {
     }
 
     @Test
-    fun `sync metrics prometheus helpers escape label values`() {
+    fun `sync metrics reject private labels and helpers still escape label values`() {
         val registry = SyncMetricsRegistry()
         registry.recordOperation("""sync."media"\test""", durationMs = 10, success = true, bytes = 5)
         val snapshot = registry.snapshot()
@@ -59,7 +59,7 @@ class SyncRouteBehaviorContractTest {
             )
         toPrometheus.isAccessible = true
         val output = toPrometheus.invoke(null, snapshot) as String
-        assertTrue(output.contains("operation=\"sync.\\\"media\\\"\\\\test\""))
+        assertTrue(!output.contains("sync."))
 
         val escape = ktClass.getDeclaredMethod("escapeLabelValue", String::class.java)
         escape.isAccessible = true

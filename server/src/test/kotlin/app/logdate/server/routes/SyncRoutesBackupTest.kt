@@ -165,6 +165,35 @@ class SyncRoutesBackupTest {
         }
 
     @Test
+    fun `backup upload rejects duplicate data fields`() =
+        testApplication {
+            val repository = InMemorySyncRepository()
+            val mockStorage = createBackupStorageMock("unused").storage
+            application {
+                install(ServerContentNegotiation) { json(json) }
+                routing {
+                    route("/api/v1") {
+                        syncRoutes(
+                            tokenService = jwtService,
+                            mediaStorage = mockStorage,
+                            metrics = SyncMetricsRegistry(),
+                            collectionsRepository = repository.asLogDateCollectionsRepository(),
+                            mediaBlobRepository = repository.asLogDateMediaRepository().asLogDateMediaBlobRepository(),
+                            backupRepository = repository.asLogDateBackupRepository(),
+                        )
+                    }
+                }
+            }
+            val response =
+                client.post("/api/v1/backups") {
+                    header(HttpHeaders.Authorization, "Bearer ${jwtService.generateAccessToken(testUserId.toString())}")
+                    setBody(backupUploadMultipartContent("device-1", "{}", byteArrayOf(1), duplicateData = true))
+                }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(repository.listBackups(testUserId).isEmpty())
+        }
+
+    @Test
     fun `backup download returns 503 when storage is not configured`() =
         testApplication {
             val repository = InMemorySyncRepository()

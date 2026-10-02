@@ -36,6 +36,7 @@ import app.logdate.server.database.PostgreSQLAccountIdentityRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
 import app.logdate.server.database.PostgreSQLAtprotoPasswordCredentialRepository
 import app.logdate.server.database.PostgreSQLAtprotoSessionRepository
+import app.logdate.server.database.PostgreSQLDiagnosticReportStore
 import app.logdate.server.database.PostgreSQLHostedPlcOperationRepository
 import app.logdate.server.database.PostgreSQLLogDateAtprotoBlobRepository
 import app.logdate.server.database.PostgreSQLLogDateBackupRepository
@@ -50,6 +51,9 @@ import app.logdate.server.database.PostgreSQLResourceRouteRepository
 import app.logdate.server.database.PostgreSQLRestoreCredentialRepository
 import app.logdate.server.database.PostgreSQLSessionManager
 import app.logdate.server.database.PostgreSQLSigningKeyRepository
+import app.logdate.server.diagnostics.DiagnosticReportAvailability
+import app.logdate.server.diagnostics.DiagnosticReportStore
+import app.logdate.server.diagnostics.InMemoryDiagnosticReportStore
 import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.HostedPlcOperationRepository
@@ -285,6 +289,10 @@ fun serverModule(isDatabaseAvailable: Boolean) =
         }
         single { AtprotoIdentityConfig.fromEnvironment() }
         single { ServerDescriptorConfig.fromEnvironment() }
+        single { DiagnosticReportAvailability.fromEnvironment(isDatabaseAvailable) }
+        single<DiagnosticReportStore> {
+            if (isDatabaseAvailable) PostgreSQLDiagnosticReportStore() else InMemoryDiagnosticReportStore()
+        }
         single {
             OAuthConfig.fromEnvironment(
                 defaultIssuer = get<AtprotoIdentityConfig>().pdsServiceEndpoint,

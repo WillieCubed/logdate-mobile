@@ -62,7 +62,7 @@ internal fun Route.syncMediaRoutes(
 
                 val req = call.receiveMediaMultipartUpload() ?: return@post
                 bytes = req.sizeBytes
-                Napier.d("Media upload for user $userId: ${req.fileName}")
+                Napier.d("Media upload started")
 
                 if (entitlementEnforcer != null) {
                     val quota = entitlementEnforcer.checkMediaUpload(userId, req.sizeBytes)
@@ -88,7 +88,7 @@ internal fun Route.syncMediaRoutes(
                             req.contentId,
                         )
                     }.getOrElse { error ->
-                        Napier.e("Failed to encrypt media payload", error)
+                        Napier.e("Media encryption failed")
                         return@post call.respond(
                             HttpStatusCode.InternalServerError,
                             error("MEDIA_ENCRYPT_FAILED", "Failed to encrypt media payload"),
@@ -109,7 +109,7 @@ internal fun Route.syncMediaRoutes(
                                 ),
                             )
                         }.getOrElse { error ->
-                            Napier.e("Failed to upload media to external storage", error)
+                            Napier.e("Media storage upload failed")
                             return@post call.respond(
                                 HttpStatusCode.InternalServerError,
                                 error("MEDIA_UPLOAD_FAILED", "Failed to store media"),
@@ -143,10 +143,10 @@ internal fun Route.syncMediaRoutes(
                         if (storagePath != null) {
                             runCatching { mediaStorage?.deleteBlob(storagePath) }
                                 .onFailure { deleteError ->
-                                    Napier.w("Failed to roll back media blob $mediaId after metadata write failure", deleteError)
+                                    Napier.w("Media rollback failed")
                                 }
                         }
-                        Napier.e("Failed to persist media metadata", error)
+                        Napier.e("Media metadata persistence failed")
                         return@post call.respond(
                             HttpStatusCode.InternalServerError,
                             error("MEDIA_METADATA_WRITE_FAILED", "Failed to store media metadata"),
@@ -227,7 +227,7 @@ internal fun Route.syncMediaRoutes(
                     runCatching {
                         encryptionService.processMediaDownload(encryptedPayload, shouldDecrypt = true)
                     }.getOrElse { error ->
-                        Napier.e("Failed to decrypt media payload for $mediaId", error)
+                        Napier.e("Media decryption failed")
                         return@get call.respond(
                             HttpStatusCode.InternalServerError,
                             error("MEDIA_DECRYPT_FAILED", "Failed to decrypt media payload"),
@@ -260,7 +260,7 @@ internal fun Route.syncMediaRoutes(
                                     error("MEDIA_STORAGE_UNAVAILABLE", "Media storage not configured"),
                                 )
                         if (!storage.deleteBlob(storagePath)) {
-                            Napier.w("Failed to delete media blob for $mediaId at $storagePath")
+                            Napier.w("Media deletion failed")
                             return@delete call.respond(
                                 HttpStatusCode.InternalServerError,
                                 error("MEDIA_DELETE_FAILED", "Failed to delete media blob"),

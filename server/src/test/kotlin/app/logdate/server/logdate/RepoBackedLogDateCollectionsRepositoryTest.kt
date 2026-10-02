@@ -96,15 +96,22 @@ class RepoBackedLogDateCollectionsRepositoryTest {
             assertNotNull(canonicalRecord)
             assertEquals("hello", canonicalRecord.value.stringValue("content"))
 
-            val deletedAt = changes.lastTimestamp + 1L
+            val deletedAt = changes.lastTimestamp - 1L
             repository.deleteEntry(userId = userId, id = "entry-1", deletedAt = deletedAt)
 
             val deleted = repository.entryChanges(userId = userId, since = stored.version, limit = 20)
+            assertTrue(
+                deleted.deletions.single().serverVersion > stored.version,
+                "Tombstone order must use its authoritative version, not a wall-clock deletion timestamp",
+            )
             val purged = repository.purgeTombstones(userId = userId, olderThan = deletedAt + 1L)
 
             assertNull(repository.getEntry(userId = userId, id = "entry-1"))
             assertTrue(repository.listEntries(userId).isEmpty())
-            assertEquals(listOf(LogDateEntryDeletion(id = "entry-1", deletedAt = deletedAt)), deleted.deletions)
+            assertEquals(
+                listOf(LogDateEntryDeletion(id = "entry-1", deletedAt = deletedAt, serverVersion = deleted.lastTimestamp)),
+                deleted.deletions,
+            )
             assertEquals(1, purged.entryPurged)
         }
 
@@ -334,6 +341,52 @@ class RepoBackedLogDateCollectionsRepositoryTest {
             version = 0L,
             deviceId = DeviceId("device-purge"),
         )
+
+    @Test
+    fun `legacy draft update cannot erase an upgraded draft`() =
+        runTest {
+            val accounts = InMemoryAccountRepository()
+            val identity = identityService(accounts)
+            val account =
+                identity.ensureIdentity(
+                    accounts.save(
+                        Account(
+                            id = Uuid.random(),
+                            username = "draft-owner",
+                            displayName = "Draft owner",
+                            createdAt = Clock.System.now(),
+                        ),
+                    ),
+                )
+            val repository =
+                RepoBackedLogDateCollectionsRepository(
+                    accountRepository = accounts,
+                    identityService = identity,
+                    signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
+                    blockStore = InMemoryRepoBlockStore(),
+                    metadataStore = InMemoryLogDateCollectionsMetadataStore(),
+                )
+            val user = account.id.toJavaUUID()
+            val rich =
+                LogDateDraft(
+                    id = "draft-1",
+                    content = "legacy text",
+                    blockTypes = listOf("TEXT", "IMAGE"),
+                    journalIds = listOf("journal-1"),
+                    createdAt = 1L,
+                    lastUpdated = 2L,
+                    version = 0L,
+                    deviceId = DeviceId("new-client"),
+                    encryptedBlocksVersion = 1,
+                    encryptedBlocks = "LDSE2:blocks",
+                )
+            repository.upsertDraft(user, rich)
+
+            assertFailsWith<DraftFormatUpgradeRequiredException> {
+                repository.upsertDraft(user, rich.copy(encryptedBlocks = null, encryptedBlocksVersion = null, content = "old edit"))
+            }
+            assertEquals(rich.encryptedBlocks, repository.getDraft(user, rich.id)?.encryptedBlocks)
+        }
 
     private fun identityService(accountRepository: InMemoryAccountRepository): AtprotoIdentityService =
         AtprotoIdentityService(

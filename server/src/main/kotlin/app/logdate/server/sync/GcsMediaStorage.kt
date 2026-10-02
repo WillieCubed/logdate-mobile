@@ -3,13 +3,18 @@ package app.logdate.server.sync
 import app.logdate.server.logdate.LogDateBlobNamespace
 import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateBlobWriteRequest
+import app.logdate.server.logdate.copyBackupFile
 import com.google.cloud.storage.BlobId
 import com.google.cloud.storage.BlobInfo
 import com.google.cloud.storage.Storage
 import com.google.cloud.storage.StorageOptions
 import io.github.aakira.napier.Napier
 import java.net.URL
+import java.nio.channels.Channels
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Google Cloud Storage implementation for media file storage.
@@ -26,6 +31,62 @@ class GcsMediaStorage(
             .build()
             .service,
 ) : LogDateBlobStorage {
+    override fun putBlobFile(request: app.logdate.server.logdate.LogDateBlobFileWriteRequest): String {
+        val storagePath =
+            buildStoragePath(
+                LogDateBlobWriteRequest(
+                    request.ownerId,
+                    request.namespace,
+                    request.blobId,
+                    request.fileName,
+                    request.contentType,
+                    ByteArray(0),
+                ),
+            )
+        val blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, storagePath)).setContentType(request.contentType).build()
+        val options = if (kmsKeyName != null) arrayOf(Storage.BlobWriteOption.kmsKeyName(kmsKeyName)) else emptyArray()
+        try {
+            request.checkActive()
+            storage.writer(blobInfo, *options).use { channel ->
+                Channels.newOutputStream(channel).use { destination ->
+                    Files.newInputStream(request.path).buffered().use { source ->
+                        copyBackupFile(source, destination, request.checkActive)
+                    }
+                }
+            }
+            return storagePath
+        } catch (cancellation: CancellationException) {
+            runCatching { storage.delete(BlobId.of(bucketName, storagePath)) }
+            throw cancellation
+        } catch (error: Exception) {
+            runCatching { storage.delete(BlobId.of(bucketName, storagePath)) }
+            throw MediaStorageException("Failed to upload backup")
+        }
+    }
+
+    override fun getBlobFile(
+        storagePath: String,
+        destination: Path,
+        checkActive: () -> Unit,
+    ): Boolean {
+        val blobId = BlobId.of(bucketName, storagePath)
+        checkActive()
+        if (storage.get(blobId) == null) return false
+        try {
+            storage.reader(blobId).use { channel ->
+                Channels.newInputStream(channel).use { source ->
+                    Files.newOutputStream(destination).buffered().use { output ->
+                        copyBackupFile(source, output, checkActive)
+                    }
+                }
+            }
+        } catch (error: Exception) {
+            Files.deleteIfExists(destination)
+            throw error
+        }
+        return true
+    }
+
     /**
      * Upload a LogDate blob into the configured GCS bucket.
      */
@@ -47,10 +108,10 @@ class GcsMediaStorage(
                     emptyArray()
                 }
             storage.create(blobInfo, request.bytes, *options)
-            Napier.d("Uploaded $label to GCS: $storagePath (${request.bytes.size} bytes)")
+            Napier.d("Uploaded $label to GCS")
             return storagePath
         } catch (e: Exception) {
-            Napier.e("Failed to upload $label to GCS: $storagePath", e)
+            Napier.e("Failed to upload $label to GCS")
             throw MediaStorageException("Failed to upload $label", e)
         }
     }
@@ -76,7 +137,7 @@ class GcsMediaStorage(
                 )
             url.toString()
         } catch (e: Exception) {
-            Napier.e("Failed to generate signed URL for: $storagePath", e)
+            Napier.e("Failed to generate signed URL")
             throw MediaStorageException("Failed to generate download URL", e)
         }
     }
@@ -91,7 +152,7 @@ class GcsMediaStorage(
         return try {
             storage.readAllBytes(blobId)
         } catch (e: Exception) {
-            Napier.e("Failed to download blob from GCS: $storagePath", e)
+            Napier.e("Failed to download blob from GCS")
             null
         }
     }
@@ -106,13 +167,13 @@ class GcsMediaStorage(
         return try {
             val deleted = storage.delete(blobId)
             if (deleted) {
-                Napier.d("Deleted blob from GCS: $storagePath")
+                Napier.d("Deleted blob from GCS")
             } else {
-                Napier.w("Blob not found in GCS: $storagePath")
+                Napier.w("Blob not found in GCS")
             }
             deleted
         } catch (e: Exception) {
-            Napier.e("Failed to delete blob from GCS: $storagePath", e)
+            Napier.e("Failed to delete blob from GCS")
             false
         }
     }

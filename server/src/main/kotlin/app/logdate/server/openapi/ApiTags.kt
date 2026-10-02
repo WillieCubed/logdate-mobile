@@ -19,6 +19,7 @@ internal object ApiTags {
     const val SYNC_STATUS = "Sync status"
     const val QUOTA = "Quota"
     const val TRANSCRIPTION = "Transcription"
+    const val DIAGNOSTICS = "Diagnostics"
     const val RESOURCES = "Resources"
     const val OAUTH = "OAuth"
     const val XRPC = "XRPC"
@@ -188,6 +189,17 @@ internal val apiTagGroups: List<ApiTagGroup> =
 
                     Needs an active subscription with the matching entitlement and is limited to
                     {{transcription.sessions}} per account.
+                    """.trimIndent(),
+                ),
+                ApiTag(
+                    ApiTags.DIAGNOSTICS,
+                    """
+                    Sync diagnostic reports a person chose to share from the app. Reports carry only fixed event codes,
+                    counters and random IDs, never journal content or credentials, and only the account that sent a
+                    report can read or delete it.
+
+                    Reporting is off unless the operator switches it on. Check for `diagnosticReportsV1` in
+                    **Describe this server** first; a server without it answers `503 DIAGNOSTIC_REPORTS_UNAVAILABLE`.
                     """.trimIndent(),
                 ),
                 ApiTag(

@@ -43,9 +43,14 @@ or record its response. The harness exits after 30 minutes or when its control d
 1. Build `:integration:server-client-e2e:writeAndroidHistoryHarnessClasspath`.
 2. Launch `app.logdate.integration.e2e.harness.AndroidHistoryHarness` with the classpath in
    `build/android-history-harness.classpath` and a private temporary directory as its sole argument.
-   Wait for the `ready` file. For PostgreSQL validation, pass an isolated database's `DATABASE_URL`,
-   `DATABASE_USER`, `DATABASE_PASSWORD`, and `AUTO_MIGRATE=true` to that process. Database setup fails
-   closed; it cannot silently fall back when a database URL was supplied.
+   Set `ATPROTO_PDS_SERVICE_URL=http://10.0.2.2:18880` so server discovery advertises the same
+   emulator-reachable origin the client uses. Set `ATPROTO_HOSTED_DID_METHOD=web` so fixture
+   account creation does not depend on an external PLC directory. Since OAuth metadata and
+   WebAuthn require HTTPS, also set `ATPROTO_OAUTH_ISSUER=https://logdate.app` and
+   `WEBAUTHN_ORIGIN=https://logdate.app` for this local API-only fixture. Wait for the `ready` file.
+   For PostgreSQL validation, pass an isolated database's `DATABASE_URL`, `DATABASE_USER`,
+   `DATABASE_PASSWORD`, and `AUTO_MIGRATE=true` to that process. Database setup fails closed; it
+   cannot silently fall back when a database URL was supplied.
 3. Run `:app:android-main:flagshipPhoneApi36DebugAndroidTest` with
    `-Plogdate.androidTestClass=app.logdate.client.e2e.EncryptedHistoryInstallationsE2ETest` and
    `-Pandroid.testInstrumentationRunnerArguments.historyPhase=source`.

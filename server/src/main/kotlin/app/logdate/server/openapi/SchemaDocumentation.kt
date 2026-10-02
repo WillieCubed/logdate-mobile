@@ -3,6 +3,7 @@ package app.logdate.server.openapi
 import app.logdate.server.openapi.schemadocs.AtProtoSchemaDocs
 import app.logdate.server.openapi.schemadocs.AuthSchemaDocs
 import app.logdate.server.openapi.schemadocs.CloudSchemaDocs
+import app.logdate.server.openapi.schemadocs.DiagnosticSchemaDocs
 import app.logdate.server.openapi.schemadocs.LocationHistorySchemaDocs
 import app.logdate.server.openapi.schemadocs.SyncSchemaDocs
 import io.swagger.v3.oas.models.OpenAPI
@@ -24,7 +25,8 @@ internal data class SchemaDoc(
  */
 internal object SchemaDocumentation {
     val registry: Map<String, SchemaDoc> =
-        AuthSchemaDocs.docs + SyncSchemaDocs.docs + LocationHistorySchemaDocs.docs + CloudSchemaDocs.docs + AtProtoSchemaDocs.docs
+        AuthSchemaDocs.docs + SyncSchemaDocs.docs + LocationHistorySchemaDocs.docs + CloudSchemaDocs.docs + AtProtoSchemaDocs.docs +
+            DiagnosticSchemaDocs.docs
 }
 
 /**

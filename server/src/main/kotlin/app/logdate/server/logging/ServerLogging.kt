@@ -31,15 +31,7 @@ fun installServerLogging() {
     }
 }
 
-/**
- * Forwards Napier records to SLF4J, which `logback.xml` fans out to stdout and Sentry.
- *
- * A Napier tag selects the logger, so `logback.xml` can raise or lower a single subsystem the
- * same way it already does for `io.netty`. Untagged calls — the overwhelming majority — land on
- * [SERVER_LOG_NAME]. The tag is never derived by walking the stack the way Napier's own
- * `DebugAntilog` does: that costs a stack capture on every call and is fragile under
- * minification.
- */
+/** Only validated events and finite fallback codes reach downstream appenders. */
 internal class Slf4jAntilog : Antilog() {
     override fun performLog(
         priority: LogLevel,
@@ -47,14 +39,15 @@ internal class Slf4jAntilog : Antilog() {
         throwable: Throwable?,
         message: String?,
     ) {
-        val text = message ?: throwable?.message ?: return
-        val logger = LoggerFactory.getLogger(tag?.takeIf(String::isNotBlank) ?: SERVER_LOG_NAME)
+        if (message == null && throwable == null) return
+        val text = safeServerMessage(priority, tag, message)
+        val logger = LoggerFactory.getLogger(SERVER_LOG_NAME)
         when (priority) {
-            LogLevel.VERBOSE -> logger.trace(text, throwable)
-            LogLevel.DEBUG -> logger.debug(text, throwable)
-            LogLevel.INFO -> logger.info(text, throwable)
-            LogLevel.WARNING -> logger.warn(text, throwable)
-            LogLevel.ERROR, LogLevel.ASSERT -> logger.error(text, throwable)
+            LogLevel.VERBOSE -> logger.trace(text)
+            LogLevel.DEBUG -> logger.debug(text)
+            LogLevel.INFO -> logger.info(text)
+            LogLevel.WARNING -> logger.warn(text)
+            LogLevel.ERROR, LogLevel.ASSERT -> logger.error(text)
         }
     }
 }

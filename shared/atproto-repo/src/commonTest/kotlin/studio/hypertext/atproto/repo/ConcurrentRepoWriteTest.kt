@@ -10,6 +10,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.startCoroutine
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 
 /**
@@ -113,6 +114,22 @@ class ConcurrentRepoWriteTest {
                 reachable,
                 "every record written must still be reachable from the head",
             )
+        }
+
+    @Test
+    fun `create if absent rejects a record created during head retry`() =
+        runSuspend {
+            val blockStore = InterleavingBlockStore()
+            val engine = DefaultRepoEngine(blockStore)
+            val id = RepoRecordId(repo, collection, RecordKey.require("draft"))
+            blockStore.onBeforeSwap = {
+                engine.putRecord(id, entry("rich draft")).getOrThrow()
+            }
+
+            val staleCreate = engine.putRecordIfAbsent(id, entry("legacy draft"))
+
+            assertIs<InvalidSwapException>(staleCreate.exceptionOrNull())
+            assertEquals(entry("rich draft"), engine.getRecord(id).getOrThrow()?.value)
         }
 }
 

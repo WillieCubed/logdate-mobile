@@ -22,7 +22,7 @@ object AndroidHistoryHarness {
             require(args.size == 1) { "Supply a private temporary control directory" }
             val control = Path.of(args.single())
             Files.createDirectories(control)
-            withServerClientHarness {
+            withServerClientHarness(serverPort = 18880) {
                 val account = apiClient.createAccountWithSyntheticPasskey("android_history_${Random.nextInt(100000, 999999)}").data
                 val words = DesktopCryptoManager().generateRecoveryPhrase()
                 val fixture =

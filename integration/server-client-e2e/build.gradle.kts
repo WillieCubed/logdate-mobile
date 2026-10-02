@@ -51,3 +51,9 @@ tasks.register("writeAndroidHistoryHarnessClasspath") {
         destination.get().asFile.writeText(harnessClasspath.asPath)
     }
 }
+
+tasks.withType<Test>().configureEach {
+    if (System.getenv("LOGDATE_LARGE_BACKUP_TEST") == "1") {
+        maxHeapSize = "512m"
+    }
+}

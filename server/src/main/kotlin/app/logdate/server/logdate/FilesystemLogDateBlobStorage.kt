@@ -1,9 +1,11 @@
 package app.logdate.server.logdate
 
 import io.github.aakira.napier.Napier
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.readBytes
@@ -14,7 +16,7 @@ import kotlin.io.path.readBytes
  * Files live under `<rootPath>/<namespace>/<ownerId>/<blobId>`. The layout mirrors the GCS object
  * naming the first-party cloud uses so that signed-URL or path-shape assumptions hold everywhere.
  *
- * This is deliberately simple: no retention, no deduplication, no streaming. A small operator
+ * This is deliberately simple: no retention or deduplication. A small operator
  * running this against a local disk gets correct behavior for media and backups without needing
  * to stand up Google Cloud Storage. Larger deployments should still use GCS.
  *
@@ -26,6 +28,45 @@ import kotlin.io.path.readBytes
 class FilesystemLogDateBlobStorage(
     private val rootPath: Path,
 ) : LogDateBlobStorage {
+    override fun putBlobFile(request: LogDateBlobFileWriteRequest): String {
+        val relative = relativePath(request.namespace, request.ownerId.toString(), request.blobId)
+        val absolute = rootPath.resolve(relative)
+        absolute.parent.createDirectories()
+        val pending = Files.createTempFile(absolute.parent, ".logdate-blob-", ".pending")
+        try {
+            Files.newInputStream(request.path).use { source ->
+                Files.newOutputStream(pending).use { destination ->
+                    copyBackupFile(source, destination, request.checkActive)
+                }
+            }
+            try {
+                Files.move(pending, absolute, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(pending, absolute, StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            Files.deleteIfExists(pending)
+        }
+        return relative
+    }
+
+    override fun getBlobFile(
+        storagePath: String,
+        destination: Path,
+        checkActive: () -> Unit,
+    ): Boolean =
+        try {
+            Files.newInputStream(rootPath.resolve(storagePath)).use { source ->
+                Files.newOutputStream(destination).use { output -> copyBackupFile(source, output, checkActive) }
+            }
+            true
+        } catch (_: NoSuchFileException) {
+            false
+        } catch (error: Exception) {
+            Files.deleteIfExists(destination)
+            throw error
+        }
+
     init {
         rootPath.createDirectories()
     }
@@ -44,7 +85,7 @@ class FilesystemLogDateBlobStorage(
         } catch (_: NoSuchFileException) {
             null
         } catch (e: Exception) {
-            Napier.w("Filesystem blob read failed at $storagePath", e)
+            Napier.w("Filesystem blob read failed")
             null
         }
 
@@ -52,7 +93,7 @@ class FilesystemLogDateBlobStorage(
         try {
             rootPath.resolve(storagePath).deleteIfExists()
         } catch (e: Exception) {
-            Napier.w("Filesystem blob delete failed at $storagePath", e)
+            Napier.w("Filesystem blob delete failed")
             false
         }
 
@@ -75,7 +116,7 @@ class FilesystemLogDateBlobStorage(
                 try {
                     Path.of(raw)
                 } catch (e: Exception) {
-                    Napier.w("Invalid $ENV_VAR path: $raw", e)
+                    Napier.w("Invalid $ENV_VAR path")
                     return null
                 }
             return FilesystemLogDateBlobStorage(rebuiltPath)

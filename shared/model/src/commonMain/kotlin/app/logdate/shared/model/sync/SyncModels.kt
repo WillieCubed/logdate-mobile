@@ -144,6 +144,7 @@ data class ContentChange(
 data class ContentDeletion(
     val id: String,
     val deletedAt: Long,
+    val serverVersion: Long = deletedAt,
 )
 
 @Serializable
@@ -204,6 +205,7 @@ data class JournalChange(
 data class JournalDeletion(
     val id: String,
     val deletedAt: Long,
+    val serverVersion: Long = deletedAt,
 )
 
 @Serializable
@@ -250,6 +252,7 @@ data class AssociationDeletion(
     val journalId: String,
     val contentId: String,
     val deletedAt: Long,
+    val serverVersion: Long = deletedAt,
 )
 
 @Serializable
@@ -344,6 +347,8 @@ data class DraftUploadRequest(
     val createdAt: Long,
     val lastUpdated: Long,
     val deviceId: DeviceId = DeviceId.UNKNOWN,
+    val encryptedBlocksVersion: Int? = null,
+    val encryptedBlocks: String? = null,
 )
 
 @Serializable
@@ -357,6 +362,16 @@ data class DraftUploadResponse(
 data class DraftChangesResponse(
     val drafts: List<DraftChange>,
     val cursor: VersionConstraint? = null,
+    val deletions: List<DraftDeletion> = emptyList(),
+    val lastTimestamp: Long = 0L,
+    val hasMore: Boolean = false,
+)
+
+@Serializable
+data class DraftDeletion(
+    val id: String,
+    val deletedAt: Long,
+    val serverVersion: Long,
 )
 
 @Serializable
@@ -369,6 +384,8 @@ data class DraftChange(
     val lastUpdated: Long,
     val deviceId: DeviceId,
     val serverVersion: Long,
+    val encryptedBlocksVersion: Int? = null,
+    val encryptedBlocks: String? = null,
     @SerialName("is_deleted")
     val isDeleted: Boolean = false,
 )

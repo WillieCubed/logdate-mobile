@@ -1,6 +1,7 @@
 package app.logdate.server.routes.sync
 
 import app.logdate.server.auth.TokenService
+import app.logdate.server.logdate.DraftFormatUpgradeRequiredException
 import app.logdate.server.logdate.LogDateAssociation
 import app.logdate.server.logdate.LogDateAssociationRef
 import app.logdate.server.logdate.LogDateCollectionsRepository
@@ -26,6 +27,7 @@ import app.logdate.shared.model.sync.ContentUploadResponse
 import app.logdate.shared.model.sync.DeviceId
 import app.logdate.shared.model.sync.DraftChange
 import app.logdate.shared.model.sync.DraftChangesResponse
+import app.logdate.shared.model.sync.DraftDeletion
 import app.logdate.shared.model.sync.DraftUploadRequest
 import app.logdate.shared.model.sync.DraftUploadResponse
 import app.logdate.shared.model.sync.JournalChangesResponse
@@ -86,7 +88,7 @@ private fun Route.contentRoutes(
                     )
                 }
                 val wasCreated = !collectionsRepository.entryExists(userId, contentId)
-                Napier.d("Content upsert for user $userId: $contentId")
+                Napier.d("Content upsert completed")
                 val stored =
                     collectionsRepository.upsertEntry(
                         userId = userId,
@@ -133,7 +135,14 @@ private fun Route.contentRoutes(
                 val pageSize = call.resolvePageSize()
                 val changeSet = collectionsRepository.entryChanges(userId, since, pageSize)
                 val changes = changeSet.changes.map(LogDateEntry::toContentChange)
-                val deletions = changeSet.deletions.map { ContentDeletion(id = it.id, deletedAt = it.deletedAt) }
+                val deletions =
+                    changeSet.deletions.map {
+                        ContentDeletion(
+                            id = it.id,
+                            deletedAt = it.deletedAt,
+                            serverVersion = it.serverVersion,
+                        )
+                    }
                 call.respond(ContentChangesResponse(changes, deletions, changeSet.lastTimestamp, changeSet.hasMore))
                 success = true
             } finally {
@@ -234,7 +243,7 @@ private fun Route.journalRoutes(
                     )
                 }
                 val wasCreated = !collectionsRepository.journalExists(userId, journalId)
-                Napier.d("Journal upsert for user $userId: $journalId")
+                Napier.d("Journal upsert completed")
                 val stored =
                     collectionsRepository.upsertJournal(
                         userId = userId,
@@ -271,7 +280,14 @@ private fun Route.journalRoutes(
                 val pageSize = call.resolvePageSize()
                 val changeSet = collectionsRepository.journalChanges(userId, since, pageSize)
                 val changes = changeSet.changes.map(LogDateJournal::toJournalChange)
-                val deletions = changeSet.deletions.map { JournalDeletion(id = it.id, deletedAt = it.deletedAt) }
+                val deletions =
+                    changeSet.deletions.map {
+                        JournalDeletion(
+                            id = it.id,
+                            deletedAt = it.deletedAt,
+                            serverVersion = it.serverVersion,
+                        )
+                    }
                 call.respond(JournalChangesResponse(changes, deletions, changeSet.lastTimestamp, changeSet.hasMore))
                 success = true
             } finally {
@@ -397,6 +413,7 @@ private fun Route.associationRoutes(
                             journalId = it.association.journalId,
                             contentId = it.association.entryId,
                             deletedAt = it.deletedAt,
+                            serverVersion = it.serverVersion,
                         )
                     }
                 call.respond(AssociationChangesResponse(changes, deletions, changeSet.lastTimestamp, changeSet.hasMore))
@@ -482,21 +499,39 @@ private fun Route.draftRoutes(
             val userId = extractUserId(call, tokenService) ?: return@put
             val draftId = call.requiredPathParam("draftId")
             val req = call.receive<DraftUploadRequest>()
+            val encryptedBlocks = req.encryptedBlocks
+            if ((req.encryptedBlocksVersion == null) != (req.encryptedBlocks == null) ||
+                (req.encryptedBlocksVersion != null && req.encryptedBlocksVersion != 1) ||
+                (encryptedBlocks != null && !encryptedBlocks.startsWith("LDSE2:"))
+            ) {
+                call.respond(HttpStatusCode.BadRequest, error("INVALID_DRAFT_FORMAT", "Unsupported draft format"))
+                return@put
+            }
             val stored =
-                collectionsRepository.upsertDraft(
-                    userId = userId,
-                    draft =
-                        LogDateDraft(
-                            id = draftId,
-                            content = req.content,
-                            blockTypes = req.blockTypes,
-                            journalIds = req.journalIds,
-                            createdAt = req.createdAt,
-                            lastUpdated = req.lastUpdated,
-                            version = 0L,
-                            deviceId = req.deviceId,
-                        ),
-                )
+                try {
+                    collectionsRepository.upsertDraft(
+                        userId = userId,
+                        draft =
+                            LogDateDraft(
+                                id = draftId,
+                                content = req.content,
+                                blockTypes = req.blockTypes,
+                                journalIds = req.journalIds,
+                                createdAt = req.createdAt,
+                                lastUpdated = req.lastUpdated,
+                                version = 0L,
+                                deviceId = req.deviceId,
+                                encryptedBlocksVersion = req.encryptedBlocksVersion,
+                                encryptedBlocks = req.encryptedBlocks,
+                            ),
+                    )
+                } catch (_: DraftFormatUpgradeRequiredException) {
+                    call.respond(
+                        HttpStatusCode.Conflict,
+                        error("DRAFT_FORMAT_UPGRADE_REQUIRED", "Upgrade this client before editing this draft"),
+                    )
+                    return@put
+                }
             call.respond(
                 HttpStatusCode.OK,
                 DraftUploadResponse(
@@ -525,8 +560,16 @@ private fun Route.draftRoutes(
                                 lastUpdated = draft.lastUpdated,
                                 deviceId = draft.deviceId,
                                 serverVersion = draft.version,
+                                encryptedBlocksVersion = draft.encryptedBlocksVersion,
+                                encryptedBlocks = draft.encryptedBlocks,
                             )
                         },
+                    deletions =
+                        changeSet.deletions.map {
+                            DraftDeletion(it.id, it.deletedAt, it.serverVersion)
+                        },
+                    lastTimestamp = changeSet.lastTimestamp,
+                    hasMore = changeSet.hasMore,
                 ),
             )
         }

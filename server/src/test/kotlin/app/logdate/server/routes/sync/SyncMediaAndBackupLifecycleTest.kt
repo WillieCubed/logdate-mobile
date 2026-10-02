@@ -62,7 +62,7 @@ class SyncMediaAndBackupLifecycleTest {
             every {
                 storage.putBlob(match { it.namespace == LogDateBlobNamespace.MEDIA })
             } throws IllegalStateException("media-upload-fail")
-            every { storage.putBlob(match { it.namespace == LogDateBlobNamespace.BACKUP }) } returns "users/u/backups/b.enc"
+            every { storage.putBlobFile(match { it.namespace == LogDateBlobNamespace.BACKUP }) } returns "users/u/backups/b.enc"
             every { storage.getBlob(any()) } returns null
             every { storage.deleteBlob(any()) } returns true
             every { storage.getSignedDownloadUrl(any(), any()) } returns "https://signed.example/object"
@@ -136,7 +136,7 @@ class SyncMediaAndBackupLifecycleTest {
             val backupPath = "users/u/backups/backup-rollback.enc"
 
             every { storage.putBlob(match { it.namespace == LogDateBlobNamespace.MEDIA }) } returns mediaPath
-            every { storage.putBlob(match { it.namespace == LogDateBlobNamespace.BACKUP }) } returns backupPath
+            every { storage.putBlobFile(match { it.namespace == LogDateBlobNamespace.BACKUP }) } returns backupPath
             every { storage.deleteBlob(mediaPath) } returns true
             every { storage.deleteBlob(backupPath) } returns true
             every { storage.getBlob(any()) } returns null
@@ -212,10 +212,11 @@ class SyncMediaAndBackupLifecycleTest {
             val auth = "Bearer ${tokenService.generateAccessToken(userId.toString())}"
 
             every { encryptionService.processMediaUpload(any(), any(), any(), any()) } throws IllegalStateException("enc media")
-            every { encryptionService.processBackupUpload(any(), any(), any()) } throws IllegalStateException("enc backup")
+            every { encryptionService.processBackupUpload(any(), any(), any(), any(), any()) } throws
+                IllegalStateException("enc backup")
             every { encryptionService.processMediaDownload(any(), any()) } answers { firstArg() }
             every { encryptionService.processBackupDownload(any(), any()) } answers { firstArg() }
-            every { storage.putBlob(match { it.namespace == LogDateBlobNamespace.BACKUP }) } returns "users/u/backups/b.enc"
+            every { storage.putBlobFile(match { it.namespace == LogDateBlobNamespace.BACKUP }) } returns "users/u/backups/b.enc"
             every { storage.getSignedDownloadUrl(any(), any()) } returns "https://signed.example/object"
 
             application {
