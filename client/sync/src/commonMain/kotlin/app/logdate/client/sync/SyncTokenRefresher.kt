@@ -1,6 +1,7 @@
 package app.logdate.client.sync
 
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.networking.PasskeyApiErrorCodes
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.shared.model.CloudAccountRepository
 import io.github.aakira.napier.Napier
@@ -45,8 +46,19 @@ internal class SyncTokenRefresher(
         Napier.i("Token expired (401) during $operationName, attempting refresh")
         val refreshResult = cloudAccountRepository.refreshAccessToken(currentSession.refreshToken)
         if (refreshResult.isFailure) {
-            Napier.e("Token refresh failed: ${refreshResult.exceptionOrNull()}")
-            return initialResult // Return original error if refresh fails
+            val refreshError = refreshResult.exceptionOrNull()
+            Napier.e("Token refresh failed", refreshError)
+            // Settings observes this same session. A refused refresh token must stop looking
+            // signed in, while an outage must preserve credentials for the next attempt.
+            if (refreshError is CloudApiException &&
+                refreshError.statusCode == 401 &&
+                refreshError.errorCode in
+                setOf(PasskeyApiErrorCodes.INVALID_REFRESH_TOKEN, PasskeyApiErrorCodes.REFRESH_TOKEN_REVOKED) &&
+                sessionStorage.getSession() == currentSession
+            ) {
+                sessionStorage.clearSession()
+            }
+            return Result.failure(refreshError!!)
         }
 
         // Refresh succeeded, retry operation with new token
@@ -55,6 +67,9 @@ internal class SyncTokenRefresher(
             Napier.w("Token refresh succeeded but returned null")
             return initialResult
         }
+
+        // A sign-out or a new sign-in may finish while the refresh request is in flight.
+        if (sessionStorage.getSession() != currentSession) return initialResult
 
         // Keep the refreshed token. The account repository persists it under its own storage key,
         // which the session storage never reads, so without this the session keeps handing out the
