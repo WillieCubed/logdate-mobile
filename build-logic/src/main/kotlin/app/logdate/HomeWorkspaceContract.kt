@@ -1,7 +1,8 @@
 package app.logdate
 
+import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
-import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
+import org.jetbrains.kotlin.cli.jvm.compiler.legacy.pipeline.createProjectEnvironment
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil
@@ -22,10 +23,11 @@ object HomeWorkspaceContract {
         val disposable = Disposer.newDisposable()
         try {
             val environment =
-                KotlinCoreEnvironment.createForProduction(
-                    disposable,
+                createProjectEnvironment(
                     CompilerConfiguration(),
+                    disposable,
                     EnvironmentConfigFiles.JVM_CONFIG_FILES,
+                    MessageCollector.NONE,
                 )
             val file = KtPsiFactory(environment.project).createFile(source)
             val aliases =

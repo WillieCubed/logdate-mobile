@@ -1,6 +1,7 @@
 @file:Suppress("UnstableApiUsage")
 
 import com.android.build.api.dsl.ApplicationExtension
+import com.android.build.api.variant.ResValue
 import java.util.Properties
 import java.util.zip.ZipFile
 
@@ -203,14 +204,6 @@ extensions.configure<ApplicationExtension> {
         )
     defaultConfig {
         applicationId = baseApplicationId
-        // The account type res/xml/authenticator.xml declares. AndroidAccountManager derives the
-        // same value from the installed package name, so the two cannot drift apart. This is the
-        // unsuffixed default; the debug build type overrides it to match its own package.
-        resValue("string", "logdate_account_type", "$baseApplicationId.account")
-        // res/xml files are not subject to ${applicationId} manifest placeholder substitution,
-        // so the static launcher shortcut reads its target package from here instead. A shortcut
-        // naming a package that is not installed simply fails to launch, silently.
-        resValue("string", "logdate_application_id", baseApplicationId)
         // Maps and Places use a dedicated Android-restricted credential. Never fall back to the
         // general Firebase API key generated from google-services.json.
         resValue("string", "google_maps_api_key", resolvedGoogleMapsApiKey)
@@ -254,17 +247,6 @@ extensions.configure<ApplicationExtension> {
         getByName("debug") {
             applicationIdSuffix = debugApplicationIdSuffix
             versionNameSuffix = "-debug"
-            // defaultConfig builds this from the unsuffixed id, and a buildType suffix is applied
-            // too late to be visible there. AndroidAccountManager derives the same string from
-            // context.packageName, which does include the suffix, and authenticator.xml notes that
-            // a mismatch fails addAccountExplicitly with a SecurityException rather than anything
-            // clearer -- so the two have to be restated together here.
-            resValue(
-                "string",
-                "logdate_account_type",
-                "$baseApplicationId$debugApplicationIdSuffix.account",
-            )
-            resValue("string", "logdate_application_id", "$baseApplicationId$debugApplicationIdSuffix")
             enableUnitTestCoverage = true
             // Local managed-device runs can disable instrumentation coverage to
             // reduce emulator memory pressure while keeping CI coverage enabled.
@@ -312,11 +294,9 @@ extensions.configure<ApplicationExtension> {
             matchingFallbacks += listOf("debug")
             // initWith copies debug's applicationIdSuffix, which would rename dogfood and break the
             // Digital Asset Links match this build type exists for -- silently, with no build
-            // error. Reset both, and restore the unsuffixed account type debug overrode.
+            // error. Reset both to preserve the production identity.
             applicationIdSuffix = null
             versionNameSuffix = null
-            resValue("string", "logdate_account_type", "$baseApplicationId.account")
-            resValue("string", "logdate_application_id", baseApplicationId)
             // Signed with the upload key (already trusted for logdate.app's Digital Asset
             // Links) instead of the per-machine debug keystore, so passkey sign-in against
             // production works on a locally-built, fully debuggable install. Falls back to
@@ -383,6 +363,21 @@ extensions.configure<ApplicationExtension> {
         unitTests.all {
             it.maxHeapSize = "4g"
         }
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        // XML resources do not expand manifest placeholders. Account authentication and launcher
+        // shortcuts must use the final package, including any variant suffix or legacy override.
+        variant.resValues.put(
+            variant.makeResValueKey("string", "logdate_account_type"),
+            variant.applicationId.map { ResValue("$it.account") },
+        )
+        variant.resValues.put(
+            variant.makeResValueKey("string", "logdate_application_id"),
+            variant.applicationId.map { ResValue(it) },
+        )
     }
 }
 
