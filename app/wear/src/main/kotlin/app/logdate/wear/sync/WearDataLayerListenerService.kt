@@ -2,6 +2,7 @@ package app.logdate.wear.sync
 
 import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.SyncableJournalContentRepository
@@ -27,6 +28,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * Receives data items from the paired phone via the Wear Data Layer API.
@@ -157,10 +159,14 @@ class WearDataLayerListenerService : WearableListenerService() {
 
         Napier.d("Received delete signal for note: $noteId")
         try {
+            val mediaRef = (notesRepository.getNoteById(noteId) as? JournalNote.Audio)?.mediaRef
             if (notesRepository is SyncableJournalNotesRepository) {
                 notesRepository.deleteFromSync(noteId)
             } else {
                 notesRepository.removeById(noteId)
+            }
+            if (notesRepository.getNoteById(noteId) == null) {
+                deleteLocalAudio(mediaRef, File(filesDir, "audio_notes"))
             }
         } catch (e: Exception) {
             Napier.w("Failed to delete synced note: $noteId", e)
