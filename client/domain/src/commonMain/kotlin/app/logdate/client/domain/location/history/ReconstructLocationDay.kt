@@ -19,8 +19,7 @@ import kotlin.math.sqrt
  * stopped recording for longer than [HistoryReconstructionParameters.maximumGap]; those cuts are
  * shown as gaps rather than guessed across. Within each recorded stretch, [SegmentAssembler]
  * separates the time someone stayed put from the time they travelled, tolerating the position noise
- * real phones produce. Fixes without a reported accuracy only shape a stretch that has no
- * precise fixes at all.
+ * real phones produce. Fixes without a reported accuracy only shape a stretch made mostly of them.
  *
  * Item identity comes from evidence: a visit or journey is named after its first precise sample, so
  * the same recordings always produce the same ids, and edits keyed to a sample keep finding it.
@@ -54,11 +53,18 @@ class ReconstructLocationDay(
         }
     }
 
-    /** Unrated fixes only shape a stretch when nothing more precise was recorded during it. */
+    /**
+     * Unrated fixes are left out of a stretch that mostly reported its accuracy, where they are the
+     * odd coarse capture. When most of a stretch is unrated (recordings from before accuracy was
+     * kept), they are the best evidence there is.
+     */
     private fun usableSamples(
         segment: List<LocationObservation>,
         preciseIds: Set<String>,
-    ): Set<String> = if (segment.any { it.id in preciseIds }) preciseIds else preciseSamples(segment, parameters, acceptUnrated = true)
+    ): Set<String> {
+        val rated = segment.count { it.accuracyMeters != null }
+        return if (rated * 2 > segment.size) preciseIds else preciseSamples(segment, parameters, acceptUnrated = true)
+    }
 
     private fun splitAtGaps(source: List<LocationObservation>): List<List<LocationObservation>> {
         val segments = mutableListOf<MutableList<LocationObservation>>()

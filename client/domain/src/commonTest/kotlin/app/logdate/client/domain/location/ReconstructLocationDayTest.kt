@@ -171,6 +171,15 @@ class ReconstructLocationDayTest {
     }
 
     @Test
+    fun `unrated fixes shape a recording when they make up most of it`() {
+        val unrated = (stayAt(0.0, 0.minutes, 30.minutes) + stayAt(2_000.0, 40.minutes, 70.minutes)).map { it.copy(accuracyMeters = null) }
+        val rated = listOf(sample("rated", 15.minutes, accuracy = 20f))
+        val visits = reconstruct(unrated + rated).filterIsInstance<PlaceVisit>()
+        assertEquals(2, visits.size)
+        assertTrue(visits.all { it.confirmedStay })
+    }
+
+    @Test
     fun `a brief drift away is absorbed into the stay`() {
         val samples =
             stayAt(0.0, 0.minutes, 40.minutes).map {
