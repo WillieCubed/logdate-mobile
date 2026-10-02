@@ -1,5 +1,6 @@
 package app.logdate.wear.presentation.onboarding
 
+import android.Manifest
 import org.junit.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -48,5 +49,25 @@ class OnboardingPermissionsUiStateTest {
         assertTrue(state.allRequiredGranted)
         assertFalse(state.showAllowButton)
         assertFalse(state.showSkipLocationButton)
+    }
+
+    @Test
+    fun `permission request covers mic and location on every supported release`() {
+        val request = onboardingPermissionRequest(sdkInt = 31).toSet()
+
+        assertTrue(Manifest.permission.RECORD_AUDIO in request)
+        assertTrue(Manifest.permission.ACCESS_FINE_LOCATION in request)
+        assertTrue(Manifest.permission.ACCESS_COARSE_LOCATION in request)
+    }
+
+    @Test
+    fun `permission request asks for notifications where the system gates them`() {
+        assertTrue(Manifest.permission.POST_NOTIFICATIONS in onboardingPermissionRequest(sdkInt = 33))
+        assertTrue(Manifest.permission.POST_NOTIFICATIONS in onboardingPermissionRequest(sdkInt = 36))
+    }
+
+    @Test
+    fun `permission request leaves out notifications before the system gates them`() {
+        assertFalse(Manifest.permission.POST_NOTIFICATIONS in onboardingPermissionRequest(sdkInt = 32))
     }
 }

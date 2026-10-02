@@ -1,5 +1,8 @@
 package app.logdate.wear.presentation.onboarding
 
+import android.Manifest
+import android.os.Build
+
 /**
  * Pure UI state for the onboarding permissions page.
  *
@@ -26,3 +29,17 @@ internal data class OnboardingPermissionsUiState(
      */
     val showSkipLocationButton: Boolean get() = micGranted && !locationGranted
 }
+
+/**
+ * The permissions the onboarding Allow button asks for in one prompt sequence.
+ *
+ * Notifications are included from Android 13, where the system hides the recording notification
+ * until the user allows them. Neither notifications nor location gate onboarding.
+ */
+internal fun onboardingPermissionRequest(sdkInt: Int = Build.VERSION.SDK_INT): Array<String> =
+    buildList {
+        add(Manifest.permission.RECORD_AUDIO)
+        add(Manifest.permission.ACCESS_FINE_LOCATION)
+        add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (sdkInt >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
+    }.toTypedArray()

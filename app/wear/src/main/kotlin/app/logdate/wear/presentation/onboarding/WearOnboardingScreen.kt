@@ -281,13 +281,7 @@ private fun PermissionsPage(onNext: () -> Unit) {
                     item {
                         Button(
                             onClick = {
-                                permissionLauncher.launch(
-                                    arrayOf(
-                                        Manifest.permission.RECORD_AUDIO,
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION,
-                                    ),
-                                )
+                                permissionLauncher.launch(onboardingPermissionRequest())
                             },
                             label = { Text(stringResource(R.string.wear_onboarding_permissions_allow)) },
                             modifier =
