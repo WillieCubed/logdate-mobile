@@ -158,6 +158,95 @@ class FileWatchAudioStoreTest {
             assertFalse(store.isDeleted(Uuid.random()))
         }
 
+    @Test
+    fun `a new transfer clears staging files an earlier transfer abandoned`() =
+        runTest {
+            val abandoned = stagingFile(Uuid.random(), ageMillis = TWO_HOURS)
+
+            store.writeAudio(noteId, ByteArrayInputStream(byteArrayOf(1)))
+
+            assertFalse(abandoned.exists())
+        }
+
+    @Test
+    fun `a new transfer leaves a staging file that is still being written`() =
+        runTest {
+            val inProgress = stagingFile(Uuid.random(), ageMillis = FIVE_MINUTES)
+
+            store.writeAudio(noteId, ByteArrayInputStream(byteArrayOf(1)))
+
+            assertTrue(inProgress.exists())
+        }
+
+    @Test
+    fun `clearing staging files never touches stored audio`() =
+        runTest {
+            val other = Uuid.random()
+            store.writeAudio(other, ByteArrayInputStream(byteArrayOf(7)))
+            File(store.audioPath(other)).setLastModified(System.currentTimeMillis() - TWO_HOURS)
+
+            store.writeAudio(noteId, ByteArrayInputStream(byteArrayOf(1)))
+
+            assertTrue(store.hasAudio(other))
+        }
+
+    @Test
+    fun `stashing metadata clears metadata whose audio never arrived`() =
+        runTest {
+            val stale = Uuid.random()
+            store.stashMetadata(stale, mapOf("uid" to stale.toString()))
+            metadataFile(stale).setLastModified(System.currentTimeMillis() - EIGHT_DAYS)
+
+            store.stashMetadata(noteId, mapOf("uid" to noteId.toString()))
+
+            assertNull(store.stashedMetadata(stale))
+            assertEquals(mapOf("uid" to noteId.toString()), store.stashedMetadata(noteId))
+        }
+
+    @Test
+    fun `stashing metadata leaves recent metadata for other notes`() =
+        runTest {
+            val recent = Uuid.random()
+            store.stashMetadata(recent, mapOf("uid" to recent.toString()))
+            metadataFile(recent).setLastModified(System.currentTimeMillis() - ONE_DAY)
+
+            store.stashMetadata(noteId, mapOf("uid" to noteId.toString()))
+
+            assertEquals(mapOf("uid" to recent.toString()), store.stashedMetadata(recent))
+        }
+
+    @Test
+    fun `clearing stale metadata keeps old deletion markers`() =
+        runTest {
+            val deleted = Uuid.random()
+            store.markDeleted(deleted)
+            File(incomingDirectory, "$deleted.deleted").setLastModified(System.currentTimeMillis() - EIGHT_DAYS)
+
+            store.stashMetadata(noteId, mapOf("uid" to noteId.toString()))
+
+            assertTrue(store.isDeleted(deleted))
+        }
+
+    private fun stagingFile(
+        id: Uuid,
+        ageMillis: Long,
+    ): File {
+        audioDirectory.mkdirs()
+        return File(audioDirectory, "wear_$id.m4a.part").apply {
+            writeBytes(byteArrayOf(1, 2))
+            setLastModified(System.currentTimeMillis() - ageMillis)
+        }
+    }
+
+    private fun metadataFile(id: Uuid): File = File(incomingDirectory, "$id.json")
+
+    private companion object {
+        const val FIVE_MINUTES = 5 * 60 * 1000L
+        const val TWO_HOURS = 2 * 60 * 60 * 1000L
+        const val ONE_DAY = 24 * 60 * 60 * 1000L
+        const val EIGHT_DAYS = 8 * ONE_DAY
+    }
+
     private class FailingStream(
         private val prefix: ByteArray,
     ) : InputStream() {
