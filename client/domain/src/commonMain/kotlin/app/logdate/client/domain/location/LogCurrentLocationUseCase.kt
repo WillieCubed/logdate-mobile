@@ -30,19 +30,22 @@ class LogCurrentLocationUseCase(
         when (request) {
             is LocationLogRequest.LogLocation -> {
                 try {
-                    val location = locationProvider.getCurrentLocation()
-                    val now = Clock.System.now()
+                    val fix = locationProvider.getCurrentFix()
                     val record =
                         LocationLogRecord(
                             userId = canonicalOwnerProvider.getCanonicalOwnerId(),
                             deviceId = deviceIdProvider.getDeviceId().value.toString(),
-                            timestamp = now,
-                            loggedAt = now,
-                            location = location,
+                            timestamp = fix.observedAt,
+                            loggedAt = Clock.System.now(),
+                            location = fix.location,
                             confidence = 1.0f,
                             isGenuine = true,
                             capturePipeline = request.capturePipeline,
                             captureSource = request.captureSource,
+                            accuracyMeters = fix.accuracyMeters,
+                            speedMetersPerSecond = fix.speedMetersPerSecond,
+                            bearingDegrees = fix.bearingDegrees,
+                            isMock = fix.isMock,
                         )
                     val result =
                         locationHistoryRepository.logLocation(record)

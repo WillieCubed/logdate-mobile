@@ -32,14 +32,10 @@ class ScheduledLocationTrackerWorker(
         Napier.i("ScheduledLocationTrackerWorker: Starting scheduled location tracking")
 
         try {
-            // Request a fresh location update
-            locationProvider.refreshLocation()
-
-            // Try to get current location with timeout
             try {
-                val location =
+                val fix =
                     withTimeout(30.seconds) {
-                        locationProvider.getCurrentLocation()
+                        locationProvider.getCurrentFix()
                     }
                 val settings = settingsRepository.getSettings()
                 val pipeline =
@@ -49,14 +45,16 @@ class ScheduledLocationTrackerWorker(
                         LocationCapturePipeline.LEGACY
                     }
 
-                Napier.i("ScheduledLocationTrackerWorker: Got location: $location")
+                Napier.i("ScheduledLocationTrackerWorker: Got location accurate to ${fix.accuracyMeters} m")
                 locationTracker.logLocation(
-                    location = location,
+                    location = fix.location,
+                    timestamp = fix.observedAt,
                     metadata =
-                        mapOf(
-                            "capturePipeline" to pipeline,
-                            "captureSource" to LocationCaptureSource.BACKGROUND_PERIODIC,
-                        ),
+                        fix.evidence() +
+                            mapOf(
+                                "capturePipeline" to pipeline,
+                                "captureSource" to LocationCaptureSource.BACKGROUND_PERIODIC,
+                            ),
                 )
                 return Result.success()
             } catch (e: Exception) {

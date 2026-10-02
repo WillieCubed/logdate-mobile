@@ -2,6 +2,7 @@ package app.logdate.client.location
 
 import app.logdate.shared.model.Location
 import kotlinx.coroutines.flow.SharedFlow
+import kotlin.time.Clock
 
 /**
  * A provider that provides the current location of the client.
@@ -23,6 +24,13 @@ interface ClientLocationProvider {
      * Gets the current location of the client.
      */
     suspend fun getCurrentLocation(): Location
+
+    /**
+     * Gets the current location along with how precise it is and when it was taken. Location
+     * history needs both to tell a real move from measurement noise. Providers that only know a
+     * position report it as taken now, with unknown accuracy.
+     */
+    suspend fun getCurrentFix(): LocationFix = LocationFix(getCurrentLocation(), Clock.System.now())
 
     /**
      * Forcibly updates the location of the client.

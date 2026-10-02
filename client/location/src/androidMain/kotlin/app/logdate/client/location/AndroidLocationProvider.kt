@@ -2,6 +2,8 @@ package app.logdate.client.location
 
 import android.content.Context
 import android.os.Looper
+import androidx.core.location.LocationCompat
+import app.logdate.client.location.tracking.observedAt
 import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.Location
 import app.logdate.shared.model.LocationAltitude
@@ -22,6 +24,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.time.Clock
 import android.location.Location as AndroidLocation
 
 /**
@@ -56,7 +59,9 @@ class AndroidLocationProvider(
         tryEmitLastKnownLocation()
     }
 
-    override suspend fun getCurrentLocation(): Location {
+    override suspend fun getCurrentLocation(): Location = getCurrentFix().location
+
+    override suspend fun getCurrentFix(): LocationFix {
         if (!hasLocationPermission()) {
             throw SecurityException("Location permission not granted. Please enable location access in your device settings.")
         }
@@ -72,9 +77,9 @@ class AndroidLocationProvider(
                         cancellationTokenSource.token,
                     ).addOnSuccessListener { androidLocation ->
                         if (androidLocation != null) {
-                            val location = androidLocation.toLogDateLocation()
-                            _currentLocation.tryEmit(location)
-                            continuation.resume(location)
+                            val fix = androidLocation.toLocationFix()
+                            _currentLocation.tryEmit(fix.location)
+                            continuation.resume(fix)
                         } else {
                             continuation.resumeWithException(
                                 IllegalStateException("Unable to get current location"),
@@ -181,6 +186,16 @@ class AndroidLocationProvider(
 
     override fun hasLocationPermission(): Boolean =
         permissionManager.isPermissionGranted(app.logdate.client.permissions.PermissionType.LOCATION)
+
+    private fun AndroidLocation.toLocationFix(): LocationFix =
+        LocationFix(
+            location = toLogDateLocation(),
+            observedAt = observedAt(Clock.System.now()),
+            accuracyMeters = accuracy.takeIf { hasAccuracy() },
+            speedMetersPerSecond = speed.takeIf { hasSpeed() },
+            bearingDegrees = bearing.takeIf { hasBearing() },
+            isMock = LocationCompat.isMock(this),
+        )
 
     private fun AndroidLocation.toLogDateLocation(): Location =
         Location(

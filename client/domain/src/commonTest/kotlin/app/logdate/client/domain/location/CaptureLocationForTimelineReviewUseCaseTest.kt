@@ -3,6 +3,7 @@ package app.logdate.client.domain.location
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.location.ClientLocationProvider
+import app.logdate.client.location.LocationFix
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.location.settings.LocationTrackingSettingsRepository
 import app.logdate.client.repository.location.LocationCaptureSource
@@ -72,6 +73,28 @@ class CaptureLocationForTimelineReviewUseCaseTest {
             assertEquals(LocationCaptureSource.TIMELINE_REVIEW, repository.lastRecord?.captureSource)
         }
 
+    @Test
+    fun `invoke records how precise the fix was and when it was taken`() =
+        runTest {
+            val repository = FakeLocationHistoryRepository()
+            val useCase =
+                CaptureLocationForTimelineReviewUseCase(
+                    settingsRepository =
+                        FakeLocationTrackingSettingsRepository(
+                            LocationTrackingSettings(autoTrackForTimelineReview = true),
+                        ),
+                    logCurrentLocationUseCase = buildLogCurrentLocationUseCase(repository),
+                )
+
+            useCase()
+
+            val record = repository.lastRecord!!
+            assertEquals(FIX_TIME, record.timestamp)
+            assertEquals(18f, record.accuracyMeters)
+            assertEquals(1.5f, record.speedMetersPerSecond)
+            assertEquals(90f, record.bearingDegrees)
+        }
+
     private fun buildLogCurrentLocationUseCase(repository: FakeLocationHistoryRepository): LogCurrentLocationUseCase {
         val locationProvider = FakeLocationProvider()
         return LogCurrentLocationUseCase(
@@ -121,6 +144,9 @@ class CaptureLocationForTimelineReviewUseCaseTest {
         override fun hasLocationPermission(): Boolean = true
 
         override suspend fun getCurrentLocation(): Location = location
+
+        override suspend fun getCurrentFix(): LocationFix =
+            LocationFix(location, FIX_TIME, accuracyMeters = 18f, speedMetersPerSecond = 1.5f, bearingDegrees = 90f)
 
         override suspend fun refreshLocation() = Unit
     }
@@ -175,6 +201,8 @@ class CaptureLocationForTimelineReviewUseCaseTest {
         override suspend fun getLocationCount(): Int = loggedLocations
     }
 }
+
+private val FIX_TIME: Instant = Instant.parse("2026-09-30T08:15:00Z")
 
 /** Identity stand-ins so location rows carry a stable owner and device in tests. */
 private class TestCanonicalOwnerProvider(

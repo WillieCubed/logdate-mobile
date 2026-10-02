@@ -2,6 +2,7 @@ package app.logdate.client.location.history
 
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.location.ClientLocationProvider
+import app.logdate.client.location.LocationFix
 import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.location.LocationLogRecord
 import app.logdate.shared.model.AltitudeUnit
@@ -76,5 +77,38 @@ class StandardLocationTrackerEvidenceTest {
             assertEquals("America/Los_Angeles", record.timeZoneId)
             assertEquals(record.activityType, result.activityType)
             assertEquals(record.timeZoneId, result.timeZoneId)
+        }
+
+    @Test
+    fun currentLocationKeepsTheFixAccuracyAndTime() =
+        runTest {
+            var saved: LocationLogRecord? = null
+            val repository =
+                Proxy.newProxyInstance(
+                    LocationHistoryRepository::class.java.classLoader,
+                    arrayOf(LocationHistoryRepository::class.java),
+                ) { _, _, arguments ->
+                    saved = arguments.first() as LocationLogRecord
+                    Unit
+                } as LocationHistoryRepository
+            val location = Location(36.0, -115.0, LocationAltitude(0.0, AltitudeUnit.METERS))
+            val fixTime = Instant.fromEpochMilliseconds(5_000)
+            val provider =
+                object : ClientLocationProvider {
+                    override val currentLocation = MutableSharedFlow<Location>()
+
+                    override fun hasLocationPermission() = true
+
+                    override suspend fun getCurrentLocation() = location
+
+                    override suspend fun getCurrentFix() = LocationFix(location, fixTime, accuracyMeters = 35f, isMock = true)
+
+                    override suspend fun refreshLocation() = Unit
+                }
+            StandardLocationTracker(provider, repository, "device").logCurrentLocation().getOrThrow()
+            val record = assertNotNull(saved)
+            assertEquals(fixTime, record.timestamp)
+            assertEquals(35f, record.accuracyMeters)
+            assertEquals(true, record.isMock)
         }
 }

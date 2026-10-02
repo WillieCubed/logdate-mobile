@@ -24,9 +24,13 @@ import platform.CoreLocation.kCLAuthorizationStatusAuthorizedAlways
 import platform.CoreLocation.kCLAuthorizationStatusAuthorizedWhenInUse
 import platform.CoreLocation.kCLLocationAccuracyHundredMeters
 import platform.Foundation.NSError
+import platform.Foundation.timeIntervalSince1970
 import platform.darwin.NSObject
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 /**
  * iOS [ClientLocationProvider] backed by `CLLocationManager`.
@@ -35,8 +39,8 @@ import kotlin.coroutines.resumeWithException
  * tracker (see `IosDeviceLocationTracker`) handles long-running updates while this provider exists
  * to answer "where am I right now?" lookups from feature code that does not own a tracker.
  *
- * The provider keeps the most recent fix in [currentLocation]'s replay cache so the next
- * [getCurrentLocation] call answers instantly rather than re-prompting CoreLocation.
+ * The provider keeps the most recent fix so a [getCurrentLocation] call within a couple of
+ * minutes answers instantly rather than re-prompting CoreLocation.
  */
 class IosLocationProvider(
     private val permissionManager: PermissionManager,
@@ -46,7 +50,9 @@ class IosLocationProvider(
 
     override val currentLocation: SharedFlow<Location> = _currentLocation.asSharedFlow()
 
-    private val pendingRequests = mutableListOf<CancellableContinuation<Location>>()
+    private val pendingRequests = mutableListOf<CancellableContinuation<LocationFix>>()
+
+    private var latestFix: LocationFix? = null
 
     private val locationDelegate =
         object :
@@ -57,9 +63,10 @@ class IosLocationProvider(
                 didUpdateLocations: List<*>,
             ) {
                 val mostRecent = didUpdateLocations.filterIsInstance<CLLocation>().lastOrNull() ?: return
-                val mapped = mostRecent.toModel()
-                _currentLocation.tryEmit(mapped)
-                drainPending(success = mapped, failure = null)
+                val fix = mostRecent.toFix()
+                latestFix = fix
+                _currentLocation.tryEmit(fix.location)
+                drainPending(success = fix, failure = null)
             }
 
             override fun locationManager(
@@ -80,11 +87,14 @@ class IosLocationProvider(
         permissionManager.isPermissionGranted(PermissionType.LOCATION) ||
             isAuthorizedFromCoreLocation()
 
-    override suspend fun getCurrentLocation(): Location {
+    override suspend fun getCurrentLocation(): Location = getCurrentFix().location
+
+    /** Answers from the last fix while it is recent; an older one would place the person where they used to be. */
+    override suspend fun getCurrentFix(): LocationFix {
         if (!hasLocationPermission()) {
             error("Location permission not granted")
         }
-        _currentLocation.replayCache.firstOrNull()?.let { return it }
+        latestFix?.takeIf { Clock.System.now() - it.observedAt <= MAXIMUM_CACHED_FIX_AGE }?.let { return it }
         return requestOneShot()
     }
 
@@ -97,7 +107,7 @@ class IosLocationProvider(
             .onFailure { Napier.w("refreshLocation: $it") }
     }
 
-    private suspend fun requestOneShot(): Location =
+    private suspend fun requestOneShot(): LocationFix =
         withContext(Dispatchers.Main) {
             suspendCancellableCoroutine { continuation ->
                 pendingRequests += continuation
@@ -107,7 +117,7 @@ class IosLocationProvider(
         }
 
     private fun drainPending(
-        success: Location?,
+        success: LocationFix?,
         failure: NSError?,
     ) {
         if (pendingRequests.isEmpty()) return
@@ -130,12 +140,24 @@ class IosLocationProvider(
             status == kCLAuthorizationStatusAuthorizedAlways
     }
 
-    private fun CLLocation.toModel(): Location =
-        coordinate.useContents {
-            Location(
-                latitude = latitude,
-                longitude = longitude,
-                altitude = LocationAltitude(this@toModel.altitude, AltitudeUnit.METERS),
-            )
-        }
+    private fun CLLocation.toFix(): LocationFix =
+        LocationFix(
+            location =
+                coordinate.useContents {
+                    Location(
+                        latitude = latitude,
+                        longitude = longitude,
+                        altitude = LocationAltitude(this@toFix.altitude, AltitudeUnit.METERS),
+                    )
+                },
+            observedAt = Instant.fromEpochMilliseconds((timestamp.timeIntervalSince1970 * 1000).toLong()),
+            // CoreLocation reports a negative value when it has no estimate.
+            accuracyMeters = horizontalAccuracy.takeIf { it >= 0 }?.toFloat(),
+            speedMetersPerSecond = speed.takeIf { it >= 0 }?.toFloat(),
+            bearingDegrees = course.takeIf { it >= 0 }?.toFloat(),
+        )
+
+    private companion object {
+        val MAXIMUM_CACHED_FIX_AGE = 2.minutes
+    }
 }

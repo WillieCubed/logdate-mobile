@@ -58,8 +58,8 @@ class StandardLocationTracker(
 
     override suspend fun logCurrentLocation(): Result<LocationHistoryItem> =
         try {
-            val location = locationProvider.getCurrentLocation()
-            logLocation(location)
+            val fix = locationProvider.getCurrentFix()
+            logLocation(fix.location, fix.observedAt, fix.evidence())
         } catch (e: Exception) {
             Napier.e("Failed to log current location", e)
             Result.failure(e)
