@@ -34,6 +34,33 @@ class IdentityKeyManager(
      */
     suspend fun hasIdentityKey(): Boolean = secureStorage.getBytes(KEY_IDENTITY_KEY) != null
 
+    /** Bind a locally held key to one account before publishing it to that account's vault. */
+    suspend fun bindToAccount(accountId: String): Boolean =
+        identityMutex.withLock {
+            val owner = secureStorage.getString(KEY_ACCOUNT_ID)
+            if (owner != null && owner != accountId) return@withLock false
+            secureStorage.putString(KEY_ACCOUNT_ID, accountId)
+            true
+        }
+
+    /** Install an account key on a signed-in device without creating a recovery phrase. */
+    suspend fun installAccountKey(
+        accountId: String,
+        key: ByteArray,
+    ) {
+        require(key.size == 32) { "Invalid identity key length" }
+        identityMutex.withLock {
+            val owner = secureStorage.getString(KEY_ACCOUNT_ID)
+            require(owner == null || owner == accountId) { "Identity key belongs to a different account" }
+            val existing = secureStorage.getBytes(KEY_IDENTITY_KEY)
+            require(existing == null || existing.contentEquals(key)) { "Local identity key conflicts with account key" }
+            secureStorage.putBytes(KEY_IDENTITY_KEY, key)
+            secureStorage.putString(KEY_ACCOUNT_ID, accountId)
+            secureStorage.remove(KEY_RECOVERY_PHRASE)
+            secureStorage.remove(KEY_RECOVERY_VERIFIED)
+        }
+    }
+
     private val identityMutex = Mutex()
 
     /**
@@ -189,6 +216,7 @@ class IdentityKeyManager(
      */
     suspend fun clearIdentityKey() {
         secureStorage.remove(KEY_IDENTITY_KEY)
+        secureStorage.remove(KEY_ACCOUNT_ID)
         secureStorage.remove(KEY_RECOVERY_PHRASE)
         secureStorage.remove(KEY_RECOVERY_VERIFIED)
         backupStore.clear()
@@ -197,6 +225,7 @@ class IdentityKeyManager(
 
     companion object {
         private const val KEY_IDENTITY_KEY = "identity_key_v1"
+        private const val KEY_ACCOUNT_ID = "identity_account_id_v1"
         private const val KEY_RECOVERY_PHRASE = "identity_recovery_phrase_v1"
         private const val KEY_RECOVERY_VERIFIED = "identity_recovery_verified_v1"
         private const val RECOVERY_PHRASE_WORD_COUNT = 12

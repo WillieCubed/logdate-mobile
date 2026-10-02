@@ -12,7 +12,7 @@ actual fun formatDeviceLastActive(timestamp: Instant): String {
 
     val formatter =
         DateTimeFormatter
-            .ofLocalizedDateTime(FormatStyle.MEDIUM)
+            .ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
             .withZone(ZoneId.systemDefault())
     return formatter.format(timestamp.toJavaTimeInstant())
 }

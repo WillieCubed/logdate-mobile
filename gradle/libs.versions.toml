@@ -150,6 +150,7 @@ uiAndroid = "1.11.1"
 okio = "3.17.0"
 kotlinxIo = "0.9.0"
 zxing = "3.5.4"
+googleCodeScanner = "16.1.0"
 
 sherpaOnnx = "8.5.1"
 commonsCompress = "1.28.0"
@@ -273,6 +274,7 @@ json-schema-validator = { module = "com.networknt:json-schema-validator", versio
 cryptography-provider-optimal = { module = "dev.whyoleg.cryptography:cryptography-provider-optimal", version.ref = "cryptographyKotlin" }
 nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimbusJoseJwt" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
+google-code-scanner = { group = "com.google.android.gms", name = "play-services-code-scanner", version.ref = "googleCodeScanner" }
 
 napier = { group = "io.github.aakira", name = "napier", version.ref = "napier" }
 

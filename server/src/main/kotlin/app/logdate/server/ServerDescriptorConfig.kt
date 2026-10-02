@@ -18,6 +18,7 @@ data class ServerDescriptorConfig(
         webAuthnRpId: String,
         webAuthnRpName: String,
         diagnosticReportsEnabled: Boolean = false,
+        accountKeyVaultEnabled: Boolean = false,
     ): ServerDescriptor {
         val serverOrigin = identityConfig.pdsServiceEndpoint.trimEnd('/')
         val capabilities =
@@ -49,6 +50,9 @@ data class ServerDescriptorConfig(
                     add(ServerProtocolFeature.RICH_DRAFTS_V1)
                     if (diagnosticReportsEnabled) {
                         add(ServerProtocolFeature.DIAGNOSTIC_REPORTS_V1)
+                    }
+                    if (accountKeyVaultEnabled) {
+                        add(ServerProtocolFeature.ACCOUNT_KEY_VAULT_V1)
                     }
                     if (identityConfig.publishesPlcOperations) {
                         add(ServerProtocolFeature.ATPROTO_PLC_PUBLISHING_V1)

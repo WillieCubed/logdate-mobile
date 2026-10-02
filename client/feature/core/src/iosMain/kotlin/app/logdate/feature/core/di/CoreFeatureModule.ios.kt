@@ -1,5 +1,7 @@
 package app.logdate.feature.core.di
 
+import app.logdate.client.device.crypto.CryptographyDeviceTransfer
+import app.logdate.client.device.crypto.DeviceTransferSealer
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.domain.account.EmailVerificationAvailability
 import app.logdate.client.domain.account.EnqueueAllLocalDataUseCase
@@ -87,6 +89,7 @@ actual val coreFeatureModule: Module =
         single<BiometricGatekeeper> { IosBiometricGatekeeper() }
         single<AppUpdateController> { UnsupportedAppUpdateController(get()) }
         single<MemoriesWidgetInstallController> { HiddenMemoriesWidgetInstallController() }
+        single<DeviceTransferSealer> { CryptographyDeviceTransfer() }
         single<MediaSourceOpener> { IosMediaSourceOpener() }
 
         // TODO: Verify this iOS export implementation works correctly with the root view controller

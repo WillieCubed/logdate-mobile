@@ -102,6 +102,18 @@ class JwtTokenServiceTest {
     }
 
     @Test
+    fun `refresh tokens minted together for one account stay distinct`() {
+        val service = JwtTokenService(secret = hmacKey, issuer = issuer, audience = audience)
+
+        val first = service.generateRefreshToken("acc-same-second", "did:plc:alice123")
+        val second = service.generateRefreshToken("acc-same-second", "did:plc:alice123")
+
+        assertNotEquals(first, second)
+        assertEquals("acc-same-second", service.validateRefreshToken(first))
+        assertEquals("acc-same-second", service.validateRefreshToken(second))
+    }
+
+    @Test
     fun `secret generation yields non-empty random values`() {
         val first = JwtTokenService.generateSecret()
         val second = JwtTokenService.generateSecret()
@@ -173,9 +185,10 @@ class JwtTokenServiceTest {
                 Long::class.java,
                 String::class.java,
                 String::class.java,
+                String::class.java,
             )
         payloadConstructor.isAccessible = true
-        val payload = payloadConstructor.newInstance("acc-1", issuer, audience, 1000L, 900L, "access", "did:plc:alice123")
+        val payload = payloadConstructor.newInstance("acc-1", issuer, audience, 1000L, 900L, "access", "did:plc:alice123", null)
         assertEquals(900L, payloadClass.getMethod("getIat").invoke(payload))
         assertEquals("did:plc:alice123", payloadClass.getMethod("getDid").invoke(payload))
     }

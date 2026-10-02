@@ -27,7 +27,7 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>LogDate uses the microphone to record audio notes you can attach to entries.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>LogDate uses the camera to capture photos and videos directly inside the entry editor.</string>
+	<string>LogDate uses the camera to capture photos and videos in the entry editor and to scan the code that connects a new device to your account.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>LogDate transcribes your audio notes on-device so you can search and read them as text.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

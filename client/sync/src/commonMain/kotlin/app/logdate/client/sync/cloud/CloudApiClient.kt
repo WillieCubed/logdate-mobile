@@ -5,6 +5,13 @@ import app.logdate.shared.model.BeginAccountCreationResponse
 import app.logdate.shared.model.CompleteAccountCreationRequest
 import app.logdate.shared.model.CompleteAccountCreationResponse
 import app.logdate.shared.model.LogDateAccount
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class AccountKeyMaterialDto(
+    val identityKey: String,
+    val mediaKey: String,
+)
 
 /**
  * Interface defining the API client for LogDate Cloud services.
@@ -23,6 +30,13 @@ interface CloudApiClient {
         backupId: String,
         destination: kotlinx.io.files.Path,
     ): Result<BackupInfoResponse> = Result.failure(UnsupportedOperationException("Streaming backup downloads are not supported"))
+
+    suspend fun getAccountKeys(accessToken: String): Result<AccountKeyMaterialDto?> = Result.success(null)
+
+    suspend fun putAccountKeys(
+        accessToken: String,
+        keys: AccountKeyMaterialDto,
+    ): Result<Unit> = Result.success(Unit)
 
     /**
      * Checks if a username is available for registration.

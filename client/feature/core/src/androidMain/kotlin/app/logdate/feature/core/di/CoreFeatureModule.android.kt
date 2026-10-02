@@ -1,6 +1,8 @@
 package app.logdate.feature.core.di
 
 import android.app.Activity
+import app.logdate.client.device.crypto.AndroidDeviceTransferSealer
+import app.logdate.client.device.crypto.DeviceTransferSealer
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.KeyDerivation
 import app.logdate.client.domain.account.EmailVerificationAvailability
@@ -71,6 +73,8 @@ import app.logdate.feature.core.settings.ui.SettingsOverviewViewModel
 import app.logdate.feature.core.settings.ui.StreakSettingsViewModel
 import app.logdate.feature.core.settings.ui.TimelineSettingsViewModel
 import app.logdate.feature.core.settings.ui.VoiceNotesSettingsViewModel
+import app.logdate.feature.core.settings.ui.devices.CodeScannerAvailability
+import app.logdate.feature.core.settings.ui.devices.PlayServicesCodeScannerAvailability
 import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.feature.core.sync.SyncIssuesViewModel
 import app.logdate.feature.core.sync.SyncPresentationViewModel
@@ -103,6 +107,8 @@ actual val coreFeatureModule: Module =
         single { ActivityProvider() }
 
         // Single instance exposed as both concrete type and interface
+        single<DeviceTransferSealer> { AndroidDeviceTransferSealer() }
+        single<CodeScannerAvailability> { PlayServicesCodeScannerAvailability }
         single<MediaSourceOpener> { AndroidMediaSourceOpener(androidContext()) }
         single {
             val identity = get<IdentityKeyManager>()

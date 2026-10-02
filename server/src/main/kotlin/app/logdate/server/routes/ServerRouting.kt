@@ -1,6 +1,7 @@
 package app.logdate.server.routes
 
 import app.logdate.server.ServerDescriptorConfig
+import app.logdate.server.accountkeys.AccountKeyVault
 import app.logdate.server.atproto.AtprotoSessionTokenService
 import app.logdate.server.auth.AccountDeletionService
 import app.logdate.server.auth.AccountIdentityRepository
@@ -11,6 +12,7 @@ import app.logdate.server.auth.GoogleIdTokenVerifier
 import app.logdate.server.auth.RefreshTokenRevocationRepository
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.TokenService
+import app.logdate.server.enrollment.DeviceEnrollmentRepository
 import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.entitlements.EntitlementService
 import app.logdate.server.entitlements.PlanCatalogService
@@ -117,10 +119,14 @@ internal fun Application.accountApiRoutes() {
     val planCatalogService by inject<PlanCatalogService>()
     val emailVerificationService by inject<EmailVerificationService>()
     val signingKeyService by inject<SigningKeyService>()
+    val deviceEnrollmentRepository by inject<DeviceEnrollmentRepository>()
+    val accountKeyVault by inject<AccountKeyVault>()
 
     routing {
         route("/api/v1") {
             serverInfoRoutes(serverDescriptor())
+            deviceEnrollmentRoutes(tokenService, deviceEnrollmentRepository, accountRepository)
+            accountKeyRoutes(tokenService, accountKeyVault)
             planRoutes(planCatalogService)
             authV1Routes(
                 accountRepository = accountRepository,
@@ -211,4 +217,5 @@ private fun Application.serverDescriptor() =
         webAuthnRpId = inject<WebAuthnConfig>().value.relyingPartyId,
         webAuthnRpName = inject<WebAuthnConfig>().value.relyingPartyName,
         diagnosticReportsEnabled = inject<app.logdate.server.diagnostics.DiagnosticReportAvailability>().value.enabled,
+        accountKeyVaultEnabled = inject<AccountKeyVault>().value.isAvailable,
     )

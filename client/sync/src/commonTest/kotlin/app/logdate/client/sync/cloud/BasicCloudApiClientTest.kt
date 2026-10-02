@@ -6,6 +6,7 @@ import app.logdate.shared.model.BeginAccountCreationRequest
 import app.logdate.shared.model.CompleteAccountCreationRequest
 import app.logdate.shared.model.PasskeyAuthenticatorResponse
 import app.logdate.shared.model.PasskeyCredentialResponse
+import app.logdate.shared.model.ServerProtocolFeature
 import app.logdate.util.UuidSerializer
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -45,6 +46,51 @@ class BasicCloudApiClientTest {
                 SerializersModule {
                     contextual(Uuid::class, UuidSerializer)
                 }
+        }
+
+    @Test
+    fun `account keys use authenticated idempotent endpoint`() =
+        runTest {
+            var requests = 0
+            val client =
+                createApiClient(
+                    MockEngine { request ->
+                        requests++
+                        assertEquals("$baseUrl/account/keys", request.url.toString())
+                        assertEquals("Bearer access", request.headers[HttpHeaders.Authorization])
+                        if (requests == 1) {
+                            respond(
+                                """{"identityKey":"identity","mediaKey":"media"}""",
+                                HttpStatusCode.OK,
+                                headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                            )
+                        } else {
+                            respond("", HttpStatusCode.Created)
+                        }
+                    },
+                    protocolFeatures = listOf(ServerProtocolFeature.ACCOUNT_KEY_VAULT_V1),
+                )
+            val material = client.getAccountKeys("access").getOrThrow()
+            assertEquals(AccountKeyMaterialDto("identity", "media"), material)
+            client.putAccountKeys("access", requireNotNull(material)).getOrThrow()
+            assertEquals(2, requests)
+        }
+
+    @Test
+    fun `servers without an account key vault are never asked for keys`() =
+        runTest {
+            var requests = 0
+            val client =
+                createApiClient(
+                    MockEngine {
+                        requests++
+                        respond("", HttpStatusCode.ServiceUnavailable)
+                    },
+                )
+
+            assertEquals(null, client.getAccountKeys("access").getOrThrow())
+            client.putAccountKeys("access", AccountKeyMaterialDto("identity", "media")).getOrThrow()
+            assertEquals(0, requests)
         }
 
     @Test
@@ -431,14 +477,28 @@ class BasicCloudApiClientTest {
         override fun close() = Unit
     }
 
-    private fun createApiClient(mockEngine: MockEngine): LogDateCloudApiClient {
+    private fun createApiClient(
+        mockEngine: MockEngine,
+        protocolFeatures: List<String> = emptyList(),
+    ): LogDateCloudApiClient {
         val httpClient =
             HttpClient(mockEngine) {
                 install(ContentNegotiation) {
                     json(json)
                 }
             }
-        return LogDateCloudApiClient(MockConfigRepository(baseUrl), httpClient)
+        val config = MockConfigRepository(baseUrl)
+        if (protocolFeatures.isNotEmpty()) {
+            config.descriptor =
+                app.logdate.shared.model.ServerDescriptor(
+                    serverOrigin = baseUrl.removeSuffix("/api/v1"),
+                    apiBaseUrl = baseUrl,
+                    deploymentKind = app.logdate.shared.model.DeploymentKind.SELF_HOSTED,
+                    displayName = "Test",
+                    protocolFeatures = protocolFeatures,
+                )
+        }
+        return LogDateCloudApiClient(config, httpClient)
     }
 
     private class MockConfigRepository(
@@ -449,6 +509,11 @@ class BasicCloudApiClientTest {
         private val _apiBaseUrl = MutableStateFlow(baseUrl)
         private val _localServerAddress = MutableStateFlow("localhost:8765")
         private val _serverDescriptor = MutableStateFlow<app.logdate.shared.model.ServerDescriptor?>(null)
+        var descriptor: app.logdate.shared.model.ServerDescriptor?
+            get() = _serverDescriptor.value
+            set(value) {
+                _serverDescriptor.value = value
+            }
 
         override val backendUrl: StateFlow<String> = _backendUrl
         override val apiVersion: StateFlow<String> = _apiVersion

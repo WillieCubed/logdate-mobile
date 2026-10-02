@@ -114,6 +114,7 @@ kotlin {
         }
 
         androidMain.dependencies {
+            implementation(libs.google.code.scanner)
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.koin.android)
             implementation(projects.client.notifications)

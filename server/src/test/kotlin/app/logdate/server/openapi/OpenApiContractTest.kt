@@ -351,13 +351,14 @@ class OpenApiContractTest {
                 "getRecord",
                 "listRecords",
                 "getBlob",
+                "claimDeviceEnrollment",
             )
 
         /** XRPC methods that work without any optional service and therefore never answer 501. */
         private val XRPC_ALWAYS_AVAILABLE = setOf("resolveHandle", "describeAtprotoServer", "describeRepo")
 
-        /** Operations that answer 200 with an empty body, as their protocol specifies. */
-        private val SUCCESS_WITHOUT_BODY = setOf("revokeOAuthToken")
+        /** Operations whose success status is the whole answer, so they reply with an empty body. */
+        private val SUCCESS_WITHOUT_BODY = setOf("revokeOAuthToken", "storeAccountKeys")
 
         /** Operations that answer 201 without a Location header because the created thing has no URL of its own. */
         private val CREATED_WITHOUT_LOCATION =

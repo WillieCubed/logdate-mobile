@@ -13,6 +13,7 @@ import app.logdate.shared.model.CompleteAccountCreationResponse
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyRegistrationOptions
 import app.logdate.shared.model.RefreshTokenRequest
+import app.logdate.shared.model.ServerProtocolFeature
 import app.logdate.shared.model.UsernameAvailabilityResponse
 import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
@@ -109,6 +110,57 @@ class LogDateCloudApiClient(
             "Cloud account changed during request",
             statusCode = 401,
         )
+
+    /**
+     * Null when this server does not keep account keys or holds none for the account yet; servers
+     * without [ServerProtocolFeature.ACCOUNT_KEY_VAULT_V1] are never asked.
+     */
+    override suspend fun getAccountKeys(accessToken: String): Result<AccountKeyMaterialDto?> =
+        try {
+            if (!supportsAccountKeyVault()) return Result.success(null)
+            val baseUrl = getBaseUrl(accessToken)
+            val response =
+                transport.get("$baseUrl/account/keys") {
+                    headers.append(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
+            when (response.status) {
+                HttpStatusCode.OK -> Result.success(response.body<AccountKeyMaterialDto>())
+                HttpStatusCode.NotFound -> Result.success(null)
+                else -> handleApiError(response)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            Napier.w("Could not read the account key")
+            Result.failure(failure)
+        }
+
+    override suspend fun putAccountKeys(
+        accessToken: String,
+        keys: AccountKeyMaterialDto,
+    ): Result<Unit> =
+        try {
+            if (!supportsAccountKeyVault()) return Result.success(Unit)
+            val baseUrl = getBaseUrl(accessToken)
+            val response =
+                transport.put("$baseUrl/account/keys") {
+                    headers.append(HttpHeaders.Authorization, "Bearer $accessToken")
+                    contentType(ContentType.Application.Json)
+                    setBody(keys)
+                }
+            when (response.status) {
+                HttpStatusCode.Created, HttpStatusCode.OK -> Result.success(Unit)
+                else -> handleApiError(response)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            Napier.w("Could not store the account key")
+            Result.failure(failure)
+        }
+
+    private fun supportsAccountKeyVault(): Boolean =
+        configRepository.getCurrentServerDescriptor()?.hasProtocolFeature(ServerProtocolFeature.ACCOUNT_KEY_VAULT_V1) == true
 
     /**
      * Checks if a username is available for registration using the availability endpoint.

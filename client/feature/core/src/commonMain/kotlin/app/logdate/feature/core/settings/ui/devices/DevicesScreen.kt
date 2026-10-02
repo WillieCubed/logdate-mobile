@@ -3,7 +3,9 @@
 
 package app.logdate.feature.core.settings.ui.devices
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,25 +14,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,24 +43,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import app.logdate.ui.adaptive.FoldableBookLayout
-import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.app_version_label
 import logdate.client.feature.core.generated.resources.device_name
 import logdate.client.feature.core.generated.resources.devices
+import logdate.client.feature.core.generated.resources.devices_connected
 import logdate.client.feature.core.generated.resources.enter_a_new_name_for_this_device
 import logdate.client.feature.core.generated.resources.last_active_label
 import logdate.client.feature.core.generated.resources.loading_devices
-import logdate.client.feature.core.generated.resources.platform_label
 import logdate.client.feature.core.generated.resources.remove_device_confirmation
 import logdate.client.feature.core.generated.resources.rename
 import logdate.client.feature.core.generated.resources.reset
 import logdate.client.feature.core.generated.resources.reset_device_id
 import logdate.client.feature.core.generated.resources.reset_device_id_confirmation
+import logdate.client.feature.core.generated.resources.sync_device_options_label
 import logdate.client.feature.core.generated.resources.sync_device_remove_label
 import logdate.client.feature.core.generated.resources.sync_device_remove_title
 import logdate.client.feature.core.generated.resources.sync_device_rename_label
@@ -173,101 +173,44 @@ fun DevicesScreenContent(
         )
     }
 
-    FoldableBookLayout(
-        modifier = modifier.fillMaxSize(),
-        minPaneWidth = 320.dp,
-        startPane = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(vertical = Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-            ) {
-                if (uiState.isLoading) {
-                    LoadingState(modifier = Modifier.padding(horizontal = Spacing.lg))
-                } else {
-                    uiState.devices.forEach { device ->
-                        DeviceItem(
-                            device = device,
-                            onRenameClick = { onRenameClick(device) },
-                            onRemoveClick = { onRemoveClick(device) },
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
-                        )
-                    }
+    Box(
+        modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        SettingsScaffold(
+            title = stringResource(Res.string.devices),
+            onBack = onBackClick,
+            modifier = Modifier.widthIn(max = 680.dp).fillMaxSize(),
+        ) {
+            if (uiState.isLoading) {
+                item {
+                    LoadingState()
                 }
-            }
-        },
-        endPane = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(vertical = Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text = stringResource(Res.string.sync_device_rename_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                )
-                Button(onClick = onShowResetDialog) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
+            } else {
+                item {
+                    Text(
+                        stringResource(Res.string.devices_connected),
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
-                    Spacer(modifier = Modifier.width(Spacing.sm))
-                    Text(stringResource(Res.string.reset_device_id))
                 }
-            }
-        },
-        standardContent = {
-            SettingsScaffold(
-                title = stringResource(Res.string.devices),
-                onBack = onBackClick,
-                modifier = modifier,
-            ) {
-                if (uiState.isLoading) {
-                    item {
-                        LoadingState()
-                    }
-                } else {
-                    items(uiState.devices) { device ->
-                        DeviceItem(
-                            device = device,
-                            onRenameClick = { onRenameClick(device) },
-                            onRemoveClick = { onRemoveClick(device) },
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
-                        )
-                    }
-
-                    item {
-                        Column(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = Spacing.lg),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Button(onClick = onShowResetDialog) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                                Spacer(modifier = Modifier.width(Spacing.sm))
-                                Text(stringResource(Res.string.reset_device_id))
-                            }
-                        }
+                items(uiState.devices) { device ->
+                    DeviceItem(
+                        device = device,
+                        onRenameClick = { onRenameClick(device) },
+                        onRemoveClick = { onRemoveClick(device) },
+                        onShowResetDialog = onShowResetDialog,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                    )
+                }
+                item {
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg)) {
+                        DeviceApprovalAction()
                     }
                 }
             }
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -287,59 +230,86 @@ private fun DeviceItem(
     device: DeviceInfoUiState,
     onRenameClick: () -> Unit,
     onRemoveClick: () -> Unit,
+    onShowResetDialog: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    MaterialContainer(modifier = modifier) {
-        SurfaceItem {
-            ListItem(
-                headlineContent = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    ) {
-                        Text(device.name)
-                        if (device.isCurrentDevice) {
-                            Text(
-                                text = stringResource(Res.string.this_device),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
+    var showOptions by remember { mutableStateOf(false) }
+    Surface(
+        modifier = modifier.fillMaxWidth().testTag("existing-device-card"),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(48.dp)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Outlined.Devices, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(device.name, style = MaterialTheme.typography.titleMedium)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(device.platformName, style = MaterialTheme.typography.bodyMedium)
+                    if (device.isCurrentDevice) {
+                        Text(
+                            text = stringResource(Res.string.this_device),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier =
+                                Modifier
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(50))
+                                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                        )
                     }
-                },
-                supportingContent = {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                        Text(stringResource(Res.string.platform_label, device.platformName))
-                        Text(stringResource(Res.string.last_active_label, device.lastActiveFormatted))
-                        Text(stringResource(Res.string.app_version_label, device.appVersion))
-                    }
-                },
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Outlined.Devices,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                }
+                Text(
+                    text = stringResource(Res.string.last_active_label, device.lastActiveFormatted),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp).testTag("device-supplemental-row"),
+                )
+            }
+            Box {
+                IconButton(onClick = { showOptions = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(Res.string.sync_device_options_label))
+                }
+                DropdownMenu(expanded = showOptions, onDismissRequest = { showOptions = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(Res.string.sync_device_rename_label)) },
+                        onClick = {
+                            showOptions = false
+                            onRenameClick()
+                        },
                     )
-                },
-                trailingContent = {
-                    Row {
-                        IconButton(onClick = onRenameClick) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = stringResource(Res.string.sync_device_rename_label),
-                            )
-                        }
-                        if (!device.isCurrentDevice) {
-                            IconButton(onClick = onRemoveClick) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = stringResource(Res.string.sync_device_remove_label),
-                                )
-                            }
-                        }
+                    if (device.isCurrentDevice) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.reset_device_id)) },
+                            onClick = {
+                                showOptions = false
+                                onShowResetDialog()
+                            },
+                        )
+                    } else {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(Res.string.sync_device_remove_label)) },
+                            onClick = {
+                                showOptions = false
+                                onRemoveClick()
+                            },
+                        )
                     }
-                },
-            )
+                }
+            }
         }
     }
 }

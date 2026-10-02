@@ -5,6 +5,7 @@ import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.KeyDerivation
 import app.logdate.client.device.storage.getBytes
 import app.logdate.client.device.storage.putBytes
+import app.logdate.client.sync.cloud.AccountKeyMaterialDto
 import app.logdate.client.sync.cloud.ContentChangesResponse
 import app.logdate.client.sync.cloud.InMemorySecureStorage
 import app.logdate.client.sync.cloud.JournalChangesResponse
@@ -18,9 +19,12 @@ import app.logdate.client.sync.test.fakeSyncMetadataService
 import app.logdate.client.sync.test.testDefaultSyncManager
 import app.logdate.shared.model.sync.JournalChange
 import kotlinx.coroutines.test.runTest
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
@@ -32,6 +36,93 @@ import kotlin.time.Instant
  * became unreadable forever, and everything from then on quietly started a second identity.
  */
 class IdentityKeyProvisioningTest {
+    @OptIn(ExperimentalEncodingApi::class)
+    @Test
+    fun `signed in device restores account keys without a recovery phrase`() =
+        runTest {
+            val identity = ByteArray(32) { 0x31 }
+            val media = ByteArray(32) { 0x42 }
+            val identityManager = IdentityKeyManager(InMemorySecureStorage(), TestCryptoManager())
+            val mediaStorage = InMemorySecureStorage()
+            val cryptoManager = TestCryptoManager()
+            val mediaProvider = MediaPayloadKeyProvider(mediaStorage, cryptoManager, identityManager, KeyDerivation(cryptoManager))
+            val api =
+                fakeCloudApiClient {
+                    accountKeysResponse = Result.success(AccountKeyMaterialDto(Base64.encode(identity), Base64.encode(media)))
+                }
+            val manager =
+                testDefaultSyncManager(
+                    identityKeyManager = identityManager,
+                    mediaPayloadKeyProvider = mediaProvider,
+                    cloudApiClient = api,
+                )
+
+            manager.uploadPendingChanges()
+
+            assertTrue(identityManager.getIdentityKey().contentEquals(identity))
+            assertNull(identityManager.getStoredRecoveryPhrase())
+            assertTrue(mediaProvider.getOrCreateKey().contentEquals(media))
+        }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    @Test
+    fun `an existing local key is stored for the account when the server holds none`() =
+        runTest {
+            val identityManager = IdentityKeyManager(InMemorySecureStorage(), TestCryptoManager())
+            identityManager.setupNewIdentity()
+            val cryptoManager = TestCryptoManager()
+            val mediaProvider =
+                MediaPayloadKeyProvider(InMemorySecureStorage(), cryptoManager, identityManager, KeyDerivation(cryptoManager))
+            val api = fakeCloudApiClient { accountKeysResponse = Result.success(null) }
+
+            testDefaultSyncManager(
+                identityKeyManager = identityManager,
+                mediaPayloadKeyProvider = mediaProvider,
+                cloudApiClient = api,
+            ).uploadPendingChanges()
+
+            val published = assertNotNull(api.publishedAccountKeys)
+            assertTrue(Base64.decode(published.identityKey).contentEquals(identityManager.getIdentityKey()))
+            assertTrue(Base64.decode(published.mediaKey).contentEquals(mediaProvider.getOrCreateKey()))
+        }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    @Test
+    fun `a local key that differs from the account key pauses sync instead of overwriting either`() =
+        runTest {
+            val identityManager = IdentityKeyManager(InMemorySecureStorage(), TestCryptoManager())
+            identityManager.setupNewIdentity()
+            val local = identityManager.getIdentityKey().copyOf()
+            val api =
+                fakeCloudApiClient {
+                    accountKeysResponse =
+                        Result.success(AccountKeyMaterialDto(Base64.encode(ByteArray(32) { 7 }), Base64.encode(ByteArray(32) { 8 })))
+                }
+            val recoveryStore = InMemoryIdentityRecoveryNeededStore()
+
+            testDefaultSyncManager(
+                identityKeyManager = identityManager,
+                cloudApiClient = api,
+                identityRecoveryNeededStore = recoveryStore,
+            ).uploadPendingChanges()
+
+            assertTrue(recoveryStore.isNeeded())
+            assertTrue(identityManager.getIdentityKey().contentEquals(local))
+            assertNull(api.publishedAccountKeys)
+        }
+
+    @Test
+    fun `an unreadable account key never leads to minting a new one`() =
+        runTest {
+            val identityManager = IdentityKeyManager(InMemorySecureStorage(), TestCryptoManager())
+            val api = fakeCloudApiClient { accountKeysResponse = Result.failure(IllegalStateException("unavailable")) }
+
+            testDefaultSyncManager(identityKeyManager = identityManager, cloudApiClient = api).uploadPendingChanges()
+
+            assertFalse(identityManager.hasIdentityKey())
+            assertNull(api.publishedAccountKeys)
+        }
+
     @Test
     fun `draft only accounts and failed draft checks never mint a different identity`() =
         runTest {

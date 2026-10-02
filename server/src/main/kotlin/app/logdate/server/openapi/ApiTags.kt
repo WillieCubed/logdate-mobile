@@ -9,6 +9,7 @@ internal object ApiTags {
     const val AUTHENTICATION = "Authentication"
     const val ACCOUNT = "Account"
     const val IDENTITY = "Identity"
+    const val DEVICES = "Devices"
     const val CONTENTS = "Contents"
     const val JOURNALS = "Journals"
     const val ASSOCIATIONS = "Associations"
@@ -92,6 +93,19 @@ internal val apiTagGroups: List<ApiTagGroup> =
 
                     Most app developers never call these. Self-hosters and people building AT Protocol tooling do. The
                     private key never leaves a device unprotected: every export and import is wrapped with a passphrase.
+                    """.trimIndent(),
+                ),
+                ApiTag(
+                    ApiTags.DEVICES,
+                    """
+                    A signed-in device can ask another device on the same account to approve it. The new device
+                    displays a short-lived QR and confirmation code; an existing device verifies both and sends
+                    an encrypted key envelope. The server relays that envelope without reading the keys, and the
+                    new device may consume it only once before the request expires. A new device that is not yet
+                    signed in receives its own account session in that envelope, so each device signs out on its own.
+
+                    Servers that advertise `accountKeyVaultV1` also keep an encrypted copy of the account's keys, so a
+                    device that signs in directly can recover them without another device.
                     """.trimIndent(),
                 ),
             ),

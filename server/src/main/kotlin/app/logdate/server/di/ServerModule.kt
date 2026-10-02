@@ -1,6 +1,9 @@
 package app.logdate.server.di
 
 import app.logdate.server.ServerDescriptorConfig
+import app.logdate.server.accountkeys.AccountKeyRepository
+import app.logdate.server.accountkeys.AccountKeyVault
+import app.logdate.server.accountkeys.InMemoryAccountKeyRepository
 import app.logdate.server.atproto.AtprotoPasswordCredentialRepository
 import app.logdate.server.atproto.AtprotoPasswordService
 import app.logdate.server.atproto.AtprotoPdsSessionService
@@ -31,11 +34,14 @@ import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.TokenService
 import app.logdate.server.config.RuntimeProfile
 import app.logdate.server.config.profileAwareBoolEnv
+import app.logdate.server.crypto.EnvironmentKeyring
 import app.logdate.server.database.DatabaseConfig
 import app.logdate.server.database.PostgreSQLAccountIdentityRepository
+import app.logdate.server.database.PostgreSQLAccountKeyRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
 import app.logdate.server.database.PostgreSQLAtprotoPasswordCredentialRepository
 import app.logdate.server.database.PostgreSQLAtprotoSessionRepository
+import app.logdate.server.database.PostgreSQLDeviceEnrollmentRepository
 import app.logdate.server.database.PostgreSQLDiagnosticReportStore
 import app.logdate.server.database.PostgreSQLHostedPlcOperationRepository
 import app.logdate.server.database.PostgreSQLLogDateAtprotoBlobRepository
@@ -54,6 +60,8 @@ import app.logdate.server.database.PostgreSQLSigningKeyRepository
 import app.logdate.server.diagnostics.DiagnosticReportAvailability
 import app.logdate.server.diagnostics.DiagnosticReportStore
 import app.logdate.server.diagnostics.InMemoryDiagnosticReportStore
+import app.logdate.server.enrollment.DeviceEnrollmentRepository
+import app.logdate.server.enrollment.InMemoryDeviceEnrollmentRepository
 import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.HostedPlcOperationRepository
@@ -273,6 +281,13 @@ fun serverModule(isDatabaseAvailable: Boolean) =
         single<PendingEmailVerificationRepository> {
             if (isDatabaseAvailable) PostgreSQLPendingEmailVerificationRepository() else InMemoryPendingEmailVerificationRepository()
         }
+        single<DeviceEnrollmentRepository> {
+            if (isDatabaseAvailable) PostgreSQLDeviceEnrollmentRepository() else InMemoryDeviceEnrollmentRepository()
+        }
+        single<AccountKeyRepository> {
+            if (isDatabaseAvailable) PostgreSQLAccountKeyRepository() else InMemoryAccountKeyRepository()
+        }
+        single { AccountKeyVault(get(), EnvironmentKeyring.fromEnvironmentOrNull()) }
         single { GoogleVcJwksCache() }
         single {
             DigitalCredentialVerifier(

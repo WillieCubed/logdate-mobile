@@ -25,6 +25,21 @@ class IdentityKeyManagerTest {
     private val manager = IdentityKeyManager(mockSecureStorage, cryptoManager, backupStore)
 
     @Test
+    fun `account key restore binds the identity to one account`() =
+        runTest {
+            val key = ByteArray(32) { 0x31 }
+            manager.installAccountKey("account-a", key)
+            assertTrue(manager.hasIdentityKey())
+            assertTrue(manager.getIdentityKey().contentEquals(key))
+            assertEquals(null, manager.getStoredRecoveryPhrase())
+            assertTrue(manager.bindToAccount("account-a"))
+            assertFalse(manager.bindToAccount("account-b"))
+            assertFailsWith<IllegalArgumentException> {
+                manager.installAccountKey("account-b", ByteArray(32) { 0x42 })
+            }
+        }
+
+    @Test
     fun `no identity key initially`() =
         runTest {
             assertFalse(manager.hasIdentityKey())

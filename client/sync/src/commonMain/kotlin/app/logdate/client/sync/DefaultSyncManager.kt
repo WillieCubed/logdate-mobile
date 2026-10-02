@@ -169,6 +169,15 @@ class DefaultSyncManager(
         }
     }
 
+    private val accountKeys =
+        AccountKeySync(
+            mediaPayloadKeyProvider = mediaPayloadKeyProvider,
+            syncMetadataService = syncMetadataService,
+            identityRecoveryNeededStore = identityRecoveryNeededStore,
+            unreadableCloudRecordStore = unreadableCloudRecordStore,
+            downloadInbox = downloadInbox,
+        )
+
     /**
      * Every note, journal, and draft is encrypted with a key derived from this device's identity
      * key, so a device without one fails every upload. Onboarding provisions it for new devices;
@@ -190,8 +199,20 @@ class DefaultSyncManager(
      */
     private suspend fun provisionIdentityKey(accessToken: String) {
         val manager = identityKeyManager ?: return
+        val client = cloudApiClient
+        val accountId = sessionStorage.getSession()?.accountId
+        val vault = client?.getAccountKeys(accessToken)
+        if (vault?.isFailure == true) {
+            Napier.w("Could not read the account key; will retry on the next sync")
+            if (!manager.hasIdentityKey()) return
+        }
+        val remote = vault?.getOrNull()
         if (manager.hasIdentityKey()) {
-            if (identityRecoveryNeededStore.isNeeded()) identityRecoveryNeededStore.setNeeded(false)
+            accountKeys.reconcile(manager, client, accessToken, accountId, remote, vaultRead = vault?.isSuccess == true)
+            return
+        }
+        if (remote != null && accountId != null) {
+            accountKeys.install(manager, accountId, remote)
             return
         }
 
@@ -208,7 +229,6 @@ class DefaultSyncManager(
             return
         }
 
-        val client = cloudApiClient
         if (client == null) {
             runCatching { manager.setupNewIdentity() }
                 .onFailure { Napier.e("Could not provision an identity key; uploads will fail") }
@@ -226,6 +246,7 @@ class DefaultSyncManager(
             false -> {
                 runCatching { manager.setupNewIdentity() }
                     .onFailure { Napier.e("Could not provision an identity key; uploads will fail") }
+                if (manager.hasIdentityKey()) accountKeys.publish(client, accessToken, manager)
             }
             null -> {
                 // Could not tell (offline, a server error). Leave things as they are; the next

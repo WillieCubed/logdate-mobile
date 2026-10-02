@@ -13,6 +13,8 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * Production JWT token service for LogDate Cloud authentication.
@@ -30,6 +32,10 @@ class JwtTokenService(
         private val ACCESS_TOKEN_DURATION = 1.hours
         private val REFRESH_TOKEN_DURATION = 30.days
         private val SESSION_TOKEN_DURATION = 15.minutes
+
+        // Claims are read only after the signature verifies, so tolerating claims this build does not know
+        // lets a later release add one without invalidating tokens during a rollback.
+        private val tokenJson = Json { ignoreUnknownKeys = true }
 
         fun generateSecret(): String {
             val bytes = ByteArray(32)
@@ -53,6 +59,7 @@ class JwtTokenService(
         val iat: Long, // issued at (seconds since epoch)
         val type: String, // token type: "access", "refresh", "session"
         val did: String? = null, // AT Protocol DID for user-bound tokens
+        val jti: String? = null, // unique ID, so two refresh tokens minted in the same second stay separately revocable
     )
 
     override fun generateAccessToken(
@@ -76,6 +83,7 @@ class JwtTokenService(
         return generateToken(payload)
     }
 
+    @OptIn(ExperimentalUuidApi::class)
     override fun generateRefreshToken(
         accountId: String,
         did: String?,
@@ -92,6 +100,7 @@ class JwtTokenService(
                 iat = now.epochSeconds,
                 type = "refresh",
                 did = did,
+                jti = Uuid.random().toString(),
             )
 
         return generateToken(payload)
@@ -134,7 +143,7 @@ class JwtTokenService(
 
             return "$message.$signature"
         } catch (e: Exception) {
-            Napier.e("Failed to generate JWT token", e)
+            Napier.e("Failed to generate JWT token")
             throw IllegalStateException("Failed to generate token", e)
         }
     }
@@ -146,7 +155,7 @@ class JwtTokenService(
         try {
             val parts = token.split(".")
             if (parts.size != 3) {
-                Napier.w("Invalid JWT format: expected 3 parts, got ${parts.size}")
+                Napier.w("Invalid JWT format")
                 return null
             }
 
@@ -163,11 +172,11 @@ class JwtTokenService(
 
             // Decode and validate payload
             val payloadJson = base64UrlDecode(encodedPayload)
-            val payload = Json.decodeFromString<JwtPayload>(payloadJson)
+            val payload = tokenJson.decodeFromString<JwtPayload>(payloadJson)
 
             // Validate token type
             if (payload.type != expectedType) {
-                Napier.w("JWT type mismatch: expected $expectedType, got ${payload.type}")
+                Napier.w("JWT type mismatch")
                 return null
             }
 
@@ -180,13 +189,13 @@ class JwtTokenService(
             // Check expiration
             val now = Clock.System.now().epochSeconds
             if (payload.exp <= now) {
-                Napier.d("JWT token expired: exp=${payload.exp}, now=$now")
+                Napier.d("JWT token expired")
                 return null
             }
 
             return payload.sub
-        } catch (e: Exception) {
-            Napier.e("Failed to validate JWT token", e)
+        } catch (_: Exception) {
+            Napier.e("Failed to validate JWT token")
             return null
         }
     }

@@ -3,6 +3,7 @@ package app.logdate.feature.core.settings.ui.devices
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.device.identity.DefaultDeviceManager
+import app.logdate.client.device.identity.safeDeviceDisplayName
 import app.logdate.client.device.models.DeviceInfo
 import app.logdate.client.device.models.DevicePlatform
 import io.github.aakira.napier.Napier
@@ -35,7 +36,7 @@ class DevicesViewModel(
 
                 // Collect associated devices
                 deviceManager.getAssociatedDevices().collect { devices ->
-                    val allDevices = (devices + currentDevice).distinctBy { it.id }
+                    val allDevices = (listOf(currentDevice) + devices).distinctBy { it.id }
                     val deviceUiStates = allDevices.map { it.toUiState(it.id == currentDevice.id) }
 
                     _uiState.update {
@@ -119,7 +120,7 @@ class DevicesViewModel(
     private fun DeviceInfo.toUiState(isCurrentDevice: Boolean): DeviceInfoUiState =
         DeviceInfoUiState(
             id = id,
-            name = name,
+            name = safeDeviceDisplayName(name, "${getPlatformName(platform)} device"),
             platformName = getPlatformName(platform),
             lastActiveFormatted = formatDeviceLastActive(lastActive),
             appVersion = appVersion,

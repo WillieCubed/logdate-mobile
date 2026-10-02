@@ -118,8 +118,35 @@
     <!-- Device management -->
     <string name="device_name">Device Name</string>
     <string name="devices">Devices</string>
+    <string name="devices_connected">Connected devices</string>
     <string name="devices_settings_description">Manage your connected devices</string>
-    <string name="this_device">(This device)</string>
+    <string name="connect_device_title">Connect a device</string>
+    <string name="connect_device_description">Scan the code shown on your other device.</string>
+    <string name="connect_device_confirmation_title">Connect %1$s?</string>
+    <string name="connect_device_confirmation_help">Check that this code matches the one shown on the other device.</string>
+    <string name="connect_device_account">Account: %1$s</string>
+    <string name="connect_device_code">Code: %1$s</string>
+    <string name="connect_device_confirm">Connect</string>
+    <string name="connect_device_reject">Reject</string>
+    <string name="connect_device_scanner_title">Scan the code on your other device</string>
+    <string name="connect_device_scanner_cancel">Cancel</string>
+    <string name="connect_device_looking_up">Checking the code…</string>
+    <string name="connect_device_connecting">Connecting %1$s…</string>
+    <string name="connect_device_rejecting">Rejecting the request from %1$s…</string>
+    <string name="connect_device_connected">%1$s is connected.</string>
+    <string name="connect_device_rejected">The request from %1$s was rejected.</string>
+    <string name="connect_device_error_not_a_code">This QR code isn't a LogDate connection code.</string>
+    <string name="connect_device_error_scan_failed">The code couldn't be scanned. Try again.</string>
+    <string name="connect_device_error_camera_denied">Camera access is off. Allow camera access for LogDate in Settings, then scan the code again.</string>
+    <string name="connect_device_error_signed_out">Sign in on this phone, then scan the code again.</string>
+    <string name="connect_device_error_account_mismatch">This phone's sign-in doesn't match its account. Sign out and sign in again, then scan the code.</string>
+    <string name="connect_device_error_wrong_account_or_expired">This phone is signed in to a different account than the new device, or the request expired. Check the account, then start again on the new device.</string>
+    <string name="connect_device_error_expired">This connection request expired. Start again on the new device.</string>
+    <string name="connect_device_error_already_used">This connection code was already used. Start again on the new device.</string>
+    <string name="connect_device_error_keys_missing">This phone doesn't have your encryption keys yet. Finish setting up sync on this phone, then try again.</string>
+    <string name="connect_device_error_connection_failed">The LogDate server couldn't be reached. Check your connection and try again.</string>
+    <string name="connect_device_error_server">The LogDate server couldn't finish this request. Try again in a moment.</string>
+    <string name="this_device">This device</string>
     <string name="loading_devices">Loading devices...</string>
     <string name="last_active_label">Last active: %1$s</string>
     <string name="enter_a_new_name_for_this_device">Enter a new name for this device:</string>
@@ -127,6 +154,7 @@
     <string name="sync_device_remove_title">Remove Device</string>
     <string name="remove_device_confirmation">Are you sure you want to remove &quot;%1$s&quot; from your account? This device will no longer receive notifications or sync data.</string>
     <string name="sync_device_rename_label">Rename device</string>
+    <string name="sync_device_options_label">Device options</string>
     <string name="sync_device_rename_title">Rename Device</string>
 
     <!-- Debug / developer -->

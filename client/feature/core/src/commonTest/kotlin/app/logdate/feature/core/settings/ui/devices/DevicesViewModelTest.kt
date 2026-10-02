@@ -115,6 +115,7 @@ class DevicesViewModelTest {
             assertFalse(state.isLoading, "Loading should be complete")
             assertEquals(3, state.devices.size, "Should load all 3 devices")
             assertNull(state.error, "Should have no error")
+            assertEquals(currentDeviceId, state.devices.first().id, "This device should lead the list")
 
             // Verify current device is properly marked
             val currentDevice = assertNotNull(state.devices.find { it.id == currentDeviceId })
@@ -127,6 +128,27 @@ class DevicesViewModelTest {
                 .forEach { device ->
                     assertFalse(device.isCurrentDevice, "Other devices should not be marked as current")
                 }
+        }
+
+    @Test
+    fun `raw device identifiers are not shown as names`() =
+        testScope.runTest {
+            repository.addAssociatedDevice(
+                deviceInfo(
+                    id = Uuid.parse("423e4567-e89b-12d3-a456-426614174000"),
+                    name = "sdk_gphone16k_arm64",
+                    platform = DevicePlatform.ANDROID,
+                ),
+            )
+
+            viewModel.loadDevices()
+            advanceUntilIdle()
+
+            val names =
+                viewModel.uiState.value.devices
+                    .map { it.name }
+            assertTrue("Android device" in names)
+            assertFalse("sdk_gphone16k_arm64" in names)
         }
 
     @Test
