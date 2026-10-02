@@ -44,6 +44,15 @@ plugins.withType<WasmYarnPlugin> {
     the<WasmYarnRootExtension>().resolution("ws", "8.21.0")
 }
 
+// build-logic is an included build, so a root `./gradlew test` never reaches its tests. They cover
+// release signing resolution, which decides what the Play publish uploads with, so the root `test`
+// task runs them too.
+tasks.register("test") {
+    group = "verification"
+    description = "Runs the build-logic tests, which the subprojects' test tasks do not reach."
+    dependsOn(gradle.includedBuild("build-logic").task(":test"))
+}
+
 subprojects {
     apply {
         // TODO: Migrate to version catalog
