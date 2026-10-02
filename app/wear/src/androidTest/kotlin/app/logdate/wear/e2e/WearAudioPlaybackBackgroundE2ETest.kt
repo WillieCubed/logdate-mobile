@@ -8,7 +8,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.test.core.app.ApplicationProvider
@@ -51,7 +50,7 @@ class WearAudioPlaybackBackgroundE2ETest {
 
     @Before
     fun setUp() {
-        grantNotificationPermissionIfNeeded()
+        grantNotificationPermission()
         LogDateNotificationRegistrar(context).registerChannel(LogDateNotificationChannelKey.AUDIO_PLAYBACK)
         playbackManager = AndroidAudioPlaybackManager(context, scope)
     }
@@ -195,8 +194,7 @@ class WearAudioPlaybackBackgroundE2ETest {
         return future.get(10, TimeUnit.SECONDS).also { controller = it }
     }
 
-    private fun grantNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    private fun grantNotificationPermission() {
         InstrumentationRegistry
             .getInstrumentation()
             .uiAutomation

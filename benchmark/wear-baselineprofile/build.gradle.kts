@@ -15,7 +15,7 @@ android {
     targetProjectPath = ":app:wear"
 
     defaultConfig {
-        minSdk = 31
+        minSdk = 34
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments["androidx.benchmark.suppressErrors"] = "EMULATOR"
     }

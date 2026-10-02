@@ -52,8 +52,8 @@ class OnboardingPermissionsUiStateTest {
     }
 
     @Test
-    fun `permission request covers mic and location on every supported release`() {
-        val request = onboardingPermissionRequest(sdkInt = 31).toSet()
+    fun `permission request covers mic and location`() {
+        val request = onboardingPermissionRequest().toSet()
 
         assertTrue(Manifest.permission.RECORD_AUDIO in request)
         assertTrue(Manifest.permission.ACCESS_FINE_LOCATION in request)
@@ -61,13 +61,7 @@ class OnboardingPermissionsUiStateTest {
     }
 
     @Test
-    fun `permission request asks for notifications where the system gates them`() {
-        assertTrue(Manifest.permission.POST_NOTIFICATIONS in onboardingPermissionRequest(sdkInt = 33))
-        assertTrue(Manifest.permission.POST_NOTIFICATIONS in onboardingPermissionRequest(sdkInt = 36))
-    }
-
-    @Test
-    fun `permission request leaves out notifications before the system gates them`() {
-        assertFalse(Manifest.permission.POST_NOTIFICATIONS in onboardingPermissionRequest(sdkInt = 32))
+    fun `permission request always asks for notifications`() {
+        assertTrue(Manifest.permission.POST_NOTIFICATIONS in onboardingPermissionRequest())
     }
 }

@@ -3,7 +3,7 @@
 LogDate on your wrist. Tap to record a thought, or press and hold to talk; log your mood with an
 emoji; and listen back to your voice memories, all without pulling out your phone.
 
-**Min SDK**: 31 (Wear OS 3+) | **Target SDK**: 37 | **Compile SDK**: 37
+**Min SDK**: 34 (Wear OS 5+) | **Target SDK**: 37 | **Compile SDK**: 37
 
 ## The watch and the phone are one app
 
@@ -29,7 +29,7 @@ plugin in `build-logic`; publishing is covered in
 
 ### Prerequisites
 
-- Android Studio with Wear OS system images (API 33+ round)
+- Android Studio with Wear OS system images (API 34+ round)
 - `adb` available on PATH ([setup](../../docs/environment/setup.md))
 - A Wear OS emulator **or** a physical watch with developer options enabled
 

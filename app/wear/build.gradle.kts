@@ -31,7 +31,7 @@ extensions.configure<ApplicationExtension> {
 
     defaultConfig {
         applicationId = release.applicationId
-        minSdk = 31
+        minSdk = 34
         targetSdk = 37
         versionCode = release.versionCode
         versionName = release.versionName
