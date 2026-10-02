@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import platform.CoreLocation.CLLocation
 import platform.CoreLocation.CLLocationManager
 import platform.CoreLocation.CLLocationManagerDelegateProtocol
@@ -30,6 +31,7 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /**
@@ -62,7 +64,12 @@ class IosLocationProvider(
                 manager: CLLocationManager,
                 didUpdateLocations: List<*>,
             ) {
-                val mostRecent = didUpdateLocations.filterIsInstance<CLLocation>().lastOrNull() ?: return
+                // CoreLocation marks a fix whose coordinate is invalid with a negative accuracy.
+                val mostRecent = didUpdateLocations.filterIsInstance<CLLocation>().lastOrNull { it.horizontalAccuracy >= 0 }
+                if (mostRecent == null) {
+                    drainPending(success = null, failure = null)
+                    return
+                }
                 val fix = mostRecent.toFix()
                 latestFix = fix
                 _currentLocation.tryEmit(fix.location)
@@ -87,16 +94,30 @@ class IosLocationProvider(
         permissionManager.isPermissionGranted(PermissionType.LOCATION) ||
             isAuthorizedFromCoreLocation()
 
-    override suspend fun getCurrentLocation(): Location = getCurrentFix().location
+    /** Answers instantly from the last fix when there is one, so callers such as note saving never wait on CoreLocation. */
+    override suspend fun getCurrentLocation(): Location {
+        if (!hasLocationPermission()) {
+            error("Location permission not granted")
+        }
+        return latestFix?.location ?: requestFix().location
+    }
 
-    /** Answers from the last fix while it is recent; an older one would place the person where they used to be. */
+    /**
+     * Answers from the last fix while it is recent; an older one would place the person where they
+     * used to be. If CoreLocation does not answer in time, the older fix is returned with its real
+     * age rather than holding the caller up.
+     */
     override suspend fun getCurrentFix(): LocationFix {
         if (!hasLocationPermission()) {
             error("Location permission not granted")
         }
-        latestFix?.takeIf { Clock.System.now() - it.observedAt <= MAXIMUM_CACHED_FIX_AGE }?.let { return it }
-        return requestOneShot()
+        val cached = latestFix
+        if (cached != null && Clock.System.now() - cached.observedAt <= MAXIMUM_CACHED_FIX_AGE) return cached
+        return withTimeoutOrNull(ONE_SHOT_TIMEOUT) { requestOneShot() } ?: cached ?: error("No location fix within $ONE_SHOT_TIMEOUT")
     }
+
+    private suspend fun requestFix(): LocationFix =
+        withTimeoutOrNull(ONE_SHOT_TIMEOUT) { requestOneShot() } ?: error("No location fix within $ONE_SHOT_TIMEOUT")
 
     override suspend fun refreshLocation() {
         if (!hasLocationPermission()) {
@@ -151,13 +172,13 @@ class IosLocationProvider(
                     )
                 },
             observedAt = Instant.fromEpochMilliseconds((timestamp.timeIntervalSince1970 * 1000).toLong()),
-            // CoreLocation reports a negative value when it has no estimate.
-            accuracyMeters = horizontalAccuracy.takeIf { it >= 0 }?.toFloat(),
+            accuracyMeters = horizontalAccuracy.toFloat(),
             speedMetersPerSecond = speed.takeIf { it >= 0 }?.toFloat(),
             bearingDegrees = course.takeIf { it >= 0 }?.toFloat(),
         )
 
     private companion object {
         val MAXIMUM_CACHED_FIX_AGE = 2.minutes
+        val ONE_SHOT_TIMEOUT = 15.seconds
     }
 }

@@ -5,6 +5,8 @@ import app.logdate.client.location.settings.LocationTrackingSettings
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 /**
  * Unit tests for computing location tracking execution decisions based on user settings.
@@ -113,14 +115,19 @@ class ForegroundActivityCounterTest {
     }
 
     @Test
-    fun `periodic samples pause only while the active stream is recording`() {
-        val active = LocationTrackingSettings(backgroundTrackingEnabled = true, captureMode = LocationCaptureMode.ACTIVE)
+    fun `periodic samples pause only while the active stream is delivering fixes`() {
+        val active =
+            LocationTrackingSettings(
+                backgroundTrackingEnabled = true,
+                captureMode = LocationCaptureMode.ACTIVE,
+                minimumPersistIntervalMinutes = 30,
+            )
         val passive = active.copy(captureMode = LocationCaptureMode.PASSIVE)
+        val now = Instant.parse("2026-10-02T12:00:00Z")
 
-        assertFalse(shouldRecordPeriodicSample(active, LocationCaptureStatus.Running))
-        assertTrue(shouldRecordPeriodicSample(active, LocationCaptureStatus.Starting))
-        assertTrue(shouldRecordPeriodicSample(active, LocationCaptureStatus.Failed))
-        assertTrue(shouldRecordPeriodicSample(active, LocationCaptureStatus.Stopped))
-        assertTrue(shouldRecordPeriodicSample(passive, LocationCaptureStatus.Running))
+        assertFalse(shouldRecordPeriodicSample(active, now - 4.minutes, now))
+        assertTrue(shouldRecordPeriodicSample(active, now - 45.minutes, now))
+        assertTrue(shouldRecordPeriodicSample(active, null, now))
+        assertTrue(shouldRecordPeriodicSample(passive, now - 4.minutes, now))
     }
 }

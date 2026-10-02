@@ -14,6 +14,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeout
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -27,17 +28,18 @@ class ScheduledLocationTrackerWorker(
     private val locationProvider: ClientLocationProvider by inject()
     private val locationTracker: LocationTracker by inject()
     private val settingsRepository: LocationTrackingSettingsRepository by inject()
+    private val clock: Clock by inject()
 
     override suspend fun doWork(): Result {
         Napier.i("ScheduledLocationTrackerWorker: Starting scheduled location tracking")
 
         try {
-            val settings = settingsRepository.getSettings()
-            if (!shouldRecordPeriodicSample(settings, ActivityAwareLocationService.captureStatus.value)) {
-                Napier.i("ScheduledLocationTrackerWorker: Activity-aware stream is recording; skipping this sample")
-                return Result.success()
-            }
             try {
+                val settings = settingsRepository.getSettings()
+                if (!shouldRecordPeriodicSample(settings, ActivityAwareLocationService.lastFixAt, clock.now())) {
+                    Napier.i("ScheduledLocationTrackerWorker: Activity-aware stream is delivering fixes; skipping this sample")
+                    return Result.success()
+                }
                 val fix =
                     withTimeout(30.seconds) {
                         locationProvider.getCurrentFix()
@@ -62,7 +64,7 @@ class ScheduledLocationTrackerWorker(
                 )
                 return Result.success()
             } catch (e: Exception) {
-                Napier.w("ScheduledLocationTrackerWorker: Failed to get location within timeout", e)
+                Napier.w("ScheduledLocationTrackerWorker: Failed to record a periodic location; retrying", e)
                 return Result.retry()
             }
         } catch (e: CancellationException) {

@@ -112,6 +112,11 @@ class ActivityAwareLocationService :
         private val captureStatusTracker = LocationCaptureStatusTracker()
         val captureStatus: StateFlow<LocationCaptureStatus> = captureStatusTracker.status
 
+        /** When the stream last delivered a fix; a subscription alone does not mean fixes arrive. */
+        @Volatile
+        var lastFixAt: Instant? = null
+            private set
+
         /**
          * Weak reference to the running service instance so that [ActivityTransitionReceiver]
          * can forward transition events without binding.
@@ -315,6 +320,7 @@ class ActivityAwareLocationService :
     }
 
     private fun persistLocation(androidLocation: AndroidLocation) {
+        lastFixAt = clock.now()
         val location =
             Location(
                 latitude = androidLocation.latitude,
