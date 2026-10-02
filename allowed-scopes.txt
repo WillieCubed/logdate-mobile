@@ -22,6 +22,7 @@ postcards  # Postcard creation, editing, viewing, and collection
 stickers  # Sticker extraction from photos, personal sticker library
 android-widget  # Home screen widgets (Memories, On This Day)
 streaks  # Journaling streak (campfire) tracking and display
+reminders  # Moment-aware reminders on the phone and the watch: triggers, limits, delivery
 
 # App scopes
 wear  # Wear OS companion app

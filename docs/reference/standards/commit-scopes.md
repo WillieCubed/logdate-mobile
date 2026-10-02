@@ -25,6 +25,7 @@ These are the main scopes for user-facing features. **Prefer these scopes** for 
 | `client/feature/timeline/` | `timeline` |
 | `client/feature/android-widgets/` | `android-widget` |
 | `client/domain/` (streak), streak UI in any feature | `streaks` |
+| `client/domain/` (reminders), reminder settings and delivery on the phone or the watch | `reminders` |
 
 ## Apps Scopes
 
