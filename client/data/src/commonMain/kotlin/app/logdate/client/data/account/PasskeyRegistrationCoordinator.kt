@@ -12,6 +12,7 @@ import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.BeginAccountCreationRequest
 import app.logdate.shared.model.BeginAuthenticationRequest
 import app.logdate.shared.model.CompleteAccountCreationRequest
+import app.logdate.shared.model.CompleteAuthenticationData
 import app.logdate.shared.model.CompleteAuthenticationRequest
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyAuthenticationOptions
@@ -164,13 +165,7 @@ internal class PasskeyRegistrationCoordinator(
             val assertion = credentialCodec.parseAssertionResponse(localAssertion.credentialJson)
 
             // Step 4: Complete authentication
-            val completeRequest =
-                CompleteAuthenticationRequest(
-                    credential = assertion,
-                    challenge = beginData.challenge,
-                )
-
-            val completeResult = apiClient.completeAuthentication(completeRequest)
+            val completeResult = apiClient.completeAuthentication(CompleteAuthenticationRequest(assertion, beginData.challenge))
             if (completeResult.isFailure) {
                 return Result.failure(completeResult.exceptionOrNull()!!)
             }
@@ -184,15 +179,7 @@ internal class PasskeyRegistrationCoordinator(
                     return Result.failure(CanonicalOwnerMismatchException())
             }
 
-            require(configRepository.apiBaseUrl.first() == apiBaseUrl) { "The connected server changed during sign-in" }
-            accountKeyUnlockCoordinator?.unlockOrProvision(
-                apiBaseUrl = apiBaseUrl,
-                accountId = completeData.account.id.toString(),
-                accessToken = completeData.tokens.accessToken,
-                credentialId = assertion.id,
-                unlockSecret = unlockSecret,
-                mayPublishLocalKeys = originalOwner == completeData.account.id.toString(),
-            )
+            unlockAccountKeys(completeData, assertion.id, unlockSecret, originalOwner, apiBaseUrl)
 
             // Step 5: Store session and account data
             persistSession(
@@ -222,6 +209,24 @@ internal class PasskeyRegistrationCoordinator(
         } finally {
             unlockSecret?.fill(0)
         }
+    }
+
+    private suspend fun unlockAccountKeys(
+        completeData: CompleteAuthenticationData,
+        credentialId: String,
+        unlockSecret: ByteArray?,
+        originalOwner: String?,
+        apiBaseUrl: String,
+    ) {
+        require(configRepository.apiBaseUrl.first() == apiBaseUrl) { "The connected server changed during sign-in" }
+        accountKeyUnlockCoordinator?.unlockOrProvision(
+            apiBaseUrl = apiBaseUrl,
+            accountId = completeData.account.id.toString(),
+            accessToken = completeData.tokens.accessToken,
+            credentialId = credentialId,
+            unlockSecret = unlockSecret,
+            mayPublishLocalKeys = originalOwner == completeData.account.id.toString(),
+        )
     }
 
     private suspend fun registerPlatformAccount(
