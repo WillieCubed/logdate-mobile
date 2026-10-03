@@ -53,10 +53,62 @@ class FeatureFlagStoreTest {
     fun `setting a flag persists it and overrides the default`() =
         runTest {
             store.setEnabled(FeatureFlag.LIBRARY, enabled = false)
-            store.setEnabled(FeatureFlag.EVENTS, enabled = false)
+            store.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, enabled = true)
 
             assertFalse(store.isEnabled(FeatureFlag.LIBRARY))
-            assertFalse(store.isEnabled(FeatureFlag.EVENTS))
+            assertTrue(store.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2))
+        }
+
+    @Test
+    fun `setting a flag to a value other than its default stores that value`() =
+        runTest {
+            store.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, enabled = true)
+            store.setEnabled(FeatureFlag.CAMPFIRE_STREAKS, enabled = false)
+
+            val stored = preferences.data.first()
+
+            assertEquals(true, stored[booleanPreferencesKey("watch_experience_v2_enabled")])
+            assertEquals(false, stored[booleanPreferencesKey("campfire_streaks_enabled")])
+        }
+
+    /**
+     * A flag switched back to its default has no value of its own. A stored value is read before the
+     * default, so one left behind would keep deciding the flag after the default changes, and a flag
+     * that is on by default is no longer listed in Labs to switch it back.
+     */
+    @Test
+    fun `setting a flag to its default clears the stored value`() =
+        runTest {
+            store.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, enabled = true)
+            store.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, enabled = false)
+
+            val stored = preferences.data.first()[booleanPreferencesKey("watch_experience_v2_enabled")]
+
+            assertNull(stored, "a stored false would keep the flag off if its default turned on")
+            assertFalse(store.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2))
+        }
+
+    @Test
+    fun `setting a flag that is on by default back to on clears the stored value`() =
+        runTest {
+            store.setEnabled(FeatureFlag.CAMPFIRE_STREAKS, enabled = false)
+            store.setEnabled(FeatureFlag.CAMPFIRE_STREAKS, enabled = true)
+
+            val stored = preferences.data.first()[booleanPreferencesKey("campfire_streaks_enabled")]
+
+            assertNull(stored)
+            assertTrue(store.isEnabled(FeatureFlag.CAMPFIRE_STREAKS))
+        }
+
+    @Test
+    fun `setting a flag to its default when nothing is stored stores nothing`() =
+        runTest {
+            store.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, enabled = false)
+            store.setEnabled(FeatureFlag.LIBRARY, enabled = true)
+
+            val stored = preferences.data.first()
+
+            assertTrue(stored.asMap().isEmpty())
         }
 
     @Test
@@ -111,11 +163,11 @@ class FeatureFlagStoreTest {
     @Test
     fun `a flag is stored under its declared key`() =
         runTest {
-            store.setEnabled(FeatureFlag.LIBRARY, enabled = true)
+            store.setEnabled(FeatureFlag.LIBRARY, enabled = false)
 
             val stored = preferences.data.first()[booleanPreferencesKey("library_enabled")]
 
-            assertEquals(true, stored)
+            assertEquals(false, stored)
         }
 
     /**
@@ -128,11 +180,11 @@ class FeatureFlagStoreTest {
         runTest {
             val dataSource = LogdatePreferencesDataSource(preferences)
 
-            store.setEnabled(FeatureFlag.LIBRARY, enabled = true)
-            assertTrue(dataSource.observeLibraryEnabled().first())
+            store.setEnabled(FeatureFlag.LIBRARY, enabled = false)
+            assertFalse(dataSource.observeLibraryEnabled().first())
 
-            dataSource.setLibraryEnabled(false)
-            assertFalse(store.isEnabled(FeatureFlag.LIBRARY))
+            dataSource.setLibraryEnabled(true)
+            assertTrue(store.isEnabled(FeatureFlag.LIBRARY))
         }
 
     /**

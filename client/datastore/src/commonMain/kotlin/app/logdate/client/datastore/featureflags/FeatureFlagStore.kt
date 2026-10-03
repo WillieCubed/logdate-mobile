@@ -31,6 +31,10 @@ interface FeatureFlagStore {
 
     /**
      * Turns [flag] on or off for this installation.
+     *
+     * Setting a flag to its [FeatureFlag.defaultEnabled] clears the stored value instead of writing
+     * it, so the flag follows its default again. A stored value is read before the default, so one
+     * written for the current default would keep deciding the flag after the default changes.
      */
     suspend fun setEnabled(
         flag: FeatureFlag,
@@ -53,9 +57,14 @@ class DataStoreFeatureFlagStore(
         flag: FeatureFlag,
         enabled: Boolean,
     ) {
+        val key = booleanPreferencesKey(flag.key)
         userPreferences.updateData { preferences ->
             preferences.toMutablePreferences().apply {
-                this[booleanPreferencesKey(flag.key)] = enabled
+                if (enabled == flag.defaultEnabled) {
+                    remove(key)
+                } else {
+                    this[key] = enabled
+                }
             }
         }
     }

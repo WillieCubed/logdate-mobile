@@ -119,6 +119,28 @@ class LabsSettingsViewModelTest {
         }
 
     @Test
+    fun `turning a flag back off shows it off`() =
+        runTest {
+            val store = FakeFeatureFlagStore()
+            val viewModel = LabsSettingsViewModel(store, flags = listOf(FeatureFlag.WATCH_EXPERIENCE_V2))
+            backgroundScope.launch { viewModel.uiState.collect { } }
+
+            viewModel.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, enabled = true)
+            advanceUntilIdle()
+            viewModel.setEnabled(FeatureFlag.WATCH_EXPERIENCE_V2, enabled = false)
+            advanceUntilIdle()
+
+            assertEquals(
+                listOf(FeatureFlag.WATCH_EXPERIENCE_V2 to true, FeatureFlag.WATCH_EXPERIENCE_V2 to false),
+                store.writes,
+            )
+            assertEquals(
+                LabsUiState.Ready(listOf(LabsFlag(FeatureFlag.WATCH_EXPERIENCE_V2, enabled = false))),
+                viewModel.uiState.value,
+            )
+        }
+
+    @Test
     fun `a flag changed elsewhere shows its new value`() =
         runTest {
             val store = FakeFeatureFlagStore()
