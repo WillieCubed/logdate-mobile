@@ -7,8 +7,8 @@ import app.logdate.client.notifications.LogDateNotificationChannelKey
 import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.wear.di.wearAudioModule
 import app.logdate.wear.di.wearDataModule
-import app.logdate.wear.notification.WearPromptScheduler
 import app.logdate.wear.recording.WearRecordingRecovery
+import app.logdate.wear.reminders.LegacyPromptAlarms
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.runBlocking
@@ -52,8 +52,8 @@ class LogDateWearApplication : Application() {
 
         recoverInterruptedRecordings(launchedAtMs)
 
-        // Schedule morning/evening journal prompt alarms.
-        WearPromptScheduler(this).scheduleAll()
+        runCatching { LegacyPromptAlarms.cancel(this) }
+            .onFailure { error -> Napier.w("Failed to remove the legacy journal prompts", error) }
 
         // Trigger database initialization on a background thread.
         // The database singleton uses runBlocking for SQLCipher passphrase retrieval

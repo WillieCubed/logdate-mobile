@@ -65,6 +65,14 @@ Bring the phone and watch within range and confirm the watch's Settings screen s
 | Play with no headphones connected on a watch with no speaker | "Connect headphones to listen", and the button opens Bluetooth settings |
 | Play with the phone out of range a memory the watch never received | "Couldn't load audio. Tap to retry" |
 
+## Reminders
+
+| Do this | You should see |
+|---------|----------------|
+| Install this build over one that showed "Good morning!" or "Time to reflect", then wear the watch past 8 AM and past 9 PM | Neither notification appears |
+| Open Settings on the watch | No Morning prompt or Evening prompt switch |
+| Open LogDate's notification settings on the watch | No "Journal reminders" category |
+
 ## Known gaps
 
 These are known and should not be reported again as new bugs:
