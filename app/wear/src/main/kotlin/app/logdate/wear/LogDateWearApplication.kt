@@ -7,6 +7,7 @@ import app.logdate.client.notifications.LogDateNotificationChannelKey
 import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.wear.di.wearAudioModule
 import app.logdate.wear.di.wearDataModule
+import app.logdate.wear.di.wearExperienceModule
 import app.logdate.wear.recording.WearRecordingRecovery
 import app.logdate.wear.reminders.LegacyPromptAlarms
 import io.github.aakira.napier.DebugAntilog
@@ -39,6 +40,7 @@ class LogDateWearApplication : Application() {
             modules(
                 wearDataModule,
                 wearAudioModule,
+                wearExperienceModule,
             )
         }
 

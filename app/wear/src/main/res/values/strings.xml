@@ -183,6 +183,10 @@
     <string name="wear_saved_detail_syncing">Syncing to phone</string>
     <string name="wear_saved_detail_watch_only">On watch only</string>
 
+    <!-- New watch experience -->
+    <string name="wear_v2_placeholder_title">New watch experience</string>
+    <string name="wear_v2_placeholder_body">Not built yet</string>
+
     <!-- Plurals -->
     <plurals name="wear_tile_entry_count">
         <item quantity="one">%d entry today</item>

@@ -1,165 +1,79 @@
 package app.logdate.wear.presentation
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.runtime.entryProvider
-import androidx.navigation3.ui.NavDisplay
-import app.logdate.client.repository.journals.JournalNotesRepository
-import app.logdate.wear.location.WearLocationCaptureCoordinator
-import app.logdate.wear.presentation.camera.WearRemoteCameraScreen
-import app.logdate.wear.presentation.camera.WearRemoteCameraViewModel
-import app.logdate.wear.presentation.home.WearHomeScreen
-import app.logdate.wear.presentation.memories.WearMemoryPlayerScreen
-import app.logdate.wear.presentation.memories.WearVoiceMemoriesScreen
-import app.logdate.wear.presentation.mood.MoodCheckInScreen
-import app.logdate.wear.presentation.more.WearMoreScreen
-import app.logdate.wear.presentation.navigation.WearHomeRoute
-import app.logdate.wear.presentation.navigation.WearMemoryPlayerRoute
-import app.logdate.wear.presentation.navigation.WearMoodCheckInRoute
-import app.logdate.wear.presentation.navigation.WearMoreRoute
-import app.logdate.wear.presentation.navigation.WearOnboardingRoute
-import app.logdate.wear.presentation.navigation.WearQuickTextRoute
-import app.logdate.wear.presentation.navigation.WearRemoteCameraRoute
-import app.logdate.wear.presentation.navigation.WearSettingsRoute
-import app.logdate.wear.presentation.navigation.WearTimelineDayDetailRoute
-import app.logdate.wear.presentation.navigation.WearTimelineRoute
-import app.logdate.wear.presentation.navigation.WearVoiceMemoriesRoute
-import app.logdate.wear.presentation.navigation.wearRouteFor
-import app.logdate.wear.presentation.onboarding.WearOnboardingScreen
-import app.logdate.wear.presentation.onboarding.isOnboardingComplete
-import app.logdate.wear.presentation.quicktext.QuickTextLauncher
-import app.logdate.wear.presentation.settings.WearSettingsScreen
-import app.logdate.wear.presentation.theme.LogDateTheme
-import app.logdate.wear.presentation.timeline.WearDayDetailScreen
-import app.logdate.wear.presentation.timeline.WearTimelineScreen
-import app.logdate.wear.presentation.timeline.WearTimelineViewModel
-import org.koin.compose.koinInject
-import org.koin.compose.viewmodel.koinViewModel
+import androidx.lifecycle.lifecycleScope
+import app.logdate.wear.launch.WearExperience
+import app.logdate.wear.launch.WearExperienceGate
+import app.logdate.wear.launch.WearLaunchRequest
+import app.logdate.wear.launch.toWearLaunchRequest
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
+import org.koin.android.ext.android.inject
 
-private const val TILE_ROUTE_EXTRA = "tile_route"
-
+/**
+ * The watch app's only activity.
+ *
+ * Tiles, complications and the benchmark modules start it as `app.logdate.wear.presentation.MainActivity`,
+ * so its name and package stay as they are. It is single-top: a launch that arrives while it is on
+ * screen comes through [onNewIntent].
+ */
 class MainActivity : ComponentActivity() {
+    private val experienceGate: WearExperienceGate by inject()
+    private val experience = MutableStateFlow<WearExperience?>(null)
+    private val launchRequests = Channel<WearLaunchRequest>(Channel.CONFLATED)
+
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         setTheme(android.R.style.Theme_DeviceDefault)
+        splashScreen.setKeepOnScreenCondition { experience.value == null }
+        resolveExperience(savedInstanceState)
+
+        val initialRequest = intent.toWearLaunchRequest()
+        val newRequests = launchRequests.receiveAsFlow()
         setContent {
-            WearApp(initialRouteName = intent?.getStringExtra(TILE_ROUTE_EXTRA))
+            val resolvedExperience by experience.collectAsState()
+            MainActivityContent(
+                experience = resolvedExperience,
+                initialRequest = initialRequest,
+                newRequests = newRequests,
+            )
         }
     }
-}
 
-@Composable
-fun WearApp(initialRouteName: String? = null) {
-    LogDateTheme {
-        val context = LocalContext.current
-        val startRoute: NavKey =
-            if (isOnboardingComplete(context)) {
-                wearRouteFor(initialRouteName)
-            } else {
-                WearOnboardingRoute
-            }
-        val backStack = remember { mutableStateListOf(startRoute) }
-        val navigateBack: () -> Unit = {
-            if (backStack.size > 1) {
-                backStack.removeAt(backStack.lastIndex)
-            }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val request = intent.toWearLaunchRequest() ?: return
+        launchRequests.trySend(request)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        val resolved = experience.value ?: return
+        outState.putString(STATE_EXPERIENCE, resolved.name)
+    }
+
+    /**
+     * Picks the watch app behind the splash screen. A recreated activity passes its saved choice, so
+     * the app never changes while the activity is alive.
+     */
+    private fun resolveExperience(savedInstanceState: Bundle?) {
+        val restored = WearExperience.fromName(savedInstanceState?.getString(STATE_EXPERIENCE))
+        lifecycleScope.launch {
+            experience.value = experienceGate.resolve(restored)
         }
+    }
 
-        NavDisplay(
-            backStack = backStack,
-            onBack = navigateBack,
-            entryProvider =
-                entryProvider {
-                    entry<WearOnboardingRoute> {
-                        WearOnboardingScreen(
-                            onComplete = {
-                                backStack.clear()
-                                backStack.add(WearHomeRoute)
-                            },
-                        )
-                    }
-                    entry<WearHomeRoute> {
-                        WearHomeScreen(
-                            onNavigateToMoodCheckIn = {
-                                backStack.add(WearMoodCheckInRoute)
-                            },
-                            onNavigateToMemories = {
-                                backStack.add(WearVoiceMemoriesRoute)
-                            },
-                            onNavigateToMore = {
-                                backStack.add(WearMoreRoute)
-                            },
-                        )
-                    }
-                    entry<WearVoiceMemoriesRoute> {
-                        WearVoiceMemoriesScreen(onOpenMemory = { noteId -> backStack.add(WearMemoryPlayerRoute(noteId)) })
-                    }
-                    entry<WearMemoryPlayerRoute> { route ->
-                        WearMemoryPlayerScreen(noteId = route.noteId)
-                    }
-                    entry<WearMoreRoute> {
-                        WearMoreScreen(
-                            onNavigateToQuickText = { backStack.add(WearQuickTextRoute) },
-                            onNavigateToTimeline = { backStack.add(WearTimelineRoute) },
-                            onNavigateToSettings = { backStack.add(WearSettingsRoute) },
-                        )
-                    }
-                    entry<WearMoodCheckInRoute> {
-                        MoodCheckInScreen(
-                            onNavigateBack = navigateBack,
-                            // The recorder is the Home screen; it never starts recording on its own. Replacing the
-                            // stack also reaches Home when a tile or complication opened the check-in directly.
-                            onNavigateToVoiceNote = {
-                                backStack.clear()
-                                backStack.add(WearHomeRoute)
-                            },
-                        )
-                    }
-                    entry<WearQuickTextRoute> {
-                        val notesRepository = koinInject<JournalNotesRepository>()
-                        val locationCaptureCoordinator = koinInject<WearLocationCaptureCoordinator>()
-                        QuickTextLauncher(
-                            notesRepository = notesRepository,
-                            locationCaptureCoordinator = locationCaptureCoordinator,
-                            onDone = navigateBack,
-                        )
-                    }
-                    entry<WearTimelineRoute> {
-                        val timelineViewModel = koinViewModel<WearTimelineViewModel>()
-                        WearTimelineScreen(
-                            onNavigateBack = navigateBack,
-                            onNavigateToDay = { date ->
-                                timelineViewModel.selectDay(date)
-                                backStack.add(WearTimelineDayDetailRoute(date))
-                            },
-                            viewModel = timelineViewModel,
-                        )
-                    }
-                    entry<WearTimelineDayDetailRoute> { route ->
-                        val timelineViewModel = koinViewModel<WearTimelineViewModel>()
-                        WearDayDetailScreen(
-                            date = route.date,
-                            viewModel = timelineViewModel,
-                        )
-                    }
-                    entry<WearRemoteCameraRoute> {
-                        WearRemoteCameraScreen(
-                            viewModel = koinViewModel<WearRemoteCameraViewModel>(),
-                            onNavigateBack = navigateBack,
-                        )
-                    }
-                    entry<WearSettingsRoute> {
-                        WearSettingsScreen(onNavigateBack = navigateBack)
-                    }
-                },
-        )
+    private companion object {
+        const val STATE_EXPERIENCE = "wear_experience"
     }
 }
