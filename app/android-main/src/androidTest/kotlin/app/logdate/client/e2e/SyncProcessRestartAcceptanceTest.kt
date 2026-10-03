@@ -18,7 +18,6 @@ import app.logdate.client.sync.cloud.CloudApiClient
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
@@ -46,150 +45,153 @@ import kotlin.uuid.Uuid
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class SyncProcessRestartAcceptanceTest {
     @Test
-    fun a_queueOfflineEditsAndDeletion(): Unit = runBlocking {
-        val fixture = fetchFixtureOrSkip() ?: return@runBlocking
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val context = instrumentation.targetContext
-        val preferences = context.getSharedPreferences(PREFERENCES, 0)
-        assertFalse(preferences.getBoolean(PREPARED, false), "acceptance emulator must start with a clean profile")
+    fun a_queueOfflineEditsAndDeletion(): Unit =
+        runBlocking {
+            val fixture = fetchFixtureOrSkip() ?: return@runBlocking
+            val instrumentation = InstrumentationRegistry.getInstrumentation()
+            val context = instrumentation.targetContext
+            val preferences = context.getSharedPreferences(PREFERENCES, 0)
+            assertFalse(preferences.getBoolean(PREPARED, false), "acceptance emulator must start with a clean profile")
 
-        val koin = GlobalContext.get()
-        val config = koin.get<LogDateConfigRepository>()
-        koin.get<LogDateConfigDataSource>().awaitConfigurationLoaded()
-        config.updateBackendUrl(fixture.origin)
-        val descriptor = koin.get<ServerDiscoveryClient>().discoverServer(fixture.origin).getOrThrow()
-        assertEquals(fixture.origin, descriptor.serverOrigin)
-        config.updateServerDescriptor(descriptor)
+            val koin = GlobalContext.get()
+            val config = koin.get<LogDateConfigRepository>()
+            koin.get<LogDateConfigDataSource>().awaitConfigurationLoaded()
+            config.updateBackendUrl(fixture.origin)
+            val descriptor = koin.get<ServerDiscoveryClient>().discoverServer(fixture.origin).getOrThrow()
+            assertEquals(fixture.origin, descriptor.serverOrigin)
+            config.updateServerDescriptor(descriptor)
 
-        val owner = koin.get<CanonicalOwnerProvider>()
-        assertTrue(owner.adoptRemoteOwnerIfUninitialized(fixture.accountId))
-        val identity = koin.get<IdentityKeyManager>()
-        identity.recoverIdentity(fixture.recoveryWords)
-        val sessions = koin.get<SessionStorage>()
-        sessions.saveSession(UserSession(fixture.accessToken, fixture.refreshToken, fixture.accountId))
+            val owner = koin.get<CanonicalOwnerProvider>()
+            assertTrue(owner.adoptRemoteOwnerIfUninitialized(fixture.accountId))
+            val identity = koin.get<IdentityKeyManager>()
+            identity.recoverIdentity(fixture.recoveryWords)
+            val sessions = koin.get<SessionStorage>()
+            sessions.saveSession(UserSession(fixture.accessToken, fixture.refreshToken, fixture.accountId))
 
-        val journals = koin.get<JournalRepository>()
-        val notes = koin.get<JournalNotesRepository>()
-        val sync = koin.get<DefaultSyncManager>()
-        val journalId = Uuid.random()
-        val deletedNoteId = Uuid.random()
-        val offlineNoteId = Uuid.random()
-        val journal = Journal(id = journalId, title = "Process restart acceptance")
-        val now = Clock.System.now()
-        journals.create(journal)
-        notes.create(
-            JournalNote.Text(
-                uid = deletedNoteId,
-                creationTimestamp = now,
-                lastUpdated = now,
-                content = "Delete after going offline",
-            ),
-            journalId,
-        )
-        awaitSettled(sync)
-
-        val device = UiDevice.getInstance(instrumentation)
-        var leftOfflineForRestart = false
-        try {
-            setNetworkEnabled(device, false)
-            assertTrue(awaitServerUnavailable(fixture.origin), "server remained reachable after airplane mode was enabled")
-
-            notes.removeById(deletedNoteId)
+            val journals = koin.get<JournalRepository>()
+            val notes = koin.get<JournalNotesRepository>()
+            val sync = koin.get<DefaultSyncManager>()
+            val journalId = Uuid.random()
+            val deletedNoteId = Uuid.random()
+            val offlineNoteId = Uuid.random()
+            val journal = Journal(id = journalId, title = "Process restart acceptance")
+            val now = Clock.System.now()
+            journals.create(journal)
             notes.create(
                 JournalNote.Text(
-                    uid = offlineNoteId,
-                    creationTimestamp = Clock.System.now(),
-                    lastUpdated = Clock.System.now(),
-                    content = "Offline edit survives process restart",
+                    uid = deletedNoteId,
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    content = "Delete after going offline",
                 ),
                 journalId,
             )
-            sync.fullSync()
+            awaitSettled(sync)
 
-            val status = sync.getSyncStatus()
-            assertTrue(status.pendingUploads >= 2, "offline create and deletion were not durably queued")
-            assertNull(notes.getNoteById(deletedNoteId), "local deletion did not apply")
+            val device = UiDevice.getInstance(instrumentation)
+            var leftOfflineForRestart = false
+            try {
+                setNetworkEnabled(device, false)
+                assertTrue(awaitServerUnavailable(fixture.origin), "server remained reachable after airplane mode was enabled")
+
+                notes.removeById(deletedNoteId)
+                notes.create(
+                    JournalNote.Text(
+                        uid = offlineNoteId,
+                        creationTimestamp = Clock.System.now(),
+                        lastUpdated = Clock.System.now(),
+                        content = "Offline edit survives process restart",
+                    ),
+                    journalId,
+                )
+                sync.fullSync()
+
+                val status = sync.getSyncStatus()
+                assertTrue(status.pendingUploads >= 2, "offline create and deletion were not durably queued")
+                assertNull(notes.getNoteById(deletedNoteId), "local deletion did not apply")
+                assertEquals(
+                    "Offline edit survives process restart",
+                    (notes.getNoteById(offlineNoteId) as? JournalNote.Text)?.content,
+                )
+
+                preferences
+                    .edit()
+                    .putInt(PREVIOUS_PID, Process.myPid())
+                    .putString(ACCOUNT_ID, fixture.accountId)
+                    .putString(SERVER_ORIGIN, fixture.origin)
+                    .putString(JOURNAL_ID, journalId.toString())
+                    .putString(DELETED_NOTE_ID, deletedNoteId.toString())
+                    .putString(OFFLINE_NOTE_ID, offlineNoteId.toString())
+                    .putBoolean(PREPARED, true)
+                    .commit()
+                leftOfflineForRestart = true
+            } finally {
+                if (!leftOfflineForRestart) setNetworkEnabled(device, true)
+            }
+        }
+
+    @Test
+    fun b_restartAndRetryRetainsOfflineEdits(): Unit =
+        runBlocking {
+            val instrumentation = InstrumentationRegistry.getInstrumentation()
+            val context = instrumentation.targetContext
+            val preferences = context.getSharedPreferences(PREFERENCES, 0)
+            assertTrue(preferences.getBoolean(PREPARED, false), "offline setup test did not complete")
+            assertFalse(
+                Process.myPid() == preferences.getInt(PREVIOUS_PID, -1),
+                "Android Test Orchestrator did not restart the app process between phases",
+            )
+
+            val koin = GlobalContext.get()
+            koin.get<LogDateConfigDataSource>().awaitConfigurationLoaded()
+            val owner = koin.get<CanonicalOwnerProvider>()
+            val identity = koin.get<IdentityKeyManager>()
+            val sessions = koin.get<SessionStorage>()
+            assertTrue(sessions.hasValidSession(), "persisted session was not loaded after process restart")
+            val session = assertNotNull(sessions.getOriginBoundSession(), "signed-in session did not survive process restart")
+            val fixture =
+                Fixture(
+                    origin = requireNotNull(preferences.getString(SERVER_ORIGIN, null)),
+                    accountId = requireNotNull(preferences.getString(ACCOUNT_ID, null)),
+                    accessToken = session.session.accessToken,
+                    refreshToken = session.session.refreshToken,
+                    recoveryWords = emptyList(),
+                )
+            assertEquals(fixture.origin, session.origin)
+            assertEquals(fixture.accountId, session.session.accountId)
+            assertEquals(fixture.accountId, owner.getCanonicalOwnerId())
+            assertTrue(identity.hasIdentityKey(), "recovery identity did not survive process restart")
+
+            val journalId = Uuid.parse(requireNotNull(preferences.getString(JOURNAL_ID, null)))
+            val deletedNoteId = Uuid.parse(requireNotNull(preferences.getString(DELETED_NOTE_ID, null)))
+            val offlineNoteId = Uuid.parse(requireNotNull(preferences.getString(OFFLINE_NOTE_ID, null)))
+            val notes = koin.get<JournalNotesRepository>()
+            val sync = koin.get<DefaultSyncManager>()
+            assertTrue(sync.getSyncStatus().pendingUploads >= 2, "pending edits disappeared after process restart")
+            assertNull(notes.getNoteById(deletedNoteId), "pending local deletion was lost after process restart")
             assertEquals(
                 "Offline edit survives process restart",
                 (notes.getNoteById(offlineNoteId) as? JournalNote.Text)?.content,
             )
+            assertNotNull(koin.get<JournalRepository>().getJournalById(journalId))
 
-            preferences.edit()
-                .putInt(PREVIOUS_PID, Process.myPid())
-                .putString(ACCOUNT_ID, fixture.accountId)
-                .putString(SERVER_ORIGIN, fixture.origin)
-                .putString(JOURNAL_ID, journalId.toString())
-                .putString(DELETED_NOTE_ID, deletedNoteId.toString())
-                .putString(OFFLINE_NOTE_ID, offlineNoteId.toString())
-                .putBoolean(PREPARED, true)
-                .commit()
-            leftOfflineForRestart = true
-        } finally {
-            if (!leftOfflineForRestart) setNetworkEnabled(device, true)
-        }
-    }
+            val device = UiDevice.getInstance(instrumentation)
+            setNetworkEnabled(device, true)
+            assertTrue(awaitServer(fixture.origin), "persistent server did not become reachable after reconnect")
 
-    @Test
-    fun b_restartAndRetryRetainsOfflineEdits(): Unit = runBlocking {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val context = instrumentation.targetContext
-        val preferences = context.getSharedPreferences(PREFERENCES, 0)
-        assertTrue(preferences.getBoolean(PREPARED, false), "offline setup test did not complete")
-        assertFalse(
-            Process.myPid() == preferences.getInt(PREVIOUS_PID, -1),
-            "Android Test Orchestrator did not restart the app process between phases",
-        )
+            awaitQueueDrained(sync)
 
-        val koin = GlobalContext.get()
-        koin.get<LogDateConfigDataSource>().awaitConfigurationLoaded()
-        val owner = koin.get<CanonicalOwnerProvider>()
-        val identity = koin.get<IdentityKeyManager>()
-        val sessions = koin.get<SessionStorage>()
-        assertTrue(sessions.hasValidSession(), "persisted session was not loaded after process restart")
-        val session = assertNotNull(sessions.getOriginBoundSession(), "signed-in session did not survive process restart")
-        val fixture =
-            Fixture(
-                origin = requireNotNull(preferences.getString(SERVER_ORIGIN, null)),
-                accountId = requireNotNull(preferences.getString(ACCOUNT_ID, null)),
-                accessToken = session.session.accessToken,
-                refreshToken = session.session.refreshToken,
-                recoveryWords = emptyList(),
+            assertNull(notes.getNoteById(deletedNoteId), "server retry resurrected a locally deleted note")
+            assertEquals(
+                "Offline edit survives process restart",
+                (notes.getNoteById(offlineNoteId) as? JournalNote.Text)?.content,
             )
-        assertEquals(fixture.origin, session.origin)
-        assertEquals(fixture.accountId, session.session.accountId)
-        assertEquals(fixture.accountId, owner.getCanonicalOwnerId())
-        assertTrue(identity.hasIdentityKey(), "recovery identity did not survive process restart")
+            val remote = koin.get<CloudApiClient>().getContentChanges(fixture.accessToken, since = 0L, limit = 100).getOrThrow()
+            assertTrue(remote.deletions.any { it.id == deletedNoteId.toString() }, "server did not receive the pending deletion")
+            assertTrue(remote.changes.any { it.id == offlineNoteId.toString() }, "server did not receive the offline edit")
 
-        val journalId = Uuid.parse(requireNotNull(preferences.getString(JOURNAL_ID, null)))
-        val deletedNoteId = Uuid.parse(requireNotNull(preferences.getString(DELETED_NOTE_ID, null)))
-        val offlineNoteId = Uuid.parse(requireNotNull(preferences.getString(OFFLINE_NOTE_ID, null)))
-        val notes = koin.get<JournalNotesRepository>()
-        val sync = koin.get<DefaultSyncManager>()
-        assertTrue(sync.getSyncStatus().pendingUploads >= 2, "pending edits disappeared after process restart")
-        assertNull(notes.getNoteById(deletedNoteId), "pending local deletion was lost after process restart")
-        assertEquals(
-            "Offline edit survives process restart",
-            (notes.getNoteById(offlineNoteId) as? JournalNote.Text)?.content,
-        )
-        assertNotNull(koin.get<JournalRepository>().getJournalById(journalId))
-
-        val device = UiDevice.getInstance(instrumentation)
-        setNetworkEnabled(device, true)
-        assertTrue(awaitServer(fixture.origin), "persistent server did not become reachable after reconnect")
-
-        awaitQueueDrained(sync)
-
-        assertNull(notes.getNoteById(deletedNoteId), "server retry resurrected a locally deleted note")
-        assertEquals(
-            "Offline edit survives process restart",
-            (notes.getNoteById(offlineNoteId) as? JournalNote.Text)?.content,
-        )
-        val remote = koin.get<CloudApiClient>().getContentChanges(fixture.accessToken, since = 0L, limit = 100).getOrThrow()
-        assertTrue(remote.deletions.any { it.id == deletedNoteId.toString() }, "server did not receive the pending deletion")
-        assertTrue(remote.changes.any { it.id == offlineNoteId.toString() }, "server did not receive the offline edit")
-
-        preferences.edit().remove(PREPARED).commit()
-    }
+            preferences.edit().remove(PREPARED).commit()
+        }
 
     private suspend fun awaitSettled(sync: DefaultSyncManager) {
         withTimeout(120_000) {
@@ -212,7 +214,10 @@ class SyncProcessRestartAcceptanceTest {
         }
     }
 
-    private fun setNetworkEnabled(device: UiDevice, enabled: Boolean) {
+    private fun setNetworkEnabled(
+        device: UiDevice,
+        enabled: Boolean,
+    ) {
         val mode = if (enabled) "disable" else "enable"
         device.executeShellCommand("cmd connectivity airplane-mode $mode")
         device.executeShellCommand(if (enabled) "svc wifi enable" else "svc wifi disable")
@@ -257,6 +262,7 @@ class SyncProcessRestartAcceptanceTest {
             }.getOrNull()
         assumeTrue("private isolated persistent-server fixture is missing", json != null)
         val fixture = requireNotNull(json)
+
         fun field(name: String) = fixture.getValue(name).jsonPrimitive.content
         return Fixture(
             origin = field("serverOrigin"),

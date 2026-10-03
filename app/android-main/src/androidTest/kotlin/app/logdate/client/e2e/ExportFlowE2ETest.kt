@@ -14,11 +14,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.domain.export.ExportStats
-import app.logdate.feature.core.export.ExportOptions
 import app.logdate.feature.core.export.ExportState
+import app.logdate.feature.core.restore.RestoreState
 import app.logdate.feature.core.settings.ui.DataSettingsContent
 import app.logdate.feature.core.settings.ui.IntegrityState
-import app.logdate.feature.core.restore.RestoreState
 import app.logdate.feature.core.settings.ui.StorageQuotaUi
 import org.junit.Rule
 import org.junit.Test
@@ -32,18 +31,18 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class ExportFlowE2ETest {
-
     @get:Rule
     val composeRule = createComposeRule()
 
-    private val defaultQuota = StorageQuotaUi(
-        totalBytes = 100_000_000_000L,
-        usedBytes = 0L,
-        usagePercentage = 0f,
-        formattedTotal = "100 GB",
-        formattedUsed = "0 B",
-        categories = emptyList(),
-    )
+    private val defaultQuota =
+        StorageQuotaUi(
+            totalBytes = 100_000_000_000L,
+            usedBytes = 0L,
+            usagePercentage = 0f,
+            formattedTotal = "100 GB",
+            formattedUsed = "0 B",
+            categories = emptyList(),
+        )
 
     // region DataSettingsContent — Export State Rendering
 
@@ -229,16 +228,18 @@ class ExportFlowE2ETest {
                 onBack = {},
                 quotaUsage = defaultQuota,
                 isQuotaAvailable = true,
-                exportState = ExportState.Completed(
-                    path = "content://downloads/logdate_export.zip",
-                    fileName = "logdate_export.zip",
-                    stats = ExportStats(
-                        journalCount = 3,
-                        noteCount = 42,
-                        draftCount = 5,
-                        mediaCount = 10,
+                exportState =
+                    ExportState.Completed(
+                        path = "content://downloads/logdate_export.zip",
+                        fileName = "logdate_export.zip",
+                        stats =
+                            ExportStats(
+                                journalCount = 3,
+                                noteCount = 42,
+                                draftCount = 5,
+                                mediaCount = 10,
+                            ),
                     ),
-                ),
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
                 onConfirmExport = {},
@@ -277,10 +278,11 @@ class ExportFlowE2ETest {
                 onBack = {},
                 quotaUsage = defaultQuota,
                 isQuotaAvailable = true,
-                exportState = ExportState.Completed(
-                    path = "content://downloads/export.zip",
-                    fileName = "export.zip",
-                ),
+                exportState =
+                    ExportState.Completed(
+                        path = "content://downloads/export.zip",
+                        fileName = "export.zip",
+                    ),
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
                 onConfirmExport = {},
@@ -318,10 +320,11 @@ class ExportFlowE2ETest {
                 onBack = {},
                 quotaUsage = defaultQuota,
                 isQuotaAvailable = true,
-                exportState = ExportState.Completed(
-                    path = "/path/to/export.zip",
-                    fileName = "export.zip",
-                ),
+                exportState =
+                    ExportState.Completed(
+                        path = "/path/to/export.zip",
+                        fileName = "export.zip",
+                    ),
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
                 onConfirmExport = {},
@@ -355,11 +358,12 @@ class ExportFlowE2ETest {
                 onBack = {},
                 quotaUsage = defaultQuota,
                 isQuotaAvailable = true,
-                exportState = ExportState.Completed(
-                    path = "/path/to/export.zip",
-                    fileName = "export.zip",
-                    stats = null,
-                ),
+                exportState =
+                    ExportState.Completed(
+                        path = "/path/to/export.zip",
+                        fileName = "export.zip",
+                        stats = null,
+                    ),
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
                 onConfirmExport = {},
@@ -396,10 +400,11 @@ class ExportFlowE2ETest {
                 onBack = {},
                 quotaUsage = defaultQuota,
                 isQuotaAvailable = true,
-                exportState = ExportState.Failed(
-                    reason = "Disk space full",
-                    canRetry = true,
-                ),
+                exportState =
+                    ExportState.Failed(
+                        reason = "Disk space full",
+                        canRetry = true,
+                    ),
                 onShowExportOptions = {},
                 onUpdateExportOptions = {},
                 onConfirmExport = {},
@@ -630,11 +635,12 @@ class ExportFlowE2ETest {
                 onUpdateExportOptions = {},
                 onConfirmExport = {},
                 onCancelExport = {
-                    state = ExportState.Completed(
-                        path = "/test/export.zip",
-                        fileName = "export.zip",
-                        stats = ExportStats(1, 5, 2, 3),
-                    )
+                    state =
+                        ExportState.Completed(
+                            path = "/test/export.zip",
+                            fileName = "export.zip",
+                            stats = ExportStats(1, 5, 2, 3),
+                        )
                 },
                 onRetryExport = {},
                 onDismissExport = {},

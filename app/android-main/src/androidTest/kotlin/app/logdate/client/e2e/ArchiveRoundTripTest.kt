@@ -1,7 +1,5 @@
 package app.logdate.client.e2e
 
-import kotlinx.coroutines.flow.flowOf
-import app.logdate.client.sync.metadata.QueuedUpload
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -45,19 +43,22 @@ import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
+import app.logdate.client.sync.metadata.QueuedUpload
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.feature.core.restore.RestoreLauncher
+import app.logdate.feature.core.restore.RestoreWorker
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.shared.model.user.UserData
-import app.logdate.feature.core.restore.RestoreLauncher
-import app.logdate.feature.core.restore.RestoreWorker
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -67,7 +68,6 @@ import org.junit.runner.RunWith
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module
-import io.mockk.mockk
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -120,103 +120,113 @@ class ArchiveRoundTripTest {
     fun setup() {
         val dispatcher = Dispatchers.Unconfined
 
-        sourceDb = Room
-            .inMemoryDatabaseBuilder(context, LogDateDatabase::class.java)
-            .allowMainThreadQueries()
-            .build()
+        sourceDb =
+            Room
+                .inMemoryDatabaseBuilder(context, LogDateDatabase::class.java)
+                .allowMainThreadQueries()
+                .build()
 
-        destDb = Room
-            .inMemoryDatabaseBuilder(context, LogDateDatabase::class.java)
-            .allowMainThreadQueries()
-            .build()
+        destDb =
+            Room
+                .inMemoryDatabaseBuilder(context, LogDateDatabase::class.java)
+                .allowMainThreadQueries()
+                .build()
 
         val sourceSyncMeta = InMemorySyncMetadataService()
         val sourceDraftRepo = InMemoryDraftRepository()
 
-        sourceJournalRepo = OfflineFirstJournalRepository(
-            journalDao = sourceDb.journalDao(),
-            remoteDataSource = NoOpRemoteJournalDataSource(),
-            draftRepository = sourceDraftRepo,
-            syncMetadataService = sourceSyncMeta,
-            dispatcher = dispatcher,
-            externalScope = kotlinx.coroutines.CoroutineScope(dispatcher),
-        )
+        sourceJournalRepo =
+            OfflineFirstJournalRepository(
+                journalDao = sourceDb.journalDao(),
+                remoteDataSource = NoOpRemoteJournalDataSource(),
+                draftRepository = sourceDraftRepo,
+                syncMetadataService = sourceSyncMeta,
+                dispatcher = dispatcher,
+                externalScope = kotlinx.coroutines.CoroutineScope(dispatcher),
+            )
 
-        sourceNotesRepo = OfflineFirstJournalNotesRepository(
-            textNoteDao = sourceDb.textNoteDao(),
-            imageNoteDao = sourceDb.imageNoteDao(),
-            audioNoteDao = sourceDb.audioNoteDao(),
-            videoNoteDao = sourceDb.videoNoteDao(),
-            journalContentDao = sourceDb.journalContentDao(),
-            journalRepository = sourceJournalRepo,
-            mediaCaptionDao = sourceDb.mediaCaptionDao(),
-            notePlaceResolver = EmptyNotePlaceResolver,
-            syncMetadataService = sourceSyncMeta,
-            syncScope = kotlinx.coroutines.CoroutineScope(dispatcher),
-        )
+        sourceNotesRepo =
+            OfflineFirstJournalNotesRepository(
+                textNoteDao = sourceDb.textNoteDao(),
+                imageNoteDao = sourceDb.imageNoteDao(),
+                audioNoteDao = sourceDb.audioNoteDao(),
+                videoNoteDao = sourceDb.videoNoteDao(),
+                journalContentDao = sourceDb.journalContentDao(),
+                journalRepository = sourceJournalRepo,
+                mediaCaptionDao = sourceDb.mediaCaptionDao(),
+                notePlaceResolver = EmptyNotePlaceResolver,
+                syncMetadataService = sourceSyncMeta,
+                syncScope = kotlinx.coroutines.CoroutineScope(dispatcher),
+            )
 
-        sourceContentRepo = OfflineFirstJournalContentRepository(
-            journalContentDao = sourceDb.journalContentDao(),
-            journalRepository = sourceJournalRepo,
-            journalNotesRepository = sourceNotesRepo,
-            syncMetadataService = sourceSyncMeta,
-            dispatcher = dispatcher,
-        )
+        sourceContentRepo =
+            OfflineFirstJournalContentRepository(
+                journalContentDao = sourceDb.journalContentDao(),
+                journalRepository = sourceJournalRepo,
+                journalNotesRepository = sourceNotesRepo,
+                syncMetadataService = sourceSyncMeta,
+                dispatcher = dispatcher,
+            )
 
-        exportUseCase = ExportUserDataUseCase(
-            journalRepository = sourceJournalRepo,
-            journalNotesRepository = sourceNotesRepo,
-            profileRepository = StoredProfileRepository(),
-            userPlacesRepository = InMemoryUserPlacesRepository(),
-            locationHistoryRepository = InMemoryLocationHistoryRepository(),
-            userStateRepository = InMemoryUserStateRepository(),
-            deviceIdProvider = FixedDeviceIdProvider(),
-            appInfoProvider = FixedAppInfoProvider(),
-        )
+        exportUseCase =
+            ExportUserDataUseCase(
+                journalRepository = sourceJournalRepo,
+                journalNotesRepository = sourceNotesRepo,
+                profileRepository = StoredProfileRepository(),
+                userPlacesRepository = InMemoryUserPlacesRepository(),
+                locationHistoryRepository = InMemoryLocationHistoryRepository(),
+                userStateRepository = InMemoryUserStateRepository(),
+                deviceIdProvider = FixedDeviceIdProvider(),
+                appInfoProvider = FixedAppInfoProvider(),
+            )
 
         val destSyncMeta = InMemorySyncMetadataService()
         val destDraftRepo = InMemoryDraftRepository()
 
-        destJournalRepo = OfflineFirstJournalRepository(
-            journalDao = destDb.journalDao(),
-            remoteDataSource = NoOpRemoteJournalDataSource(),
-            draftRepository = destDraftRepo,
-            syncMetadataService = destSyncMeta,
-            dispatcher = dispatcher,
-            externalScope = kotlinx.coroutines.CoroutineScope(dispatcher),
-        )
+        destJournalRepo =
+            OfflineFirstJournalRepository(
+                journalDao = destDb.journalDao(),
+                remoteDataSource = NoOpRemoteJournalDataSource(),
+                draftRepository = destDraftRepo,
+                syncMetadataService = destSyncMeta,
+                dispatcher = dispatcher,
+                externalScope = kotlinx.coroutines.CoroutineScope(dispatcher),
+            )
 
-        destNotesRepo = OfflineFirstJournalNotesRepository(
-            textNoteDao = destDb.textNoteDao(),
-            imageNoteDao = destDb.imageNoteDao(),
-            audioNoteDao = destDb.audioNoteDao(),
-            videoNoteDao = destDb.videoNoteDao(),
-            journalContentDao = destDb.journalContentDao(),
-            journalRepository = destJournalRepo,
-            mediaCaptionDao = destDb.mediaCaptionDao(),
-            notePlaceResolver = EmptyNotePlaceResolver,
-            syncMetadataService = destSyncMeta,
-            syncScope = kotlinx.coroutines.CoroutineScope(dispatcher),
-        )
+        destNotesRepo =
+            OfflineFirstJournalNotesRepository(
+                textNoteDao = destDb.textNoteDao(),
+                imageNoteDao = destDb.imageNoteDao(),
+                audioNoteDao = destDb.audioNoteDao(),
+                videoNoteDao = destDb.videoNoteDao(),
+                journalContentDao = destDb.journalContentDao(),
+                journalRepository = destJournalRepo,
+                mediaCaptionDao = destDb.mediaCaptionDao(),
+                notePlaceResolver = EmptyNotePlaceResolver,
+                syncMetadataService = destSyncMeta,
+                syncScope = kotlinx.coroutines.CoroutineScope(dispatcher),
+            )
 
-        destContentRepo = OfflineFirstJournalContentRepository(
-            journalContentDao = destDb.journalContentDao(),
-            journalRepository = destJournalRepo,
-            journalNotesRepository = destNotesRepo,
-            syncMetadataService = destSyncMeta,
-            dispatcher = dispatcher,
-        )
+        destContentRepo =
+            OfflineFirstJournalContentRepository(
+                journalContentDao = destDb.journalContentDao(),
+                journalRepository = destJournalRepo,
+                journalNotesRepository = destNotesRepo,
+                syncMetadataService = destSyncMeta,
+                dispatcher = dispatcher,
+            )
 
-        restoreUseCase = RestoreUserDataUseCase(
-            journalRepository = destJournalRepo,
-            journalNotesRepository = destNotesRepo,
-            journalContentRepository = destContentRepo,
-            profileRepository = StoredProfileRepository(),
-            userPlacesRepository = InMemoryUserPlacesRepository(),
-            locationHistoryRepository = InMemoryLocationHistoryRepository(),
-            canonicalOwnerProvider = FixedCanonicalOwnerProvider(),
-            deviceIdProvider = FixedDeviceIdProvider(),
-        )
+        restoreUseCase =
+            RestoreUserDataUseCase(
+                journalRepository = destJournalRepo,
+                journalNotesRepository = destNotesRepo,
+                journalContentRepository = destContentRepo,
+                profileRepository = StoredProfileRepository(),
+                userPlacesRepository = InMemoryUserPlacesRepository(),
+                locationHistoryRepository = InMemoryLocationHistoryRepository(),
+                canonicalOwnerProvider = FixedCanonicalOwnerProvider(),
+                deviceIdProvider = FixedDeviceIdProvider(),
+            )
     }
 
     @After
@@ -227,8 +237,7 @@ class ArchiveRoundTripTest {
 
     // ── Helpers ─────────────────────────────────────────────────────────
 
-    private fun Instant.truncateToMillis(): Instant =
-        Instant.fromEpochMilliseconds(toEpochMilliseconds())
+    private fun Instant.truncateToMillis(): Instant = Instant.fromEpochMilliseconds(toEpochMilliseconds())
 
     private fun now(): Instant = Clock.System.now().truncateToMillis()
 
@@ -250,7 +259,10 @@ class ArchiveRoundTripTest {
         try {
             // Write — same logic as AndroidExportArchiveWriter.writeExportToZip
             ZipOutputStream(FileOutputStream(archiveFile)).use { zip ->
-                fun entry(name: String, content: String) {
+                fun entry(
+                    name: String,
+                    content: String,
+                ) {
                     zip.putNextEntry(ZipEntry(name))
                     zip.write(content.toByteArray(Charsets.UTF_8))
                     zip.closeEntry()
@@ -267,28 +279,31 @@ class ArchiveRoundTripTest {
             }
 
             // Read — same logic as RestoreWorker.readRequiredEntry / readOptionalEntry
-            val bundle = ZipFile(archiveFile).use { zip ->
-                fun required(name: String): String {
-                    val e = zip.getEntry(name)
-                        ?: error("Required archive entry missing: $name")
-                    return zip.getInputStream(e).bufferedReader(Charsets.UTF_8).readText()
+            val bundle =
+                ZipFile(archiveFile).use { zip ->
+                    fun required(name: String): String {
+                        val e =
+                            zip.getEntry(name)
+                                ?: error("Required archive entry missing: $name")
+                        return zip.getInputStream(e).bufferedReader(Charsets.UTF_8).readText()
+                    }
+
+                    fun optional(name: String): String? {
+                        val e = zip.getEntry(name) ?: return null
+                        return zip.getInputStream(e).bufferedReader(Charsets.UTF_8).readText()
+                    }
+                    RestoreBundle(
+                        metadataJson = required(ExportFileStructure.METADATA_FILE),
+                        journalsJson = required(ExportFileStructure.JOURNALS_FILE),
+                        notesJson = required(ExportFileStructure.NOTES_FILE),
+                        journalNotesJson = required(ExportFileStructure.JOURNAL_NOTES_FILE),
+                        draftsJson = required(ExportFileStructure.DRAFTS_FILE),
+                        profileJson = optional(ExportFileStructure.PROFILE_FILE),
+                        placesJson = optional(ExportFileStructure.PLACES_FILE),
+                        locationHistoryJson = optional(ExportFileStructure.LOCATION_HISTORY_FILE),
+                        mediaManifestJson = optional(ExportFileStructure.MEDIA_MANIFEST_FILE),
+                    )
                 }
-                fun optional(name: String): String? {
-                    val e = zip.getEntry(name) ?: return null
-                    return zip.getInputStream(e).bufferedReader(Charsets.UTF_8).readText()
-                }
-                RestoreBundle(
-                    metadataJson = required(ExportFileStructure.METADATA_FILE),
-                    journalsJson = required(ExportFileStructure.JOURNALS_FILE),
-                    notesJson = required(ExportFileStructure.NOTES_FILE),
-                    journalNotesJson = required(ExportFileStructure.JOURNAL_NOTES_FILE),
-                    draftsJson = required(ExportFileStructure.DRAFTS_FILE),
-                    profileJson = optional(ExportFileStructure.PROFILE_FILE),
-                    placesJson = optional(ExportFileStructure.PLACES_FILE),
-                    locationHistoryJson = optional(ExportFileStructure.LOCATION_HISTORY_FILE),
-                    mediaManifestJson = optional(ExportFileStructure.MEDIA_MANIFEST_FILE),
-                )
-            }
 
             restoreUseCase.restore(bundle, options)
         } finally {
@@ -333,11 +348,12 @@ class ArchiveRoundTripTest {
 
     private fun networkState(context: Context): NetworkState =
         NetworkState(
-            airplaneModeEnabled = Settings.Global.getInt(
-                context.contentResolver,
-                Settings.Global.AIRPLANE_MODE_ON,
-                0,
-            ) != 0,
+            airplaneModeEnabled =
+                Settings.Global.getInt(
+                    context.contentResolver,
+                    Settings.Global.AIRPLANE_MODE_ON,
+                    0,
+                ) != 0,
             wifiEnabled = context.getSystemService(WifiManager::class.java).isWifiEnabled,
         )
 
@@ -390,40 +406,45 @@ class ArchiveRoundTripTest {
             sourceJournalRepo.create(journal1)
             sourceJournalRepo.create(journal2)
 
-            val textNote = JournalNote.Text(
-                uid = Uuid.random(),
-                creationTimestamp = now - 2.hours,
-                lastUpdated = now,
-                content = "A regular text entry",
-            )
-            val imageNote = JournalNote.Image(
-                uid = Uuid.random(),
-                creationTimestamp = now - 1.hours,
-                lastUpdated = now,
-                mediaRef = "content://media/external/images/1",
-                caption = "Sunrise",
-            )
-            val audioNote = JournalNote.Audio(
-                uid = Uuid.random(),
-                creationTimestamp = now,
-                lastUpdated = now,
-                mediaRef = "content://media/external/audio/1",
-                durationMs = 30000,
-            )
-            val videoNote = JournalNote.Video(
-                uid = Uuid.random(),
-                creationTimestamp = now,
-                lastUpdated = now,
-                mediaRef = "content://media/external/video/1",
-                caption = "Timelapse",
-            )
-            val geoNote = JournalNote.Text(
-                uid = Uuid.random(),
-                creationTimestamp = now,
-                lastUpdated = now,
-                content = "At the park",
-                location = NoteLocation(coordinates = NoteCoordinates(latitude = 51.5074, longitude = -0.1278)),
-            )
+            val textNote =
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    creationTimestamp = now - 2.hours,
+                    lastUpdated = now,
+                    content = "A regular text entry",
+                )
+            val imageNote =
+                JournalNote.Image(
+                    uid = Uuid.random(),
+                    creationTimestamp = now - 1.hours,
+                    lastUpdated = now,
+                    mediaRef = "content://media/external/images/1",
+                    caption = "Sunrise",
+                )
+            val audioNote =
+                JournalNote.Audio(
+                    uid = Uuid.random(),
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    mediaRef = "content://media/external/audio/1",
+                    durationMs = 30000,
+                )
+            val videoNote =
+                JournalNote.Video(
+                    uid = Uuid.random(),
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    mediaRef = "content://media/external/video/1",
+                    caption = "Timelapse",
+                )
+            val geoNote =
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    content = "At the park",
+                    location = NoteLocation(coordinates = NoteCoordinates(latitude = 51.5074, longitude = -0.1278)),
+                )
 
             sourceNotesRepo.create(textNote, journal1.id)
             sourceNotesRepo.create(imageNote, journal1.id)
@@ -473,132 +494,141 @@ class ArchiveRoundTripTest {
         }
 
     @Test
-    fun `RestoreWorker imports a one gibibyte archive and restored image remains readable offline`() = runTest {
-        val paddingSize = 1L shl 30
-        assertTrue(Runtime.getRuntime().maxMemory() < paddingSize)
+    fun `RestoreWorker imports a one gibibyte archive and restored image remains readable offline`() =
+        runTest {
+            val paddingSize = 1L shl 30
+            assertTrue(Runtime.getRuntime().maxMemory() < paddingSize)
 
-        val now = now()
-        val journal = Journal(id = Uuid.random(), title = "Offline restore", created = now, lastUpdated = now)
-        sourceJournalRepo.create(journal)
-        val originalUri = "content://archive-fixture/source/photo.png"
-        val imageNote = JournalNote.Image(
-            uid = Uuid.random(),
-            creationTimestamp = now,
-            lastUpdated = now,
-            mediaRef = originalUri,
-            caption = "Restored offline",
-        )
-        sourceNotesRepo.create(imageNote, journal.id)
+            val now = now()
+            val journal = Journal(id = Uuid.random(), title = "Offline restore", created = now, lastUpdated = now)
+            sourceJournalRepo.create(journal)
+            val originalUri = "content://archive-fixture/source/photo.png"
+            val imageNote =
+                JournalNote.Image(
+                    uid = Uuid.random(),
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    mediaRef = originalUri,
+                    caption = "Restored offline",
+                )
+            sourceNotesRepo.create(imageNote, journal.id)
 
-        val exportProgress = exportUseCase.exportUserData(includeMedia = false).last()
-        val export = assertIs<ExportProgress.Completed>(exportProgress).result
-        val pngBitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
-        val imageBytes = ByteArrayOutputStream().use { output ->
-            try {
-                assertTrue(pngBitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
-                output.toByteArray()
-            } finally {
-                pngBitmap.recycle()
-            }
-        }
-
-        val archiveFile = File.createTempFile("restore-worker-1gib", ".zip", context.noBackupFilesDir)
-        var koinStarted = false
-        var restoredMediaUri: String? = null
-        val mediaManager = AndroidMediaManager(context.contentResolver, context, Dispatchers.IO)
-        val restoreLauncher = mockk<RestoreLauncher>(relaxed = true)
-        try {
-            ZipOutputStream(FileOutputStream(archiveFile)).use { zip ->
-                fun entry(name: String, content: ByteArray) {
-                    zip.putNextEntry(ZipEntry(name))
-                    zip.write(content)
-                    zip.closeEntry()
+            val exportProgress = exportUseCase.exportUserData(includeMedia = false).last()
+            val export = assertIs<ExportProgress.Completed>(exportProgress).result
+            val pngBitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+            val imageBytes =
+                ByteArrayOutputStream().use { output ->
+                    try {
+                        assertTrue(pngBitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
+                        output.toByteArray()
+                    } finally {
+                        pngBitmap.recycle()
+                    }
                 }
 
-                entry(ExportFileStructure.METADATA_FILE, export.serializeMetadata().encodeToByteArray())
-                entry(ExportFileStructure.JOURNALS_FILE, export.serializeJournals().encodeToByteArray())
-                entry(ExportFileStructure.NOTES_FILE, export.serializeNotes().encodeToByteArray())
-                entry(ExportFileStructure.JOURNAL_NOTES_FILE, export.serializeJournalNotes().encodeToByteArray())
-                entry(ExportFileStructure.DRAFTS_FILE, export.serializeDrafts().encodeToByteArray())
-                entry(
-                    ExportFileStructure.MEDIA_MANIFEST_FILE,
-                    """{"files":[{"exportPath":"media/offline/photo.png","sourceUri":"$originalUri"}]}"""
-                        .encodeToByteArray(),
-                )
-                entry("media/offline/photo.png", imageBytes)
-                writeStoredPadding(zip, paddingSize)
-            }
-            assertTrue(archiveFile.length() >= paddingSize, "fixture must be at least 1 GiB on disk")
-
-            runCatching { stopKoin() }
-            startKoin {
-                modules(
-                    module {
-                        single<RestoreUserDataUseCase> { restoreUseCase }
-                        single<MediaManager> { mediaManager }
-                        single<RestoreLauncher> { restoreLauncher }
-                    },
-                )
-            }
-            koinStarted = true
-
-            val worker = TestListenableWorkerBuilder<RestoreWorker>(context)
-                .setInputData(
-                    androidx.work.Data.Builder()
-                        .putString(RestoreWorker.SOURCE_URI_KEY, Uri.fromFile(archiveFile).toString())
-                        .putBoolean(RestoreWorker.INCLUDE_MEDIA_KEY, true)
-                        .build(),
-                )
-                .build()
-
-            assertIs<ListenableWorker.Result.Success>(worker.doWork())
-            val restoredImage = assertIs<JournalNote.Image>(destNotesRepo.getNoteById(imageNote.uid))
-            val mediaUri = restoredImage.mediaRef
-            restoredMediaUri = mediaUri
-            assertTrue(mediaUri.startsWith("file:"), "restored attachment must be app-local for offline access")
-
-            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-            val previousNetworkState = networkState(context)
+            val archiveFile = File.createTempFile("restore-worker-1gib", ".zip", context.noBackupFilesDir)
+            var koinStarted = false
+            var restoredMediaUri: String? = null
+            val mediaManager = AndroidMediaManager(context.contentResolver, context, Dispatchers.IO)
+            val restoreLauncher = mockk<RestoreLauncher>(relaxed = true)
             try {
-                setNetworkEnabled(device, false)
-                assertDeviceOffline(context)
-                val media = mediaManager.readMedia(mediaUri)
-                assertContentEquals(imageBytes, media.data)
-                val decoded = assertNotNull(BitmapFactory.decodeByteArray(media.data, 0, media.data.size))
+                ZipOutputStream(FileOutputStream(archiveFile)).use { zip ->
+                    fun entry(
+                        name: String,
+                        content: ByteArray,
+                    ) {
+                        zip.putNextEntry(ZipEntry(name))
+                        zip.write(content)
+                        zip.closeEntry()
+                    }
+
+                    entry(ExportFileStructure.METADATA_FILE, export.serializeMetadata().encodeToByteArray())
+                    entry(ExportFileStructure.JOURNALS_FILE, export.serializeJournals().encodeToByteArray())
+                    entry(ExportFileStructure.NOTES_FILE, export.serializeNotes().encodeToByteArray())
+                    entry(ExportFileStructure.JOURNAL_NOTES_FILE, export.serializeJournalNotes().encodeToByteArray())
+                    entry(ExportFileStructure.DRAFTS_FILE, export.serializeDrafts().encodeToByteArray())
+                    entry(
+                        ExportFileStructure.MEDIA_MANIFEST_FILE,
+                        """{"files":[{"exportPath":"media/offline/photo.png","sourceUri":"$originalUri"}]}"""
+                            .encodeToByteArray(),
+                    )
+                    entry("media/offline/photo.png", imageBytes)
+                    writeStoredPadding(zip, paddingSize)
+                }
+                assertTrue(archiveFile.length() >= paddingSize, "fixture must be at least 1 GiB on disk")
+
+                runCatching { stopKoin() }
+                startKoin {
+                    modules(
+                        module {
+                            single<RestoreUserDataUseCase> { restoreUseCase }
+                            single<MediaManager> { mediaManager }
+                            single<RestoreLauncher> { restoreLauncher }
+                        },
+                    )
+                }
+                koinStarted = true
+
+                val worker =
+                    TestListenableWorkerBuilder<RestoreWorker>(context)
+                        .setInputData(
+                            androidx.work.Data
+                                .Builder()
+                                .putString(RestoreWorker.SOURCE_URI_KEY, Uri.fromFile(archiveFile).toString())
+                                .putBoolean(RestoreWorker.INCLUDE_MEDIA_KEY, true)
+                                .build(),
+                        ).build()
+
+                assertIs<ListenableWorker.Result.Success>(worker.doWork())
+                val restoredImage = assertIs<JournalNote.Image>(destNotesRepo.getNoteById(imageNote.uid))
+                val mediaUri = restoredImage.mediaRef
+                restoredMediaUri = mediaUri
+                assertTrue(mediaUri.startsWith("file:"), "restored attachment must be app-local for offline access")
+
+                val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+                val previousNetworkState = networkState(context)
                 try {
-                    assertEquals(1, decoded.width)
-                    assertEquals(1, decoded.height)
+                    setNetworkEnabled(device, false)
+                    assertDeviceOffline(context)
+                    val media = mediaManager.readMedia(mediaUri)
+                    assertContentEquals(imageBytes, media.data)
+                    val decoded = assertNotNull(BitmapFactory.decodeByteArray(media.data, 0, media.data.size))
+                    try {
+                        assertEquals(1, decoded.width)
+                        assertEquals(1, decoded.height)
+                    } finally {
+                        decoded.recycle()
+                    }
                 } finally {
-                    decoded.recycle()
+                    restoreNetworkState(device, previousNetworkState)
                 }
             } finally {
-                restoreNetworkState(device, previousNetworkState)
+                if (koinStarted) stopKoin()
+                restoredMediaUri?.let { mediaManager.deleteOwnedMedia(it) }
+                archiveFile.delete()
             }
-        } finally {
-            if (koinStarted) stopKoin()
-            restoredMediaUri?.let { mediaManager.deleteOwnedMedia(it) }
-            archiveFile.delete()
         }
-    }
 
     @Test
     fun `archive unicode and special characters preserved exactly`() =
         runTest {
             val now = now()
-            val journal = Journal(
-                id = Uuid.random(),
-                title = "日記 📖",
-                created = now,
-                lastUpdated = now,
-            )
+            val journal =
+                Journal(
+                    id = Uuid.random(),
+                    title = "日記 📖",
+                    created = now,
+                    lastUpdated = now,
+                )
             sourceJournalRepo.create(journal)
 
-            val note = JournalNote.Text(
-                uid = Uuid.random(),
-                creationTimestamp = now,
-                lastUpdated = now,
-                content = "こんにちは 🌸 \"quoted\" \\ newline\nend",
-            )
+            val note =
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    content = "こんにちは 🌸 \"quoted\" \\ newline\nend",
+                )
             sourceNotesRepo.create(note, journal.id)
 
             archiveRoundTrip()
@@ -621,12 +651,13 @@ class ArchiveRoundTripTest {
             val journal = Journal(id = Uuid.random(), title = "Precision", created = created, lastUpdated = updated)
             sourceJournalRepo.create(journal)
 
-            val note = JournalNote.Text(
-                uid = Uuid.random(),
-                creationTimestamp = created,
-                lastUpdated = updated,
-                content = "Timestamp precision test",
-            )
+            val note =
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    creationTimestamp = created,
+                    lastUpdated = updated,
+                    content = "Timestamp precision test",
+                )
             sourceNotesRepo.create(note, journal.id)
 
             archiveRoundTrip()
@@ -647,16 +678,18 @@ class ArchiveRoundTripTest {
             val journal = Journal(id = Uuid.random(), title = "Bulk", created = now, lastUpdated = now)
             sourceJournalRepo.create(journal)
 
-            val noteIds = (1..50).map { i ->
-                val note = JournalNote.Text(
-                    uid = Uuid.random(),
-                    creationTimestamp = now - i.hours,
-                    lastUpdated = now,
-                    content = "Entry number $i",
-                )
-                sourceNotesRepo.create(note, journal.id)
-                note.uid
-            }
+            val noteIds =
+                (1..50).map { i ->
+                    val note =
+                        JournalNote.Text(
+                            uid = Uuid.random(),
+                            creationTimestamp = now - i.hours,
+                            lastUpdated = now,
+                            content = "Entry number $i",
+                        )
+                    sourceNotesRepo.create(note, journal.id)
+                    note.uid
+                }
 
             archiveRoundTrip()
 
@@ -675,15 +708,17 @@ class ArchiveRoundTripTest {
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
             sourceJournalRepo.create(journal)
 
-            val draft = EditorDraft(
-                id = Uuid.random(),
-                blocks = listOf(
-                    SerializableTextBlock(id = Uuid.random(), timestamp = now, content = "Draft text 📝"),
-                ),
-                selectedJournalIds = listOf(journal.id),
-                createdAt = now - 1.hours,
-                lastModifiedAt = now,
-            )
+            val draft =
+                EditorDraft(
+                    id = Uuid.random(),
+                    blocks =
+                        listOf(
+                            SerializableTextBlock(id = Uuid.random(), timestamp = now, content = "Draft text 📝"),
+                        ),
+                    selectedJournalIds = listOf(journal.id),
+                    createdAt = now - 1.hours,
+                    lastModifiedAt = now,
+                )
             sourceJournalRepo.saveDraft(draft)
 
             archiveRoundTrip(RestoreOptions(includeDrafts = true))
@@ -741,33 +776,52 @@ class ArchiveRoundTripTest {
         override suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload> =
             pending[entityType]?.values?.toList() ?: emptyList()
 
-        override suspend fun markAsSynced(entityId: String, entityType: EntityType, syncedAt: Instant, version: Long) {
+        override suspend fun markAsSynced(
+            entityId: String,
+            entityType: EntityType,
+            syncedAt: Instant,
+            version: Long,
+        ) {
             pending[entityType]?.remove(entityId)
             updateCount()
         }
 
         override suspend fun getLastSyncTime(entityType: EntityType): Instant? = syncTimes[entityType]
 
-        override suspend fun updateLastSyncTime(entityType: EntityType, syncedAt: Instant) {
+        override suspend fun updateLastSyncTime(
+            entityType: EntityType,
+            syncedAt: Instant,
+        ) {
             syncTimes[entityType] = syncedAt
         }
 
-        override suspend fun enqueuePending(entityId: String, entityType: EntityType, operation: PendingOperation) {
+        override suspend fun enqueuePending(
+            entityId: String,
+            entityType: EntityType,
+            operation: PendingOperation,
+        ) {
             pending.getOrPut(entityType) { mutableMapOf() }[entityId] = PendingUpload(entityId, operation, 0)
             updateCount()
         }
 
-        override suspend fun resetSyncStatus(entityId: String, entityType: EntityType) {
+        override suspend fun resetSyncStatus(
+            entityId: String,
+            entityType: EntityType,
+        ) {
             pending.getOrPut(entityType) { mutableMapOf() }[entityId] = PendingUpload(entityId, PendingOperation.UPDATE, 0)
             updateCount()
         }
 
         override suspend fun getPendingCount(): Int = pending.values.sumOf { it.size }
+
         override fun observePendingCount(): Flow<Int> = pendingCountFlow
 
         override fun observePendingUploads(): Flow<List<QueuedUpload>> = flowOf(emptyList())
 
-        override suspend fun incrementRetryCount(entityId: String, entityType: EntityType) {
+        override suspend fun incrementRetryCount(
+            entityId: String,
+            entityType: EntityType,
+        ) {
             val existing = pending[entityType]?.get(entityId) ?: return
             pending[entityType]!![entityId] = existing.copy(retryCount = existing.retryCount + 1)
         }
@@ -796,8 +850,11 @@ class ArchiveRoundTripTest {
         }
 
         override suspend fun getLatestDraft(): EditorDraft? = drafts.values.maxByOrNull { it.lastModifiedAt }
+
         override suspend fun getAllDrafts(): List<EditorDraft> = drafts.values.toList()
+
         override val allDrafts: Flow<List<EditorDraft>> get() = draftsFlow
+
         override suspend fun getDraft(id: Uuid): EditorDraft? = drafts[id]
 
         override suspend fun deleteDraft(id: Uuid) {
@@ -813,8 +870,11 @@ class ArchiveRoundTripTest {
 
     private class NoOpRemoteJournalDataSource : RemoteJournalDataSource {
         override suspend fun observeAllJournals(): List<Journal> = emptyList()
+
         override suspend fun addJournal(journal: Journal): String = journal.id.toString()
+
         override suspend fun editJournal(journal: Journal) {}
+
         override suspend fun deleteJournal(journalId: String) {}
     }
 
@@ -831,19 +891,23 @@ class ArchiveRoundTripTest {
         override suspend fun updateProfilePhoto(profilePhotoUri: String?): Result<LogDateProfile> =
             Result.success(profile.value.copy(profilePhotoUri = profilePhotoUri)).also { profile.value = it.getOrThrow() }
 
-        override suspend fun updateBio(bio: String?, originalBio: String?): Result<LogDateProfile> =
+        override suspend fun updateBio(
+            bio: String?,
+            originalBio: String?,
+        ): Result<LogDateProfile> =
             Result.success(profile.value.copy(bio = bio, originalBio = originalBio)).also { profile.value = it.getOrThrow() }
 
         override suspend fun getCurrentProfile(): LogDateProfile = profile.value
 
-        override suspend fun clearProfile(): Result<Unit> =
-            Result.success(Unit).also { profile.value = LogDateProfile() }
+        override suspend fun clearProfile(): Result<Unit> = Result.success(Unit).also { profile.value = LogDateProfile() }
     }
 
     private class FixedDeviceIdProvider : DeviceIdProvider {
         private val id = Uuid.parse("00000000-0000-0000-0000-000000000001")
         private val flow = MutableStateFlow(id)
+
         override fun getDeviceId(): StateFlow<Uuid> = flow
+
         override suspend fun refreshDeviceId() {}
     }
 
@@ -854,18 +918,23 @@ class ArchiveRoundTripTest {
     }
 
     private class FixedAppInfoProvider : AppInfoProvider {
-        override fun getAppInfo(): AppInfo = AppInfo(
-            versionName = "1.0.0-test",
-            versionCode = 1,
-            packageName = "app.logdate.test",
-        )
+        override fun getAppInfo(): AppInfo =
+            AppInfo(
+                versionName = "1.0.0-test",
+                versionCode = 1,
+                packageName = "app.logdate.test",
+            )
     }
 
     private class InMemoryUserStateRepository : UserStateRepository {
         override val userData: Flow<UserData> = MutableStateFlow(UserData())
+
         override suspend fun setBirthday(birthday: Instant) {}
+
         override suspend fun setIsOnboardingComplete(isComplete: Boolean) {}
+
         override suspend fun setBiometricEnabled(isEnabled: Boolean) {}
+
         override suspend fun addFavoriteNote(vararg noteId: String) {}
     }
 }

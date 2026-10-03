@@ -31,14 +31,14 @@ import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.TimelineSuggestionBlockType
 import app.logdate.ui.timeline.TimelineSuggestionBlockUiState
 import kotlinx.datetime.LocalDate
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
-import org.junit.Rule
-import org.junit.Test
-import org.junit.runner.RunWith
 
 /**
  * Instrumented tests for various sharing entry points across the application.

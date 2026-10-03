@@ -114,7 +114,11 @@ class AudioPlaybackBackgroundE2ETest {
         assertEquals(AudioPlaybackService.CHANNEL_ID, notification?.notification?.channelId)
         assertEquals(
             "Background playback check",
-            notification?.notification?.extras?.getCharSequence("android.title")?.toString(),
+            notification
+                ?.notification
+                ?.extras
+                ?.getCharSequence("android.title")
+                ?.toString(),
         )
 
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
@@ -365,7 +369,8 @@ class AudioPlaybackBackgroundE2ETest {
     private fun expandNotificationShade(device: UiDevice) {
         device.openNotification()
         runCatching {
-            InstrumentationRegistry.getInstrumentation()
+            InstrumentationRegistry
+                .getInstrumentation()
                 .uiAutomation
                 .executeShellCommand("cmd statusbar expand-notifications")
                 .use { }

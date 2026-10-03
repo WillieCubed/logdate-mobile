@@ -7,11 +7,11 @@ import app.logdate.feature.core.profile.ui.ProfileEditState
 import app.logdate.feature.core.profile.ui.ProfileScreenContent
 import app.logdate.feature.core.profile.ui.ProfileUiState
 import app.logdate.feature.core.profile.ui.ProfileUpdateState
+import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
+import app.logdate.screenshots.common.ScreenshotTheme
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.profile.LogDateProfile
-import app.logdate.screenshots.common.ScreenshotPreviewMatrix
-import app.logdate.screenshots.common.ScreenshotTheme
 import com.android.tools.screenshot.PreviewTest
 
 private val sampleProfile = LogDateProfile(displayName = "Alex Johnson")

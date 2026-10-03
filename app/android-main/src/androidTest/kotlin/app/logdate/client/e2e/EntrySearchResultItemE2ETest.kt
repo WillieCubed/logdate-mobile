@@ -3,11 +3,11 @@ package app.logdate.client.e2e
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.text.AnnotatedString
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.ui.search.EntrySearchResultItem
 import app.logdate.ui.search.EntrySearchResultUiState
@@ -23,25 +23,26 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class EntrySearchResultItemE2ETest {
-
     @get:Rule
     val composeRule = createComposeRule()
 
-    private val textNoteState = EntrySearchResultUiState(
-        id = "result-1",
-        contentText = AnnotatedString("Watched the sunset from the balcony."),
-        dateLabel = "Mar 15, 2026",
-        typeLabel = "Text note",
-        typeIcon = Icons.Default.Search,
-    )
+    private val textNoteState =
+        EntrySearchResultUiState(
+            id = "result-1",
+            contentText = AnnotatedString("Watched the sunset from the balcony."),
+            dateLabel = "Mar 15, 2026",
+            typeLabel = "Text note",
+            typeIcon = Icons.Default.Search,
+        )
 
-    private val voiceNoteState = EntrySearchResultUiState(
-        id = "result-2",
-        contentText = AnnotatedString("Quick memo about tomorrow's schedule."),
-        dateLabel = "Mar 16, 2026",
-        typeLabel = "Voice note",
-        typeIcon = Icons.Default.Mic,
-    )
+    private val voiceNoteState =
+        EntrySearchResultUiState(
+            id = "result-2",
+            contentText = AnnotatedString("Quick memo about tomorrow's schedule."),
+            dateLabel = "Mar 16, 2026",
+            typeLabel = "Voice note",
+            typeIcon = Icons.Default.Mic,
+        )
 
     // region Rendering
 

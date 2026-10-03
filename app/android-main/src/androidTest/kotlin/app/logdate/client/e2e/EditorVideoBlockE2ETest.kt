@@ -28,7 +28,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
-import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 @RunWith(AndroidJUnit4::class)
@@ -57,7 +56,8 @@ class EditorVideoBlockE2ETest {
     private fun assertEditorVideoControlsAreUsable() {
         composeRule.onNodeWithTag(VideoPlayerTags.ROOT).assertIsDisplayed()
         composeRule.onNodeWithTag(VideoPlayerTags.PIP_BUTTON).assertIsDisplayed().assertHasClickAction()
-        composeRule.onAllNodesWithTag(MediaDeviceSelectorTags.chip("Audio output"))[0]
+        composeRule
+            .onAllNodesWithTag(MediaDeviceSelectorTags.chip("Audio output"))[0]
             .assertIsDisplayed()
             .assertHasClickAction()
             .performClick()

@@ -7,11 +7,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.notifications.AndroidLogDateNotificationCatalog
 import app.logdate.client.notifications.LogDateNotificationChannelKey
 import app.logdate.client.notifications.LogDateNotificationRegistrar
+import org.junit.runner.RunWith
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import org.junit.runner.RunWith
 
 /**
  * Verifies the registration and management of Android notification channels.
@@ -22,7 +22,6 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class LogDateNotificationRegistrarTest {
-
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private val notificationManager =
         context.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as NotificationManager

@@ -4,14 +4,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.feature.journals.ui.creation.JournalCreationScreenContent
 import app.logdate.feature.journals.ui.detail.ConfirmEntryDeletionDialog
-import app.logdate.feature.journals.ui.detail.JournalDetailUiState
 import app.logdate.feature.journals.ui.list.JournalsListDialog
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
-import app.logdate.screenshots.common.ScreenshotTestData.baseInstant
 import app.logdate.screenshots.common.ScreenshotTheme
 import com.android.tools.screenshot.PreviewTest
-import kotlin.uuid.Uuid
 
 // ─── Journal Creation ───────────────────────────────────────────────────────────
 

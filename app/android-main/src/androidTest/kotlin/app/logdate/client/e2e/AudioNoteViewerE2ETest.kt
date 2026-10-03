@@ -17,16 +17,16 @@ import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.media.device.MediaDeviceUiState
-import app.logdate.ui.audio.AudioContext
-import app.logdate.ui.audio.model.AudioPalette
-import app.logdate.ui.audio.model.AudioSegment
-import app.logdate.ui.audio.model.SegmentType
 import app.logdate.feature.journals.ui.detail.AudioNoteViewerContent
 import app.logdate.feature.journals.ui.detail.AudioNoteViewerUiState
 import app.logdate.feature.journals.ui.detail.AudioPlaybackUiState
+import app.logdate.ui.audio.AudioContext
 import app.logdate.ui.audio.AudioPlaybackDisplayInfo
 import app.logdate.ui.audio.AudioPlaybackState
 import app.logdate.ui.audio.LocalAudioPlaybackState
+import app.logdate.ui.audio.model.AudioPalette
+import app.logdate.ui.audio.model.AudioSegment
+import app.logdate.ui.audio.model.SegmentType
 import app.logdate.ui.media.MediaDeviceSelectorTags
 import app.logdate.ui.theme.LogDateTheme
 import org.junit.Assume.assumeTrue
@@ -63,7 +63,8 @@ class AudioNoteViewerE2ETest {
     }
 
     private fun assertOutputRouteControlsAreUsable() {
-        composeRule.onAllNodesWithTag(MediaDeviceSelectorTags.chip("Audio output"))[0]
+        composeRule
+            .onAllNodesWithTag(MediaDeviceSelectorTags.chip("Audio output"))[0]
             .assertIsDisplayed()
             .assertHasClickAction()
             .performClick()

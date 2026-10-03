@@ -8,7 +8,6 @@ import androidx.core.content.FileProvider
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import app.logdate.client.EditorActivity
 import app.logdate.client.MainActivity
 import app.logdate.client.media.MediaManager
@@ -107,7 +106,12 @@ class IncomingShareE2ETest {
             attachments,
         )
         assertEquals("image/jpeg", fakeMediaManager.savedRequests.single().mimeType)
-        assertTrue(fakeMediaManager.savedRequests.single().fileName.endsWith(".jpg"))
+        assertTrue(
+            fakeMediaManager.savedRequests
+                .single()
+                .fileName
+                .endsWith(".jpg"),
+        )
     }
 
     @Test
@@ -133,7 +137,12 @@ class IncomingShareE2ETest {
             attachments,
         )
         assertEquals("video/mp4", fakeMediaManager.savedRequests.single().mimeType)
-        assertTrue(fakeMediaManager.savedRequests.single().fileName.endsWith(".mp4"))
+        assertTrue(
+            fakeMediaManager.savedRequests
+                .single()
+                .fileName
+                .endsWith(".mp4"),
+        )
     }
 
     @Test
@@ -286,7 +295,6 @@ private class RecordingMediaManager : MediaManager {
     override suspend fun getMedia(uri: String): MediaObject = error("Not needed for IncomingShareE2ETest")
 
     override suspend fun deleteOwnedMedia(uri: String): Boolean = false
-
 
     override suspend fun exists(mediaId: String): Boolean = false
 

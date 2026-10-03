@@ -1,9 +1,9 @@
 package app.logdate.client.e2e
 
 import android.content.Intent
-import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -12,9 +12,9 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.logdate.client.MainActivity
 import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_NEW_ENTRY
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_TARGET
-import app.logdate.client.MainActivity
 import app.logdate.client.testing.onboarding.OnboardingTestFixture
 import app.logdate.client.testing.onboarding.putOnboardingTestFixture
 import org.junit.Rule

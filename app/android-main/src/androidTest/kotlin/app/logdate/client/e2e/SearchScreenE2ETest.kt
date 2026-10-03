@@ -2,9 +2,6 @@ package app.logdate.client.e2e
 
 import android.content.Context
 import androidx.activity.ComponentActivity
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -13,20 +10,23 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.core.app.ApplicationProvider
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.data.search.AndroidPlatformSearchIndexManager
 import app.logdate.client.data.search.AndroidPlatformSearchRepository
 import app.logdate.client.data.search.OfflineFirstSearchRepository
 import app.logdate.client.database.LogDateDatabase
-import app.logdate.client.database.getRoomDatabase
 import app.logdate.client.database.entities.TextNoteEntity
+import app.logdate.client.database.getRoomDatabase
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.domain.search.ObserveRecentSearchesUseCase
 import app.logdate.client.domain.search.UniversalSearchUseCase
-import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.RecentSearchesRepository
+import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.feature.search.ui.SearchScreen
 import app.logdate.feature.search.ui.SearchScreenContent
@@ -56,7 +56,6 @@ import kotlin.uuid.Uuid
  */
 @RunWith(AndroidJUnit4::class)
 class SearchScreenE2ETest {
-
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
@@ -64,18 +63,20 @@ class SearchScreenE2ETest {
     private lateinit var searchScope: CoroutineScope
     private lateinit var viewModel: SearchViewModel
 
-    private val textNoteResult = SearchResult(
-        uid = Uuid.random(),
-        content = "Finished the final chapter of the novel today.",
-        created = Clock.System.now(),
-        contentType = SearchContentType.TEXT_NOTE,
-    )
-    private val transcriptionResult = SearchResult(
-        uid = Uuid.random(),
-        content = "Voice memo about the sunset hike and planning next week.",
-        created = Clock.System.now(),
-        contentType = SearchContentType.TRANSCRIPTION,
-    )
+    private val textNoteResult =
+        SearchResult(
+            uid = Uuid.random(),
+            content = "Finished the final chapter of the novel today.",
+            created = Clock.System.now(),
+            contentType = SearchContentType.TEXT_NOTE,
+        )
+    private val transcriptionResult =
+        SearchResult(
+            uid = Uuid.random(),
+            content = "Voice memo about the sunset hike and planning next week.",
+            created = Clock.System.now(),
+            contentType = SearchContentType.TRANSCRIPTION,
+        )
     private val allResults = listOf(textNoteResult, transcriptionResult)
 
     @Before
@@ -185,9 +186,10 @@ class SearchScreenE2ETest {
         }
 
         composeRule.waitForIdle()
-        composeRule.onNodeWithText(
-            "Voice memo about the sunset hike and planning next week.",
-        ).assertIsDisplayed()
+        composeRule
+            .onNodeWithText(
+                "Voice memo about the sunset hike and planning next week.",
+            ).assertIsDisplayed()
     }
 
     @Test
@@ -226,10 +228,12 @@ class SearchScreenE2ETest {
         composeRule.onNodeWithTag("search_screen_input").performTextInput("sunr")
 
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithText(
-                "Hiked the sunrise trail before breakfast.",
-                substring = true,
-            ).fetchSemanticsNodes().isNotEmpty()
+            composeRule
+                .onAllNodesWithText(
+                    "Hiked the sunrise trail before breakfast.",
+                    substring = true,
+                ).fetchSemanticsNodes()
+                .isNotEmpty()
         }
 
         composeRule
@@ -259,9 +263,11 @@ class SearchScreenE2ETest {
         composeRule.onNodeWithTag("search_screen_input").performTextInput("zzz_no_match")
 
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithText(
-                "No results for \"zzz_no_match\"",
-            ).fetchSemanticsNodes().isNotEmpty()
+            composeRule
+                .onAllNodesWithText(
+                    "No results for \"zzz_no_match\"",
+                ).fetchSemanticsNodes()
+                .isNotEmpty()
         }
 
         composeRule.onNodeWithText("No results for \"zzz_no_match\"").assertIsDisplayed()

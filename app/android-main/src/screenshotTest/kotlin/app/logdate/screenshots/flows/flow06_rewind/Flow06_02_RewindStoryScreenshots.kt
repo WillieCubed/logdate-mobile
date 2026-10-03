@@ -2,17 +2,14 @@ package app.logdate.screenshots.flows.flow06_rewind
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import app.logdate.feature.rewind.ui.EmptyRewindContent
-import app.logdate.feature.rewind.ui.RewindDetailUiState
-import app.logdate.feature.rewind.ui.RewindPanelUiState
 import app.logdate.feature.rewind.ui.BasicTextRewindPanelUiState
-import app.logdate.feature.rewind.ui.NarrativeContextRewindPanelUiState
-import app.logdate.feature.rewind.ui.SubtitledRewindPanelUiState
 import app.logdate.feature.rewind.ui.BigStatisticRewindPanelUiState
+import app.logdate.feature.rewind.ui.EmptyRewindContent
+import app.logdate.feature.rewind.ui.NarrativeContextRewindPanelUiState
+import app.logdate.feature.rewind.ui.RewindScreenContent
+import app.logdate.feature.rewind.ui.SubtitledRewindPanelUiState
 import app.logdate.feature.rewind.ui.TextNoteRewindPanelUiState
 import app.logdate.feature.rewind.ui.TransitionRewindPanelUiState
-import app.logdate.feature.rewind.ui.RewindPanelBackgroundSpec
-import app.logdate.feature.rewind.ui.RewindScreenContent
 import app.logdate.feature.rewind.ui.detail.RewindStoryContent
 import app.logdate.feature.rewind.ui.overview.RewindHistoryUiState
 import app.logdate.feature.rewind.ui.overview.RewindOverviewScreenUiState
@@ -26,20 +23,36 @@ import kotlin.uuid.Uuid
 
 private val sampleRewindId = Uuid.parse("00000000-0000-0000-0000-000000000020")
 
-private val samplePastRewinds = listOf(
-    RewindHistoryUiState(uid = sampleRewindId, title = "Week of Feb 17", label = "Week 8", startDate = LocalDate(2025, 2, 17), endDate = LocalDate(2025, 2, 23), message = "Your week, captured"),
-    RewindHistoryUiState(uid = Uuid.parse("00000000-0000-0000-0000-000000000021"), title = "Week of Feb 10", label = "Week 7", startDate = LocalDate(2025, 2, 10), endDate = LocalDate(2025, 2, 16), message = "Moments worth remembering"),
-)
+private val samplePastRewinds =
+    listOf(
+        RewindHistoryUiState(
+            uid = sampleRewindId,
+            title = "Week of Feb 17",
+            label = "Week 8",
+            startDate = LocalDate(2025, 2, 17),
+            endDate = LocalDate(2025, 2, 23),
+            message = "Your week, captured",
+        ),
+        RewindHistoryUiState(
+            uid = Uuid.parse("00000000-0000-0000-0000-000000000021"),
+            title = "Week of Feb 10",
+            label = "Week 7",
+            startDate = LocalDate(2025, 2, 10),
+            endDate = LocalDate(2025, 2, 16),
+            message = "Moments worth remembering",
+        ),
+    )
 
-private val samplePreview = RewindPreviewUiState(
-    message = "Your week in review",
-    rewindId = sampleRewindId,
-    label = "This Week",
-    title = "A Week of New Beginnings",
-    start = LocalDate(2025, 2, 17),
-    end = LocalDate(2025, 2, 23),
-    rewindAvailable = true,
-)
+private val samplePreview =
+    RewindPreviewUiState(
+        message = "Your week in review",
+        rewindId = sampleRewindId,
+        label = "This Week",
+        title = "A Week of New Beginnings",
+        start = LocalDate(2025, 2, 17),
+        end = LocalDate(2025, 2, 23),
+        rewindAvailable = true,
+    )
 
 // ─── Overview States ────────────────────────────────────────────────────────────
 
@@ -73,10 +86,11 @@ fun S02_RewindOverviewNotReady() {
 fun S03_RewindOverviewNotReadyGenerating() {
     ScreenshotTheme {
         RewindScreenContent(
-            state = RewindOverviewScreenUiState.NotReady(
-                pastRewinds = samplePastRewinds,
-                isGeneratingRewind = true,
-            ),
+            state =
+                RewindOverviewScreenUiState.NotReady(
+                    pastRewinds = samplePastRewinds,
+                    isGeneratingRewind = true,
+                ),
             onOpenRewind = {},
         )
     }
@@ -88,10 +102,11 @@ fun S03_RewindOverviewNotReadyGenerating() {
 fun S04_RewindOverviewReady() {
     ScreenshotTheme {
         RewindScreenContent(
-            state = RewindOverviewScreenUiState.Ready(
-                pastRewinds = samplePastRewinds,
-                mostRecentRewind = samplePreview,
-            ),
+            state =
+                RewindOverviewScreenUiState.Ready(
+                    pastRewinds = samplePastRewinds,
+                    mostRecentRewind = samplePreview,
+                ),
             onOpenRewind = {},
         )
     }
@@ -103,10 +118,11 @@ fun S04_RewindOverviewReady() {
 fun S05_RewindOverviewReadyDark() {
     ScreenshotTheme(darkTheme = true) {
         RewindScreenContent(
-            state = RewindOverviewScreenUiState.Ready(
-                pastRewinds = samplePastRewinds,
-                mostRecentRewind = samplePreview,
-            ),
+            state =
+                RewindOverviewScreenUiState.Ready(
+                    pastRewinds = samplePastRewinds,
+                    mostRecentRewind = samplePreview,
+                ),
             onOpenRewind = {},
         )
     }
@@ -131,9 +147,10 @@ fun S06_RewindOverviewEmpty() {
 fun S07_RewindPanelBasicText() {
     ScreenshotTheme {
         RewindStoryContent(
-            panel = BasicTextRewindPanelUiState(
-                text = "This week was about finding your rhythm in a new city.",
-            ),
+            panel =
+                BasicTextRewindPanelUiState(
+                    text = "This week was about finding your rhythm in a new city.",
+                ),
         )
     }
 }
@@ -144,10 +161,11 @@ fun S07_RewindPanelBasicText() {
 fun S08_RewindPanelSubtitled() {
     ScreenshotTheme {
         RewindStoryContent(
-            panel = SubtitledRewindPanelUiState(
-                title = "Your Week",
-                subtitle = "February 17 – 23, 2025",
-            ),
+            panel =
+                SubtitledRewindPanelUiState(
+                    title = "Your Week",
+                    subtitle = "February 17 – 23, 2025",
+                ),
         )
     }
 }
@@ -158,12 +176,13 @@ fun S08_RewindPanelSubtitled() {
 fun S09_RewindPanelBigStatistic() {
     ScreenshotTheme {
         RewindStoryContent(
-            panel = BigStatisticRewindPanelUiState(
-                title = "Steps Taken",
-                statistic = "47,832",
-                units = "steps",
-                description = "You were more active than last week",
-            ),
+            panel =
+                BigStatisticRewindPanelUiState(
+                    title = "Steps Taken",
+                    statistic = "47,832",
+                    units = "steps",
+                    description = "You were more active than last week",
+                ),
         )
     }
 }
@@ -174,12 +193,13 @@ fun S09_RewindPanelBigStatistic() {
 fun S10_RewindPanelTextNote() {
     ScreenshotTheme {
         RewindStoryContent(
-            panel = TextNoteRewindPanelUiState(
-                sourceId = sampleRewindId,
-                timestamp = baseInstant,
-                content = "Finally made it to the California coast. The sunset was incredible.",
-                dateFormatted = "Feb 19, 2025",
-            ),
+            panel =
+                TextNoteRewindPanelUiState(
+                    sourceId = sampleRewindId,
+                    timestamp = baseInstant,
+                    content = "Finally made it to the California coast. The sunset was incredible.",
+                    dateFormatted = "Feb 19, 2025",
+                ),
         )
     }
 }
@@ -190,11 +210,12 @@ fun S10_RewindPanelTextNote() {
 fun S11_RewindPanelNarrativeContext() {
     ScreenshotTheme {
         RewindStoryContent(
-            panel = NarrativeContextRewindPanelUiState(
-                sourceId = sampleRewindId,
-                timestamp = baseInstant,
-                contextText = "You finally made it to the California coast after months of planning.",
-            ),
+            panel =
+                NarrativeContextRewindPanelUiState(
+                    sourceId = sampleRewindId,
+                    timestamp = baseInstant,
+                    contextText = "You finally made it to the California coast after months of planning.",
+                ),
         )
     }
 }
@@ -205,11 +226,12 @@ fun S11_RewindPanelNarrativeContext() {
 fun S12_RewindPanelTransition() {
     ScreenshotTheme {
         RewindStoryContent(
-            panel = TransitionRewindPanelUiState(
-                sourceId = sampleRewindId,
-                timestamp = baseInstant,
-                transitionText = "Later that evening...",
-            ),
+            panel =
+                TransitionRewindPanelUiState(
+                    sourceId = sampleRewindId,
+                    timestamp = baseInstant,
+                    transitionText = "Later that evening...",
+                ),
         )
     }
 }

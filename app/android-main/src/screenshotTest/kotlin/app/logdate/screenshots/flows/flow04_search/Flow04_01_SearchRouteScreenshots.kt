@@ -28,9 +28,7 @@ fun S03_SearchEmpty() = SharedSearchScene(SharedScreenshotSceneId.SearchEmpty)
 fun S04_SearchResults() = SharedSearchScene(SharedScreenshotSceneId.SearchResults)
 
 @Composable
-private fun SharedSearchScene(
-    sceneId: SharedScreenshotSceneId,
-) {
+private fun SharedSearchScene(sceneId: SharedScreenshotSceneId) {
     ScreenshotTheme {
         SharedScreenshotScene(sceneId)
     }

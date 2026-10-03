@@ -9,10 +9,10 @@ import app.logdate.feature.core.profile.ui.ProfileScreenContent
 import app.logdate.feature.core.profile.ui.ProfileUiState
 import app.logdate.feature.core.profile.ui.ProfileUpdateState
 import app.logdate.screenshots.common.ScreenshotTestData
-import app.logdate.shared.model.profile.LogDateProfile
-import app.logdate.shared.model.LogDateAccount
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
+import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.profile.LogDateProfile
 import com.android.tools.screenshot.PreviewTest
 
 private val sampleProfile = LogDateProfile(displayName = "Alex Johnson")
@@ -34,11 +34,12 @@ fun Profile_Default() {
     val snackbarHostState = remember { SnackbarHostState() }
     ScreenshotTheme {
         ProfileScreenContent(
-            uiState = ProfileUiState(
-                localProfile = sampleProfile,
-                account = sampleAccount,
-                userData = null,
-            ),
+            uiState =
+                ProfileUiState(
+                    localProfile = sampleProfile,
+                    account = sampleAccount,
+                    userData = null,
+                ),
             onBack = {},
             onStartEditingDisplayName = {},
             onCancelEditing = {},
@@ -57,11 +58,12 @@ fun Profile_Default_Dark() {
     val snackbarHostState = remember { SnackbarHostState() }
     ScreenshotTheme(darkTheme = true) {
         ProfileScreenContent(
-            uiState = ProfileUiState(
-                localProfile = sampleProfile,
-                account = sampleAccount,
-                userData = null,
-            ),
+            uiState =
+                ProfileUiState(
+                    localProfile = sampleProfile,
+                    account = sampleAccount,
+                    userData = null,
+                ),
             onBack = {},
             onStartEditingDisplayName = {},
             onCancelEditing = {},
@@ -80,12 +82,13 @@ fun Profile_EditDisplayName() {
     val snackbarHostState = remember { SnackbarHostState() }
     ScreenshotTheme {
         ProfileScreenContent(
-            uiState = ProfileUiState(
-                localProfile = sampleProfile,
-                account = sampleAccount,
-                userData = null,
-                editState = ProfileEditState.DisplayName("Alex Johnson"),
-            ),
+            uiState =
+                ProfileUiState(
+                    localProfile = sampleProfile,
+                    account = sampleAccount,
+                    userData = null,
+                    editState = ProfileEditState.DisplayName("Alex Johnson"),
+                ),
             onBack = {},
             onStartEditingDisplayName = {},
             onCancelEditing = {},
@@ -104,12 +107,13 @@ fun Profile_Updating() {
     val snackbarHostState = remember { SnackbarHostState() }
     ScreenshotTheme {
         ProfileScreenContent(
-            uiState = ProfileUiState(
-                localProfile = sampleProfile,
-                account = sampleAccount,
-                userData = null,
-                updateState = ProfileUpdateState.Updating,
-            ),
+            uiState =
+                ProfileUiState(
+                    localProfile = sampleProfile,
+                    account = sampleAccount,
+                    userData = null,
+                    updateState = ProfileUpdateState.Updating,
+                ),
             onBack = {},
             onStartEditingDisplayName = {},
             onCancelEditing = {},
@@ -128,11 +132,12 @@ fun Profile_NoAccount() {
     val snackbarHostState = remember { SnackbarHostState() }
     ScreenshotTheme {
         ProfileScreenContent(
-            uiState = ProfileUiState(
-                localProfile = LogDateProfile(displayName = "Local User"),
-                account = null,
-                userData = null,
-            ),
+            uiState =
+                ProfileUiState(
+                    localProfile = LogDateProfile(displayName = "Local User"),
+                    account = null,
+                    userData = null,
+                ),
             onBack = {},
             onStartEditingDisplayName = {},
             onCancelEditing = {},

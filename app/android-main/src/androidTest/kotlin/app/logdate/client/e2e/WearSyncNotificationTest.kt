@@ -4,12 +4,12 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteType
 import app.logdate.client.sync.WearSyncNotificationHelper
+import org.junit.Test
+import org.junit.runner.RunWith
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
-import org.junit.Test
-import org.junit.runner.RunWith
 
 /**
  * Tests for the watch sync notification helper.
@@ -19,18 +19,18 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class WearSyncNotificationTest {
-
     private val fixedTime = Instant.fromEpochMilliseconds(1_710_000_000_000)
 
     @Test
     fun `audio note produces voice note title`() {
-        val note = JournalNote.Audio(
-            uid = Uuid.random(),
-            creationTimestamp = fixedTime,
-            lastUpdated = fixedTime,
-            mediaRef = "/storage/recording.aac",
-            durationMs = 4200,
-        )
+        val note =
+            JournalNote.Audio(
+                uid = Uuid.random(),
+                creationTimestamp = fixedTime,
+                lastUpdated = fixedTime,
+                mediaRef = "/storage/recording.aac",
+                durationMs = 4200,
+            )
 
         val (title, body) = WearSyncNotificationHelper.contentForNote(note)
 
@@ -41,12 +41,13 @@ class WearSyncNotificationTest {
     @Test
     fun `text note shows content preview`() {
         val content = "Had an amazing lunch at the park today with the family"
-        val note = JournalNote.Text(
-            uid = Uuid.random(),
-            creationTimestamp = fixedTime,
-            lastUpdated = fixedTime,
-            content = content,
-        )
+        val note =
+            JournalNote.Text(
+                uid = Uuid.random(),
+                creationTimestamp = fixedTime,
+                lastUpdated = fixedTime,
+                content = content,
+            )
 
         val (title, body) = WearSyncNotificationHelper.contentForNote(note)
 
@@ -57,12 +58,13 @@ class WearSyncNotificationTest {
     @Test
     fun `long text note truncates to80 chars`() {
         val longContent = "A".repeat(200)
-        val note = JournalNote.Text(
-            uid = Uuid.random(),
-            creationTimestamp = fixedTime,
-            lastUpdated = fixedTime,
-            content = longContent,
-        )
+        val note =
+            JournalNote.Text(
+                uid = Uuid.random(),
+                creationTimestamp = fixedTime,
+                lastUpdated = fixedTime,
+                content = longContent,
+            )
 
         val (_, body) = WearSyncNotificationHelper.contentForNote(note)
 
@@ -71,12 +73,13 @@ class WearSyncNotificationTest {
 
     @Test
     fun `image note produces photo title`() {
-        val note = JournalNote.Image(
-            uid = Uuid.random(),
-            creationTimestamp = fixedTime,
-            lastUpdated = fixedTime,
-            mediaRef = "/storage/photo.jpg",
-        )
+        val note =
+            JournalNote.Image(
+                uid = Uuid.random(),
+                creationTimestamp = fixedTime,
+                lastUpdated = fixedTime,
+                mediaRef = "/storage/photo.jpg",
+            )
 
         val (title, body) = WearSyncNotificationHelper.contentForNote(note)
 
@@ -86,12 +89,13 @@ class WearSyncNotificationTest {
 
     @Test
     fun `video note produces video title`() {
-        val note = JournalNote.Video(
-            uid = Uuid.random(),
-            creationTimestamp = fixedTime,
-            lastUpdated = fixedTime,
-            mediaRef = "/storage/clip.mp4",
-        )
+        val note =
+            JournalNote.Video(
+                uid = Uuid.random(),
+                creationTimestamp = fixedTime,
+                lastUpdated = fixedTime,
+                mediaRef = "/storage/clip.mp4",
+            )
 
         val (title, body) = WearSyncNotificationHelper.contentForNote(note)
 
@@ -101,12 +105,13 @@ class WearSyncNotificationTest {
 
     @Test
     fun `mood text note shows mood content`() {
-        val note = JournalNote.Text(
-            uid = Uuid.random(),
-            creationTimestamp = fixedTime,
-            lastUpdated = fixedTime,
-            content = "#mood:good Feeling great today",
-        )
+        val note =
+            JournalNote.Text(
+                uid = Uuid.random(),
+                creationTimestamp = fixedTime,
+                lastUpdated = fixedTime,
+                content = "#mood:good Feeling great today",
+            )
 
         val (title, body) = WearSyncNotificationHelper.contentForNote(note)
 
@@ -116,24 +121,37 @@ class WearSyncNotificationTest {
 
     @Test
     fun `each note type maps to correct type`() {
-        val types = mapOf(
-            NoteType.AUDIO to JournalNote.Audio(
-                uid = Uuid.random(), creationTimestamp = fixedTime, lastUpdated = fixedTime,
-                mediaRef = "/a.aac",
-            ),
-            NoteType.TEXT to JournalNote.Text(
-                uid = Uuid.random(), creationTimestamp = fixedTime, lastUpdated = fixedTime,
-                content = "test",
-            ),
-            NoteType.IMAGE to JournalNote.Image(
-                uid = Uuid.random(), creationTimestamp = fixedTime, lastUpdated = fixedTime,
-                mediaRef = "/a.jpg",
-            ),
-            NoteType.VIDEO to JournalNote.Video(
-                uid = Uuid.random(), creationTimestamp = fixedTime, lastUpdated = fixedTime,
-                mediaRef = "/a.mp4",
-            ),
-        )
+        val types =
+            mapOf(
+                NoteType.AUDIO to
+                    JournalNote.Audio(
+                        uid = Uuid.random(),
+                        creationTimestamp = fixedTime,
+                        lastUpdated = fixedTime,
+                        mediaRef = "/a.aac",
+                    ),
+                NoteType.TEXT to
+                    JournalNote.Text(
+                        uid = Uuid.random(),
+                        creationTimestamp = fixedTime,
+                        lastUpdated = fixedTime,
+                        content = "test",
+                    ),
+                NoteType.IMAGE to
+                    JournalNote.Image(
+                        uid = Uuid.random(),
+                        creationTimestamp = fixedTime,
+                        lastUpdated = fixedTime,
+                        mediaRef = "/a.jpg",
+                    ),
+                NoteType.VIDEO to
+                    JournalNote.Video(
+                        uid = Uuid.random(),
+                        creationTimestamp = fixedTime,
+                        lastUpdated = fixedTime,
+                        mediaRef = "/a.mp4",
+                    ),
+            )
 
         for ((type, note) in types) {
             val (title, _) = WearSyncNotificationHelper.contentForNote(note)

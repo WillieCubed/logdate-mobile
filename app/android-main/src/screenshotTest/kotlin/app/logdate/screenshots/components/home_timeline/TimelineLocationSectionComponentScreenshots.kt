@@ -1,13 +1,13 @@
 package app.logdate.screenshots.components.home_timeline
 
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.feature.timeline.ui.details.TimelineDayDetailPanel
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
-import app.logdate.ui.maps.LocalGoogleMapsAvailabilityOverride
 import app.logdate.ui.location.PlaceUiState
+import app.logdate.ui.maps.LocalGoogleMapsAvailabilityOverride
 import app.logdate.ui.timeline.TimelineDayUiState
 import com.android.tools.screenshot.PreviewTest
 import kotlinx.datetime.LocalDate

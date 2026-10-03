@@ -15,11 +15,11 @@ import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.logdate.client.EditorActivity
-import kotlin.test.assertNotEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
+import kotlin.test.assertNotEquals
 
 /**
  * Instrumented E2E coverage that multi-window editor windows stay hinge-aware and keep

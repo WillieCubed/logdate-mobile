@@ -113,7 +113,20 @@ fun RecoveryPhrase_Revealed() {
         RecoveryPhraseContent(
             state =
                 RecoveryPhraseUiState.Revealed(
-                    listOf("orbit", "canvas", "meadow", "lantern", "harbor", "velvet", "summit", "pepper", "gravel", "whisper", "copper", "tundra"),
+                    listOf(
+                        "orbit",
+                        "canvas",
+                        "meadow",
+                        "lantern",
+                        "harbor",
+                        "velvet",
+                        "summit",
+                        "pepper",
+                        "gravel",
+                        "whisper",
+                        "copper",
+                        "tundra",
+                    ),
                 ),
             onBack = {},
             onReveal = {},

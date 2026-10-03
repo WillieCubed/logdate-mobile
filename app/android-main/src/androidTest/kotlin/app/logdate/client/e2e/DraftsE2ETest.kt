@@ -60,9 +60,10 @@ import kotlin.uuid.Uuid
 class DraftsE2ETest {
     private val fakeDraftRepository = FakeDraftRepository()
 
-    private val testModule = module {
-        single<EntryDraftRepository> { fakeDraftRepository }
-    }
+    private val testModule =
+        module {
+            single<EntryDraftRepository> { fakeDraftRepository }
+        }
 
     private val koinRule = DraftsKoinModuleOverrideRule(testModule)
     private val composeRule = createAndroidComposeRule<EditorActivity>()
@@ -132,7 +133,10 @@ class DraftsE2ETest {
         val savedDraft = fakeDraftRepository.currentDrafts.single()
         assertEquals(
             "Draft content to save",
-            savedDraft.notes.filterIsInstance<JournalNote.Text>().single().content,
+            savedDraft.notes
+                .filterIsInstance<JournalNote.Text>()
+                .single()
+                .content,
         )
     }
 
@@ -173,7 +177,10 @@ class DraftsE2ETest {
         assertEquals(
             "Immediate Save Draft must persist the entered text before navigation",
             "Temporary content",
-            savedDraft.notes.filterIsInstance<JournalNote.Text>().single().content,
+            savedDraft.notes
+                .filterIsInstance<JournalNote.Text>()
+                .single()
+                .content,
         )
     }
 
@@ -185,7 +192,8 @@ class DraftsE2ETest {
 
         composeRule.onNodeWithTag("editor_text_input").performTextInput(content)
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            fakeDraftRepository.currentDrafts.singleOrNull()
+            fakeDraftRepository.currentDrafts
+                .singleOrNull()
                 ?.notes
                 ?.filterIsInstance<JournalNote.Text>()
                 ?.singleOrNull()
@@ -195,7 +203,8 @@ class DraftsE2ETest {
         composeRule.activityRule.scenario.recreate()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            composeRule.onAllNodesWithTag("editor_text_input")
+            composeRule
+                .onAllNodesWithTag("editor_text_input")
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
@@ -209,7 +218,8 @@ class DraftsE2ETest {
         startTextEntry()
         composeRule.onNodeWithTag("editor_text_input").performTextInput("Discard this exact draft")
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            fakeDraftRepository.currentDrafts.singleOrNull()
+            fakeDraftRepository.currentDrafts
+                .singleOrNull()
                 ?.notes
                 ?.filterIsInstance<JournalNote.Text>()
                 ?.singleOrNull()
@@ -245,7 +255,8 @@ class DraftsE2ETest {
         // The sheet fetches drafts asynchronously after it opens. Wait for the durable
         // preview rather than asserting during the loading frame on slower devices.
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithText(draftContent, substring = true)
+            composeRule
+                .onAllNodesWithText(draftContent, substring = true)
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
@@ -256,7 +267,8 @@ class DraftsE2ETest {
         composeRule.waitForIdle()
 
         // Verify text content was loaded into the editor
-        composeRule.onNodeWithTag("editor_text_input")
+        composeRule
+            .onNodeWithTag("editor_text_input")
             .assertTextEquals(draftContent)
 
         // Save the entry
@@ -287,7 +299,8 @@ class DraftsE2ETest {
 
     private fun openDraftsDialog() {
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithContentDescription("More options")
+            composeRule
+                .onAllNodesWithContentDescription("More options")
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
@@ -299,7 +312,8 @@ class DraftsE2ETest {
     private fun startTextEntry() {
         composeRule.onNodeWithContentDescription("Start text entry").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            composeRule.onAllNodesWithTag("editor_text_input")
+            composeRule
+                .onAllNodesWithTag("editor_text_input")
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
@@ -319,19 +333,21 @@ private class FakeDraftRepository : EntryDraftRepository {
     fun seedDraft(textContent: String): Uuid {
         val now = Clock.System.now()
         val id = Uuid.random()
-        val draft = EntryDraft(
-            id = id,
-            notes = listOf(
-                JournalNote.Text(
-                    uid = Uuid.random(),
-                    creationTimestamp = now,
-                    lastUpdated = now,
-                    content = textContent,
-                ),
-            ),
-            createdAt = now,
-            updatedAt = now,
-        )
+        val draft =
+            EntryDraft(
+                id = id,
+                notes =
+                    listOf(
+                        JournalNote.Text(
+                            uid = Uuid.random(),
+                            creationTimestamp = now,
+                            lastUpdated = now,
+                            content = textContent,
+                        ),
+                    ),
+                createdAt = now,
+                updatedAt = now,
+            )
         drafts.value = drafts.value + draft
         return id
     }
@@ -362,19 +378,23 @@ private class FakeDraftRepository : EntryDraftRepository {
         selectedJournalIds: List<Uuid>,
     ): Uuid {
         val now = Clock.System.now()
-        val draft = EntryDraft(
-            id = uid,
-            notes = notes,
-            createdAt = now,
-            updatedAt = now,
-            pendingMedia = pendingMedia,
-            selectedJournalIds = selectedJournalIds,
-        )
+        val draft =
+            EntryDraft(
+                id = uid,
+                notes = notes,
+                createdAt = now,
+                updatedAt = now,
+                pendingMedia = pendingMedia,
+                selectedJournalIds = selectedJournalIds,
+            )
         drafts.value = drafts.value.filterNot { it.id == uid } + draft
         return draft.id
     }
 
-    override suspend fun updateDraft(uid: Uuid, notes: List<JournalNote>): Uuid {
+    override suspend fun updateDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+    ): Uuid {
         val existing = drafts.value.firstOrNull { it.id == uid }
         return updateDraft(
             uid = uid,
@@ -392,23 +412,24 @@ private class FakeDraftRepository : EntryDraftRepository {
     ): Uuid {
         val now = Clock.System.now()
         val existing = drafts.value.firstOrNull { it.id == uid }
-        val updated = if (existing != null) {
-            existing.copy(
-                notes = notes,
-                pendingMedia = pendingMedia,
-                selectedJournalIds = selectedJournalIds,
-                updatedAt = now,
-            )
-        } else {
-            EntryDraft(
-                id = uid,
-                notes = notes,
-                createdAt = now,
-                updatedAt = now,
-                pendingMedia = pendingMedia,
-                selectedJournalIds = selectedJournalIds,
-            )
-        }
+        val updated =
+            if (existing != null) {
+                existing.copy(
+                    notes = notes,
+                    pendingMedia = pendingMedia,
+                    selectedJournalIds = selectedJournalIds,
+                    updatedAt = now,
+                )
+            } else {
+                EntryDraft(
+                    id = uid,
+                    notes = notes,
+                    createdAt = now,
+                    updatedAt = now,
+                    pendingMedia = pendingMedia,
+                    selectedJournalIds = selectedJournalIds,
+                )
+            }
         drafts.value = drafts.value.filterNot { it.id == uid } + updated
         return uid
     }
@@ -443,7 +464,10 @@ private class FakeDraftRepository : EntryDraftRepository {
 private class DraftsKoinModuleOverrideRule(
     private val module: Module,
 ) : TestRule {
-    override fun apply(base: Statement, description: Description): Statement =
+    override fun apply(
+        base: Statement,
+        description: Description,
+    ): Statement =
         object : Statement() {
             override fun evaluate() {
                 val context = ApplicationProvider.getApplicationContext<Context>()

@@ -56,7 +56,8 @@ class MiniAudioPlayerE2ETest {
 
     private fun assertOutputRouteControlsAreUsable() {
         composeRule.onNodeWithText("Voice note from journal").assertIsDisplayed()
-        composeRule.onAllNodesWithTag(MediaDeviceSelectorTags.chip("Audio output"))[0]
+        composeRule
+            .onAllNodesWithTag(MediaDeviceSelectorTags.chip("Audio output"))[0]
             .assertIsDisplayed()
             .assertHasClickAction()
             .performClick()

@@ -6,7 +6,6 @@ import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.client.media.device.MediaDeviceUiState
-import app.logdate.ui.audio.model.AudioPalette
 import app.logdate.feature.editor.ui.audio.expansion.ImmersiveAudioScreen
 import app.logdate.feature.journals.ui.detail.EntryDisplayData
 import app.logdate.feature.journals.ui.detail.JournalDetailScreenContent
@@ -20,6 +19,7 @@ import app.logdate.ui.audio.AudioPlaybackDisplayInfo
 import app.logdate.ui.audio.AudioPlaybackState
 import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.audio.MiniAudioPlayer
+import app.logdate.ui.audio.model.AudioPalette
 import app.logdate.ui.timeline.AudioNoteUiState
 import com.android.tools.screenshot.PreviewTest
 import kotlin.time.Duration.Companion.minutes
@@ -87,9 +87,10 @@ private val playbackState =
         outputSelection = controllableOutputSelection,
     )
 
-private val systemControlledPlaybackState = playbackState.copy(
-    outputSelection = systemControlledOutputSelection,
-)
+private val systemControlledPlaybackState =
+    playbackState.copy(
+        outputSelection = systemControlledOutputSelection,
+    )
 
 private val inlineAudioNoteId = Uuid.parse("00000000-0000-0000-0000-000000000172")
 

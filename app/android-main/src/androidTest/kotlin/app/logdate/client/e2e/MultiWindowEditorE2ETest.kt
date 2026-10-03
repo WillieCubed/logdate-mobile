@@ -8,11 +8,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.logdate.client.EditorActivity
 import io.github.aakira.napier.Napier
-import kotlin.test.assertEquals
-import kotlin.uuid.Uuid
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlin.test.assertEquals
+import kotlin.uuid.Uuid
 
 /**
  * End-to-end tests for multi-window editor functionality.
@@ -59,11 +59,12 @@ class MultiWindowEditorE2ETest {
         val entryId = Uuid.random()
         val journalId = Uuid.random()
 
-        val intent = EditorActivity.createIntent(
-            context,
-            entryId = entryId,
-            journalId = journalId
-        )
+        val intent =
+            EditorActivity.createIntent(
+                context,
+                entryId = entryId,
+                journalId = journalId,
+            )
 
         // Verify intent extras are set
         assertEquals(entryId.toString(), intent.getStringExtra("entry_id"))
@@ -107,17 +108,18 @@ class MultiWindowEditorE2ETest {
         val initialText = "Test journal entry content"
         val attachmentUri = "content://media/external/images/media/1"
 
-        val intent = EditorActivity.createIntent(
-            context,
-            initialText = initialText,
-            attachments = listOf(attachmentUri)
-        )
+        val intent =
+            EditorActivity.createIntent(
+                context,
+                initialText = initialText,
+                attachments = listOf(attachmentUri),
+            )
 
         // Verify initial content is in intent
         assertEquals(initialText, intent.getStringExtra("initial_text"))
         assertEquals(
             listOf(attachmentUri),
-            intent.getStringArrayListExtra("attachments") ?: emptyList()
+            intent.getStringArrayListExtra("attachments") ?: emptyList(),
         )
 
         // Verify this is configured as a new document

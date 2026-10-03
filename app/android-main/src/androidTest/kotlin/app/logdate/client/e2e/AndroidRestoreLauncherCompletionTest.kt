@@ -5,10 +5,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.feature.core.restore.AndroidRestoreLauncher
 import app.logdate.feature.core.restore.RestoreError
 import app.logdate.feature.core.restore.RestoreOutcome
+import org.junit.runner.RunWith
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class AndroidRestoreLauncherCompletionTest {

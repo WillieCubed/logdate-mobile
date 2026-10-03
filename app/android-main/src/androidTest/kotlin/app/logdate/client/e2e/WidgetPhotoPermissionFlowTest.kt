@@ -39,7 +39,13 @@ class WidgetPhotoPermissionFlowTest {
                 device.wait(Until.hasObject(By.text("Allow photos")), 20_000L),
                 "Photo action absent: title=${device.hasObject(By.text("New Entry shape"))}, " +
                     "full=${context.checkSelfPermission(permission)}, " +
-                    "selected=${if (Build.VERSION.SDK_INT >= 34) context.checkSelfPermission(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) else -1}",
+                    "selected=${if (Build.VERSION.SDK_INT >= 34) {
+                        context.checkSelfPermission(
+                            Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+                        )
+                    } else {
+                        -1
+                    }}",
             )
             device.findObject(By.text("Allow photos")).click()
             val allow =

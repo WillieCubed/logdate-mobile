@@ -53,7 +53,8 @@ class LibraryMediaDetailVideoE2ETest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(VideoPlayerTags.ROOT).assertIsDisplayed()
         composeRule.onNodeWithText("External display audio").assertIsDisplayed()
-        composeRule.onAllNodesWithTag(MediaDeviceSelectorTags.chip("Audio output"))[0]
+        composeRule
+            .onAllNodesWithTag(MediaDeviceSelectorTags.chip("Audio output"))[0]
             .assertIsDisplayed()
             .assertHasClickAction()
             .performClick()
@@ -82,7 +83,8 @@ class LibraryMediaDetailVideoE2ETest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(VideoPlayerTags.ROOT).assertIsDisplayed()
         composeRule.onNodeWithText("External display audio").assertIsDisplayed()
-        composeRule.onAllNodesWithTag(MediaDeviceSelectorTags.chip("Audio output"))[0]
+        composeRule
+            .onAllNodesWithTag(MediaDeviceSelectorTags.chip("Audio output"))[0]
             .assertIsDisplayed()
             .assertHasClickAction()
             .performClick()

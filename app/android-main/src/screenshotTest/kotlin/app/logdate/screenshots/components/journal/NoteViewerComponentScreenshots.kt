@@ -11,12 +11,13 @@ import app.logdate.screenshots.common.ScreenshotTheme
 import com.android.tools.screenshot.PreviewTest
 import kotlin.uuid.Uuid
 
-private val sampleShared = NoteViewerShared(
-    noteId = Uuid.parse("00000000-0000-0000-0000-000000000030"),
-    createdAt = baseInstant,
-    lastUpdated = baseInstant,
-    location = null,
-)
+private val sampleShared =
+    NoteViewerShared(
+        noteId = Uuid.parse("00000000-0000-0000-0000-000000000030"),
+        createdAt = baseInstant,
+        lastUpdated = baseInstant,
+        location = null,
+    )
 
 // ─── Note Viewer Content ────────────────────────────────────────────────────────
 

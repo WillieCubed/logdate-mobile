@@ -5,9 +5,9 @@ package app.logdate.screenshots.common
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import kotlinx.datetime.LocalDate
 import app.logdate.ui.common.formatting.LocalToday
 import app.logdate.ui.theme.LogDateTheme
+import kotlinx.datetime.LocalDate
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.LocalResourceReader
 

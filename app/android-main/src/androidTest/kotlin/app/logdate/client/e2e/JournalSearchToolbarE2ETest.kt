@@ -6,8 +6,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.repository.search.SearchContentType
+import app.logdate.client.repository.search.SearchResult
 import app.logdate.feature.journals.ui.JournalListItemUiState
 import app.logdate.feature.journals.ui.JournalSearchToolbar
 import app.logdate.shared.model.Journal
@@ -25,32 +25,35 @@ import kotlin.uuid.Uuid
  */
 @RunWith(AndroidJUnit4::class)
 class JournalSearchToolbarE2ETest {
-
     @get:Rule
     val composeRule = createComposeRule()
 
-    private val tripJournal = Journal(
-        id = Uuid.random(),
-        title = "Summer Trip 2025",
-        description = "Family vacation photos",
-    )
-    private val workJournal = Journal(
-        id = Uuid.random(),
-        title = "Work Notes",
-        description = "Daily standup summaries",
-    )
-    private val journalItems = listOf(
-        JournalListItemUiState.ExistingJournal(tripJournal),
-        JournalListItemUiState.ExistingJournal(workJournal),
-        JournalListItemUiState.CreateJournalPlaceholder,
-    )
+    private val tripJournal =
+        Journal(
+            id = Uuid.random(),
+            title = "Summer Trip 2025",
+            description = "Family vacation photos",
+        )
+    private val workJournal =
+        Journal(
+            id = Uuid.random(),
+            title = "Work Notes",
+            description = "Daily standup summaries",
+        )
+    private val journalItems =
+        listOf(
+            JournalListItemUiState.ExistingJournal(tripJournal),
+            JournalListItemUiState.ExistingJournal(workJournal),
+            JournalListItemUiState.CreateJournalPlaceholder,
+        )
 
-    private val entryResult = SearchResult(
-        uid = Uuid.random(),
-        content = "Went hiking at sunset and captured the golden hour.",
-        created = Clock.System.now(),
-        contentType = SearchContentType.TEXT_NOTE,
-    )
+    private val entryResult =
+        SearchResult(
+            uid = Uuid.random(),
+            content = "Went hiking at sunset and captured the golden hour.",
+            created = Clock.System.now(),
+            contentType = SearchContentType.TEXT_NOTE,
+        )
 
     // region Collapsed State
 
@@ -99,10 +102,11 @@ class JournalSearchToolbarE2ETest {
         composeRule.setContent {
             JournalSearchToolbar(
                 searchQuery = "trip",
-                filteredJournals = listOf(
-                    JournalListItemUiState.ExistingJournal(tripJournal),
-                    JournalListItemUiState.CreateJournalPlaceholder,
-                ),
+                filteredJournals =
+                    listOf(
+                        JournalListItemUiState.ExistingJournal(tripJournal),
+                        JournalListItemUiState.CreateJournalPlaceholder,
+                    ),
                 entryResults = emptyList(),
                 onQueryChange = {},
                 onOpenJournal = {},
@@ -167,10 +171,11 @@ class JournalSearchToolbarE2ETest {
         composeRule.setContent {
             JournalSearchToolbar(
                 searchQuery = "trip",
-                filteredJournals = listOf(
-                    JournalListItemUiState.ExistingJournal(tripJournal),
-                    JournalListItemUiState.CreateJournalPlaceholder,
-                ),
+                filteredJournals =
+                    listOf(
+                        JournalListItemUiState.ExistingJournal(tripJournal),
+                        JournalListItemUiState.CreateJournalPlaceholder,
+                    ),
                 entryResults = emptyList(),
                 onQueryChange = {},
                 onOpenJournal = { openedJournalId = it },

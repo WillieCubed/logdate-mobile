@@ -12,9 +12,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
@@ -145,33 +145,36 @@ class RewindImmersiveE2ETest {
     private fun PlaybackNavigation() {
         val backStack = remember { mutableStateListOf<NavKey>(HomeRoute) }
         val window = LocalWindowInfo.current.containerSize
-        val photo = remember {
-            val target = InstrumentationRegistry.getInstrumentation().targetContext
-            val file = File(target.cacheDir, "rewind-immersive-fixture.jpg")
-            target.resources.openRawResource(app.logdate.client.R.drawable.workspace_sample_photo).use { input ->
-                file.outputStream().use { input.copyTo(it) }
+        val photo =
+            remember {
+                val target = InstrumentationRegistry.getInstrumentation().targetContext
+                val file = File(target.cacheDir, "rewind-immersive-fixture.jpg")
+                target.resources.openRawResource(app.logdate.client.R.drawable.workspace_sample_photo).use { input ->
+                    file.outputStream().use { input.copyTo(it) }
+                }
+                file.toURI().toString()
             }
-            file.toURI().toString()
-        }
         val density = LocalDensity.current
-        val fold = with(density) {
-            if (folded.value) {
-                val width = window.width.toDp()
-                val height = window.height.toDp()
-                FoldableLayoutInfo(
-                    isFoldable = true,
-                    hinge = FoldableHingeInfo(
-                        FoldableHingeOrientation.Vertical,
-                        FoldableHingeState.HalfOpened,
-                        FoldableOcclusionType.Full,
-                        FoldableHingeBounds(width / 2 - 10.dp, 0.dp, width / 2 + 10.dp, height, 20.dp, height),
-                        true,
-                    ),
-                )
-            } else {
-                FoldableLayoutInfo()
+        val fold =
+            with(density) {
+                if (folded.value) {
+                    val width = window.width.toDp()
+                    val height = window.height.toDp()
+                    FoldableLayoutInfo(
+                        isFoldable = true,
+                        hinge =
+                            FoldableHingeInfo(
+                                FoldableHingeOrientation.Vertical,
+                                FoldableHingeState.HalfOpened,
+                                FoldableOcclusionType.Full,
+                                FoldableHingeBounds(width / 2 - 10.dp, 0.dp, width / 2 + 10.dp, height, 20.dp, height),
+                                true,
+                            ),
+                    )
+                } else {
+                    FoldableLayoutInfo()
+                }
             }
-        }
         LogDateTheme {
             CompositionLocalProvider(
                 LocalWorkspaceEnabled provides workspaceEnabled.value,
@@ -183,32 +186,34 @@ class RewindImmersiveE2ETest {
                         onBack = { if (backStack.size > 1) backStack.removeLastOrNull() },
                         sceneStrategies = listOf(HomeSceneStrategy<NavKey>(supportsDualPane = { true })),
                         entryDecorators = listOf(rememberWorkspaceRouteDecorator()),
-                        entryProvider = entryProvider {
-                            taggedEntry<HomeRoute> {
-                                WorkspaceScaffold(
-                                    destinations = listOf(WorkspaceDestination("rewind", "Rewind", Icons.Default.History)),
-                                    selectedKey = "rewind",
-                                    onSelect = {},
-                                    onSearch = {},
-                                ) {
-                                    TextButton(onClick = { backStack.add(RewindDetailRoute(REWIND_ID)) }) { Text("Open rewind") }
+                        entryProvider =
+                            entryProvider {
+                                taggedEntry<HomeRoute> {
+                                    WorkspaceScaffold(
+                                        destinations = listOf(WorkspaceDestination("rewind", "Rewind", Icons.Default.History)),
+                                        selectedKey = "rewind",
+                                        onSelect = {},
+                                        onSearch = {},
+                                    ) {
+                                        TextButton(onClick = { backStack.add(RewindDetailRoute(REWIND_ID)) }) { Text("Open rewind") }
+                                    }
                                 }
-                            }
-                            taggedEntry<RewindDetailRoute> {
-                                RewindDetailScreenContent(
-                                    uiState = RewindDetailUiState.Success(
-                                        listOf(
-                                            SubtitledRewindPanelUiState("First moment", "Monday", photo),
-                                            SubtitledRewindPanelUiState("Second moment", "Tuesday", photo),
-                                            SubtitledRewindPanelUiState("Third moment", "Wednesday", photo),
-                                        ),
-                                    ),
-                                    onExitRewind = { backStack.removeLastOrNull() },
-                                    externalPause = externallyPaused.value,
-                                    modifier = Modifier.fillMaxSize().testTag("rewind_fullscreen"),
-                                )
-                            }
-                        },
+                                taggedEntry<RewindDetailRoute> {
+                                    RewindDetailScreenContent(
+                                        uiState =
+                                            RewindDetailUiState.Success(
+                                                listOf(
+                                                    SubtitledRewindPanelUiState("First moment", "Monday", photo),
+                                                    SubtitledRewindPanelUiState("Second moment", "Tuesday", photo),
+                                                    SubtitledRewindPanelUiState("Third moment", "Wednesday", photo),
+                                                ),
+                                            ),
+                                        onExitRewind = { backStack.removeLastOrNull() },
+                                        externalPause = externallyPaused.value,
+                                        modifier = Modifier.fillMaxSize().testTag("rewind_fullscreen"),
+                                    )
+                                }
+                            },
                     )
                 }
             }
@@ -217,23 +222,25 @@ class RewindImmersiveE2ETest {
 
     private fun capture(name: String) {
         compose.waitForIdle()
-        val directory = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")
-            ?: error("Runtime screenshots require a Gradle Managed Device task")
+        val directory =
+            InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")
+                ?: error("Runtime screenshots require a Gradle Managed Device task")
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         val file = File(directory, "$name-${device.displayWidth}x${device.displayHeight}.png")
         file.parentFile?.mkdirs()
         compose.waitUntil(timeoutMillis = 10000) {
             check(device.takeScreenshot(file))
             val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-            val colorfulPixels = (0 until bitmap.width step 32).sumOf { x ->
-                (0 until bitmap.height step 32).count { y ->
-                    val color = bitmap.getPixel(x, y)
-                    val red = (color shr 16) and 255
-                    val green = (color shr 8) and 255
-                    val blue = color and 255
-                    maxOf(red, green, blue) - minOf(red, green, blue) > 25
+            val colorfulPixels =
+                (0 until bitmap.width step 32).sumOf { x ->
+                    (0 until bitmap.height step 32).count { y ->
+                        val color = bitmap.getPixel(x, y)
+                        val red = (color shr 16) and 255
+                        val green = (color shr 8) and 255
+                        val blue = color and 255
+                        maxOf(red, green, blue) - minOf(red, green, blue) > 25
+                    }
                 }
-            }
             bitmap.recycle()
             colorfulPixels > 50
         }

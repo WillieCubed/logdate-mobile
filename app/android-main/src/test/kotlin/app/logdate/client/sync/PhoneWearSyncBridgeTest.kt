@@ -9,10 +9,10 @@ import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
-import java.io.ByteArrayInputStream
-import java.io.InputStream
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import java.io.ByteArrayInputStream
+import java.io.InputStream
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -28,145 +28,148 @@ import kotlin.uuid.Uuid
  * discrete data items (like text notes) and binary streams (like audio recordings).
  */
 class PhoneWearSyncBridgeTest {
-
     private val notesRepository = mockk<JournalNotesRepository>()
     private val noteDataMapper = NoteDataMapper()
 
     @Test
-    fun `publishNotesToWatch sends serialized notes through transport`() = runTest {
-        val textNote =
-            JournalNote.Text(
-                uid = Uuid.random(),
-                creationTimestamp = Instant.fromEpochMilliseconds(1_710_000_000_000),
-                lastUpdated = Instant.fromEpochMilliseconds(1_710_000_000_000),
-                content = "Phone note",
-            )
-        val audioNote =
-            JournalNote.Audio(
-                uid = Uuid.random(),
-                creationTimestamp = Instant.fromEpochMilliseconds(1_710_000_010_000),
-                lastUpdated = Instant.fromEpochMilliseconds(1_710_000_010_000),
-                mediaRef = "/storage/emulated/0/notes/audio.m4a",
-                durationMs = 4_200,
-            )
-        val transport = RecordingTransport()
+    fun `publishNotesToWatch sends serialized notes through transport`() =
+        runTest {
+            val textNote =
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    creationTimestamp = Instant.fromEpochMilliseconds(1_710_000_000_000),
+                    lastUpdated = Instant.fromEpochMilliseconds(1_710_000_000_000),
+                    content = "Phone note",
+                )
+            val audioNote =
+                JournalNote.Audio(
+                    uid = Uuid.random(),
+                    creationTimestamp = Instant.fromEpochMilliseconds(1_710_000_010_000),
+                    lastUpdated = Instant.fromEpochMilliseconds(1_710_000_010_000),
+                    mediaRef = "/storage/emulated/0/notes/audio.m4a",
+                    durationMs = 4_200,
+                )
+            val transport = RecordingTransport()
 
-        every { notesRepository.allNotesObserved } returns flowOf(listOf(textNote, audioNote))
+            every { notesRepository.allNotesObserved } returns flowOf(listOf(textNote, audioNote))
 
-        val bridge =
-            DefaultPhoneWearSyncBridge(
-                notesRepository = notesRepository,
-                noteDataMapper = noteDataMapper,
-                transport = transport,
-                audioStreamOpener = UnusedAudioOpener,
-            )
+            val bridge =
+                DefaultPhoneWearSyncBridge(
+                    notesRepository = notesRepository,
+                    noteDataMapper = noteDataMapper,
+                    transport = transport,
+                    audioStreamOpener = UnusedAudioOpener,
+                )
 
-        bridge.publishNotesToWatch(sourceNodeId = "watch-node")
+            bridge.publishNotesToWatch(sourceNodeId = "watch-node")
 
-        assertEquals(2, transport.putRequests.size)
-        assertEquals(NoteDataMapper.notePath(textNote.uid), transport.putRequests[0].path)
-        assertEquals(textNote, noteDataMapper.fromDataMap(transport.putRequests[0].data))
-        assertEquals(NoteDataMapper.notePath(audioNote.uid), transport.putRequests[1].path)
-        assertEquals(audioNote, noteDataMapper.fromDataMap(transport.putRequests[1].data))
-    }
-
-    @Test
-    fun `streamAudioToWatch pipes requested note bytes to transfer channel`() = runTest {
-        val noteId = Uuid.random()
-        val payload = "synced-audio".encodeToByteArray()
-        val audioNote =
-            JournalNote.Audio(
-                uid = noteId,
-                creationTimestamp = Instant.fromEpochMilliseconds(1_710_000_000_000),
-                lastUpdated = Instant.fromEpochMilliseconds(1_710_000_000_000),
-                mediaRef = "content://phone/audio/$noteId",
-                durationMs = 4_200,
-            )
-        val transport = RecordingTransport()
-
-        coEvery { notesRepository.getNoteById(noteId) } returns audioNote
-
-        val bridge =
-            DefaultPhoneWearSyncBridge(
-                notesRepository = notesRepository,
-                noteDataMapper = noteDataMapper,
-                transport = transport,
-                audioStreamOpener =
-                    object : PhoneAudioStreamOpener {
-                        override fun open(mediaRef: String): InputStream? = ByteArrayInputStream(payload)
-                    },
-            )
-
-        bridge.streamAudioToWatch(noteId = noteId, sourceNodeId = "watch-node")
-
-        assertEquals(1, transport.streamRequests.size)
-        val request = transport.streamRequests.single()
-        assertEquals("watch-node", request.nodeId)
-        assertEquals(WearAudioRequestPaths.audioTransferPath(noteId), request.channelPath)
-        assertContentEquals(payload, request.payload)
-    }
+            assertEquals(2, transport.putRequests.size)
+            assertEquals(NoteDataMapper.notePath(textNote.uid), transport.putRequests[0].path)
+            assertEquals(textNote, noteDataMapper.fromDataMap(transport.putRequests[0].data))
+            assertEquals(NoteDataMapper.notePath(audioNote.uid), transport.putRequests[1].path)
+            assertEquals(audioNote, noteDataMapper.fromDataMap(transport.putRequests[1].data))
+        }
 
     @Test
-    fun `streamAudioToWatch skips transport when media stream cannot be opened`() = runTest {
-        val noteId = Uuid.random()
-        val audioNote =
-            JournalNote.Audio(
-                uid = noteId,
-                creationTimestamp = Instant.fromEpochMilliseconds(1_710_000_000_000),
-                lastUpdated = Instant.fromEpochMilliseconds(1_710_000_000_000),
-                mediaRef = "content://phone/audio/$noteId",
-                durationMs = 4_200,
-            )
-        val transport = RecordingTransport()
+    fun `streamAudioToWatch pipes requested note bytes to transfer channel`() =
+        runTest {
+            val noteId = Uuid.random()
+            val payload = "synced-audio".encodeToByteArray()
+            val audioNote =
+                JournalNote.Audio(
+                    uid = noteId,
+                    creationTimestamp = Instant.fromEpochMilliseconds(1_710_000_000_000),
+                    lastUpdated = Instant.fromEpochMilliseconds(1_710_000_000_000),
+                    mediaRef = "content://phone/audio/$noteId",
+                    durationMs = 4_200,
+                )
+            val transport = RecordingTransport()
 
-        coEvery { notesRepository.getNoteById(noteId) } returns audioNote
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote
 
-        val bridge =
-            DefaultPhoneWearSyncBridge(
-                notesRepository = notesRepository,
-                noteDataMapper = noteDataMapper,
-                transport = transport,
-                audioStreamOpener =
-                    object : PhoneAudioStreamOpener {
-                        override fun open(mediaRef: String): InputStream? = null
-                    },
-            )
+            val bridge =
+                DefaultPhoneWearSyncBridge(
+                    notesRepository = notesRepository,
+                    noteDataMapper = noteDataMapper,
+                    transport = transport,
+                    audioStreamOpener =
+                        object : PhoneAudioStreamOpener {
+                            override fun open(mediaRef: String): InputStream? = ByteArrayInputStream(payload)
+                        },
+                )
 
-        bridge.streamAudioToWatch(noteId = noteId, sourceNodeId = "watch-node")
+            bridge.streamAudioToWatch(noteId = noteId, sourceNodeId = "watch-node")
 
-        assertTrue(transport.streamRequests.isEmpty())
-    }
+            assertEquals(1, transport.streamRequests.size)
+            val request = transport.streamRequests.single()
+            assertEquals("watch-node", request.nodeId)
+            assertEquals(WearAudioRequestPaths.audioTransferPath(noteId), request.channelPath)
+            assertContentEquals(payload, request.payload)
+        }
 
     @Test
-    fun `publishRemoteCameraCaptureResult sends saved result through transport`() = runTest {
-        val transport = RecordingTransport()
-        val bridge =
-            DefaultPhoneWearSyncBridge(
-                notesRepository = notesRepository,
-                noteDataMapper = noteDataMapper,
-                transport = transport,
-                audioStreamOpener = UnusedAudioOpener,
+    fun `streamAudioToWatch skips transport when media stream cannot be opened`() =
+        runTest {
+            val noteId = Uuid.random()
+            val audioNote =
+                JournalNote.Audio(
+                    uid = noteId,
+                    creationTimestamp = Instant.fromEpochMilliseconds(1_710_000_000_000),
+                    lastUpdated = Instant.fromEpochMilliseconds(1_710_000_000_000),
+                    mediaRef = "content://phone/audio/$noteId",
+                    durationMs = 4_200,
+                )
+            val transport = RecordingTransport()
+
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote
+
+            val bridge =
+                DefaultPhoneWearSyncBridge(
+                    notesRepository = notesRepository,
+                    noteDataMapper = noteDataMapper,
+                    transport = transport,
+                    audioStreamOpener =
+                        object : PhoneAudioStreamOpener {
+                            override fun open(mediaRef: String): InputStream? = null
+                        },
+                )
+
+            bridge.streamAudioToWatch(noteId = noteId, sourceNodeId = "watch-node")
+
+            assertTrue(transport.streamRequests.isEmpty())
+        }
+
+    @Test
+    fun `publishRemoteCameraCaptureResult sends saved result through transport`() =
+        runTest {
+            val transport = RecordingTransport()
+            val bridge =
+                DefaultPhoneWearSyncBridge(
+                    notesRepository = notesRepository,
+                    noteDataMapper = noteDataMapper,
+                    transport = transport,
+                    audioStreamOpener = UnusedAudioOpener,
+                )
+
+            bridge.publishRemoteCameraCaptureResult(
+                RemoteCameraCaptureResult(
+                    isSaved = true,
+                    message = "Remote photo saved",
+                    mediaType = "photo",
+                ),
             )
 
-        bridge.publishRemoteCameraCaptureResult(
-            RemoteCameraCaptureResult(
-                isSaved = true,
-                message = "Remote photo saved",
-                mediaType = "photo",
-            ),
-        )
-
-        val request = transport.putRequests.single()
-        assertEquals(RemoteCameraCaptureResultDataMapper.PATH_CAMERA_CAPTURE_RESULT, request.path)
-        assertEquals(
-            RemoteCameraCaptureResult(
-                isSaved = true,
-                message = "Remote photo saved",
-                mediaType = "photo",
-            ),
-            RemoteCameraCaptureResultDataMapper.fromDataMap(request.data),
-        )
-    }
+            val request = transport.putRequests.single()
+            assertEquals(RemoteCameraCaptureResultDataMapper.PATH_CAMERA_CAPTURE_RESULT, request.path)
+            assertEquals(
+                RemoteCameraCaptureResult(
+                    isSaved = true,
+                    message = "Remote photo saved",
+                    mediaType = "photo",
+                ),
+                RemoteCameraCaptureResultDataMapper.fromDataMap(request.data),
+            )
+        }
 
     private object UnusedAudioOpener : PhoneAudioStreamOpener {
         override fun open(mediaRef: String): InputStream? = null

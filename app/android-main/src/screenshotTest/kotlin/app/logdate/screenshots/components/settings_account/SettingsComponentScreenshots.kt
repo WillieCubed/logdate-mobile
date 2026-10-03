@@ -44,20 +44,22 @@ import app.logdate.screenshots.common.ScreenshotTestData.TABLET
 import app.logdate.screenshots.common.ScreenshotTheme
 import com.android.tools.screenshot.PreviewTest
 
-private val sampleUserProfile = UserProfile(
-    name = "Alex Johnson",
-    username = "alex_j",
-    isEditable = true,
-    isAuthenticated = true,
-)
+private val sampleUserProfile =
+    UserProfile(
+        name = "Alex Johnson",
+        username = "alex_j",
+        isEditable = true,
+        isAuthenticated = true,
+    )
 
-private val sampleQuota = StorageQuotaUi(
-    totalBytes = 5_368_709_120L, // 5 GB
-    usedBytes = 2_147_483_648L, // 2 GB
-    usagePercentage = 0.4f,
-    formattedTotal = "5.0 GB",
-    formattedUsed = "2.0 GB",
-)
+private val sampleQuota =
+    StorageQuotaUi(
+        totalBytes = 5_368_709_120L, // 5 GB
+        usedBytes = 2_147_483_648L, // 2 GB
+        usagePercentage = 0.4f,
+        formattedTotal = "5.0 GB",
+        formattedUsed = "2.0 GB",
+    )
 
 // ─── Settings Overview ──────────────────────────────────────────────────────────
 

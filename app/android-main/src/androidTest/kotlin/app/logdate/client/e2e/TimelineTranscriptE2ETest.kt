@@ -16,11 +16,11 @@ import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.newstuff.EndOfTimelineUiState
 import app.logdate.ui.timeline.newstuff.TimelineList
 import kotlinx.datetime.LocalDate
-import kotlin.uuid.Uuid
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlin.uuid.Uuid
 
 /**
  * Instrumented tests for audio transcript visualization in the timeline.
@@ -32,7 +32,6 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class TimelineTranscriptE2ETest {
-
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 

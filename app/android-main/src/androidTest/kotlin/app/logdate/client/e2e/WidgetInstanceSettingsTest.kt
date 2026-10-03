@@ -8,12 +8,12 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.domain.recommendation.RecallMode
 import app.logdate.client.domain.recommendation.WidgetContentType
-import app.logdate.client.feature.widgets.WidgetInstanceSettings
-import app.logdate.client.feature.widgets.PhotoWidgetShape
 import app.logdate.client.feature.widgets.FixedMemoryWidgetConfigActivity
 import app.logdate.client.feature.widgets.FixedMemoryWidgetReceiver
 import app.logdate.client.feature.widgets.NewEntryWidgetReceiver
 import app.logdate.client.feature.widgets.OnThisDayWidgetReceiver
+import app.logdate.client.feature.widgets.PhotoWidgetShape
+import app.logdate.client.feature.widgets.WidgetInstanceSettings
 import app.logdate.client.feature.widgets.createWidgetConfigurationIntent
 import app.logdate.client.feature.widgets.requireWidgetContentAccess
 import app.logdate.shared.model.user.AppSecurityLevel
@@ -86,18 +86,47 @@ class WidgetInstanceSettingsTest {
     }
 
     @Test
-    fun `widget content requires successful authentication when app lock is enabled`() = runBlocking {
-        var prompts = 0
-        assertTrue(requireWidgetContentAccess({ AppSecurityLevel.NONE }) { prompts++; false })
-        assertEquals(0, prompts)
-        assertEquals(false, requireWidgetContentAccess({ AppSecurityLevel.BIOMETRIC }) { prompts++; false })
-        assertEquals(1, prompts)
-        assertTrue(requireWidgetContentAccess({ AppSecurityLevel.BIOMETRIC }) { prompts++; true })
-        assertEquals(2, prompts)
-        assertEquals(false, requireWidgetContentAccess({ AppSecurityLevel.PASSWORD }) { prompts++; true })
-        assertEquals(false, requireWidgetContentAccess({ null }) { prompts++; true })
-        assertEquals(2, prompts)
-    }
+    fun `widget content requires successful authentication when app lock is enabled`() =
+        runBlocking {
+            var prompts = 0
+            assertTrue(
+                requireWidgetContentAccess({ AppSecurityLevel.NONE }) {
+                    prompts++
+                    false
+                },
+            )
+            assertEquals(0, prompts)
+            assertEquals(
+                false,
+                requireWidgetContentAccess({ AppSecurityLevel.BIOMETRIC }) {
+                    prompts++
+                    false
+                },
+            )
+            assertEquals(1, prompts)
+            assertTrue(
+                requireWidgetContentAccess({ AppSecurityLevel.BIOMETRIC }) {
+                    prompts++
+                    true
+                },
+            )
+            assertEquals(2, prompts)
+            assertEquals(
+                false,
+                requireWidgetContentAccess({ AppSecurityLevel.PASSWORD }) {
+                    prompts++
+                    true
+                },
+            )
+            assertEquals(
+                false,
+                requireWidgetContentAccess({ null }) {
+                    prompts++
+                    true
+                },
+            )
+            assertEquals(2, prompts)
+        }
 
     @Test
     fun `widget settings survive launcher ID remapping`() {

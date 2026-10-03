@@ -5,13 +5,13 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.sync.datalayer.NoteDataMapper
+import org.junit.Test
+import org.junit.runner.RunWith
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
-import org.junit.Test
-import org.junit.runner.RunWith
 
 /**
  * Instrumented tests verifying the phone side of the watch↔phone Data Layer sync.
@@ -27,7 +27,6 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class PhoneWearSyncE2ETest {
-
     private val mapper = NoteDataMapper()
     private val fixedTime = Instant.fromEpochMilliseconds(1_710_000_000_000)
 
@@ -38,14 +37,15 @@ class PhoneWearSyncE2ETest {
     @Test
     fun `phone can deserialize watch audio note`() {
         val noteId = Uuid.random()
-        val watchNote = JournalNote.Audio(
-            uid = noteId,
-            creationTimestamp = fixedTime,
-            lastUpdated = fixedTime,
-            mediaRef = "/data/data/app.logdate.wear/files/recordings/rec_$noteId.aac",
-            durationMs = 4200,
-            syncVersion = 0,
-        )
+        val watchNote =
+            JournalNote.Audio(
+                uid = noteId,
+                creationTimestamp = fixedTime,
+                lastUpdated = fixedTime,
+                mediaRef = "/data/data/app.logdate.wear/files/recordings/rec_$noteId.aac",
+                durationMs = 4200,
+                syncVersion = 0,
+            )
 
         // Simulate watch serialization
         val dataMap = mapper.toDataMap(watchNote)
@@ -62,21 +62,24 @@ class PhoneWearSyncE2ETest {
 
     @Test
     fun `phone can deserialize watch audio note with location`() {
-        val watchNote = JournalNote.Audio(
-            uid = Uuid.random(),
-            creationTimestamp = fixedTime,
-            lastUpdated = fixedTime,
-            mediaRef = "/storage/recording.aac",
-            durationMs = 10000,
-            location = NoteLocation(
-                coordinates = NoteCoordinates(
-                    latitude = 37.7749,
-                    longitude = -122.4194,
-                    altitude = 15.0,
-                    accuracy = 3.5f,
-                ),
-            ),
-        )
+        val watchNote =
+            JournalNote.Audio(
+                uid = Uuid.random(),
+                creationTimestamp = fixedTime,
+                lastUpdated = fixedTime,
+                mediaRef = "/storage/recording.aac",
+                durationMs = 10000,
+                location =
+                    NoteLocation(
+                        coordinates =
+                            NoteCoordinates(
+                                latitude = 37.7749,
+                                longitude = -122.4194,
+                                altitude = 15.0,
+                                accuracy = 3.5f,
+                            ),
+                    ),
+            )
 
         val dataMap = mapper.toDataMap(watchNote)
         val phoneNote = mapper.fromDataMap(dataMap)
@@ -94,12 +97,13 @@ class PhoneWearSyncE2ETest {
 
     @Test
     fun `phone can deserialize watch text note`() {
-        val watchNote = JournalNote.Text(
-            uid = Uuid.random(),
-            creationTimestamp = fixedTime,
-            lastUpdated = fixedTime,
-            content = "Quick thought from my watch",
-        )
+        val watchNote =
+            JournalNote.Text(
+                uid = Uuid.random(),
+                creationTimestamp = fixedTime,
+                lastUpdated = fixedTime,
+                content = "Quick thought from my watch",
+            )
 
         val dataMap = mapper.toDataMap(watchNote)
         val phoneNote = mapper.fromDataMap(dataMap)
@@ -110,12 +114,13 @@ class PhoneWearSyncE2ETest {
 
     @Test
     fun `phone can deserialize mood note from watch`() {
-        val watchNote = JournalNote.Text(
-            uid = Uuid.random(),
-            creationTimestamp = fixedTime,
-            lastUpdated = fixedTime,
-            content = "#mood:good Feeling great today",
-        )
+        val watchNote =
+            JournalNote.Text(
+                uid = Uuid.random(),
+                creationTimestamp = fixedTime,
+                lastUpdated = fixedTime,
+                content = "#mood:good Feeling great today",
+            )
 
         val dataMap = mapper.toDataMap(watchNote)
         val phoneNote = mapper.fromDataMap(dataMap) as JournalNote.Text
@@ -129,24 +134,35 @@ class PhoneWearSyncE2ETest {
 
     @Test
     fun `phone can deserialize batch of mixed notes`() {
-        val notes = listOf(
-            JournalNote.Audio(
-                uid = Uuid.random(), creationTimestamp = fixedTime, lastUpdated = fixedTime,
-                mediaRef = "/rec1.aac", durationMs = 3000,
-            ),
-            JournalNote.Text(
-                uid = Uuid.random(), creationTimestamp = fixedTime, lastUpdated = fixedTime,
-                content = "Text entry",
-            ),
-            JournalNote.Audio(
-                uid = Uuid.random(), creationTimestamp = fixedTime, lastUpdated = fixedTime,
-                mediaRef = "/rec2.aac", durationMs = 58000,
-            ),
-            JournalNote.Text(
-                uid = Uuid.random(), creationTimestamp = fixedTime, lastUpdated = fixedTime,
-                content = "#mood:great",
-            ),
-        )
+        val notes =
+            listOf(
+                JournalNote.Audio(
+                    uid = Uuid.random(),
+                    creationTimestamp = fixedTime,
+                    lastUpdated = fixedTime,
+                    mediaRef = "/rec1.aac",
+                    durationMs = 3000,
+                ),
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    creationTimestamp = fixedTime,
+                    lastUpdated = fixedTime,
+                    content = "Text entry",
+                ),
+                JournalNote.Audio(
+                    uid = Uuid.random(),
+                    creationTimestamp = fixedTime,
+                    lastUpdated = fixedTime,
+                    mediaRef = "/rec2.aac",
+                    durationMs = 58000,
+                ),
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    creationTimestamp = fixedTime,
+                    lastUpdated = fixedTime,
+                    content = "#mood:great",
+                ),
+            )
 
         for (watchNote in notes) {
             val dataMap = mapper.toDataMap(watchNote)
@@ -187,14 +203,15 @@ class PhoneWearSyncE2ETest {
 
     @Test
     fun `sync version preserved through sync`() {
-        val watchNote = JournalNote.Audio(
-            uid = Uuid.random(),
-            creationTimestamp = fixedTime,
-            lastUpdated = fixedTime,
-            mediaRef = "/storage/audio.aac",
-            durationMs = 5000,
-            syncVersion = 7,
-        )
+        val watchNote =
+            JournalNote.Audio(
+                uid = Uuid.random(),
+                creationTimestamp = fixedTime,
+                lastUpdated = fixedTime,
+                mediaRef = "/storage/audio.aac",
+                durationMs = 5000,
+                syncVersion = 7,
+            )
 
         val dataMap = mapper.toDataMap(watchNote)
         val phoneNote = mapper.fromDataMap(dataMap)
@@ -211,13 +228,14 @@ class PhoneWearSyncE2ETest {
         val preciseTime = Instant.fromEpochMilliseconds(1_710_000_123_456)
         val preciseUpdate = Instant.fromEpochMilliseconds(1_710_000_123_789)
 
-        val watchNote = JournalNote.Audio(
-            uid = Uuid.random(),
-            creationTimestamp = preciseTime,
-            lastUpdated = preciseUpdate,
-            mediaRef = "/storage/audio.aac",
-            durationMs = 5000,
-        )
+        val watchNote =
+            JournalNote.Audio(
+                uid = Uuid.random(),
+                creationTimestamp = preciseTime,
+                lastUpdated = preciseUpdate,
+                mediaRef = "/storage/audio.aac",
+                durationMs = 5000,
+            )
 
         val dataMap = mapper.toDataMap(watchNote)
         val phoneNote = mapper.fromDataMap(dataMap)
@@ -235,14 +253,22 @@ class PhoneWearSyncE2ETest {
         val uid1 = Uuid.random()
         val uid2 = Uuid.random()
 
-        val note1 = JournalNote.Audio(
-            uid = uid1, creationTimestamp = fixedTime, lastUpdated = fixedTime,
-            mediaRef = "/a.aac", durationMs = 1000,
-        )
-        val note2 = JournalNote.Audio(
-            uid = uid2, creationTimestamp = fixedTime, lastUpdated = fixedTime,
-            mediaRef = "/b.aac", durationMs = 2000,
-        )
+        val note1 =
+            JournalNote.Audio(
+                uid = uid1,
+                creationTimestamp = fixedTime,
+                lastUpdated = fixedTime,
+                mediaRef = "/a.aac",
+                durationMs = 1000,
+            )
+        val note2 =
+            JournalNote.Audio(
+                uid = uid2,
+                creationTimestamp = fixedTime,
+                lastUpdated = fixedTime,
+                mediaRef = "/b.aac",
+                durationMs = 2000,
+            )
 
         val restored1 = mapper.fromDataMap(mapper.toDataMap(note1))
         val restored2 = mapper.fromDataMap(mapper.toDataMap(note2))
@@ -261,20 +287,23 @@ class PhoneWearSyncE2ETest {
         // Step 1: Watch records audio and creates note
         val recordingNoteId = Uuid.random()
         val recordingTimestamp = Instant.fromEpochMilliseconds(System.currentTimeMillis())
-        val watchCreatedNote = JournalNote.Audio(
-            uid = recordingNoteId,
-            creationTimestamp = recordingTimestamp,
-            lastUpdated = recordingTimestamp,
-            mediaRef = "/data/data/app.logdate.wear/files/recordings/walkie_talkie_$recordingNoteId.aac",
-            durationMs = 4200,
-            syncVersion = 0,
-            location = NoteLocation(
-                coordinates = NoteCoordinates(
-                    latitude = 40.7128,
-                    longitude = -74.0060,
-                ),
-            ),
-        )
+        val watchCreatedNote =
+            JournalNote.Audio(
+                uid = recordingNoteId,
+                creationTimestamp = recordingTimestamp,
+                lastUpdated = recordingTimestamp,
+                mediaRef = "/data/data/app.logdate.wear/files/recordings/walkie_talkie_$recordingNoteId.aac",
+                durationMs = 4200,
+                syncVersion = 0,
+                location =
+                    NoteLocation(
+                        coordinates =
+                            NoteCoordinates(
+                                latitude = 40.7128,
+                                longitude = -74.0060,
+                            ),
+                    ),
+            )
 
         // Step 2: Watch serializes for Data Layer transport
         val watchDataMap = mapper.toDataMap(watchCreatedNote)
@@ -294,8 +323,10 @@ class PhoneWearSyncE2ETest {
         val audioNote: JournalNote.Audio = phoneReceivedNote
 
         assertEquals(recordingNoteId, audioNote.uid)
-        assertEquals(recordingTimestamp.toEpochMilliseconds(),
-            audioNote.creationTimestamp.toEpochMilliseconds())
+        assertEquals(
+            recordingTimestamp.toEpochMilliseconds(),
+            audioNote.creationTimestamp.toEpochMilliseconds(),
+        )
         assertEquals(4200, audioNote.durationMs)
         assertEquals(watchCreatedNote.mediaRef, audioNote.mediaRef)
         assertEquals(0, audioNote.syncVersion)

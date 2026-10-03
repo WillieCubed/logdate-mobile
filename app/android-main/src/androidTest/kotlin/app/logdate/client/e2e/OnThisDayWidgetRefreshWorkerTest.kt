@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.minus
@@ -57,114 +56,134 @@ class OnThisDayWidgetRefreshWorkerTest {
     }
 
     @Test
-    fun `worker succeeds with no entries`() = runTest {
-        setupKoin(
-            notesForDay = emptyList(),
-            contextualRecommendationsEnabled = true,
-        )
+    fun `worker succeeds with no entries`() =
+        runTest {
+            setupKoin(
+                notesForDay = emptyList(),
+                contextualRecommendationsEnabled = true,
+            )
 
-        val worker = TestListenableWorkerBuilder<OnThisDayWidgetRefreshWorker>(context).build()
-        val result = worker.doWork()
+            val worker = TestListenableWorkerBuilder<OnThisDayWidgetRefreshWorker>(context).build()
+            val result = worker.doWork()
 
-        assertEquals(ListenableWorker.Result.success(), result)
-    }
-
-    @Test
-    fun `worker succeeds when recommendations disabled`() = runTest {
-        setupKoin(
-            notesForDay = emptyList(),
-            contextualRecommendationsEnabled = false,
-        )
-
-        val worker = TestListenableWorkerBuilder<OnThisDayWidgetRefreshWorker>(context).build()
-        val result = worker.doWork()
-
-        assertEquals(ListenableWorker.Result.success(), result)
-    }
+            assertEquals(ListenableWorker.Result.success(), result)
+        }
 
     @Test
-    fun `worker succeeds with entry one year ago`() = runTest {
-        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
-        val oneYearAgo = today.minus(1, DateTimeUnit.YEAR)
-        val timestamp = oneYearAgo.atStartOfDayIn(TimeZone.currentSystemDefault())
+    fun `worker succeeds when recommendations disabled`() =
+        runTest {
+            setupKoin(
+                notesForDay = emptyList(),
+                contextualRecommendationsEnabled = false,
+            )
 
-        setupKoin(
-            notesForDay = listOf(
-                JournalNote.Text(
-                    uid = Uuid.random(),
-                    content = "A wonderful day at the beach",
-                    creationTimestamp = timestamp,
-                    lastUpdated = timestamp,
-                    location = NoteLocation(),
-                ),
-            ),
-            contextualRecommendationsEnabled = true,
-        )
+            val worker = TestListenableWorkerBuilder<OnThisDayWidgetRefreshWorker>(context).build()
+            val result = worker.doWork()
 
-        val worker = TestListenableWorkerBuilder<OnThisDayWidgetRefreshWorker>(context).build()
-        val result = worker.doWork()
-
-        assertEquals(ListenableWorker.Result.success(), result)
-    }
+            assertEquals(ListenableWorker.Result.success(), result)
+        }
 
     @Test
-    fun `worker succeeds with archive mode`() = runTest {
-        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
-        val archiveDay = today.minus(45, DateTimeUnit.DAY)
-        val timestamp = archiveDay.atStartOfDayIn(TimeZone.currentSystemDefault())
+    fun `worker succeeds with entry one year ago`() =
+        runTest {
+            val today =
+                Clock.System
+                    .now()
+                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                    .date
+            val oneYearAgo = today.minus(1, DateTimeUnit.YEAR)
+            val timestamp = oneYearAgo.atStartOfDayIn(TimeZone.currentSystemDefault())
 
-        setupKoin(
-            notesForDay = listOf(
-                JournalNote.Image(
-                    uid = Uuid.random(),
-                    mediaRef = "content://media/archive-photo",
-                    creationTimestamp = timestamp,
-                    lastUpdated = timestamp,
-                    location = NoteLocation(),
-                ),
-            ),
-            contextualRecommendationsEnabled = true,
-            recallMode = RecallMode.REDISCOVER,
-        )
+            setupKoin(
+                notesForDay =
+                    listOf(
+                        JournalNote.Text(
+                            uid = Uuid.random(),
+                            content = "A wonderful day at the beach",
+                            creationTimestamp = timestamp,
+                            lastUpdated = timestamp,
+                            location = NoteLocation(),
+                        ),
+                    ),
+                contextualRecommendationsEnabled = true,
+            )
 
-        val worker = TestListenableWorkerBuilder<OnThisDayWidgetRefreshWorker>(context).build()
-        val result = worker.doWork()
+            val worker = TestListenableWorkerBuilder<OnThisDayWidgetRefreshWorker>(context).build()
+            val result = worker.doWork()
 
-        assertEquals(ListenableWorker.Result.success(), result)
-    }
+            assertEquals(ListenableWorker.Result.success(), result)
+        }
 
     @Test
-    fun `worker succeeds with photos only content filter`() = runTest {
-        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
-        val oneYearAgo = today.minus(1, DateTimeUnit.YEAR)
-        val timestamp = oneYearAgo.atStartOfDayIn(TimeZone.currentSystemDefault())
+    fun `worker succeeds with archive mode`() =
+        runTest {
+            val today =
+                Clock.System
+                    .now()
+                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                    .date
+            val archiveDay = today.minus(45, DateTimeUnit.DAY)
+            val timestamp = archiveDay.atStartOfDayIn(TimeZone.currentSystemDefault())
 
-        setupKoin(
-            notesForDay = listOf(
-                JournalNote.Text(
-                    uid = Uuid.random(),
-                    content = "Text note",
-                    creationTimestamp = timestamp,
-                    lastUpdated = timestamp,
-                    location = NoteLocation(),
-                ),
-                JournalNote.Image(
-                    uid = Uuid.random(),
-                    mediaRef = "content://media/photo-only",
-                    creationTimestamp = timestamp,
-                    lastUpdated = timestamp,
-                    location = NoteLocation(),
-                ),
-            ),
-            contextualRecommendationsEnabled = true,
-            widgetContentTypes = setOf(WidgetContentType.PHOTOS),
-        )
+            setupKoin(
+                notesForDay =
+                    listOf(
+                        JournalNote.Image(
+                            uid = Uuid.random(),
+                            mediaRef = "content://media/archive-photo",
+                            creationTimestamp = timestamp,
+                            lastUpdated = timestamp,
+                            location = NoteLocation(),
+                        ),
+                    ),
+                contextualRecommendationsEnabled = true,
+                recallMode = RecallMode.REDISCOVER,
+            )
 
-        val worker = TestListenableWorkerBuilder<OnThisDayWidgetRefreshWorker>(context).build()
-        val result = worker.doWork()
+            val worker = TestListenableWorkerBuilder<OnThisDayWidgetRefreshWorker>(context).build()
+            val result = worker.doWork()
 
-        assertEquals(ListenableWorker.Result.success(), result)
-    }
+            assertEquals(ListenableWorker.Result.success(), result)
+        }
+
+    @Test
+    fun `worker succeeds with photos only content filter`() =
+        runTest {
+            val today =
+                Clock.System
+                    .now()
+                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                    .date
+            val oneYearAgo = today.minus(1, DateTimeUnit.YEAR)
+            val timestamp = oneYearAgo.atStartOfDayIn(TimeZone.currentSystemDefault())
+
+            setupKoin(
+                notesForDay =
+                    listOf(
+                        JournalNote.Text(
+                            uid = Uuid.random(),
+                            content = "Text note",
+                            creationTimestamp = timestamp,
+                            lastUpdated = timestamp,
+                            location = NoteLocation(),
+                        ),
+                        JournalNote.Image(
+                            uid = Uuid.random(),
+                            mediaRef = "content://media/photo-only",
+                            creationTimestamp = timestamp,
+                            lastUpdated = timestamp,
+                            location = NoteLocation(),
+                        ),
+                    ),
+                contextualRecommendationsEnabled = true,
+                widgetContentTypes = setOf(WidgetContentType.PHOTOS),
+            )
+
+            val worker = TestListenableWorkerBuilder<OnThisDayWidgetRefreshWorker>(context).build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+        }
 
     private fun setupKoin(
         notesForDay: List<JournalNote>,
@@ -174,13 +193,14 @@ class OnThisDayWidgetRefreshWorkerTest {
     ) {
         val fakeRepo = FakeJournalNotesRepository(notesForDay)
         val getMemoryRecall = GetMemoryRecallUseCase(fakeRepo)
-        val settings = FakeMemoriesSettingsRepository(
-            MemoriesSettings(
-                contextualRecommendationsEnabled = contextualRecommendationsEnabled,
-                recallMode = recallMode,
-                widgetContentTypes = widgetContentTypes,
-            ),
-        )
+        val settings =
+            FakeMemoriesSettingsRepository(
+                MemoriesSettings(
+                    contextualRecommendationsEnabled = contextualRecommendationsEnabled,
+                    recallMode = recallMode,
+                    widgetContentTypes = widgetContentTypes,
+                ),
+            )
 
         startKoin {
             modules(
@@ -198,19 +218,33 @@ private class FakeMemoriesSettingsRepository(
     private val settings: MemoriesSettings,
 ) : MemoriesSettingsRepository {
     override suspend fun getSettings(): MemoriesSettings = settings
+
     override fun observeSettings(): Flow<MemoriesSettings> = flowOf(settings)
+
     override suspend fun updateSettings(settings: MemoriesSettings) {}
+
     override suspend fun setContextualRecommendationsEnabled(enabled: Boolean) {}
+
     override suspend fun setAmbientPromptsEnabled(enabled: Boolean) {}
+
     override suspend fun setCaptureNudgesEnabled(enabled: Boolean) {}
+
     override suspend fun setDraftRescueEnabled(enabled: Boolean) {}
+
     override suspend fun setMemoryRecallNotificationsEnabled(enabled: Boolean) {}
+
     override suspend fun setMorningPromptEnabled(enabled: Boolean) {}
+
     override suspend fun setEveningPromptEnabled(enabled: Boolean) {}
+
     override suspend fun setMorningPromptTime(time: AmbientPromptTime) {}
+
     override suspend fun setEveningPromptTime(time: AmbientPromptTime) {}
+
     override suspend fun setAiRecallEnabled(enabled: Boolean) {}
+
     override suspend fun setRecallMode(mode: RecallMode) {}
+
     override suspend fun setWidgetContentTypes(types: Set<WidgetContentType>) {}
 }
 
@@ -218,16 +252,40 @@ private class FakeJournalNotesRepository(
     private val notesForDay: List<JournalNote>,
 ) : JournalNotesRepository {
     override val allNotesObserved: Flow<List<JournalNote>> = flowOf(notesForDay)
+
     override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> = flowOf(emptyList())
-    override fun observeNotesInRange(start: Instant, end: Instant): Flow<List<JournalNote>> = flowOf(notesForDay)
-    override fun observeNotesPage(pageSize: Int, offset: Int): Flow<List<JournalNote>> = flowOf(notesForDay)
+
+    override fun observeNotesInRange(
+        start: Instant,
+        end: Instant,
+    ): Flow<List<JournalNote>> = flowOf(notesForDay)
+
+    override fun observeNotesPage(
+        pageSize: Int,
+        offset: Int,
+    ): Flow<List<JournalNote>> = flowOf(notesForDay)
+
     override fun observeNotesStream(pageSize: Int): Flow<List<JournalNote>> = flowOf(notesForDay)
+
     override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = flowOf(notesForDay)
+
     override suspend fun getNoteById(noteId: Uuid): JournalNote? = null
+
     override suspend fun create(note: JournalNote): Uuid = throw UnsupportedOperationException()
+
     override suspend fun remove(note: JournalNote) {}
+
     override suspend fun removeById(noteId: Uuid) {}
-    override suspend fun create(note: JournalNote, journalId: Uuid) {}
-    override suspend fun removeFromJournal(noteId: Uuid, journalId: Uuid) {}
+
+    override suspend fun create(
+        note: JournalNote,
+        journalId: Uuid,
+    ) {}
+
+    override suspend fun removeFromJournal(
+        noteId: Uuid,
+        journalId: Uuid,
+    ) {}
+
     override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
 }

@@ -60,7 +60,8 @@ class JournalInlineAudioE2ETest {
 
     private fun assertOutputRouteControlsAreUsable() {
         composeRule.onNodeWithTag("journal-audio-playback-button").assertIsDisplayed()
-        composeRule.onAllNodesWithTag(MediaDeviceSelectorTags.chip("Audio output"))[0]
+        composeRule
+            .onAllNodesWithTag(MediaDeviceSelectorTags.chip("Audio output"))[0]
             .assertIsDisplayed()
             .assertHasClickAction()
             .performClick()

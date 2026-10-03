@@ -9,22 +9,20 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import app.logdate.client.domain.export.ExportFileStructure
 import app.logdate.client.domain.export.ExportMetadata
 import app.logdate.client.domain.export.ExportStats
-import app.logdate.client.domain.restore.RestoreBundle
-import app.logdate.client.domain.restore.RestoreOptions
 import app.logdate.client.domain.restore.RestoreResult
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.media.MediaManager
 import app.logdate.client.sync.diagnostics.DiagnosticSource
 import app.logdate.client.sync.metadata.UploadScope
-import app.logdate.shared.model.diagnostics.DiagnosticOutcome
-import app.logdate.shared.model.diagnostics.DiagnosticPhase
-import app.logdate.shared.model.diagnostics.SyncDiagnosticEvent
 import app.logdate.feature.core.restore.ImportOptions
+import app.logdate.feature.core.restore.RestoreDiagnosticEvents
 import app.logdate.feature.core.restore.RestoreLauncher
 import app.logdate.feature.core.restore.RestoreOutcome
 import app.logdate.feature.core.restore.RestoreProgressInfo
 import app.logdate.feature.core.restore.RestoreWorker
-import app.logdate.feature.core.restore.RestoreDiagnosticEvents
+import app.logdate.shared.model.diagnostics.DiagnosticOutcome
+import app.logdate.shared.model.diagnostics.DiagnosticPhase
+import app.logdate.shared.model.diagnostics.SyncDiagnosticEvent
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,23 +38,15 @@ import org.koin.core.context.stopKoin
 import org.koin.dsl.module
 import java.io.File
 import java.io.FileOutputStream
+import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
-import java.util.UUID
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
-/**
- * Instrumented tests for [RestoreWorker].
- *
- * Verifies that the worker maps source URI availability and archive validity to the
- * correct WorkManager results, and that [RestoreLauncher.completeRestore] receives
- * the right outcome. Uses [TestListenableWorkerBuilder] with a Koin module wiring
- * fake/mock dependencies.
- */
 /**
  * Instrumented tests for the [RestoreWorker] background task.
  *
@@ -148,15 +138,20 @@ class RestoreWorkerTest {
                 val result = worker.doWork()
 
                 assertIs<ListenableWorker.Result.Success>(result)
-                val successOutcome = recordingLauncher.completedOutcomes
-                    .filterIsInstance<RestoreOutcome.Success>()
-                    .lastOrNull()
+                val successOutcome =
+                    recordingLauncher.completedOutcomes
+                        .filterIsInstance<RestoreOutcome.Success>()
+                        .lastOrNull()
                 assertNotNull(successOutcome, "Expected completeRestore to be called with Success")
                 assertTrue(
                     successOutcome.summary.journalsImported == 1,
                     "Expected 1 journal imported, got ${successOutcome.summary.journalsImported}",
                 )
-                val completed = diagnosticEvents.events.single { it.phase == DiagnosticPhase.RESTORE && it.outcome == DiagnosticOutcome.SUCCEEDED }
+                val completed =
+                    diagnosticEvents.events.single {
+                        it.phase == DiagnosticPhase.RESTORE &&
+                            it.outcome == DiagnosticOutcome.SUCCEEDED
+                    }
                 assertTrue(completed.operationId == operationId)
                 assertNotNull(completed.attemptId)
             } finally {
@@ -187,9 +182,10 @@ class RestoreWorkerTest {
                 val result = worker.doWork()
 
                 assertIs<ListenableWorker.Result.Failure>(result)
-                val failureOutcome = recordingLauncher.completedOutcomes
-                    .filterIsInstance<RestoreOutcome.Failure>()
-                    .lastOrNull()
+                val failureOutcome =
+                    recordingLauncher.completedOutcomes
+                        .filterIsInstance<RestoreOutcome.Failure>()
+                        .lastOrNull()
                 assertNotNull(failureOutcome, "Expected completeRestore to be called with Failure")
                 assertTrue(diagnosticEvents.events.any { it.phase == DiagnosticPhase.RESTORE && it.outcome == DiagnosticOutcome.FAILED })
             } finally {
@@ -198,28 +194,42 @@ class RestoreWorkerTest {
         }
 
     @Test
-    fun `invalid cloud archive is deleted before restore returns`() = runTest {
-        val cloudArchive = File.createTempFile("cloud-restore-test", ".zip", context.noBackupFilesDir)
-        cloudArchive.writeText("invalid zip")
-        val cachedBefore = context.cacheDir.listFiles().orEmpty().filter { it.name.startsWith("logdate_restore") }.toSet()
-        val recordingLauncher = RecordingRestoreLauncher()
-        setupKoin(mockk(relaxed = true), mockk(relaxed = true), recordingLauncher)
-        val worker = TestListenableWorkerBuilder<RestoreWorker>(context)
-            .setInputData(
-                androidx.work.Data.Builder()
-                    .putString(RestoreWorker.SOURCE_URI_KEY, Uri.fromFile(cloudArchive).toString())
-                    .putBoolean(RestoreWorker.DELETE_SOURCE_AFTER_RESTORE_KEY, true)
-                    .build(),
-            ).build()
+    fun `invalid cloud archive is deleted before restore returns`() =
+        runTest {
+            val cloudArchive = File.createTempFile("cloud-restore-test", ".zip", context.noBackupFilesDir)
+            cloudArchive.writeText("invalid zip")
+            val cachedBefore =
+                context.cacheDir
+                    .listFiles()
+                    .orEmpty()
+                    .filter { it.name.startsWith("logdate_restore") }
+                    .toSet()
+            val recordingLauncher = RecordingRestoreLauncher()
+            setupKoin(mockk(relaxed = true), mockk(relaxed = true), recordingLauncher)
+            val worker =
+                TestListenableWorkerBuilder<RestoreWorker>(context)
+                    .setInputData(
+                        androidx.work.Data
+                            .Builder()
+                            .putString(RestoreWorker.SOURCE_URI_KEY, Uri.fromFile(cloudArchive).toString())
+                            .putBoolean(RestoreWorker.DELETE_SOURCE_AFTER_RESTORE_KEY, true)
+                            .build(),
+                    ).build()
 
-        try {
-            assertIs<ListenableWorker.Result.Failure>(worker.doWork())
-            assertFalse(cloudArchive.exists())
-            assertTrue(context.cacheDir.listFiles().orEmpty().filter { it.name.startsWith("logdate_restore") }.toSet() == cachedBefore)
-        } finally {
-            cloudArchive.delete()
+            try {
+                assertIs<ListenableWorker.Result.Failure>(worker.doWork())
+                assertFalse(cloudArchive.exists())
+                assertTrue(
+                    context.cacheDir
+                        .listFiles()
+                        .orEmpty()
+                        .filter { it.name.startsWith("logdate_restore") }
+                        .toSet() == cachedBefore,
+                )
+            } finally {
+                cloudArchive.delete()
+            }
         }
-    }
 
     private fun setupKoin(
         restoreUseCase: RestoreUserDataUseCase,
@@ -246,7 +256,10 @@ private class RecordingRestoreDiagnostics : RestoreDiagnosticEvents {
 
     override fun source(): DiagnosticSource = source
 
-    override fun record(event: SyncDiagnosticEvent, source: DiagnosticSource?) {
+    override fun record(
+        event: SyncDiagnosticEvent,
+        source: DiagnosticSource?,
+    ) {
         assertTrue(source === this.source)
         events += event
     }

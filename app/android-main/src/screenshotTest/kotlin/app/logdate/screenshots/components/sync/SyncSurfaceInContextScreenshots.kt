@@ -9,6 +9,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.feature.core.sync.SyncErrorBanner
+import app.logdate.feature.core.sync.SyncPresentation
 import app.logdate.feature.core.sync.SyncStatusButton
 import app.logdate.screenshots.common.HomeTabRouteFrame
 import app.logdate.screenshots.common.RoutePreviewTab
@@ -21,7 +22,6 @@ import app.logdate.ui.streak.CampfireChip
 import app.logdate.ui.streak.CampfirePhase
 import app.logdate.ui.streak.CampfirePresentation
 import app.logdate.ui.streak.CampfireSize
-import app.logdate.feature.core.sync.SyncPresentation
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.ImageNoteUiState
 import app.logdate.ui.timeline.MomentAudioUiState

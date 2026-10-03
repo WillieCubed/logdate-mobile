@@ -2,13 +2,13 @@ package app.logdate.client.e2e
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.printToString
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -16,7 +16,6 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import app.logdate.client.MainActivity
 import app.logdate.client.datastore.SessionStorage
-import app.logdate.client.testing.launch.ActivityLaunchTestOverrides
 import app.logdate.client.testing.onboarding.OnboardingTestFixture
 import app.logdate.feature.core.account.CLOUD_ACCOUNT_DISPLAY_NAME_CONTINUE_TAG
 import app.logdate.feature.core.account.CLOUD_ACCOUNT_DISPLAY_NAME_FIELD_TAG
@@ -28,12 +27,12 @@ import app.logdate.feature.core.account.CLOUD_ACCOUNT_USERNAME_FIELD_TAG
 import app.logdate.feature.core.account.CLOUD_ACCOUNT_USERNAME_ROOT_TAG
 import app.logdate.feature.onboarding.flow.OnboardingEntryMode
 import app.logdate.feature.onboarding.ui.CLOUD_ACCOUNT_SETUP_PRIMARY_ACTION_TAG
+import app.logdate.feature.onboarding.ui.CLOUD_ACCOUNT_SETUP_ROOT_TAG
 import app.logdate.feature.onboarding.ui.MEMORIES_IMPORT_INFO_CONTINUE_TAG
 import app.logdate.feature.onboarding.ui.MEMORY_SELECTION_CONTINUE_TAG
 import app.logdate.feature.onboarding.ui.ONBOARDING_OVERVIEW_CONTINUE_TAG
 import app.logdate.feature.onboarding.ui.ONBOARDING_START_GET_STARTED_TAG
 import app.logdate.feature.onboarding.ui.ONBOARDING_START_ROOT_TAG
-import app.logdate.feature.onboarding.ui.CLOUD_ACCOUNT_SETUP_ROOT_TAG
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
 import kotlinx.coroutines.runBlocking
@@ -264,7 +263,10 @@ class PlatformSyncJourneyE2ETest {
         return null
     }
 
-    private fun getJson(url: String, token: String): String {
+    private fun getJson(
+        url: String,
+        token: String,
+    ): String {
         val connection =
             (URL(url).openConnection() as HttpURLConnection).apply {
                 setRequestProperty("Authorization", "Bearer $token")

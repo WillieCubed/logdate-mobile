@@ -13,6 +13,10 @@ import app.logdate.client.datastore.UserSession
 import app.logdate.client.domain.dayboundary.DayBoundarySettings
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
 import app.logdate.client.domain.recommendation.AmbientPromptTime
+import app.logdate.client.domain.recommendation.MemoriesSettings
+import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
+import app.logdate.client.domain.recommendation.RecallMode
+import app.logdate.client.domain.recommendation.WidgetContentType
 import app.logdate.client.health.HealthDataAvailability
 import app.logdate.client.health.LocalFirstHealthRepository
 import app.logdate.client.health.model.DayBounds
@@ -35,10 +39,6 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.streak.StreakSettingsRepository
 import app.logdate.client.repository.user.UserStateRepository
-import app.logdate.client.domain.recommendation.RecallMode
-import app.logdate.client.domain.recommendation.WidgetContentType
-import app.logdate.client.domain.recommendation.MemoriesSettings
-import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.di.appModule
 import app.logdate.feature.onboarding.flow.OnboardingDeviceState
 import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
@@ -69,7 +69,6 @@ import org.koin.core.module.Module
 import org.koin.dsl.module
 import java.io.File
 import kotlin.time.Clock
-import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -239,40 +238,40 @@ internal class OnboardingFakeUserStateRepository : UserStateRepository {
 }
 
 internal class OnboardingFakeProfileRepository : ProfileRepository {
-    private val _profile = MutableStateFlow(LogDateProfile())
-    override val currentProfile: Flow<LogDateProfile> = _profile.asStateFlow()
+    private val profileState = MutableStateFlow(LogDateProfile())
+    override val currentProfile: Flow<LogDateProfile> = profileState.asStateFlow()
 
     fun reset() {
-        _profile.value = LogDateProfile()
+        profileState.value = LogDateProfile()
     }
 
     override suspend fun updateDisplayName(displayName: String): Result<LogDateProfile> {
-        _profile.value = _profile.value.copy(displayName = displayName)
-        return Result.success(_profile.value)
+        profileState.value = profileState.value.copy(displayName = displayName)
+        return Result.success(profileState.value)
     }
 
     override suspend fun updateBirthday(birthday: Instant?): Result<LogDateProfile> {
-        _profile.value = _profile.value.copy(birthday = birthday)
-        return Result.success(_profile.value)
+        profileState.value = profileState.value.copy(birthday = birthday)
+        return Result.success(profileState.value)
     }
 
     override suspend fun updateProfilePhoto(profilePhotoUri: String?): Result<LogDateProfile> {
-        _profile.value = _profile.value.copy(profilePhotoUri = profilePhotoUri)
-        return Result.success(_profile.value)
+        profileState.value = profileState.value.copy(profilePhotoUri = profilePhotoUri)
+        return Result.success(profileState.value)
     }
 
     override suspend fun updateBio(
         bio: String?,
         originalBio: String?,
     ): Result<LogDateProfile> {
-        _profile.value = _profile.value.copy(bio = bio, originalBio = originalBio)
-        return Result.success(_profile.value)
+        profileState.value = profileState.value.copy(bio = bio, originalBio = originalBio)
+        return Result.success(profileState.value)
     }
 
-    override suspend fun getCurrentProfile(): LogDateProfile = _profile.value
+    override suspend fun getCurrentProfile(): LogDateProfile = profileState.value
 
     override suspend fun clearProfile(): Result<Unit> {
-        _profile.value = LogDateProfile()
+        profileState.value = LogDateProfile()
         return Result.success(Unit)
     }
 }
@@ -298,7 +297,10 @@ internal class OnboardingFakeAccountRepository : AccountRepository {
         return Result.success(updated)
     }
 
-    override suspend fun refreshAccount(): Result<LogDateAccount> = Result.success(current.value ?: LogDateAccount(username = "user", displayName = "User"))
+    override suspend fun refreshAccount(): Result<LogDateAccount> =
+        Result.success(
+            current.value ?: LogDateAccount(username = "user", displayName = "User"),
+        )
 
     override suspend fun checkUsernameAvailability(username: String): Result<Boolean> = Result.success(true)
 }
@@ -487,7 +489,6 @@ internal class OnboardingFakeMediaManager : MediaManager {
     override suspend fun getMedia(uri: String): MediaObject = sampleMedia.first { it.uri == uri }
 
     override suspend fun deleteOwnedMedia(uri: String): Boolean = false
-
 
     override suspend fun exists(mediaId: String): Boolean = sampleMedia.any { it.uri == mediaId }
 

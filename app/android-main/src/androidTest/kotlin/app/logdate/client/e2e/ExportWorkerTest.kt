@@ -100,7 +100,12 @@ class ExportWorkerTest {
                 val completedUpdate = recordingLauncher.progressUpdates.lastOrNull { it.completedFilePath != null }
                 assertNotNull(completedUpdate, "Expected a progress update with a completed file path")
                 ZipFile(destFile).use { zip ->
-                    val names = zip.entries().asSequence().map { it.name }.toSet()
+                    val names =
+                        zip
+                            .entries()
+                            .asSequence()
+                            .map { it.name }
+                            .toSet()
                     assertTrue("manifest.json" in names)
                     assertTrue("README.txt" in names)
                     assertTrue("SHA256SUMS" in names)

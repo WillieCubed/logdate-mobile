@@ -56,13 +56,13 @@ import app.logdate.ui.foldable.FoldableOcclusionType
 import app.logdate.ui.foldable.FoldablePosture
 import app.logdate.ui.foldable.provideFoldableLayoutInfo
 import app.logdate.ui.theme.LogDateTheme
+import org.junit.Rule
+import org.junit.Test
 import java.io.File
 import kotlin.math.abs
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
-import org.junit.Rule
-import org.junit.Test
 
 /** Emulator-only capture of the production editing components and the Android IME. */
 class EditorEditingScreenshotsTest {
@@ -95,21 +95,22 @@ class EditorEditingScreenshotsTest {
                             topBarContent = { NoteEditorToolbar({ expanded.value = null }, {}, {}) },
                             editorContent = {
                                 MainEditorContent(
-                                    uiState = BlocksUiState(
-                                        blocks = blocks.value,
-                                        expandedBlockId = expanded.value,
-                                        availableJournals = listOf(journal),
-                                        selectedJournalIds = listOf(journal.id),
-                                        onBlockFocused = { expanded.value = it },
-                                        onJournalSelectionChanged = {},
-                                        onUpdateBlock = { updated ->
-                                            blocks.value = blocks.value.map { if (it.id == updated.id) updated else it }
-                                        },
-                                        onCreateBlock = { _, id ->
-                                            TextBlockUiState(id = id).also { blocks.value = blocks.value + it }
-                                        },
-                                        onDeleteBlock = { id -> blocks.value = blocks.value.filterNot { it.id == id } },
-                                    ),
+                                    uiState =
+                                        BlocksUiState(
+                                            blocks = blocks.value,
+                                            expandedBlockId = expanded.value,
+                                            availableJournals = listOf(journal),
+                                            selectedJournalIds = listOf(journal.id),
+                                            onBlockFocused = { expanded.value = it },
+                                            onJournalSelectionChanged = {},
+                                            onUpdateBlock = { updated ->
+                                                blocks.value = blocks.value.map { if (it.id == updated.id) updated else it }
+                                            },
+                                            onCreateBlock = { _, id ->
+                                                TextBlockUiState(id = id).also { blocks.value = blocks.value + it }
+                                            },
+                                            onDeleteBlock = { id -> blocks.value = blocks.value.filterNot { it.id == id } },
+                                        ),
                                     shouldReturnToPickerOnBack = false,
                                     onDismissExpanded = { expanded.value = null },
                                     listState = listState,
@@ -187,9 +188,10 @@ class EditorEditingScreenshotsTest {
                 compose.waitForIdle()
                 capture(device, "$variant-draft")
                 compose.runOnUiThread {
-                    blocks.value = blocks.value.map {
-                        if (it is ImageBlockUiState) it.copy(presentation = PhotoPresentation.Framed) else it
-                    }
+                    blocks.value =
+                        blocks.value.map {
+                            if (it is ImageBlockUiState) it.copy(presentation = PhotoPresentation.Framed) else it
+                        }
                 }
                 compose.waitForIdle()
                 repeat(3) {
@@ -217,12 +219,21 @@ class EditorEditingScreenshotsTest {
                 assertTrue(abs(framedBounds.left.value - addBounds.left.value) <= 2f, "Add block and photo have different left edges")
                 assertTrue(abs(framedBounds.right.value - addBounds.right.value) <= 2f, "Add block and photo have different right edges")
                 val journalBounds = compose.onNodeWithTag("editor_journal_selector").getBoundsInRoot()
-                assertTrue(abs(journalBounds.left.value - addBounds.left.value) <= 2f, "Journal selector and memory have different left edges: $journalBounds and $addBounds")
-                assertTrue(abs(journalBounds.right.value - addBounds.right.value) <= 2f, "Journal selector and memory have different right edges: $journalBounds and $addBounds")
+                assertTrue(
+                    abs(journalBounds.left.value - addBounds.left.value) <= 2f,
+                    "Journal selector and memory have different left edges: $journalBounds and $addBounds",
+                )
+                assertTrue(
+                    abs(journalBounds.right.value - addBounds.right.value) <= 2f,
+                    "Journal selector and memory have different right edges: $journalBounds and $addBounds",
+                )
                 val surfaceGap = journalBounds.top - addBounds.bottom
                 assertTrue(surfaceGap in 6.dp..12.dp, "Add surface and journal selector need a small gap: $surfaceGap")
                 capture(device, "$variant-pull-open")
-                assertTrue(addBounds.bottom >= expandedListBounds.bottom - 4.dp, "Expanded Add block leaves extra dead space: $addBounds in $expandedListBounds")
+                assertTrue(
+                    addBounds.bottom >= expandedListBounds.bottom - 4.dp,
+                    "Expanded Add block leaves extra dead space: $addBounds in $expandedListBounds",
+                )
                 compose.onNodeWithTag("add_close").performClick()
                 waitForCompactAdd()
                 compose.onNodeWithTag("editor_block_list").performTouchInput {
@@ -248,11 +259,12 @@ class EditorEditingScreenshotsTest {
                 hideKeyboard()
             }
         } finally {
-            val command = if (oldImeSetting == "null") {
-                "settings delete secure show_ime_with_hard_keyboard"
-            } else {
-                "settings put secure show_ime_with_hard_keyboard $oldImeSetting"
-            }
+            val command =
+                if (oldImeSetting == "null") {
+                    "settings delete secure show_ime_with_hard_keyboard"
+                } else {
+                    "settings put secure show_ime_with_hard_keyboard $oldImeSetting"
+                }
             device.executeShellCommand(command)
         }
     }
@@ -273,7 +285,10 @@ class EditorEditingScreenshotsTest {
             val footer = layout.visibleItemsInfo.firstOrNull { it.key == "add_memory_footer" }
             val addBounds = compose.onNodeWithTag("add_memory_surface").getUnclippedBoundsInRoot()
             val listBounds = compose.onNodeWithTag("editor_block_list").getBoundsInRoot()
-            throw AssertionError("Expanded Add clipped: footer=$footer viewportEnd=${layout.viewportEndOffset} canScrollForward=${listState.canScrollForward} surface=$addBounds list=$listBounds", e)
+            throw AssertionError(
+                "Expanded Add clipped: footer=$footer viewportEnd=${layout.viewportEndOffset} canScrollForward=${listState.canScrollForward} surface=$addBounds list=$listBounds",
+                e,
+            )
         }
     }
 
@@ -297,13 +312,14 @@ class EditorEditingScreenshotsTest {
         return FoldableLayoutInfo(
             isFoldable = true,
             posture = if (vertical) FoldablePosture.Book else FoldablePosture.Tabletop,
-            hinge = FoldableHingeInfo(
-                orientation = if (vertical) FoldableHingeOrientation.Vertical else FoldableHingeOrientation.Horizontal,
-                state = FoldableHingeState.HalfOpened,
-                occlusionType = FoldableOcclusionType.None,
-                bounds = FoldableHingeBounds(left.dp, top.dp, right.dp, bottom.dp, (right - left).dp, (bottom - top).dp),
-                isSeparating = true,
-            ),
+            hinge =
+                FoldableHingeInfo(
+                    orientation = if (vertical) FoldableHingeOrientation.Vertical else FoldableHingeOrientation.Horizontal,
+                    state = FoldableHingeState.HalfOpened,
+                    occlusionType = FoldableOcclusionType.None,
+                    bounds = FoldableHingeBounds(left.dp, top.dp, right.dp, bottom.dp, (right - left).dp, (bottom - top).dp),
+                    isSeparating = true,
+                ),
         )
     }
 
@@ -321,7 +337,8 @@ class EditorEditingScreenshotsTest {
         compose.waitUntil(10_000) {
             var shown = false
             compose.runOnUiThread {
-                shown = ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
+                shown = ViewCompat
+                    .getRootWindowInsets(compose.activity.window.decorView)
                     ?.isVisible(WindowInsetsCompat.Type.ime()) == true
             }
             shown == visible
@@ -329,13 +346,17 @@ class EditorEditingScreenshotsTest {
         compose.waitForIdle()
     }
 
-    private fun capture(device: UiDevice, name: String) {
+    private fun capture(
+        device: UiDevice,
+        name: String,
+    ) {
         // Wait for system IME animation and local photo decoding, beyond Compose's idle state.
         Thread.sleep(700)
         if (name.endsWith("keyboard")) waitForKeyboard(true)
         val arguments = InstrumentationRegistry.getArguments()
-        val outputDir = arguments.getString("additionalTestOutputDir")
-            ?: error("Run this capture using a Gradle Managed Device with additionalTestOutputDir")
+        val outputDir =
+            arguments.getString("additionalTestOutputDir")
+                ?: error("Run this capture using a Gradle Managed Device with additionalTestOutputDir")
         val output = File(outputDir, "$name.png")
         output.parentFile?.mkdirs()
         assertTrue(device.takeScreenshot(output), "Screenshot failed: $name")

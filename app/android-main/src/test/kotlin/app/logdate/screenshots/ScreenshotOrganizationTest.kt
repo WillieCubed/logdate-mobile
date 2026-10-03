@@ -110,7 +110,11 @@ class ScreenshotOrganizationTest {
                     assertTrue(previewNames.isNotEmpty(), "Expected adaptive audit previews in $file")
                     val numericOrder =
                         previewNames.sortedBy { name ->
-                            Regex("""^A(\d+)_""").find(name)?.groupValues?.get(1)?.toInt() ?: Int.MAX_VALUE
+                            Regex("""^A(\d+)_""")
+                                .find(name)
+                                ?.groupValues
+                                ?.get(1)
+                                ?.toInt() ?: Int.MAX_VALUE
                         }
                     assertTrue(
                         previewNames == numericOrder,

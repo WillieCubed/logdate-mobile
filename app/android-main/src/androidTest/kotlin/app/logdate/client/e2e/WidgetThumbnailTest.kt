@@ -1,7 +1,7 @@
 package app.logdate.client.e2e
 
-import android.content.Context
 import android.content.ContentValues
+import android.content.Context
 import android.graphics.Bitmap
 import android.provider.MediaStore
 import androidx.test.core.app.ApplicationProvider
@@ -29,14 +29,15 @@ class WidgetThumbnailTest {
             assertTrue(thumbnail.height <= 384)
             assertTrue(thumbnail.byteCount <= 384 * 384 * 4)
 
-            mediaUri = context.contentResolver.insert(
-                MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
-                ContentValues().apply {
-                    put(MediaStore.Images.Media.DISPLAY_NAME, "logdate-widget-large-photo-test.jpg")
-                    put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-                    put(MediaStore.Images.Media.IS_PENDING, 1)
-                },
-            )
+            mediaUri =
+                context.contentResolver.insert(
+                    MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
+                    ContentValues().apply {
+                        put(MediaStore.Images.Media.DISPLAY_NAME, "logdate-widget-large-photo-test.jpg")
+                        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                        put(MediaStore.Images.Media.IS_PENDING, 1)
+                    },
+                )
             val uri = assertNotNull(mediaUri)
             context.contentResolver.openOutputStream(uri)?.use { source.compress(Bitmap.CompressFormat.JPEG, 90, it) }
             context.contentResolver.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)

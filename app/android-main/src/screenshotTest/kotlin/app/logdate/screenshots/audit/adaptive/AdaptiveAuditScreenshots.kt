@@ -3,8 +3,8 @@ package app.logdate.screenshots.audit.adaptive
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -17,42 +17,38 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.client.R
 import app.logdate.client.awareness.daylight.DaylightPeriod
-import app.logdate.client.repository.journals.NoteCoordinates
-import app.logdate.client.repository.journals.NoteLocation
-import app.logdate.client.repository.journals.NotePlace
-import app.logdate.client.repository.search.SearchResult
-import app.logdate.client.repository.search.SearchContentType
-import app.logdate.client.ui.LockableContent
-import app.logdate.feature.core.account.CloudAccountWelcomeContent
-import app.logdate.feature.core.account.CloudAccountSignInContent
-import app.logdate.feature.core.account.PasskeyAccountCreationFinalContent
-import app.logdate.feature.core.export.ExportOptions
-import app.logdate.feature.core.export.ExportState
-import app.logdate.feature.core.restore.ImportOptions
-import app.logdate.feature.core.restore.RestoreState
-import app.logdate.feature.core.settings.ui.ClearDataSettingsContent
-import app.logdate.feature.core.settings.ui.DataSettingsContent
-import app.logdate.feature.core.settings.ui.ServerSelectionState
-import app.logdate.feature.core.settings.ui.ResetAppSettingsContent
-import app.logdate.feature.core.settings.ui.ResetSettingsScreen
-import app.logdate.feature.core.settings.ui.IntegrityState
-import app.logdate.feature.core.settings.ui.StorageQuotaUi
-import app.logdate.feature.core.settings.updates.AppUpdatePrompt
-import app.logdate.feature.core.settings.updates.AppUpdateStatus
-import app.logdate.feature.core.settings.updates.AppUpdateUiState
-import app.logdate.feature.core.profile.ui.ProfileEditState
-import app.logdate.feature.core.profile.ui.ProfileScreenContent
-import app.logdate.feature.core.profile.ui.ProfileUiState
 import app.logdate.client.domain.dayboundary.HealthConnectGateKind
 import app.logdate.client.domain.dayboundary.HealthConnectGateState
 import app.logdate.client.domain.export.ExportCounts
 import app.logdate.client.domain.export.ExportSchemaVersion
 import app.logdate.client.domain.export.ExportStats
 import app.logdate.client.domain.restore.ArchivePreview
-import app.logdate.ui.audio.AudioContext
-import app.logdate.ui.audio.model.AudioPalette
-import app.logdate.ui.audio.model.AudioSegment
-import app.logdate.ui.audio.model.SegmentType
+import app.logdate.client.repository.journals.NoteCoordinates
+import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.journals.NotePlace
+import app.logdate.client.repository.search.SearchContentType
+import app.logdate.client.repository.search.SearchResult
+import app.logdate.client.ui.LockableContent
+import app.logdate.feature.core.account.CloudAccountSignInContent
+import app.logdate.feature.core.account.CloudAccountWelcomeContent
+import app.logdate.feature.core.account.PasskeyAccountCreationFinalContent
+import app.logdate.feature.core.export.ExportOptions
+import app.logdate.feature.core.export.ExportState
+import app.logdate.feature.core.profile.ui.ProfileEditState
+import app.logdate.feature.core.profile.ui.ProfileScreenContent
+import app.logdate.feature.core.profile.ui.ProfileUiState
+import app.logdate.feature.core.restore.ImportOptions
+import app.logdate.feature.core.restore.RestoreState
+import app.logdate.feature.core.settings.ui.ClearDataSettingsContent
+import app.logdate.feature.core.settings.ui.DataSettingsContent
+import app.logdate.feature.core.settings.ui.IntegrityState
+import app.logdate.feature.core.settings.ui.ResetAppSettingsContent
+import app.logdate.feature.core.settings.ui.ResetSettingsScreen
+import app.logdate.feature.core.settings.ui.ServerSelectionState
+import app.logdate.feature.core.settings.ui.StorageQuotaUi
+import app.logdate.feature.core.settings.updates.AppUpdatePrompt
+import app.logdate.feature.core.settings.updates.AppUpdateStatus
+import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.feature.editor.ui.MainEditorContent
 import app.logdate.feature.editor.ui.audio.ActiveRecordingDisplay
 import app.logdate.feature.editor.ui.audio.AudioRecordingControls
@@ -77,9 +73,9 @@ import app.logdate.feature.journals.ui.detail.AudioNoteViewerContent
 import app.logdate.feature.journals.ui.detail.AudioNoteViewerUiState
 import app.logdate.feature.journals.ui.detail.AudioPlaybackUiState
 import app.logdate.feature.journals.ui.detail.EntryDisplayData
+import app.logdate.feature.journals.ui.detail.JournalContext
 import app.logdate.feature.journals.ui.detail.JournalDetailScreenContent
 import app.logdate.feature.journals.ui.detail.JournalDetailUiState
-import app.logdate.feature.journals.ui.detail.JournalContext
 import app.logdate.feature.journals.ui.detail.NoteViewerScaffoldContent
 import app.logdate.feature.journals.ui.detail.NoteViewerShared
 import app.logdate.feature.journals.ui.settings.JournalSettingsScreenContent
@@ -93,28 +89,35 @@ import app.logdate.feature.onboarding.ui.CloudAccountSetupContent
 import app.logdate.feature.onboarding.ui.OnboardingBirthdayContent
 import app.logdate.feature.onboarding.ui.OnboardingCompletionContent
 import app.logdate.feature.onboarding.ui.OnboardingDayBoundariesContent
+import app.logdate.feature.onboarding.ui.OnboardingLocationContent
 import app.logdate.feature.onboarding.ui.OnboardingNotificationsContent
 import app.logdate.feature.onboarding.ui.OnboardingOverviewScreen
-import app.logdate.feature.onboarding.ui.OnboardingLocationContent
 import app.logdate.feature.onboarding.ui.OnboardingRecommendationsContent
 import app.logdate.feature.onboarding.ui.OnboardingStartScreenContent
-import app.logdate.feature.onboarding.ui.RecoveryPhraseEntryScreen
-import app.logdate.feature.onboarding.ui.RecoveryPhraseSetupScreen
 import app.logdate.feature.onboarding.ui.PersonalIntroContent
 import app.logdate.feature.onboarding.ui.PersonalIntroStep
 import app.logdate.feature.onboarding.ui.PersonalIntroUiState
+import app.logdate.feature.onboarding.ui.RecoveryPhraseEntryScreen
+import app.logdate.feature.onboarding.ui.RecoveryPhraseSetupScreen
 import app.logdate.feature.onboarding.ui.WelcomeBackScreenContent
 import app.logdate.feature.search.ui.SearchScreenContent
 import app.logdate.feature.search.ui.SearchScreenState
 import app.logdate.feature.timeline.ui.details.TimelineDayDetailPanel
-import app.logdate.shared.model.LogDateAccount
-import app.logdate.shared.model.profile.LogDateProfile
-import app.logdate.screenshots.components.library.LibraryScreenshotData
 import app.logdate.screenshots.common.LargeScreenAuditPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTheme
+import app.logdate.screenshots.components.library.LibraryScreenshotData
 import app.logdate.screenshots.shared.SharedScreenshotScene
 import app.logdate.screenshots.shared.SharedScreenshotSceneId
+import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.profile.LogDateProfile
+import app.logdate.ui.audio.AudioContext
+import app.logdate.ui.audio.AudioPlaybackDisplayInfo
+import app.logdate.ui.audio.AudioPlaybackState
+import app.logdate.ui.audio.LocalAudioPlaybackState
+import app.logdate.ui.audio.model.AudioPalette
+import app.logdate.ui.audio.model.AudioSegment
+import app.logdate.ui.audio.model.SegmentType
 import app.logdate.ui.foldable.FoldableHingeBounds
 import app.logdate.ui.foldable.FoldableHingeInfo
 import app.logdate.ui.foldable.FoldableHingeOrientation
@@ -123,9 +126,6 @@ import app.logdate.ui.foldable.FoldableLayoutInfo
 import app.logdate.ui.foldable.FoldableOcclusionType
 import app.logdate.ui.foldable.FoldablePosture
 import app.logdate.ui.foldable.provideFoldableLayoutInfo
-import app.logdate.ui.audio.AudioPlaybackDisplayInfo
-import app.logdate.ui.audio.AudioPlaybackState
-import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.location.PlaceUiState
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.DayEventUiState
@@ -441,7 +441,6 @@ private val auditEditorUiState =
         onCreateBlock = { _: BlockType, id: Uuid -> TextBlockUiState(id = id) },
         onDeleteBlock = {},
     )
-
 
 @PreviewTest
 @LargeScreenAuditPreviewMatrix
@@ -1638,20 +1637,21 @@ fun A106_RecoveryPhraseSetupBookPosture() {
     provideFoldableLayoutInfo(bookPostureLayoutInfo) {
         ScreenshotTheme {
             RecoveryPhraseSetupScreen(
-                words = listOf(
-                    "orbit",
-                    "paper",
-                    "candle",
-                    "forest",
-                    "river",
-                    "silver",
-                    "puzzle",
-                    "anchor",
-                    "signal",
-                    "harbor",
-                    "lantern",
-                    "sunset",
-                ),
+                words =
+                    listOf(
+                        "orbit",
+                        "paper",
+                        "candle",
+                        "forest",
+                        "river",
+                        "silver",
+                        "puzzle",
+                        "anchor",
+                        "signal",
+                        "harbor",
+                        "lantern",
+                        "sunset",
+                    ),
                 isLoading = false,
                 errorMessage = null,
                 onRetry = {},
@@ -1668,20 +1668,21 @@ fun A107_RecoveryPhraseSetupTabletopPosture() {
     provideFoldableLayoutInfo(tabletopPostureLayoutInfo) {
         ScreenshotTheme {
             RecoveryPhraseSetupScreen(
-                words = listOf(
-                    "orbit",
-                    "paper",
-                    "candle",
-                    "forest",
-                    "river",
-                    "silver",
-                    "puzzle",
-                    "anchor",
-                    "signal",
-                    "harbor",
-                    "lantern",
-                    "sunset",
-                ),
+                words =
+                    listOf(
+                        "orbit",
+                        "paper",
+                        "candle",
+                        "forest",
+                        "river",
+                        "silver",
+                        "puzzle",
+                        "anchor",
+                        "signal",
+                        "harbor",
+                        "lantern",
+                        "sunset",
+                    ),
                 isLoading = false,
                 errorMessage = null,
                 onRetry = {},

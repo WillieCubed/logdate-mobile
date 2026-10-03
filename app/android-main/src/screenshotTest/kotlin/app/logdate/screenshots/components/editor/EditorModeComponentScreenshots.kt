@@ -6,11 +6,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.client.R
-import app.logdate.ui.audio.model.AudioPalette
 import app.logdate.feature.editor.ui.MainEditorContent
 import app.logdate.feature.editor.ui.audio.ActiveRecordingDisplay
 import app.logdate.feature.editor.ui.audio.AudioRecordingControls
-import app.logdate.ui.audio.expansion.SpatialExpandedAudioBlock
 import app.logdate.feature.editor.ui.camera.CameraAspectRatio
 import app.logdate.feature.editor.ui.camera.CameraCapturePreviewContent
 import app.logdate.feature.editor.ui.camera.CameraCapturePreviewState
@@ -32,11 +30,13 @@ import app.logdate.feature.editor.ui.state.BlocksUiState
 import app.logdate.feature.editor.ui.text.TextBlockContent
 import app.logdate.feature.editor.ui.video.VideoBlockEditor
 import app.logdate.feature.editor.ui.video.VideoPickerPreviewContent
-import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.LargeScreenAuditPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
+import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
+import app.logdate.ui.audio.expansion.SpatialExpandedAudioBlock
+import app.logdate.ui.audio.model.AudioPalette
 import com.android.tools.screenshot.PreviewTest
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -66,13 +66,14 @@ private const val TABLETOP_FOLDABLE = "spec:width=1440dp,height=900dp"
 )
 private annotation class MediaImportStatePreviewMatrix
 
-private val mockPalette = AudioPalette(
-    waveformGradientStart = 0xFFE8A044,
-    waveformGradientEnd = 0xFFD4603A,
-    playedFillColor = 0xFFE8A044,
-    accentColor = 0xFFE8A044,
-    immersiveBackground = 0xFF1A0F05,
-)
+private val mockPalette =
+    AudioPalette(
+        waveformGradientStart = 0xFFE8A044,
+        waveformGradientEnd = 0xFFD4603A,
+        playedFillColor = 0xFFE8A044,
+        accentColor = 0xFFE8A044,
+        immersiveBackground = 0xFF1A0F05,
+    )
 
 private val mockCreatedAt = Instant.fromEpochMilliseconds(1_740_000_000_000L)
 

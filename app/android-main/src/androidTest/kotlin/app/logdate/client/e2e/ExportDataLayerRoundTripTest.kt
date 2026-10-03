@@ -1,7 +1,5 @@
 package app.logdate.client.e2e
 
-import kotlinx.coroutines.flow.flowOf
-import app.logdate.client.sync.metadata.QueuedUpload
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -19,6 +17,7 @@ import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
+import app.logdate.client.sync.metadata.QueuedUpload
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
@@ -26,11 +25,11 @@ import app.logdate.shared.model.SerializableAudioBlock
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.SerializableVideoBlock
-import app.logdate.shared.model.user.UserData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -73,40 +72,44 @@ class ExportDataLayerRoundTripTest {
         val syncMeta = InMemorySyncMetadataService()
         val draftRepo = InMemoryDraftRepository()
 
-        db = Room
-            .inMemoryDatabaseBuilder(context, LogDateDatabase::class.java)
-            .allowMainThreadQueries()
-            .build()
+        db =
+            Room
+                .inMemoryDatabaseBuilder(context, LogDateDatabase::class.java)
+                .allowMainThreadQueries()
+                .build()
 
-        journalRepo = OfflineFirstJournalRepository(
-            journalDao = db.journalDao(),
-            remoteDataSource = NoOpRemoteJournalDataSource(),
-            draftRepository = draftRepo,
-            syncMetadataService = syncMeta,
-            dispatcher = dispatcher,
-            externalScope = kotlinx.coroutines.CoroutineScope(dispatcher),
-        )
+        journalRepo =
+            OfflineFirstJournalRepository(
+                journalDao = db.journalDao(),
+                remoteDataSource = NoOpRemoteJournalDataSource(),
+                draftRepository = draftRepo,
+                syncMetadataService = syncMeta,
+                dispatcher = dispatcher,
+                externalScope = kotlinx.coroutines.CoroutineScope(dispatcher),
+            )
 
-        notesRepo = OfflineFirstJournalNotesRepository(
-            textNoteDao = db.textNoteDao(),
-            imageNoteDao = db.imageNoteDao(),
-            audioNoteDao = db.audioNoteDao(),
-            videoNoteDao = db.videoNoteDao(),
-            journalContentDao = db.journalContentDao(),
-            journalRepository = journalRepo,
-            mediaCaptionDao = db.mediaCaptionDao(),
-            notePlaceResolver = EmptyNotePlaceResolver,
-            syncMetadataService = syncMeta,
-            syncScope = kotlinx.coroutines.CoroutineScope(dispatcher),
-        )
+        notesRepo =
+            OfflineFirstJournalNotesRepository(
+                textNoteDao = db.textNoteDao(),
+                imageNoteDao = db.imageNoteDao(),
+                audioNoteDao = db.audioNoteDao(),
+                videoNoteDao = db.videoNoteDao(),
+                journalContentDao = db.journalContentDao(),
+                journalRepository = journalRepo,
+                mediaCaptionDao = db.mediaCaptionDao(),
+                notePlaceResolver = EmptyNotePlaceResolver,
+                syncMetadataService = syncMeta,
+                syncScope = kotlinx.coroutines.CoroutineScope(dispatcher),
+            )
 
-        contentRepo = OfflineFirstJournalContentRepository(
-            journalContentDao = db.journalContentDao(),
-            journalRepository = journalRepo,
-            journalNotesRepository = notesRepo,
-            syncMetadataService = syncMeta,
-            dispatcher = dispatcher,
-        )
+        contentRepo =
+            OfflineFirstJournalContentRepository(
+                journalContentDao = db.journalContentDao(),
+                journalRepository = journalRepo,
+                journalNotesRepository = notesRepo,
+                syncMetadataService = syncMeta,
+                dispatcher = dispatcher,
+            )
     }
 
     @After
@@ -116,8 +119,7 @@ class ExportDataLayerRoundTripTest {
 
     // ── Helper ───────────────────────────────────────────────────────────
 
-    private fun now(): Instant =
-        Instant.fromEpochMilliseconds(Clock.System.now().toEpochMilliseconds())
+    private fun now(): Instant = Instant.fromEpochMilliseconds(Clock.System.now().toEpochMilliseconds())
 
     // ── Journal fields ───────────────────────────────────────────────────
 
@@ -125,13 +127,14 @@ class ExportDataLayerRoundTripTest {
     fun `room journal all fields round trip`() =
         runTest {
             val now = now()
-            val journal = Journal(
-                id = Uuid.random(),
-                title = "Trip to Japan 🇯🇵",
-                description = "Two weeks in Tokyo and Kyoto",
-                created = now - 48.hours,
-                lastUpdated = now,
-            )
+            val journal =
+                Journal(
+                    id = Uuid.random(),
+                    title = "Trip to Japan 🇯🇵",
+                    description = "Two weeks in Tokyo and Kyoto",
+                    created = now - 48.hours,
+                    lastUpdated = now,
+                )
             journalRepo.create(journal)
 
             val restored = journalRepo.getJournalById(journal.id)
@@ -147,11 +150,12 @@ class ExportDataLayerRoundTripTest {
     fun `room all journals observed includes every created journal`() =
         runTest {
             val now = now()
-            val ids = (1..5).map { i ->
-                val j = Journal(id = Uuid.random(), title = "Journal $i", created = now, lastUpdated = now)
-                journalRepo.create(j)
-                j.id
-            }
+            val ids =
+                (1..5).map { i ->
+                    val j = Journal(id = Uuid.random(), title = "Journal $i", created = now, lastUpdated = now)
+                    journalRepo.create(j)
+                    j.id
+                }
 
             val observed = journalRepo.allJournalsObserved.first()
             ids.forEach { id ->
@@ -168,16 +172,18 @@ class ExportDataLayerRoundTripTest {
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
             journalRepo.create(journal)
 
-            val note = JournalNote.Text(
-                uid = Uuid.random(),
-                content = "こんにちは 🌸 \"quoted\" newline\nend",
-                creationTimestamp = now - 1.hours,
-                lastUpdated = now,
-                location = NoteLocation(
-                    coordinates = NoteCoordinates(latitude = 35.6762, longitude = 139.6503),
-                ),
-                syncVersion = 5L,
-            )
+            val note =
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    content = "こんにちは 🌸 \"quoted\" newline\nend",
+                    creationTimestamp = now - 1.hours,
+                    lastUpdated = now,
+                    location =
+                        NoteLocation(
+                            coordinates = NoteCoordinates(latitude = 35.6762, longitude = 139.6503),
+                        ),
+                    syncVersion = 5L,
+                )
             notesRepo.create(note, journal.id)
 
             val restored = notesRepo.getNoteById(note.uid) as? JournalNote.Text
@@ -200,12 +206,13 @@ class ExportDataLayerRoundTripTest {
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
             journalRepo.create(journal)
 
-            val note = JournalNote.Text(
-                uid = Uuid.random(),
-                content = "No location",
-                creationTimestamp = now,
-                lastUpdated = now,
-            )
+            val note =
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    content = "No location",
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                )
             notesRepo.create(note, journal.id)
 
             val restored = notesRepo.getNoteById(note.uid) as JournalNote.Text
@@ -221,14 +228,15 @@ class ExportDataLayerRoundTripTest {
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
             journalRepo.create(journal)
 
-            val note = JournalNote.Image(
-                uid = Uuid.random(),
-                mediaRef = "content://media/external/images/9876",
-                caption = "Sunset at the beach 🌅",
-                creationTimestamp = now - 2.hours,
-                lastUpdated = now,
-                syncVersion = 2L,
-            )
+            val note =
+                JournalNote.Image(
+                    uid = Uuid.random(),
+                    mediaRef = "content://media/external/images/9876",
+                    caption = "Sunset at the beach 🌅",
+                    creationTimestamp = now - 2.hours,
+                    lastUpdated = now,
+                    syncVersion = 2L,
+                )
             notesRepo.create(note, journal.id)
 
             val restored = notesRepo.getNoteById(note.uid) as? JournalNote.Image
@@ -248,13 +256,14 @@ class ExportDataLayerRoundTripTest {
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
             journalRepo.create(journal)
 
-            val note = JournalNote.Image(
-                uid = Uuid.random(),
-                mediaRef = "content://media/external/images/1",
-                caption = "",
-                creationTimestamp = now,
-                lastUpdated = now,
-            )
+            val note =
+                JournalNote.Image(
+                    uid = Uuid.random(),
+                    mediaRef = "content://media/external/images/1",
+                    caption = "",
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                )
             notesRepo.create(note, journal.id)
 
             val restored = notesRepo.getNoteById(note.uid) as JournalNote.Image
@@ -270,14 +279,15 @@ class ExportDataLayerRoundTripTest {
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
             journalRepo.create(journal)
 
-            val note = JournalNote.Audio(
-                uid = Uuid.random(),
-                mediaRef = "content://media/external/audio/5555",
-                durationMs = 187_500L,
-                creationTimestamp = now,
-                lastUpdated = now,
-                syncVersion = 1L,
-            )
+            val note =
+                JournalNote.Audio(
+                    uid = Uuid.random(),
+                    mediaRef = "content://media/external/audio/5555",
+                    durationMs = 187_500L,
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    syncVersion = 1L,
+                )
             notesRepo.create(note, journal.id)
 
             val restored = notesRepo.getNoteById(note.uid) as? JournalNote.Audio
@@ -299,14 +309,15 @@ class ExportDataLayerRoundTripTest {
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
             journalRepo.create(journal)
 
-            val note = JournalNote.Video(
-                uid = Uuid.random(),
-                mediaRef = "content://media/external/video/7777",
-                caption = "Dog compilation 🐶",
-                creationTimestamp = now,
-                lastUpdated = now,
-                syncVersion = 4L,
-            )
+            val note =
+                JournalNote.Video(
+                    uid = Uuid.random(),
+                    mediaRef = "content://media/external/video/7777",
+                    caption = "Dog compilation 🐶",
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    syncVersion = 4L,
+                )
             notesRepo.create(note, journal.id)
 
             val restored = notesRepo.getNoteById(note.uid) as? JournalNote.Video
@@ -379,9 +390,30 @@ class ExportDataLayerRoundTripTest {
             journalRepo.create(journal)
 
             val text = JournalNote.Text(uid = Uuid.random(), content = "T", creationTimestamp = now, lastUpdated = now)
-            val image = JournalNote.Image(uid = Uuid.random(), mediaRef = "img://1", caption = "", creationTimestamp = now, lastUpdated = now)
-            val audio = JournalNote.Audio(uid = Uuid.random(), mediaRef = "audio://1", durationMs = 1000, creationTimestamp = now, lastUpdated = now)
-            val video = JournalNote.Video(uid = Uuid.random(), mediaRef = "video://1", caption = "", creationTimestamp = now, lastUpdated = now)
+            val image =
+                JournalNote.Image(
+                    uid = Uuid.random(),
+                    mediaRef = "img://1",
+                    caption = "",
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                )
+            val audio =
+                JournalNote.Audio(
+                    uid = Uuid.random(),
+                    mediaRef = "audio://1",
+                    durationMs = 1000,
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                )
+            val video =
+                JournalNote.Video(
+                    uid = Uuid.random(),
+                    mediaRef = "video://1",
+                    caption = "",
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                )
 
             notesRepo.create(text, journal.id)
             notesRepo.create(image, journal.id)
@@ -404,15 +436,17 @@ class ExportDataLayerRoundTripTest {
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
             journalRepo.create(journal)
 
-            val draft = EditorDraft(
-                id = Uuid.random(),
-                blocks = listOf(
-                    SerializableTextBlock(id = Uuid.random(), timestamp = now, content = "Draft body 📝"),
-                ),
-                selectedJournalIds = listOf(journal.id),
-                createdAt = now - 1.hours,
-                lastModifiedAt = now,
-            )
+            val draft =
+                EditorDraft(
+                    id = Uuid.random(),
+                    blocks =
+                        listOf(
+                            SerializableTextBlock(id = Uuid.random(), timestamp = now, content = "Draft body 📝"),
+                        ),
+                    selectedJournalIds = listOf(journal.id),
+                    createdAt = now - 1.hours,
+                    lastModifiedAt = now,
+                )
             journalRepo.saveDraft(draft)
 
             val restored = journalRepo.getDraft(draft.id)
@@ -433,17 +467,19 @@ class ExportDataLayerRoundTripTest {
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
             journalRepo.create(journal)
 
-            val draft = EditorDraft(
-                id = Uuid.random(),
-                blocks = listOf(
-                    SerializableImageBlock(id = Uuid.random(), timestamp = now, uri = "content://media/1"),
-                    SerializableAudioBlock(id = Uuid.random(), timestamp = now, uri = "content://audio/2", duration = 5000L),
-                    SerializableVideoBlock(id = Uuid.random(), timestamp = now, uri = "content://video/3"),
-                ),
-                selectedJournalIds = listOf(journal.id),
-                createdAt = now,
-                lastModifiedAt = now,
-            )
+            val draft =
+                EditorDraft(
+                    id = Uuid.random(),
+                    blocks =
+                        listOf(
+                            SerializableImageBlock(id = Uuid.random(), timestamp = now, uri = "content://media/1"),
+                            SerializableAudioBlock(id = Uuid.random(), timestamp = now, uri = "content://audio/2", duration = 5000L),
+                            SerializableVideoBlock(id = Uuid.random(), timestamp = now, uri = "content://video/3"),
+                        ),
+                    selectedJournalIds = listOf(journal.id),
+                    createdAt = now,
+                    lastModifiedAt = now,
+                )
             journalRepo.saveDraft(draft)
 
             val restored = journalRepo.getDraft(draft.id)!!
@@ -464,17 +500,19 @@ class ExportDataLayerRoundTripTest {
             val journal = Journal(id = Uuid.random(), title = "J", created = now, lastUpdated = now)
             journalRepo.create(journal)
 
-            val draftIds = (1..3).map {
-                val d = EditorDraft(
-                    id = Uuid.random(),
-                    blocks = listOf(SerializableTextBlock(id = Uuid.random(), timestamp = now, content = "Draft $it")),
-                    selectedJournalIds = listOf(journal.id),
-                    createdAt = now - it.hours,
-                    lastModifiedAt = now,
-                )
-                journalRepo.saveDraft(d)
-                d.id
-            }
+            val draftIds =
+                (1..3).map {
+                    val d =
+                        EditorDraft(
+                            id = Uuid.random(),
+                            blocks = listOf(SerializableTextBlock(id = Uuid.random(), timestamp = now, content = "Draft $it")),
+                            selectedJournalIds = listOf(journal.id),
+                            createdAt = now - it.hours,
+                            lastModifiedAt = now,
+                        )
+                    journalRepo.saveDraft(d)
+                    d.id
+                }
 
             val all = journalRepo.getAllDrafts()
             draftIds.forEach { id ->
@@ -492,32 +530,52 @@ class ExportDataLayerRoundTripTest {
         override suspend fun getPendingUploads(entityType: EntityType): List<PendingUpload> =
             pending[entityType]?.values?.toList() ?: emptyList()
 
-        override suspend fun markAsSynced(entityId: String, entityType: EntityType, syncedAt: Instant, version: Long) {
-            pending[entityType]?.remove(entityId); updateCount()
+        override suspend fun markAsSynced(
+            entityId: String,
+            entityType: EntityType,
+            syncedAt: Instant,
+            version: Long,
+        ) {
+            pending[entityType]?.remove(entityId)
+            updateCount()
         }
 
         override suspend fun getLastSyncTime(entityType: EntityType): Instant? = syncTimes[entityType]
 
-        override suspend fun updateLastSyncTime(entityType: EntityType, syncedAt: Instant) {
+        override suspend fun updateLastSyncTime(
+            entityType: EntityType,
+            syncedAt: Instant,
+        ) {
             syncTimes[entityType] = syncedAt
         }
 
-        override suspend fun enqueuePending(entityId: String, entityType: EntityType, operation: PendingOperation) {
+        override suspend fun enqueuePending(
+            entityId: String,
+            entityType: EntityType,
+            operation: PendingOperation,
+        ) {
             pending.getOrPut(entityType) { mutableMapOf() }[entityId] = PendingUpload(entityId, operation, 0)
             updateCount()
         }
 
-        override suspend fun resetSyncStatus(entityId: String, entityType: EntityType) {
+        override suspend fun resetSyncStatus(
+            entityId: String,
+            entityType: EntityType,
+        ) {
             pending.getOrPut(entityType) { mutableMapOf() }[entityId] = PendingUpload(entityId, PendingOperation.UPDATE, 0)
             updateCount()
         }
 
         override suspend fun getPendingCount(): Int = pending.values.sumOf { it.size }
+
         override fun observePendingCount(): Flow<Int> = pendingCountFlow
 
         override fun observePendingUploads(): Flow<List<QueuedUpload>> = flowOf(emptyList())
 
-        override suspend fun incrementRetryCount(entityId: String, entityType: EntityType) {
+        override suspend fun incrementRetryCount(
+            entityId: String,
+            entityType: EntityType,
+        ) {
             val existing = pending[entityType]?.get(entityId) ?: return
             pending[entityType]!![entityId] = existing.copy(retryCount = existing.retryCount + 1)
         }
@@ -531,26 +589,46 @@ class ExportDataLayerRoundTripTest {
             syncTimes.clear()
         }
 
-        private fun updateCount() { pendingCountFlow.value = pending.values.sumOf { it.size } }
+        private fun updateCount() {
+            pendingCountFlow.value = pending.values.sumOf { it.size }
+        }
     }
 
     private class InMemoryDraftRepository : DraftRepository {
         private val drafts = mutableMapOf<Uuid, EditorDraft>()
         private val flow = MutableStateFlow<List<EditorDraft>>(emptyList())
 
-        override suspend fun saveDraft(draft: EditorDraft) { drafts[draft.id] = draft; flow.value = drafts.values.toList() }
+        override suspend fun saveDraft(draft: EditorDraft) {
+            drafts[draft.id] = draft
+            flow.value = drafts.values.toList()
+        }
+
         override suspend fun getLatestDraft(): EditorDraft? = drafts.values.maxByOrNull { it.lastModifiedAt }
+
         override suspend fun getAllDrafts(): List<EditorDraft> = drafts.values.toList()
+
         override val allDrafts: Flow<List<EditorDraft>> get() = flow
+
         override suspend fun getDraft(id: Uuid): EditorDraft? = drafts[id]
-        override suspend fun deleteDraft(id: Uuid) { drafts.remove(id); flow.value = drafts.values.toList() }
-        override suspend fun clearAllDrafts() { drafts.clear(); flow.value = emptyList() }
+
+        override suspend fun deleteDraft(id: Uuid) {
+            drafts.remove(id)
+            flow.value = drafts.values.toList()
+        }
+
+        override suspend fun clearAllDrafts() {
+            drafts.clear()
+            flow.value = emptyList()
+        }
     }
 
     private class NoOpRemoteJournalDataSource : RemoteJournalDataSource {
         override suspend fun observeAllJournals(): List<Journal> = emptyList()
+
         override suspend fun addJournal(journal: Journal): String = journal.id.toString()
+
         override suspend fun editJournal(journal: Journal) {}
+
         override suspend fun deleteJournal(journalId: String) {}
     }
 }

@@ -54,7 +54,8 @@ class NoteViewerVideoE2ETest {
     private fun assertVideoNoteViewerControlsAreUsable() {
         composeRule.onNodeWithTag(VideoPlayerTags.ROOT).assertIsDisplayed()
         composeRule.onNodeWithTag(VideoPlayerTags.PIP_BUTTON).assertIsDisplayed().assertHasClickAction()
-        composeRule.onAllNodesWithTag(MediaDeviceSelectorTags.chip("Audio output"))[0]
+        composeRule
+            .onAllNodesWithTag(MediaDeviceSelectorTags.chip("Audio output"))[0]
             .assertIsDisplayed()
             .assertHasClickAction()
             .performClick()

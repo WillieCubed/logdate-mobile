@@ -24,7 +24,11 @@ internal object ScreenshotResourceReader : ResourceReader {
         throw MissingResourceException(path)
     }
 
-    override suspend fun readPart(path: String, offset: Long, size: Long): ByteArray {
+    override suspend fun readPart(
+        path: String,
+        offset: Long,
+        size: Long,
+    ): ByteArray {
         val file = assetsDir.resolve(path)
         if (!file.exists()) throw MissingResourceException(path)
         return file.inputStream().use { input ->
@@ -57,10 +61,11 @@ internal object ScreenshotResourceReader : ResourceReader {
         var dir: File? = startDir
         while (dir != null) {
             if (File(dir, "settings.gradle.kts").exists()) {
-                val assets = File(
-                    dir,
-                    "app/android-main/build/intermediates/assets/debug/mergeDebugAssets",
-                )
+                val assets =
+                    File(
+                        dir,
+                        "app/android-main/build/intermediates/assets/debug/mergeDebugAssets",
+                    )
                 if (assets.exists()) return assets
             }
             dir = dir.parentFile

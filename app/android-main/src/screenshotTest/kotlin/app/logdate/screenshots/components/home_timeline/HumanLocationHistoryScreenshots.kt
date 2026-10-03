@@ -3,11 +3,11 @@
 package app.logdate.screenshots.components.home_timeline
 
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Surface
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -17,20 +17,20 @@ import app.logdate.feature.location.timeline.ui.history.HistoryMemoryKind
 import app.logdate.feature.location.timeline.ui.history.HistoryMemoryUi
 import app.logdate.feature.location.timeline.ui.history.HistoryPlaceUi
 import app.logdate.feature.location.timeline.ui.history.HistoryTab
+import app.logdate.feature.location.timeline.ui.history.HumanHistoryMap
 import app.logdate.feature.location.timeline.ui.history.HumanLocationHistoryActions
 import app.logdate.feature.location.timeline.ui.history.HumanLocationHistoryContent
 import app.logdate.feature.location.timeline.ui.history.HumanLocationHistoryDetailContent
 import app.logdate.feature.location.timeline.ui.history.HumanLocationHistoryState
-import app.logdate.feature.location.timeline.ui.history.HumanHistoryMap
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
-import app.logdate.ui.timeline.MomentAudioUiState
 import app.logdate.shared.model.location.JourneyLeg
 import app.logdate.shared.model.location.LocationObservation
 import app.logdate.shared.model.location.PlaceVisit
 import app.logdate.shared.model.location.SemanticPlace
 import app.logdate.shared.model.location.TravelMode
+import app.logdate.ui.timeline.MomentAudioUiState
 import com.android.tools.screenshot.PreviewTest
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -157,7 +157,10 @@ fun HumanLocationHistoryDetailScreenshot() = HistoryDetailScene("cafe-morning")
 fun HumanLocationHistoryAudioScreenshot() = HistoryDetailScene("library")
 
 @Composable
-private fun HistoryScene(state: HumanLocationHistoryState, showTitle: Boolean = false) {
+private fun HistoryScene(
+    state: HumanLocationHistoryState,
+    showTitle: Boolean = false,
+) {
     ScreenshotTheme {
         HumanLocationHistoryContent(
             state,
@@ -176,17 +179,24 @@ internal fun HistoryMapFixture(modifier: Modifier) {
     val cafe = SemanticPlace("cafe", "Mothership Coffee", 36.1662, -115.1431)
     val library = SemanticPlace("library", "Las Vegas Library", 36.1624, -115.1452)
     val park = SemanticPlace("park", "Near Baker Park", 36.1595, -115.1500)
-    val visits = listOf(
-        "home-morning" to home,
-        "cafe-morning" to cafe,
-        "library" to library,
-        "cafe-afternoon" to cafe,
-        "brief" to park,
-        "home-evening" to home,
-    ).map { (id, place) ->
-        PlaceVisit(id, time, time, listOf(id), place.latitude, place.longitude, true, place)
-    }
-    fun leg(id: String, mode: TravelMode, from: SemanticPlace, to: SemanticPlace): JourneyLeg =
+    val visits =
+        listOf(
+            "home-morning" to home,
+            "cafe-morning" to cafe,
+            "library" to library,
+            "cafe-afternoon" to cafe,
+            "brief" to park,
+            "home-evening" to home,
+        ).map { (id, place) ->
+            PlaceVisit(id, time, time, listOf(id), place.latitude, place.longitude, true, place)
+        }
+
+    fun leg(
+        id: String,
+        mode: TravelMode,
+        from: SemanticPlace,
+        to: SemanticPlace,
+    ): JourneyLeg =
         JourneyLeg(
             id,
             time,

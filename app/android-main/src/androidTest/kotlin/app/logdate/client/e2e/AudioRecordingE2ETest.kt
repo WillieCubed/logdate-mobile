@@ -1,8 +1,8 @@
 package app.logdate.client.e2e
 
 import android.content.Context
-import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -12,11 +12,12 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.EditorActivity
+import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.media.audio.AudioRecordingManager
+import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import app.logdate.client.media.audio.transcription.TranscriptionStartResult
-import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.permissions.PermissionManager
 import app.logdate.client.permissions.PermissionResult
 import app.logdate.client.permissions.PermissionStatus
@@ -27,7 +28,6 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.transcription.TranscriptionData
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.transcription.TranscriptionStatus
-import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.di.appModule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -65,20 +65,21 @@ import kotlin.uuid.Uuid
  */
 @RunWith(AndroidJUnit4::class)
 class AudioRecordingE2ETest {
+    private val fakeRecordingManager =
+        FakeAudioRecordingManager(
+            outputUri = "file:///test/audio.m4a",
+            recordingDuration = 5.seconds,
+        )
 
-    private val fakeRecordingManager = FakeAudioRecordingManager(
-        outputUri = "file:///test/audio.m4a",
-        recordingDuration = 5.seconds
-    )
-
-    private val testModule = module {
-        single<AudioRecordingManager> { fakeRecordingManager }
-        single<AudioPlaybackManager> { FakeAudioPlaybackManager() }
-        single<TranscriptionRepository> { FakeTranscriptionRepository() }
-        single<TranscriptionService> { FakeTranscriptionService() }
-        single<PermissionManager> { GrantedPermissionManager() }
-        single<EntryDraftRepository> { EmptyEntryDraftRepository() }
-    }
+    private val testModule =
+        module {
+            single<AudioRecordingManager> { fakeRecordingManager }
+            single<AudioPlaybackManager> { FakeAudioPlaybackManager() }
+            single<TranscriptionRepository> { FakeTranscriptionRepository() }
+            single<TranscriptionService> { FakeTranscriptionService() }
+            single<PermissionManager> { GrantedPermissionManager() }
+            single<EntryDraftRepository> { EmptyEntryDraftRepository() }
+        }
 
     private val koinRule = KoinModuleOverrideRule(testModule)
     private val composeRule = createAndroidComposeRule<EditorActivity>()
@@ -112,26 +113,30 @@ class AudioRecordingE2ETest {
 }
 
 private class KoinModuleOverrideRule(
-    private val module: Module
+    private val module: Module,
 ) : TestRule {
-    override fun apply(base: Statement, description: Description): Statement = object : Statement() {
-        override fun evaluate() {
-            val context = ApplicationProvider.getApplicationContext<Context>()
-            if (GlobalContext.getOrNull() == null) {
-                startKoin {
-                    androidContext(context)
-                    modules(appModule)
+    override fun apply(
+        base: Statement,
+        description: Description,
+    ): Statement =
+        object : Statement() {
+            override fun evaluate() {
+                val context = ApplicationProvider.getApplicationContext<Context>()
+                if (GlobalContext.getOrNull() == null) {
+                    startKoin {
+                        androidContext(context)
+                        modules(appModule)
+                    }
                 }
+                loadKoinModules(module)
+                base.evaluate()
             }
-            loadKoinModules(module)
-            base.evaluate()
         }
-    }
 }
 
 private class FakeAudioRecordingManager(
     private val outputUri: String,
-    private val recordingDuration: Duration
+    private val recordingDuration: Duration,
 ) : AudioRecordingManager {
     private val audioLevelFlow = MutableStateFlow(0.4f)
     private val durationFlow = MutableStateFlow(Duration.ZERO)
@@ -171,7 +176,7 @@ private class FakeAudioPlaybackManager : AudioPlaybackManager {
         uri: String,
         metadata: AudioPlaybackMetadata?,
         onProgressUpdated: (Float) -> Unit,
-        onPlaybackCompleted: () -> Unit
+        onPlaybackCompleted: () -> Unit,
     ) {
         onProgressUpdated(0f)
     }
@@ -188,12 +193,14 @@ private class FakeAudioPlaybackManager : AudioPlaybackManager {
 private class EmptyEntryDraftRepository : EntryDraftRepository {
     override fun getDrafts(): Flow<List<EntryDraft>> = flowOf(emptyList())
 
-    override fun getDraft(uid: Uuid): Flow<Result<EntryDraft>> =
-        flowOf(Result.failure(NoSuchElementException("Draft not found")))
+    override fun getDraft(uid: Uuid): Flow<Result<EntryDraft>> = flowOf(Result.failure(NoSuchElementException("Draft not found")))
 
     override suspend fun createDraft(notes: List<JournalNote>): Uuid = Uuid.random()
 
-    override suspend fun updateDraft(uid: Uuid, notes: List<JournalNote>): Uuid = uid
+    override suspend fun updateDraft(
+        uid: Uuid,
+        notes: List<JournalNote>,
+    ): Uuid = uid
 
     override suspend fun setPendingMedia(
         uid: Uuid,
@@ -216,8 +223,7 @@ private class FakeTranscriptionService : TranscriptionService {
 
     override suspend fun stopLiveTranscription(): TranscriptionResult = TranscriptionResult.Cancelled
 
-    override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult =
-        TranscriptionResult.Success("Test transcription")
+    override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult = TranscriptionResult.Success("Test transcription")
 
     override suspend fun cancelTranscription() = Unit
 
@@ -239,8 +245,7 @@ private class FakeTranscriptionRepository : TranscriptionRepository {
 
     override suspend fun requestTranscription(noteId: Uuid): Boolean = true
 
-    override suspend fun getTranscription(noteId: Uuid): TranscriptionData? =
-        transcriptions[noteId]?.value
+    override suspend fun getTranscription(noteId: Uuid): TranscriptionData? = transcriptions[noteId]?.value
 
     override fun observeTranscription(noteId: Uuid): Flow<TranscriptionData?> =
         transcriptions.getOrPut(noteId) { MutableStateFlow(null) }.asStateFlow()
@@ -251,19 +256,20 @@ private class FakeTranscriptionRepository : TranscriptionRepository {
         noteId: Uuid,
         text: String?,
         status: TranscriptionStatus,
-        errorMessage: String?
+        errorMessage: String?,
     ): Boolean {
         val now = Clock.System.now()
         val current = transcriptions.getOrPut(noteId) { MutableStateFlow(null) }
-        current.value = TranscriptionData(
-            noteId = noteId,
-            text = text,
-            status = status,
-            errorMessage = errorMessage,
-            created = now,
-            lastUpdated = now,
-            id = Uuid.random()
-        )
+        current.value =
+            TranscriptionData(
+                noteId = noteId,
+                text = text,
+                status = status,
+                errorMessage = errorMessage,
+                created = now,
+                lastUpdated = now,
+                id = Uuid.random(),
+            )
         return true
     }
 
@@ -274,9 +280,10 @@ private class FakeTranscriptionRepository : TranscriptionRepository {
 }
 
 private class GrantedPermissionManager : PermissionManager {
-    private val permissions = MutableStateFlow(
-        PermissionType.values().associateWith { PermissionStatus.GRANTED }
-    )
+    private val permissions =
+        MutableStateFlow(
+            PermissionType.values().associateWith { PermissionStatus.GRANTED },
+        )
 
     override fun isPermissionGranted(type: PermissionType): Boolean = true
 
@@ -285,11 +292,17 @@ private class GrantedPermissionManager : PermissionManager {
     override fun observePermissions(types: Set<PermissionType>): StateFlow<Map<PermissionType, PermissionStatus>> =
         permissions.asStateFlow()
 
-    override fun requestPermission(type: PermissionType, onResult: (PermissionResult) -> Unit) {
+    override fun requestPermission(
+        type: PermissionType,
+        onResult: (PermissionResult) -> Unit,
+    ) {
         onResult(PermissionResult(type, PermissionStatus.GRANTED, shouldShowRationale = false))
     }
 
-    override fun requestPermissions(types: Set<PermissionType>, onResult: (List<PermissionResult>) -> Unit) {
+    override fun requestPermissions(
+        types: Set<PermissionType>,
+        onResult: (List<PermissionResult>) -> Unit,
+    ) {
         onResult(types.map { PermissionResult(it, PermissionStatus.GRANTED, shouldShowRationale = false) })
     }
 

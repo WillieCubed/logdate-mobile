@@ -190,8 +190,22 @@ private val timelineNoPeopleState =
 private val rewindId = Uuid.parse("00000000-0000-0000-0000-000000000051")
 internal val pastRewinds =
     listOf(
-        RewindHistoryUiState(uid = rewindId, title = "Week of Feb 17", label = "Week 8", startDate = LocalDate(2025, 2, 17), endDate = LocalDate(2025, 2, 23), message = "Your week, captured"),
-        RewindHistoryUiState(uid = Uuid.parse("00000000-0000-0000-0000-000000000052"), title = "Week of Feb 10", label = "Week 7", startDate = LocalDate(2025, 2, 10), endDate = LocalDate(2025, 2, 16), message = "Moments worth remembering"),
+        RewindHistoryUiState(
+            uid = rewindId,
+            title = "Week of Feb 17",
+            label = "Week 8",
+            startDate = LocalDate(2025, 2, 17),
+            endDate = LocalDate(2025, 2, 23),
+            message = "Your week, captured",
+        ),
+        RewindHistoryUiState(
+            uid = Uuid.parse("00000000-0000-0000-0000-000000000052"),
+            title = "Week of Feb 10",
+            label = "Week 7",
+            startDate = LocalDate(2025, 2, 10),
+            endDate = LocalDate(2025, 2, 16),
+            message = "Moments worth remembering",
+        ),
     )
 
 internal val mostRecentRewind =
@@ -252,7 +266,20 @@ fun S03_TimelineScrollToTopVisible() {
     ScreenshotTheme {
         HomeTabRouteFrame(selectedTab = RoutePreviewTab.TIMELINE) {
             TimelinePane(
-                uiState = TimelineUiState(items = List(8) { index -> timelineDays[index % timelineDays.size].copy(date = LocalDate(2025, 2, 20 - index)) }),
+                uiState =
+                    TimelineUiState(
+                        items =
+                            List(8) { index ->
+                                timelineDays[index % timelineDays.size].copy(
+                                    date =
+                                        LocalDate(
+                                            2025,
+                                            2,
+                                            20 - index,
+                                        ),
+                                )
+                            },
+                    ),
                 onNewEntry = {},
                 onShareMemory = { _ -> },
                 onOpenDay = {},

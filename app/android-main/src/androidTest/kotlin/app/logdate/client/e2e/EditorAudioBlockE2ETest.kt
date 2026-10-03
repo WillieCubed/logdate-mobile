@@ -55,7 +55,8 @@ class EditorAudioBlockE2ETest {
     }
 
     private fun assertPlaybackRouteControlsAreUsable() {
-        composeRule.onAllNodesWithTag(MediaDeviceSelectorTags.chip("Audio output"))[0]
+        composeRule
+            .onAllNodesWithTag(MediaDeviceSelectorTags.chip("Audio output"))[0]
             .assertIsDisplayed()
             .assertHasClickAction()
             .performClick()

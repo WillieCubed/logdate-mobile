@@ -60,8 +60,7 @@ fun S10_OnboardingRecommendations() = SharedOnboardingMainScene(SharedScreenshot
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S11_OnboardingDayBoundariesConnected() =
-    SharedOnboardingMainScene(SharedScreenshotSceneId.OnboardingDayBoundariesConnected)
+fun S11_OnboardingDayBoundariesConnected() = SharedOnboardingMainScene(SharedScreenshotSceneId.OnboardingDayBoundariesConnected)
 
 @PreviewTest
 @ScreenshotPreviewMatrix
@@ -89,9 +88,7 @@ fun S15_OnboardingCompletionFinal() = SharedOnboardingMainScene(SharedScreenshot
 fun S16_OnboardingWelcomeBack() = SharedOnboardingMainScene(SharedScreenshotSceneId.OnboardingWelcomeBack)
 
 @Composable
-private fun SharedOnboardingMainScene(
-    sceneId: SharedScreenshotSceneId,
-) {
+private fun SharedOnboardingMainScene(sceneId: SharedScreenshotSceneId) {
     ScreenshotTheme {
         SharedScreenshotScene(sceneId)
     }

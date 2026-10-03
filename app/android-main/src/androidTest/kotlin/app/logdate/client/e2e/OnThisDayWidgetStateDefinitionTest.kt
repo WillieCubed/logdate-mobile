@@ -15,12 +15,6 @@ import kotlin.test.assertIs
 import kotlin.uuid.Uuid
 
 /**
- * Instrumented test verifying the Glance state definition persists and
- * recovers widget state through a real Android file system round-trip.
- *
- * Each test uses a unique fileKey to avoid cross-test DataStore cache pollution.
- */
-/**
  * Tests the Glance [GlanceStateDefinition] for the "On This Day" widget.
  *
  * These tests verify that the widget's [OnThisDayWidgetState] is correctly serialized
@@ -48,79 +42,86 @@ class OnThisDayWidgetStateDefinitionTest {
     }
 
     @Test
-    fun `default state is loading`() = runTest {
-        val key = uniqueKey()
-        val store = stateDefinition.getDataStore(context, key)
-        val state = store.data.first()
+    fun `default state is loading`() =
+        runTest {
+            val key = uniqueKey()
+            val store = stateDefinition.getDataStore(context, key)
+            val state = store.data.first()
 
-        assertIs<OnThisDayWidgetState.Loading>(state)
-    }
-
-    @Test
-    fun `write and read has memory`() = runTest {
-        val key = uniqueKey()
-        val store = stateDefinition.getDataStore(context, key)
-        val expected = OnThisDayWidgetState.HasMemory(
-            dateIso = "2025-03-24",
-            dateFormatted = "March 24, 2025",
-            summary = "Trip to the park with friends",
-            thumbnailUri = "content://media/images/42",
-        )
-
-        store.updateData { expected }
-        val actual = store.data.first()
-
-        assertIs<OnThisDayWidgetState.HasMemory>(actual)
-        assertEquals(expected.dateIso, actual.dateIso)
-        assertEquals(expected.dateFormatted, actual.dateFormatted)
-        assertEquals(expected.summary, actual.summary)
-        assertEquals(expected.thumbnailUri, actual.thumbnailUri)
-    }
-
-    @Test
-    fun `write no memory today overwrites previous memory`() = runTest {
-        val key = uniqueKey()
-        val store = stateDefinition.getDataStore(context, key)
-
-        store.updateData {
-            OnThisDayWidgetState.HasMemory(
-                dateIso = "2025-01-01",
-                dateFormatted = "January 1, 2025",
-                summary = "New Year",
-                thumbnailUri = null,
-            )
+            assertIs<OnThisDayWidgetState.Loading>(state)
         }
-        store.updateData { OnThisDayWidgetState.NoMemoryToday }
-        val actual = store.data.first()
-
-        assertIs<OnThisDayWidgetState.NoMemoryToday>(actual)
-    }
 
     @Test
-    fun `has memory with null thumbnail round trips`() = runTest {
-        val key = uniqueKey()
-        val store = stateDefinition.getDataStore(context, key)
-        val expected = OnThisDayWidgetState.HasMemory(
-            dateIso = "2025-07-04",
-            dateFormatted = "July 4, 2025",
-            summary = "Independence Day",
-            thumbnailUri = null,
-        )
+    fun `write and read has memory`() =
+        runTest {
+            val key = uniqueKey()
+            val store = stateDefinition.getDataStore(context, key)
+            val expected =
+                OnThisDayWidgetState.HasMemory(
+                    dateIso = "2025-03-24",
+                    dateFormatted = "March 24, 2025",
+                    summary = "Trip to the park with friends",
+                    thumbnailUri = "content://media/images/42",
+                )
 
-        store.updateData { expected }
-        val actual = store.data.first()
+            store.updateData { expected }
+            val actual = store.data.first()
 
-        assertIs<OnThisDayWidgetState.HasMemory>(actual)
-        assertEquals(null, actual.thumbnailUri)
-        assertEquals(expected.summary, actual.summary)
-    }
+            assertIs<OnThisDayWidgetState.HasMemory>(actual)
+            assertEquals(expected.dateIso, actual.dateIso)
+            assertEquals(expected.dateFormatted, actual.dateFormatted)
+            assertEquals(expected.summary, actual.summary)
+            assertEquals(expected.thumbnailUri, actual.thumbnailUri)
+        }
 
     @Test
-    fun `cached data store returns same instance`() = runTest {
-        val key = uniqueKey()
-        val store1 = stateDefinition.getDataStore(context, key)
-        val store2 = stateDefinition.getDataStore(context, key)
+    fun `write no memory today overwrites previous memory`() =
+        runTest {
+            val key = uniqueKey()
+            val store = stateDefinition.getDataStore(context, key)
 
-        assertEquals(store1, store2)
-    }
+            store.updateData {
+                OnThisDayWidgetState.HasMemory(
+                    dateIso = "2025-01-01",
+                    dateFormatted = "January 1, 2025",
+                    summary = "New Year",
+                    thumbnailUri = null,
+                )
+            }
+            store.updateData { OnThisDayWidgetState.NoMemoryToday }
+            val actual = store.data.first()
+
+            assertIs<OnThisDayWidgetState.NoMemoryToday>(actual)
+        }
+
+    @Test
+    fun `has memory with null thumbnail round trips`() =
+        runTest {
+            val key = uniqueKey()
+            val store = stateDefinition.getDataStore(context, key)
+            val expected =
+                OnThisDayWidgetState.HasMemory(
+                    dateIso = "2025-07-04",
+                    dateFormatted = "July 4, 2025",
+                    summary = "Independence Day",
+                    thumbnailUri = null,
+                )
+
+            store.updateData { expected }
+            val actual = store.data.first()
+
+            assertIs<OnThisDayWidgetState.HasMemory>(actual)
+            assertEquals(null, actual.thumbnailUri)
+            assertEquals(expected.summary, actual.summary)
+        }
+
+    @Test
+    fun `cached data store returns same instance`() =
+        runTest {
+            val key = uniqueKey()
+            val store1 = stateDefinition.getDataStore(context, key)
+            val store2 = stateDefinition.getDataStore(context, key)
+
+            assertEquals(store1, store2)
+        }
 }

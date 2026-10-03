@@ -25,9 +25,9 @@ import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
 import com.android.tools.screenshot.PreviewTest
+import kotlinx.datetime.LocalDate
 import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.Uuid
-import kotlinx.datetime.LocalDate
 
 private val journalEntries =
     listOf(
@@ -90,7 +90,8 @@ private val pickerBrowseState =
 
                                 |The apartment was still enough to hear the kettle click off, then the first drops tapping the glass. I kept writing past the point where I had planned to stop because the morning felt worth keeping in full.
 
-                                |The mug cooled between both hands. Outside, the sidewalk shone and the little maple at the corner shook itself dry every few minutes.""".trimMargin(),
+                                |The mug cooled between both hands. Outside, the sidewalk shone and the little maple at the corner shook itself dry every few minutes.
+                            """.trimMargin(),
                         ),
                         JournalContentPickerItem(
                             Uuid.parse("00000000-0000-0000-0000-000000000085"),
@@ -415,9 +416,24 @@ fun S18_JournalContentPickerSearch() {
             state =
                 pickerBrowseState.copy(
                     query = "rain",
-                    groups = listOf(pickerBrowseState.groups.first().copy(items = pickerBrowseState.groups.first().items.drop(1))),
-                    selectedItems = listOf(pickerBrowseState.groups.first().items.first()),
-            ),
+                    groups =
+                        listOf(
+                            pickerBrowseState.groups.first().copy(
+                                items =
+                                    pickerBrowseState.groups
+                                        .first()
+                                        .items
+                                        .drop(1),
+                            ),
+                        ),
+                    selectedItems =
+                        listOf(
+                            pickerBrowseState.groups
+                                .first()
+                                .items
+                                .first(),
+                        ),
+                ),
             onBack = {},
             previewMedia = previewMedia,
         )

@@ -21,7 +21,6 @@ import kotlin.test.assertNull
  * before they are transmitted to the server or shared with other devices.
  */
 class AndroidPhoneAudioStreamOpenerTest {
-
     private val filesDir = createTempDirectory().toFile()
     private val opener =
         AndroidPhoneAudioStreamOpener(

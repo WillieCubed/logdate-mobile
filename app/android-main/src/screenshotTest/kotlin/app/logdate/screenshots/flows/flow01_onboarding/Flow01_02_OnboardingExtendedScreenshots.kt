@@ -31,8 +31,7 @@ fun S04_RecommendationsSaving() = SharedOnboardingExtendedScene(SharedScreenshot
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S05_DayBoundariesPermissionsNeeded() =
-    SharedOnboardingExtendedScene(SharedScreenshotSceneId.DayBoundariesPermissionsNeeded)
+fun S05_DayBoundariesPermissionsNeeded() = SharedOnboardingExtendedScene(SharedScreenshotSceneId.DayBoundariesPermissionsNeeded)
 
 @PreviewTest
 @ScreenshotPreviewMatrix
@@ -42,31 +41,25 @@ fun S06_DayBoundariesChecking() = SharedOnboardingExtendedScene(SharedScreenshot
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S07_NotificationsDecisionHandled() =
-    SharedOnboardingExtendedScene(SharedScreenshotSceneId.NotificationsDecisionHandled)
+fun S07_NotificationsDecisionHandled() = SharedOnboardingExtendedScene(SharedScreenshotSceneId.NotificationsDecisionHandled)
 
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
-fun S08_CloudAccountSelectedSignIn() =
-    SharedOnboardingExtendedScene(SharedScreenshotSceneId.CloudAccountSelectedSignIn)
+fun S08_CloudAccountSelectedSignIn() = SharedOnboardingExtendedScene(SharedScreenshotSceneId.CloudAccountSelectedSignIn)
 
 @PreviewTest
 @LargeScreenAuditPreviewMatrix
 @Composable
-fun S09_CloudAccountAdaptiveLargeScreen() =
-    SharedOnboardingExtendedScene(SharedScreenshotSceneId.CloudAccountAdaptiveLargeScreen)
+fun S09_CloudAccountAdaptiveLargeScreen() = SharedOnboardingExtendedScene(SharedScreenshotSceneId.CloudAccountAdaptiveLargeScreen)
 
 @PreviewTest
 @LargeScreenAuditPreviewMatrix
 @Composable
-fun S10_MemorySelectionAdaptiveLargeScreen() =
-    SharedOnboardingExtendedScene(SharedScreenshotSceneId.MemorySelectionAdaptiveLargeScreen)
+fun S10_MemorySelectionAdaptiveLargeScreen() = SharedOnboardingExtendedScene(SharedScreenshotSceneId.MemorySelectionAdaptiveLargeScreen)
 
 @Composable
-private fun SharedOnboardingExtendedScene(
-    sceneId: SharedScreenshotSceneId,
-) {
+private fun SharedOnboardingExtendedScene(sceneId: SharedScreenshotSceneId) {
     ScreenshotTheme {
         SharedScreenshotScene(sceneId)
     }

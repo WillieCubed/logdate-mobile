@@ -1,7 +1,7 @@
 package app.logdate.screenshots.components.home_timeline
 
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.client.domain.location.LocationMemoryTimeFilter
 import app.logdate.feature.location.timeline.ui.LocationTimelineContent
@@ -29,102 +29,104 @@ internal val sampleCurrentLocation =
         longitude = -122.4194,
     )
 
-internal val sampleStops = listOf(
-    LocationStopUiModel(
-        id = "1",
-        title = "Golden Gate Park",
-        subtitle = "501 Stanyan St, San Francisco, CA",
-        latitude = 37.7749,
-        longitude = -122.4194,
-        startedAt = "2:15 PM",
-        endedAt = "3:00 PM",
-        timeRange = "2:15 PM - 3:00 PM",
-        duration = "Stayed for 45m",
-        sourceLabel = "Google Places",
-        source = LocationLabelSource.GOOGLE_PLACES,
-        sampleCount = 8,
-        startTime = Instant.fromEpochMilliseconds(1_740_000_000_000L),
-        endTime = Instant.fromEpochMilliseconds(1_740_002_700_000L),
-        hasReliableDuration = true,
-    ),
-    LocationStopUiModel(
-        id = "2",
-        title = "Home",
-        subtitle = "456 Oak St, San Francisco, CA",
-        latitude = 37.7694,
-        longitude = -122.4862,
-        startedAt = "10:30 AM",
-        endedAt = "12:00 PM",
-        timeRange = "10:30 AM - 12:00 PM",
-        duration = "Stayed for 1h 30m",
-        sourceLabel = "Saved place",
-        source = LocationLabelSource.USER_DEFINED,
-        sampleCount = 12,
-        startTime = Instant.fromEpochMilliseconds(1_739_990_000_000L),
-        endTime = Instant.fromEpochMilliseconds(1_739_995_400_000L),
-        hasReliableDuration = true,
-    ),
-)
+internal val sampleStops =
+    listOf(
+        LocationStopUiModel(
+            id = "1",
+            title = "Golden Gate Park",
+            subtitle = "501 Stanyan St, San Francisco, CA",
+            latitude = 37.7749,
+            longitude = -122.4194,
+            startedAt = "2:15 PM",
+            endedAt = "3:00 PM",
+            timeRange = "2:15 PM - 3:00 PM",
+            duration = "Stayed for 45m",
+            sourceLabel = "Google Places",
+            source = LocationLabelSource.GOOGLE_PLACES,
+            sampleCount = 8,
+            startTime = Instant.fromEpochMilliseconds(1_740_000_000_000L),
+            endTime = Instant.fromEpochMilliseconds(1_740_002_700_000L),
+            hasReliableDuration = true,
+        ),
+        LocationStopUiModel(
+            id = "2",
+            title = "Home",
+            subtitle = "456 Oak St, San Francisco, CA",
+            latitude = 37.7694,
+            longitude = -122.4862,
+            startedAt = "10:30 AM",
+            endedAt = "12:00 PM",
+            timeRange = "10:30 AM - 12:00 PM",
+            duration = "Stayed for 1h 30m",
+            sourceLabel = "Saved place",
+            source = LocationLabelSource.USER_DEFINED,
+            sampleCount = 12,
+            startTime = Instant.fromEpochMilliseconds(1_739_990_000_000L),
+            endTime = Instant.fromEpochMilliseconds(1_739_995_400_000L),
+            hasReliableDuration = true,
+        ),
+    )
 
-internal val samplePlaces = listOf(
-    LocationPlaceUiModel(
-        id = "place-1",
-        title = "Golden Gate Park",
-        subtitle = "2 memories · San Francisco, CA",
-        latitude = 37.7749,
-        longitude = -122.4194,
-        lastVisitedLabel = "Visited today",
-        memoryCount = 2,
-        sourceLabel = "Google Places",
-        source = LocationLabelSource.GOOGLE_PLACES,
-        memories =
-            listOf(
-                LocationMemoryPreviewUiModel(
-                    noteId = Uuid.parse("00000000-0000-0000-0000-000000000111"),
-                    title = "Afternoon walk",
-                    subtitle = "Text memory",
-                    timestamp = Instant.fromEpochMilliseconds(1_740_002_700_000L),
-                    latitude = 37.7749,
-                    longitude = -122.4194,
-                    kind = LocationMemoryKind.TEXT,
+internal val samplePlaces =
+    listOf(
+        LocationPlaceUiModel(
+            id = "place-1",
+            title = "Golden Gate Park",
+            subtitle = "2 memories · San Francisco, CA",
+            latitude = 37.7749,
+            longitude = -122.4194,
+            lastVisitedLabel = "Visited today",
+            memoryCount = 2,
+            sourceLabel = "Google Places",
+            source = LocationLabelSource.GOOGLE_PLACES,
+            memories =
+                listOf(
+                    LocationMemoryPreviewUiModel(
+                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000111"),
+                        title = "Afternoon walk",
+                        subtitle = "Text memory",
+                        timestamp = Instant.fromEpochMilliseconds(1_740_002_700_000L),
+                        latitude = 37.7749,
+                        longitude = -122.4194,
+                        kind = LocationMemoryKind.TEXT,
+                    ),
+                    LocationMemoryPreviewUiModel(
+                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000112"),
+                        title = "Park snapshot",
+                        subtitle = "Photo memory",
+                        timestamp = Instant.fromEpochMilliseconds(1_740_001_800_000L),
+                        latitude = 37.7749,
+                        longitude = -122.4194,
+                        kind = LocationMemoryKind.PHOTO,
+                    ),
                 ),
-                LocationMemoryPreviewUiModel(
-                    noteId = Uuid.parse("00000000-0000-0000-0000-000000000112"),
-                    title = "Park snapshot",
-                    subtitle = "Photo memory",
-                    timestamp = Instant.fromEpochMilliseconds(1_740_001_800_000L),
-                    latitude = 37.7749,
-                    longitude = -122.4194,
-                    kind = LocationMemoryKind.PHOTO,
+            relatedStops = listOf(sampleStops.first()),
+        ),
+        LocationPlaceUiModel(
+            id = "place-2",
+            title = "Home",
+            subtitle = "1 memory · San Francisco, CA",
+            latitude = 37.7694,
+            longitude = -122.4862,
+            lastVisitedLabel = "Visited yesterday",
+            memoryCount = 1,
+            sourceLabel = "Saved place",
+            source = LocationLabelSource.USER_DEFINED,
+            memories =
+                listOf(
+                    LocationMemoryPreviewUiModel(
+                        noteId = Uuid.parse("00000000-0000-0000-0000-000000000113"),
+                        title = "Quiet evening",
+                        subtitle = "Audio memory",
+                        timestamp = Instant.fromEpochMilliseconds(1_739_995_400_000L),
+                        latitude = 37.7694,
+                        longitude = -122.4862,
+                        kind = LocationMemoryKind.AUDIO,
+                    ),
                 ),
-            ),
-        relatedStops = listOf(sampleStops.first()),
-    ),
-    LocationPlaceUiModel(
-        id = "place-2",
-        title = "Home",
-        subtitle = "1 memory · San Francisco, CA",
-        latitude = 37.7694,
-        longitude = -122.4862,
-        lastVisitedLabel = "Visited yesterday",
-        memoryCount = 1,
-        sourceLabel = "Saved place",
-        source = LocationLabelSource.USER_DEFINED,
-        memories =
-            listOf(
-                LocationMemoryPreviewUiModel(
-                    noteId = Uuid.parse("00000000-0000-0000-0000-000000000113"),
-                    title = "Quiet evening",
-                    subtitle = "Audio memory",
-                    timestamp = Instant.fromEpochMilliseconds(1_739_995_400_000L),
-                    latitude = 37.7694,
-                    longitude = -122.4862,
-                    kind = LocationMemoryKind.AUDIO,
-                ),
-            ),
-        relatedStops = listOf(sampleStops.last()),
-    ),
-)
+            relatedStops = listOf(sampleStops.last()),
+        ),
+    )
 
 internal val sampleLocationContentState =
     LocationTimelineUiState.Content(
@@ -189,15 +191,16 @@ fun LocationTimeline_Loading() {
 fun LocationTimeline_PartiallyLoaded() {
     ScreenshotTheme {
         LocationTimelineContent(
-            uiState = LocationTimelineUiState.Content(
-                isLoadingCurrentLocation = false,
-                isLoadingPlaces = false,
-                isLoadingStops = true,
-                currentLocation = sampleCurrentLocation,
-                places = samplePlaces,
-                visiblePlaces = samplePlaces,
-                selectedPlaceId = samplePlaces.first().id,
-            ),
+            uiState =
+                LocationTimelineUiState.Content(
+                    isLoadingCurrentLocation = false,
+                    isLoadingPlaces = false,
+                    isLoadingStops = true,
+                    currentLocation = sampleCurrentLocation,
+                    places = samplePlaces,
+                    visiblePlaces = samplePlaces,
+                    selectedPlaceId = samplePlaces.first().id,
+                ),
             onSelectPlace = {},
             onDismissPlaceDetail = {},
             onDeleteStop = {},

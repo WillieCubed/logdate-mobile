@@ -94,7 +94,13 @@ class PortableMediaReferencesE2ETest {
 
         assertEquals("content", uri.scheme)
         assertEquals("${context.packageName}.provider", uri.authority)
-        assertEquals(jpeg.size, context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }.size)
+        assertEquals(
+            jpeg.size,
+            context.contentResolver
+                .openInputStream(uri)!!
+                .use { it.readBytes() }
+                .size,
+        )
     }
 
     @Test

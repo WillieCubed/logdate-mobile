@@ -56,17 +56,19 @@ fun DraftsList_NoItems() {
     // during layoutlib inflate that crashes ERROR_NOT_INFLATED for the empty branch)
     ScreenshotTheme {
         Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .height(520.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth(0.92f)
+                    .height(520.dp),
             shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 6.dp,
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(24.dp),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
             ) {
                 Text(
                     text = "Previous Drafts",
@@ -111,26 +113,27 @@ fun DraftsList_NoItems() {
 fun DraftsList_Populated() {
     ScreenshotTheme {
         DraftsBottomSheet(
-            drafts = listOf(
-                EntryDraft(
-                    id = Uuid.parse("00000000-0000-0000-0000-000000000010"),
-                    notes = emptyList(),
-                    createdAt = baseInstant,
-                    updatedAt = baseInstant,
+            drafts =
+                listOf(
+                    EntryDraft(
+                        id = Uuid.parse("00000000-0000-0000-0000-000000000010"),
+                        notes = emptyList(),
+                        createdAt = baseInstant,
+                        updatedAt = baseInstant,
+                    ),
+                    EntryDraft(
+                        id = Uuid.parse("00000000-0000-0000-0000-000000000011"),
+                        notes = emptyList(),
+                        createdAt = baseInstant,
+                        updatedAt = baseInstant,
+                    ),
+                    EntryDraft(
+                        id = Uuid.parse("00000000-0000-0000-0000-000000000012"),
+                        notes = emptyList(),
+                        createdAt = baseInstant,
+                        updatedAt = baseInstant,
+                    ),
                 ),
-                EntryDraft(
-                    id = Uuid.parse("00000000-0000-0000-0000-000000000011"),
-                    notes = emptyList(),
-                    createdAt = baseInstant,
-                    updatedAt = baseInstant,
-                ),
-                EntryDraft(
-                    id = Uuid.parse("00000000-0000-0000-0000-000000000012"),
-                    notes = emptyList(),
-                    createdAt = baseInstant,
-                    updatedAt = baseInstant,
-                ),
-            ),
             isLoading = false,
             onDismiss = {},
             onDraftSelected = { _: EntryDraft -> },

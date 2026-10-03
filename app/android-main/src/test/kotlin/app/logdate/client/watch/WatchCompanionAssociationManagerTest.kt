@@ -94,9 +94,10 @@ class WatchCompanionAssociationManagerTest {
     @Test
     fun `canceled association returns to unassociated state`() =
         scope.runTest {
-            val companionClient = FakeCompanionDeviceClient(
-                currentAssociation = WatchAssociationSnapshot.Unassociated,
-            )
+            val companionClient =
+                FakeCompanionDeviceClient(
+                    currentAssociation = WatchAssociationSnapshot.Unassociated,
+                )
             val manager =
                 DefaultWatchCompanionAssociationManager(
                     companionDeviceClient = companionClient,
@@ -163,9 +164,7 @@ class WatchCompanionAssociationManagerTest {
         override fun createRequest(): AssociationRequest = request
     }
 
-    private fun mockAssociationInfo(
-        displayName: String,
-    ): AssociationInfo =
+    private fun mockAssociationInfo(displayName: String): AssociationInfo =
         mockk {
             every { this@mockk.displayName } returns displayName
             every { this@mockk.deviceMacAddress } returns null

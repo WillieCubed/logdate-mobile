@@ -2,36 +2,36 @@ package app.logdate.screenshots.components.editor
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
-import app.logdate.client.media.audio.transcription.TranscriptionFailure
-import app.logdate.ui.audio.model.AudioPalette
 import app.logdate.client.awareness.daylight.DaylightPeriod
-import app.logdate.feature.editor.ui.audio.AudioTranscriptionUi
-import app.logdate.feature.editor.ui.audio.AudioUiState
+import app.logdate.client.media.audio.transcription.TranscriptionFailure
 import app.logdate.feature.editor.ui.audio.ActiveRecordingDisplay
 import app.logdate.feature.editor.ui.audio.AudioRecordingControls
 import app.logdate.feature.editor.ui.audio.AudioRecordingDisplay
+import app.logdate.feature.editor.ui.audio.AudioTranscriptionUi
+import app.logdate.feature.editor.ui.audio.AudioUiState
 import app.logdate.feature.editor.ui.audio.EmptyAudioBlockContent
 import app.logdate.feature.editor.ui.audio.expansion.ImmersiveAudioScreen
-import app.logdate.ui.audio.expansion.SpatialExpandedAudioBlock
 import app.logdate.feature.editor.ui.content.EmptyEditorStateContent
 import app.logdate.feature.editor.ui.dialog.alert.ExitConfirmationDialog
 import app.logdate.feature.editor.ui.editor.RecordingState
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
+import app.logdate.ui.audio.expansion.SpatialExpandedAudioBlock
+import app.logdate.ui.audio.model.AudioPalette
 import com.android.tools.screenshot.PreviewTest
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
-private val mockPalette = AudioPalette(
-    waveformGradientStart = 0xFFE8A044,
-    waveformGradientEnd = 0xFFD4603A,
-    playedFillColor = 0xFFE8A044,
-    accentColor = 0xFFE8A044,
-    immersiveBackground = 0xFF1A0F05,
-)
+private val mockPalette =
+    AudioPalette(
+        waveformGradientStart = 0xFFE8A044,
+        waveformGradientEnd = 0xFFD4603A,
+        playedFillColor = 0xFFE8A044,
+        accentColor = 0xFFE8A044,
+        immersiveBackground = 0xFF1A0F05,
+    )
 
 private val mockCreatedAt = Instant.fromEpochMilliseconds(1_740_000_000_000L)
 
@@ -195,9 +195,10 @@ fun Editor_Transcription_InProgress() {
 fun Editor_Transcription_Success() {
     ScreenshotTheme {
         AudioTranscriptionUi(
-            transcriptionState = AudioUiState.TranscriptionState.Success(
-                text = "Today was a good day. I went for a walk in the park and saw the cherry blossoms beginning to bloom.",
-            ),
+            transcriptionState =
+                AudioUiState.TranscriptionState.Success(
+                    text = "Today was a good day. I went for a walk in the park and saw the cherry blossoms beginning to bloom.",
+                ),
             onRequestTranscription = {},
         )
     }
@@ -209,9 +210,10 @@ fun Editor_Transcription_Success() {
 fun Editor_Transcription_Error() {
     ScreenshotTheme {
         AudioTranscriptionUi(
-            transcriptionState = AudioUiState.TranscriptionState.Error(
-                reason = TranscriptionFailure.Unknown,
-            ),
+            transcriptionState =
+                AudioUiState.TranscriptionState.Error(
+                    reason = TranscriptionFailure.Unknown,
+                ),
             onRequestTranscription = {},
         )
     }

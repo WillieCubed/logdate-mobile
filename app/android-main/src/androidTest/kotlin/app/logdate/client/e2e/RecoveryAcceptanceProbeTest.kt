@@ -26,6 +26,14 @@ import app.logdate.shared.model.SerializableAudioBlock
 import app.logdate.shared.model.SerializableImageBlock
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.SerializableVideoBlock
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import org.json.JSONObject
+import org.junit.Assume.assumeTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.koin.core.context.GlobalContext
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -39,14 +47,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
-import org.json.JSONObject
-import org.junit.Assume.assumeTrue
-import org.junit.Test
-import org.junit.runner.RunWith
-import org.koin.core.context.GlobalContext
 
 /**
  * Two-device acceptance probe. The host supplies a task-private androidTest asset, never secrets
@@ -56,80 +56,81 @@ import org.koin.core.context.GlobalContext
 @RunWith(AndroidJUnit4::class)
 class RecoveryAcceptanceProbeTest {
     @Test
-    fun `a fresh second device recovers content and opens it offline`(): Unit = runBlocking {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val mode = InstrumentationRegistry.getArguments().getString(MODE_ARGUMENT)
-        assumeTrue("run only in the two-device acceptance harness", mode == "create" || mode == "read")
-        require(Build.HARDWARE == "ranchu" || Build.HARDWARE == "goldfish") {
-            "recovery acceptance can run only on an Android emulator"
-        }
-        val fixture = readFixture()
-        val koin = GlobalContext.get()
-        val config = koin.get<LogDateConfigRepository>()
-        koin.get<LogDateConfigDataSource>().awaitConfigurationLoaded()
-        require(fixture.serverOrigin.startsWith("http://10.0.2.2:")) { "acceptance server must be local" }
-        config.updateBackendUrl(fixture.serverOrigin)
-        assertEquals(fixture.serverOrigin, config.getCurrentBackendUrl(), "acceptance server selection failed")
-        val descriptor = koin.get<ServerDiscoveryClient>().discoverServer(fixture.serverOrigin).getOrThrow()
-        assertEquals(fixture.serverOrigin, descriptor.serverOrigin)
-        assertTrue(
-            descriptor.hasProtocolFeature(app.logdate.shared.model.ServerProtocolFeature.RICH_DRAFTS_V1),
-            "persistent server does not advertise rich draft sync",
-        )
-        config.updateServerDescriptor(descriptor)
+    fun `a fresh second device recovers content and opens it offline`(): Unit =
+        runBlocking {
+            val instrumentation = InstrumentationRegistry.getInstrumentation()
+            val mode = InstrumentationRegistry.getArguments().getString(MODE_ARGUMENT)
+            assumeTrue("run only in the two-device acceptance harness", mode == "create" || mode == "read")
+            require(Build.HARDWARE == "ranchu" || Build.HARDWARE == "goldfish") {
+                "recovery acceptance can run only on an Android emulator"
+            }
+            val fixture = readFixture()
+            val koin = GlobalContext.get()
+            val config = koin.get<LogDateConfigRepository>()
+            koin.get<LogDateConfigDataSource>().awaitConfigurationLoaded()
+            require(fixture.serverOrigin.startsWith("http://10.0.2.2:")) { "acceptance server must be local" }
+            config.updateBackendUrl(fixture.serverOrigin)
+            assertEquals(fixture.serverOrigin, config.getCurrentBackendUrl(), "acceptance server selection failed")
+            val descriptor = koin.get<ServerDiscoveryClient>().discoverServer(fixture.serverOrigin).getOrThrow()
+            assertEquals(fixture.serverOrigin, descriptor.serverOrigin)
+            assertTrue(
+                descriptor.hasProtocolFeature(app.logdate.shared.model.ServerProtocolFeature.RICH_DRAFTS_V1),
+                "persistent server does not advertise rich draft sync",
+            )
+            config.updateServerDescriptor(descriptor)
 
-        val identity = koin.get<IdentityKeyManager>()
-        val sessions = koin.get<SessionStorage>()
-        val sync = koin.get<DefaultSyncManager>()
-        val journals = koin.get<JournalRepository>()
-        val notes = koin.get<JournalNotesRepository>()
-        val links = koin.get<JournalContentRepository>()
-        val media = koin.get<MediaManager>()
-        val owner = koin.get<app.logdate.client.device.identity.CanonicalOwnerProvider>()
-        assertFalse(identity.hasIdentityKey(), "managed device already has an identity")
-        assertTrue(journals.allJournalsObserved.first().isEmpty(), "managed device already has journals")
-        assertTrue(notes.allNotesObserved.first().isEmpty(), "managed device already has notes")
-        assertTrue(journals.getAllDrafts().isEmpty(), "managed device already has drafts")
+            val identity = koin.get<IdentityKeyManager>()
+            val sessions = koin.get<SessionStorage>()
+            val sync = koin.get<DefaultSyncManager>()
+            val journals = koin.get<JournalRepository>()
+            val notes = koin.get<JournalNotesRepository>()
+            val links = koin.get<JournalContentRepository>()
+            val media = koin.get<MediaManager>()
+            val owner = koin.get<app.logdate.client.device.identity.CanonicalOwnerProvider>()
+            assertFalse(identity.hasIdentityKey(), "managed device already has an identity")
+            assertTrue(journals.allJournalsObserved.first().isEmpty(), "managed device already has journals")
+            assertTrue(notes.allNotesObserved.first().isEmpty(), "managed device already has notes")
+            assertTrue(journals.getAllDrafts().isEmpty(), "managed device already has drafts")
 
-        assertFalse(owner.hasBoundOwner(), "managed device already belongs to an account")
-        assertTrue(owner.adoptRemoteOwnerIfUninitialized(fixture.accountId))
-        assertEquals(fixture.accountId, owner.getCanonicalOwnerId())
-        identity.recoverIdentity(fixture.recoveryWords)
-        sessions.saveSession(UserSession(fixture.accessToken, fixture.refreshToken, fixture.accountId))
-        assertEquals(fixture.serverOrigin, sessions.getOriginBoundSession()?.origin)
-        assertEquals(fixture.accountId, sessions.getOriginBoundSession()?.session?.accountId)
+            assertFalse(owner.hasBoundOwner(), "managed device already belongs to an account")
+            assertTrue(owner.adoptRemoteOwnerIfUninitialized(fixture.accountId))
+            assertEquals(fixture.accountId, owner.getCanonicalOwnerId())
+            identity.recoverIdentity(fixture.recoveryWords)
+            sessions.saveSession(UserSession(fixture.accessToken, fixture.refreshToken, fixture.accountId))
+            assertEquals(fixture.serverOrigin, sessions.getOriginBoundSession()?.origin)
+            assertEquals(fixture.accountId, sessions.getOriginBoundSession()?.session?.accountId)
 
-        if (mode == "create") {
-            createFixture(fixture, journals, notes, links, media)
-            awaitSettledSync(sync)
-            notes.removeById(fixture.id("deletedNote"))
-            journals.deleteDraft(fixture.id("deletedDraft"))
-            awaitSettledSync(sync)
-            assertEquals(null, notes.getNoteById(fixture.id("deletedNote")))
-            assertEquals(null, journals.getDraft(fixture.id("deletedDraft")))
-        } else {
-            awaitSettledSync(sync)
-            assertRecovered(fixture, journals, notes, links, media)
-            val device = UiDevice.getInstance(instrumentation)
-            try {
-                device.executeShellCommand("cmd connectivity airplane-mode enable")
-                device.executeShellCommand("svc wifi disable")
-                device.executeShellCommand("svc data disable")
-                var networkChecksRemaining = 20
-                while (networkChecksRemaining > 0 && serverReachable(fixture.serverOrigin)) {
-                    delay(500)
-                    networkChecksRemaining--
-                }
-                assertFalse(serverReachable(fixture.serverOrigin), "network is still available")
+            if (mode == "create") {
+                createFixture(fixture, journals, notes, links, media)
+                awaitSettledSync(sync)
+                notes.removeById(fixture.id("deletedNote"))
+                journals.deleteDraft(fixture.id("deletedDraft"))
+                awaitSettledSync(sync)
+                assertEquals(null, notes.getNoteById(fixture.id("deletedNote")))
+                assertEquals(null, journals.getDraft(fixture.id("deletedDraft")))
+            } else {
+                awaitSettledSync(sync)
                 assertRecovered(fixture, journals, notes, links, media)
-                assertOfflineAttachmentsOpen(fixture, notes, journals, media)
-            } finally {
-                device.executeShellCommand("cmd connectivity airplane-mode disable")
-                device.executeShellCommand("svc data enable")
-                device.executeShellCommand("svc wifi enable")
+                val device = UiDevice.getInstance(instrumentation)
+                try {
+                    device.executeShellCommand("cmd connectivity airplane-mode enable")
+                    device.executeShellCommand("svc wifi disable")
+                    device.executeShellCommand("svc data disable")
+                    var networkChecksRemaining = 20
+                    while (networkChecksRemaining > 0 && serverReachable(fixture.serverOrigin)) {
+                        delay(500)
+                        networkChecksRemaining--
+                    }
+                    assertFalse(serverReachable(fixture.serverOrigin), "network is still available")
+                    assertRecovered(fixture, journals, notes, links, media)
+                    assertOfflineAttachmentsOpen(fixture, notes, journals, media)
+                } finally {
+                    device.executeShellCommand("cmd connectivity airplane-mode disable")
+                    device.executeShellCommand("svc data enable")
+                    device.executeShellCommand("svc wifi enable")
+                }
             }
         }
-    }
 
     private suspend fun createFixture(
         fixture: Fixture,
@@ -150,35 +151,50 @@ class RecoveryAcceptanceProbeTest {
         val draftImageRef = media.saveMedia(payload("recovery/draft.png", "image/png"))
         val draftVideoRef = media.saveMedia(payload("recovery/draft.mp4", "video/mp4"))
 
-        val text = JournalNote.Text(
-            uid = fixture.id("textNote"), creationTimestamp = now, lastUpdated = now, content = fixture.text,
-        )
+        val text =
+            JournalNote.Text(
+                uid = fixture.id("textNote"),
+                creationTimestamp = now,
+                lastUpdated = now,
+                content = fixture.text,
+            )
         notes.create(text, primary.id)
         links.addContentToJournal(text.uid, secondary.id)
         notes.create(
             JournalNote.Image(
-                uid = fixture.id("imageNote"), creationTimestamp = now, lastUpdated = now,
-                mediaRef = imageRef, caption = fixture.imageCaption,
+                uid = fixture.id("imageNote"),
+                creationTimestamp = now,
+                lastUpdated = now,
+                mediaRef = imageRef,
+                caption = fixture.imageCaption,
             ),
             primary.id,
         )
         notes.create(
             JournalNote.Audio(
-                uid = fixture.id("audioNote"), creationTimestamp = now, lastUpdated = now,
-                mediaRef = audioRef, durationMs = 500L,
+                uid = fixture.id("audioNote"),
+                creationTimestamp = now,
+                lastUpdated = now,
+                mediaRef = audioRef,
+                durationMs = 500L,
             ),
             secondary.id,
         )
         notes.create(
             JournalNote.Video(
-                uid = fixture.id("videoNote"), creationTimestamp = now, lastUpdated = now,
-                mediaRef = videoRef, caption = fixture.videoCaption,
+                uid = fixture.id("videoNote"),
+                creationTimestamp = now,
+                lastUpdated = now,
+                mediaRef = videoRef,
+                caption = fixture.videoCaption,
             ),
             primary.id,
         )
         notes.create(
             JournalNote.Text(
-                uid = fixture.id("deletedNote"), creationTimestamp = now, lastUpdated = now,
+                uid = fixture.id("deletedNote"),
+                creationTimestamp = now,
+                lastUpdated = now,
                 content = "deleted-${fixture.marker}",
             ),
             primary.id,
@@ -187,31 +203,34 @@ class RecoveryAcceptanceProbeTest {
         journals.saveDraft(
             EditorDraft(
                 id = fixture.id("richDraft"),
-                blocks = listOf(
-                    SerializableTextBlock(id = fixture.id("richTextBlock"), timestamp = now, content = fixture.draftText),
-                    SerializableImageBlock(id = fixture.id("richImageBlock"), timestamp = now, uri = imageRef),
-                    SerializableAudioBlock(id = fixture.id("richAudioBlock"), timestamp = now, uri = audioRef),
-                    SerializableVideoBlock(id = fixture.id("richVideoBlock"), timestamp = now, uri = videoRef),
-                ),
+                blocks =
+                    listOf(
+                        SerializableTextBlock(id = fixture.id("richTextBlock"), timestamp = now, content = fixture.draftText),
+                        SerializableImageBlock(id = fixture.id("richImageBlock"), timestamp = now, uri = imageRef),
+                        SerializableAudioBlock(id = fixture.id("richAudioBlock"), timestamp = now, uri = audioRef),
+                        SerializableVideoBlock(id = fixture.id("richVideoBlock"), timestamp = now, uri = videoRef),
+                    ),
                 selectedJournalIds = listOf(primary.id, secondary.id),
             ),
         )
         journals.saveDraft(
             EditorDraft(
                 id = fixture.id("mediaDraft"),
-                blocks = listOf(
-                    SerializableImageBlock(id = fixture.id("mediaImageBlock"), timestamp = now, uri = draftImageRef),
-                    SerializableVideoBlock(id = fixture.id("mediaVideoBlock"), timestamp = now, uri = draftVideoRef),
-                ),
+                blocks =
+                    listOf(
+                        SerializableImageBlock(id = fixture.id("mediaImageBlock"), timestamp = now, uri = draftImageRef),
+                        SerializableVideoBlock(id = fixture.id("mediaVideoBlock"), timestamp = now, uri = draftVideoRef),
+                    ),
                 selectedJournalIds = listOf(secondary.id),
             ),
         )
         journals.saveDraft(
             EditorDraft(
                 id = fixture.id("deletedDraft"),
-                blocks = listOf(
-                    SerializableTextBlock(id = fixture.id("deletedDraftBlock"), timestamp = now, content = "delete me"),
-                ),
+                blocks =
+                    listOf(
+                        SerializableTextBlock(id = fixture.id("deletedDraftBlock"), timestamp = now, content = "delete me"),
+                    ),
                 selectedJournalIds = listOf(primary.id),
             ),
         )
@@ -239,17 +258,22 @@ class RecoveryAcceptanceProbeTest {
         assertMediaHash(media, audio.mediaRef, "recovery/proof.wav")
         assertMediaHash(media, video.mediaRef, "recovery/proof.mp4")
 
-        val expectedLinks = setOf(
-            fixture.id("journalPrimary") to fixture.id("textNote"),
-            fixture.id("journalSecondary") to fixture.id("textNote"),
-            fixture.id("journalPrimary") to fixture.id("imageNote"),
-            fixture.id("journalSecondary") to fixture.id("audioNote"),
-            fixture.id("journalPrimary") to fixture.id("videoNote"),
-        )
+        val expectedLinks =
+            setOf(
+                fixture.id("journalPrimary") to fixture.id("textNote"),
+                fixture.id("journalSecondary") to fixture.id("textNote"),
+                fixture.id("journalPrimary") to fixture.id("imageNote"),
+                fixture.id("journalSecondary") to fixture.id("audioNote"),
+                fixture.id("journalPrimary") to fixture.id("videoNote"),
+            )
         assertEquals(expectedLinks, notes.getAllJournalNoteLinks().toSet())
         assertEquals(
             setOf(fixture.id("journalPrimary"), fixture.id("journalSecondary")),
-            links.observeJournalsForContent(fixture.id("textNote")).first().map { it.id }.toSet(),
+            links
+                .observeJournalsForContent(fixture.id("textNote"))
+                .first()
+                .map { it.id }
+                .toSet(),
         )
         val richDraft = assertNotNull(journals.getDraft(fixture.id("richDraft")))
         assertEquals(
@@ -302,7 +326,11 @@ class RecoveryAcceptanceProbeTest {
         return code.takeIf { it.matches(Regex("[A-Z][A-Z0-9_]{0,63}")) } ?: "UNRECOGNIZED_API_ERROR"
     }
 
-    private suspend fun assertMediaHash(media: MediaManager, ref: String, asset: String) {
+    private suspend fun assertMediaHash(
+        media: MediaManager,
+        ref: String,
+        asset: String,
+    ) {
         assertTrue(media.exists(ref), "recovered media is missing")
         assertEquals(sha256(assetBytes(asset)), sha256(media.readMedia(ref).data), "decrypted media bytes changed")
     }
@@ -335,7 +363,10 @@ class RecoveryAcceptanceProbeTest {
         }
     }
 
-    private fun playOfflineMedia(bytes: ByteArray, extension: String) {
+    private fun playOfflineMedia(
+        bytes: ByteArray,
+        extension: String,
+    ) {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val source = File.createTempFile("recovery-playback-", extension, context.cacheDir)
         try {
@@ -364,25 +395,39 @@ class RecoveryAcceptanceProbeTest {
         }
     }
 
-    private fun payload(asset: String, mimeType: String): MediaPayload {
+    private fun payload(
+        asset: String,
+        mimeType: String,
+    ): MediaPayload {
         val bytes = assetBytes(asset)
         return MediaPayload(asset.substringAfterLast('/'), mimeType, bytes.size.toLong(), bytes)
     }
 
     private fun assetBytes(path: String): ByteArray =
-        InstrumentationRegistry.getInstrumentation().context.assets.open(path).use { it.readBytes() }
+        InstrumentationRegistry
+            .getInstrumentation()
+            .context.assets
+            .open(path)
+            .use { it.readBytes() }
 
     private fun sha256(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { byte ->
             (byte.toInt() and 0xff).toString(16).padStart(2, '0')
         }
 
-    private fun serverReachable(origin: String): Boolean = try {
-        val connection = URL("$origin/health").openConnection() as HttpURLConnection
-        connection.connectTimeout = 2_000
-        connection.readTimeout = 2_000
-        try { connection.responseCode in 200..499 } finally { connection.disconnect() }
-    } catch (_: Exception) { false }
+    private fun serverReachable(origin: String): Boolean =
+        try {
+            val connection = URL("$origin/health").openConnection() as HttpURLConnection
+            connection.connectTimeout = 2_000
+            connection.readTimeout = 2_000
+            try {
+                connection.responseCode in 200..499
+            } finally {
+                connection.disconnect()
+            }
+        } catch (_: Exception) {
+            false
+        }
 
     private fun readFixture(): Fixture {
         val raw = assetBytes(PRIVATE_ASSET).decodeToString()
@@ -415,6 +460,7 @@ class RecoveryAcceptanceProbeTest {
         val draftText = "Rich unfinished entry $marker"
         val imageCaption = "Image caption $marker"
         val videoCaption = "Video caption $marker"
+
         fun id(name: String): Uuid = Uuid.parse(requireNotNull(ids[name]) { "missing fixture id" })
     }
 

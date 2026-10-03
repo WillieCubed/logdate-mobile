@@ -26,22 +26,21 @@ import app.logdate.ui.timeline.ImageNoteUiState
 import app.logdate.ui.timeline.MomentMediaUiState
 import app.logdate.ui.timeline.MomentUiState
 import app.logdate.ui.timeline.TextNoteUiState
-import app.logdate.ui.timeline.TimelineDayUiState
 import app.logdate.ui.timeline.TimelinePane
 import app.logdate.ui.timeline.TimelineSuggestionBlock
 import app.logdate.ui.timeline.TimelineUiState
 import app.logdate.ui.timeline.createSemanticTimelineDayUiState
 import com.android.tools.screenshot.PreviewTest
 import kotlinx.datetime.LocalDate
-import kotlin.time.Instant
-import kotlin.uuid.Uuid
 import logdate.app.composemain.generated.resources.Res
+import logdate.app.composemain.generated.resources.account_storage_reset_action
 import logdate.app.composemain.generated.resources.encrypted_data_recovery_required
 import logdate.app.composemain.generated.resources.open_recovery_tools
-import logdate.app.composemain.generated.resources.account_storage_reset_action
 import logdate.app.composemain.generated.resources.restart
 import logdate.app.composemain.generated.resources.update_ready_restart_to_finish_installing
 import org.jetbrains.compose.resources.stringResource
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 private const val ROOT_PREVIEW_IMAGE_URI = "android.resource://studio.hypertext.logdate.debug/mipmap/ic_launcher"
 
@@ -96,7 +95,9 @@ private val rootTimelineDays =
                         id = "moment-2025-02-19-root-home",
                         label = "At Home",
                         timeOfDay = DaylightPeriod.EVENING,
-                        textSnippet = "The tablet journals flow finally reads like a deliberate column instead of a stretched phone screen.",
+                        textSnippet =
+                            "The tablet journals flow finally reads like a deliberate column " +
+                                "instead of a stretched phone screen.",
                         places = listOf(rootHome),
                         isHero = true,
                     ),

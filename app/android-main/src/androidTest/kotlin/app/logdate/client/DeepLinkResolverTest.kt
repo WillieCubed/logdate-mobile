@@ -10,11 +10,11 @@ import app.logdate.feature.journals.navigation.NoteDetailRoute
 import app.logdate.feature.postcards.navigation.PostcardViewerRoute
 import app.logdate.feature.rewind.navigation.RewindDetailRoute
 import app.logdate.navigation.TimelineDetailRoute
+import org.junit.runner.RunWith
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.uuid.Uuid
-import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class DeepLinkResolverTest {

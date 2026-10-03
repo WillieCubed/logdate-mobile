@@ -119,7 +119,8 @@ internal class CredentialProviderRule(
 internal fun describeSystemUi(): String {
     val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
     val xml =
-        java.io.ByteArrayOutputStream()
+        java.io
+            .ByteArrayOutputStream()
             .also { runCatching { device.dumpWindowHierarchy(it) } }
             .toString(Charsets.UTF_8.name())
     val interesting =

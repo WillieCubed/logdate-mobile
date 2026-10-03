@@ -21,9 +21,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import org.junit.runner.Description
 import org.junit.rules.RuleChain
 import org.junit.rules.TestRule
+import org.junit.runner.Description
 import org.junit.runner.RunWith
 import org.junit.runners.model.Statement
 import org.koin.core.module.Module
@@ -80,9 +80,10 @@ class WatchPairingSettingsE2ETest {
         fakeConnectionManager.updateState(WatchConnectionState.AssociationPending)
 
         composeRule.onNodeWithText("Finish pairing on this phone").assertIsDisplayed()
-        composeRule.onNodeWithText(
-            "Complete the system pairing prompt, then LogDate will reconnect to your watch automatically.",
-        ).assertIsDisplayed()
+        composeRule
+            .onNodeWithText(
+                "Complete the system pairing prompt, then LogDate will reconnect to your watch automatically.",
+            ).assertIsDisplayed()
     }
 
     @Test
@@ -179,8 +180,7 @@ private class FakeWatchSettingsRepository : WatchSettingsRepository {
 
     override fun observeSyncSettings(): StateFlow<WatchSyncSettings> = syncSettings.asStateFlow()
 
-    override fun observeNotificationSettings(): StateFlow<WatchNotificationSettings> =
-        notificationSettings.asStateFlow()
+    override fun observeNotificationSettings(): StateFlow<WatchNotificationSettings> = notificationSettings.asStateFlow()
 
     override suspend fun setSyncVoiceNotes(enabled: Boolean) {
         syncSettings.value = syncSettings.value.copy(syncVoiceNotes = enabled)

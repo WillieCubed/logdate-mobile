@@ -1,30 +1,29 @@
 package app.logdate.screenshots.components.sync
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsTopHeight
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.background
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.core.sync.SyncErrorBanner
+import app.logdate.feature.core.sync.SyncPresentation
+import app.logdate.feature.core.sync.SyncStatusButton
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTheme
-import app.logdate.feature.core.sync.SyncErrorBanner
-import app.logdate.feature.core.sync.SyncStatusButton
-import app.logdate.feature.core.sync.SyncPresentation
 import com.android.tools.screenshot.PreviewTest
 
 /**
@@ -42,8 +41,6 @@ import com.android.tools.screenshot.PreviewTest
  * No live `SyncManager` is involved: surfaces take [SyncPresentation] directly, so each test is
  * a pure-UI snapshot. Mirrors the convention in `SettingsComponentScreenshots.kt`.
  */
-
-// ─── Status button states ────────────────────────────────────────────────────────────────
 
 @PreviewTest
 @ScreenshotPreviewMatrix
@@ -98,7 +95,6 @@ fun Chip_NetworkError_no_pending() {
 }
 
 // ─── Banner states ──────────────────────────────────────────────────────────────
-
 @PreviewTest
 @ScreenshotPreviewMatrix
 @Composable
@@ -135,7 +131,6 @@ fun Banner_ConflictError_many() {
 }
 
 // ─── Inset regression: banner under a TopAppBar with a faked status bar ─────────
-
 @OptIn(ExperimentalMaterial3Api::class)
 @PreviewTest
 @ScreenshotPreviewMatrix
@@ -161,14 +156,16 @@ fun Banner_respects_status_bar_inset_under_top_app_bar() {
             Column(modifier = Modifier.fillMaxSize().padding(padding)) {
                 SyncErrorBanner(
                     presentation = SyncPresentation.AuthError,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 560.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 560.dp),
                 )
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surface),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surface),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text("(timeline content)")
@@ -179,16 +176,16 @@ fun Banner_respects_status_bar_inset_under_top_app_bar() {
 }
 
 // ─── Harnesses ──────────────────────────────────────────────────────────────────
-
 @Composable
 private fun StatusButtonHarness(presentation: SyncPresentation) {
     ScreenshotTheme {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface)
-                .systemBarsPadding()
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .systemBarsPadding()
+                    .padding(16.dp),
             contentAlignment = Alignment.TopStart,
         ) {
             SyncStatusButton(presentation = presentation)
@@ -200,10 +197,11 @@ private fun StatusButtonHarness(presentation: SyncPresentation) {
 private fun BannerHarness(presentation: SyncPresentation) {
     ScreenshotTheme {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface)
-                .systemBarsPadding(),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .systemBarsPadding(),
         ) {
             // Top spacer matching a typical status bar so reviewers can verify the banner sits
             // visibly *below* OS chrome — a sanity check that complements the Scaffold-based
@@ -211,9 +209,10 @@ private fun BannerHarness(presentation: SyncPresentation) {
             Box(modifier = Modifier.fillMaxWidth().windowInsetsTopHeight(WindowInsets(0)))
             SyncErrorBanner(
                 presentation = presentation,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 560.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 560.dp),
             )
         }
     }

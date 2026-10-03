@@ -57,16 +57,37 @@ class DeviceApprovalSettingsE2ETest {
             composeRule.onAllNodesWithText("Connect a device").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithText("Connect a device").assertIsDisplayed().assertHasClickAction()
-        val currentDeviceTop = composeRule.onNodeWithText("This device").fetchSemanticsNode().boundsInRoot.top
-        val connectTop = composeRule.onNodeWithText("Connect a device").fetchSemanticsNode().boundsInRoot.top
+        val currentDeviceTop =
+            composeRule
+                .onNodeWithText("This device")
+                .fetchSemanticsNode()
+                .boundsInRoot.top
+        val connectTop =
+            composeRule
+                .onNodeWithText("Connect a device")
+                .fetchSemanticsNode()
+                .boundsInRoot.top
         assertTrue(connectTop > currentDeviceTop)
-        val existingDeviceBottom = composeRule.onNodeWithTag("existing-device-card").fetchSemanticsNode().boundsInRoot.bottom
+        val existingDeviceBottom =
+            composeRule
+                .onNodeWithTag("existing-device-card")
+                .fetchSemanticsNode()
+                .boundsInRoot.bottom
         assertTrue(connectTop > existingDeviceBottom)
-        val existingDeviceHeight = composeRule.onNodeWithTag("existing-device-card").fetchSemanticsNode().boundsInRoot.height
-        val connectHeight = composeRule.onNodeWithTag("connect-device-action").fetchSemanticsNode().boundsInRoot.height
+        val existingDeviceHeight =
+            composeRule
+                .onNodeWithTag("existing-device-card")
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        val connectHeight =
+            composeRule
+                .onNodeWithTag("connect-device-action")
+                .fetchSemanticsNode()
+                .boundsInRoot.height
         assertTrue(existingDeviceHeight > connectHeight)
-        val outputDir = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")
-            ?: error("Run this capture using a Gradle Managed Device")
+        val outputDir =
+            InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")
+                ?: error("Run this capture using a Gradle Managed Device")
         val screenshot = File(outputDir, "device-approval-settings.png")
         screenshot.parentFile?.mkdirs()
         assertTrue(UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(screenshot))

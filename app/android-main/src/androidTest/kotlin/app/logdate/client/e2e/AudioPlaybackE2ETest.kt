@@ -1,12 +1,8 @@
 package app.logdate.client.e2e
 
 import android.content.Context
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.MainActivity
@@ -30,15 +26,8 @@ import org.koin.core.context.loadKoinModules
 import org.koin.core.context.startKoin
 import org.koin.core.module.Module
 import org.koin.dsl.module
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * End-to-end tests for audio playback usability.
- *
- * Verifies the mini-player appears when audio is playing, displays contextual
- * information, and responds to user controls.
- */
 /**
  * Instrumented E2E tests for the audio playback experience.
  *

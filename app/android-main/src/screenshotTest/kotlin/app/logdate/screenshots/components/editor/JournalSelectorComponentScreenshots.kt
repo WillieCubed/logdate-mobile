@@ -14,11 +14,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.common.JournalSelectorDropdown
-import app.logdate.shared.model.Journal
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE_LANDSCAPE
 import app.logdate.screenshots.common.ScreenshotTheme
+import app.logdate.shared.model.Journal
 import com.android.tools.screenshot.PreviewTest
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -67,10 +67,11 @@ fun JournalSelector_Collapsed_MultipleSelected() {
     SelectorFrame {
         JournalSelectorDropdown(
             availableJournals = ScreenshotTestData.sampleJournals,
-            selectedJournalIds = listOf(
-                ScreenshotTestData.sampleJournal.id,
-                ScreenshotTestData.sampleJournal2.id,
-            ),
+            selectedJournalIds =
+                listOf(
+                    ScreenshotTestData.sampleJournal.id,
+                    ScreenshotTestData.sampleJournal2.id,
+                ),
             onSelectionChanged = {},
             expanded = false,
             onExpandedChange = {},
@@ -207,8 +208,9 @@ private fun SelectorFrame(content: @Composable () -> Unit) {
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Today was a quiet one. Finished the last chapter of the book " +
-                            "I've been carrying around for months.",
+                        text =
+                            "Today was a quiet one. Finished the last chapter of the book " +
+                                "I've been carrying around for months.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
@@ -217,10 +219,11 @@ private fun SelectorFrame(content: @Composable () -> Unit) {
 
             // Selector pinned to the bottom, matching how EditorBottomContent positions it
             Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(16.dp),
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(16.dp),
             ) {
                 content()
             }
@@ -235,47 +238,48 @@ private fun SelectorFrame(content: @Composable () -> Unit) {
 private val baseTime = Instant.fromEpochMilliseconds(1_740_000_000_000L)
 
 /** Seven journals — enough to exceed the four-item max height and trigger scrolling. */
-private val manyJournals = listOf(
-    Journal(
-        id = Uuid.parse("00000000-0000-0000-0000-000000000011"),
-        title = "Daily Reflections",
-        created = baseTime,
-        lastUpdated = baseTime,
-    ),
-    Journal(
-        id = Uuid.parse("00000000-0000-0000-0000-000000000012"),
-        title = "Travel Log",
-        created = baseTime,
-        lastUpdated = baseTime,
-    ),
-    Journal(
-        id = Uuid.parse("00000000-0000-0000-0000-000000000013"),
-        title = "Recipe Notes",
-        created = baseTime,
-        lastUpdated = baseTime,
-    ),
-    Journal(
-        id = Uuid.parse("00000000-0000-0000-0000-000000000014"),
-        title = "Work Journal",
-        created = baseTime,
-        lastUpdated = baseTime,
-    ),
-    Journal(
-        id = Uuid.parse("00000000-0000-0000-0000-000000000015"),
-        title = "Book Notes",
-        created = baseTime,
-        lastUpdated = baseTime,
-    ),
-    Journal(
-        id = Uuid.parse("00000000-0000-0000-0000-000000000016"),
-        title = "Ideas & Concepts",
-        created = baseTime,
-        lastUpdated = baseTime,
-    ),
-    Journal(
-        id = Uuid.parse("00000000-0000-0000-0000-000000000017"),
-        title = "Fitness Tracker",
-        created = baseTime,
-        lastUpdated = baseTime,
-    ),
-)
+private val manyJournals =
+    listOf(
+        Journal(
+            id = Uuid.parse("00000000-0000-0000-0000-000000000011"),
+            title = "Daily Reflections",
+            created = baseTime,
+            lastUpdated = baseTime,
+        ),
+        Journal(
+            id = Uuid.parse("00000000-0000-0000-0000-000000000012"),
+            title = "Travel Log",
+            created = baseTime,
+            lastUpdated = baseTime,
+        ),
+        Journal(
+            id = Uuid.parse("00000000-0000-0000-0000-000000000013"),
+            title = "Recipe Notes",
+            created = baseTime,
+            lastUpdated = baseTime,
+        ),
+        Journal(
+            id = Uuid.parse("00000000-0000-0000-0000-000000000014"),
+            title = "Work Journal",
+            created = baseTime,
+            lastUpdated = baseTime,
+        ),
+        Journal(
+            id = Uuid.parse("00000000-0000-0000-0000-000000000015"),
+            title = "Book Notes",
+            created = baseTime,
+            lastUpdated = baseTime,
+        ),
+        Journal(
+            id = Uuid.parse("00000000-0000-0000-0000-000000000016"),
+            title = "Ideas & Concepts",
+            created = baseTime,
+            lastUpdated = baseTime,
+        ),
+        Journal(
+            id = Uuid.parse("00000000-0000-0000-0000-000000000017"),
+            title = "Fitness Tracker",
+            created = baseTime,
+            lastUpdated = baseTime,
+        ),
+    )
