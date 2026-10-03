@@ -1,12 +1,25 @@
 package app.logdate.wear.di
 
 import android.content.Context
+import androidx.wear.phone.interactions.PhoneTypeHelper
+import androidx.wear.remote.interactions.RemoteActivityHelper
+import app.logdate.client.domain.streak.ObserveCampfireUseCase
 import app.logdate.ui.platform.LogDateHaptics
 import app.logdate.ui.platform.createAndroidPlatformHapticsController
 import app.logdate.ui.platform.isSystemHapticFeedbackOff
 import app.logdate.wear.v2.haptics.HapticsPreferenceStore
 import app.logdate.wear.v2.haptics.SharedPreferencesHapticsPreferenceStore
 import app.logdate.wear.v2.haptics.watchHaptics
+import app.logdate.wear.v2.phone.PhoneHandoff
+import app.logdate.wear.v2.phone.PhoneLinkRepository
+import app.logdate.wear.v2.today.DayClock
+import app.logdate.wear.v2.today.TodayViewModel
+import app.logdate.wear.v2.today.WatchDayBoundaryPreferences
+import app.logdate.wear.v2.today.WatchStreakSettings
+import app.logdate.wear.v2.today.timeChangeSignals
+import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.Dispatchers
+import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 /** Koin module for the redesigned watch app. Only the new app's screens resolve anything from it. */
@@ -23,6 +36,42 @@ val wearV2Module =
                 controller = createAndroidPlatformHapticsController(context),
                 preferences = get(),
                 systemHapticsOff = { isSystemHapticFeedbackOff(context) },
+            )
+        }
+
+        single { DayClock(timeChanges = timeChangeSignals(get())) }
+        // The phone shares its day-start hour through the state document (Track A, C2); until then there is none.
+        single {
+            ObserveCampfireUseCase(
+                notesRepository = get(),
+                streakSettingsRepository = WatchStreakSettings(get()),
+                dayBoundaryPreferences = WatchDayBoundaryPreferences(phoneDayStartHour = { null }),
+            )
+        }
+        single {
+            val context = get<Context>()
+            PhoneLinkRepository(
+                capabilityClient = Wearable.getCapabilityClient(context),
+                nodeClient = Wearable.getNodeClient(context),
+                phoneType = { PhoneTypeHelper.getPhoneDeviceType(context) },
+                ioDispatcher = Dispatchers.IO,
+            )
+        }
+        single {
+            val context = get<Context>()
+            PhoneHandoff(
+                remoteActivityHelper = RemoteActivityHelper(context),
+                packageName = context.packageName,
+                ioDispatcher = Dispatchers.IO,
+            )
+        }
+        viewModel {
+            TodayViewModel(
+                dayClock = get(),
+                notesRepository = get(),
+                observeCampfire = get(),
+                phoneLinks = get(),
+                phoneHandoff = get(),
             )
         }
     }

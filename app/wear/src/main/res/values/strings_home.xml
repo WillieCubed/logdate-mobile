@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Today, in the new watch app -->
+    <string name="wear_today_no_moments">No moments today</string>
+    <plurals name="wear_today_moments">
+        <item quantity="one">%1$d&#160;moment</item>
+        <item quantity="other">%1$d&#160;moments</item>
+    </plurals>
+    <plurals name="wear_today_places">
+        <item quantity="one">%1$d&#160;place</item>
+        <item quantity="other">%1$d&#160;places</item>
+    </plurals>
+    <string name="wear_today_voice">%1$s&#160;voice</string>
+    <string name="wear_today_summary_separator">"&#160;· "</string>
+    <string name="wear_today_failed">Couldn’t load today’s moments</string>
+    <string name="wear_today_get_phone_app_title">Get LogDate on your phone</string>
+    <string name="wear_today_get_phone_app_body">Opens the Play Store on your phone</string>
+    <string name="wear_today_get_phone_app_failed">Couldn’t reach your phone. Tap to try again.</string>
+    <string name="wear_today_record">Record</string>
+    <string name="wear_today_mark">Mark</string>
+    <string name="wear_today_add">Add</string>
+    <string name="wear_today_add_symbol" translatable="false">+</string>
+
+    <!-- Moments, in the new watch app -->
+    <string name="wear_moment_text">Note</string>
+    <string name="wear_moment_voice">Voice note · %1$s</string>
+    <string name="wear_moment_photo">Photo</string>
+    <string name="wear_moment_video">Video</string>
+</resources>
