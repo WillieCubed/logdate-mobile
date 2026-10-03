@@ -302,6 +302,10 @@ commit_synthetic_repo() {
     printf '%s\n' "$commit"
 }
 
+# CI staging uses the committed template rather than Terraform evaluation.
+assert_equals "true" "$(jq -r '.env_vars.LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED' \
+    "$OPERATOR_ROOT/infra/terraform/staging-contract-template.json")"
+
 initialize_synthetic_repo "$SOURCE_REPO"
 cat >"$SOURCE_REPO/infra/terraform/staging.tfvars" <<'EOF'
 # committed-valid-staging
