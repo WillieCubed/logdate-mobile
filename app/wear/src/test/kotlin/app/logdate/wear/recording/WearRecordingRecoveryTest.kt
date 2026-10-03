@@ -4,6 +4,7 @@ import app.logdate.client.media.audio.AudioDurationResolver
 import app.logdate.client.media.audio.AudioRemuxer
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.wear.sync.SyncedAudioCache
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -274,5 +275,38 @@ class WearRecordingRecoveryTest {
             assertTrue(created.isEmpty())
             assertTrue(pulled.isFile)
             assertFalse(File(directory, "recording_$id.m4a").exists())
+        }
+
+    @Test
+    fun `audio in the synced audio cache is never adopted`() =
+        runTest {
+            val root = Files.createTempDirectory("wear-files").toFile()
+            try {
+                val recordings = File(root, "audio_notes").apply { mkdirs() }
+                val synced = File(root, SyncedAudioCache.DIRECTORY_NAME).apply { mkdirs() }
+                val pulled = File(synced, "recording_${Uuid.random()}.aac").apply { writeBytes(ByteArray(50_000) { 1 }) }
+
+                val recovered = WearRecordingRecovery(recordings, repository, resolver, remuxer).recover()
+
+                assertEquals(0, recovered)
+                assertTrue(created.isEmpty())
+                assertTrue(pulled.isFile)
+            } finally {
+                root.deleteRecursively()
+            }
+        }
+
+    @Test
+    fun `a partial download is never adopted`() =
+        runTest {
+            val id = Uuid.random()
+            val part = file("recording_$id.aac.part", bytes = 50_000)
+            durations[File(directory, "recording_$id.m4a").absolutePath] = 10_000L
+
+            val recovered = recovery.recover()
+
+            assertEquals(0, recovered)
+            assertTrue(created.isEmpty())
+            assertTrue(part.isFile)
         }
 }

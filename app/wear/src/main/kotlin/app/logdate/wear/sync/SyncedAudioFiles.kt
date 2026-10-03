@@ -5,8 +5,9 @@ import app.logdate.client.media.storage.MediaFileResolver
 import java.io.File
 
 /**
- * Deletes the audio file of a note the phone removed, including audio pulled from the phone for
- * playback, which otherwise stays in storage for good.
+ * Deletes the audio file of a note the phone removed, including audio that versions before
+ * [SyncedAudioCache] pulled from the phone into the recordings directory, which otherwise stays in
+ * storage for good.
  *
  * Only a file directly inside the watch's recordings directory is touched, because a note's media
  * reference can also be a phone path or a content URI.

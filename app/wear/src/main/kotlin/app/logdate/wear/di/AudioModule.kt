@@ -47,6 +47,7 @@ import app.logdate.wear.recording.MicrophonePermissionChecker
 import app.logdate.wear.recording.WearAudioRecordingManager
 import app.logdate.wear.recording.WearRecorder
 import app.logdate.wear.recording.WearRecordingRecovery
+import app.logdate.wear.sync.SyncedAudioCache
 import app.logdate.wear.sync.WearDataLayerClient
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -131,10 +132,11 @@ val wearAudioModule =
                 resolver = get(),
             )
         }
+        single { SyncedAudioCache(File(get<Context>().filesDir, SyncedAudioCache.DIRECTORY_NAME)) }
         single<WearSyncedAudioResolver> {
             PhoneSyncedAudioResolver(
                 context = get(),
-                audioStorage = get(),
+                syncedAudioCache = get(),
                 dataLayerClient = get(),
                 notesRepository = get(),
                 ioDispatcher = get(qualifier = wearIoDispatcherQualifier),

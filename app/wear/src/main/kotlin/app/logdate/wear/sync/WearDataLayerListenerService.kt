@@ -138,7 +138,7 @@ class WearDataLayerListenerService : WearableListenerService() {
 
         try {
             when {
-                NoteDataMapper.isDeletePath(path) -> handleNoteDelete(path, notesRepository)
+                NoteDataMapper.isDeletePath(path) -> handleNoteDelete(path, notesRepository, koin.get())
                 NoteDataMapper.isNotePath(path) -> handleNoteSync(path, event.data, notesRepository)
                 JournalDataMapper.isDeletePath(path) -> handleJournalDelete(path, journalRepository)
                 JournalDataMapper.isJournalPath(path) -> handleJournalSync(path, event.data, journalRepository)
@@ -161,6 +161,7 @@ class WearDataLayerListenerService : WearableListenerService() {
     private suspend fun handleNoteDelete(
         path: String,
         notesRepository: JournalNotesRepository,
+        syncedAudioCache: SyncedAudioCache,
     ) {
         val noteId =
             try {
@@ -180,6 +181,7 @@ class WearDataLayerListenerService : WearableListenerService() {
             }
             if (notesRepository.getNoteById(noteId) == null) {
                 deleteLocalAudio(mediaRef, androidMediaFileResolver(this))
+                syncedAudioCache.delete(noteId)
             }
         } catch (e: Exception) {
             Napier.w("Failed to delete synced note: $noteId", e)

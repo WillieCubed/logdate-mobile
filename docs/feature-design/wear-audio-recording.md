@@ -93,8 +93,12 @@ already exercised on the phone.
 `WearRecordingRecovery` runs at every launch, on a background thread, over raw files written before the
 process started. It wraps a raw file that has no m4a, saves a note for any recording whose note is
 missing, and removes the raw file once the note exists. A raw file that cannot be wrapped yet stays for
-the next launch. An m4a with no raw file beside it is never adopted, because it was saved, deleted, or
-pulled from the phone. A raw file a note references is audio pulled from the phone and is left alone.
+the next launch. An m4a with no raw file beside it is never adopted, because it was saved or deleted.
+
+Audio pulled from the phone for playback lives in `filesDir/synced_audio/<note id>.<extension>`, apart
+from recordings, and appears there only once the download is complete, so recovery never sees it and
+an interrupted download never becomes a note. Earlier versions pulled audio into `audio_notes`; a raw
+file a note references is such a pull and is left alone.
 
 Starting a recording needs room for the raw file and the m4a together, about twice the recording.
 

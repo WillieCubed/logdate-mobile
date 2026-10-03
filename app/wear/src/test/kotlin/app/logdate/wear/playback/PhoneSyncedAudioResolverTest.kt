@@ -1,12 +1,12 @@
 package app.logdate.wear.playback
 
 import android.content.Context
-import app.logdate.client.media.audio.AudioRecordingTarget
-import app.logdate.client.media.audio.AudioStorage
 import app.logdate.client.media.storage.AndroidMediaDirectories
+import app.logdate.client.media.storage.MediaCollection
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
+import app.logdate.wear.sync.SyncedAudioCache
 import app.logdate.wear.sync.WearDataLayerClient
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -14,6 +14,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import java.io.File
@@ -24,35 +25,40 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * Tests for [PhoneSyncedAudioResolver], which manages the availability of remote audio
- * resources on the local Wear OS device.
- *
- * The test suite validates the logic for resolving playable URIs, including the "just-in-time"
- * downloading of audio files from the connected phone when they aren't yet cached locally,
- * and the subsequent update of the local repository to ensure future playback is instantaneous.
+ * Tests [PhoneSyncedAudioResolver], which finds a playable file for an audio note and pulls one from
+ * the phone into the synced audio cache when the watch has none.
  */
 class PhoneSyncedAudioResolverTest {
     private val context = mockk<Context>(relaxed = true)
-    private val audioStorage = mockk<AudioStorage>()
     private val dataLayerClient = mockk<WearDataLayerClient>(relaxed = true)
     private val notesRepository = mockk<SyncableJournalNotesRepository>(relaxed = true)
     private val filesDir = Files.createTempDirectory("wear-files").toFile()
+    private val cacheDirectory = File(filesDir, SyncedAudioCache.DIRECTORY_NAME).apply { mkdirs() }
+    private val cache = SyncedAudioCache(cacheDirectory)
+    private val mediaFiles = MediaFileResolver(AndroidMediaDirectories(filesDir))
 
     @Before
     fun setUp() {
-        coEvery { audioStorage.createRecordingTarget(any()) } returns AudioRecordingTarget("/tmp/watch-cache-default.m4a")
-        coEvery { dataLayerClient.downloadAudioFromPhone(any(), any()) } returns true
         coEvery { dataLayerClient.isPhoneConnected() } returns true
+        coEvery { dataLayerClient.downloadAudioFromPhone(any(), any()) } answers {
+            File(secondArg<String>()).writeText("phone audio")
+            true
+        }
+    }
+
+    @After
+    fun cleanUp() {
+        filesDir.deleteRecursively()
     }
 
     private fun buildResolver(dispatcher: CoroutineDispatcher = UnconfinedTestDispatcher()) =
         PhoneSyncedAudioResolver(
             context = context,
-            audioStorage = audioStorage,
+            syncedAudioCache = cache,
             dataLayerClient = dataLayerClient,
             notesRepository = notesRepository,
             ioDispatcher = dispatcher,
-            mediaFiles = MediaFileResolver(AndroidMediaDirectories(filesDir)),
+            mediaFiles = mediaFiles,
         )
 
     @Test
@@ -67,107 +73,125 @@ class PhoneSyncedAudioResolverTest {
 
             assertEquals(reference, result.getOrNull())
             coVerify(exactly = 0) { dataLayerClient.downloadAudioFromPhone(any(), any()) }
-            filesDir.deleteRecursively()
         }
 
     @Test
     fun `returns existing local media ref without download`() =
         runTest {
             val noteId = Uuid.random()
-            val localFile = File.createTempFile("wear-note-$noteId", ".m4a")
-            localFile.writeText("audio")
-            val note = audioNote(noteId = noteId, mediaRef = localFile.absolutePath)
+            val localFile = File.createTempFile("wear-note-$noteId", ".m4a").apply { writeText("audio") }
+            try {
+                val result = buildResolver().resolvePlayableUri(audioNote(noteId, localFile.absolutePath))
 
-            val result = buildResolver().resolvePlayableUri(note)
-
-            assertTrue(result.isSuccess)
-            assertEquals(localFile.absolutePath, result.getOrNull())
-            coVerify(exactly = 0) { dataLayerClient.downloadAudioFromPhone(any(), any()) }
-            coVerify(exactly = 0) { audioStorage.createRecordingTarget(any()) }
-            coVerify(exactly = 0) { dataLayerClient.isPhoneConnected() }
-
-            localFile.delete()
+                assertEquals(localFile.absolutePath, result.getOrNull())
+                coVerify(exactly = 0) { dataLayerClient.downloadAudioFromPhone(any(), any()) }
+                coVerify(exactly = 0) { dataLayerClient.isPhoneConnected() }
+            } finally {
+                localFile.delete()
+            }
         }
 
     @Test
-    fun `downloads phone media and updates synced note media ref`() =
+    fun `phone audio is pulled into the cache under the note's id`() =
         runTest {
             val noteId = Uuid.random()
-            val note = audioNote(noteId = noteId, mediaRef = "content://phone/audio/$noteId")
-            val targetPath = "/tmp/watch-cache-$noteId.m4a"
 
-            coEvery { audioStorage.createRecordingTarget("m4a") } returns AudioRecordingTarget(targetPath)
-            coEvery { dataLayerClient.downloadAudioFromPhone(noteId, targetPath) } returns true
+            val result = buildResolver().resolvePlayableUri(audioNote(noteId, "content://phone/audio/$noteId.m4a"))
 
-            val result = buildResolver().resolvePlayableUri(note)
-
-            assertTrue(result.isSuccess)
-            assertEquals(targetPath, result.getOrNull())
+            val expected = File(cacheDirectory, "$noteId.m4a").absolutePath
+            assertEquals(expected, result.getOrNull())
+            assertEquals("phone audio", File(expected).readText())
             coVerify { dataLayerClient.isPhoneConnected() }
-            coVerify { dataLayerClient.downloadAudioFromPhone(noteId, targetPath) }
-            coVerify { notesRepository.updateMediaRef(noteId, targetPath) }
+            coVerify { notesRepository.updateMediaRef(noteId, expected) }
+        }
+
+    @Test
+    fun `pulled phone audio stays outside the recordings collection and plays again from its stored path`() =
+        runTest {
+            val noteId = Uuid.random()
+
+            val pulled = buildResolver().resolvePlayableUri(audioNote(noteId, "content://phone/audio/$noteId.m4a")).getOrThrow()
+
+            assertEquals(null, mediaFiles.refFor(pulled))
+            assertEquals(pulled, mediaFiles.storedReference(pulled))
+            assertTrue(File(mediaFiles.directory(MediaCollection.Recordings)).listFiles().orEmpty().isEmpty())
+            val replayed = buildResolver().resolvePlayableUri(audioNote(noteId, mediaFiles.storedReference(pulled)))
+            assertEquals(pulled, replayed.getOrNull())
+            coVerify(exactly = 1) { dataLayerClient.downloadAudioFromPhone(any(), any()) }
+        }
+
+    @Test
+    fun `audio pulled earlier is reused without asking the phone again`() =
+        runTest {
+            val noteId = Uuid.random()
+            val earlier = File(cacheDirectory, "$noteId.m4a").apply { writeText("earlier pull") }
+
+            val result = buildResolver().resolvePlayableUri(audioNote(noteId, "content://phone/audio/$noteId.m4a"))
+
+            assertEquals(earlier.absolutePath, result.getOrNull())
+            coVerify(exactly = 0) { dataLayerClient.downloadAudioFromPhone(any(), any()) }
+            coVerify { notesRepository.updateMediaRef(noteId, earlier.absolutePath) }
+        }
+
+    @Test
+    fun `an extension that is not a plain file extension is replaced`() =
+        runTest {
+            val noteId = Uuid.random()
+
+            val result = buildResolver().resolvePlayableUri(audioNote(noteId, "content://phone/a.b/c"))
+
+            assertEquals(File(cacheDirectory, "$noteId.m4a").absolutePath, result.getOrNull())
         }
 
     @Test
     fun `a remote url is fetched from the phone instead of streamed`() =
         runTest {
             val noteId = Uuid.random()
-            val note = audioNote(noteId = noteId, mediaRef = "https://cloud.example/media/$noteId")
-            val targetPath = "/tmp/watch-cache-$noteId.m4a"
-            coEvery { audioStorage.createRecordingTarget(any()) } returns AudioRecordingTarget(targetPath)
-            coEvery { dataLayerClient.downloadAudioFromPhone(noteId, targetPath) } returns true
 
-            val result = buildResolver().resolvePlayableUri(note)
+            val result = buildResolver().resolvePlayableUri(audioNote(noteId, "https://cloud.example/media/$noteId"))
 
-            assertEquals(targetPath, result.getOrNull())
-            coVerify { dataLayerClient.downloadAudioFromPhone(noteId, targetPath) }
+            assertEquals(File(cacheDirectory, "$noteId.m4a").absolutePath, result.getOrNull())
+            coVerify { dataLayerClient.downloadAudioFromPhone(noteId, any()) }
+        }
+
+    @Test
+    fun `a failed pull fails and leaves nothing in the cache`() =
+        runTest {
+            val noteId = Uuid.random()
+            coEvery { dataLayerClient.downloadAudioFromPhone(any(), any()) } answers {
+                File(secondArg<String>()).writeText("partial")
+                false
+            }
+
+            val result = buildResolver().resolvePlayableUri(audioNote(noteId, "content://phone/audio/$noteId"))
+
+            assertTrue(result.isFailure)
+            assertEquals(emptyList(), cacheDirectory.listFiles().orEmpty().toList())
+            coVerify { dataLayerClient.downloadAudioFromPhone(noteId, any()) }
+            coVerify(exactly = 0) { notesRepository.updateMediaRef(any(), any()) }
         }
 
     @Test
     fun `a remote url with no phone in range fails instead of streaming`() =
         runTest {
             val noteId = Uuid.random()
-            val note = audioNote(noteId = noteId, mediaRef = "https://cloud.example/media/$noteId")
             coEvery { dataLayerClient.isPhoneConnected() } returns false
 
-            val result = buildResolver().resolvePlayableUri(note)
+            val result = buildResolver().resolvePlayableUri(audioNote(noteId, "https://cloud.example/media/$noteId"))
 
             assertTrue(result.isFailure)
             coVerify(exactly = 0) { dataLayerClient.downloadAudioFromPhone(any(), any()) }
         }
 
     @Test
-    fun `fails when phone media download fails`() =
+    fun `fails when the phone is unreachable`() =
         runTest {
             val noteId = Uuid.random()
-            val note = audioNote(noteId = noteId, mediaRef = "content://phone/audio/$noteId")
-            val targetPath = "/tmp/watch-cache-$noteId.m4a"
-
-            coEvery { audioStorage.createRecordingTarget("m4a") } returns AudioRecordingTarget(targetPath)
-            coEvery { dataLayerClient.downloadAudioFromPhone(noteId, targetPath) } returns false
-
-            val result = buildResolver().resolvePlayableUri(note)
-
-            assertTrue(result.isFailure)
-            coVerify { dataLayerClient.isPhoneConnected() }
-            coVerify { dataLayerClient.downloadAudioFromPhone(noteId, targetPath) }
-            coVerify(exactly = 0) { notesRepository.updateMediaRef(any(), any()) }
-        }
-
-    @Test
-    fun `fails when phone is unreachable`() =
-        runTest {
-            val noteId = Uuid.random()
-            val note = audioNote(noteId = noteId, mediaRef = "content://phone/audio/$noteId")
-            val targetPath = "/tmp/watch-cache-$noteId.m4a"
-
-            coEvery { audioStorage.createRecordingTarget("m4a") } returns AudioRecordingTarget(targetPath)
             coEvery { dataLayerClient.isPhoneConnected() } returns false
 
-            val result = buildResolver().resolvePlayableUri(note)
+            val result = buildResolver().resolvePlayableUri(audioNote(noteId, "content://phone/audio/$noteId"))
 
             assertTrue(result.isFailure)
-            coVerify { dataLayerClient.isPhoneConnected() }
             coVerify(exactly = 0) { dataLayerClient.downloadAudioFromPhone(any(), any()) }
             coVerify(exactly = 0) { notesRepository.updateMediaRef(any(), any()) }
         }
