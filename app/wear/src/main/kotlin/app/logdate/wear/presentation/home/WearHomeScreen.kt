@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Mood
@@ -47,6 +48,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.IconButton
@@ -169,6 +171,10 @@ private fun RecorderStatusContent(
     recordingState: RecordingUiState,
 ) {
     val secondary = MaterialTheme.colorScheme.onSurfaceVariant
+    if (recordingState.confirmingDiscard) {
+        StatusText(stringResource(R.string.wear_recorder_discard_confirm), MaterialTheme.colorScheme.error)
+        return
+    }
     when (recordingState.phase) {
         RecordingPhase.READY -> ReadyStatus(homeState, recordingState.showGestureHint)
         RecordingPhase.STARTING -> StatusText(stringResource(R.string.wear_recorder_starting), secondary)
@@ -328,6 +334,13 @@ private fun RecorderControls(
         }
         RecordSurface(phase = phase, isLatched = recordingState.isLatched, onPress = onPress, onRelease = onRelease)
         when {
+            showRecordingControls && recordingState.confirmingDiscard ->
+                SideControl(
+                    icon = Icons.Default.DeleteForever,
+                    description = stringResource(R.string.wear_recorder_discard_confirm),
+                    onClick = onDiscard,
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                )
             showRecordingControls ->
                 SideControl(Icons.Default.Close, stringResource(R.string.wear_recorder_discard), onDiscard)
             isIdle ->
@@ -342,11 +355,12 @@ private fun SideControl(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     description: String,
     onClick: () -> Unit,
+    containerColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.surfaceContainer,
 ) {
     IconButton(
         onClick = onClick,
         modifier = Modifier.size(SIDE_CONTROL_SIZE),
-        colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        colors = IconButtonDefaults.iconButtonColors(containerColor = containerColor),
     ) {
         Icon(imageVector = icon, contentDescription = description, modifier = Modifier.size(18.dp))
     }
@@ -366,7 +380,11 @@ private fun RecorderFollowUp(
     ) {
         when {
             recordingState.phase == RecordingPhase.READY ->
-                CompactButton(onClick = onNavigateToMore, label = { Text(stringResource(R.string.wear_home_more)) })
+                CompactButton(
+                    onClick = onNavigateToMore,
+                    colors = ButtonDefaults.filledTonalButtonColors(),
+                    label = { Text(stringResource(R.string.wear_home_more)) },
+                )
             recordingState.phase == RecordingPhase.SAVED && recordingState.undoableNoteId != null ->
                 CompactButton(onClick = onUndo, label = { Text(stringResource(R.string.wear_recorder_undo)) })
             recordingState.phase == RecordingPhase.ERROR && recordingState.error == RecordingError.MICROPHONE_PERMISSION_DENIED ->
@@ -396,7 +414,7 @@ fun RecordSurface(
     val color by animateColorAsState(
         targetValue =
             when (phase) {
-                RecordingPhase.RECORDING -> MaterialTheme.colorScheme.primary
+                RecordingPhase.READY, RecordingPhase.RECORDING -> MaterialTheme.colorScheme.primary
                 RecordingPhase.SAVED -> MaterialTheme.colorScheme.primaryContainer
                 RecordingPhase.ERROR -> MaterialTheme.colorScheme.errorContainer
                 else -> MaterialTheme.colorScheme.surfaceContainer
@@ -454,7 +472,7 @@ private fun RecordSurfaceIcon(
         when {
             phase == RecordingPhase.SAVED -> Icons.Default.Check to MaterialTheme.colorScheme.onPrimaryContainer
             isRecording && isLatched -> Icons.Default.Stop to MaterialTheme.colorScheme.onPrimary
-            isRecording -> Icons.Default.Mic to MaterialTheme.colorScheme.onPrimary
+            isRecording || phase == RecordingPhase.READY -> Icons.Default.Mic to MaterialTheme.colorScheme.onPrimary
             phase == RecordingPhase.PAUSED -> Icons.Default.Stop to MaterialTheme.colorScheme.onSurface
             else -> Icons.Default.Mic to MaterialTheme.colorScheme.onSurface
         }

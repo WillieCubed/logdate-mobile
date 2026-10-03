@@ -91,6 +91,21 @@ class WearHomeScreenshots {
     @PreviewTest
     @WearScreenshotPreviewMatrix
     @Composable
+    fun S16_HomeDiscardConfirm() {
+        HomeWithRecorder(
+            RecordingUiState(
+                phase = RecordingPhase.RECORDING,
+                recordingDurationMs = 84_000,
+                audioLevels = sampleLevels(),
+                isLatched = true,
+                confirmingDiscard = true,
+            ),
+        )
+    }
+
+    @PreviewTest
+    @WearScreenshotPreviewMatrix
+    @Composable
     fun S07_HomeRecordingLatched() {
         HomeWithRecorder(
             RecordingUiState(
@@ -185,7 +200,7 @@ private fun HomeWithRecorder(recordingState: RecordingUiState) {
 
 /** The watch's black background, so the previews show the contrast the screen is designed for. */
 @Composable
-private fun OnWatchSurface(content: @Composable () -> Unit) {
+internal fun OnWatchSurface(content: @Composable () -> Unit) {
     MaterialTheme {
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) { content() }
     }

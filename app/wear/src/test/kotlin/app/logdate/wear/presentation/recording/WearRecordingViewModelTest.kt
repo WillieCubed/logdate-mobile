@@ -828,12 +828,75 @@ class WearRecordingViewModelTest {
             tapToStart(viewModel)
 
             viewModel.onDiscard()
+            viewModel.onDiscard()
             runCurrent()
 
             assertEquals(RecordingPhase.READY, viewModel.uiState.value.phase)
             assertEquals(1, recorder.discards)
             assertEquals(0, recorder.stops)
             coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
+        }
+
+    @Test
+    fun `the first discard tap asks for confirmation and the recording continues`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+
+            viewModel.onDiscard()
+            runCurrent()
+
+            assertTrue(viewModel.uiState.value.confirmingDiscard)
+            assertEquals(RecordingPhase.RECORDING, viewModel.uiState.value.phase)
+            assertEquals(0, recorder.discards)
+        }
+
+    @Test
+    fun `the discard confirmation lapses on its own and asks again`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            viewModel.onDiscard()
+            runCurrent()
+
+            advanceTimeBy(WearRecordingViewModel.DISCARD_CONFIRM_MS + 1)
+            runCurrent()
+            assertFalse(viewModel.uiState.value.confirmingDiscard)
+
+            viewModel.onDiscard()
+            runCurrent()
+            assertTrue(viewModel.uiState.value.confirmingDiscard)
+            assertEquals(0, recorder.discards)
+        }
+
+    @Test
+    fun `pausing cancels the discard confirmation`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            viewModel.onDiscard()
+            runCurrent()
+
+            viewModel.onPauseToggle()
+            runCurrent()
+
+            assertFalse(viewModel.uiState.value.confirmingDiscard)
+            assertEquals(RecordingPhase.PAUSED, viewModel.uiState.value.phase)
+        }
+
+    @Test
+    fun `stopping while a discard is being confirmed saves the recording`() =
+        runTest {
+            val viewModel = createViewModel()
+            tapToStart(viewModel)
+            viewModel.onDiscard()
+            runCurrent()
+
+            press(viewModel)
+
+            assertEquals(RecordingPhase.SAVED, viewModel.uiState.value.phase)
+            assertFalse(viewModel.uiState.value.confirmingDiscard)
+            assertEquals(0, recorder.discards)
         }
 
     @Test
@@ -844,6 +907,7 @@ class WearRecordingViewModelTest {
             viewModel.onPauseToggle()
             runCurrent()
 
+            viewModel.onDiscard()
             viewModel.onDiscard()
             runCurrent()
 
@@ -882,6 +946,7 @@ class WearRecordingViewModelTest {
             val viewModel = createViewModel()
             tapToStart(viewModel)
 
+            viewModel.onDiscard()
             viewModel.onDiscard()
             runCurrent()
 

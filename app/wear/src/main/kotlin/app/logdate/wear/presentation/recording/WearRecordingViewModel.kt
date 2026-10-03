@@ -71,6 +71,8 @@ data class RecordingUiState(
     val saveFeedback: SaveFeedback? = null,
     val error: RecordingError? = null,
     val showGestureHint: Boolean = false,
+    /** The discard control was tapped once; a second tap within the window deletes the recording. */
+    val confirmingDiscard: Boolean = false,
 )
 
 /** Remembers whether the tap-or-hold hint has already been shown. */
@@ -113,6 +115,7 @@ class WearRecordingViewModel(
         const val MIN_DURATION_MS = 500L
         const val UNDO_WINDOW_MS = 5_000L
         const val TOO_SHORT_DISPLAY_MS = 1_200L
+        const val DISCARD_CONFIRM_MS = 3_000L
         const val LOCATION_TIMEOUT_MS = 3_000L
         private const val MAX_LEVEL_SAMPLES = 50
         private val NEAR_LIMIT = WearAudioRecordingManager.MAX_RECORDING_DURATION - 1.minutes
@@ -125,6 +128,7 @@ class WearRecordingViewModel(
     private var releasedAtMs: Long? = null
     private var nearLimitWarned = false
     private var undoJob: Job? = null
+    private var discardConfirmJob: Job? = null
 
     /** A finalized recording that could not be stored. The next press saves it instead of starting a new one. */
     private var unsavedPath: String? = null
@@ -168,6 +172,7 @@ class WearRecordingViewModel(
     }
 
     fun onPauseToggle() {
+        cancelDiscardConfirmation()
         when (_uiState.value.phase) {
             RecordingPhase.RECORDING -> viewModelScope.launch { recorder.pause() }
             RecordingPhase.PAUSED -> resume()
@@ -175,11 +180,28 @@ class WearRecordingViewModel(
         }
     }
 
+    /** The first tap asks to confirm, so a long recording is never one slip from gone; a second tap discards. */
     fun onDiscard() {
-        val phase = _uiState.value.phase
-        if (phase != RecordingPhase.RECORDING && phase != RecordingPhase.PAUSED) return
+        val state = _uiState.value
+        if (state.phase != RecordingPhase.RECORDING && state.phase != RecordingPhase.PAUSED) return
+        if (!state.confirmingDiscard) {
+            _uiState.update { it.copy(confirmingDiscard = true) }
+            discardConfirmJob?.cancel()
+            discardConfirmJob =
+                viewModelScope.launch {
+                    delay(DISCARD_CONFIRM_MS)
+                    _uiState.update { it.copy(confirmingDiscard = false) }
+                }
+            return
+        }
+        discardConfirmJob?.cancel()
         _uiState.update { RecordingUiState(showGestureHint = it.showGestureHint) }
         viewModelScope.launch { recorder.discard() }
+    }
+
+    private fun cancelDiscardConfirmation() {
+        discardConfirmJob?.cancel()
+        _uiState.update { if (it.confirmingDiscard) it.copy(confirmingDiscard = false) else it }
     }
 
     fun onUndo() {
@@ -244,7 +266,8 @@ class WearRecordingViewModel(
     }
 
     private fun stopAndSave() {
-        _uiState.update { it.copy(phase = RecordingPhase.SAVING) }
+        discardConfirmJob?.cancel()
+        _uiState.update { it.copy(phase = RecordingPhase.SAVING, confirmingDiscard = false) }
         viewModelScope.launch {
             // Stopping and saving finish even if the screen is cleared partway through.
             withContext(NonCancellable) {
