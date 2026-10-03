@@ -66,9 +66,11 @@ class GoogleWearDataLayerClient(
     override suspend fun putDataItem(
         path: String,
         data: Map<String, String>,
+        urgent: Boolean,
     ): Boolean =
         try {
             val request = putDataRequestFactory.create(path, data)
+            if (urgent) request.setUrgent()
             dataClient.putDataItem(request).await()
             Napier.d("Data item put at path: $path")
             true

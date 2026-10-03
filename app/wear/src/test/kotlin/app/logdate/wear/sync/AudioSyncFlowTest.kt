@@ -66,7 +66,7 @@ class AudioSyncFlowTest {
         healthSnapshotDao = mockk(relaxed = true)
 
         coEvery { dataLayerClient.isPhoneConnected(any()) } returns true
-        coEvery { dataLayerClient.putDataItem(any(), any()) } returns true
+        coEvery { dataLayerClient.putDataItem(any(), any(), any()) } returns true
         coEvery { dataLayerClient.sendFile(any(), any()) } returns true
         every { syncMetadataService.observePendingCount() } returns MutableStateFlow(0)
         coEvery { healthSnapshotDao.getAfter(any()) } returns emptyList()
@@ -124,7 +124,7 @@ class AudioSyncFlowTest {
             val capturedFilePath = slot<String>()
             val capturedChannelPath = slot<String>()
 
-            coEvery { dataLayerClient.putDataItem(capture(capturedPath), capture(capturedData)) } returns true
+            coEvery { dataLayerClient.putDataItem(capture(capturedPath), capture(capturedData), any()) } returns true
             coEvery { dataLayerClient.sendFile(capture(capturedChannelPath), capture(capturedFilePath)) } returns true
 
             // --- Act: Trigger sync (normally called by OfflineFirstJournalNotesRepository) ---
@@ -206,7 +206,7 @@ class AudioSyncFlowTest {
             }
 
             // No data sent
-            coVerify(exactly = 0) { dataLayerClient.putDataItem(any(), any()) }
+            coVerify(exactly = 0) { dataLayerClient.putDataItem(any(), any(), any()) }
             coVerify(exactly = 0) { dataLayerClient.sendFile(any(), any()) }
         }
 
@@ -233,7 +233,7 @@ class AudioSyncFlowTest {
                     PendingUpload(noteId.toString(), PendingOperation.CREATE),
                 )
             // Metadata succeeds but file transfer fails
-            coEvery { dataLayerClient.putDataItem(any(), any()) } returns true
+            coEvery { dataLayerClient.putDataItem(any(), any(), any()) } returns true
             coEvery { dataLayerClient.sendFile(any(), any()) } returns false
 
             val result = syncManager.syncContent()
@@ -280,7 +280,7 @@ class AudioSyncFlowTest {
             assertTrue(result.success)
 
             // 5 metadata puts + 5 file sends
-            coVerify(exactly = 5) { dataLayerClient.putDataItem(any(), any()) }
+            coVerify(exactly = 5) { dataLayerClient.putDataItem(any(), any(), any()) }
             coVerify(exactly = 5) { dataLayerClient.sendFile(any(), any()) }
 
             // Nothing is marked synced until the phone acknowledges each note
@@ -319,7 +319,7 @@ class AudioSyncFlowTest {
             }
 
             // Should not attempt any data transfer
-            coVerify(exactly = 0) { dataLayerClient.putDataItem(any(), any()) }
+            coVerify(exactly = 0) { dataLayerClient.putDataItem(any(), any(), any()) }
         }
 
     // =======================================================================
@@ -343,7 +343,7 @@ class AudioSyncFlowTest {
 
             // Should send delete signal, not a create
             coVerify {
-                dataLayerClient.putDataItem(NoteDataMapper.noteDeletePath(noteId), any())
+                dataLayerClient.putDataItem(NoteDataMapper.noteDeletePath(noteId), any(), any())
             }
             coVerify(exactly = 0) { dataLayerClient.sendFile(any(), any()) }
         }
@@ -374,7 +374,7 @@ class AudioSyncFlowTest {
 
             // Capture the serialized data
             val capturedData = slot<Map<String, String>>()
-            coEvery { dataLayerClient.putDataItem(any(), capture(capturedData)) } returns true
+            coEvery { dataLayerClient.putDataItem(any(), capture(capturedData), any()) } returns true
 
             syncManager.syncContent()
 

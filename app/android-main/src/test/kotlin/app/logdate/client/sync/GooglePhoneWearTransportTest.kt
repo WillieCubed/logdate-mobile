@@ -39,7 +39,7 @@ class GooglePhoneWearTransportTest {
                 )
             every { dataClient.putDataItem(any()) } returns Tasks.forResult(mockk<DataItem>(relaxed = true))
 
-            val success = transport.putDataItem(path = "/logdate/notes/1", data = mapOf("id" to "1"))
+            val success = transport.putDataItem(path = "/logdate/notes/1", data = mapOf("id" to "1"), urgent = false)
 
             assertTrue(success)
             verify(exactly = 1) { dataClient.putDataItem(request) }
@@ -57,7 +57,7 @@ class GooglePhoneWearTransportTest {
                 )
             every { dataClient.putDataItem(any()) } returns Tasks.forException(IllegalStateException("boom"))
 
-            val success = transport.putDataItem(path = "/logdate/notes/1", data = mapOf("id" to "1"))
+            val success = transport.putDataItem(path = "/logdate/notes/1", data = mapOf("id" to "1"), urgent = false)
 
             assertFalse(success)
         }
@@ -101,5 +101,39 @@ class GooglePhoneWearTransportTest {
                 )
 
             assertFalse(success)
+        }
+
+    @Test
+    fun `putDataItem marks an urgent item for immediate delivery`() =
+        runTest {
+            val request = mockk<PutDataRequest>(relaxed = true)
+            val transport =
+                GooglePhoneWearTransport(
+                    dataClient = dataClient,
+                    channelClient = channelClient,
+                    putDataRequestFactory = PhoneWearPutDataRequestFactory { _, _ -> request },
+                )
+            every { dataClient.putDataItem(any()) } returns Tasks.forResult(mockk<DataItem>(relaxed = true))
+
+            transport.putDataItem(path = "/logdate/camera/capture-result", data = mapOf("isSaved" to "true"), urgent = true)
+
+            verify(exactly = 1) { request.setUrgent() }
+        }
+
+    @Test
+    fun `putDataItem leaves a routine item to the Data Layer's batching`() =
+        runTest {
+            val request = mockk<PutDataRequest>(relaxed = true)
+            val transport =
+                GooglePhoneWearTransport(
+                    dataClient = dataClient,
+                    channelClient = channelClient,
+                    putDataRequestFactory = PhoneWearPutDataRequestFactory { _, _ -> request },
+                )
+            every { dataClient.putDataItem(any()) } returns Tasks.forResult(mockk<DataItem>(relaxed = true))
+
+            transport.putDataItem(path = "/logdate/notes/1", data = mapOf("id" to "1"), urgent = false)
+
+            verify(exactly = 0) { request.setUrgent() }
         }
 }

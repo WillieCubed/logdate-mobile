@@ -132,7 +132,7 @@ class WearDataLayerSyncManager(
     }
 
     override suspend fun notifyRemoved(noteId: Uuid) {
-        if (!dataLayerClient.putDataItem(NoteDataMapper.noteDeletePath(noteId), deleteSignal(noteId))) {
+        if (!dataLayerClient.putDataItem(NoteDataMapper.noteDeletePath(noteId), deleteSignal(noteId), urgent = true)) {
             Napier.w("Could not tell the phone note $noteId was removed")
         }
     }
@@ -349,7 +349,7 @@ class WearDataLayerSyncManager(
             val dataMap = healthSnapshotDataMapper.toDataMap(syncData)
             val path = HealthSnapshotDataMapper.healthPath(entity.id)
 
-            if (dataLayerClient.putDataItem(path, dataMap)) {
+            if (dataLayerClient.putDataItem(path, dataMap, urgent = false)) {
                 uploaded++
             } else {
                 errors.add(
@@ -387,7 +387,7 @@ class WearDataLayerSyncManager(
         }
 
         val path = NoteDataMapper.notePath(noteId)
-        val putSuccess = dataLayerClient.putDataItem(path, dataMapFor(note))
+        val putSuccess = dataLayerClient.putDataItem(path, dataMapFor(note), urgent = true)
 
         if (!putSuccess) {
             Napier.w("Failed to put data item for note $noteId")
@@ -416,7 +416,7 @@ class WearDataLayerSyncManager(
     private suspend fun uploadNoteDelete(pending: PendingUpload): UploadOutcome {
         val noteId = parseUuid(pending.entityId) ?: return UploadOutcome.SKIPPED
 
-        return if (dataLayerClient.putDataItem(NoteDataMapper.noteDeletePath(noteId), deleteSignal(noteId))) {
+        return if (dataLayerClient.putDataItem(NoteDataMapper.noteDeletePath(noteId), deleteSignal(noteId), urgent = true)) {
             UploadOutcome.SUCCESS
         } else {
             UploadOutcome.FAILED
@@ -445,7 +445,7 @@ class WearDataLayerSyncManager(
         val dataMap = journalDataMapper.toDataMap(journal)
         val path = JournalDataMapper.journalPath(journalId)
 
-        return if (dataLayerClient.putDataItem(path, dataMap)) {
+        return if (dataLayerClient.putDataItem(path, dataMap, urgent = false)) {
             UploadOutcome.SUCCESS
         } else {
             Napier.w("Failed to put data item for journal $journalId")
@@ -458,7 +458,7 @@ class WearDataLayerSyncManager(
 
         val path = JournalDataMapper.journalDeletePath(journalId)
         val deleteData = mapOf(JournalDataMapper.KEY_UID to journalId.toString())
-        return if (dataLayerClient.putDataItem(path, deleteData)) {
+        return if (dataLayerClient.putDataItem(path, deleteData, urgent = false)) {
             UploadOutcome.SUCCESS
         } else {
             UploadOutcome.FAILED
@@ -479,7 +479,7 @@ class WearDataLayerSyncManager(
         val dataMap = associationDataMapper.toDataMap(key.journalId, key.contentId)
         val path = AssociationDataMapper.associationPath(key.journalId, key.contentId)
 
-        return if (dataLayerClient.putDataItem(path, dataMap)) {
+        return if (dataLayerClient.putDataItem(path, dataMap, urgent = false)) {
             UploadOutcome.SUCCESS
         } else {
             Napier.w("Failed to put data item for association ${pending.entityId}")
@@ -496,7 +496,7 @@ class WearDataLayerSyncManager(
 
         val path = AssociationDataMapper.associationDeletePath(key.journalId, key.contentId)
         val deleteData = associationDataMapper.toDataMap(key.journalId, key.contentId)
-        return if (dataLayerClient.putDataItem(path, deleteData)) {
+        return if (dataLayerClient.putDataItem(path, deleteData, urgent = false)) {
             UploadOutcome.SUCCESS
         } else {
             UploadOutcome.FAILED

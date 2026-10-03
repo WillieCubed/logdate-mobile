@@ -171,6 +171,34 @@ class PhoneWearSyncBridgeTest {
             )
         }
 
+    @Test
+    fun `notes go to the watch with the usual batching and camera results go at once`() =
+        runTest {
+            val transport = RecordingTransport()
+            val phoneNote =
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    creationTimestamp = Instant.fromEpochMilliseconds(1_710_000_000_000),
+                    lastUpdated = Instant.fromEpochMilliseconds(1_710_000_000_000),
+                    content = "Phone note",
+                )
+            every { notesRepository.allNotesObserved } returns flowOf(listOf(phoneNote))
+            val bridge =
+                DefaultPhoneWearSyncBridge(
+                    notesRepository = notesRepository,
+                    noteDataMapper = noteDataMapper,
+                    transport = transport,
+                    audioStreamOpener = UnusedAudioOpener,
+                )
+
+            bridge.publishNotesToWatch(sourceNodeId = "watch-node")
+            bridge.publishRemoteCameraCaptureResult(
+                RemoteCameraCaptureResult(isSaved = true, message = "Remote photo saved", mediaType = "photo"),
+            )
+
+            assertEquals(listOf(false, true), transport.putRequests.map { it.urgent })
+        }
+
     private object UnusedAudioOpener : PhoneAudioStreamOpener {
         override fun open(mediaRef: String): InputStream? = null
     }
@@ -182,8 +210,9 @@ class PhoneWearSyncBridgeTest {
         override suspend fun putDataItem(
             path: String,
             data: Map<String, String>,
+            urgent: Boolean,
         ): Boolean {
-            putRequests += PutRequest(path, data)
+            putRequests += PutRequest(path, data, urgent)
             return true
         }
 
@@ -200,6 +229,7 @@ class PhoneWearSyncBridgeTest {
     private data class PutRequest(
         val path: String,
         val data: Map<String, String>,
+        val urgent: Boolean,
     )
 
     private data class StreamRequest(

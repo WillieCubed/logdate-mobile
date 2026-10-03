@@ -55,12 +55,13 @@ class GoogleWearDataLayerClientTest {
             every { dataClient.putDataItem(any()) } returns Tasks.forResult(mockk<DataItem>(relaxed = true))
 
             val client = createClient(this, putDataRequestFactory = WearPutDataRequestFactory { _, _ -> request })
-            val success = client.putDataItem(path = "/logdate/notes/1", data = mapOf("id" to "1"))
+            val success = client.putDataItem(path = "/logdate/notes/1", data = mapOf("id" to "1"), urgent = false)
 
             assertTrue(success)
             verify(exactly = 1) { dataClient.putDataItem(request) }
         }
 
+    @Test
     fun `deleteDataItem returns false when wearable delete fails`() =
         runTest {
             every { dataClient.deleteDataItems(any()) } returns Tasks.forException(IllegalStateException("boom"))
@@ -456,6 +457,30 @@ class GoogleWearDataLayerClientTest {
 
             assertFalse(client.sendFile(channelPath = "/logdate/notes/1/audio", localFilePath = source.toString()))
             verify(exactly = 1) { channelClient.close(channel) }
+        }
+
+    @Test
+    fun `putDataItem marks an urgent item for immediate delivery`() =
+        runTest {
+            val request = mockk<PutDataRequest>(relaxed = true)
+            every { dataClient.putDataItem(any()) } returns Tasks.forResult(mockk<DataItem>(relaxed = true))
+            val client = createClient(this, putDataRequestFactory = WearPutDataRequestFactory { _, _ -> request })
+
+            assertTrue(client.putDataItem(path = "/logdate/notes/1", data = mapOf("id" to "1"), urgent = true))
+
+            verify(exactly = 1) { request.setUrgent() }
+        }
+
+    @Test
+    fun `putDataItem leaves a routine item to the Data Layer's batching`() =
+        runTest {
+            val request = mockk<PutDataRequest>(relaxed = true)
+            every { dataClient.putDataItem(any()) } returns Tasks.forResult(mockk<DataItem>(relaxed = true))
+            val client = createClient(this, putDataRequestFactory = WearPutDataRequestFactory { _, _ -> request })
+
+            assertTrue(client.putDataItem(path = "/logdate/journals/1", data = mapOf("id" to "1"), urgent = false))
+
+            verify(exactly = 0) { request.setUrgent() }
         }
 
     private fun createClient(

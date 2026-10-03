@@ -39,9 +39,14 @@ interface PhoneWearSyncBridge {
 }
 
 interface PhoneWearTransport {
+    /**
+     * Puts a data item for the watch. The Data Layer may delay an ordinary item by up to 30 minutes;
+     * an [urgent] one goes out at once, for anything someone on the watch is waiting on.
+     */
     suspend fun putDataItem(
         path: String,
         data: Map<String, String>,
+        urgent: Boolean,
     ): Boolean
 
     suspend fun streamToNode(
@@ -75,6 +80,7 @@ class DefaultPhoneWearSyncBridge(
                 transport.putDataItem(
                     path = NoteDataMapper.notePath(note.uid),
                     data = noteDataMapper.toDataMap(note),
+                    urgent = false,
                 )
             if (!sent) {
                 Napier.w("Failed to publish note ${note.uid} to watch node $sourceNodeId")
@@ -114,6 +120,7 @@ class DefaultPhoneWearSyncBridge(
             transport.putDataItem(
                 path = RemoteCameraDeviceDataMapper.PATH_CAMERA_DEVICES,
                 data = RemoteCameraDeviceDataMapper.toDataMap(selection),
+                urgent = true,
             )
         if (!sent) {
             Napier.w("Failed to publish remote camera device list to watch")
@@ -125,6 +132,7 @@ class DefaultPhoneWearSyncBridge(
             transport.putDataItem(
                 path = RemoteCameraCaptureResultDataMapper.PATH_CAMERA_CAPTURE_RESULT,
                 data = RemoteCameraCaptureResultDataMapper.toDataMap(result),
+                urgent = true,
             )
         if (!sent) {
             Napier.w("Failed to publish remote camera capture result to watch")
@@ -145,9 +153,11 @@ class GooglePhoneWearTransport(
     override suspend fun putDataItem(
         path: String,
         data: Map<String, String>,
+        urgent: Boolean,
     ): Boolean =
         runCatching {
             val request = putDataRequestFactory.create(path, data)
+            if (urgent) request.setUrgent()
             dataClient.putDataItem(request).await()
             true
         }.getOrElse { error ->

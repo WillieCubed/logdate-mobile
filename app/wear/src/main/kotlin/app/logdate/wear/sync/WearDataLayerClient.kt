@@ -11,11 +11,16 @@ import kotlin.uuid.Uuid
 interface WearDataLayerClient {
     /**
      * Puts a data item at the given [path] with the provided key-value [data].
+     *
+     * The Data Layer batches ordinary items to save battery and may delay one by up to 30 minutes. An
+     * [urgent] item goes out at once: use it for what someone just captured or removed.
+     *
      * Returns true if the put succeeded.
      */
     suspend fun putDataItem(
         path: String,
         data: Map<String, String>,
+        urgent: Boolean,
     ): Boolean
 
     /**

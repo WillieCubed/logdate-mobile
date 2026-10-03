@@ -19,6 +19,7 @@ import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
+import app.logdate.shared.model.Journal
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -112,7 +113,7 @@ class WearDataLayerSyncManagerTest {
         healthSnapshotDataMapper = HealthSnapshotDataMapper()
 
         coEvery { dataLayerClient.isPhoneConnected(any()) } returns true
-        coEvery { dataLayerClient.putDataItem(any(), any()) } returns true
+        coEvery { dataLayerClient.putDataItem(any(), any(), any()) } returns true
         coEvery { dataLayerClient.deleteDataItem(any()) } returns true
         coEvery { dataLayerClient.sendFile(any(), any()) } returns true
         every { syncMetadataService.observePendingCount() } returns MutableStateFlow(0)
@@ -238,6 +239,7 @@ class WearDataLayerSyncManagerTest {
                 dataLayerClient.putDataItem(
                     NoteDataMapper.notePath(noteId),
                     any(),
+                    any(),
                 )
             }
         }
@@ -302,7 +304,7 @@ class WearDataLayerSyncManagerTest {
 
             assertTrue(result.success)
             assertEquals(1, result.uploadedItems)
-            coVerify { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId), any()) }
+            coVerify { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId), any(), any()) }
         }
 
     @Test
@@ -334,7 +336,7 @@ class WearDataLayerSyncManagerTest {
 
             syncManager.uploadPendingChanges()
 
-            coVerify { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId), any()) }
+            coVerify { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId), any(), any()) }
         }
 
     @Test
@@ -418,7 +420,7 @@ class WearDataLayerSyncManagerTest {
 
             fixedClockSyncManager().uploadPendingChanges()
 
-            coVerify(exactly = 0) { dataLayerClient.putDataItem(any(), any()) }
+            coVerify(exactly = 0) { dataLayerClient.putDataItem(any(), any(), any()) }
             coVerify(exactly = 0) { dataLayerClient.sendFile(any(), any()) }
         }
 
@@ -447,7 +449,7 @@ class WearDataLayerSyncManagerTest {
                 )
             coEvery { notesRepository.getNoteById(noteId) } returns audioNote
             val sentData = mutableListOf<Map<String, String>>()
-            coEvery { dataLayerClient.putDataItem(any(), capture(sentData)) } returns true
+            coEvery { dataLayerClient.putDataItem(any(), capture(sentData), any()) } returns true
 
             fixedClockSyncManager().uploadPendingChanges()
 
@@ -481,7 +483,7 @@ class WearDataLayerSyncManagerTest {
     fun `a removed note is announced to the phone at its delete path`() =
         runTest {
             val sent = mutableListOf<Pair<String, Map<String, String>>>()
-            coEvery { dataLayerClient.putDataItem(any(), any()) } answers {
+            coEvery { dataLayerClient.putDataItem(any(), any(), any()) } answers {
                 sent += firstArg<String>() to secondArg<Map<String, String>>()
                 true
             }
@@ -499,13 +501,13 @@ class WearDataLayerSyncManagerTest {
 
             syncManager.notifyRemoved(noteId)
 
-            coVerify(exactly = 1) { dataLayerClient.putDataItem(NoteDataMapper.noteDeletePath(noteId), any()) }
+            coVerify(exactly = 1) { dataLayerClient.putDataItem(NoteDataMapper.noteDeletePath(noteId), any(), any()) }
         }
 
     @Test
     fun `a removal that cannot be put does not throw`() =
         runTest {
-            coEvery { dataLayerClient.putDataItem(any(), any()) } returns false
+            coEvery { dataLayerClient.putDataItem(any(), any(), any()) } returns false
 
             syncManager.notifyRemoved(noteId)
         }
@@ -527,11 +529,11 @@ class WearDataLayerSyncManagerTest {
             val second = async { syncManager.fullSync() }
             runCurrent()
 
-            coVerify(exactly = 1) { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId), any()) }
+            coVerify(exactly = 1) { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId), any(), any()) }
             gate.complete(Unit)
             first.await()
             second.await()
-            coVerify(exactly = 2) { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId), any()) }
+            coVerify(exactly = 2) { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId), any(), any()) }
         }
 
     @Test
@@ -551,7 +553,7 @@ class WearDataLayerSyncManagerTest {
                     PendingUpload(noteId.toString(), PendingOperation.CREATE),
                 )
             coEvery { notesRepository.getNoteById(noteId) } returns audioNote
-            coEvery { dataLayerClient.putDataItem(any(), any()) } returns false
+            coEvery { dataLayerClient.putDataItem(any(), any(), any()) } returns false
 
             val result = syncManager.uploadPendingChanges()
 
@@ -567,7 +569,7 @@ class WearDataLayerSyncManagerTest {
                     PendingUpload(noteId.toString(), PendingOperation.CREATE),
                 )
             coEvery { notesRepository.getNoteById(noteId) } returns audioNote
-            coEvery { dataLayerClient.putDataItem(any(), any()) } returns false
+            coEvery { dataLayerClient.putDataItem(any(), any(), any()) } returns false
 
             syncManager.uploadPendingChanges()
 
@@ -601,7 +603,7 @@ class WearDataLayerSyncManagerTest {
             val result = syncManager.uploadPendingChanges()
 
             assertTrue(result.success)
-            coVerify { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId), any()) }
+            coVerify { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId), any(), any()) }
             coVerify { dataLayerClient.sendFile(any(), audioNoteWithLocation.mediaRef) }
         }
 
@@ -641,7 +643,7 @@ class WearDataLayerSyncManagerTest {
             assertEquals(1, result.uploadedItems)
             // File sent only for audio, not text
             coVerify(exactly = 1) { dataLayerClient.sendFile(any(), any()) }
-            coVerify(exactly = 2) { dataLayerClient.putDataItem(any(), any()) }
+            coVerify(exactly = 2) { dataLayerClient.putDataItem(any(), any(), any()) }
         }
 
     // =======================================================================
@@ -659,7 +661,7 @@ class WearDataLayerSyncManagerTest {
             val result = syncManager.uploadPendingChanges()
 
             assertTrue(result.success)
-            coVerify { dataLayerClient.putDataItem(NoteDataMapper.noteDeletePath(noteId), any()) }
+            coVerify { dataLayerClient.putDataItem(NoteDataMapper.noteDeletePath(noteId), any(), any()) }
         }
 
     @Test
@@ -730,7 +732,7 @@ class WearDataLayerSyncManagerTest {
 
             syncManager.uploadPendingChanges()
 
-            coVerify(exactly = 0) { dataLayerClient.putDataItem(any(), any()) }
+            coVerify(exactly = 0) { dataLayerClient.putDataItem(any(), any(), any()) }
             coVerify(exactly = 0) { dataLayerClient.sendFile(any(), any()) }
         }
 
@@ -753,7 +755,7 @@ class WearDataLayerSyncManagerTest {
                     PendingUpload(noteId.toString(), PendingOperation.CREATE),
                 )
             coEvery { notesRepository.getNoteById(noteId) } returns textNote
-            coEvery { dataLayerClient.putDataItem(any(), any()) } returns false
+            coEvery { dataLayerClient.putDataItem(any(), any(), any()) } returns false
 
             syncManager.uploadPendingChanges()
 
@@ -775,7 +777,7 @@ class WearDataLayerSyncManagerTest {
 
             assertTrue(result.success)
             assertEquals(0, result.uploadedItems)
-            coVerify(exactly = 0) { dataLayerClient.putDataItem(any(), any()) }
+            coVerify(exactly = 0) { dataLayerClient.putDataItem(any(), any(), any()) }
         }
 
     @Test
@@ -815,8 +817,8 @@ class WearDataLayerSyncManagerTest {
             coEvery { notesRepository.getNoteById(noteId) } returns textNote
             coEvery { notesRepository.getNoteById(noteId2) } returns note2
             // First put fails, second succeeds
-            coEvery { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId), any()) } returns false
-            coEvery { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId2), any()) } returns true
+            coEvery { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId), any(), any()) } returns false
+            coEvery { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId2), any(), any()) } returns true
 
             val result = syncManager.uploadPendingChanges()
 
@@ -856,7 +858,7 @@ class WearDataLayerSyncManagerTest {
             val result = syncManager.syncContent()
 
             assertTrue(result.success)
-            coVerify { dataLayerClient.putDataItem(any(), any()) }
+            coVerify { dataLayerClient.putDataItem(any(), any(), any()) }
         }
 
     // =======================================================================
@@ -944,12 +946,53 @@ class WearDataLayerSyncManagerTest {
                     PendingUpload(noteId.toString(), PendingOperation.CREATE),
                 )
             coEvery { notesRepository.getNoteById(noteId) } returns audioNote
-            coEvery { dataLayerClient.putDataItem(any(), capture(capturedMaps)) } returns true
+            coEvery { dataLayerClient.putDataItem(any(), capture(capturedMaps), any()) } returns true
 
             syncManager.uploadPendingChanges()
 
             assertTrue(capturedMaps.isNotEmpty())
             val restoredNote = noteDataMapper.fromDataMap(capturedMaps.first())
             assertEquals(audioNote, restoredNote)
+        }
+
+    // =======================================================================
+    // Delivery urgency
+    // =======================================================================
+
+    @Test
+    fun `notes go to the phone urgently`() =
+        runTest {
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(PendingUpload(noteId.toString(), PendingOperation.CREATE))
+            coEvery { notesRepository.getNoteById(noteId) } returns textNote
+
+            syncManager.uploadPendingChanges()
+
+            coVerify(exactly = 1) { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId), any(), true) }
+        }
+
+    @Test
+    fun `note removals go to the phone urgently`() =
+        runTest {
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(PendingUpload(noteId.toString(), PendingOperation.DELETE))
+
+            syncManager.uploadPendingChanges()
+            syncManager.notifyRemoved(noteId)
+
+            coVerify(exactly = 2) { dataLayerClient.putDataItem(NoteDataMapper.noteDeletePath(noteId), any(), true) }
+        }
+
+    @Test
+    fun `journals go to the phone with the Data Layer's usual batching`() =
+        runTest {
+            val journalId = Uuid.parse("770e8400-e29b-41d4-a716-446655440000")
+            coEvery { syncMetadataService.getPendingUploads(EntityType.JOURNAL) } returns
+                listOf(PendingUpload(journalId.toString(), PendingOperation.CREATE))
+            coEvery { journalRepository.getJournalById(journalId) } returns Journal(id = journalId, title = "Walks")
+
+            syncManager.syncJournals()
+
+            coVerify(exactly = 1) { dataLayerClient.putDataItem(JournalDataMapper.journalPath(journalId), any(), false) }
         }
 }
