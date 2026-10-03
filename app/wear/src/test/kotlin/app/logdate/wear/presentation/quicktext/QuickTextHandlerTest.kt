@@ -101,10 +101,12 @@ class QuickTextHandlerTest {
         runTest {
             val callOrder = mutableListOf<String>()
             coEvery { locationCoordinator.captureForJournalEntry() } answers {
-                callOrder += "location"; null
+                callOrder += "location"
+                null
             }
             coEvery { notesRepository.create(any()) } answers {
-                callOrder += "create"; Uuid.random()
+                callOrder += "create"
+                Uuid.random()
             }
 
             saveQuickTextAndComplete(

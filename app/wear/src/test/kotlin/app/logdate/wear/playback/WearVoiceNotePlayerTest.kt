@@ -4,8 +4,6 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.wear.presentation.timeline.WearPlaybackUiState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
@@ -28,8 +26,7 @@ class WearVoiceNotePlayerTest {
     private val resolver = FakeResolver()
     private val note = audioNote(durationMs = 40_000)
 
-    private fun TestScope.player() =
-        WearVoiceNotePlayer(scope = backgroundScope, engine = engine, outputs = outputs, resolver = resolver)
+    private fun TestScope.player() = WearVoiceNotePlayer(scope = backgroundScope, engine = engine, outputs = outputs, resolver = resolver)
 
     @Test
     fun `playing a note resolves it and starts the engine`() =

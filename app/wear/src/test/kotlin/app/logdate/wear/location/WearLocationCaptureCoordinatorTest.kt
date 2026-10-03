@@ -12,7 +12,6 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -22,8 +21,7 @@ class WearLocationCaptureCoordinatorTest {
     private val locationProvider = mockk<ClientLocationProvider>(relaxed = true)
     private val settingsRepository = mockk<LocationTrackingSettingsRepository>(relaxed = true)
 
-    private fun coordinator(): WearLocationCaptureCoordinator =
-        WearLocationCaptureCoordinator(locationProvider, settingsRepository)
+    private fun coordinator(): WearLocationCaptureCoordinator = WearLocationCaptureCoordinator(locationProvider, settingsRepository)
 
     @Test
     fun `note location is null when journal auto-tagging is disabled`() =

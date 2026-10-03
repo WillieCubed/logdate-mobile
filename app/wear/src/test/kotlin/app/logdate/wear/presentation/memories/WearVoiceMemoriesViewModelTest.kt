@@ -97,7 +97,11 @@ class WearVoiceMemoriesViewModelTest {
             all.value = listOf(fresh, existing)
             runCurrent()
 
-            assertEquals(listOf(fresh.uid, existing.uid), viewModel.uiState.value.memories.map { it.noteId })
+            assertEquals(
+                listOf(fresh.uid, existing.uid),
+                viewModel.uiState.value.memories
+                    .map { it.noteId },
+            )
         }
 
     @Test
@@ -159,7 +163,11 @@ class WearVoiceMemoriesViewModelTest {
             all.value = notes - deleted
             runCurrent()
 
-            assertFalse(deleted.uid in viewModel.uiState.value.memories.map { it.noteId })
+            assertFalse(
+                deleted.uid in
+                    viewModel.uiState.value.memories
+                        .map { it.noteId },
+            )
             assertEquals(notes.size - 1, viewModel.uiState.value.memories.size)
         }
 

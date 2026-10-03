@@ -70,7 +70,10 @@ class LogDateWearApplication : Application() {
     private fun recoverInterruptedRecordings(launchedAtMs: Long) {
         thread(name = "recording-recovery", isDaemon = true) {
             try {
-                val recovery = org.koin.java.KoinJavaComponent.getKoin().get<WearRecordingRecovery>()
+                val recovery =
+                    org.koin.java.KoinJavaComponent
+                        .getKoin()
+                        .get<WearRecordingRecovery>()
                 val recovered = runBlocking { recovery.recover(modifiedBefore = launchedAtMs) }
                 if (recovered > 0) Napier.i("Recovered $recovered interrupted recording(s)")
             } catch (e: Exception) {

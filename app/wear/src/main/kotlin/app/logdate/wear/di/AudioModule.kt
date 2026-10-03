@@ -5,13 +5,13 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.VibratorManager
 import androidx.core.content.ContextCompat
+import app.logdate.client.media.audio.AdtsToM4aRemuxer
 import app.logdate.client.media.audio.AndroidAudioDurationResolver
 import app.logdate.client.media.audio.AndroidAudioPlaybackManager
 import app.logdate.client.media.audio.AndroidAudioStorage
-import app.logdate.client.media.audio.AdtsToM4aRemuxer
 import app.logdate.client.media.audio.AndroidRecordingServiceController
-import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioDurationResolver
+import app.logdate.client.media.audio.AudioPlaybackManager
 import app.logdate.client.media.audio.AudioPlaybackStatusProvider
 import app.logdate.client.media.audio.AudioStorage
 import app.logdate.client.media.audio.RecordingServiceController
@@ -55,10 +55,10 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import java.io.File
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
+import java.io.File
 
 /**
  * Koin module for Wear OS audio recording, playback, and capture features.

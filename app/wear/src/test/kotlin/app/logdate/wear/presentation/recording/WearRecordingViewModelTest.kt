@@ -22,8 +22,8 @@ import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -580,7 +580,11 @@ class WearRecordingViewModelTest {
 
     /** A finished recording and the raw file a crash-safe session leaves beside it, as real files. */
     private fun recordingWithRawFile(name: String): Pair<File, File> {
-        val directory = java.nio.file.Files.createTempDirectory("wear-vm").toFile().also { it.deleteOnExit() }
+        val directory =
+            java.nio.file.Files
+                .createTempDirectory("wear-vm")
+                .toFile()
+                .also { it.deleteOnExit() }
         val finished = File(directory, "recording_$name.m4a").apply { writeText("audio") }
         val raw = CrashSafeRecording.inFlightFile(finished).apply { writeText("raw audio") }
         return finished to raw
@@ -969,7 +973,11 @@ class WearRecordingViewModelTest {
             runCurrent()
 
             assertEquals(12_000L, viewModel.uiState.value.recordingDurationMs)
-            assertEquals(0.6f, viewModel.uiState.value.audioLevels.last())
+            assertEquals(
+                0.6f,
+                viewModel.uiState.value.audioLevels
+                    .last(),
+            )
         }
 
     @Test

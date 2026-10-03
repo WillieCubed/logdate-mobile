@@ -132,14 +132,24 @@ class WearRecorderServiceE2ETest {
     fun discarding_removes_the_recording() =
         runBlocking {
             val audioDirectory = File(context.filesDir, "audio_notes")
-            val before = audioDirectory.listFiles().orEmpty().map { it.name }.toSet()
+            val before =
+                audioDirectory
+                    .listFiles()
+                    .orEmpty()
+                    .map { it.name }
+                    .toSet()
             assertTrue(manager.start())
             delay(1_000)
 
             manager.discard()
 
             assertFalse(manager.isRecording.value)
-            val after = audioDirectory.listFiles().orEmpty().map { it.name }.toSet()
+            val after =
+                audioDirectory
+                    .listFiles()
+                    .orEmpty()
+                    .map { it.name }
+                    .toSet()
             assertEquals("A discarded recording should leave no file behind", before, after)
         }
 
@@ -180,7 +190,12 @@ class WearRecorderServiceE2ETest {
     fun a_recording_cut_short_can_be_wrapped_from_what_was_written() =
         runBlocking {
             val audioDirectory = File(context.filesDir, "audio_notes")
-            val before = audioDirectory.listFiles().orEmpty().map { it.name }.toSet()
+            val before =
+                audioDirectory
+                    .listFiles()
+                    .orEmpty()
+                    .map { it.name }
+                    .toSet()
             assertTrue(manager.start())
             delay(2_500)
 
@@ -209,7 +224,12 @@ class WearRecorderServiceE2ETest {
     fun destroying_the_service_mid_recording_still_wraps_the_file() =
         runBlocking {
             val audioDirectory = File(context.filesDir, "audio_notes")
-            val before = audioDirectory.listFiles().orEmpty().map { it.name }.toSet()
+            val before =
+                audioDirectory
+                    .listFiles()
+                    .orEmpty()
+                    .map { it.name }
+                    .toSet()
             assertTrue(manager.start())
             delay(2_000)
             val raw =
@@ -231,7 +251,12 @@ class WearRecorderServiceE2ETest {
     fun recovery_from_the_app_graph_turns_a_cut_recording_into_a_note() =
         runBlocking {
             val audioDirectory = File(context.filesDir, "audio_notes")
-            val before = audioDirectory.listFiles().orEmpty().map { it.name }.toSet()
+            val before =
+                audioDirectory
+                    .listFiles()
+                    .orEmpty()
+                    .map { it.name }
+                    .toSet()
             assertTrue(manager.start())
             delay(2_500)
             val live =
@@ -246,7 +271,9 @@ class WearRecorderServiceE2ETest {
             recordedFiles += File(audioDirectory, orphan.name)
             manager.discard()
 
-            val koin = org.koin.java.KoinJavaComponent.getKoin()
+            val koin =
+                org.koin.java.KoinJavaComponent
+                    .getKoin()
             val count = koin.get<WearRecordingRecovery>().recover()
 
             val repository = koin.get<JournalNotesRepository>()
@@ -268,13 +295,23 @@ class WearRecorderServiceE2ETest {
     fun a_discarded_recording_leaves_no_raw_file() =
         runBlocking {
             val audioDirectory = File(context.filesDir, "audio_notes")
-            val before = audioDirectory.listFiles().orEmpty().map { it.name }.toSet()
+            val before =
+                audioDirectory
+                    .listFiles()
+                    .orEmpty()
+                    .map { it.name }
+                    .toSet()
             assertTrue(manager.start())
             delay(1_000)
 
             manager.discard()
 
-            val after = audioDirectory.listFiles().orEmpty().map { it.name }.toSet()
+            val after =
+                audioDirectory
+                    .listFiles()
+                    .orEmpty()
+                    .map { it.name }
+                    .toSet()
             assertEquals("A discarded recording should leave no raw file behind", before, after)
         }
 

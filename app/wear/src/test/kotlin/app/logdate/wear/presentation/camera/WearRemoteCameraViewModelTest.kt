@@ -467,7 +467,11 @@ class WearRemoteCameraViewModelTest {
             assertEquals("USB document camera", viewModel.uiState.value.selectedCameraLabel)
             assertEquals("usb-camera-1", viewModel.uiState.value.selectedCameraDeviceId)
             assertEquals(2, viewModel.uiState.value.availableCameras.size)
-            assertEquals("usb-camera-1", viewModel.uiState.value.availableCameras[1].id)
+            assertEquals(
+                "usb-camera-1",
+                viewModel.uiState.value.availableCameras[1]
+                    .id,
+            )
         }
 
     @Test

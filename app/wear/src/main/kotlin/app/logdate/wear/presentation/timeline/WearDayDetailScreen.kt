@@ -368,8 +368,7 @@ private fun outputRouteStatusText(
     }
 }
 
-private fun defaultWearOutputSelection(): MediaDeviceSelectionUiState =
-    systemControlledSelection(MediaDeviceKind.AUDIO_OUTPUT)
+private fun defaultWearOutputSelection(): MediaDeviceSelectionUiState = systemControlledSelection(MediaDeviceKind.AUDIO_OUTPUT)
 
 @Composable
 private fun NoteEntryCard(

@@ -81,10 +81,10 @@ class WearTimelineViewModel(
             .map { notes -> groupNotesIntoDays(notes) }
             .stateIn(viewModelScope, SharingStarted.Eagerly, WearTimelineUiState())
 
-    private val _selectedDate = MutableStateFlow<LocalDate?>(null)
+    private val selectedDateFlow = MutableStateFlow<LocalDate?>(null)
 
     val selectedDayState: StateFlow<WearDayDetailUiState?> =
-        _selectedDate
+        selectedDateFlow
             .flatMapLatest { date ->
                 if (date == null) {
                     flowOf(null)
@@ -124,11 +124,11 @@ class WearTimelineViewModel(
     fun openBluetoothSettings() = player.openBluetoothSettings()
 
     fun selectDay(date: LocalDate) {
-        _selectedDate.value = date
+        selectedDateFlow.value = date
     }
 
     fun clearSelection() {
-        _selectedDate.value = null
+        selectedDateFlow.value = null
     }
 
     override fun onCleared() {

@@ -64,7 +64,8 @@ class WearRecordingRecovery(
         return stored
     }
 
-    private suspend fun isReferenced(file: File): Boolean = notesRepository.notesReferencingMediaPaths(setOf(file.absolutePath)).isNotEmpty()
+    private suspend fun isReferenced(file: File): Boolean =
+        notesRepository.notesReferencingMediaPaths(setOf(file.absolutePath)).isNotEmpty()
 
     private fun wrap(
         raw: File,

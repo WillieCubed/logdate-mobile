@@ -7,15 +7,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.wear.compose.material3.MaterialTheme
-import app.logdate.wear.presentation.home.WearHomeContent
 import app.logdate.wear.presentation.common.SaveFeedback
+import app.logdate.wear.presentation.home.WearHomeContent
 import app.logdate.wear.presentation.home.WearHomeUiState
 import app.logdate.wear.presentation.recording.RecordingError
 import app.logdate.wear.presentation.recording.RecordingPhase
 import app.logdate.wear.presentation.recording.RecordingUiState
 import app.logdate.wear.presentation.theme.LogDateTheme
-import java.util.Random
 import com.android.tools.screenshot.PreviewTest
+import java.util.Random
 
 class WearHomeScreenshots {
     @PreviewTest

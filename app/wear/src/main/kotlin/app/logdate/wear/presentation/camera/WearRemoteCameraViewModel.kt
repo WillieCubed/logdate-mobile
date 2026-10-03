@@ -165,7 +165,10 @@ class WearRemoteCameraViewModel(
         selectCamera(
             payload = CAMERA_SELECT_BACK,
             label = "Back camera",
-            deviceId = _uiState.value.availableCameras.firstOrNull { it.label == "Back camera" }?.id,
+            deviceId =
+                _uiState.value.availableCameras
+                    .firstOrNull { it.label == "Back camera" }
+                    ?.id,
         )
     }
 
@@ -173,7 +176,10 @@ class WearRemoteCameraViewModel(
         selectCamera(
             payload = CAMERA_SELECT_FRONT,
             label = "Front camera",
-            deviceId = _uiState.value.availableCameras.firstOrNull { it.label == "Front camera" }?.id,
+            deviceId =
+                _uiState.value.availableCameras
+                    .firstOrNull { it.label == "Front camera" }
+                    ?.id,
         )
     }
 

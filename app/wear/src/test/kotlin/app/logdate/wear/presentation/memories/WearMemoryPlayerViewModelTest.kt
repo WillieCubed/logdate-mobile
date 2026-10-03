@@ -227,7 +227,11 @@ class WearMemoryPlayerViewModelTest {
             viewModel.open(other.uid)
 
             assertEquals(1, engine.stops)
-            assertEquals(other.uid, viewModel.uiState.value.memory?.noteId)
+            assertEquals(
+                other.uid,
+                viewModel.uiState.value.memory
+                    ?.noteId,
+            )
             assertEquals(2, engine.started.size)
         }
 

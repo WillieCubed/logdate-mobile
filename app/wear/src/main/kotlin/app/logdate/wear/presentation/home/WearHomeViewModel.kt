@@ -36,13 +36,13 @@ class WearHomeViewModel(
                 .toLocalDateTime(TimeZone.currentSystemDefault())
                 .date
 
-    private val _syncBadge = MutableStateFlow(SyncBadge.NONE)
+    private val syncBadgeFlow = MutableStateFlow(SyncBadge.NONE)
     private var pollingJob: Job? = null
 
     val uiState =
         combine(
             notesRepository.observeNotesForDay(today).map { it.size },
-            _syncBadge,
+            syncBadgeFlow,
         ) { entryCount, syncBadge ->
             val timeOfDay = currentTimeOfDay()
             WearHomeUiState(
@@ -92,7 +92,7 @@ class WearHomeViewModel(
             val connected = dataLayerClient.isPhoneConnected()
             val status = syncManager.getSyncStatus()
 
-            _syncBadge.value =
+            syncBadgeFlow.value =
                 when {
                     status.hasErrors -> SyncBadge.ERROR
                     connected && status.pendingUploads > 0 -> SyncBadge.SYNCING
