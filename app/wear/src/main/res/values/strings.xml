@@ -183,10 +183,6 @@
     <string name="wear_saved_detail_syncing">Syncing to phone</string>
     <string name="wear_saved_detail_watch_only">On watch only</string>
 
-    <!-- Rewind -->
-    <string name="wear_rewind_title">Rewinds</string>
-    <string name="wear_rewind_empty">No rewinds yet</string>
-
     <!-- Plurals -->
     <plurals name="wear_tile_entry_count">
         <item quantity="one">%d entry today</item>

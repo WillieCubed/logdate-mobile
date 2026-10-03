@@ -15,14 +15,11 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.presentation.camera.WearRemoteCameraScreen
 import app.logdate.wear.presentation.camera.WearRemoteCameraViewModel
-import app.logdate.wear.presentation.health.HealthDashboardScreen
-import app.logdate.wear.presentation.health.HealthDashboardViewModel
 import app.logdate.wear.presentation.home.WearHomeScreen
 import app.logdate.wear.presentation.memories.WearMemoryPlayerScreen
 import app.logdate.wear.presentation.memories.WearVoiceMemoriesScreen
 import app.logdate.wear.presentation.mood.MoodCheckInScreen
 import app.logdate.wear.presentation.more.WearMoreScreen
-import app.logdate.wear.presentation.navigation.WearHealthDashboardRoute
 import app.logdate.wear.presentation.navigation.WearHomeRoute
 import app.logdate.wear.presentation.navigation.WearMemoryPlayerRoute
 import app.logdate.wear.presentation.navigation.WearMoodCheckInRoute
@@ -30,18 +27,14 @@ import app.logdate.wear.presentation.navigation.WearMoreRoute
 import app.logdate.wear.presentation.navigation.WearOnboardingRoute
 import app.logdate.wear.presentation.navigation.WearQuickTextRoute
 import app.logdate.wear.presentation.navigation.WearRemoteCameraRoute
-import app.logdate.wear.presentation.navigation.WearRewindListRoute
-import app.logdate.wear.presentation.navigation.WearRewindPlaybackRoute
 import app.logdate.wear.presentation.navigation.WearSettingsRoute
 import app.logdate.wear.presentation.navigation.WearTimelineDayDetailRoute
 import app.logdate.wear.presentation.navigation.WearTimelineRoute
 import app.logdate.wear.presentation.navigation.WearVoiceMemoriesRoute
+import app.logdate.wear.presentation.navigation.wearRouteFor
 import app.logdate.wear.presentation.onboarding.WearOnboardingScreen
 import app.logdate.wear.presentation.onboarding.isOnboardingComplete
 import app.logdate.wear.presentation.quicktext.QuickTextLauncher
-import app.logdate.wear.presentation.rewind.WearRewindListScreen
-import app.logdate.wear.presentation.rewind.WearRewindPlaybackScreen
-import app.logdate.wear.presentation.rewind.WearRewindViewModel
 import app.logdate.wear.presentation.settings.WearSettingsScreen
 import app.logdate.wear.presentation.theme.LogDateTheme
 import app.logdate.wear.presentation.timeline.WearDayDetailScreen
@@ -69,7 +62,7 @@ fun WearApp(initialRouteName: String? = null) {
         val context = LocalContext.current
         val startRoute: NavKey =
             if (isOnboardingComplete(context)) {
-                initialRouteName.toWearRoute() ?: WearHomeRoute
+                wearRouteFor(initialRouteName)
             } else {
                 WearOnboardingRoute
             }
@@ -157,26 +150,6 @@ fun WearApp(initialRouteName: String? = null) {
                             viewModel = timelineViewModel,
                         )
                     }
-                    entry<WearRewindListRoute> {
-                        val rewindViewModel = koinViewModel<WearRewindViewModel>()
-                        WearRewindListScreen(
-                            viewModel = rewindViewModel,
-                            onSelectRewind = { uid ->
-                                rewindViewModel.selectRewind(uid)
-                                backStack.add(WearRewindPlaybackRoute)
-                            },
-                        )
-                    }
-                    entry<WearRewindPlaybackRoute> {
-                        val rewindViewModel = koinViewModel<WearRewindViewModel>()
-                        WearRewindPlaybackScreen(
-                            viewModel = rewindViewModel,
-                            onExit = navigateBack,
-                        )
-                    }
-                    entry<WearHealthDashboardRoute> {
-                        HealthDashboardScreen(viewModel = koinViewModel<HealthDashboardViewModel>())
-                    }
                     entry<WearRemoteCameraRoute> {
                         WearRemoteCameraScreen(
                             viewModel = koinViewModel<WearRemoteCameraViewModel>(),
@@ -190,17 +163,3 @@ fun WearApp(initialRouteName: String? = null) {
         )
     }
 }
-
-private fun String?.toWearRoute(): NavKey? =
-    when (this) {
-        "quick_record", "voice_note" -> WearHomeRoute
-        "memories" -> WearVoiceMemoriesRoute
-        "mood" -> WearMoodCheckInRoute
-        "quick_text" -> WearQuickTextRoute
-        "timeline" -> WearTimelineRoute
-        "rewind" -> WearRewindListRoute
-        "health" -> WearHealthDashboardRoute
-        "remote_camera" -> WearRemoteCameraRoute
-        "settings" -> WearSettingsRoute
-        else -> null
-    }

@@ -16,12 +16,6 @@ data class WearTimelineDayDetailRoute(
     val date: LocalDate,
 ) : NavKey
 
-data object WearRewindListRoute : NavKey
-
-data object WearRewindPlaybackRoute : NavKey
-
-data object WearHealthDashboardRoute : NavKey
-
 data object WearRemoteCameraRoute : NavKey
 
 data object WearSettingsRoute : NavKey

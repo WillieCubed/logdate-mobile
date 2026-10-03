@@ -22,7 +22,6 @@ import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.media.storage.androidMediaFileResolver
 import app.logdate.client.repository.journals.JournalNotesRepository
-import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.client.sync.SyncManager
 import app.logdate.wear.data.storage.StorageSpaceChecker
 import app.logdate.wear.haptic.WearHapticEngine
@@ -34,7 +33,6 @@ import app.logdate.wear.playback.WearPlaybackEngine
 import app.logdate.wear.playback.WearSyncedAudioResolver
 import app.logdate.wear.playback.WearVoiceNotePlayer
 import app.logdate.wear.presentation.camera.WearRemoteCameraViewModel
-import app.logdate.wear.presentation.health.HealthDashboardViewModel
 import app.logdate.wear.presentation.home.WearHomeViewModel
 import app.logdate.wear.presentation.memories.WearMemoryPlayerViewModel
 import app.logdate.wear.presentation.memories.WearVoiceMemoriesViewModel
@@ -43,7 +41,6 @@ import app.logdate.wear.presentation.onboarding.WearOnboardingViewModel
 import app.logdate.wear.presentation.recording.RecordingHintStore
 import app.logdate.wear.presentation.recording.SharedPreferencesRecordingHintStore
 import app.logdate.wear.presentation.recording.WearRecordingViewModel
-import app.logdate.wear.presentation.rewind.WearRewindViewModel
 import app.logdate.wear.presentation.settings.WearSettingsViewModel
 import app.logdate.wear.presentation.timeline.WearTimelineViewModel
 import app.logdate.wear.recording.MicrophonePermissionChecker
@@ -194,18 +191,7 @@ val wearAudioModule =
             )
         }
         viewModel {
-            WearRewindViewModel(
-                get<RewindRepository>(),
-            )
-        }
-        viewModel {
             WearRemoteCameraViewModel(
-                get(),
-            )
-        }
-        viewModel {
-            HealthDashboardViewModel(
-                get(),
                 get(),
             )
         }
