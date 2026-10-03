@@ -198,8 +198,4 @@ private class FakeWatchSettingsRepository : WatchSettingsRepository {
     override suspend fun setShowEntryNotifications(enabled: Boolean) {
         notificationSettings.value = notificationSettings.value.copy(showEntryNotifications = enabled)
     }
-
-    override suspend fun setIncludeAudioPreview(enabled: Boolean) {
-        notificationSettings.value = notificationSettings.value.copy(includeAudioPreview = enabled)
-    }
 }

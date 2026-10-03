@@ -1194,14 +1194,9 @@ object SharedScreenshotCatalog {
             },
             sharedScene(SharedScreenshotSceneId.WatchNotificationSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
                 WatchNotificationSettingsContent(
-                    settings =
-                        WatchNotificationSettings(
-                            showEntryNotifications = true,
-                            includeAudioPreview = false,
-                        ),
+                    settings = WatchNotificationSettings(showEntryNotifications = true),
                     onBack = {},
                     onSetShowEntryNotifications = {},
-                    onSetIncludeAudioPreview = {},
                 )
             },
             sharedScene(SharedScreenshotSceneId.WatchTroubleshooting, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {

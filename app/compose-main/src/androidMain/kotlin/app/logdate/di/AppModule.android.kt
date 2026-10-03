@@ -54,6 +54,7 @@ import app.logdate.client.shortcuts.DynamicShortcutRefreshWorker
 import app.logdate.client.shortcuts.DynamicShortcutScheduler
 import app.logdate.client.shortcuts.JournalShortcutIcons
 import app.logdate.client.sync.AndroidPhoneAudioStreamOpener
+import app.logdate.client.sync.AndroidWatchNoteNotificationPoster
 import app.logdate.client.sync.DefaultPhoneWearSyncBridge
 import app.logdate.client.sync.FileWatchAudioStore
 import app.logdate.client.sync.GooglePhoneWearTransport
@@ -65,9 +66,9 @@ import app.logdate.client.sync.PhoneWearTransport
 import app.logdate.client.sync.WatchAudioStore
 import app.logdate.client.sync.WatchMessageSender
 import app.logdate.client.sync.WatchNoteAcknowledger
+import app.logdate.client.sync.WatchNoteArrivalNotifier
 import app.logdate.client.sync.WatchNoteIngestor
 import app.logdate.client.sync.WatchNoteNotifier
-import app.logdate.client.sync.WearSyncNotificationHelper
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.tiles.RecordVoiceTileUpdater
 import app.logdate.client.tiles.RecordingWindowTracker
@@ -215,19 +216,24 @@ actual val appModule: Module =
         }
 
         single { NoteDataMapper() }
-        single { WearSyncNotificationHelper(androidContext()) }
+        single<WatchNoteNotifier> {
+            WatchNoteArrivalNotifier(
+                context = androidContext(),
+                settingsRepository = get(),
+                poster = AndroidWatchNoteNotificationPoster(androidContext()),
+            )
+        }
         single<PhoneWearTransport> { GooglePhoneWearTransport(androidContext()) }
         single<PhoneAudioStreamOpener> { AndroidPhoneAudioStreamOpener(androidContext()) }
         single<WatchAudioStore> { FileWatchAudioStore(androidContext()) }
         single<WatchMessageSender> { GoogleWatchMessageSender(androidContext()) }
         single<WatchNoteAcknowledger> { MessageWatchNoteAcknowledger(get()) }
         single {
-            val notificationHelper = get<WearSyncNotificationHelper>()
             WatchNoteIngestor(
                 notesRepository = get(),
                 audioStore = get(),
                 acknowledger = get(),
-                notifier = WatchNoteNotifier(notificationHelper::notifyNoteReceived),
+                notifier = get(),
                 noteDataMapper = get(),
             )
         }

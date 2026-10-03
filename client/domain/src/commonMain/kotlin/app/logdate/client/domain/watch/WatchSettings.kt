@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.Flow
  */
 data class WatchNotificationSettings(
     val showEntryNotifications: Boolean = true,
-    val includeAudioPreview: Boolean = false,
 )
 
 /**
@@ -17,6 +16,4 @@ interface WatchSettingsRepository {
     fun observeNotificationSettings(): Flow<WatchNotificationSettings>
 
     suspend fun setShowEntryNotifications(enabled: Boolean)
-
-    suspend fun setIncludeAudioPreview(enabled: Boolean)
 }

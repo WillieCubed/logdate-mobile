@@ -108,8 +108,5 @@ class WatchSettingsViewModelTest {
 
         override suspend fun setShowEntryNotifications(enabled: Boolean) {
         }
-
-        override suspend fun setIncludeAudioPreview(enabled: Boolean) {
-        }
     }
 }

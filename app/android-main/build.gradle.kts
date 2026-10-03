@@ -525,6 +525,7 @@ dependencies {
     testImplementation(projects.client.domain)
     testImplementation(projects.client.healthConnect)
     testImplementation(projects.client.media)
+    testImplementation(projects.client.notifications)
     testImplementation(projects.client.feature.editor)
     testImplementation(projects.client.repository)
     testImplementation(projects.client.sync)

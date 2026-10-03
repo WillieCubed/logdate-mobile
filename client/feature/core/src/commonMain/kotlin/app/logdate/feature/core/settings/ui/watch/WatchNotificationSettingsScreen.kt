@@ -13,8 +13,6 @@ import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.watch_notification_audio_preview
-import logdate.client.feature.core.generated.resources.watch_notification_audio_preview_description
 import logdate.client.feature.core.generated.resources.watch_notification_entry_section
 import logdate.client.feature.core.generated.resources.watch_notification_show
 import logdate.client.feature.core.generated.resources.watch_notification_show_description
@@ -36,7 +34,6 @@ fun WatchNotificationSettingsScreen(
         settings = notificationSettings,
         onBack = onBack,
         onSetShowEntryNotifications = viewModel::setShowEntryNotifications,
-        onSetIncludeAudioPreview = viewModel::setIncludeAudioPreview,
         modifier = modifier,
     )
 }
@@ -46,7 +43,6 @@ fun WatchNotificationSettingsContent(
     settings: WatchNotificationSettings,
     onBack: () -> Unit,
     onSetShowEntryNotifications: (Boolean) -> Unit,
-    onSetIncludeAudioPreview: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     SettingsScaffold(
@@ -64,12 +60,6 @@ fun WatchNotificationSettingsContent(
                     description = stringResource(Res.string.watch_notification_show_description),
                     checked = settings.showEntryNotifications,
                     onCheckedChange = onSetShowEntryNotifications,
-                )
-                ToggleSettingsItem(
-                    title = stringResource(Res.string.watch_notification_audio_preview),
-                    description = stringResource(Res.string.watch_notification_audio_preview_description),
-                    checked = settings.includeAudioPreview,
-                    onCheckedChange = onSetIncludeAudioPreview,
                 )
             }
         }

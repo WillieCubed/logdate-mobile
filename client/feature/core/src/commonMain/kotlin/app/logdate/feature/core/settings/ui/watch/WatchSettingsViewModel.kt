@@ -81,14 +81,4 @@ class WatchSettingsViewModel(
             }
         }
     }
-
-    fun setIncludeAudioPreview(enabled: Boolean) {
-        viewModelScope.launch {
-            try {
-                settingsRepository.setIncludeAudioPreview(enabled)
-            } catch (e: Exception) {
-                Napier.e(e) { "Failed to update audio preview setting" }
-            }
-        }
-    }
 }

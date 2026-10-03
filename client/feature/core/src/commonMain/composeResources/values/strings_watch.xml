@@ -32,8 +32,6 @@
     <string name="watch_notification_entry_section">Entry notifications</string>
     <string name="watch_notification_show">Show notifications for new entries</string>
     <string name="watch_notification_show_description">Get notified when a voice note or entry arrives from your watch</string>
-    <string name="watch_notification_audio_preview">Include audio preview</string>
-    <string name="watch_notification_audio_preview_description">Show transcription preview in notification</string>
 
     <!-- Watch troubleshooting -->
     <string name="watch_help">Help</string>

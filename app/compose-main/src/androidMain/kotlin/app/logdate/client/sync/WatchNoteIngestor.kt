@@ -55,7 +55,7 @@ fun interface WatchNoteAcknowledger {
 }
 
 fun interface WatchNoteNotifier {
-    fun noteReceived(note: JournalNote)
+    suspend fun noteReceived(note: JournalNote)
 }
 
 /**

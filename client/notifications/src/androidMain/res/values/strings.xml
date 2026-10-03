@@ -29,6 +29,11 @@
     <string name="notification_rewind_ready_action_watch">Watch</string>
     <string name="notification_channel_watch_sync_name">Watch sync</string>
     <string name="notification_channel_watch_sync_description">Alerts when entries arrive from your watch.</string>
+    <string name="notification_watch_note_audio_title">Voice note from your watch</string>
+    <string name="notification_watch_note_text_title">Note from your watch</string>
+    <string name="notification_watch_note_photo_title">Photo from your watch</string>
+    <string name="notification_watch_note_video_title">Video from your watch</string>
+    <string name="notification_watch_note_open_body">Tap to open it in the editor</string>
     <string name="notification_channel_data_export_name">Data export</string>
     <string name="notification_channel_data_export_description">Shows progress while exporting your LogDate data.</string>
     <string name="notification_channel_data_restore_name">Data restore</string>
