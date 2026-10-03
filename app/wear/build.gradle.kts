@@ -133,6 +133,7 @@ dependencies {
     // Client dependencies for Wear - shared data infrastructure
     implementation(projects.client.repository)
     implementation(projects.client.domain)
+    implementation(projects.client.healthConnect)
     implementation(projects.client.data)
     implementation(projects.client.database)
     implementation(projects.client.device)
