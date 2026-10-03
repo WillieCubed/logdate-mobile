@@ -1,7 +1,6 @@
 package app.logdate.wear.screenshots
 
 import androidx.compose.runtime.Composable
-import androidx.wear.compose.material3.MaterialTheme
 import app.logdate.wear.presentation.mood.MoodOption
 import app.logdate.wear.presentation.mood.MoodSavedContent
 import app.logdate.wear.presentation.mood.SelectMoodContent
@@ -13,7 +12,7 @@ class MoodCheckInScreenshots {
     @WearScreenshotPreviewMatrix
     @Composable
     fun S01_MoodSelectMood() {
-        MaterialTheme {
+        OnWatchSurface {
             SelectMoodContent(onMoodSelected = {})
         }
     }
@@ -22,7 +21,7 @@ class MoodCheckInScreenshots {
     @WearScreenshotPreviewMatrix
     @Composable
     fun S02_MoodVoicePromptGreat() {
-        MaterialTheme {
+        OnWatchSurface {
             VoicePromptContent(
                 selectedMood = MoodOption.GREAT,
                 onAttachVoice = {},
@@ -35,7 +34,7 @@ class MoodCheckInScreenshots {
     @WearScreenshotPreviewMatrix
     @Composable
     fun S03_MoodVoicePromptSad() {
-        MaterialTheme {
+        OnWatchSurface {
             VoicePromptContent(
                 selectedMood = MoodOption.SAD,
                 onAttachVoice = {},
@@ -48,7 +47,7 @@ class MoodCheckInScreenshots {
     @WearScreenshotPreviewMatrix
     @Composable
     fun S04_MoodVoicePromptNull() {
-        MaterialTheme {
+        OnWatchSurface {
             VoicePromptContent(
                 selectedMood = null,
                 onAttachVoice = {},
@@ -61,7 +60,7 @@ class MoodCheckInScreenshots {
     @WearScreenshotPreviewMatrix
     @Composable
     fun S05_MoodSaved() {
-        MaterialTheme {
+        OnWatchSurface {
             MoodSavedContent()
         }
     }
