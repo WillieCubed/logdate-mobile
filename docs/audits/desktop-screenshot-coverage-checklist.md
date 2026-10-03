@@ -195,7 +195,6 @@ Allowed exception categories:
 - `[todo]` Location tracking options screen
 - `[todo]` Watch settings screen
 - `[todo]` Watch notification settings screen
-- `[todo]` Watch sync settings screen
 - `[todo]` Watch troubleshooting screen
 
 ## Export And Import

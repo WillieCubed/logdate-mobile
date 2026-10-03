@@ -361,7 +361,6 @@ fun LogDateNavDisplay(
                                     if (isWatchSupported) {
                                         watchEntries(
                                             onBack = { backStack.removeLastOrNull() },
-                                            onNavigateToSync = { backStack.add(SyncSettingsRoute) },
                                             onNavigateToNotifications = { backStack.add(WatchNotificationSettingsRoute) },
                                             onNavigateToTroubleshooting = { backStack.add(WatchTroubleshootingRoute) },
                                         )

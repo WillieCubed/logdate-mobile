@@ -45,6 +45,7 @@ import logdate.client.feature.core.generated.resources.watch_app_not_installed_d
 import logdate.client.feature.core.generated.resources.watch_association_pending
 import logdate.client.feature.core.generated.resources.watch_association_pending_description
 import logdate.client.feature.core.generated.resources.watch_connected
+import logdate.client.feature.core.generated.resources.watch_help
 import logdate.client.feature.core.generated.resources.watch_install_on_watch
 import logdate.client.feature.core.generated.resources.watch_loading
 import logdate.client.feature.core.generated.resources.watch_needs_association
@@ -64,8 +65,6 @@ import logdate.client.feature.core.generated.resources.watch_sync_last_connected
 import logdate.client.feature.core.generated.resources.watch_sync_not_yet
 import logdate.client.feature.core.generated.resources.watch_sync_now
 import logdate.client.feature.core.generated.resources.watch_sync_pending
-import logdate.client.feature.core.generated.resources.watch_sync_settings
-import logdate.client.feature.core.generated.resources.watch_sync_settings_description
 import logdate.client.feature.core.generated.resources.watch_sync_up_to_date
 import logdate.client.feature.core.generated.resources.watch_troubleshooting
 import logdate.client.feature.core.generated.resources.watch_troubleshooting_description
@@ -75,7 +74,6 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun WatchSettingsScreen(
     onBack: () -> Unit,
-    onNavigateToSync: () -> Unit,
     onNavigateToNotifications: () -> Unit,
     onNavigateToTroubleshooting: () -> Unit,
     viewModel: WatchSettingsViewModel = koinViewModel(),
@@ -89,7 +87,6 @@ fun WatchSettingsScreen(
         onBeginAssociation = viewModel::beginAssociation,
         onRequestSync = viewModel::requestSync,
         onInstallOnWatch = viewModel::installAppOnWatch,
-        onNavigateToSync = onNavigateToSync,
         onNavigateToNotifications = onNavigateToNotifications,
         onNavigateToTroubleshooting = onNavigateToTroubleshooting,
         modifier = modifier,
@@ -103,7 +100,6 @@ fun WatchSettingsContent(
     onBeginAssociation: () -> Unit,
     onRequestSync: () -> Unit,
     onInstallOnWatch: () -> Unit,
-    onNavigateToSync: () -> Unit,
     onNavigateToNotifications: () -> Unit,
     onNavigateToTroubleshooting: () -> Unit,
     modifier: Modifier = Modifier,
@@ -141,7 +137,6 @@ fun WatchSettingsContent(
                 WatchConnectedSections(
                     connectionState = connectionState,
                     onRequestSync = onRequestSync,
-                    onNavigateToSync = onNavigateToSync,
                     onNavigateToNotifications = onNavigateToNotifications,
                 )
                 WatchTroubleshootingSection(onNavigateToTroubleshooting)
@@ -170,7 +165,6 @@ fun WatchSettingsContent(
                             WatchConnectedSections(
                                 connectionState = connectionState,
                                 onRequestSync = onRequestSync,
-                                onNavigateToSync = onNavigateToSync,
                                 onNavigateToNotifications = onNavigateToNotifications,
                             )
                         }
@@ -202,7 +196,6 @@ fun WatchSettingsContent(
 private fun WatchConnectedSections(
     connectionState: WatchConnectionState,
     onRequestSync: () -> Unit,
-    onNavigateToSync: () -> Unit,
     onNavigateToNotifications: () -> Unit,
 ) {
     when (connectionState) {
@@ -235,12 +228,6 @@ private fun WatchConnectedSections(
                         Spacer(Modifier.width(Spacing.sm))
                         Text(stringResource(Res.string.watch_sync_now))
                     }
-
-                    SettingsNavItem(
-                        title = stringResource(Res.string.watch_sync_settings),
-                        description = stringResource(Res.string.watch_sync_settings_description),
-                        onClick = onNavigateToSync,
-                    )
                 }
 
                 SettingsSection(
@@ -268,7 +255,7 @@ private fun WatchConnectedSections(
 @Composable
 private fun WatchTroubleshootingSection(onNavigateToTroubleshooting: () -> Unit) {
     SettingsSection(
-        title = "",
+        title = stringResource(Res.string.watch_help),
         modifier = Modifier.padding(horizontal = Spacing.lg),
     ) {
         SettingsNavItem(

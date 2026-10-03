@@ -2,7 +2,6 @@ package app.logdate.feature.core.settings.ui.watch
 
 import app.logdate.client.domain.watch.WatchNotificationSettings
 import app.logdate.client.domain.watch.WatchSettingsRepository
-import app.logdate.client.domain.watch.WatchSyncSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -103,27 +102,9 @@ class WatchSettingsViewModelTest {
     }
 
     private class FakeWatchSettingsRepository : WatchSettingsRepository {
-        private val syncSettings = MutableStateFlow(WatchSyncSettings())
         private val notificationSettings = MutableStateFlow(WatchNotificationSettings())
 
-        override fun observeSyncSettings(): StateFlow<WatchSyncSettings> = syncSettings.asStateFlow()
-
         override fun observeNotificationSettings(): StateFlow<WatchNotificationSettings> = notificationSettings.asStateFlow()
-
-        override suspend fun setSyncVoiceNotes(enabled: Boolean) {
-        }
-
-        override suspend fun setSyncTextEntries(enabled: Boolean) {
-        }
-
-        override suspend fun setSyncMoodCheckIns(enabled: Boolean) {
-        }
-
-        override suspend fun setSyncHealthData(enabled: Boolean) {
-        }
-
-        override suspend fun setAutoSync(enabled: Boolean) {
-        }
 
         override suspend fun setShowEntryNotifications(enabled: Boolean) {
         }

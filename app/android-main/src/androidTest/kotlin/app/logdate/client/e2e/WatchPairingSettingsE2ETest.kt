@@ -1,14 +1,16 @@
 package app.logdate.client.e2e
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.MainActivity
 import app.logdate.client.domain.watch.WatchNotificationSettings
 import app.logdate.client.domain.watch.WatchSettingsRepository
-import app.logdate.client.domain.watch.WatchSyncSettings
 import app.logdate.client.testing.launch.ActivityLaunchTestOverrides
 import app.logdate.client.testing.navigation.NavigationTestDestination
 import app.logdate.client.testing.onboarding.OnboardingTestFixture
@@ -84,6 +86,21 @@ class WatchPairingSettingsE2ETest {
             .onNodeWithText(
                 "Complete the system pairing prompt, then LogDate will reconnect to your watch automatically.",
             ).assertIsDisplayed()
+    }
+
+    @Test
+    fun `watch settings offer no sync options and title the help section`() {
+        fakeConnectionManager.updateState(
+            WatchConnectionState.Connected(
+                watchName = "Pixel Watch",
+                lastSynced = null,
+                pendingCount = 0,
+            ),
+        )
+
+        composeRule.onNodeWithText("Sync settings").assertDoesNotExist()
+        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Help"))
+        composeRule.onNodeWithText("Help").assertIsDisplayed()
     }
 
     @Test
@@ -170,37 +187,13 @@ private class RecordingWatchConnectionManager : WatchConnectionManager {
 }
 
 private class FakeWatchSettingsRepository : WatchSettingsRepository {
-    private val syncSettings = MutableStateFlow(WatchSyncSettings())
     private val notificationSettings = MutableStateFlow(WatchNotificationSettings())
 
     fun reset() {
-        syncSettings.value = WatchSyncSettings()
         notificationSettings.value = WatchNotificationSettings()
     }
 
-    override fun observeSyncSettings(): StateFlow<WatchSyncSettings> = syncSettings.asStateFlow()
-
     override fun observeNotificationSettings(): StateFlow<WatchNotificationSettings> = notificationSettings.asStateFlow()
-
-    override suspend fun setSyncVoiceNotes(enabled: Boolean) {
-        syncSettings.value = syncSettings.value.copy(syncVoiceNotes = enabled)
-    }
-
-    override suspend fun setSyncTextEntries(enabled: Boolean) {
-        syncSettings.value = syncSettings.value.copy(syncTextEntries = enabled)
-    }
-
-    override suspend fun setSyncMoodCheckIns(enabled: Boolean) {
-        syncSettings.value = syncSettings.value.copy(syncMoodCheckIns = enabled)
-    }
-
-    override suspend fun setSyncHealthData(enabled: Boolean) {
-        syncSettings.value = syncSettings.value.copy(syncHealthData = enabled)
-    }
-
-    override suspend fun setAutoSync(enabled: Boolean) {
-        syncSettings.value = syncSettings.value.copy(autoSync = enabled)
-    }
 
     override suspend fun setShowEntryNotifications(enabled: Boolean) {
         notificationSettings.value = notificationSettings.value.copy(showEntryNotifications = enabled)

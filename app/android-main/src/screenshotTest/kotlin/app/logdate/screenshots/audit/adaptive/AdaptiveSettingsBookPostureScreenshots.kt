@@ -97,13 +97,6 @@ fun A16_WatchSettingsBookPosture() {
 }
 
 @PreviewTest
-@Preview(name = "Watch sync settings book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A17_WatchSyncSettingsBookPosture() {
-    BookPostureSettingsScene(SharedScreenshotSceneId.WatchSyncSettings)
-}
-
-@PreviewTest
 @Preview(name = "Watch notification settings book posture", showBackground = true, device = BOOK_FOLDABLE)
 @Composable
 fun A18_WatchNotificationSettingsBookPosture() {

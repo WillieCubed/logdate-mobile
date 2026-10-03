@@ -20,24 +20,10 @@
     <!-- Watch sync -->
     <string name="watch_sync">Sync</string>
     <string name="watch_sync_now">Sync Now</string>
-    <string name="watch_sync_settings">Sync settings</string>
-    <string name="watch_sync_settings_description">Choose what syncs between phone and watch</string>
     <string name="watch_sync_up_to_date">Up to date</string>
     <string name="watch_sync_not_yet">Not yet synced</string>
     <string name="watch_sync_pending">%1$d entries waiting to sync</string>
     <string name="watch_sync_last_connected">Last synced while connected</string>
-    <string name="watch_sync_what_syncs">What syncs</string>
-    <string name="watch_sync_voice_notes">Voice notes</string>
-    <string name="watch_sync_voice_notes_description">Sync voice recordings captured on your watch</string>
-    <string name="watch_sync_text_entries">Text entries</string>
-    <string name="watch_sync_text_entries_description">Quick text and dictated notes</string>
-    <string name="watch_sync_mood_checkins">Mood check-ins</string>
-    <string name="watch_sync_mood_checkins_description">Mood emoji and attached voice notes</string>
-    <string name="watch_sync_health_data">Health data</string>
-    <string name="watch_sync_health_data_description">Heart rate, steps, and other sensor data</string>
-    <string name="watch_sync_behavior">Behavior</string>
-    <string name="watch_sync_auto">Auto-sync</string>
-    <string name="watch_sync_auto_description">Sync automatically whenever your watch is in range</string>
 
     <!-- Watch notifications -->
     <string name="watch_notifications">Notifications</string>
@@ -50,8 +36,9 @@
     <string name="watch_notification_audio_preview_description">Show transcription preview in notification</string>
 
     <!-- Watch troubleshooting -->
+    <string name="watch_help">Help</string>
     <string name="watch_troubleshooting">Troubleshooting</string>
-    <string name="watch_troubleshooting_description">Fix connection issues, reinstall, reset sync</string>
+    <string name="watch_troubleshooting_description">Reconnect your watch, or install or open LogDate on it</string>
     <string name="watch_troubleshooting_watch_app">Watch app</string>
     <string name="watch_troubleshooting_pair">Pair or reconnect watch</string>
     <string name="watch_troubleshooting_install">Install or update on watch</string>

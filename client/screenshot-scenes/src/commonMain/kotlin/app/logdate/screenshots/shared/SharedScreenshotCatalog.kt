@@ -22,7 +22,6 @@ import app.logdate.client.domain.recommendation.RecallMode
 import app.logdate.client.domain.recommendation.WidgetContentType
 import app.logdate.client.domain.streak.StreakData
 import app.logdate.client.domain.watch.WatchNotificationSettings
-import app.logdate.client.domain.watch.WatchSyncSettings
 import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.media.MediaObject
@@ -93,7 +92,6 @@ import app.logdate.feature.core.settings.ui.labs.LabsUiState
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionState
 import app.logdate.feature.core.settings.ui.watch.WatchNotificationSettingsContent
 import app.logdate.feature.core.settings.ui.watch.WatchSettingsContent
-import app.logdate.feature.core.settings.ui.watch.WatchSyncSettingsContent
 import app.logdate.feature.core.settings.ui.watch.WatchTroubleshootingContent
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
@@ -218,7 +216,6 @@ enum class SharedScreenshotSceneId(
     AdvancedSettings("advanced-settings"),
     LabsSettings("labs-settings"),
     WatchSettings("watch-settings"),
-    WatchSyncSettings("watch-sync-settings"),
     WatchNotificationSettings("watch-notification-settings"),
     WatchTroubleshooting("watch-troubleshooting"),
     EventsSettings("events-settings"),
@@ -1191,27 +1188,8 @@ object SharedScreenshotCatalog {
                     onBeginAssociation = {},
                     onRequestSync = {},
                     onInstallOnWatch = {},
-                    onNavigateToSync = {},
                     onNavigateToNotifications = {},
                     onNavigateToTroubleshooting = {},
-                )
-            },
-            sharedScene(SharedScreenshotSceneId.WatchSyncSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
-                WatchSyncSettingsContent(
-                    settings =
-                        WatchSyncSettings(
-                            syncVoiceNotes = true,
-                            syncTextEntries = true,
-                            syncMoodCheckIns = true,
-                            syncHealthData = false,
-                            autoSync = true,
-                        ),
-                    onBack = {},
-                    onSetSyncVoiceNotes = {},
-                    onSetSyncTextEntries = {},
-                    onSetSyncMoodCheckIns = {},
-                    onSetSyncHealthData = {},
-                    onSetAutoSync = {},
                 )
             },
             sharedScene(SharedScreenshotSceneId.WatchNotificationSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {

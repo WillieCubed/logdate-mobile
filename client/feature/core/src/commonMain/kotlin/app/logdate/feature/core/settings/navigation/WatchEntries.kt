@@ -23,14 +23,12 @@ fun NavBackStack<NavKey>.navigateToWatchSettings() {
  */
 fun EntryProviderScope<NavKey>.watchEntries(
     onBack: () -> Unit,
-    onNavigateToSync: () -> Unit,
     onNavigateToNotifications: () -> Unit,
     onNavigateToTroubleshooting: () -> Unit,
 ) {
     taggedEntry<WatchSettingsRoute> {
         WatchSettingsScreen(
             onBack = onBack,
-            onNavigateToSync = onNavigateToSync,
             onNavigateToNotifications = onNavigateToNotifications,
             onNavigateToTroubleshooting = onNavigateToTroubleshooting,
         )
