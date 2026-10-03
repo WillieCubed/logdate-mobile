@@ -64,6 +64,7 @@ import app.logdate.client.sync.PhoneAudioStreamOpener
 import app.logdate.client.sync.PhoneWearSyncBridge
 import app.logdate.client.sync.PhoneWearTransport
 import app.logdate.client.sync.WatchAudioStore
+import app.logdate.client.sync.WatchJournalIngestor
 import app.logdate.client.sync.WatchMessageSender
 import app.logdate.client.sync.WatchNoteAcknowledger
 import app.logdate.client.sync.WatchNoteArrivalNotifier
@@ -235,6 +236,13 @@ actual val appModule: Module =
                 acknowledger = get(),
                 notifier = get(),
                 noteDataMapper = get(),
+            )
+        }
+        single {
+            WatchJournalIngestor(
+                journalRepository = get(),
+                contentRepository = get(),
+                journalContentDao = get(),
             )
         }
         single<PhoneWearSyncBridge> {

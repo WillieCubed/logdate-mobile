@@ -2,14 +2,9 @@ package app.logdate.client.sync
 
 import android.net.Uri
 import app.logdate.client.database.dao.HealthSnapshotDao
-import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.entities.HealthSnapshotEntity
-import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.repository.journals.JournalNote
-import app.logdate.client.repository.journals.JournalRepository
-import app.logdate.client.repository.journals.SyncableJournalContentRepository
-import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.client.sync.datalayer.AssociationDataMapper
 import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
 import app.logdate.client.sync.datalayer.HealthSnapshotSyncData
@@ -394,147 +389,64 @@ class PhoneDataLayerListenerServiceTest {
         }
 
     @Test
-    fun `journal sync uses sync-aware repository`() =
+    fun `a journal from the watch goes to the journal ingestor`() =
         runTest {
             val journal = Journal(id = Uuid.random(), title = "Travel")
-            val journalRepository = mockk<SyncableJournalRepository>(relaxed = true)
-            val service = serviceWithDependencies(journalRepository = journalRepository)
+            val journalIngestor = mockk<WatchJournalIngestor>(relaxed = true)
+            val service = serviceWithDependencies(journalIngestor = journalIngestor)
 
             service.processEvents(journalEvent(journal))
 
-            coVerify(exactly = 1) { journalRepository.createFromSync(journal) }
+            coVerify(exactly = 1) { journalIngestor.onJournal(journal) }
         }
 
     @Test
-    fun `journal sync falls back to create for non-syncable repository`() =
-        runTest {
-            val journal = Journal(id = Uuid.random(), title = "Home")
-            val journalRepository = mockk<JournalRepository>(relaxed = true)
-            coEvery { journalRepository.create(journal) } returns journal.id
-            val service = serviceWithDependencies(journalRepository = journalRepository)
-
-            service.processEvents(journalEvent(journal))
-
-            coVerify(exactly = 1) { journalRepository.create(journal) }
-        }
-
-    @Test
-    fun `journal delete uses sync-aware repository when available`() =
+    fun `a journal deletion from the watch goes to the journal ingestor`() =
         runTest {
             val journalId = Uuid.random()
-            val journalRepository = mockk<SyncableJournalRepository>(relaxed = true)
-            val service = serviceWithDependencies(journalRepository = journalRepository)
+            val journalIngestor = mockk<WatchJournalIngestor>(relaxed = true)
+            val service = serviceWithDependencies(journalIngestor = journalIngestor)
 
             service.processEvents(journalDeleteEvent(journalId))
 
-            coVerify(exactly = 1) { journalRepository.deleteFromSync(journalId) }
+            coVerify(exactly = 1) { journalIngestor.onJournalDeleted(journalId) }
         }
 
     @Test
-    fun `journal delete falls back to repository delete for non-syncable repository`() =
-        runTest {
-            val journalId = Uuid.random()
-            val journalRepository = mockk<JournalRepository>(relaxed = true)
-            val service = serviceWithDependencies(journalRepository = journalRepository)
-
-            service.processEvents(journalDeleteEvent(journalId))
-
-            coVerify(exactly = 1) { journalRepository.delete(journalId) }
-        }
-
-    @Test
-    fun `association sync uses syncable content repository when available`() =
+    fun `a journal link from the watch goes to the journal ingestor`() =
         runTest {
             val journalId = Uuid.random()
             val contentId = Uuid.random()
-            val contentRepository = mockk<SyncableJournalContentRepository>(relaxed = true)
-            val journalContentDao = mockk<JournalContentDao>(relaxed = true)
-            val service =
-                serviceWithDependencies(
-                    contentRepository = contentRepository,
-                    journalContentDao = journalContentDao,
-                )
+            val journalIngestor = mockk<WatchJournalIngestor>(relaxed = true)
+            val service = serviceWithDependencies(journalIngestor = journalIngestor)
 
             service.processEvents(associationEvent(journalId, contentId))
 
-            coVerify(exactly = 1) { contentRepository.addContentToJournalFromSync(contentId, journalId) }
-            coVerify(exactly = 0) { journalContentDao.addContentToJournal(any()) }
+            coVerify(exactly = 1) { journalIngestor.onAssociation(journalId, contentId) }
         }
 
     @Test
-    fun `association sync falls back to dao when syncable content repository unavailable`() =
+    fun `a journal link removal from the watch goes to the journal ingestor`() =
         runTest {
             val journalId = Uuid.random()
             val contentId = Uuid.random()
-            val journalContentDao = mockk<JournalContentDao>(relaxed = true)
-            val service =
-                serviceWithDependencies(
-                    contentRepository = null,
-                    journalContentDao = journalContentDao,
-                )
-
-            service.processEvents(associationEvent(journalId, contentId))
-
-            coVerify(exactly = 1) {
-                journalContentDao.addContentToJournal(
-                    match { link ->
-                        link == JournalContentEntityLink(journalId = journalId, contentId = contentId)
-                    },
-                )
-            }
-        }
-
-    @Test
-    fun `association delete uses syncable content repository when available`() =
-        runTest {
-            val journalId = Uuid.random()
-            val contentId = Uuid.random()
-            val contentRepository = mockk<SyncableJournalContentRepository>(relaxed = true)
-            val journalContentDao = mockk<JournalContentDao>(relaxed = true)
-            val service =
-                serviceWithDependencies(
-                    contentRepository = contentRepository,
-                    journalContentDao = journalContentDao,
-                )
+            val journalIngestor = mockk<WatchJournalIngestor>(relaxed = true)
+            val service = serviceWithDependencies(journalIngestor = journalIngestor)
 
             service.processEvents(associationDeleteEvent(journalId, contentId))
 
-            coVerify(exactly = 1) { contentRepository.removeContentFromJournalFromSync(contentId, journalId) }
-            coVerify(exactly = 0) { journalContentDao.removeContentFromJournal(any(), any()) }
+            coVerify(exactly = 1) { journalIngestor.onAssociationDeleted(journalId, contentId) }
         }
 
     @Test
-    fun `association delete falls back to dao when syncable content repository unavailable`() =
+    fun `an invalid link removal path does not reach the journal ingestor`() =
         runTest {
-            val journalId = Uuid.random()
-            val contentId = Uuid.random()
-            val journalContentDao = mockk<JournalContentDao>(relaxed = true)
-            val service =
-                serviceWithDependencies(
-                    contentRepository = null,
-                    journalContentDao = journalContentDao,
-                )
-
-            service.processEvents(associationDeleteEvent(journalId, contentId))
-
-            coVerify(exactly = 1) { journalContentDao.removeContentFromJournal(journalId, contentId) }
-        }
-
-    @Test
-    fun `invalid association delete path does not touch content dependencies`() =
-        runTest {
-            val contentRepository = mockk<SyncableJournalContentRepository>(relaxed = true)
-            val journalContentDao = mockk<JournalContentDao>(relaxed = true)
-            val service =
-                serviceWithDependencies(
-                    contentRepository = contentRepository,
-                    journalContentDao = journalContentDao,
-                )
+            val journalIngestor = mockk<WatchJournalIngestor>(relaxed = true)
+            val service = serviceWithDependencies(journalIngestor = journalIngestor)
 
             service.processEvents(PhoneDataLayerSnapshotEvent(path = "/logdate/associations/not-valid/delete", data = emptyMap()))
 
-            coVerify(exactly = 0) { contentRepository.removeContentFromJournalFromSync(any(), any()) }
-            coVerify(exactly = 0) { journalContentDao.removeContentFromJournal(any(), any()) }
+            confirmVerified(journalIngestor)
         }
 
     @Test
@@ -708,9 +620,7 @@ class PhoneDataLayerListenerServiceTest {
 
     private fun serviceWithDependencies(
         noteIngestor: WatchNoteIngestor = mockk(relaxed = true),
-        journalRepository: JournalRepository = mockk<SyncableJournalRepository>(relaxed = true),
-        contentRepository: SyncableJournalContentRepository? = mockk(relaxed = true),
-        journalContentDao: JournalContentDao? = mockk(relaxed = true),
+        journalIngestor: WatchJournalIngestor = mockk(relaxed = true),
         healthSnapshotDao: HealthSnapshotDao = mockk(relaxed = true),
     ): TestPhoneDataLayerListenerService =
         TestPhoneDataLayerListenerService(
@@ -718,25 +628,19 @@ class PhoneDataLayerListenerServiceTest {
             syncDependencies =
                 dependencies(
                     noteIngestor = noteIngestor,
-                    journalRepository = journalRepository,
-                    contentRepository = contentRepository,
-                    journalContentDao = journalContentDao,
+                    journalIngestor = journalIngestor,
                     healthSnapshotDao = healthSnapshotDao,
                 ),
         )
 
     private fun dependencies(
         noteIngestor: WatchNoteIngestor = mockk(relaxed = true),
-        journalRepository: JournalRepository = mockk<SyncableJournalRepository>(relaxed = true),
-        contentRepository: SyncableJournalContentRepository? = mockk(relaxed = true),
-        journalContentDao: JournalContentDao? = mockk(relaxed = true),
+        journalIngestor: WatchJournalIngestor = mockk(relaxed = true),
         healthSnapshotDao: HealthSnapshotDao = mockk(relaxed = true),
     ): PhoneDataLayerSyncDependencies =
         PhoneDataLayerSyncDependencies(
             noteIngestor = noteIngestor,
-            journalRepository = journalRepository,
-            contentRepository = contentRepository,
-            journalContentDao = journalContentDao,
+            journalIngestor = journalIngestor,
             healthSnapshotDao = healthSnapshotDao,
         )
 

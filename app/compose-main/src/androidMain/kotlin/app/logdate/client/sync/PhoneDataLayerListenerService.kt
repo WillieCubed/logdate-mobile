@@ -1,15 +1,10 @@
 package app.logdate.client.sync
 
 import app.logdate.client.database.dao.HealthSnapshotDao
-import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.entities.HealthSnapshotEntity
-import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.remote.RemoteCameraActivity
 import app.logdate.client.remote.RemoteCameraSessionController
-import app.logdate.client.repository.journals.JournalRepository
-import app.logdate.client.repository.journals.SyncableJournalContentRepository
-import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.client.sync.datalayer.AssociationDataMapper
 import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
 import app.logdate.client.sync.datalayer.JournalDataMapper
@@ -42,7 +37,7 @@ import java.io.InputStream
  * Handles notes, journals, journal-content associations, health snapshots, and the audio files
  * that go with watch audio notes. Notes and audio go through [WatchNoteIngestor], which queues
  * them for cloud backup once they are complete and tells the watch they arrived. Journals and
- * associations use sync-aware repository methods so they don't re-trigger outbound sync.
+ * associations go through [WatchJournalIngestor], which queues them for cloud backup too.
  *
  * For new notes, a notification is posted so the user can tap to expand the note
  * in the editor (entry handoff).
@@ -221,9 +216,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
         val koin = resolveKoin() ?: return null
         return PhoneDataLayerSyncDependencies(
             noteIngestor = koin.get(),
-            journalRepository = koin.get(),
-            contentRepository = koin.getOrNull(),
-            journalContentDao = koin.getOrNull(),
+            journalIngestor = koin.get(),
             healthSnapshotDao = koin.get(),
         )
     }
@@ -242,10 +235,10 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
             when {
                 NoteDataMapper.isDeletePath(path) -> handleNoteDelete(path, dependencies.noteIngestor)
                 NoteDataMapper.isNotePath(path) -> handleNoteSync(event, path, dependencies.noteIngestor)
-                JournalDataMapper.isDeletePath(path) -> handleJournalDelete(path, dependencies.journalRepository)
-                JournalDataMapper.isJournalPath(path) -> handleJournalSync(event, path, dependencies.journalRepository)
-                AssociationDataMapper.isDeletePath(path) -> handleAssociationDelete(path, dependencies)
-                AssociationDataMapper.isAssociationPath(path) -> handleAssociationSync(event, path, dependencies)
+                JournalDataMapper.isDeletePath(path) -> handleJournalDelete(path, dependencies.journalIngestor)
+                JournalDataMapper.isJournalPath(path) -> handleJournalSync(event, path, dependencies.journalIngestor)
+                AssociationDataMapper.isDeletePath(path) -> handleAssociationDelete(path, dependencies.journalIngestor)
+                AssociationDataMapper.isAssociationPath(path) -> handleAssociationSync(event, path, dependencies.journalIngestor)
                 HealthSnapshotDataMapper.isHealthPath(path) -> handleHealthSync(event, path, dependencies.healthSnapshotDao)
             }
         } catch (e: Exception) {
@@ -287,7 +280,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
 
     private suspend fun handleJournalDelete(
         path: String,
-        journalRepository: JournalRepository,
+        ingestor: WatchJournalIngestor,
     ) {
         val journalId =
             try {
@@ -299,11 +292,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
 
         Napier.d("Received delete signal from watch for journal: $journalId")
         try {
-            if (journalRepository is SyncableJournalRepository) {
-                journalRepository.deleteFromSync(journalId)
-            } else {
-                journalRepository.delete(journalId)
-            }
+            ingestor.onJournalDeleted(journalId)
         } catch (e: Exception) {
             Napier.w("Failed to delete synced journal from watch: $journalId", e)
         }
@@ -312,17 +301,12 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
     private suspend fun handleJournalSync(
         event: PhoneDataLayerSnapshotEvent,
         path: String,
-        journalRepository: JournalRepository,
+        ingestor: WatchJournalIngestor,
     ) {
         try {
             val journal = journalDataMapper.fromDataMap(event.data)
             Napier.d("Received journal from watch: ${journal.id}")
-            if (journalRepository is SyncableJournalRepository) {
-                // createFromSync uses upsert — safe for duplicates and updates
-                journalRepository.createFromSync(journal)
-            } else {
-                journalRepository.create(journal)
-            }
+            ingestor.onJournal(journal)
         } catch (e: Exception) {
             Napier.w("Failed to process synced journal from watch at path: $path", e)
         }
@@ -330,7 +314,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
 
     private suspend fun handleAssociationDelete(
         path: String,
-        dependencies: PhoneDataLayerSyncDependencies,
+        ingestor: WatchJournalIngestor,
     ) {
         val (journalId, contentId) =
             try {
@@ -342,13 +326,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
 
         Napier.d("Received association delete from watch: journal=$journalId, content=$contentId")
         try {
-            val contentRepo = dependencies.contentRepository
-            if (contentRepo != null) {
-                contentRepo.removeContentFromJournalFromSync(contentId, journalId)
-            } else {
-                val dao = requireNotNull(dependencies.journalContentDao) { "JournalContentDao unavailable" }
-                dao.removeContentFromJournal(journalId, contentId)
-            }
+            ingestor.onAssociationDeleted(journalId, contentId)
         } catch (e: Exception) {
             Napier.w("Failed to delete synced association: $path", e)
         }
@@ -357,18 +335,12 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
     private suspend fun handleAssociationSync(
         event: PhoneDataLayerSnapshotEvent,
         path: String,
-        dependencies: PhoneDataLayerSyncDependencies,
+        ingestor: WatchJournalIngestor,
     ) {
         try {
             val (journalId, contentId) = associationDataMapper.fromDataMap(event.data)
             Napier.d("Received association from watch: journal=$journalId, content=$contentId")
-            val contentRepo = dependencies.contentRepository
-            if (contentRepo != null) {
-                contentRepo.addContentToJournalFromSync(contentId, journalId)
-            } else {
-                val dao = requireNotNull(dependencies.journalContentDao) { "JournalContentDao unavailable" }
-                dao.addContentToJournal(JournalContentEntityLink(journalId, contentId))
-            }
+            ingestor.onAssociation(journalId, contentId)
         } catch (e: Exception) {
             Napier.w("Failed to process synced association from watch at path: $path", e)
         }
@@ -493,8 +465,6 @@ data class PhoneDataLayerSnapshotEvent(
 
 data class PhoneDataLayerSyncDependencies(
     val noteIngestor: WatchNoteIngestor,
-    val journalRepository: JournalRepository,
-    val contentRepository: SyncableJournalContentRepository? = null,
-    val journalContentDao: JournalContentDao? = null,
+    val journalIngestor: WatchJournalIngestor,
     val healthSnapshotDao: HealthSnapshotDao,
 )
