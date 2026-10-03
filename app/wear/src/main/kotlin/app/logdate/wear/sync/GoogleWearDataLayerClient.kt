@@ -1,6 +1,7 @@
 package app.logdate.wear.sync
 
 import android.content.Context
+import android.net.Uri
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.ChannelClient
@@ -11,6 +12,7 @@ import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.PutDataRequest
 import com.google.android.gms.wearable.Wearable
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,9 +28,7 @@ import java.io.FileOutputStream
 import kotlin.coroutines.resume
 import kotlin.uuid.Uuid
 
-/**
- * Production [WearDataLayerClient] backed by Google Play Services Wearable APIs.
- */
+/** Builds the request for a put; a seam so JVM tests need no real [PutDataRequest]. */
 fun interface WearPutDataRequestFactory {
     fun create(
         path: String,
@@ -36,6 +36,17 @@ fun interface WearPutDataRequestFactory {
     ): PutDataRequest
 }
 
+/** Builds the URI of the data item [nodeId] wrote at a path; a seam so JVM tests need no [Uri]. */
+fun interface WearDataItemUriFactory {
+    fun create(
+        nodeId: String,
+        path: String,
+    ): Uri
+}
+
+/**
+ * Production [WearDataLayerClient] backed by Google Play Services Wearable APIs.
+ */
 class GoogleWearDataLayerClient(
     private val dataClient: DataClient,
     private val channelClient: ChannelClient,
@@ -46,6 +57,7 @@ class GoogleWearDataLayerClient(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val audioTransferTimeoutMs: Long = AUDIO_TRANSFER_TIMEOUT_MS,
     private val putDataRequestFactory: WearPutDataRequestFactory = defaultWearPutDataRequestFactory,
+    private val dataItemUriFactory: WearDataItemUriFactory = defaultWearDataItemUriFactory,
 ) : WearDataLayerClient {
     constructor(
         context: Context,
@@ -81,19 +93,16 @@ class GoogleWearDataLayerClient(
             false
         }
 
-    override suspend fun deleteDataItem(path: String): Boolean =
+    override suspend fun deleteOwnDataItem(path: String): Boolean =
         try {
-            dataClient
-                .deleteDataItems(
-                    android.net.Uri
-                        .Builder()
-                        .scheme("wear")
-                        .path(path)
-                        .build(),
-                ).await()
+            val localNodeId = nodeClient.localNode.await().id
+            val deleted = dataClient.deleteDataItems(dataItemUriFactory.create(localNodeId, path)).await()
+            Napier.d("Deleted $deleted data item(s) this watch wrote at $path")
             true
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            Napier.w("Failed to delete data item at path: $path", e)
+            Napier.w("Failed to delete this watch's data item at path: $path", e)
             false
         }
 
@@ -284,6 +293,16 @@ class GoogleWearDataLayerClient(
                             dataMap.putString(key, value)
                         }
                     }.asPutDataRequest()
+            }
+
+        val defaultWearDataItemUriFactory =
+            WearDataItemUriFactory { nodeId, path ->
+                Uri
+                    .Builder()
+                    .scheme(PutDataRequest.WEAR_URI_SCHEME)
+                    .authority(nodeId)
+                    .path(path)
+                    .build()
             }
     }
 }

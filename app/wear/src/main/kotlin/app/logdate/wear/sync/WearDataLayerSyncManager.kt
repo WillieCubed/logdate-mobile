@@ -142,7 +142,8 @@ class WearDataLayerSyncManager(
      * Clears a note the phone confirmed. It runs under the same lock as uploads, so a confirmation can
      * neither land in the middle of an upload's own bookkeeping nor clear a version newer than the one
      * the phone stored. A queued removal is never cleared by the confirmation of a create, and a
-     * confirmation without a version, from an older phone, clears the note as before.
+     * confirmation without a version, from an older phone, clears the note as before. Once a
+     * confirmation is applied, the note's data item is deleted.
      */
     override suspend fun onNoteAcknowledged(
         noteId: Uuid,
@@ -162,6 +163,7 @@ class WearDataLayerSyncManager(
             return@withLock
         }
         settle(EntityType.NOTE, pending, version = 1)
+        deleteDeliveredDataItem(noteId)
     }
 
     private suspend fun queuedNote(noteId: Uuid): PendingUpload? =
@@ -173,6 +175,18 @@ class WearDataLayerSyncManager(
     ): Boolean {
         val local = notesRepository.getNoteById(noteId) ?: return false
         return local.lastUpdated.toEpochMilliseconds() > ack.lastUpdated
+    }
+
+    /**
+     * The phone has stored the note, so the data item that sent it has done its job. Deleting it
+     * stops Play services from storing it on both devices and syncing it to devices that connect
+     * later. It runs under the same lock as uploads, so it can never remove a newer version an upload
+     * is putting. A failed deletion changes nothing the person sees, so it is logged and the note
+     * stays confirmed.
+     */
+    private suspend fun deleteDeliveredDataItem(noteId: Uuid) {
+        if (dataLayerClient.deleteOwnDataItem(NoteDataMapper.notePath(noteId))) return
+        Napier.w("Could not delete the data item of note $noteId after the phone confirmed it")
     }
 
     override suspend fun downloadRemoteChanges(): SyncResult {

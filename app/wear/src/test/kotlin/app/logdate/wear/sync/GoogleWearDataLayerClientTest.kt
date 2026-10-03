@@ -1,4 +1,5 @@
 package app.logdate.wear.sync
+import android.net.Uri
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.CapabilityClient
@@ -67,16 +68,6 @@ class GoogleWearDataLayerClientTest {
 
             assertTrue(success)
             verify(exactly = 1) { dataClient.putDataItem(request) }
-        }
-
-    @Test
-    fun `deleteDataItem returns false when wearable delete fails`() =
-        runTest {
-            every { dataClient.deleteDataItems(any()) } returns Tasks.forException(IllegalStateException("boom"))
-
-            val client = createClient(this)
-
-            assertFalse(client.deleteDataItem("/logdate/notes/1"))
         }
 
     @Test
@@ -525,10 +516,53 @@ class GoogleWearDataLayerClientTest {
             verify(exactly = 0) { channelClient.openChannel("other-node", any()) }
         }
 
+    @Test
+    fun `deleteOwnDataItem deletes the item this watch wrote at the path`() =
+        runTest {
+            every { nodeClient.localNode } returns Tasks.forResult(mockk<Node> { every { id } returns "watch-node" })
+            val uri = mockk<Uri>()
+            every { dataClient.deleteDataItems(uri) } returns Tasks.forResult(1)
+            val requested = mutableListOf<Pair<String, String>>()
+            val client =
+                createClient(
+                    this,
+                    dataItemUriFactory =
+                        WearDataItemUriFactory { nodeId, path ->
+                            requested += nodeId to path
+                            uri
+                        },
+                )
+
+            assertTrue(client.deleteOwnDataItem("/logdate/notes/1"))
+
+            assertEquals(listOf("watch-node" to "/logdate/notes/1"), requested)
+            verify(exactly = 1) { dataClient.deleteDataItems(uri) }
+        }
+
+    @Test
+    fun `deleteOwnDataItem reports failure when the watch's node cannot be read`() =
+        runTest {
+            every { nodeClient.localNode } returns Tasks.forException(IllegalStateException("Play services unavailable"))
+
+            assertFalse(createClient(this).deleteOwnDataItem("/logdate/notes/1"))
+
+            verify(exactly = 0) { dataClient.deleteDataItems(any()) }
+        }
+
+    @Test
+    fun `deleteOwnDataItem reports failure when the delete fails`() =
+        runTest {
+            every { nodeClient.localNode } returns Tasks.forResult(mockk<Node> { every { id } returns "watch-node" })
+            every { dataClient.deleteDataItems(any()) } returns Tasks.forException(IllegalStateException("boom"))
+
+            assertFalse(createClient(this).deleteOwnDataItem("/logdate/notes/1"))
+        }
+
     private fun createClient(
         scope: TestScope,
         audioTransferTimeoutMs: Long = 1_000L,
         putDataRequestFactory: WearPutDataRequestFactory? = WearPutDataRequestFactory { _, _ -> mockk(relaxed = true) },
+        dataItemUriFactory: WearDataItemUriFactory = WearDataItemUriFactory { _, _ -> mockk(relaxed = true) },
     ): GoogleWearDataLayerClient =
         if (putDataRequestFactory == null) {
             GoogleWearDataLayerClient(
@@ -540,6 +574,7 @@ class GoogleWearDataLayerClientTest {
                 coroutineScope = scope,
                 ioDispatcher = UnconfinedTestDispatcher(scope.testScheduler),
                 audioTransferTimeoutMs = audioTransferTimeoutMs,
+                dataItemUriFactory = dataItemUriFactory,
             )
         } else {
             GoogleWearDataLayerClient(
@@ -552,6 +587,7 @@ class GoogleWearDataLayerClientTest {
                 ioDispatcher = UnconfinedTestDispatcher(scope.testScheduler),
                 audioTransferTimeoutMs = audioTransferTimeoutMs,
                 putDataRequestFactory = putDataRequestFactory,
+                dataItemUriFactory = dataItemUriFactory,
             )
         }
 }

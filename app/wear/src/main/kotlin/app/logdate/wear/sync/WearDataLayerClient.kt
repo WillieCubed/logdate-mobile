@@ -24,10 +24,10 @@ interface WearDataLayerClient {
     ): Boolean
 
     /**
-     * Deletes the data item at the given [path].
-     * Returns true if deletion succeeded.
+     * Deletes the data item this watch wrote at [path]. Items the phone wrote at the same path are
+     * untouched. Returns true if the item is gone, including when there was none.
      */
-    suspend fun deleteDataItem(path: String): Boolean
+    suspend fun deleteOwnDataItem(path: String): Boolean
 
     /**
      * Returns true if a connected node with the [capability] is reachable.

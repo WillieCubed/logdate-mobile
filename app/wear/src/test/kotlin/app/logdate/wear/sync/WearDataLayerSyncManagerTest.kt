@@ -128,7 +128,7 @@ class WearDataLayerSyncManagerTest {
 
         coEvery { dataLayerClient.isPhoneConnected(any()) } returns true
         coEvery { dataLayerClient.putDataItem(any(), any(), any()) } returns true
-        coEvery { dataLayerClient.deleteDataItem(any()) } returns true
+        coEvery { dataLayerClient.deleteOwnDataItem(any()) } returns true
         coEvery { dataLayerClient.sendFile(any(), any()) } returns true
         every { syncMetadataService.observePendingCount() } returns pendingCount
         every { deadLetterStore.observe() } returns deadLetters
@@ -1385,4 +1385,48 @@ class WearDataLayerSyncManagerTest {
             phoneReachability = PhoneReachability { phone },
             scope = scope,
         )
+
+    // =======================================================================
+    // Data item cleanup
+    // =======================================================================
+
+    @Test
+    fun `a confirmed note's data item is deleted after the confirmation is recorded`() =
+        runTest {
+            givenQueuedNote(PendingOperation.CREATE)
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote
+
+            syncManager.onNoteAcknowledged(noteId, NoteAckPayload(fixedTime.toEpochMilliseconds()))
+
+            coVerifyOrder {
+                syncMetadataService.settleIfCurrent(EntityType.NOTE, match { it.entityId == noteId.toString() }, any(), any())
+                dataLayerClient.deleteOwnDataItem(NoteDataMapper.notePath(noteId))
+            }
+        }
+
+    @Test
+    fun `a confirmation of an older version leaves the newer data item in place`() =
+        runTest {
+            givenQueuedNote(PendingOperation.UPDATE)
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote.copy(lastUpdated = fixedTime + 5.seconds)
+
+            syncManager.onNoteAcknowledged(noteId, NoteAckPayload(fixedTime.toEpochMilliseconds()))
+
+            coVerify(exactly = 0) { dataLayerClient.deleteOwnDataItem(any()) }
+        }
+
+    @Test
+    fun `a data item that cannot be deleted leaves the confirmation applied`() =
+        runTest {
+            givenQueuedNote(PendingOperation.CREATE)
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote
+            coEvery { dataLayerClient.deleteOwnDataItem(any()) } returns false
+
+            syncManager.onNoteAcknowledged(noteId, NoteAckPayload(fixedTime.toEpochMilliseconds()))
+
+            coVerify(exactly = 1) {
+                syncMetadataService.settleIfCurrent(EntityType.NOTE, match { it.entityId == noteId.toString() }, any(), any())
+            }
+            coVerify(exactly = 1) { dataLayerClient.deleteOwnDataItem(NoteDataMapper.notePath(noteId)) }
+        }
 }
