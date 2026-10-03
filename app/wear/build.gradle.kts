@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.androidx.baselineprofile)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.screenshot)
     alias(libs.plugins.gradlePlayPublisher)
     id("app.logdate.android-release")
@@ -148,9 +149,10 @@ dependencies {
     // Serialization (required by LocalFirstDraftRepository)
     implementation(libs.kotlinx.serialization.json)
 
-    // Add navigation for Wear
+    // Navigation 3
     implementation(libs.nav3.runtime)
     implementation(libs.nav3.ui)
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     implementation(libs.androidx.compose.material.iconsExtended)
 
     // Additional Compose support
@@ -162,21 +164,33 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.graphics.shapes)
 
-    // Material 3 for Wear OS
-    implementation(libs.androidx.compose.material)
+    // Wear Compose
     implementation(libs.androidx.wear.material3)
     implementation(libs.androidx.wear.foundation)
-    implementation(libs.androidx.wear.navigation)
-    implementation(libs.material)
+    implementation(libs.androidx.wear.compose.navigation3)
+    implementation(libs.androidx.wear.compose.ui.tooling)
+
+    // Wear OS platform libraries
+    implementation(libs.androidx.wear)
+    implementation(libs.androidx.wear.ongoing)
+    implementation(libs.androidx.wear.input)
+    implementation(libs.androidx.wear.phone.interactions)
+    implementation(libs.wear.remote.interactions)
 
     implementation(libs.androidx.wear.tooling.preview)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.splashscreen)
+
+    // Both tiles extend horologist-tiles' SuspendingTileService and draw with protolayout-material;
+    // both go when the tiles move to Material3TileService.
     implementation(libs.androidx.tiles)
-    implementation(libs.androidx.tiles.material)
     implementation(libs.androidx.tiles.tooling.preview)
-    implementation(libs.horologist.compose.tools)
+    implementation(libs.androidx.protolayout)
+    implementation(libs.androidx.protolayout.expression)
+    implementation(libs.androidx.protolayout.material)
+    implementation(libs.androidx.protolayout.material3)
     implementation(libs.horologist.tiles)
     implementation(libs.androidx.watchface.complications.data.source.ktx)
     implementation(libs.androidx.health.services.client)

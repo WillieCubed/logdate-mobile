@@ -59,7 +59,7 @@ jetbrains-material3AdaptiveNav3Mp = "1.3.0-alpha02"
 # Google-published canonical Navigation 3. -runtime is KMP (JVM, Native, Web),
 # -ui is Android-only — iOS/desktop need a custom NavDisplay.
 nav3 = "1.1.1"
-lifecycleViewmodelNav3 = "2.11.0-alpha03"
+lifecycleViewmodelNav3 = "2.11.0"
 
 coil = "3.4.0"
 koin = "4.2.1"
@@ -113,7 +113,7 @@ androidxGlance = "1.2.0"
 androidxExifInterface = "1.4.1"
 androidxWork = "2.11.2"
 healthConnect = "1.2.0-alpha03"
-healthServicesClient = "1.1.0-rc01"
+healthServicesClient = "1.1.0"
 media3 = "1.10.0"
 
 playServicesLocation = "21.3.0"
@@ -135,18 +135,17 @@ firebase-perf-plugin = "2.0.2"
 versioningPlugin = "2.2.0"
 playServicesWearable = "19.0.0"
 composeBom = "2026.05.00"
-composeMaterial = "1.6.1"
 wearToolingPreview = "1.0.0"
-wearComposeMaterial3 = "1.6.1"
-wearComposeFoundation = "1.6.1"
-wearComposeNavigation = "1.6.1"
-tiles = "1.6.0"
-tilesMaterial = "1.6.0"
-tilesTooling = "1.6.0"
-tilesToolingPreview = "1.6.0"
-horologistComposeTools = "0.8.3-alpha"
+wearCompose = "1.7.0"
+tiles = "1.6.2"
+protolayout = "1.4.2"
 horologistTiles = "0.8.3-alpha"
 wearRemoteInteractions = "1.2.0"
+androidxWear = "1.4.0"
+wearOngoing = "1.1.0"
+wearInput = "1.2.0"
+wearPhoneInteractions = "1.1.1"
+graphicsShapes = "1.1.0"
 watchfaceComplicationsDataSourceKtx = "1.3.0"
 uiAndroid = "1.11.1"
 okio = "3.17.0"
@@ -416,17 +415,24 @@ androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest", version.ref = "uiAndroid" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4", version.ref = "uiAndroid" }
-androidx-compose-material = { group = "androidx.wear.compose", name = "compose-material", version.ref = "composeMaterial" }
 androidx-compose-material-iconsExtended = { group = "androidx.compose.material", name = "material-icons-extended" }
-androidx-wear-material3 = { group = "androidx.wear.compose", name = "compose-material3", version.ref = "wearComposeMaterial3" }
-androidx-wear-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "wearComposeFoundation" }
-androidx-wear-navigation = { group = "androidx.wear.compose", name = "compose-navigation", version.ref = "wearComposeNavigation" }
+androidx-wear-material3 = { group = "androidx.wear.compose", name = "compose-material3", version.ref = "wearCompose" }
+androidx-wear-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "wearCompose" }
+androidx-wear-compose-navigation3 = { group = "androidx.wear.compose", name = "compose-navigation3", version.ref = "wearCompose" }
+androidx-wear-compose-ui-tooling = { group = "androidx.wear.compose", name = "compose-ui-tooling", version.ref = "wearCompose" }
 androidx-wear-tooling-preview = { group = "androidx.wear", name = "wear-tooling-preview", version.ref = "wearToolingPreview" }
+androidx-wear = { group = "androidx.wear", name = "wear", version.ref = "androidxWear" }
+androidx-wear-ongoing = { group = "androidx.wear", name = "wear-ongoing", version.ref = "wearOngoing" }
+androidx-wear-input = { group = "androidx.wear", name = "wear-input", version.ref = "wearInput" }
+androidx-wear-phone-interactions = { group = "androidx.wear", name = "wear-phone-interactions", version.ref = "wearPhoneInteractions" }
 androidx-tiles = { group = "androidx.wear.tiles", name = "tiles", version.ref = "tiles" }
-androidx-tiles-material = { group = "androidx.wear.tiles", name = "tiles-material", version.ref = "tilesMaterial" }
-androidx-tiles-tooling = { group = "androidx.wear.tiles", name = "tiles-tooling", version.ref = "tilesTooling" }
-androidx-tiles-tooling-preview = { group = "androidx.wear.tiles", name = "tiles-tooling-preview", version.ref = "tilesToolingPreview" }
-horologist-compose-tools = { group = "com.google.android.horologist", name = "horologist-compose-tools", version.ref = "horologistComposeTools" }
+androidx-tiles-tooling = { group = "androidx.wear.tiles", name = "tiles-tooling", version.ref = "tiles" }
+androidx-tiles-tooling-preview = { group = "androidx.wear.tiles", name = "tiles-tooling-preview", version.ref = "tiles" }
+androidx-protolayout = { group = "androidx.wear.protolayout", name = "protolayout", version.ref = "protolayout" }
+androidx-protolayout-expression = { group = "androidx.wear.protolayout", name = "protolayout-expression", version.ref = "protolayout" }
+androidx-protolayout-material = { group = "androidx.wear.protolayout", name = "protolayout-material", version.ref = "protolayout" }
+androidx-protolayout-material3 = { group = "androidx.wear.protolayout", name = "protolayout-material3", version.ref = "protolayout" }
+androidx-graphics-shapes = { group = "androidx.graphics", name = "graphics-shapes", version.ref = "graphicsShapes" }
 horologist-tiles = { group = "com.google.android.horologist", name = "horologist-tiles", version.ref = "horologistTiles" }
 wear-remote-interactions = { group = "androidx.wear", name = "wear-remote-interactions", version.ref = "wearRemoteInteractions" }
 androidx-watchface-complications-data-source-ktx = { group = "androidx.wear.watchface", name = "watchface-complications-data-source-ktx", version.ref = "watchfaceComplicationsDataSourceKtx" }
