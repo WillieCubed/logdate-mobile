@@ -43,7 +43,7 @@ class DeviceEnrollmentSessionRoutesTest {
     private val publicKey = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32) { it.toByte() })
 
     @Test
-    fun `only the owning account receives one session for a pending request`() =
+    fun `only the owning account can retry the same session for a pending request`() =
         testApplication {
             val tokens = InMemoryTokenService()
             val accounts = InMemoryAccountRepository()
@@ -71,7 +71,9 @@ class DeviceEnrollmentSessionRoutesTest {
                 client.get("/api/v1/device-enrollments/$id") { header(HttpHeaders.Authorization, "Bearer $accessToken") }.status,
             )
 
-            assertError(client.issueSession(owner, id), HttpStatusCode.Conflict, "ENROLLMENT_SESSION_ISSUED")
+            val retry = client.issueSession(owner, id)
+            assertEquals(HttpStatusCode.OK, retry.status)
+            assertEquals(session, Json.parseToJsonElement(retry.bodyAsText()).jsonObject)
             assertError(client.issueSession(other, id), HttpStatusCode.NotFound, "NOT_FOUND")
         }
 
@@ -105,7 +107,7 @@ class DeviceEnrollmentSessionRoutesTest {
             val (issuedThenApproved, issuedCode) = client.createEnrollment(owner)
             assertEquals(HttpStatusCode.OK, client.issueSession(owner, issuedThenApproved).status)
             client.approve(owner, issuedThenApproved, issuedCode)
-            assertError(client.issueSession(owner, issuedThenApproved), HttpStatusCode.Conflict, "ENROLLMENT_SESSION_ISSUED")
+            assertError(client.issueSession(owner, issuedThenApproved), HttpStatusCode.Conflict, "ENROLLMENT_UNAVAILABLE")
         }
 
     @Test

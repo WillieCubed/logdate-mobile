@@ -67,6 +67,13 @@ class TokenServiceDefaultMethodsTest {
 
         override fun validateRefreshToken(token: String): String? = null
 
+        override fun generateEnrollmentTokens(
+            accountId: String,
+            did: String?,
+            enrollmentId: String,
+            issuedAt: kotlin.time.Instant,
+        ): app.logdate.shared.model.AccountTokens = error("Enrollment is unused in this fixture")
+
         override fun generateSessionToken(sessionId: String): String = sessionId
 
         override fun validateSessionToken(token: String): String? = null

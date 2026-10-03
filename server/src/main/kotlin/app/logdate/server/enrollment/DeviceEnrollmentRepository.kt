@@ -185,8 +185,8 @@ class InMemoryDeviceEnrollmentRepository : DeviceEnrollmentRepository {
 internal fun DeviceEnrollment?.sessionIssueResult(): SessionIssueResult =
     when {
         this == null -> SessionIssueResult.NOT_FOUND
-        sessionIssued -> SessionIssueResult.ALREADY_ISSUED
         status != EnrollmentStatus.PENDING -> SessionIssueResult.NOT_PENDING
+        sessionIssued -> SessionIssueResult.ALREADY_ISSUED
         else -> SessionIssueResult.ISSUED
     }
 

@@ -33,6 +33,19 @@ class JwtTokenServiceTest {
     private val audience = "aud-a"
 
     @Test
+    fun `enrollment session is reproducible across issuer restarts and separately revocable`() {
+        val issuedAt = Clock.System.now()
+        val first = JwtTokenService(secret = hmacKey, issuer = issuer, audience = audience)
+        val replay = JwtTokenService(secret = hmacKey, issuer = issuer, audience = audience)
+        val original = first.generateEnrollmentTokens("account", null, "request-one", issuedAt)
+        assertEquals(original, replay.generateEnrollmentTokens("account", null, "request-one", issuedAt))
+        assertEquals("account", replay.validateAccessToken(original.accessToken))
+        assertEquals("account", replay.validateRefreshToken(original.refreshToken))
+        assertNotEquals(original.refreshToken, first.generateEnrollmentTokens("account", null, "request-two", issuedAt).refreshToken)
+        assertNotEquals(original.refreshToken, first.generateRefreshToken("account"))
+    }
+
+    @Test
     fun `generate and validate access refresh and session tokens`() {
         val service = JwtTokenService(secret = hmacKey, issuer = issuer, audience = audience)
 

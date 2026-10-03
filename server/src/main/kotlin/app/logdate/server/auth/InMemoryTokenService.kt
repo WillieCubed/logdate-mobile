@@ -1,8 +1,10 @@
 package app.logdate.server.auth
 
+import app.logdate.shared.model.AccountTokens
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 /**
  * Deterministic [TokenService] for local tests and in-memory server fixtures.
@@ -36,6 +38,25 @@ class InMemoryTokenService(
 
         val tokenData = "refresh.$accountId.${expiresAt.epochSeconds}"
         return "memory_${tokenData.hashCode().toString(16)}_$tokenData"
+    }
+
+    override fun generateEnrollmentTokens(
+        accountId: String,
+        did: String?,
+        enrollmentId: String,
+        issuedAt: Instant,
+    ): AccountTokens {
+        fun token(
+            type: String,
+            expiry: Instant,
+        ): String {
+            val data = "$type.$accountId.${expiry.epochSeconds}"
+            return "memory_${("$enrollmentId:$data").hashCode().toString(16)}_$data"
+        }
+        return AccountTokens(
+            token("access", issuedAt + accessTokenExpiration),
+            token("refresh", issuedAt + refreshTokenExpiration),
+        )
     }
 
     override fun generateSessionToken(sessionId: String): String {

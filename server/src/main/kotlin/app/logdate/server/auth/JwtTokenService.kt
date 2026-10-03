@@ -1,5 +1,6 @@
 package app.logdate.server.auth
 
+import app.logdate.shared.model.AccountTokens
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -13,6 +14,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -104,6 +106,31 @@ class JwtTokenService(
             )
 
         return generateToken(payload)
+    }
+
+    override fun generateEnrollmentTokens(
+        accountId: String,
+        did: String?,
+        enrollmentId: String,
+        issuedAt: Instant,
+    ): AccountTokens {
+        val access =
+            JwtPayload(
+                sub = accountId,
+                iss = issuer,
+                aud = audience,
+                exp = (issuedAt + ACCESS_TOKEN_DURATION).epochSeconds,
+                iat = issuedAt.epochSeconds,
+                type = "access",
+                did = did,
+            )
+        val refresh =
+            access.copy(
+                exp = (issuedAt + REFRESH_TOKEN_DURATION).epochSeconds,
+                type = "refresh",
+                jti = "device-enrollment:$enrollmentId",
+            )
+        return AccountTokens(generateToken(access), generateToken(refresh))
     }
 
     override fun generateSessionToken(sessionId: String): String {

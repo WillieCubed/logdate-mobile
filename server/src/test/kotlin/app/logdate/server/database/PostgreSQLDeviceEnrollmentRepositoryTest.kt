@@ -102,10 +102,13 @@ class PostgreSQLDeviceEnrollmentRepositoryTest {
                 assertEquals(SessionIssueResult.NOT_FOUND, repository.markSessionIssued(other, enrollment.id, now))
                 assertEquals(SessionIssueResult.NOT_FOUND, repository.markSessionIssued(owner, enrollment.id, now + 60_000))
                 assertEquals(SessionIssueResult.ISSUED, repository.markSessionIssued(owner, enrollment.id, now))
-                assertEquals(SessionIssueResult.ALREADY_ISSUED, repository.markSessionIssued(owner, enrollment.id, now))
+                assertEquals(
+                    SessionIssueResult.ALREADY_ISSUED,
+                    PostgreSQLDeviceEnrollmentRepository().markSessionIssued(owner, enrollment.id, now),
+                )
                 assertTrue(repository.get(owner, enrollment.id, now)?.sessionIssued == true)
                 assertTrue(repository.approve(owner, enrollment.id, "123456", "opaque", now))
-                assertEquals(SessionIssueResult.ALREADY_ISSUED, repository.markSessionIssued(owner, enrollment.id, now))
+                assertEquals(SessionIssueResult.NOT_PENDING, repository.markSessionIssued(owner, enrollment.id, now))
             }
         }
 }

@@ -1,5 +1,8 @@
 package app.logdate.server.auth
 
+import app.logdate.shared.model.AccountTokens
+import kotlin.time.Instant
+
 /**
  * Service for generating and validating JWT tokens for LogDate Cloud authentication.
  *
@@ -24,6 +27,14 @@ interface TokenService {
         accountId: String,
         did: String? = null,
     ): String
+
+    /** Reproduce a pending enrollment's session after a lost response or server restart. */
+    fun generateEnrollmentTokens(
+        accountId: String,
+        did: String?,
+        enrollmentId: String,
+        issuedAt: Instant,
+    ): AccountTokens
 
     /**
      * Validate an access token and extract the account ID.

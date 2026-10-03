@@ -10,7 +10,6 @@ import app.logdate.server.enrollment.SessionIssueResult
 import app.logdate.server.responses.error
 import app.logdate.server.routes.docs.DeviceEnrollmentDocs
 import app.logdate.server.routes.sync.extractUserId
-import app.logdate.shared.model.AccountTokens
 import io.github.smiley4.ktoropenapi.delete
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
@@ -27,6 +26,7 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
 import java.util.UUID
+import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 
 private const val ENROLLMENT_LIFETIME_MS = 5 * 60 * 1_000L
@@ -196,11 +196,7 @@ private fun Route.transferEnrollmentRoute(
     }
 }
 
-/**
- * Mints the new device's own account session, exactly as a sign-in does, so each device refreshes and logs
- * out independently. The tokens are minted before the request is reserved, so a failure never burns it, and
- * are discarded unless this call is the one that reserves it.
- */
+/** Replays one independent session from durable enrollment metadata while approval is pending. */
 @OptIn(ExperimentalUuidApi::class)
 private fun Route.issueEnrollmentSessionRoute(
     tokenService: TokenService,
@@ -216,16 +212,20 @@ private fun Route.issueEnrollmentSessionRoute(
         val account =
             accountRepository.findById(accountId.toKotlinUuid())
                 ?: return@post call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Enrollment unavailable"))
-        val subject = account.id.toString()
-        val tokens =
-            AccountTokens(
-                accessToken = tokenService.generateAccessToken(subject, account.did),
-                refreshToken = tokenService.generateRefreshToken(subject, account.did),
-            )
-        when (repository.markSessionIssued(accountId, id, System.currentTimeMillis())) {
-            SessionIssueResult.ISSUED -> call.respond(tokens)
-            SessionIssueResult.ALREADY_ISSUED ->
-                call.respond(HttpStatusCode.Conflict, error("ENROLLMENT_SESSION_ISSUED", "Device session already issued"))
+        val now = System.currentTimeMillis()
+        val enrollment =
+            repository.get(accountId, id, now)
+                ?: return@post call.respond(HttpStatusCode.NotFound, error("NOT_FOUND", "Enrollment unavailable"))
+        when (repository.markSessionIssued(accountId, id, now)) {
+            SessionIssueResult.ISSUED, SessionIssueResult.ALREADY_ISSUED ->
+                call.respond(
+                    tokenService.generateEnrollmentTokens(
+                        account.id.toString(),
+                        account.did,
+                        id.toString(),
+                        Instant.fromEpochMilliseconds(enrollment.expiresAt - ENROLLMENT_LIFETIME_MS),
+                    ),
+                )
             SessionIssueResult.NOT_PENDING ->
                 call.respond(HttpStatusCode.Conflict, error("ENROLLMENT_UNAVAILABLE", "Enrollment unavailable"))
             SessionIssueResult.NOT_FOUND ->

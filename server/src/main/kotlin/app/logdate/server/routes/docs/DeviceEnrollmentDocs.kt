@@ -155,8 +155,9 @@ internal object DeviceEnrollmentDocs {
             from the caller's own: the new device refreshes them on its own, and logging out on either device
             leaves the other signed in.
 
-            Each request issues one session. A repeated call answers `409 ENROLLMENT_SESSION_ISSUED`; to try
-            again, start a new request. The response is marked `Cache-Control: no-store`.
+            Each request issues one session. Repeated calls return identical tokens while the request is
+            pending, including after a lost response or server restart. Approval, rejection, cancellation,
+            and expiry end that replay window. The response is marked `Cache-Control: no-store`.
             """,
         )
         request { enrollmentId() }
@@ -176,11 +177,6 @@ internal object DeviceEnrollmentDocs {
             )
             syncError(
                 HttpStatusCode.Conflict,
-                ErrorCase(
-                    "ENROLLMENT_SESSION_ISSUED",
-                    "A session was already issued for this request. Start a new request.",
-                    "Device session already issued",
-                ),
                 ErrorCase("ENROLLMENT_UNAVAILABLE", "The request is no longer pending.", "Enrollment unavailable"),
             )
             syncUnauthorized()

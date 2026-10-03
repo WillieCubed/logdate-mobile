@@ -69,7 +69,7 @@ class DeviceEnrollmentRepositoryTest {
             assertEquals(SessionIssueResult.ISSUED, repository.markSessionIssued(account, request.id, now = 100))
             assertEquals(SessionIssueResult.ALREADY_ISSUED, repository.markSessionIssued(account, request.id, now = 100))
             assertTrue(repository.approve(account, request.id, "333333", "envelope", now = 100))
-            assertEquals(SessionIssueResult.ALREADY_ISSUED, repository.markSessionIssued(account, request.id, now = 100))
+            assertEquals(SessionIssueResult.NOT_PENDING, repository.markSessionIssued(account, request.id, now = 100))
 
             val approved = DeviceEnrollment(UUID.randomUUID(), account, "Mac", "key", "444444", expiresAt = 1_000)
             repository.create(approved)
