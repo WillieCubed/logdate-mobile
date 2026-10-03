@@ -83,6 +83,7 @@ kotlin {
             implementation(libs.kotlinx.serialization.core)
             implementation(libs.coil.compose)
             implementation(libs.multiplatform.markdown.renderer)
+            implementation(libs.androidx.graphics.shapes)
             // Koin
             implementation(project.dependencies.platform(libs.koin.bom))
             implementation(libs.koin.core)
