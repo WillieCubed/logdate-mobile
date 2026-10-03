@@ -5,16 +5,18 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.watch.WatchNotificationSettings
 import app.logdate.client.domain.watch.WatchSettingsRepository
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
  * ViewModel for the watch settings hub and detail screens.
  *
- * Exposes the current watch connection state and notification settings, and provides actions
- * for pairing, syncing and managing the watch app.
+ * Exposes the current watch connection state and notification settings, sends requests to the
+ * watch, and records why the last one failed so the screens can say so.
  */
 class WatchSettingsViewModel(
     private val connectionManager: WatchConnectionManager,
@@ -29,6 +31,11 @@ class WatchSettingsViewModel(
         settingsRepository
             .observeNotificationSettings()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WatchNotificationSettings())
+
+    private val _requestFailure = MutableStateFlow<WatchRequestFailure?>(null)
+
+    /** Why the last Install or Open request didn't go through; cleared when the next one starts. */
+    val requestFailure: StateFlow<WatchRequestFailure?> = _requestFailure.asStateFlow()
 
     fun beginAssociation() {
         viewModelScope.launch {
@@ -51,23 +58,11 @@ class WatchSettingsViewModel(
     }
 
     fun installAppOnWatch() {
-        viewModelScope.launch {
-            try {
-                connectionManager.installAppOnWatch()
-            } catch (e: Exception) {
-                Napier.e(e) { "Failed to launch install on watch" }
-            }
-        }
+        sendToWatch { connectionManager.installAppOnWatch() }
     }
 
     fun openAppOnWatch() {
-        viewModelScope.launch {
-            try {
-                connectionManager.openAppOnWatch()
-            } catch (e: Exception) {
-                Napier.e(e) { "Failed to open app on watch" }
-            }
-        }
+        sendToWatch { connectionManager.openAppOnWatch() }
     }
 
     // Notification settings mutations
@@ -79,6 +74,17 @@ class WatchSettingsViewModel(
             } catch (e: Exception) {
                 Napier.e(e) { "Failed to update entry notifications setting" }
             }
+        }
+    }
+
+    private fun sendToWatch(request: suspend () -> WatchRequestResult) {
+        viewModelScope.launch {
+            _requestFailure.value = null
+            _requestFailure.value =
+                when (val result = request()) {
+                    WatchRequestResult.Sent -> null
+                    is WatchRequestResult.Failed -> result.reason
+                }
         }
     }
 }

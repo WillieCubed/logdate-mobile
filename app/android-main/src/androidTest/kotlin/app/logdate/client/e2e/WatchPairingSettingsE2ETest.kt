@@ -16,6 +16,8 @@ import app.logdate.client.testing.navigation.NavigationTestDestination
 import app.logdate.client.testing.onboarding.OnboardingTestFixture
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionState
+import app.logdate.feature.core.settings.ui.watch.WatchRequestFailure
+import app.logdate.feature.core.settings.ui.watch.WatchRequestResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -120,6 +122,25 @@ class WatchPairingSettingsE2ETest {
         assertEquals(1, fakeConnectionManager.installCalls)
         assertEquals(1, fakeConnectionManager.openCalls)
     }
+
+    @Test
+    fun `troubleshooting says why the watch did not open LogDate`() {
+        fakeConnectionManager.updateState(
+            WatchConnectionState.Connected(
+                watchName = "Pixel Watch",
+                lastSynced = null,
+                pendingCount = 0,
+            ),
+        )
+        fakeConnectionManager.openResult = WatchRequestResult.Failed(WatchRequestFailure.WATCH_DID_NOT_RESPOND)
+
+        composeRule.onNodeWithText("Troubleshooting").performClick()
+        composeRule.onNodeWithText("Open LogDate on watch").performClick()
+
+        composeRule
+            .onNodeWithText("Your watch didn't respond. Unlock it, move it close to your phone, and try again.")
+            .assertIsDisplayed()
+    }
 }
 
 private class WatchLaunchOverrideRule(
@@ -154,6 +175,8 @@ private class RecordingWatchConnectionManager : WatchConnectionManager {
         private set
     var openCalls: Int = 0
         private set
+    var installResult: WatchRequestResult = WatchRequestResult.Sent
+    var openResult: WatchRequestResult = WatchRequestResult.Sent
 
     fun reset() {
         state.value = WatchConnectionState.Loading
@@ -161,6 +184,8 @@ private class RecordingWatchConnectionManager : WatchConnectionManager {
         requestSyncCalls = 0
         installCalls = 0
         openCalls = 0
+        installResult = WatchRequestResult.Sent
+        openResult = WatchRequestResult.Sent
     }
 
     fun updateState(connectionState: WatchConnectionState) {
@@ -177,12 +202,14 @@ private class RecordingWatchConnectionManager : WatchConnectionManager {
         requestSyncCalls++
     }
 
-    override suspend fun installAppOnWatch() {
+    override suspend fun installAppOnWatch(): WatchRequestResult {
         installCalls++
+        return installResult
     }
 
-    override suspend fun openAppOnWatch() {
+    override suspend fun openAppOnWatch(): WatchRequestResult {
         openCalls++
+        return openResult
     }
 }
 

@@ -520,6 +520,7 @@ dependencies {
     testImplementation(libs.nav3.runtime)
     testImplementation(libs.androidx.health.connect)
     testImplementation(libs.play.services.wearable)
+    testImplementation(libs.wear.remote.interactions)
     testImplementation(projects.client.feature.core)
     testImplementation(projects.client.database)
     testImplementation(projects.client.domain)

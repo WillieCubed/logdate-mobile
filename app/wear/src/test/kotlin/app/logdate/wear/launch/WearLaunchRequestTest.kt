@@ -49,4 +49,16 @@ class WearLaunchRequestTest {
         assertNull(WearLaunchRequest.parse(null))
         assertNull(WearLaunchRequest.parse("unknown"))
     }
+
+    @Test
+    fun `the Today link from the phone opens Home`() {
+        assertEquals(WearLaunchRequest.Home, WearLaunchRequest.parseLink("studio.hypertext.logdate://watch/today"))
+    }
+
+    @Test
+    fun `any other link is no request`() {
+        assertNull(WearLaunchRequest.parseLink(null))
+        assertNull(WearLaunchRequest.parseLink("studio.hypertext.logdate://watch/other"))
+        assertNull(WearLaunchRequest.parseLink("studio.hypertext.logdate://journal/today"))
+    }
 }

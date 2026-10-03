@@ -44,6 +44,11 @@
     <string name="watch_troubleshooting_common_issues">Common issues</string>
     <string name="watch_troubleshooting_tips">• Make sure Bluetooth is enabled on both devices\n• Keep your watch and phone within range of each other\n• Check that battery saver is not restricting LogDate\n• Restart both devices if sync seems stuck</string>
 
+    <!-- Watch requests -->
+    <string name="watch_request_failed_no_watch">No watch is connected to this phone. Bring your watch close with Bluetooth on, then try again.</string>
+    <string name="watch_request_failed_not_installed">LogDate isn&apos;t installed on your watch yet. Install it first.</string>
+    <string name="watch_request_failed_no_response">Your watch didn&apos;t respond. Unlock it, move it close to your phone, and try again.</string>
+
     <!-- Watch privacy -->
     <string name="watch_privacy_title">Your data stays on your devices</string>
     <string name="watch_privacy_description">Entries captured on your watch sync directly to this phone over Bluetooth. Nothing is sent to the cloud unless you enable cloud sync separately.</string>

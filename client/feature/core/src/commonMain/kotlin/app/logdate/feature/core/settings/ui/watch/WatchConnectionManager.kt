@@ -25,12 +25,13 @@ interface WatchConnectionManager {
     suspend fun requestSync()
 
     /**
-     * Launches the Play Store on the watch to install LogDate.
+     * Opens LogDate's Play Store listing on a connected watch: one without LogDate so it can be
+     * installed, or else one that has it so it can be updated.
      */
-    suspend fun installAppOnWatch()
+    suspend fun installAppOnWatch(): WatchRequestResult
 
     /**
-     * Opens LogDate on the connected watch.
+     * Opens LogDate at Today on a connected watch that has it installed.
      */
-    suspend fun openAppOnWatch()
+    suspend fun openAppOnWatch(): WatchRequestResult
 }

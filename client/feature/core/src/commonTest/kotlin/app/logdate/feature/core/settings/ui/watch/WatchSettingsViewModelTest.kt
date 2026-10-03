@@ -19,6 +19,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 /**
  * Unit tests for [WatchSettingsViewModel].
@@ -78,8 +79,32 @@ class WatchSettingsViewModelTest {
             )
         }
 
+    @Test
+    fun `a request the watch could not take is shown until the next request`() =
+        runTest {
+            val connectionManager =
+                FakeWatchConnectionManager(
+                    openResult = WatchRequestResult.Failed(WatchRequestFailure.NOT_INSTALLED_ON_WATCH),
+                )
+            val viewModel =
+                WatchSettingsViewModel(
+                    connectionManager = connectionManager,
+                    settingsRepository = FakeWatchSettingsRepository(),
+                )
+
+            viewModel.openAppOnWatch()
+            advanceUntilIdle()
+            assertEquals(WatchRequestFailure.NOT_INSTALLED_ON_WATCH, viewModel.requestFailure.value)
+
+            viewModel.installAppOnWatch()
+            advanceUntilIdle()
+            assertNull(viewModel.requestFailure.value)
+        }
+
     private class FakeWatchConnectionManager(
         initialState: WatchConnectionState = WatchConnectionState.Loading,
+        private val installResult: WatchRequestResult = WatchRequestResult.Sent,
+        private val openResult: WatchRequestResult = WatchRequestResult.Sent,
     ) : WatchConnectionManager {
         private val state = MutableStateFlow(initialState)
 
@@ -94,11 +119,9 @@ class WatchSettingsViewModelTest {
         override suspend fun requestSync() {
         }
 
-        override suspend fun installAppOnWatch() {
-        }
+        override suspend fun installAppOnWatch(): WatchRequestResult = installResult
 
-        override suspend fun openAppOnWatch() {
-        }
+        override suspend fun openAppOnWatch(): WatchRequestResult = openResult
     }
 
     private class FakeWatchSettingsRepository : WatchSettingsRepository {

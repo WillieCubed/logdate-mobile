@@ -231,6 +231,22 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!--
+                "Open LogDate on watch" on the phone sends this link through
+                RemoteActivityHelper, which only delivers browsable VIEW intents.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:scheme="studio.hypertext.logdate"
+                    android:host="watch"
+                    android:path="/today" />
+            </intent-filter>
         </activity>
     </application>
 

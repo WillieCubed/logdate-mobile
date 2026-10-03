@@ -91,6 +91,7 @@ import app.logdate.feature.core.settings.ui.labs.LabsSettingsContent
 import app.logdate.feature.core.settings.ui.labs.LabsUiState
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionState
 import app.logdate.feature.core.settings.ui.watch.WatchNotificationSettingsContent
+import app.logdate.feature.core.settings.ui.watch.WatchRequestFailure
 import app.logdate.feature.core.settings.ui.watch.WatchSettingsContent
 import app.logdate.feature.core.settings.ui.watch.WatchTroubleshootingContent
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
@@ -218,6 +219,7 @@ enum class SharedScreenshotSceneId(
     WatchSettings("watch-settings"),
     WatchNotificationSettings("watch-notification-settings"),
     WatchTroubleshooting("watch-troubleshooting"),
+    WatchTroubleshootingRequestFailed("watch-troubleshooting-request-failed"),
     EventsSettings("events-settings"),
     CalendarSyncSettings("calendar-sync-settings"),
     SearchIdle("search-idle"),
@@ -1184,6 +1186,7 @@ object SharedScreenshotCatalog {
                             lastSynced = baseInstant,
                             pendingCount = 2,
                         ),
+                    requestFailure = null,
                     onBack = {},
                     onBeginAssociation = {},
                     onRequestSync = {},
@@ -1205,6 +1208,22 @@ object SharedScreenshotCatalog {
                         WatchConnectionState.AppNotInstalled(
                             watchName = "Pixel Watch 3",
                         ),
+                    requestFailure = null,
+                    onBack = {},
+                    onBeginAssociation = {},
+                    onInstallOnWatch = {},
+                    onOpenOnWatch = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.WatchTroubleshootingRequestFailed, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                WatchTroubleshootingContent(
+                    connectionState =
+                        WatchConnectionState.Connected(
+                            watchName = "Pixel Watch 3",
+                            lastSynced = baseInstant,
+                            pendingCount = 0,
+                        ),
+                    requestFailure = WatchRequestFailure.WATCH_DID_NOT_RESPOND,
                     onBack = {},
                     onBeginAssociation = {},
                     onInstallOnWatch = {},

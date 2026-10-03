@@ -55,9 +55,11 @@ fun WatchTroubleshootingScreen(
     modifier: Modifier = Modifier,
 ) {
     val connectionState by viewModel.connectionState.collectAsState()
+    val requestFailure by viewModel.requestFailure.collectAsState()
 
     WatchTroubleshootingContent(
         connectionState = connectionState,
+        requestFailure = requestFailure,
         onBack = onBack,
         onBeginAssociation = viewModel::beginAssociation,
         onInstallOnWatch = viewModel::installAppOnWatch,
@@ -69,6 +71,7 @@ fun WatchTroubleshootingScreen(
 @Composable
 fun WatchTroubleshootingContent(
     connectionState: WatchConnectionState,
+    requestFailure: WatchRequestFailure?,
     onBack: () -> Unit,
     onBeginAssociation: () -> Unit,
     onInstallOnWatch: () -> Unit,
@@ -88,6 +91,7 @@ fun WatchTroubleshootingContent(
             ) {
                 WatchTroubleshootingActions(
                     connectionState = connectionState,
+                    requestFailure = requestFailure,
                     onBeginAssociation = onBeginAssociation,
                     onInstallOnWatch = onInstallOnWatch,
                     onOpenOnWatch = onOpenOnWatch,
@@ -114,6 +118,7 @@ fun WatchTroubleshootingContent(
                 item {
                     WatchTroubleshootingActions(
                         connectionState = connectionState,
+                        requestFailure = requestFailure,
                         onBeginAssociation = onBeginAssociation,
                         onInstallOnWatch = onInstallOnWatch,
                         onOpenOnWatch = onOpenOnWatch,
@@ -131,6 +136,7 @@ fun WatchTroubleshootingContent(
 @Composable
 private fun WatchTroubleshootingActions(
     connectionState: WatchConnectionState,
+    requestFailure: WatchRequestFailure?,
     onBeginAssociation: () -> Unit,
     onInstallOnWatch: () -> Unit,
     onOpenOnWatch: () -> Unit,
@@ -182,6 +188,7 @@ private fun WatchTroubleshootingActions(
                 Spacer(Modifier.width(Spacing.sm))
                 Text(stringResource(Res.string.watch_troubleshooting_open))
             }
+            requestFailure?.let { WatchRequestFailureMessage(it) }
         }
     }
 }

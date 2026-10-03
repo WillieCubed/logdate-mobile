@@ -44,6 +44,12 @@ sealed interface WearLaunchRequest {
         /** The intent extra that names the note a `moment` route opens. */
         const val EXTRA_NOTE_ID = "note_id"
 
+        /** The link the phone's "Open LogDate on watch" sends. */
+        private const val TODAY_LINK = "studio.hypertext.logdate://watch/today"
+
+        /** Parses a link the phone sent to this watch, or null for a link this app doesn't open. */
+        fun parseLink(link: String?): WearLaunchRequest? = if (link == TODAY_LINK) Home else null
+
         /**
          * Parses a route name and, for `moment`, its note ID. Returns null for a missing or unknown
          * route, and for a `moment` without a valid note ID.
@@ -74,4 +80,4 @@ fun Intent.toWearLaunchRequest(): WearLaunchRequest? =
     WearLaunchRequest.parse(
         route = getStringExtra(WearLaunchRequest.EXTRA_ROUTE),
         noteId = getStringExtra(WearLaunchRequest.EXTRA_NOTE_ID),
-    )
+    ) ?: WearLaunchRequest.parseLink(dataString)

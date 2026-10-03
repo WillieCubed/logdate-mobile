@@ -6,11 +6,15 @@ import android.net.Uri
 import androidx.wear.remote.interactions.RemoteActivityHelper
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionState
+import app.logdate.feature.core.settings.ui.watch.WatchRequestFailure
+import app.logdate.feature.core.settings.ui.watch.WatchRequestResult
 import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.MessageClient
+import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.NodeClient
 import com.google.android.gms.wearable.Wearable
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -19,9 +23,26 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
 
 private const val WATCH_CAPABILITY = "logdate_watch_app"
 private const val SYNC_REQUEST_PATH = "/logdate/sync/request"
+private const val REMOTE_START_TIMEOUT_SECONDS = 15L
+
+/** Opens LogDate on the watch at Today. The watch's MainActivity declares a matching VIEW filter. */
+const val WATCH_TODAY_LINK = "studio.hypertext.logdate://watch/today"
+
+/** LogDate's Play Store listing, which the watch opens in its own Play Store. */
+fun playListingLink(packageName: String): String = "market://details?id=$packageName"
+
+/**
+ * The only intent shape [RemoteActivityHelper] starts on another device: ACTION_VIEW with a data
+ * URI and CATEGORY_BROWSABLE. Anything else fails with IllegalArgumentException before it is sent.
+ */
+fun watchLinkIntent(link: String): Intent =
+    Intent(Intent.ACTION_VIEW)
+        .addCategory(Intent.CATEGORY_BROWSABLE)
+        .setData(Uri.parse(link))
 
 /**
  * Android implementation of [WatchConnectionManager] using Wear transport plus
@@ -31,12 +52,12 @@ class AndroidWatchConnectionManager(
     private val context: Context,
     private val associationManager: WatchCompanionAssociationManager,
     private val ioDispatcher: CoroutineDispatcher,
+    private val nodeClient: NodeClient = Wearable.getNodeClient(context),
+    private val capabilityClient: CapabilityClient = Wearable.getCapabilityClient(context),
+    private val messageClient: MessageClient = Wearable.getMessageClient(context),
+    private val remoteActivityHelper: RemoteActivityHelper = RemoteActivityHelper(context),
+    private val linkIntent: (String) -> Intent = ::watchLinkIntent,
 ) : WatchConnectionManager {
-    private val nodeClient: NodeClient = Wearable.getNodeClient(context)
-    private val capabilityClient: CapabilityClient = Wearable.getCapabilityClient(context)
-    private val messageClient: MessageClient = Wearable.getMessageClient(context)
-    private val remoteActivityHelper: RemoteActivityHelper = RemoteActivityHelper(context)
-
     override fun observeConnectionState(): Flow<WatchConnectionState> =
         combine(
             associationManager.observeAssociationState(),
@@ -57,38 +78,65 @@ class AndroidWatchConnectionManager(
         }
     }
 
-    override suspend fun installAppOnWatch() {
-        val targetNode = nodeClient.connectedNodes.await().firstOrNull() ?: return
-
-        val playStoreIntent =
-            Intent(Intent.ACTION_VIEW)
-                .addCategory(Intent.CATEGORY_BROWSABLE)
-                .setData(Uri.parse("market://details?id=${context.packageName}"))
-
-        try {
-            withContext(ioDispatcher) {
-                remoteActivityHelper.startRemoteActivity(playStoreIntent, targetNode.id).get()
-            }
-        } catch (e: Exception) {
-            Napier.e(e) { "Failed to launch Play Store on watch" }
-        }
+    override suspend fun installAppOnWatch(): WatchRequestResult {
+        val watches = connectedWatches() ?: return WatchRequestResult.Failed(WatchRequestFailure.NO_WATCH_CONNECTED)
+        val target =
+            watches.withoutApp.firstOrNull()
+                ?: watches.withApp.firstOrNull()
+                ?: return WatchRequestResult.Failed(WatchRequestFailure.NO_WATCH_CONNECTED)
+        return startOnWatch(playListingLink(context.packageName), target)
     }
 
-    override suspend fun openAppOnWatch() {
-        val targetNode = nodeClient.connectedNodes.await().firstOrNull() ?: return
+    override suspend fun openAppOnWatch(): WatchRequestResult {
+        val watches = connectedWatches() ?: return WatchRequestResult.Failed(WatchRequestFailure.NO_WATCH_CONNECTED)
+        if (watches.isEmpty()) return WatchRequestResult.Failed(WatchRequestFailure.NO_WATCH_CONNECTED)
+        val target = watches.withApp.firstOrNull() ?: return WatchRequestResult.Failed(WatchRequestFailure.NOT_INSTALLED_ON_WATCH)
+        return startOnWatch(WATCH_TODAY_LINK, target)
+    }
 
-        val launchIntent =
-            Intent(Intent.ACTION_MAIN)
-                .addCategory(Intent.CATEGORY_LAUNCHER)
-                .setPackage(context.packageName)
-
+    private suspend fun startOnWatch(
+        link: String,
+        watch: Node,
+    ): WatchRequestResult =
         try {
             withContext(ioDispatcher) {
-                remoteActivityHelper.startRemoteActivity(launchIntent, targetNode.id).get()
+                remoteActivityHelper
+                    .startRemoteActivity(linkIntent(link), watch.id)
+                    .get(REMOTE_START_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             }
+            WatchRequestResult.Sent
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            Napier.e(e) { "Failed to open app on watch" }
+            Napier.e(e) { "${watch.displayName} did not open $link" }
+            WatchRequestResult.Failed(WatchRequestFailure.WATCH_DID_NOT_RESPOND)
         }
+
+    /** The connected watches, split by whether they have LogDate, or null when the Wearable API failed. */
+    private suspend fun connectedWatches(): ConnectedWatches? =
+        try {
+            val connected = nodeClient.connectedNodes.await()
+            val withAppIds =
+                capabilityClient
+                    .getCapability(WATCH_CAPABILITY, CapabilityClient.FILTER_ALL)
+                    .await()
+                    .nodes
+                    .map { it.id }
+                    .toSet()
+            val (withApp, withoutApp) = connected.partition { it.id in withAppIds }
+            ConnectedWatches(withApp = withApp, withoutApp = withoutApp)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.e(e) { "Could not list the watches connected to this phone" }
+            null
+        }
+
+    private class ConnectedWatches(
+        val withApp: List<Node>,
+        val withoutApp: List<Node>,
+    ) {
+        fun isEmpty(): Boolean = withApp.isEmpty() && withoutApp.isEmpty()
     }
 
     /** Watches Wear capability changes and refreshes the current transport snapshot. */

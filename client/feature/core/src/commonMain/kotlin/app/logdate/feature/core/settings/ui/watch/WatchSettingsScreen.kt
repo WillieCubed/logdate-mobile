@@ -80,9 +80,11 @@ fun WatchSettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val connectionState by viewModel.connectionState.collectAsState()
+    val requestFailure by viewModel.requestFailure.collectAsState()
 
     WatchSettingsContent(
         connectionState = connectionState,
+        requestFailure = requestFailure,
         onBack = onBack,
         onBeginAssociation = viewModel::beginAssociation,
         onRequestSync = viewModel::requestSync,
@@ -96,6 +98,7 @@ fun WatchSettingsScreen(
 @Composable
 fun WatchSettingsContent(
     connectionState: WatchConnectionState,
+    requestFailure: WatchRequestFailure?,
     onBack: () -> Unit,
     onBeginAssociation: () -> Unit,
     onRequestSync: () -> Unit,
@@ -118,6 +121,7 @@ fun WatchSettingsContent(
             ) {
                 ConnectionStatusCard(
                     connectionState = connectionState,
+                    requestFailure = requestFailure,
                     onBeginAssociation = onBeginAssociation,
                     onInstallOnWatch = onInstallOnWatch,
                     modifier = Modifier.padding(horizontal = Spacing.lg),
@@ -151,6 +155,7 @@ fun WatchSettingsContent(
                 item {
                     ConnectionStatusCard(
                         connectionState = connectionState,
+                        requestFailure = requestFailure,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                         onBeginAssociation = onBeginAssociation,
                         onInstallOnWatch = onInstallOnWatch,
@@ -269,6 +274,7 @@ private fun WatchTroubleshootingSection(onNavigateToTroubleshooting: () -> Unit)
 @Composable
 private fun ConnectionStatusCard(
     connectionState: WatchConnectionState,
+    requestFailure: WatchRequestFailure?,
     onBeginAssociation: () -> Unit,
     onInstallOnWatch: () -> Unit,
     modifier: Modifier = Modifier,
@@ -398,6 +404,7 @@ private fun ConnectionStatusCard(
                     Button(onClick = onInstallOnWatch) {
                         Text(stringResource(Res.string.watch_install_on_watch))
                     }
+                    requestFailure?.let { WatchRequestFailureMessage(it) }
                 }
             }
 
