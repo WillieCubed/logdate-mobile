@@ -10,13 +10,17 @@ import app.logdate.client.permissions.PermissionType
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncResult
 import app.logdate.client.sync.SyncStatus
-import app.logdate.wear.sync.WearDataLayerClient
+import app.logdate.wear.sync.PhoneReachability
+import app.logdate.wear.sync.ReachablePhone
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -28,21 +32,22 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
- * Tests for [WearSettingsViewModel], focusing on the accurate representation of system
- * synchronization and connectivity status on Wear OS.
- *
- * These tests verify that the settings UI correctly reflects the state of the connected phone,
- * including its reachability, pending upload counts, and any synchronization errors, while
- * also ensuring that manual sync requests are properly dispatched to the underlying manager.
+ * Tests [WearSettingsViewModel]. The phone, the sync status and the location settings are followed as
+ * they change; only the location permission is read again, on resume.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class WearSettingsViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
+    private val phone = MutableStateFlow<ReachablePhone?>(null)
+    private val status =
+        MutableStateFlow(
+            SyncStatus(isEnabled = false, lastSyncTime = null, pendingUploads = 0, isSyncing = false, hasErrors = false),
+        )
+    private val locationSettings = MutableStateFlow(LocationTrackingSettings())
     private lateinit var syncManager: SyncManager
-    private lateinit var dataLayerClient: WearDataLayerClient
     private lateinit var locationSettingsRepository: LocationTrackingSettingsRepository
     private lateinit var permissionManager: PermissionManager
     private lateinit var locationTrackingManager: LocationTrackingManager
@@ -51,20 +56,11 @@ class WearSettingsViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         syncManager = mockk(relaxed = true)
-        dataLayerClient = mockk(relaxed = true)
         locationSettingsRepository = mockk(relaxed = true)
         permissionManager = mockk(relaxed = true)
         locationTrackingManager = mockk(relaxed = true)
-        coEvery { syncManager.getSyncStatus() } returns
-            SyncStatus(
-                isEnabled = false,
-                lastSyncTime = null,
-                pendingUploads = 0,
-                isSyncing = false,
-                hasErrors = false,
-            )
-        coEvery { dataLayerClient.getConnectedPhoneName() } returns null
-        coEvery { locationSettingsRepository.getSettings() } returns LocationTrackingSettings()
+        every { syncManager.syncStatusFlow } returns status
+        every { locationSettingsRepository.observeSettings() } returns locationSettings
         coEvery { locationSettingsRepository.setBackgroundTrackingEnabled(any()) } returns Unit
         coEvery { locationSettingsRepository.setCaptureMode(any()) } returns Unit
     }
@@ -77,7 +73,7 @@ class WearSettingsViewModelTest {
     private fun createViewModel(): WearSettingsViewModel =
         WearSettingsViewModel(
             syncManager,
-            dataLayerClient,
+            PhoneReachability { phone },
             locationSettingsRepository,
             permissionManager,
             locationTrackingManager,
@@ -86,9 +82,8 @@ class WearSettingsViewModelTest {
     @Test
     fun `initial state is disconnected with no sync info`() =
         runTest {
-            val viewModel = createViewModel()
-            viewModel.uiState.test {
-                val state = awaitItem()
+            createViewModel().uiState.test {
+                val state = expectMostRecentItem()
                 assertFalse(state.isPhoneConnected)
                 assertNull(state.phoneName)
                 assertNull(state.lastSyncTime)
@@ -98,154 +93,147 @@ class WearSettingsViewModelTest {
                 assertTrue(state.autoTagJournalEntries)
                 assertFalse(state.backgroundLocationEnabled)
                 assertEquals(LocationCaptureMode.PASSIVE, state.locationCaptureMode)
-                viewModel.stopPolling()
             }
         }
 
     @Test
     fun `initial state reflects location settings and foreground permission`() =
         runTest {
-            coEvery { locationSettingsRepository.getSettings() } returns
+            locationSettings.value =
                 LocationTrackingSettings(
                     backgroundTrackingEnabled = true,
                     captureMode = LocationCaptureMode.ACTIVE,
                     autoTrackForJournalEntries = true,
                 )
-            coEvery { permissionManager.isPermissionGranted(PermissionType.LOCATION) } returns true
+            every { permissionManager.isPermissionGranted(PermissionType.LOCATION) } returns true
 
-            val viewModel = createViewModel()
-
-            viewModel.uiState.test {
+            createViewModel().uiState.test {
                 val state = expectMostRecentItem()
                 assertTrue(state.locationPermissionGranted)
                 assertTrue(state.backgroundLocationEnabled)
                 assertEquals(LocationCaptureMode.ACTIVE, state.locationCaptureMode)
                 assertTrue(state.autoTagJournalEntries)
-                viewModel.stopPolling()
             }
         }
 
     @Test
-    fun `setBackgroundLocationEnabled persists setting and reapplies tracking`() =
+    fun `the phone's name follows the phone coming and going`() =
         runTest {
-            val viewModel = createViewModel()
+            createViewModel().uiState.test {
+                assertFalse(expectMostRecentItem().isPhoneConnected)
 
-            viewModel.setBackgroundLocationEnabled(true)
+                phone.value = ReachablePhone("Pixel 9")
+                val connected = awaitItem()
+                assertTrue(connected.isPhoneConnected)
+                assertEquals("Pixel 9", connected.phoneName)
 
-            coVerify { locationSettingsRepository.setBackgroundTrackingEnabled(true) }
-            verify { locationTrackingManager.startTracking() }
-            viewModel.stopPolling()
+                phone.value = null
+                assertFalse(awaitItem().isPhoneConnected)
+            }
         }
 
     @Test
-    fun `setLocationCaptureMode persists mode and reapplies tracking`() =
+    fun `waiting items, errors and the last sync follow the sync status`() =
         runTest {
+            val lastSync = Instant.fromEpochMilliseconds(1_710_000_000_000)
+            createViewModel().uiState.test {
+                expectMostRecentItem()
+
+                status.value = status.value.copy(lastSyncTime = lastSync, pendingUploads = 3, hasErrors = true)
+                val state = awaitItem()
+
+                assertEquals(lastSync, state.lastSyncTime)
+                assertEquals(3, state.pendingCount)
+                assertTrue(state.hasErrors)
+            }
+        }
+
+    @Test
+    fun `location settings follow the repository`() =
+        runTest {
+            createViewModel().uiState.test {
+                expectMostRecentItem()
+
+                locationSettings.value =
+                    LocationTrackingSettings(
+                        backgroundTrackingEnabled = true,
+                        captureMode = LocationCaptureMode.ACTIVE,
+                        autoTrackForJournalEntries = true,
+                    )
+                val state = awaitItem()
+
+                assertTrue(state.backgroundLocationEnabled)
+                assertEquals(LocationCaptureMode.ACTIVE, state.locationCaptureMode)
+            }
+        }
+
+    @Test
+    fun `the location permission is read again on resume`() =
+        runTest {
+            every { permissionManager.isPermissionGranted(PermissionType.LOCATION) } returns false
             val viewModel = createViewModel()
 
-            viewModel.setLocationCaptureMode(LocationCaptureMode.ACTIVE)
+            viewModel.uiState.test {
+                assertFalse(expectMostRecentItem().locationPermissionGranted)
+
+                every { permissionManager.isPermissionGranted(PermissionType.LOCATION) } returns true
+                viewModel.onResume()
+
+                assertTrue(awaitItem().locationPermissionGranted)
+            }
+        }
+
+    @Test
+    fun `syncNow runs a full sync and shows it while it runs`() =
+        runTest {
+            val gate = CompletableDeferred<SyncResult>()
+            coEvery { syncManager.fullSync() } coAnswers { gate.await() }
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                expectMostRecentItem()
+
+                viewModel.syncNow()
+                assertTrue(awaitItem().isSyncingNow)
+
+                gate.complete(SyncResult(success = true))
+                assertFalse(awaitItem().isSyncingNow)
+            }
+            coVerify(exactly = 1) { syncManager.fullSync() }
+        }
+
+    @Test
+    fun `setBackgroundLocationEnabled persists the setting and reapplies tracking`() =
+        runTest {
+            createViewModel().setBackgroundLocationEnabled(true)
+
+            coVerify { locationSettingsRepository.setBackgroundTrackingEnabled(true) }
+            verify { locationTrackingManager.startTracking() }
+        }
+
+    @Test
+    fun `setLocationCaptureMode persists the mode and reapplies tracking`() =
+        runTest {
+            createViewModel().setLocationCaptureMode(LocationCaptureMode.ACTIVE)
 
             coVerify { locationSettingsRepository.setCaptureMode(LocationCaptureMode.ACTIVE) }
             verify { locationTrackingManager.startTracking() }
-            viewModel.stopPolling()
         }
 
     @Test
     fun `openLocationPermissions opens app permission settings`() =
         runTest {
-            val viewModel = createViewModel()
-
-            viewModel.openLocationPermissions()
+            createViewModel().openLocationPermissions()
 
             verify { permissionManager.openPermissionSettings() }
-            viewModel.stopPolling()
         }
 
     @Test
-    fun `shows connected phone name when phone is reachable`() =
+    fun `nothing is polled`() =
         runTest {
-            coEvery { dataLayerClient.getConnectedPhoneName() } returns "Pixel 9"
-            coEvery { syncManager.getSyncStatus() } returns
-                SyncStatus(
-                    isEnabled = true,
-                    lastSyncTime = Clock.System.now(),
-                    pendingUploads = 0,
-                    isSyncing = false,
-                    hasErrors = false,
-                )
+            createViewModel().uiState.test { expectMostRecentItem() }
 
-            val viewModel = createViewModel()
-            viewModel.uiState.test {
-                val state = expectMostRecentItem()
-                assertTrue(state.isPhoneConnected)
-                assertEquals("Pixel 9", state.phoneName)
-                viewModel.stopPolling()
-            }
-        }
-
-    @Test
-    fun `shows pending count from sync status`() =
-        runTest {
-            coEvery { dataLayerClient.getConnectedPhoneName() } returns "Phone"
-            coEvery { syncManager.getSyncStatus() } returns
-                SyncStatus(
-                    isEnabled = true,
-                    lastSyncTime = null,
-                    pendingUploads = 3,
-                    isSyncing = false,
-                    hasErrors = false,
-                )
-
-            val viewModel = createViewModel()
-            viewModel.uiState.test {
-                val state = expectMostRecentItem()
-                assertEquals(3, state.pendingCount)
-                viewModel.stopPolling()
-            }
-        }
-
-    @Test
-    fun `shows error state when sync has errors`() =
-        runTest {
-            coEvery { syncManager.getSyncStatus() } returns
-                SyncStatus(
-                    isEnabled = true,
-                    lastSyncTime = null,
-                    pendingUploads = 0,
-                    isSyncing = false,
-                    hasErrors = true,
-                )
-
-            val viewModel = createViewModel()
-            viewModel.uiState.test {
-                val state = expectMostRecentItem()
-                assertTrue(state.hasErrors)
-                viewModel.stopPolling()
-            }
-        }
-
-    @Test
-    fun `syncNow calls fullSync on SyncManager`() =
-        runTest {
-            coEvery { syncManager.fullSync() } returns SyncResult(success = true)
-
-            val viewModel = createViewModel()
-            viewModel.syncNow()
-
-            coVerify { syncManager.fullSync() }
-            viewModel.stopPolling()
-        }
-
-    @Test
-    fun `disconnected state when phone name is null`() =
-        runTest {
-            coEvery { dataLayerClient.getConnectedPhoneName() } returns null
-
-            val viewModel = createViewModel()
-            viewModel.uiState.test {
-                val state = expectMostRecentItem()
-                assertFalse(state.isPhoneConnected)
-                assertNull(state.phoneName)
-                viewModel.stopPolling()
-            }
+            coVerify(exactly = 0) { syncManager.getSyncStatus() }
+            coVerify(exactly = 0) { locationSettingsRepository.getSettings() }
         }
 }

@@ -47,6 +47,7 @@ import app.logdate.wear.recording.MicrophonePermissionChecker
 import app.logdate.wear.recording.WearAudioRecordingManager
 import app.logdate.wear.recording.WearRecorder
 import app.logdate.wear.recording.WearRecordingRecovery
+import app.logdate.wear.sync.PhoneReachability
 import app.logdate.wear.sync.SyncedAudioCache
 import app.logdate.wear.sync.WearDataLayerClient
 import kotlinx.coroutines.CoroutineDispatcher
@@ -168,7 +169,6 @@ val wearAudioModule =
             WearHomeViewModel(
                 get<JournalNotesRepository>(),
                 get<SyncManager>(),
-                get<WearDataLayerClient>(),
             )
         }
         viewModel {
@@ -205,7 +205,7 @@ val wearAudioModule =
         viewModel {
             WearSettingsViewModel(
                 get<SyncManager>(),
-                get<WearDataLayerClient>(),
+                get<PhoneReachability>(),
                 get(),
                 get(),
                 get(),

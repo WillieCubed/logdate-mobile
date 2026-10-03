@@ -1,5 +1,6 @@
 package app.logdate.wear.di
 
+import android.content.Context
 import app.logdate.client.data.journals.LocalFirstDraftRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
 import app.logdate.client.data.journals.RemoteJournalDataSource
@@ -38,14 +39,17 @@ import app.logdate.wear.health.NoteHealthAnnotator
 import app.logdate.wear.health.UnavailableWearHealthSensorManager
 import app.logdate.wear.health.WearHealthSensorManager
 import app.logdate.wear.location.WearLocationCaptureCoordinator
+import app.logdate.wear.sync.CapabilityPhoneReachability
 import app.logdate.wear.sync.GoogleWearDataLayerClient
 import app.logdate.wear.sync.NoteDataMapper
+import app.logdate.wear.sync.PhoneReachability
 import app.logdate.wear.sync.WearDataLayerClient
 import app.logdate.wear.sync.WearDataLayerSyncManager
 import app.logdate.wear.sync.WearDeadLetterMigration
 import app.logdate.wear.sync.WearNoteAckHandler
 import app.logdate.wear.sync.WearNoteRemovalNotifier
 import app.logdate.wear.sync.WearPhoneMessageHandler
+import com.google.android.gms.wearable.Wearable
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.json.Json
 import org.koin.dsl.binds
@@ -84,6 +88,7 @@ val wearDataModule =
         single { JournalDataMapper(get()) }
         single { AssociationDataMapper() }
         single { HealthSnapshotDataMapper(get()) }
+        single<PhoneReachability> { CapabilityPhoneReachability(Wearable.getCapabilityClient(get<Context>()), get()) }
         single<SyncDeadLetterStore> { KeyValueSyncDeadLetterStore(get()) }
         single<SyncRetryScheduleStore> { KeyValueSyncRetryScheduleStore(get()) }
         single {
@@ -100,6 +105,8 @@ val wearDataModule =
                 associationDataMapper = get(),
                 healthSnapshotDataMapper = get(),
                 mediaFiles = get(),
+                phoneReachability = get(),
+                scope = get(),
             )
         } binds arrayOf(SyncManager::class, WearNoteAckHandler::class, WearNoteRemovalNotifier::class)
         single { WearPhoneMessageHandler(ackHandler = get(), syncManager = get()) }

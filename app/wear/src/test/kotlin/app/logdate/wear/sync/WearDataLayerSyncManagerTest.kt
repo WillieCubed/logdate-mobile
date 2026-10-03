@@ -1,5 +1,6 @@
 package app.logdate.wear.sync
 
+import app.cash.turbine.test
 import app.logdate.client.database.dao.HealthSnapshotDao
 import app.logdate.client.media.storage.AndroidMediaDirectories
 import app.logdate.client.media.storage.MediaFileResolver
@@ -29,9 +30,11 @@ import io.mockk.coVerify
 import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
@@ -74,6 +77,10 @@ class WearDataLayerSyncManagerTest {
 
     private val fixedTime = Instant.fromEpochMilliseconds(1_700_000_000_000)
     private val noteId = Uuid.parse("550e8400-e29b-41d4-a716-446655440000")
+
+    private val pendingCount = MutableStateFlow(0)
+    private val deadLetters = MutableStateFlow<List<SyncDeadLetterRecord>>(emptyList())
+    private val phone = MutableStateFlow<ReachablePhone?>(ReachablePhone("Pixel 9"))
 
     private val textNote =
         JournalNote.Text(
@@ -123,7 +130,9 @@ class WearDataLayerSyncManagerTest {
         coEvery { dataLayerClient.putDataItem(any(), any(), any()) } returns true
         coEvery { dataLayerClient.deleteDataItem(any()) } returns true
         coEvery { dataLayerClient.sendFile(any(), any()) } returns true
-        every { syncMetadataService.observePendingCount() } returns MutableStateFlow(0)
+        every { syncMetadataService.observePendingCount() } returns pendingCount
+        every { deadLetterStore.observe() } returns deadLetters
+        coEvery { syncMetadataService.getLastSyncTime(EntityType.NOTE) } returns null
         coEvery { syncMetadataService.getPendingUploads(EntityType.JOURNAL) } returns emptyList()
         coEvery { syncMetadataService.getPendingUploads(EntityType.ASSOCIATION) } returns emptyList()
         coEvery { syncMetadataService.getPendingUploads(EntityType.MEDIA) } returns emptyList()
@@ -147,6 +156,8 @@ class WearDataLayerSyncManagerTest {
                 associationDataMapper = associationDataMapper,
                 healthSnapshotDataMapper = healthSnapshotDataMapper,
                 mediaFiles = MediaFileResolver(AndroidMediaDirectories(createTempDirectory().toFile())),
+                phoneReachability = PhoneReachability { phone },
+                scope = CoroutineScope(UnconfinedTestDispatcher()),
             )
     }
 
@@ -164,6 +175,8 @@ class WearDataLayerSyncManagerTest {
             associationDataMapper = associationDataMapper,
             healthSnapshotDataMapper = healthSnapshotDataMapper,
             mediaFiles = MediaFileResolver(AndroidMediaDirectories(createTempDirectory().toFile())),
+            phoneReachability = PhoneReachability { phone },
+            scope = CoroutineScope(UnconfinedTestDispatcher()),
             clock =
                 object : Clock {
                     override fun now(): Instant = fixedTime
@@ -1300,5 +1313,76 @@ class WearDataLayerSyncManagerTest {
             retryCount = WearDataLayerSyncManager.MAX_RETRY_ATTEMPTS,
             lastError = "Failed to sync note $noteId",
             failedAt = fixedTime.toEpochMilliseconds(),
+        )
+
+    // =======================================================================
+    // Live status
+    // =======================================================================
+
+    @Test
+    fun `status follows the outbox, set-aside items and the phone without polling`() =
+        runTest {
+            val manager = statusManager(backgroundScope)
+
+            manager.syncStatusFlow.test {
+                assertFalse(awaitItem().isEnabled)
+                assertTrue(awaitItem().isEnabled)
+
+                pendingCount.value = 2
+                assertEquals(2, awaitItem().pendingUploads)
+
+                phone.value = null
+                assertFalse(awaitItem().isEnabled)
+
+                deadLetters.value = listOf(deadLetter())
+                assertTrue(awaitItem().hasErrors)
+            }
+            coVerify(exactly = 0) { dataLayerClient.isPhoneConnected(any()) }
+            coVerify(exactly = 0) { syncMetadataService.getPendingCount() }
+        }
+
+    @Test
+    fun `status shows a run while it is in progress`() =
+        runTest {
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(PendingUpload(noteId.toString(), PendingOperation.CREATE))
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote
+            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            coEvery { dataLayerClient.sendFile(any(), any()) } coAnswers {
+                gate.await()
+                true
+            }
+            val manager = statusManager(backgroundScope)
+
+            manager.syncStatusFlow.test {
+                awaitItem()
+                assertFalse(awaitItem().isSyncing)
+
+                val run = async { manager.fullSync() }
+                assertTrue(awaitItem().isSyncing)
+
+                gate.complete(Unit)
+                run.await()
+                assertFalse(awaitItem().isSyncing)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    private fun statusManager(scope: CoroutineScope): WearDataLayerSyncManager =
+        WearDataLayerSyncManager(
+            dataLayerClient = dataLayerClient,
+            syncMetadataService = syncMetadataService,
+            retryScheduleStore = retryScheduleStore,
+            deadLetterStore = deadLetterStore,
+            notesRepository = notesRepository,
+            journalRepository = journalRepository,
+            healthSnapshotDao = healthSnapshotDao,
+            noteDataMapper = noteDataMapper,
+            journalDataMapper = journalDataMapper,
+            associationDataMapper = associationDataMapper,
+            healthSnapshotDataMapper = healthSnapshotDataMapper,
+            mediaFiles = MediaFileResolver(AndroidMediaDirectories(createTempDirectory().toFile())),
+            phoneReachability = PhoneReachability { phone },
+            scope = scope,
         )
 }

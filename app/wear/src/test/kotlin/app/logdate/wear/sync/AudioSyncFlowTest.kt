@@ -21,8 +21,11 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -89,6 +92,8 @@ class AudioSyncFlowTest {
                 associationDataMapper = AssociationDataMapper(),
                 healthSnapshotDataMapper = HealthSnapshotDataMapper(),
                 mediaFiles = MediaFileResolver(AndroidMediaDirectories(createTempDirectory().toFile())),
+                phoneReachability = PhoneReachability { flowOf(ReachablePhone("Pixel 9")) },
+                scope = CoroutineScope(UnconfinedTestDispatcher()),
             )
     }
 

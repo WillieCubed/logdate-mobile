@@ -8,70 +8,69 @@ import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.client.permissions.PermissionManager
 import app.logdate.client.permissions.PermissionType
 import app.logdate.client.sync.SyncManager
-import app.logdate.wear.sync.WearDataLayerClient
+import app.logdate.wear.sync.PhoneReachability
 import io.github.aakira.napier.Napier
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.time.Instant
 
 /**
  * ViewModel backing the Wear OS Settings screen.
  *
- * Polls phone connection status every 5 seconds and observes
- * sync state from [SyncManager].
+ * The phone, the sync status and the location settings are each followed as they change. Only the
+ * location permission is read again, on resume, because it can change in system settings without
+ * any event reaching the app.
  */
 class WearSettingsViewModel(
     private val syncManager: SyncManager,
-    private val dataLayerClient: WearDataLayerClient,
+    phoneReachability: PhoneReachability,
     private val locationSettingsRepository: LocationTrackingSettingsRepository,
     private val permissionManager: PermissionManager,
     private val locationTrackingManager: LocationTrackingManager,
 ) : ViewModel() {
-    companion object {
-        private const val POLL_INTERVAL_MS = 5_000L
-    }
+    private val locationPermissionGranted = MutableStateFlow(permissionManager.isPermissionGranted(PermissionType.LOCATION))
+    private val isSyncingNow = MutableStateFlow(false)
 
-    private val _uiState = MutableStateFlow(WearSettingsUiState())
-    val uiState: StateFlow<WearSettingsUiState> = _uiState.asStateFlow()
+    val uiState: StateFlow<WearSettingsUiState> =
+        combine(
+            phoneReachability.observe(),
+            syncManager.syncStatusFlow,
+            locationSettingsRepository.observeSettings(),
+            locationPermissionGranted,
+            isSyncingNow,
+        ) { phone, status, location, permissionGranted, syncingNow ->
+            WearSettingsUiState(
+                isPhoneConnected = phone != null,
+                phoneName = phone?.displayName,
+                lastSyncTime = status.lastSyncTime,
+                pendingCount = status.pendingUploads,
+                hasErrors = status.hasErrors,
+                isSyncingNow = syncingNow,
+                locationPermissionGranted = permissionGranted,
+                autoTagJournalEntries = location.autoTrackForJournalEntries,
+                backgroundLocationEnabled = location.backgroundTrackingEnabled,
+                locationCaptureMode = location.captureMode,
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), WearSettingsUiState())
 
-    private var pollingJob: Job? = null
-
-    init {
-        startPolling()
-    }
-
-    fun startPolling() {
-        if (pollingJob?.isActive == true) return
-        pollingJob =
-            viewModelScope.launch {
-                while (isActive) {
-                    refreshStatus()
-                    delay(POLL_INTERVAL_MS)
-                }
-            }
-    }
-
-    fun stopPolling() {
-        pollingJob?.cancel()
-        pollingJob = null
+    /** Reads the location permission again; it may have changed in system settings. */
+    fun onResume() {
+        locationPermissionGranted.value = permissionManager.isPermissionGranted(PermissionType.LOCATION)
     }
 
     fun syncNow() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isSyncingNow = true) }
+            isSyncingNow.value = true
             try {
                 syncManager.fullSync()
             } catch (e: Exception) {
                 Napier.w("Sync Now failed", e)
             } finally {
-                refreshStatus()
-                _uiState.update { it.copy(isSyncingNow = false) }
+                isSyncingNow.value = false
             }
         }
     }
@@ -81,7 +80,6 @@ class WearSettingsViewModel(
             try {
                 locationSettingsRepository.setBackgroundTrackingEnabled(enabled)
                 locationTrackingManager.startTracking()
-                refreshStatus()
             } catch (e: Exception) {
                 Napier.w("Failed to update Wear background location setting", e)
             }
@@ -93,7 +91,6 @@ class WearSettingsViewModel(
             try {
                 locationSettingsRepository.setCaptureMode(mode)
                 locationTrackingManager.startTracking()
-                refreshStatus()
             } catch (e: Exception) {
                 Napier.w("Failed to update Wear location capture mode", e)
             }
@@ -104,28 +101,8 @@ class WearSettingsViewModel(
         permissionManager.openPermissionSettings()
     }
 
-    private suspend fun refreshStatus() {
-        try {
-            val phoneName = dataLayerClient.getConnectedPhoneName()
-            val syncStatus = syncManager.getSyncStatus()
-            val locationSettings = locationSettingsRepository.getSettings()
-
-            _uiState.update {
-                it.copy(
-                    isPhoneConnected = phoneName != null,
-                    phoneName = phoneName,
-                    lastSyncTime = syncStatus.lastSyncTime,
-                    pendingCount = syncStatus.pendingUploads,
-                    hasErrors = syncStatus.hasErrors,
-                    locationPermissionGranted = permissionManager.isPermissionGranted(PermissionType.LOCATION),
-                    autoTagJournalEntries = locationSettings.autoTrackForJournalEntries,
-                    backgroundLocationEnabled = locationSettings.backgroundTrackingEnabled,
-                    locationCaptureMode = locationSettings.captureMode,
-                )
-            }
-        } catch (e: Exception) {
-            Napier.w("Failed to refresh settings status", e)
-        }
+    private companion object {
+        const val STOP_TIMEOUT_MS = 5_000L
     }
 }
 

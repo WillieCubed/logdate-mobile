@@ -40,15 +40,12 @@ fun WearSettingsScreen(
 ) {
     val settingsState by viewModel.uiState.collectAsState()
 
+    // The location permission can change in system settings while this screen is away.
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer =
             LifecycleEventObserver { _, event ->
-                when (event) {
-                    Lifecycle.Event.ON_RESUME -> viewModel.startPolling()
-                    Lifecycle.Event.ON_PAUSE -> viewModel.stopPolling()
-                    else -> {}
-                }
+                if (event == Lifecycle.Event.ON_RESUME) viewModel.onResume()
             }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }

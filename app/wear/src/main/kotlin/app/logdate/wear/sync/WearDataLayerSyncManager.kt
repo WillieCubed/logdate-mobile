@@ -24,10 +24,12 @@ import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
@@ -66,13 +68,15 @@ class WearDataLayerSyncManager(
     private val associationDataMapper: AssociationDataMapper,
     private val healthSnapshotDataMapper: HealthSnapshotDataMapper,
     private val mediaFiles: MediaFileResolver,
+    phoneReachability: PhoneReachability,
+    scope: CoroutineScope,
     private val audioDigester: AudioFileDigester = FileAudioDigester(),
     private val clock: Clock = Clock.System,
 ) : SyncManager,
     WearNoteAckHandler,
     WearNoteRemovalNotifier {
-    @Volatile
-    private var isSyncing = false
+    /** True while a run has [syncLock]; the status follows it. */
+    private val running = MutableStateFlow(false)
 
     /**
      * Sync entry points can overlap: a reconnect, a phone request, the repository's debounce and the
@@ -81,23 +85,15 @@ class WearDataLayerSyncManager(
      */
     private val syncLock = Mutex()
 
-    private val _syncStatusFlow =
-        MutableStateFlow(
-            SyncStatus(
-                isEnabled = false,
-                lastSyncTime = null,
-                pendingUploads = 0,
-                isSyncing = false,
-                hasErrors = false,
-            ),
-        )
-    override val syncStatusFlow: StateFlow<SyncStatus> = _syncStatusFlow.asStateFlow()
+    override val syncStatusFlow: StateFlow<SyncStatus> =
+        wearSyncStatus(running, syncMetadataService, deadLetterStore, phoneReachability)
+            .stateIn(scope, SharingStarted.WhileSubscribed(STATUS_SUBSCRIPTION_TIMEOUT_MS), IDLE_STATUS)
 
     override fun sync(startNow: Boolean) {
         Napier.d("Wear sync requested (startNow=$startNow)")
     }
 
-    override suspend fun uploadPendingChanges(): SyncResult = syncLock.withLock { uploadPendingChangesLocked() }
+    override suspend fun uploadPendingChanges(): SyncResult = runExclusively { uploadPendingChangesLocked() }
 
     private suspend fun uploadPendingChangesLocked(): SyncResult {
         if (!dataLayerClient.isPhoneConnected()) {
@@ -184,16 +180,9 @@ class WearDataLayerSyncManager(
         return SyncResult(success = true)
     }
 
-    override suspend fun syncContent(): SyncResult {
-        isSyncing = true
-        try {
-            return uploadPendingChanges()
-        } finally {
-            isSyncing = false
-        }
-    }
+    override suspend fun syncContent(): SyncResult = uploadPendingChanges()
 
-    override suspend fun syncJournals(): SyncResult = syncLock.withLock { syncJournalsLocked() }
+    override suspend fun syncJournals(): SyncResult = runExclusively { syncJournalsLocked() }
 
     private suspend fun syncJournalsLocked(): SyncResult {
         if (!dataLayerClient.isPhoneConnected()) {
@@ -231,7 +220,7 @@ class WearDataLayerSyncManager(
 
     override suspend fun syncDrafts(): SyncResult = SyncResult(success = true)
 
-    override suspend fun syncAssociations(): SyncResult = syncLock.withLock { syncAssociationsLocked() }
+    override suspend fun syncAssociations(): SyncResult = runExclusively { syncAssociationsLocked() }
 
     private suspend fun syncAssociationsLocked(): SyncResult {
         if (!dataLayerClient.isPhoneConnected()) {
@@ -278,37 +267,43 @@ class WearDataLayerSyncManager(
      * If a parent sync phase fails, child phases still attempt — the phone
      * will buffer orphaned items and reconcile when the parent arrives.
      */
-    override suspend fun fullSync(): SyncResult = syncLock.withLock { fullSyncLocked() }
+    override suspend fun fullSync(): SyncResult = runExclusively { fullSyncLocked() }
 
     private suspend fun fullSyncLocked(): SyncResult {
-        isSyncing = true
-        try {
-            // Phase 1: Journals first (parents)
-            val journalsResult = syncJournalsLocked()
-            // Phase 2: Notes second (children of journals)
-            val notesResult = uploadPendingChangesLocked()
-            // Phase 3: Associations third (links between journals and notes)
-            val associationsResult = syncAssociationsLocked()
-            // Phase 4: Health snapshots last (reference notes)
-            val healthResult = syncHealthSnapshots()
+        // Phase 1: Journals first (parents)
+        val journalsResult = syncJournalsLocked()
+        // Phase 2: Notes second (children of journals)
+        val notesResult = uploadPendingChangesLocked()
+        // Phase 3: Associations third (links between journals and notes)
+        val associationsResult = syncAssociationsLocked()
+        // Phase 4: Health snapshots last (reference notes)
+        val healthResult = syncHealthSnapshots()
 
-            val totalUploaded =
-                journalsResult.uploadedItems + notesResult.uploadedItems +
-                    associationsResult.uploadedItems + healthResult.uploadedItems
-            val allErrors =
-                journalsResult.errors + notesResult.errors +
-                    associationsResult.errors + healthResult.errors
+        val totalUploaded =
+            journalsResult.uploadedItems + notesResult.uploadedItems +
+                associationsResult.uploadedItems + healthResult.uploadedItems
+        val allErrors =
+            journalsResult.errors + notesResult.errors +
+                associationsResult.errors + healthResult.errors
 
-            return SyncResult(
-                success = allErrors.isEmpty(),
-                uploadedItems = totalUploaded,
-                errors = allErrors,
-                lastSyncTime = clock.now(),
-            )
-        } finally {
-            isSyncing = false
-        }
+        return SyncResult(
+            success = allErrors.isEmpty(),
+            uploadedItems = totalUploaded,
+            errors = allErrors,
+            lastSyncTime = clock.now(),
+        )
     }
+
+    /** Runs [block] alone under [syncLock], with the status showing a run in progress meanwhile. */
+    private suspend fun <T> runExclusively(block: suspend () -> T): T =
+        syncLock.withLock {
+            running.value = true
+            try {
+                block()
+            } finally {
+                running.value = false
+            }
+        }
 
     override suspend fun getSyncStatus(): SyncStatus {
         val connected = dataLayerClient.isPhoneConnected()
@@ -320,7 +315,7 @@ class WearDataLayerSyncManager(
             isEnabled = connected,
             lastSyncTime = lastSync,
             pendingUploads = pendingCount,
-            isSyncing = isSyncing,
+            isSyncing = running.value,
             hasErrors = hasDeadLetters,
         )
     }
@@ -761,5 +756,11 @@ class WearDataLayerSyncManager(
 
         /** How long an item set aside after [MAX_RETRY_ATTEMPTS] failures waits before it is tried again. */
         const val DEAD_LETTER_RETRY_INTERVAL_MS = 6L * 60 * 60 * 1000
+
+        /** How long the status goes on following its sources after the last screen stops collecting it. */
+        private const val STATUS_SUBSCRIPTION_TIMEOUT_MS = 5_000L
+
+        private val IDLE_STATUS =
+            SyncStatus(isEnabled = false, lastSyncTime = null, pendingUploads = 0, isSyncing = false, hasErrors = false)
     }
 }

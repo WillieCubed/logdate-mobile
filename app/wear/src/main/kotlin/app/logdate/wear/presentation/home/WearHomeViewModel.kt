@@ -4,17 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.sync.SyncManager
-import app.logdate.wear.sync.WearDataLayerClient
-import io.github.aakira.napier.Napier
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
+import app.logdate.client.sync.SyncStatus
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -22,13 +17,8 @@ import kotlin.time.Clock
 
 class WearHomeViewModel(
     notesRepository: JournalNotesRepository,
-    private val syncManager: SyncManager,
-    private val dataLayerClient: WearDataLayerClient,
+    syncManager: SyncManager,
 ) : ViewModel() {
-    companion object {
-        private const val SYNC_POLL_INTERVAL_MS = 30_000L
-    }
-
     private val today: LocalDate
         get() =
             Clock.System
@@ -36,18 +26,14 @@ class WearHomeViewModel(
                 .toLocalDateTime(TimeZone.currentSystemDefault())
                 .date
 
-    private val syncBadgeFlow = MutableStateFlow(SyncBadge.NONE)
-    private var pollingJob: Job? = null
-
-    val uiState =
+    val uiState: StateFlow<WearHomeUiState> =
         combine(
             notesRepository.observeNotesForDay(today).map { it.size },
-            syncBadgeFlow,
+            syncManager.syncStatusFlow.map(::syncBadgeFor),
         ) { entryCount, syncBadge ->
-            val timeOfDay = currentTimeOfDay()
             WearHomeUiState(
                 greeting =
-                    when (timeOfDay) {
+                    when (currentTimeOfDay()) {
                         TimeOfDay.MORNING -> "Good morning"
                         TimeOfDay.AFTERNOON -> "Good afternoon"
                         TimeOfDay.EVENING -> "Good evening"
@@ -67,42 +53,6 @@ class WearHomeViewModel(
             WearHomeUiState(),
         )
 
-    init {
-        startSyncPolling()
-    }
-
-    fun startSyncPolling() {
-        if (pollingJob?.isActive == true) return
-        pollingJob =
-            viewModelScope.launch {
-                while (isActive) {
-                    refreshSyncBadge()
-                    delay(SYNC_POLL_INTERVAL_MS)
-                }
-            }
-    }
-
-    fun stopSyncPolling() {
-        pollingJob?.cancel()
-        pollingJob = null
-    }
-
-    private suspend fun refreshSyncBadge() {
-        try {
-            val connected = dataLayerClient.isPhoneConnected()
-            val status = syncManager.getSyncStatus()
-
-            syncBadgeFlow.value =
-                when {
-                    status.hasErrors -> SyncBadge.ERROR
-                    connected && status.pendingUploads > 0 -> SyncBadge.SYNCING
-                    else -> SyncBadge.NONE
-                }
-        } catch (e: Exception) {
-            Napier.w("Failed to refresh sync badge", e)
-        }
-    }
-
     private fun currentTimeOfDay(): TimeOfDay {
         val hour =
             Clock.System
@@ -116,6 +66,14 @@ class WearHomeViewModel(
         }
     }
 }
+
+/** What the home screen says about sync: nothing while it is healthy. */
+internal fun syncBadgeFor(status: SyncStatus): SyncBadge =
+    when {
+        status.hasErrors -> SyncBadge.ERROR
+        status.isEnabled && status.pendingUploads > 0 -> SyncBadge.SYNCING
+        else -> SyncBadge.NONE
+    }
 
 enum class TimeOfDay {
     MORNING,
