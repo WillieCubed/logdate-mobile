@@ -18,6 +18,7 @@ internal class SherpaOnnxLiveDecoder(
     private var totalAcceptedSamples: Long = 0L
     private var currentStreamStartMs: Long = 0L
     private var currentStreamAcceptedSamples: Long = 0L
+
     /**
      * Per-utterance PCM buffers captured during the live pass and consumed by
      * the Whisper refinement pass after recording stops. Each entry corresponds

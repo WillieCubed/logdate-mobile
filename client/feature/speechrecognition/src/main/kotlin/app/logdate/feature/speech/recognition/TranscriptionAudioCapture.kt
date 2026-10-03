@@ -93,7 +93,6 @@ internal class TranscriptionAudioCapture(
             }
         }
     }
-
 }
 
 internal class AudioCaptureException(

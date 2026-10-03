@@ -5,20 +5,18 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
+import androidx.credentials.CreatePublicKeyCredentialRequest
 import androidx.credentials.CreatePublicKeyCredentialResponse
 import androidx.credentials.GetCredentialResponse
+import androidx.credentials.GetPublicKeyCredentialOption
 import androidx.credentials.PublicKeyCredential
 import androidx.credentials.exceptions.CreateCredentialUnknownException
 import androidx.credentials.exceptions.GetCredentialUnknownException
 import androidx.credentials.provider.PendingIntentHandler
-import androidx.credentials.provider.ProviderCreateCredentialRequest
-import androidx.credentials.provider.ProviderGetCredentialRequest
-import androidx.credentials.CreatePublicKeyCredentialRequest
-import androidx.credentials.GetPublicKeyCredentialOption
+import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
 import java.security.interfaces.ECPublicKey
-import org.json.JSONObject
 
 /**
  * Performs the WebAuthn ceremony the user selected in the Credential Manager sheet.
@@ -28,7 +26,6 @@ import org.json.JSONObject
  * emulator with no Google account and no enrolled biometric.
  */
 class CeremonyActivity : Activity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         runCatching {
@@ -45,10 +42,12 @@ class CeremonyActivity : Activity() {
     }
 
     private fun handleCreate() {
-        val request = PendingIntentHandler.retrieveProviderCreateCredentialRequest(intent)
-            ?: error("missing ProviderCreateCredentialRequest")
-        val callingRequest = request.callingRequest as? CreatePublicKeyCredentialRequest
-            ?: error("unsupported create request type")
+        val request =
+            PendingIntentHandler.retrieveProviderCreateCredentialRequest(intent)
+                ?: error("missing ProviderCreateCredentialRequest")
+        val callingRequest =
+            request.callingRequest as? CreatePublicKeyCredentialRequest
+                ?: error("unsupported create request type")
 
         val options = JSONObject(callingRequest.requestJson)
         val rpId = options.getJSONObject("rp").getString("id")
@@ -92,8 +91,7 @@ class CeremonyActivity : Activity() {
                         .put("clientDataJSON", clientDataJson.b64u())
                         .put("attestationObject", WebAuthnCrypto.attestationObject(authData).b64u())
                         .put("transports", org.json.JSONArray(listOf("internal"))),
-                )
-                .put("clientExtensionResults", JSONObject())
+                ).put("clientExtensionResults", JSONObject())
                 .toString()
 
         val result = Intent()
@@ -102,10 +100,12 @@ class CeremonyActivity : Activity() {
     }
 
     private fun handleGet() {
-        val request = PendingIntentHandler.retrieveProviderGetCredentialRequest(intent)
-            ?: error("missing ProviderGetCredentialRequest")
-        val option = request.credentialOptions.filterIsInstance<GetPublicKeyCredentialOption>().firstOrNull()
-            ?: error("no public key credential option")
+        val request =
+            PendingIntentHandler.retrieveProviderGetCredentialRequest(intent)
+                ?: error("missing ProviderGetCredentialRequest")
+        val option =
+            request.credentialOptions.filterIsInstance<GetPublicKeyCredentialOption>().firstOrNull()
+                ?: error("no public key credential option")
 
         val options = JSONObject(option.requestJson)
         val rpId = options.getString("rpId")
@@ -113,9 +113,10 @@ class CeremonyActivity : Activity() {
 
         val store = CredentialStore(this)
         val credentialId = intent.getStringExtra(EXTRA_CREDENTIAL_ID)
-        val credential = credentialId?.let(store::find)
-            ?: store.forRpId(rpId).firstOrNull()
-            ?: error("no stored credential for $rpId")
+        val credential =
+            credentialId?.let(store::find)
+                ?: store.forRpId(rpId).firstOrNull()
+                ?: error("no stored credential for $rpId")
 
         val clientDataJson = clientData("webauthn.get", challenge, request.callingAppInfo.packageName)
         val nextSignCount = credential.signCount + 1
@@ -141,8 +142,7 @@ class CeremonyActivity : Activity() {
                         .put("authenticatorData", authData.b64u())
                         .put("signature", signature.b64u())
                         .put("userHandle", credential.userHandle),
-                )
-                .put("clientExtensionResults", JSONObject())
+                ).put("clientExtensionResults", JSONObject())
                 .toString()
 
         val result = Intent()
@@ -159,7 +159,11 @@ class CeremonyActivity : Activity() {
      * configured origin allowlist, so computing it from the real certificate is what makes the
      * ceremony verifiable server-side rather than a mock.
      */
-    private fun clientData(type: String, challenge: String, callingPackage: String): ByteArray {
+    private fun clientData(
+        type: String,
+        challenge: String,
+        callingPackage: String,
+    ): ByteArray {
         val json =
             JSONObject()
                 .put("type", type)

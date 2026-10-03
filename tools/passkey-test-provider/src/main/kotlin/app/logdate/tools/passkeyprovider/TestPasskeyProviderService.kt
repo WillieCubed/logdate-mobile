@@ -3,22 +3,22 @@ package app.logdate.tools.passkeyprovider
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.CancellationSignal
-import androidx.credentials.provider.CallingAppInfo
+import android.os.OutcomeReceiver
 import androidx.credentials.exceptions.ClearCredentialException
 import androidx.credentials.exceptions.CreateCredentialException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.provider.BeginCreateCredentialRequest
 import androidx.credentials.provider.BeginCreateCredentialResponse
 import androidx.credentials.provider.BeginCreatePublicKeyCredentialRequest
+import androidx.credentials.provider.BeginGetCredentialOption
 import androidx.credentials.provider.BeginGetCredentialRequest
 import androidx.credentials.provider.BeginGetCredentialResponse
 import androidx.credentials.provider.BeginGetPublicKeyCredentialOption
+import androidx.credentials.provider.CallingAppInfo
 import androidx.credentials.provider.CreateEntry
 import androidx.credentials.provider.CredentialProviderService
 import androidx.credentials.provider.ProviderClearCredentialStateRequest
 import androidx.credentials.provider.PublicKeyCredentialEntry
-import androidx.credentials.provider.BeginGetCredentialOption
-import android.os.OutcomeReceiver
 import org.json.JSONObject
 
 /**
@@ -29,7 +29,6 @@ import org.json.JSONObject
  * once the user picks it.
  */
 class TestPasskeyProviderService : CredentialProviderService() {
-
     override fun onBeginCreateCredentialRequest(
         request: BeginCreateCredentialRequest,
         cancellationSignal: CancellationSignal,
@@ -39,19 +38,20 @@ class TestPasskeyProviderService : CredentialProviderService() {
             callback.onResult(BeginCreateCredentialResponse())
             return
         }
-        val userName = runCatching {
-            JSONObject(request.requestJson).getJSONObject("user").getString("name")
-        }.getOrDefault("LogDate test user")
+        val userName =
+            runCatching {
+                JSONObject(request.requestJson).getJSONObject("user").getString("name")
+            }.getOrDefault("LogDate test user")
 
         val response =
-            BeginCreateCredentialResponse.Builder()
+            BeginCreateCredentialResponse
+                .Builder()
                 .addCreateEntry(
                     CreateEntry(
                         accountName = "$userName (test authenticator)",
                         pendingIntent = ceremonyIntent(CeremonyActivity.ACTION_CREATE, request.callingAppInfo),
                     ),
-                )
-                .build()
+                ).build()
         callback.onResult(response)
     }
 
@@ -80,17 +80,18 @@ class TestPasskeyProviderService : CredentialProviderService() {
         option: BeginGetCredentialOption,
         callingAppInfo: CallingAppInfo?,
     ): PublicKeyCredentialEntry =
-        PublicKeyCredentialEntry.Builder(
-            context = applicationContext,
-            username = credential.userName,
-            pendingIntent = ceremonyIntent(
-                action = CeremonyActivity.ACTION_GET,
-                callingAppInfo = callingAppInfo,
-                credentialId = credential.credentialId,
-            ),
-            beginGetPublicKeyCredentialOption = option as BeginGetPublicKeyCredentialOption,
-        )
-            .setDisplayName("LogDate test authenticator")
+        PublicKeyCredentialEntry
+            .Builder(
+                context = applicationContext,
+                username = credential.userName,
+                pendingIntent =
+                    ceremonyIntent(
+                        action = CeremonyActivity.ACTION_GET,
+                        callingAppInfo = callingAppInfo,
+                        credentialId = credential.credentialId,
+                    ),
+                beginGetPublicKeyCredentialOption = option as BeginGetPublicKeyCredentialOption,
+            ).setDisplayName("LogDate test authenticator")
             .build()
 
     override fun onClearCredentialStateRequest(

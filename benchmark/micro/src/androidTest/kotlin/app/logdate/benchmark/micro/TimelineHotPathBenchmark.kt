@@ -4,6 +4,7 @@ package app.logdate.benchmark.micro
 
 import androidx.benchmark.junit4.BenchmarkRule
 import androidx.benchmark.junit4.measureRepeated
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.domain.dayboundary.DayBoundarySettings
 import app.logdate.client.domain.dayboundary.DayBoundarySettingsRepository
 import app.logdate.client.domain.timeline.GetDayBoundsUseCase
@@ -20,7 +21,6 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.repository.journals.NotePlace
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -202,12 +202,11 @@ private class FakeJournalNotesRepository(
         limit: Int,
     ): List<JournalNote> = notesDescending.filter { it.creationTimestamp < beforeExclusive }.take(limit)
 
-    override suspend fun hasNotesBefore(beforeExclusive: Instant): Boolean =
-        notesDescending.any { it.creationTimestamp < beforeExclusive }
+    override suspend fun hasNotesBefore(beforeExclusive: Instant): Boolean = notesDescending.any { it.creationTimestamp < beforeExclusive }
 }
 
-private fun buildTimelineNotes(timeZone: TimeZone): List<JournalNote> {
-    return buildList {
+private fun buildTimelineNotes(timeZone: TimeZone): List<JournalNote> =
+    buildList {
         repeat(TIMELINE_DAYS) { dayOffset ->
             val day = START_DATE.plus(dayOffset, DateTimeUnit.DAY)
             add(textNote(day, 7, 20, "Wake up and plan the day #$dayOffset", timeZone))
@@ -220,7 +219,6 @@ private fun buildTimelineNotes(timeZone: TimeZone): List<JournalNote> {
             add(textNote(day, 23, 20, "Late-night note #$dayOffset", timeZone, location = locationFor((dayOffset + 1) % PLACES.size)))
         }
     }.sortedByDescending { it.creationTimestamp }
-}
 
 private fun textNote(
     day: LocalDate,
@@ -298,8 +296,7 @@ private fun benchmarkInstant(
     hour: Int,
     minute: Int,
     timeZone: TimeZone,
-): Instant =
-    LocalDateTime(day, LocalTime(hour, minute)).toInstant(timeZone)
+): Instant = LocalDateTime(day, LocalTime(hour, minute)).toInstant(timeZone)
 
 private fun locationFor(index: Int): NoteLocation {
     val place = PLACES[index % PLACES.size]

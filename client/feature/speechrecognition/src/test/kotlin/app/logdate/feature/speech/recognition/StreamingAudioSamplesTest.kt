@@ -60,6 +60,7 @@ class StreamingAudioSamplesTest {
         var finalCount = 0
         var lastStart = -1L
         var lastEnd = 0L
+
         fun consume(values: List<AudioSampleWindow>) {
             for (window in values) {
                 assertTrue(window.samples.size in 16_000..80_000)
@@ -80,7 +81,10 @@ class StreamingAudioSamplesTest {
         assertEquals(1, finalCount)
     }
 
-    private fun referenceResample(source: FloatArray, sourceRate: Int): FloatArray {
+    private fun referenceResample(
+        source: FloatArray,
+        sourceRate: Int,
+    ): FloatArray {
         val ratio = sourceRate.toDouble() / 16_000
         return FloatArray((source.size / ratio).toInt()) { i ->
             val position = i * ratio

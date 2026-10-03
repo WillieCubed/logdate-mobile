@@ -160,11 +160,9 @@ internal object PhoneBenchmarkConfig {
         }
     }
 
-    fun freshOnboardingFixtureJson(): String =
-        fixtureJson(isOnboarded = false)
+    fun freshOnboardingFixtureJson(): String = fixtureJson(isOnboarded = false)
 
-    fun onboardedHomeFixtureJson(): String =
-        fixtureJson(isOnboarded = true)
+    fun onboardedHomeFixtureJson(): String = fixtureJson(isOnboarded = true)
 
     private fun fixtureJson(isOnboarded: Boolean): String =
         """

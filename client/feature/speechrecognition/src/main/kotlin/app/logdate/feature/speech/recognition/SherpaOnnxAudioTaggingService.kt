@@ -16,13 +16,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -123,19 +123,22 @@ class SherpaOnnxAudioTaggingService(
                 emit(AudioTaggingResult.Unavailable)
                 return@flow
             }
-            val tagger = tagging ?: run {
-                emit(AudioTaggingResult.Unavailable)
-                return@flow
-            }
+            val tagger =
+                tagging ?: run {
+                    emit(AudioTaggingResult.Unavailable)
+                    return@flow
+                }
 
             try {
                 val cumulative = mutableMapOf<String, DetectedSound>()
-                val windows = AudioSampleWindows(
-                    WINDOW_SECONDS * AudioDecoder.TARGET_SAMPLE_RATE,
-                    (WINDOW_SECONDS - WINDOW_OVERLAP_SECONDS) * AudioDecoder.TARGET_SAMPLE_RATE,
-                    MIN_WINDOW_SAMPLES,
-                )
+                val windows =
+                    AudioSampleWindows(
+                        WINDOW_SECONDS * AudioDecoder.TARGET_SAMPLE_RATE,
+                        (WINDOW_SECONDS - WINDOW_OVERLAP_SECONDS) * AudioDecoder.TARGET_SAMPLE_RATE,
+                        MIN_WINDOW_SAMPLES,
+                    )
                 var producedWindow = false
+
                 suspend fun process(window: AudioSampleWindow) {
                     currentCoroutineContext().ensureActive()
                     val events = tagWindow(tagger, window.samples)
@@ -161,7 +164,10 @@ class SherpaOnnxAudioTaggingService(
             }
         }.flowOn(Dispatchers.Default)
 
-    private fun tagWindow(tagger: AudioTagging, window: FloatArray): Array<AudioEvent> {
+    private fun tagWindow(
+        tagger: AudioTagging,
+        window: FloatArray,
+    ): Array<AudioEvent> {
         val stream = tagger.createStream()
         try {
             stream.acceptWaveform(window, AudioDecoder.TARGET_SAMPLE_RATE)
@@ -186,19 +192,21 @@ class SherpaOnnxAudioTaggingService(
     ) {
         val existing = cumulative[name]
         if (existing == null) {
-            cumulative[name] = DetectedSound(
-                name = name,
-                confidence = confidence,
-                startMs = windowStartMs,
-                durationMs = windowDurationMs,
-            )
+            cumulative[name] =
+                DetectedSound(
+                    name = name,
+                    confidence = confidence,
+                    startMs = windowStartMs,
+                    durationMs = windowDurationMs,
+                )
         } else {
             val newEnd = windowStartMs + windowDurationMs
             val mergedEnd = maxOf(existing.startMs + existing.durationMs, newEnd)
-            cumulative[name] = existing.copy(
-                confidence = maxOf(existing.confidence, confidence),
-                durationMs = mergedEnd - existing.startMs,
-            )
+            cumulative[name] =
+                existing.copy(
+                    confidence = maxOf(existing.confidence, confidence),
+                    durationMs = mergedEnd - existing.startMs,
+                )
         }
     }
 

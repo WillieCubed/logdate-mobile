@@ -46,7 +46,10 @@ class StreamingAudioDecoderTest {
     private fun makeRecording(context: Context): File {
         val file = File.createTempFile("streaming-decoder-", ".wav", context.cacheDir)
         file.outputStream().buffered().use { output ->
-            fun number(value: Int, bytes: Int) = repeat(bytes) { output.write(value ushr (it * 8) and 255) }
+            fun number(
+                value: Int,
+                bytes: Int,
+            ) = repeat(bytes) { output.write(value ushr (it * 8) and 255) }
             val dataSize = 48_000 * SECONDS * 4
             output.write("RIFF".toByteArray())
             number(36 + dataSize, 4)

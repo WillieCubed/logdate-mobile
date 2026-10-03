@@ -1,6 +1,10 @@
 package app.logdate.feature.speech.recognition
 
-internal data class AudioSampleWindow(val samples: FloatArray, val startSample: Long, val isFinal: Boolean)
+internal data class AudioSampleWindow(
+    val samples: FloatArray,
+    val startSample: Long,
+    val isFinal: Boolean,
+)
 
 internal class AudioSampleWindows(
     private val windowSamples: Int,

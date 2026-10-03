@@ -443,7 +443,5 @@ class SherpaOnnxTranscriptionService(
         private const val MAX_CONSECUTIVE_EMPTY_READS = 50
         private const val EMPTY_READ_RETRY_DELAY_MS = 10L
         private const val MODEL_INITIALIZATION_TIMEOUT_MS = 30_000L
-
-
     }
 }

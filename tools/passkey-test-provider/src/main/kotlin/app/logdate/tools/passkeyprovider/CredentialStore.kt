@@ -1,9 +1,9 @@
 package app.logdate.tools.passkeyprovider
 
 import android.content.Context
-import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 
 /**
  * A stored test passkey. [privateKeyPkcs8] is base64url PKCS#8 - fine for an emulator-only
@@ -39,7 +39,9 @@ data class StoredCredential(
     }
 }
 
-class CredentialStore(context: Context) {
+class CredentialStore(
+    context: Context,
+) {
     private val prefs = context.getSharedPreferences("test-passkeys", Context.MODE_PRIVATE)
 
     init {

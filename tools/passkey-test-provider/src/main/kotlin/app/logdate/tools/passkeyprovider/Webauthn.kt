@@ -17,24 +17,30 @@ fun ByteArray.b64u(): String = Base64.encodeToString(this, Base64.URL_SAFE or Ba
 
 fun String.unb64u(): ByteArray = Base64.decode(this, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
 
-fun sha256(vararg parts: ByteArray): ByteArray =
-    MessageDigest.getInstance("SHA-256").apply { parts.forEach(::update) }.digest()
+fun sha256(vararg parts: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").apply { parts.forEach(::update) }.digest()
 
 /**
  * The tiny slice of CBOR that WebAuthn attestation needs: definite-length maps, byte strings, text
  * strings, and small integers. Pulling in a full CBOR library for four value types is not worth it.
  */
 object Cbor {
-    private fun header(major: Int, value: Long): ByteArray {
+    private fun header(
+        major: Int,
+        value: Long,
+    ): ByteArray {
         val mt = major shl 5
         return when {
             value < 24 -> byteArrayOf((mt or value.toInt()).toByte())
             value < 256 -> byteArrayOf((mt or 24).toByte(), value.toByte())
             value < 65536 -> byteArrayOf((mt or 25).toByte(), (value shr 8).toByte(), value.toByte())
-            else -> byteArrayOf(
-                (mt or 26).toByte(),
-                (value shr 24).toByte(), (value shr 16).toByte(), (value shr 8).toByte(), value.toByte(),
-            )
+            else ->
+                byteArrayOf(
+                    (mt or 26).toByte(),
+                    (value shr 24).toByte(),
+                    (value shr 16).toByte(),
+                    (value shr 8).toByte(),
+                    value.toByte(),
+                )
         }
     }
 
@@ -58,7 +64,10 @@ object Cbor {
     fun map(entries: List<Pair<ByteArray, ByteArray>>): ByteArray {
         val out = ByteArrayOutputStream()
         out.write(header(5, entries.size.toLong()))
-        entries.forEach { (k, v) -> out.write(k); out.write(v) }
+        entries.forEach { (k, v) ->
+            out.write(k)
+            out.write(v)
+        }
         return out.toByteArray()
     }
 }
@@ -91,11 +100,15 @@ object WebAuthnCrypto {
     }
 
     /** BigInteger.toByteArray may add a sign byte or drop leading zeros; COSE wants exactly 32. */
-    private fun fixedWidth(raw: ByteArray, width: Int = 32): ByteArray = when {
-        raw.size == width -> raw
-        raw.size > width -> raw.copyOfRange(raw.size - width, raw.size)
-        else -> ByteArray(width - raw.size) + raw
-    }
+    private fun fixedWidth(
+        raw: ByteArray,
+        width: Int = 32,
+    ): ByteArray =
+        when {
+            raw.size == width -> raw
+            raw.size > width -> raw.copyOfRange(raw.size - width, raw.size)
+            else -> ByteArray(width - raw.size) + raw
+        }
 
     fun authenticatorData(
         rpId: String,
@@ -110,8 +123,10 @@ object WebAuthnCrypto {
         out.write(flags)
         out.write(
             byteArrayOf(
-                (signCount ushr 24).toByte(), (signCount ushr 16).toByte(),
-                (signCount ushr 8).toByte(), signCount.toByte(),
+                (signCount ushr 24).toByte(),
+                (signCount ushr 16).toByte(),
+                (signCount ushr 8).toByte(),
+                signCount.toByte(),
             ),
         )
         if (credentialId != null && publicKey != null) {
@@ -133,7 +148,11 @@ object WebAuthnCrypto {
             ),
         )
 
-    fun sign(privateKey: ECPrivateKey, authData: ByteArray, clientDataJson: ByteArray): ByteArray =
+    fun sign(
+        privateKey: ECPrivateKey,
+        authData: ByteArray,
+        clientDataJson: ByteArray,
+    ): ByteArray =
         Signature.getInstance("SHA256withECDSA").run {
             initSign(privateKey)
             update(authData)

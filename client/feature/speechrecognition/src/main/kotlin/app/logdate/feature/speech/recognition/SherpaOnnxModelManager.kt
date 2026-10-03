@@ -420,6 +420,7 @@ class SherpaOnnxModelManager(
         private const val HTTP_CONNECT_TIMEOUT_MS = 30_000
         private const val HTTP_READ_TIMEOUT_MS = 60_000
         private const val DOWNLOAD_BUFFER_SIZE = 64 * 1024
+
         // Emit a Downloading update every ~512 KB so the UI feels responsive
         // without spamming Compose with hundreds of state changes per second.
         private const val PROGRESS_EMIT_INTERVAL_BYTES = 512L * 1024

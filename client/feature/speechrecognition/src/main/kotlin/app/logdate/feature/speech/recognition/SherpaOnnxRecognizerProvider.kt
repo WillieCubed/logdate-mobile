@@ -60,11 +60,11 @@ class SherpaOnnxRecognizerProvider(
                             numThreads = 2,
                             provider = "cpu",
                         ),
+                    // VAD handles primary silence-based segmentation; these rules act as
+                    // a safety fallback so the recognizer still finalizes utterances if
+                    // a speech segment from the VAD runs unusually long without a clear
+                    // semantic boundary.
                     endpointConfig =
-                        // VAD handles primary silence-based segmentation; these rules act as
-                        // a safety fallback so the recognizer still finalizes utterances if
-                        // a speech segment from the VAD runs unusually long without a clear
-                        // semantic boundary.
                         EndpointConfig(
                             rule1 = EndpointRule(false, 1.5f, 0.0f),
                             rule2 = EndpointRule(true, 0.8f, 0.0f),

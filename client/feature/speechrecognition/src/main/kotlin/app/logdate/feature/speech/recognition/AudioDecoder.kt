@@ -16,7 +16,9 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /** Decodes and resamples codec frames without retaining native-rate PCM or boxing each sample. */
-class AudioDecoder(private val context: Context) {
+class AudioDecoder(
+    private val context: Context,
+) {
     /** Compatibility path for callers that explicitly require a complete contiguous recording. */
     fun decodeToMono16kHz(uri: String): FloatArray? =
         try {
@@ -98,7 +100,10 @@ class AudioDecoder(private val context: Context) {
             }
         }
 
-    private fun queueNextFrame(codec: MediaCodec, extractor: MediaExtractor): Boolean {
+    private fun queueNextFrame(
+        codec: MediaCodec,
+        extractor: MediaExtractor,
+    ): Boolean {
         val index = codec.dequeueInputBuffer(DEQUEUE_TIMEOUT_US)
         if (index < 0) return false
         val input = checkNotNull(codec.getInputBuffer(index))
@@ -112,7 +117,10 @@ class AudioDecoder(private val context: Context) {
         return false
     }
 
-    private fun openExtractor(extractor: MediaExtractor, uri: String) {
+    private fun openExtractor(
+        extractor: MediaExtractor,
+        uri: String,
+    ) {
         when {
             uri.startsWith("content://") -> extractor.setDataSource(context, Uri.parse(uri), null)
             uri.startsWith("file://") -> extractor.setDataSource(checkNotNull(Uri.parse(uri).path))
@@ -127,7 +135,12 @@ class AudioDecoder(private val context: Context) {
         return null
     }
 
-    private fun readMonoFrame(buffer: ByteBuffer, info: MediaCodec.BufferInfo, channels: Int, encoding: Int): FloatArray {
+    private fun readMonoFrame(
+        buffer: ByteBuffer,
+        info: MediaCodec.BufferInfo,
+        channels: Int,
+        encoding: Int,
+    ): FloatArray {
         require(channels > 0)
         val sampleBytes =
             when (encoding) {
