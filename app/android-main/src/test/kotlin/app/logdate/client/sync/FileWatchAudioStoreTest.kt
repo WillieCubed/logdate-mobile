@@ -1,5 +1,6 @@
 package app.logdate.client.sync
 
+import app.logdate.client.sync.datalayer.AudioFileDigest
 import kotlinx.coroutines.test.runTest
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -236,6 +237,50 @@ class FileWatchAudioStoreTest {
             assertTrue(store.isDeleted(deleted))
         }
 
+    @Test
+    fun `written audio records its size and SHA-256`() =
+        runTest {
+            store.writeAudio(noteId, ByteArrayInputStream("abc".encodeToByteArray()))
+
+            assertEquals(AudioFileDigest(sizeBytes = 3, sha256Hex = ABC_SHA256), store.storedDigest(noteId))
+        }
+
+    @Test
+    fun `audio stored by an older version is measured from the file`() =
+        runTest {
+            audioDirectory.mkdirs()
+            File(store.audioPath(noteId)).writeText("abc")
+
+            assertEquals(AudioFileDigest(sizeBytes = 3, sha256Hex = ABC_SHA256), store.storedDigest(noteId))
+        }
+
+    @Test
+    fun `a note with no audio has no digest`() =
+        runTest {
+            assertNull(store.storedDigest(noteId))
+        }
+
+    @Test
+    fun `a newer transfer replaces the recorded digest`() =
+        runTest {
+            store.writeAudio(noteId, ByteArrayInputStream("ab".encodeToByteArray()))
+
+            store.writeAudio(noteId, ByteArrayInputStream("abc".encodeToByteArray()))
+
+            assertEquals(AudioFileDigest(sizeBytes = 3, sha256Hex = ABC_SHA256), store.storedDigest(noteId))
+        }
+
+    @Test
+    fun `discarding a note removes its recorded digest`() =
+        runTest {
+            store.writeAudio(noteId, ByteArrayInputStream("abc".encodeToByteArray()))
+
+            store.discard(noteId)
+
+            assertNull(store.storedDigest(noteId))
+            assertFalse(File(incomingDirectory, "$noteId.sha256").exists())
+        }
+
     private fun stagingFile(
         id: Uuid,
         ageMillis: Long,
@@ -250,6 +295,7 @@ class FileWatchAudioStoreTest {
     private fun metadataFile(id: Uuid): File = File(incomingDirectory, "$id.json")
 
     private companion object {
+        const val ABC_SHA256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         const val FIVE_MINUTES = 5 * 60 * 1000L
         const val TWO_HOURS = 2 * 60 * 60 * 1000L
         const val ONE_DAY = 24 * 60 * 60 * 1000L

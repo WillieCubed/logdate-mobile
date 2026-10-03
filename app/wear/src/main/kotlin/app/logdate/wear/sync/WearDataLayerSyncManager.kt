@@ -62,6 +62,7 @@ class WearDataLayerSyncManager(
     private val associationDataMapper: AssociationDataMapper,
     private val healthSnapshotDataMapper: HealthSnapshotDataMapper,
     private val mediaFiles: MediaFileResolver,
+    private val audioDigester: AudioFileDigester = FileAudioDigester(),
     private val clock: Clock = Clock.System,
 ) : SyncManager,
     WearNoteAckHandler,
@@ -404,13 +405,16 @@ class WearDataLayerSyncManager(
     }
 
     /**
-     * Audio notes carry the send time so a resend is a changed data item. The Data Layer drops a
-     * put that matches what it already holds, and the phone may have lost the earlier one.
+     * Audio notes include the send time so a resend is a changed data item: the Data Layer drops a
+     * put that matches what it already has, and the phone may have lost the earlier one. They also
+     * include the file's length and SHA-256, so the phone can tell a complete copy from one cut short.
      */
-    private fun dataMapFor(note: JournalNote): Map<String, String> {
+    private suspend fun dataMapFor(note: JournalNote): Map<String, String> {
         val dataMap = noteDataMapper.toDataMap(note)
         if (note !is JournalNote.Audio) return dataMap
-        return dataMap + (KEY_SENT_AT to clock.now().toEpochMilliseconds().toString())
+        val stamped = dataMap + (KEY_SENT_AT to clock.now().toEpochMilliseconds().toString())
+        val digest = audioDigester.digest(note.mediaRef) ?: return stamped
+        return NoteDataMapper.withAudioDigest(stamped, digest)
     }
 
     private suspend fun uploadNoteDelete(pending: PendingUpload): UploadOutcome {

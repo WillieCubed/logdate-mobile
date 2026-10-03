@@ -1,6 +1,9 @@
 package app.logdate.client.sync
 
 import android.content.Context
+import app.logdate.client.sync.datalayer.AudioFileDigest
+import app.logdate.client.sync.datalayer.audioDigest
+import app.logdate.client.sync.datalayer.copyToDigesting
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -10,17 +13,19 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import kotlin.uuid.Uuid
 
 /**
- * Stores watch audio in the phone's private audio directory, next to phone recordings, and keeps
+ * Stores watch audio in the phone's private audio directory, next to phone recordings, and stores
  * metadata that arrived ahead of its audio in a separate directory the audio scan never sees.
  *
  * The audio file appears at [audioPath] only when complete: bytes land in a staging file that is
- * synced to disk and renamed into place.
+ * synced to disk and renamed into place. Its length and SHA-256 are measured in the same pass and
+ * recorded beside the metadata, so the ingestor can compare them with what the watch measured.
  *
  * Files left by a transfer that never finished are cleared as new work arrives: a staging file the
  * process died in the middle of, and metadata whose audio never came. Deletion markers are not
@@ -51,20 +56,34 @@ class FileWatchAudioStore(
             try {
                 audioDirectory.mkdirs()
                 clearOlderThan(audioDirectory, STAGING_MAX_AGE_MS) { it.name.endsWith(STAGING_SUFFIX) }
-                FileOutputStream(staging).use { output ->
-                    source.copyTo(output)
-                    output.fd.sync()
-                }
-                if (staging.length() == 0L) {
+                val digest =
+                    FileOutputStream(staging).use { output ->
+                        source.copyToDigesting(output).also { output.fd.sync() }
+                    }
+                if (digest.sizeBytes == 0L) {
                     staging.delete()
                     return@withContext false
                 }
+                digestFile(noteId).delete()
                 Files.move(staging.toPath(), audioFile(noteId).toPath(), StandardCopyOption.ATOMIC_MOVE)
+                recordDigest(noteId, digest)
                 true
             } catch (e: Exception) {
                 Napier.w("Failed to store watch audio for note $noteId", e)
                 staging.delete()
                 false
+            }
+        }
+
+    override suspend fun storedDigest(noteId: Uuid): AudioFileDigest? =
+        withContext(ioDispatcher) {
+            val audio = audioFile(noteId)
+            if (!audio.isFile) return@withContext null
+            try {
+                recordedDigest(noteId) ?: audio.audioDigest()
+            } catch (e: IOException) {
+                Napier.w("Could not measure watch audio for note $noteId", e)
+                null
             }
         }
 
@@ -92,13 +111,17 @@ class FileWatchAudioStore(
         }
 
     override suspend fun clearMetadata(noteId: Uuid) {
-        withContext(ioDispatcher) { metadataFile(noteId).delete() }
+        withContext(ioDispatcher) {
+            metadataFile(noteId).delete()
+            digestFile(noteId).delete()
+        }
     }
 
     override suspend fun discard(noteId: Uuid) {
         withContext(ioDispatcher) {
             audioFile(noteId).delete()
             metadataFile(noteId).delete()
+            digestFile(noteId).delete()
         }
     }
 
@@ -110,6 +133,26 @@ class FileWatchAudioStore(
     }
 
     override suspend fun isDeleted(noteId: Uuid): Boolean = withContext(ioDispatcher) { deletionMarker(noteId).isFile }
+
+    /** Best effort: [storedDigest] measures the file itself when nothing is recorded. */
+    private fun recordDigest(
+        noteId: Uuid,
+        digest: AudioFileDigest,
+    ) {
+        try {
+            incomingDirectory.mkdirs()
+            digestFile(noteId).writeText("${digest.sizeBytes} ${digest.sha256Hex}")
+        } catch (e: IOException) {
+            Napier.w("Could not record the digest of watch audio for note $noteId; it is measured when needed", e)
+        }
+    }
+
+    private fun recordedDigest(noteId: Uuid): AudioFileDigest? {
+        val file = digestFile(noteId)
+        if (!file.isFile) return null
+        val (size, sha256) = file.readText().split(' ').takeIf { it.size == 2 } ?: return null
+        return AudioFileDigest(sizeBytes = size.toLongOrNull() ?: return null, sha256Hex = sha256)
+    }
 
     private fun clearOlderThan(
         directory: File,
@@ -130,11 +173,14 @@ class FileWatchAudioStore(
 
     private fun metadataFile(noteId: Uuid): File = File(incomingDirectory, "$noteId.json")
 
+    private fun digestFile(noteId: Uuid): File = File(incomingDirectory, "$noteId$DIGEST_SUFFIX")
+
     private fun deletionMarker(noteId: Uuid): File = File(incomingDirectory, "$noteId.deleted")
 
     private companion object {
         const val STAGING_SUFFIX = ".m4a.part"
         const val METADATA_SUFFIX = ".json"
+        const val DIGEST_SUFFIX = ".sha256"
 
         /** A transfer writes continuously, so a staging file untouched for an hour was abandoned. */
         const val STAGING_MAX_AGE_MS = 60L * 60 * 1000

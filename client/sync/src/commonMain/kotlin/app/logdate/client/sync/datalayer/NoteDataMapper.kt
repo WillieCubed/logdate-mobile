@@ -46,6 +46,40 @@ class NoteDataMapper(
         const val KEY_NOTE_TYPE = "noteType"
         const val KEY_JSON_PAYLOAD = "jsonPayload"
 
+        /** Length in bytes of an audio note's file, sent by the watch so the phone can check its copy. */
+        const val KEY_AUDIO_SIZE = "audioSize"
+
+        /** Lowercase hex SHA-256 of an audio note's file, sent with [KEY_AUDIO_SIZE]. */
+        const val KEY_AUDIO_SHA256 = "audioSha256"
+
+        /** [map] with [digest] added, for an audio note whose file the phone should check. */
+        fun withAudioDigest(
+            map: Map<String, String>,
+            digest: AudioFileDigest,
+        ): Map<String, String> =
+            map +
+                mapOf(
+                    KEY_AUDIO_SIZE to digest.sizeBytes.toString(),
+                    KEY_AUDIO_SHA256 to digest.sha256Hex,
+                )
+
+        /**
+         * The digest a note's data map has, or null when it has none, as from watch builds that
+         * predate digests. A value that cannot be read gives a digest no file matches, so a damaged
+         * key never lets a short file through.
+         */
+        fun audioDigest(map: Map<String, String>): AudioFileDigest? {
+            val size = map[KEY_AUDIO_SIZE]
+            val sha256 = map[KEY_AUDIO_SHA256]
+            if (size == null && sha256 == null) return null
+            return AudioFileDigest(
+                sizeBytes = size?.toLongOrNull() ?: UNREADABLE_SIZE,
+                sha256Hex = sha256?.lowercase().orEmpty(),
+            )
+        }
+
+        private const val UNREADABLE_SIZE = -1L
+
         private const val NOTES_PATH_PREFIX = "/logdate/notes"
 
         /** Data Layer path for a specific note. */
@@ -67,3 +101,9 @@ class NoteDataMapper(
         }
     }
 }
+
+/** The length and SHA-256 of an audio file, as one device measured it. */
+data class AudioFileDigest(
+    val sizeBytes: Long,
+    val sha256Hex: String,
+)

@@ -10,6 +10,7 @@ import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.datalayer.AssociationDataMapper
+import app.logdate.client.sync.datalayer.AudioFileDigest
 import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
 import app.logdate.client.sync.datalayer.JournalDataMapper
 import app.logdate.client.sync.datalayer.NoteDataMapper
@@ -31,6 +32,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
+import java.io.File
 import kotlin.io.path.createTempDirectory
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -994,5 +996,45 @@ class WearDataLayerSyncManagerTest {
             syncManager.syncJournals()
 
             coVerify(exactly = 1) { dataLayerClient.putDataItem(JournalDataMapper.journalPath(journalId), any(), false) }
+        }
+
+    // =======================================================================
+    // Audio digests
+    // =======================================================================
+
+    @Test
+    fun `an audio note tells the phone the size and SHA-256 of its file`() =
+        runTest {
+            val file = File.createTempFile("watch-recording", ".m4a").apply { writeText("abc") }
+            try {
+                coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                    listOf(PendingUpload(noteId.toString(), PendingOperation.CREATE))
+                coEvery { notesRepository.getNoteById(noteId) } returns audioNote.copy(mediaRef = file.absolutePath)
+                val sentData = mutableListOf<Map<String, String>>()
+                coEvery { dataLayerClient.putDataItem(any(), capture(sentData), any()) } returns true
+
+                syncManager.uploadPendingChanges()
+
+                assertEquals(
+                    AudioFileDigest(sizeBytes = 3, sha256Hex = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"),
+                    NoteDataMapper.audioDigest(sentData.single()),
+                )
+            } finally {
+                file.delete()
+            }
+        }
+
+    @Test
+    fun `an audio note whose file cannot be read goes without a digest`() =
+        runTest {
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(PendingUpload(noteId.toString(), PendingOperation.CREATE))
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote
+            val sentData = mutableListOf<Map<String, String>>()
+            coEvery { dataLayerClient.putDataItem(any(), capture(sentData), any()) } returns true
+
+            syncManager.uploadPendingChanges()
+
+            assertNull(NoteDataMapper.audioDigest(sentData.single()))
         }
 }

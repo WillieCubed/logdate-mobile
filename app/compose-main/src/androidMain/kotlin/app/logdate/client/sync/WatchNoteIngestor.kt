@@ -3,6 +3,7 @@ package app.logdate.client.sync
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
+import app.logdate.client.sync.datalayer.AudioFileDigest
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.sync.Mutex
@@ -27,6 +28,12 @@ interface WatchAudioStore {
         source: InputStream,
     ): Boolean
 
+    /**
+     * The length and SHA-256 of the file at [audioPath], measured when it was written, or null when
+     * there is no file or it cannot be read.
+     */
+    suspend fun storedDigest(noteId: Uuid): AudioFileDigest?
+
     suspend fun stashMetadata(
         noteId: Uuid,
         data: Map<String, String>,
@@ -34,6 +41,7 @@ interface WatchAudioStore {
 
     suspend fun stashedMetadata(noteId: Uuid): Map<String, String>?
 
+    /** Removes what waited for the note to be stored: its stashed metadata and its audio's recorded digest. */
     suspend fun clearMetadata(noteId: Uuid)
 
     /** Removes the file and any stashed metadata. A deletion marker set by [markDeleted] stays. */
@@ -164,11 +172,30 @@ class WatchNoteIngestor(
         if (!audioStore.hasAudio(noteId)) return
         val data = audioStore.stashedMetadata(noteId) ?: return
         val watchNote = noteDataMapper.fromDataMap(data) as? JournalNote.Audio ?: return
+        if (!audioMatchesWhatTheWatchSent(noteId, data)) return
 
         val note = watchNote.copy(mediaRef = audioStore.audioPath(noteId))
         notesRepository.create(note)
         audioStore.clearMetadata(noteId)
         acknowledger.acknowledge(noteId)
         notifier.noteReceived(note)
+    }
+
+    /**
+     * A watch that sends a digest lets the phone tell a complete file from one cut short on the way.
+     * A file that does not match is removed with its metadata, so the note is neither stored nor
+     * acknowledged and the watch's next resend replaces both. A watch that sends no digest is trusted,
+     * as every watch was before digests existed.
+     */
+    private suspend fun audioMatchesWhatTheWatchSent(
+        noteId: Uuid,
+        data: Map<String, String>,
+    ): Boolean {
+        val expected = NoteDataMapper.audioDigest(data) ?: return true
+        val received = audioStore.storedDigest(noteId)
+        if (received == expected) return true
+        Napier.w("Audio for watch note $noteId is $received, but the watch sent $expected; waiting for it to be sent again")
+        audioStore.discard(noteId)
+        return false
     }
 }

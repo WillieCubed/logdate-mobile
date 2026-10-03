@@ -3,7 +3,9 @@ package app.logdate.client.sync
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
+import app.logdate.client.sync.datalayer.AudioFileDigest
 import app.logdate.client.sync.datalayer.NoteDataMapper
+import app.logdate.client.sync.datalayer.copyToDigesting
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -12,6 +14,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -361,6 +364,78 @@ class WatchNoteIngestorTest {
             assertFailsWith<IllegalArgumentException> { ingestor.onNoteMetadata(emptyMap()) }
         }
 
+    @Test
+    fun `audio matching what the watch measured is stored`() =
+        runTest {
+            val note = watchAudioNote()
+
+            ingestor.onNoteMetadata(withDigestOf("complete audio", note))
+            ingestor.onAudioBytes(note.uid, bytes("complete audio"))
+
+            assertTrue(stored.containsKey(note.uid))
+            assertEquals(listOf(note.uid), acknowledger.acknowledged)
+        }
+
+    @Test
+    fun `audio cut short on the way is neither stored nor acknowledged`() =
+        runTest {
+            val note = watchAudioNote()
+
+            ingestor.onNoteMetadata(withDigestOf("complete audio", note))
+            ingestor.onAudioBytes(note.uid, bytes("complete"))
+
+            coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
+            assertTrue(acknowledger.acknowledged.isEmpty())
+            assertFalse(store.hasAudio(note.uid))
+        }
+
+    @Test
+    fun `audio cut short is stored once the watch resends it whole`() =
+        runTest {
+            val note = watchAudioNote()
+            val metadata = withDigestOf("complete audio", note)
+            ingestor.onNoteMetadata(metadata)
+            ingestor.onAudioBytes(note.uid, bytes("complete"))
+
+            ingestor.onNoteMetadata(metadata)
+            ingestor.onAudioBytes(note.uid, bytes("complete audio"))
+
+            coVerify(exactly = 1) { notesRepository.create(any<JournalNote>()) }
+            assertEquals(listOf(note.uid), acknowledger.acknowledged)
+        }
+
+    @Test
+    fun `audio that arrived first is checked when its metadata follows`() =
+        runTest {
+            val note = watchAudioNote()
+
+            ingestor.onAudioBytes(note.uid, bytes("complete"))
+            ingestor.onNoteMetadata(withDigestOf("complete audio", note))
+
+            coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
+            assertFalse(store.hasAudio(note.uid))
+        }
+
+    @Test
+    fun `a digest that cannot be read rejects the audio`() =
+        runTest {
+            val note = watchAudioNote()
+
+            ingestor.onNoteMetadata(mapper.toDataMap(note) + (NoteDataMapper.KEY_AUDIO_SIZE to "unknown"))
+            ingestor.onAudioBytes(note.uid, bytes("m4a"))
+
+            coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
+        }
+
+    private fun withDigestOf(
+        audio: String,
+        note: JournalNote.Audio,
+    ): Map<String, String> =
+        NoteDataMapper.withAudioDigest(
+            mapper.toDataMap(note),
+            ByteArrayInputStream(audio.encodeToByteArray()).copyToDigesting(ByteArrayOutputStream()),
+        )
+
     private fun bytes(text: String): InputStream = ByteArrayInputStream(text.encodeToByteArray())
 
     private fun watchAudioNote(id: Uuid = Uuid.random()): JournalNote.Audio {
@@ -414,6 +489,9 @@ class WatchNoteIngestorTest {
             audio[noteId] = source.readBytes()
             return true
         }
+
+        override suspend fun storedDigest(noteId: Uuid): AudioFileDigest? =
+            audio[noteId]?.let { bytes -> ByteArrayInputStream(bytes).copyToDigesting(ByteArrayOutputStream()) }
 
         override suspend fun stashMetadata(
             noteId: Uuid,

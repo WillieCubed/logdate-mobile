@@ -562,4 +562,56 @@ class NoteDataMapperTest {
         assertEquals(99, mapper.fromDataMap(mapper.toDataMap(textNote)).syncVersion)
         assertEquals(42, mapper.fromDataMap(mapper.toDataMap(audioNote)).syncVersion)
     }
+
+    // =======================================================================
+    // Audio digest keys
+    // =======================================================================
+
+    @Test
+    fun `an audio digest added to a data map reads back`() {
+        val digest = AudioFileDigest(sizeBytes = 42_000, sha256Hex = "ab".repeat(32))
+
+        val map = NoteDataMapper.withAudioDigest(mapper.toDataMap(audioNote()), digest)
+
+        assertEquals("42000", map[NoteDataMapper.KEY_AUDIO_SIZE])
+        assertEquals(digest, NoteDataMapper.audioDigest(map))
+    }
+
+    @Test
+    fun `a data map from a watch that sends no digest has none`() {
+        assertNull(NoteDataMapper.audioDigest(mapper.toDataMap(audioNote())))
+    }
+
+    @Test
+    fun `an unreadable size gives a digest no file matches`() {
+        val map =
+            mapper.toDataMap(audioNote()) +
+                mapOf(
+                    NoteDataMapper.KEY_AUDIO_SIZE to "lots",
+                    NoteDataMapper.KEY_AUDIO_SHA256 to "AB".repeat(32),
+                )
+
+        val digest = assertNotNull(NoteDataMapper.audioDigest(map))
+
+        assertEquals(-1L, digest.sizeBytes)
+        assertEquals("ab".repeat(32), digest.sha256Hex)
+    }
+
+    @Test
+    fun `a digest does not change the note read from the map`() {
+        val note = audioNote()
+
+        val map = NoteDataMapper.withAudioDigest(mapper.toDataMap(note), AudioFileDigest(1, "00".repeat(32)))
+
+        assertEquals(note, mapper.fromDataMap(map))
+    }
+
+    private fun audioNote(): JournalNote.Audio =
+        JournalNote.Audio(
+            uid = fixedUuid,
+            creationTimestamp = fixedTime,
+            lastUpdated = fixedTime,
+            mediaRef = "/watch/recording.m4a",
+            durationMs = 4_200,
+        )
 }
