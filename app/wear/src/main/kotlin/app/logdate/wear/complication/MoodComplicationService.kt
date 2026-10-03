@@ -9,13 +9,23 @@ import androidx.wear.watchface.complications.data.PlainComplicationText
 import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
-import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.R
+import app.logdate.wear.capture.Feeling
+import app.logdate.wear.capture.MomentNoteCodec
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
+
+private const val NO_FEELING_TEXT = "—"
+
+/**
+ * What the Mood complication shows for [feeling]: the emoji the check-in screen showed for it, or a
+ * dash on a day without a check-in.
+ */
+internal fun feelingComplicationText(feeling: Feeling?): String = feeling?.emoji ?: NO_FEELING_TEXT
 
 /**
  * Complication showing the user's most recent mood for today.
@@ -26,28 +36,27 @@ class MoodComplicationService : SuspendingComplicationDataSourceService() {
     override fun getPreviewData(type: ComplicationType): ComplicationData? {
         if (type != ComplicationType.SHORT_TEXT) return null
         return createComplicationData(
-            moodEmoji = MOOD_EMOJI_GOOD,
+            text = feelingComplicationText(Feeling.GOOD),
             contentDescription = getString(R.string.wear_complication_mood_description),
         )
     }
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData {
-        val mood = fetchTodayMood()
-        val emoji = moodToEmoji(mood)
+        val feeling = fetchTodayFeeling()
         val description =
-            if (mood != null) {
-                getString(R.string.wear_complication_mood_current, mood)
+            if (feeling != null) {
+                getString(R.string.wear_complication_mood_current, getString(feeling.labelRes))
             } else {
                 getString(R.string.wear_complication_mood_none)
             }
         return createComplicationData(
-            moodEmoji = emoji,
+            text = feelingComplicationText(feeling),
             contentDescription = description,
             tapIntent = createMoodCheckInIntent(),
         )
     }
 
-    private suspend fun fetchTodayMood(): String? =
+    private suspend fun fetchTodayFeeling(): Feeling? =
         try {
             val repository =
                 org.koin.java.KoinJavaComponent
@@ -58,15 +67,9 @@ class MoodComplicationService : SuspendingComplicationDataSourceService() {
                     .now()
                     .toLocalDateTime(TimeZone.currentSystemDefault())
                     .date
-            val notes = repository.observeNotesForDay(today).first()
-            notes
-                .filterIsInstance<JournalNote.Text>()
-                .filter { it.content.startsWith("#mood:") }
-                .maxByOrNull { it.creationTimestamp }
-                ?.content
-                ?.removePrefix("#mood:")
-                ?.trim()
+            MomentNoteCodec.latestFeeling(repository.observeNotesForDay(today).first())
         } catch (e: Exception) {
+            Napier.e("Failed to read today's mood for the Wear complication", e)
             null
         }
 
@@ -85,13 +88,13 @@ class MoodComplicationService : SuspendingComplicationDataSourceService() {
     }
 
     private fun createComplicationData(
-        moodEmoji: String,
+        text: String,
         contentDescription: String,
         tapIntent: PendingIntent? = null,
     ): ShortTextComplicationData {
         val builder =
             ShortTextComplicationData.Builder(
-                text = PlainComplicationText.Builder(moodEmoji).build(),
+                text = PlainComplicationText.Builder(text).build(),
                 contentDescription = PlainComplicationText.Builder(contentDescription).build(),
             )
         if (tapIntent != null) {
@@ -102,22 +105,5 @@ class MoodComplicationService : SuspendingComplicationDataSourceService() {
 
     companion object {
         private const val MOOD_REQUEST_CODE = 1001
-
-        private const val MOOD_EMOJI_GREAT = "\uD83D\uDE04"
-        private const val MOOD_EMOJI_GOOD = "\uD83D\uDE42"
-        private const val MOOD_EMOJI_OK = "\uD83D\uDE10"
-        private const val MOOD_EMOJI_SAD = "\uD83D\uDE1E"
-        private const val MOOD_EMOJI_ROUGH = "\uD83D\uDE23"
-        private const val MOOD_EMOJI_NONE = "\u2014" // em dash
-
-        fun moodToEmoji(mood: String?): String =
-            when (mood) {
-                "great" -> MOOD_EMOJI_GREAT
-                "good" -> MOOD_EMOJI_GOOD
-                "ok" -> MOOD_EMOJI_OK
-                "sad" -> MOOD_EMOJI_SAD
-                "rough" -> MOOD_EMOJI_ROUGH
-                else -> MOOD_EMOJI_NONE
-            }
     }
 }

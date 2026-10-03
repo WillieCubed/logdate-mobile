@@ -65,6 +65,15 @@ Bring the phone and watch within range and confirm the watch's Settings screen s
 | Play with no headphones connected on a watch with no speaker | "Connect headphones to listen", and the button opens Bluetooth settings |
 | Play with the phone out of range a memory the watch never received | "Couldn't load audio. Tap to retry" |
 
+## Mood
+
+| Do this | You should see |
+|---------|----------------|
+| Check in "Sad" from the mood button, wait up to 15 minutes, then look at the Mood complication | 😔, the face the check-in screen showed |
+| Check in "Great", wait up to 15 minutes, then open the Today's Summary tile | "😄 Great" |
+| Check in a mood, then tap Open recorder | The recorder, and Timeline lists the mood for today |
+| Open the check-in from the Mood complication, pick a mood, then tap Open recorder | The recorder, not the check-in again |
+
 ## Reminders
 
 | Do this | You should see |

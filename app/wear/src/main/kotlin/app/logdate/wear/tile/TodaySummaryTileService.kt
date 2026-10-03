@@ -22,15 +22,20 @@ import androidx.wear.tooling.preview.devices.WearDevices
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.R
-import app.logdate.wear.complication.MoodComplicationService
+import app.logdate.wear.capture.Feeling
+import app.logdate.wear.capture.MomentNoteCodec
+import app.logdate.wear.capture.MomentNoteKind
 import com.google.android.horologist.annotations.ExperimentalHorologistApi
 import com.google.android.horologist.tiles.SuspendingTileService
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 private const val RESOURCES_VERSION = "1"
+private const val MAX_PREVIEW_LENGTH = 30
 
 /**
  * Today's Summary tile showing entry count, current mood, and latest entry preview.
@@ -61,43 +66,32 @@ class TodaySummaryTileService : SuspendingTileService() {
                     .now()
                     .toLocalDateTime(TimeZone.currentSystemDefault())
                     .date
-            val notes = repository.observeNotesForDay(today).first()
-            val entryCount = notes.size
-            val latestMood =
-                notes
-                    .filterIsInstance<JournalNote.Text>()
-                    .filter { it.content.startsWith("#mood:") }
-                    .maxByOrNull { it.creationTimestamp }
-                    ?.content
-                    ?.removePrefix("#mood:")
-                    ?.trim()
-            val latestEntry =
-                notes
-                    .filter { it !is JournalNote.Text || !it.content.startsWith("#mood:") }
-                    .maxByOrNull { it.creationTimestamp }
-                    ?.let { note ->
-                        when (note) {
-                            is JournalNote.Text -> note.content.take(MAX_PREVIEW_LENGTH)
-                            is JournalNote.Audio -> getString(R.string.wear_tile_summary_voice_note)
-                            is JournalNote.Image -> getString(R.string.wear_tile_summary_photo)
-                            is JournalNote.Video -> getString(R.string.wear_tile_summary_video)
-                        }
-                    }
-            TodaySummary(entryCount, latestMood, latestEntry)
+            summarizeToday(repository.observeNotesForDay(today).first())
         } catch (e: Exception) {
-            TodaySummary(0, null, null)
+            Napier.e("Failed to read today's notes for the Wear summary tile", e)
+            TodaySummary(entryCount = 0, feeling = null, latestEntry = null)
         }
-
-    companion object {
-        private const val MAX_PREVIEW_LENGTH = 30
-    }
 }
 
+/**
+ * What the tile shows: how many notes today has, the feeling of today's newest mood check-in, and
+ * the newest note that is not a check-in.
+ */
 internal data class TodaySummary(
     val entryCount: Int,
-    val mood: String?,
-    val latestEntryPreview: String?,
+    val feeling: Feeling?,
+    val latestEntry: JournalNote?,
 )
+
+internal fun summarizeToday(notes: List<JournalNote>): TodaySummary =
+    TodaySummary(
+        entryCount = notes.size,
+        feeling = MomentNoteCodec.latestFeeling(notes),
+        latestEntry =
+            notes
+                .filter { MomentNoteCodec.classify(it) != MomentNoteKind.FEELING }
+                .maxByOrNull(JournalNote::creationTimestamp),
+    )
 
 internal fun todaySummaryTile(
     requestParams: RequestBuilders.TileRequest,
@@ -139,12 +133,10 @@ private fun todaySummaryLayout(
         )
 
     val moodLine =
-        if (summary.mood != null) {
-            val emoji = MoodComplicationService.moodToEmoji(summary.mood)
-            context.getString(R.string.wear_tile_summary_mood, emoji, summary.mood)
-        } else {
-            null
+        summary.feeling?.let { feeling ->
+            context.getString(R.string.wear_tile_summary_mood, feeling.emoji, context.getString(feeling.labelRes))
         }
+    val latestPreview = summary.latestEntry?.let { note -> latestEntryPreview(context, note) }
 
     return PrimaryLayout
         .Builder(requestParams.deviceConfiguration)
@@ -156,7 +148,7 @@ private fun todaySummaryLayout(
                 .setTypography(Typography.TYPOGRAPHY_CAPTION1)
                 .build(),
         ).setContent(
-            summaryContent(context, entryLabel, moodLine, summary.latestEntryPreview),
+            summaryContent(context, entryLabel, moodLine, latestPreview),
         ).setSecondaryLabelTextContent(
             Text
                 .Builder(context, context.getString(R.string.wear_tile_summary_open))
@@ -175,6 +167,17 @@ private fun todaySummaryLayout(
                 ).build(),
         ).build()
 }
+
+private fun latestEntryPreview(
+    context: Context,
+    note: JournalNote,
+): String =
+    when (note) {
+        is JournalNote.Text -> note.content.take(MAX_PREVIEW_LENGTH)
+        is JournalNote.Audio -> context.getString(R.string.wear_tile_summary_voice_note)
+        is JournalNote.Image -> context.getString(R.string.wear_tile_summary_photo)
+        is JournalNote.Video -> context.getString(R.string.wear_tile_summary_video)
+    }
 
 private fun summaryContent(
     context: Context,
@@ -266,8 +269,13 @@ fun todaySummaryTilePreview(context: Context) =
             context,
             TodaySummary(
                 entryCount = 5,
-                mood = "good",
-                latestEntryPreview = "Had an amazing lunch...",
+                feeling = Feeling.GOOD,
+                latestEntry =
+                    JournalNote.Text(
+                        creationTimestamp = Instant.fromEpochMilliseconds(0),
+                        lastUpdated = Instant.fromEpochMilliseconds(0),
+                        content = "Had an amazing lunch...",
+                    ),
             ),
         )
     }

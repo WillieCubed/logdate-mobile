@@ -120,9 +120,9 @@ private fun TimelineDayCard(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (day.latestMood != null) {
+        if (day.feeling != null) {
             Text(
-                text = day.latestMood,
+                text = "${day.feeling.emoji} ${stringResource(day.feeling.labelRes)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
             )

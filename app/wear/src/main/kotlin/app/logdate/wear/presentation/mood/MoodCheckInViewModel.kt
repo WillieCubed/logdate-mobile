@@ -5,10 +5,13 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SystemCaptureTimeZone
+import app.logdate.wear.capture.Feeling
+import app.logdate.wear.capture.MomentNoteCodec
 import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.presentation.common.SaveFeedback
 import app.logdate.wear.sync.WearDataLayerClient
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,18 +24,6 @@ import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-enum class MoodOption(
-    val emoji: String,
-    val label: String,
-    val tag: String,
-) {
-    GREAT("\uD83D\uDE04", "Great", "great"),
-    GOOD("\uD83D\uDE42", "Good", "good"),
-    OK("\uD83D\uDE10", "OK", "ok"),
-    SAD("\uD83D\uDE14", "Sad", "sad"),
-    ROUGH("\uD83D\uDE30", "Rough", "rough"),
-}
-
 enum class MoodCheckInStep {
     SELECT_MOOD,
     VOICE_PROMPT,
@@ -41,7 +32,7 @@ enum class MoodCheckInStep {
 
 data class MoodCheckInUiState(
     val step: MoodCheckInStep = MoodCheckInStep.SELECT_MOOD,
-    val selectedMood: MoodOption? = null,
+    val selectedMood: Feeling? = null,
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,
     val saveFeedback: SaveFeedback? = null,
@@ -68,7 +59,7 @@ class MoodCheckInViewModel(
     private val _events = MutableSharedFlow<MoodCheckInEvent>(extraBufferCapacity = 1)
     val events: SharedFlow<MoodCheckInEvent> = _events.asSharedFlow()
 
-    fun selectMood(mood: MoodOption) {
+    fun selectMood(mood: Feeling) {
         _uiState.update {
             it.copy(
                 selectedMood = mood,
@@ -82,49 +73,58 @@ class MoodCheckInViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true) }
-
-            try {
-                val now = Clock.System.now()
-                val noteLocation = locationCaptureCoordinator.captureForJournalEntry()
-                val note =
-                    JournalNote.Text(
-                        content = "#mood:${mood.tag} Feeling ${mood.label.lowercase()}",
-                        uid = Uuid.random(),
-                        creationTimestamp = now,
-                        lastUpdated = now,
-                        location = noteLocation,
-                        timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
-                    )
-                notesRepository.create(note)
-
-                val feedback =
-                    if (dataLayerClient.isPhoneConnected()) {
-                        SaveFeedback.SYNCING_TO_PHONE
-                    } else {
-                        SaveFeedback.SAVED_LOCALLY
-                    }
-
-                _uiState.update {
-                    it.copy(
-                        step = MoodCheckInStep.SAVED,
-                        isSaving = false,
-                        isSaved = true,
-                        saveFeedback = feedback,
-                    )
-                }
-
-                Napier.d("Mood check-in saved: ${mood.tag}")
-
-                delay(SAVED_DISPLAY_MS)
-                _events.emit(MoodCheckInEvent.NavigateBack)
-            } catch (e: Exception) {
-                Napier.e("Failed to save mood check-in", e)
+            val feedback = saveMood(mood)
+            if (feedback == null) {
                 _uiState.update { it.copy(isSaving = false) }
+                return@launch
             }
+            _uiState.update {
+                it.copy(
+                    step = MoodCheckInStep.SAVED,
+                    isSaving = false,
+                    isSaved = true,
+                    saveFeedback = feedback,
+                )
+            }
+            delay(SAVED_DISPLAY_MS)
+            _events.emit(MoodCheckInEvent.NavigateBack)
         }
     }
 
+    /** Saves the mood, then opens the recorder so a voice note can follow it. */
     fun attachVoice() {
-        _events.tryEmit(MoodCheckInEvent.NavigateToVoiceNote)
+        val mood = _uiState.value.selectedMood ?: return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSaving = true) }
+            val feedback = saveMood(mood)
+            _uiState.update { it.copy(isSaving = false, isSaved = feedback != null, saveFeedback = feedback) }
+            if (feedback == null) return@launch
+            _events.emit(MoodCheckInEvent.NavigateToVoiceNote)
+        }
     }
+
+    /** Saves [mood] as a check-in note. Returns where it went, or null when it could not be saved. */
+    private suspend fun saveMood(mood: Feeling): SaveFeedback? =
+        try {
+            val now = Clock.System.now()
+            val noteLocation = locationCaptureCoordinator.captureForJournalEntry()
+            notesRepository.create(
+                JournalNote.Text(
+                    content = MomentNoteCodec.encode(mood),
+                    uid = Uuid.random(),
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    location = noteLocation,
+                    timeZoneId = SystemCaptureTimeZone.currentTimeZoneId(),
+                ),
+            )
+            Napier.d("Mood check-in saved: ${mood.tag}")
+            if (dataLayerClient.isPhoneConnected()) SaveFeedback.SYNCING_TO_PHONE else SaveFeedback.SAVED_LOCALLY
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.e("Failed to save mood check-in", e)
+            null
+        }
 }

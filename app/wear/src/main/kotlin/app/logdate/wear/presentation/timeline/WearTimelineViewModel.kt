@@ -5,6 +5,9 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
+import app.logdate.wear.capture.Feeling
+import app.logdate.wear.capture.MomentNoteCodec
+import app.logdate.wear.capture.MomentNoteKind
 import app.logdate.wear.playback.AudioOutputState
 import app.logdate.wear.playback.WearVoiceNotePlayer
 import app.logdate.wear.sync.WearDataLayerClient
@@ -27,7 +30,7 @@ import kotlin.uuid.Uuid
 data class WearTimelineDayUiState(
     val date: LocalDate,
     val entryCount: Int,
-    val latestMood: String? = null,
+    val feeling: Feeling? = null,
     val previewText: String? = null,
 )
 
@@ -153,7 +156,7 @@ class WearTimelineViewModel(
                     WearTimelineDayUiState(
                         date = date,
                         entryCount = dayNotes.size,
-                        latestMood = extractMood(dayNotes),
+                        feeling = MomentNoteCodec.latestFeeling(dayNotes),
                         previewText = extractPreview(dayNotes),
                     )
                 }.sortedByDescending { it.date }
@@ -161,25 +164,12 @@ class WearTimelineViewModel(
         return WearTimelineUiState(days = days, isLoading = false)
     }
 
-    private fun extractMood(notes: List<JournalNote>): String? {
-        val moodPattern = Regex("^#mood:(\\w+)")
-        for (note in notes) {
-            if (note is JournalNote.Text) {
-                val match = moodPattern.find(note.content)
-                if (match != null) {
-                    return match.groupValues[1]
-                }
-            }
-        }
-        return null
-    }
-
-    private fun extractPreview(notes: List<JournalNote>): String? {
-        val firstText =
-            notes.firstOrNull { it is JournalNote.Text } as? JournalNote.Text
-                ?: return null
-        return firstText.content.take(50)
-    }
+    private fun extractPreview(notes: List<JournalNote>): String? =
+        notes
+            .filterIsInstance<JournalNote.Text>()
+            .firstOrNull { MomentNoteCodec.classify(it) == MomentNoteKind.TEXT }
+            ?.content
+            ?.take(50)
 }
 
 private fun WearPlaybackUiState.noteIdOrNull(): Uuid? =

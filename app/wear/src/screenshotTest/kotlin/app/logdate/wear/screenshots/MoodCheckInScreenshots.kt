@@ -1,7 +1,7 @@
 package app.logdate.wear.screenshots
 
 import androidx.compose.runtime.Composable
-import app.logdate.wear.presentation.mood.MoodOption
+import app.logdate.wear.capture.Feeling
 import app.logdate.wear.presentation.mood.MoodSavedContent
 import app.logdate.wear.presentation.mood.SelectMoodContent
 import app.logdate.wear.presentation.mood.VoicePromptContent
@@ -23,7 +23,7 @@ class MoodCheckInScreenshots {
     fun S02_MoodVoicePromptGreat() {
         OnWatchSurface {
             VoicePromptContent(
-                selectedMood = MoodOption.GREAT,
+                selectedMood = Feeling.GREAT,
                 onAttachVoice = {},
                 onSkip = {},
             )
@@ -36,7 +36,7 @@ class MoodCheckInScreenshots {
     fun S03_MoodVoicePromptSad() {
         OnWatchSurface {
             VoicePromptContent(
-                selectedMood = MoodOption.SAD,
+                selectedMood = Feeling.SAD,
                 onAttachVoice = {},
                 onSkip = {},
             )

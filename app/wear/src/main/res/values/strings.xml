@@ -120,6 +120,11 @@
     <string name="wear_mood_add_voice">Open recorder</string>
     <string name="wear_mood_skip">Skip</string>
     <string name="wear_mood_saved">Saved</string>
+    <string name="wear_feeling_great">Great</string>
+    <string name="wear_feeling_good">Good</string>
+    <string name="wear_feeling_ok">OK</string>
+    <string name="wear_feeling_sad">Sad</string>
+    <string name="wear_feeling_rough">Rough</string>
 
     <!-- Recording -->
     <string name="wear_recording_saving">Saving\u2026</string>

@@ -28,6 +28,7 @@ import androidx.wear.compose.material3.OutlinedButton
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import app.logdate.wear.R
+import app.logdate.wear.capture.Feeling
 import app.logdate.wear.haptic.WearHapticEngine
 import app.logdate.wear.presentation.common.SaveFeedback
 import kotlinx.coroutines.flow.collectLatest
@@ -77,7 +78,7 @@ fun MoodCheckInScreen(
 }
 
 @Composable
-internal fun SelectMoodContent(onMoodSelected: (MoodOption) -> Unit) {
+internal fun SelectMoodContent(onMoodSelected: (Feeling) -> Unit) {
     ScreenScaffold {
         ScalingLazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -91,12 +92,12 @@ internal fun SelectMoodContent(onMoodSelected: (MoodOption) -> Unit) {
                     modifier = Modifier.padding(bottom = 4.dp),
                 )
             }
-            items(MoodOption.entries.toList()) { mood ->
+            items(Feeling.entries) { feeling ->
                 FilledTonalButton(
-                    onClick = { onMoodSelected(mood) },
+                    onClick = { onMoodSelected(feeling) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(text = "${mood.emoji} ${mood.label}")
+                    Text(text = "${feeling.emoji} ${stringResource(feeling.labelRes)}")
                 }
             }
         }
@@ -105,7 +106,7 @@ internal fun SelectMoodContent(onMoodSelected: (MoodOption) -> Unit) {
 
 @Composable
 internal fun VoicePromptContent(
-    selectedMood: MoodOption?,
+    selectedMood: Feeling?,
     onAttachVoice: () -> Unit,
     onSkip: () -> Unit,
 ) {
@@ -123,7 +124,7 @@ internal fun VoicePromptContent(
                 style = MaterialTheme.typography.displaySmall,
             )
             Text(
-                text = selectedMood.label,
+                text = stringResource(selectedMood.labelRes),
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
             )

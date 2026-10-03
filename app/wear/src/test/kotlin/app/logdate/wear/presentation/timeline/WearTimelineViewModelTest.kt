@@ -2,6 +2,7 @@ package app.logdate.wear.presentation.timeline
 
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.wear.capture.Feeling
 import app.logdate.wear.playback.AudioOutputState
 import app.logdate.wear.playback.FakeEngine
 import app.logdate.wear.playback.FakeOutputs
@@ -198,7 +199,19 @@ class WearTimelineViewModelTest {
             val vm = createViewModel(listOf(moodNote))
             val state = vm.uiState.first()
 
-            assertEquals("good", state.days[0].latestMood)
+            assertEquals(Feeling.GOOD, state.days[0].feeling)
+        }
+
+    @Test
+    fun `the day's mood comes from its newest check-in`() =
+        runTest {
+            val older = createNote(content = "#mood:sad Feeling sad", hoursOffset = 0)
+            val newer = createNote(content = "#mood:great Feeling great", hoursOffset = 1)
+
+            val vm = createViewModel(listOf(older, newer))
+            val state = vm.uiState.first()
+
+            assertEquals(Feeling.GREAT, state.days[0].feeling)
         }
 
     @Test
@@ -209,7 +222,19 @@ class WearTimelineViewModelTest {
             val vm = createViewModel(listOf(plainNote))
             val state = vm.uiState.first()
 
-            assertNull(state.days[0].latestMood)
+            assertNull(state.days[0].feeling)
+        }
+
+    @Test
+    fun `a mood check-in is never the day's preview text`() =
+        runTest {
+            val checkIn = createNote(content = "#mood:good Feeling good", hoursOffset = 1)
+            val note = createNote(content = "Lunch by the water", hoursOffset = 0)
+
+            val vm = createViewModel(listOf(checkIn, note))
+            val state = vm.uiState.first()
+
+            assertEquals("Lunch by the water", state.days[0].previewText)
         }
 
     // =======================================================================
@@ -324,7 +349,7 @@ class WearTimelineViewModelTest {
 
             val state = vm.playbackState.first()
             assertTrue(state is WearPlaybackUiState.Active)
-            assertEquals(audioNote.uid, (state as WearPlaybackUiState.Active).noteId)
+            assertEquals(audioNote.uid, state.noteId)
             assertEquals(listOf("/watch/${audioNote.uid}.m4a"), engine.started)
         }
 
@@ -366,7 +391,7 @@ class WearTimelineViewModelTest {
 
             val state = vm.playbackState.first()
             assertTrue(state is WearPlaybackUiState.Active)
-            assertEquals(note2.uid, (state as WearPlaybackUiState.Active).noteId)
+            assertEquals(note2.uid, state.noteId)
             assertEquals(2, engine.started.size)
             assertEquals(1, engine.stops)
         }
