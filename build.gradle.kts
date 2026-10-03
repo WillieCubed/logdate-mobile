@@ -658,13 +658,19 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                     localDevices =
                         listOf(
                             ManagedVirtualDeviceConfig(
-                                deviceName = "recoveryAcceptancePhoneApi36",
-                                hardwareProfile = "Pixel 9 Pro",
-                                apiLevel = 36,
+                                deviceName = "recoveryAcceptanceDeviceAApi35",
+                                hardwareProfile = "Pixel Tablet",
+                                apiLevel = 35,
                                 systemImageSource = "google",
                             ),
                             ManagedVirtualDeviceConfig(
                                 deviceName = "recoveryAcceptanceTabletApi35",
+                                hardwareProfile = "Pixel Tablet",
+                                apiLevel = 35,
+                                systemImageSource = "google",
+                            ),
+                            ManagedVirtualDeviceConfig(
+                                deviceName = "recoveryAcceptanceRestartApi35",
                                 hardwareProfile = "Pixel Tablet",
                                 apiLevel = 35,
                                 systemImageSource = "google",
@@ -676,8 +682,9 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                                 groupName = "recoveryAcceptanceDevices",
                                 targetDeviceNames =
                                     listOf(
-                                        "recoveryAcceptancePhoneApi36",
+                                        "recoveryAcceptanceDeviceAApi35",
                                         "recoveryAcceptanceTabletApi35",
+                                        "recoveryAcceptanceRestartApi35",
                                     ),
                             ),
                         ),

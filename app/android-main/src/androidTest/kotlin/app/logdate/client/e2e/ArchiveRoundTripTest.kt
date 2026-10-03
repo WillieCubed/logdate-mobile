@@ -3,9 +3,20 @@ package app.logdate.client.e2e
 import kotlinx.coroutines.flow.flowOf
 import app.logdate.client.sync.metadata.QueuedUpload
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.ConnectivityManager
+import android.net.Uri
+import android.net.wifi.WifiManager
+import android.os.SystemClock
+import android.provider.Settings
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.UiDevice
+import androidx.work.ListenableWorker
+import androidx.work.testing.TestListenableWorkerBuilder
 import app.logdate.client.data.journals.OfflineFirstJournalContentRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
 import app.logdate.client.data.journals.RemoteJournalDataSource
@@ -22,6 +33,8 @@ import app.logdate.client.domain.export.ExportUserDataUseCase
 import app.logdate.client.domain.restore.RestoreBundle
 import app.logdate.client.domain.restore.RestoreOptions
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
+import app.logdate.client.media.AndroidMediaManager
+import app.logdate.client.media.MediaManager
 import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
@@ -37,6 +50,8 @@ import app.logdate.shared.model.Journal
 import app.logdate.shared.model.SerializableTextBlock
 import app.logdate.shared.model.profile.LogDateProfile
 import app.logdate.shared.model.user.UserData
+import app.logdate.feature.core.restore.RestoreLauncher
+import app.logdate.feature.core.restore.RestoreWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,13 +63,24 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.koin.core.context.startKoin
+import org.koin.core.context.stopKoin
+import org.koin.dsl.module
+import io.mockk.mockk
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
+import kotlin.math.min
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
@@ -267,6 +293,88 @@ class ArchiveRoundTripTest {
         }
     }
 
+    private fun writeStoredPadding(
+        zip: ZipOutputStream,
+        sizeBytes: Long,
+    ) {
+        val chunk = ByteArray(64 * 1024) { index -> ((index * 31 + 7) and 0xff).toByte() }
+        val crc = CRC32()
+        var remaining = sizeBytes
+        while (remaining > 0) {
+            val count = min(chunk.size.toLong(), remaining).toInt()
+            crc.update(chunk, 0, count)
+            remaining -= count
+        }
+
+        zip.putNextEntry(
+            ZipEntry("padding.bin").apply {
+                method = ZipEntry.STORED
+                size = sizeBytes
+                compressedSize = sizeBytes
+                this.crc = crc.value
+            },
+        )
+        remaining = sizeBytes
+        while (remaining > 0) {
+            val count = min(chunk.size.toLong(), remaining).toInt()
+            zip.write(chunk, 0, count)
+            remaining -= count
+        }
+        zip.closeEntry()
+    }
+
+    private data class NetworkState(
+        val airplaneModeEnabled: Boolean,
+        val wifiEnabled: Boolean,
+    )
+
+    private fun networkState(context: Context): NetworkState =
+        NetworkState(
+            airplaneModeEnabled = Settings.Global.getInt(
+                context.contentResolver,
+                Settings.Global.AIRPLANE_MODE_ON,
+                0,
+            ) != 0,
+            wifiEnabled = context.getSystemService(WifiManager::class.java).isWifiEnabled,
+        )
+
+    private fun setNetworkEnabled(
+        device: UiDevice,
+        enabled: Boolean,
+    ) {
+        val mode = if (enabled) "disable" else "enable"
+        device.executeShellCommand("cmd connectivity airplane-mode $mode")
+        device.executeShellCommand(if (enabled) "svc wifi enable" else "svc wifi disable")
+    }
+
+    private fun restoreNetworkState(
+        device: UiDevice,
+        state: NetworkState,
+    ) {
+        val airplaneMode = if (state.airplaneModeEnabled) "enable" else "disable"
+        device.executeShellCommand("cmd connectivity airplane-mode $airplaneMode")
+        device.executeShellCommand(if (state.wifiEnabled) "svc wifi enable" else "svc wifi disable")
+    }
+
+    private fun assertDeviceOffline(context: Context) {
+        val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
+        val deadline = SystemClock.elapsedRealtime() + 10_000L
+        while (connectivityManager.activeNetwork != null && SystemClock.elapsedRealtime() < deadline) {
+            SystemClock.sleep(250L)
+        }
+
+        assertEquals(
+            1,
+            Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0),
+            "airplane mode must be enabled before reading restored media",
+        )
+        assertFalse(
+            context.getSystemService(WifiManager::class.java).isWifiEnabled,
+            "Wi-Fi must be disabled before reading restored media",
+        )
+        assertNull(connectivityManager.activeNetwork, "device still has an active network")
+    }
+
     // ── Tests ────────────────────────────────────────────────────────────
 
     @Test
@@ -360,6 +468,115 @@ class ArchiveRoundTripTest {
             val j2Notes = destContentRepo.observeContentForJournal(journal2.id).first()
             assertEquals(2, j2Notes.size, "journal2 should have 2 notes after archive round-trip")
         }
+
+    @Test
+    fun `RestoreWorker imports a one gibibyte archive and restored image remains readable offline`() = runTest {
+        val paddingSize = 1L shl 30
+        assertTrue(Runtime.getRuntime().maxMemory() < paddingSize)
+
+        val now = now()
+        val journal = Journal(id = Uuid.random(), title = "Offline restore", created = now, lastUpdated = now)
+        sourceJournalRepo.create(journal)
+        val originalUri = "content://archive-fixture/source/photo.png"
+        val imageNote = JournalNote.Image(
+            uid = Uuid.random(),
+            creationTimestamp = now,
+            lastUpdated = now,
+            mediaRef = originalUri,
+            caption = "Restored offline",
+        )
+        sourceNotesRepo.create(imageNote, journal.id)
+
+        val exportProgress = exportUseCase.exportUserData(includeMedia = false).last()
+        val export = assertIs<ExportProgress.Completed>(exportProgress).result
+        val pngBitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        val imageBytes = ByteArrayOutputStream().use { output ->
+            try {
+                assertTrue(pngBitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
+                output.toByteArray()
+            } finally {
+                pngBitmap.recycle()
+            }
+        }
+
+        val archiveFile = File.createTempFile("restore-worker-1gib", ".zip", context.noBackupFilesDir)
+        var koinStarted = false
+        var restoredMediaUri: String? = null
+        val mediaManager = AndroidMediaManager(context.contentResolver, context, Dispatchers.IO)
+        val restoreLauncher = mockk<RestoreLauncher>(relaxed = true)
+        try {
+            ZipOutputStream(FileOutputStream(archiveFile)).use { zip ->
+                fun entry(name: String, content: ByteArray) {
+                    zip.putNextEntry(ZipEntry(name))
+                    zip.write(content)
+                    zip.closeEntry()
+                }
+
+                entry(ExportFileStructure.METADATA_FILE, export.serializeMetadata().encodeToByteArray())
+                entry(ExportFileStructure.JOURNALS_FILE, export.serializeJournals().encodeToByteArray())
+                entry(ExportFileStructure.NOTES_FILE, export.serializeNotes().encodeToByteArray())
+                entry(ExportFileStructure.JOURNAL_NOTES_FILE, export.serializeJournalNotes().encodeToByteArray())
+                entry(ExportFileStructure.DRAFTS_FILE, export.serializeDrafts().encodeToByteArray())
+                entry(
+                    ExportFileStructure.MEDIA_MANIFEST_FILE,
+                    """{"files":[{"exportPath":"media/offline/photo.png","sourceUri":"$originalUri"}]}"""
+                        .encodeToByteArray(),
+                )
+                entry("media/offline/photo.png", imageBytes)
+                writeStoredPadding(zip, paddingSize)
+            }
+            assertTrue(archiveFile.length() >= paddingSize, "fixture must be at least 1 GiB on disk")
+
+            runCatching { stopKoin() }
+            startKoin {
+                modules(
+                    module {
+                        single<RestoreUserDataUseCase> { restoreUseCase }
+                        single<MediaManager> { mediaManager }
+                        single<RestoreLauncher> { restoreLauncher }
+                    },
+                )
+            }
+            koinStarted = true
+
+            val worker = TestListenableWorkerBuilder<RestoreWorker>(context)
+                .setInputData(
+                    androidx.work.Data.Builder()
+                        .putString(RestoreWorker.SOURCE_URI_KEY, Uri.fromFile(archiveFile).toString())
+                        .putBoolean(RestoreWorker.INCLUDE_MEDIA_KEY, true)
+                        .build(),
+                )
+                .build()
+
+            assertIs<ListenableWorker.Result.Success>(worker.doWork())
+            val restoredImage = assertIs<JournalNote.Image>(destNotesRepo.getNoteById(imageNote.uid))
+            val mediaUri = restoredImage.mediaRef
+            restoredMediaUri = mediaUri
+            assertTrue(mediaUri.startsWith("file:"), "restored attachment must be app-local for offline access")
+
+            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            val previousNetworkState = networkState(context)
+            try {
+                setNetworkEnabled(device, false)
+                assertDeviceOffline(context)
+                val media = mediaManager.readMedia(mediaUri)
+                assertContentEquals(imageBytes, media.data)
+                val decoded = assertNotNull(BitmapFactory.decodeByteArray(media.data, 0, media.data.size))
+                try {
+                    assertEquals(1, decoded.width)
+                    assertEquals(1, decoded.height)
+                } finally {
+                    decoded.recycle()
+                }
+            } finally {
+                restoreNetworkState(device, previousNetworkState)
+            }
+        } finally {
+            if (koinStarted) stopKoin()
+            restoredMediaUri?.let { mediaManager.deleteOwnedMedia(it) }
+            archiveFile.delete()
+        }
+    }
 
     @Test
     fun `archive unicode and special characters preserved exactly`() =

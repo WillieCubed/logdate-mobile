@@ -33,6 +33,8 @@ import io.mockk.coEvery
 import io.mockk.mockk
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.io.IOException
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.io.files.Path
 import java.util.UUID
 import java.util.zip.Deflater
@@ -42,6 +44,7 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
@@ -207,6 +210,101 @@ class CloudBackupWorkerTest {
             encrypted.delete()
             restored?.delete()
         }
+    }
+
+    @Test
+    fun `retries a restore after a mid-download no-space failure and removes partial files`() = runTest {
+        val workId = UUID.randomUUID()
+        val backup = restoreBackupMetadata("no-space")
+        val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L))).apply {
+            backups = listOf(backup)
+            fileDownloadOverride = { destination ->
+                destination.writeBytes(byteArrayOf(0x4c, 0x44, 0x43, 0x42, 0x32))
+                Result.failure(IOException("No space left on device"))
+            }
+        }
+        val params = mockk<WorkerParameters>(relaxed = true)
+        every { params.id } returns workId
+        var handoffCalled = false
+        val worker = CloudRestoreWorker(
+            context,
+            params,
+            cloud,
+            FakeSessionStorage(UserSession("access", "refresh", "account")),
+            archiveCipher,
+        ) { handoffCalled = true }
+
+        assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Retry)
+        assertEquals(1, cloud.fileDownloadCalls)
+        assertFalse(handoffCalled)
+        assertRestoreArtifactsRemoved(workId)
+    }
+
+    @Test
+    fun `propagates restore download cancellation and removes partial files`() = runTest {
+        val workId = UUID.randomUUID()
+        val backup = restoreBackupMetadata("cancelled-download")
+        val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L))).apply {
+            backups = listOf(backup)
+            fileDownloadOverride = { destination ->
+                destination.writeBytes(byteArrayOf(0x4c, 0x44, 0x43, 0x42, 0x32))
+                throw CancellationException("download cancelled after a partial write")
+            }
+        }
+        val params = mockk<WorkerParameters>(relaxed = true)
+        every { params.id } returns workId
+        var handoffCalled = false
+        val worker = CloudRestoreWorker(
+            context,
+            params,
+            cloud,
+            FakeSessionStorage(UserSession("access", "refresh", "account")),
+            archiveCipher,
+        ) { handoffCalled = true }
+
+        assertFailsWith<CancellationException> { worker.doWork() }
+        assertEquals(1, cloud.fileDownloadCalls)
+        assertFalse(handoffCalled)
+        assertRestoreArtifactsRemoved(workId)
+    }
+
+    @Test
+    fun `keeps the sealed backup after a cancelled partial upload and reuses it on retry`() = runTest {
+        val workId = UUID.randomUUID()
+        var interruptedUploadBytes = 0
+        val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("backup", 1L, 1L))).apply {
+            fileUploadInterruption = { source ->
+                source.inputStream().use { interruptedUploadBytes = it.readNBytes(16).size }
+                throw CancellationException("upload cancelled after a partial read")
+            }
+        }
+        val params = mockk<WorkerParameters>(relaxed = true)
+        every { params.id } returns workId
+        val worker = CloudBackupWorker(
+            context,
+            params,
+            v2Exporter("{\"schemaVersion\":\"2.0\"}"),
+            cloud,
+            FakeSessionStorage(UserSession("access", "refresh", "account")),
+            FakeDeviceIdProvider(),
+            verifiedIdentity,
+            archiveCipher,
+        )
+
+        assertFailsWith<CancellationException> { worker.doWork() }
+        val archive = File(context.noBackupFilesDir, "cloud-backup-$workId.zip")
+        val digestBeforeRetry = archive.sha256()
+        assertEquals(16, interruptedUploadBytes)
+        assertTrue(archive.length() > interruptedUploadBytes, "the first upload must stop before EOF")
+        assertTrue(archive.isFile)
+        assertTrue(File(context.noBackupFilesDir, "cloud-backup-$workId.scope").isFile)
+        assertFalse(File(context.noBackupFilesDir, "cloud-backup-$workId.plain.part").exists())
+        assertFalse(File(context.noBackupFilesDir, "cloud-backup-$workId.encrypted.part").exists())
+
+        assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Success)
+        assertEquals(digestBeforeRetry, cloud.uploadedFileDigest)
+        assertEquals(2, cloud.fileUploadCalls)
+        assertFalse(archive.exists())
     }
 
     @Test
@@ -469,6 +567,24 @@ class CloudBackupWorkerTest {
             }
             zip.closeEntry()
         }
+    }
+
+    private fun restoreBackupMetadata(id: String) =
+        BackupMetadata(
+            id = id,
+            deviceId = "device",
+            manifest = CloudArchiveCipher.MANIFEST,
+            createdAt = 20L,
+            sizeBytes = 5L,
+            downloadUrl = "https://unused",
+        )
+
+    private fun assertRestoreArtifactsRemoved(workId: UUID) {
+        listOf(
+            File(context.noBackupFilesDir, "cloud-restore-$workId.encrypted.part"),
+            File(context.noBackupFilesDir, "cloud-restore-$workId.plain.part"),
+            File(context.noBackupFilesDir, "cloud-restore-$workId.zip"),
+        ).forEach { file -> assertFalse(file.exists(), "Expected ${file.name} to be removed") }
     }
 
     private fun File.sha256(): String {
@@ -745,6 +861,8 @@ class CloudBackupWorkerTest {
         var uploadedBackup: BackupFile? = null
         var fileDownloadCalls: Int = 0
         var downloadedFile: File? = null
+        var fileDownloadOverride: (suspend (File) -> Result<BackupMetadata>)? = null
+        var fileUploadInterruption: (suspend (File) -> Unit)? = null
 
         override suspend fun refreshAccessToken(refreshToken: String): Result<String> {
             refreshCalls++
@@ -759,6 +877,10 @@ class CloudBackupWorkerTest {
             fileUploadCalls++
             uploadAccessTokens += accessToken
             val source = File(backup.sourcePath.toString())
+            fileUploadInterruption?.let { interruption ->
+                fileUploadInterruption = null
+                interruption(source)
+            }
             uploadedFileSize = source.length()
             uploadedFileHeader = source.inputStream().use { it.readNBytes(5).decodeToString() }
             uploadedFileDigest = source.inputStream().use { input ->
@@ -807,6 +929,10 @@ class CloudBackupWorkerTest {
             val scriptedResult = if (fileDownloadResults.isNotEmpty()) fileDownloadResults.removeAt(0) else null
             if (scriptedResult?.isFailure == true) return scriptedResult
             val destinationFile = File(destination.toString()).apply { parentFile?.mkdirs() }
+            fileDownloadOverride?.let { override ->
+                fileDownloadOverride = null
+                return override(destinationFile)
+            }
             val sourceFile = downloadedFile
             if (sourceFile != null) {
                 sourceFile.inputStream().buffered().use { input ->

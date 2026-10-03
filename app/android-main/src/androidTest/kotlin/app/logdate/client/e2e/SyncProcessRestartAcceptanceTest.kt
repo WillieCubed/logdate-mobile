@@ -19,16 +19,12 @@ import app.logdate.feature.core.sync.SyncIssueRetryFeedback
 import app.logdate.feature.core.sync.SyncIssuesViewModel
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.Journal
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assume.assumeTrue
@@ -267,22 +263,20 @@ class SyncProcessRestartAcceptanceTest {
     private suspend fun fetchFixtureOrSkip(): Fixture? {
         val json =
             runCatching {
-                val client = HttpClient(OkHttp) { install(HttpTimeout) { requestTimeoutMillis = 5_000 } }
-                try {
-                    Json.parseToJsonElement(client.get(FIXTURE_URL).bodyAsText()).jsonObject
-                } finally {
-                    client.close()
+                val instrumentationContext = InstrumentationRegistry.getInstrumentation().context
+                instrumentationContext.assets.open("recovery-acceptance.json").bufferedReader().use { reader ->
+                    Json.parseToJsonElement(reader.readText()).jsonObject
                 }
             }.getOrNull()
-        assumeTrue("isolated persistent-server fixture is not running", json != null)
+        assumeTrue("private isolated persistent-server fixture is missing", json != null)
         val fixture = requireNotNull(json)
         fun field(name: String) = fixture.getValue(name).jsonPrimitive.content
         return Fixture(
-            origin = field("origin"),
-            accountId = field("owner"),
-            accessToken = field("token"),
+            origin = field("serverOrigin"),
+            accountId = field("accountId"),
+            accessToken = field("accessToken"),
             refreshToken = field("refreshToken"),
-            recoveryWords = field("recovery").split(' '),
+            recoveryWords = fixture.getValue("recoveryWords").jsonArray.map { it.jsonPrimitive.content },
         )
     }
 
@@ -295,7 +289,6 @@ class SyncProcessRestartAcceptanceTest {
     )
 
     private companion object {
-        const val FIXTURE_URL = "http://10.0.2.2:18879/fixture"
         const val PREFERENCES = "sync-process-restart-acceptance"
         const val PREPARED = "prepared"
         const val PREVIOUS_PID = "previous_pid"

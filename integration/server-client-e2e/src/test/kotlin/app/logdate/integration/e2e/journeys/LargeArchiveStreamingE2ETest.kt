@@ -3,6 +3,7 @@
 package app.logdate.integration.e2e.journeys
 
 import app.logdate.client.sync.cloud.BackupUploadFileRequest
+import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.integration.e2e.fixtures.createAccountWithSyntheticPasskey
 import app.logdate.integration.e2e.harness.withServerClientHarness
 import io.ktor.client.request.bearerAuth
@@ -76,7 +77,16 @@ class LargeArchiveStreamingE2ETest {
                                 }
                                 assertFalse(digest(source).contentEquals(digest(stored)))
                                 assertEquals(size, uploaded.sizeBytes)
-                                apiClient.downloadBackupToFile(token, uploaded.id, Path(restored.toString())).getOrThrow()
+                                apiClient
+                                    .downloadBackupToFile(token, uploaded.id, Path(restored.toString()))
+                                    .fold(
+                                        onSuccess = {},
+                                        onFailure = { failure ->
+                                            throw AssertionError(
+                                                "Backup download failed for $size bytes (${safeErrorCode(failure)})",
+                                            )
+                                        },
+                                    )
                                 assertEquals(size, Files.size(restored))
                                 assertContentEquals(digest(source), digest(restored))
                                 ZipFile(restored.toFile()).use { zip ->
@@ -164,6 +174,14 @@ class LargeArchiveStreamingE2ETest {
         }
         return digest.digest()
     }
+
+    private fun safeErrorCode(failure: Throwable): String =
+        (failure as? CloudApiException)
+            ?.errorCode
+            ?.takeIf { code ->
+                code.length in 1..64 && code.all { it in 'A'..'Z' || it in '0'..'9' || it == '_' }
+            }
+            ?: "UNKNOWN"
 
     private companion object {
         const val ENTRY_NAME = "data.bin"

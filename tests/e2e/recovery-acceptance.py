@@ -34,6 +34,7 @@ from xml.etree import ElementTree
 ROOT = Path(__file__).resolve().parents[2]
 DATABASE_FIXTURE_VARIABLE = "LOGDATE_ACCEPTANCE_DATABASE_FIXTURE"
 PROBE_CLASS = "app.logdate.client.e2e.RecoveryAcceptanceProbeTest"
+RESTART_CLASS = "app.logdate.client.e2e.SyncProcessRestartAcceptanceTest"
 ID_NAMES = (
     "journalPrimary", "journalSecondary", "textNote", "imageNote", "audioNote",
     "videoNote", "deletedNote", "richDraft", "mediaDraft", "deletedDraft",
@@ -141,17 +142,28 @@ def run_gradle(command: list[str], environment: dict[str, str], log_path: Path) 
             raise
 
 
-def run_managed_device(device: str, mode: str, backend: str, asset_dir: Path, log_path: Path) -> dict:
+def run_managed_device(
+    device: str,
+    mode: str,
+    backend: str,
+    asset_dir: Path,
+    log_path: Path,
+    *,
+    test_class: str = PROBE_CLASS,
+    orchestrator: bool = False,
+    expected_test_count: int = 1,
+) -> dict:
     results_dir = ROOT / "app/android-main/build/outputs/androidTest-results/managedDevice/debug" / device
     for old_result in results_dir.glob("TEST-*.xml"):
         old_result.unlink()
     command = [
         str(ROOT / "gradlew"), f":app:android-main:{device}DebugAndroidTest",
+        "-Plogdate.managedDeviceProfile=recoveryAcceptance",
         f"-Plogdate.backendUrl={backend}",
         f"-Plogdate.recoveryAcceptanceAssetsDir={asset_dir}",
         f"-Plogdate.recoveryAcceptanceMode={mode}",
-        f"-Plogdate.androidTestClass={PROBE_CLASS}",
-        "-Plogdate.androidTestOrchestrator=false",
+        f"-Plogdate.androidTestClass={test_class}",
+        f"-Plogdate.androidTestOrchestrator={str(orchestrator).lower()}",
         "-Plogdate.androidTestCoverage=false",
         "--no-daemon", "--no-configuration-cache", "--max-workers=1", "--console=plain",
         "-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8",
@@ -160,10 +172,19 @@ def run_managed_device(device: str, mode: str, backend: str, asset_dir: Path, lo
     if run_gradle(command, os.environ.copy(), log_path) != 0:
         raise RuntimeError(f"{device} {mode} managed-device task failed")
     suites = [ElementTree.parse(path).getroot() for path in results_dir.glob("TEST-*.xml")]
-    cases = [case for suite in suites for case in suite.iter("testcase") if case.get("classname") == PROBE_CLASS]
-    if len(cases) != 1 or any(case.find(tag) is not None for case in cases for tag in ("failure", "error", "skipped")):
-        raise RuntimeError(f"{device} {mode} did not execute exactly one passing recovery probe")
-    return {"device": device, "phase": mode, "tests": 1, "failures": 0, "skipped": 0}
+    cases = [case for suite in suites for case in suite.iter("testcase") if case.get("classname") == test_class]
+    if len(cases) != expected_test_count or any(
+        case.find(tag) is not None for case in cases for tag in ("failure", "error", "skipped")
+    ):
+        raise RuntimeError(f"{device} {mode} did not execute the expected passing acceptance cases")
+    return {
+        "device": device,
+        "phase": mode,
+        "testClass": test_class,
+        "tests": len(cases),
+        "failures": 0,
+        "skipped": 0,
+    }
 
 
 def stop_owned_server(server: subprocess.Popen | None) -> None:
@@ -276,11 +297,24 @@ def main() -> int:
             "ids": {name: str(uuid.uuid4()) for name in ID_NAMES},
         }
         private_file(asset_dir / "recovery-acceptance.json", json.dumps(fixture).encode())
-        print("Disposable PostgreSQL-backed server and account ready; running phone create probe.", flush=True)
-        device_results.append(run_managed_device("flagshipPhoneApi36", "create", emulator_base, asset_dir, device_log))
-        print("Phone create probe passed; running fresh tablet recovery probe.", flush=True)
-        device_results.append(run_managed_device("largeScreenTabletApi35", "read", emulator_base, asset_dir, device_log))
+        print("Disposable PostgreSQL-backed server and account ready; running tablet create probe.", flush=True)
+        device_results.append(run_managed_device("recoveryAcceptanceDeviceAApi35", "create", emulator_base, asset_dir, device_log))
+        print("Device A create probe passed; running fresh device B recovery probe.", flush=True)
+        device_results.append(run_managed_device("recoveryAcceptanceTabletApi35", "read", emulator_base, asset_dir, device_log))
         print("Tablet recovery, media integrity, deletion, and offline probes passed.", flush=True)
+        device_results.append(
+            run_managed_device(
+                "recoveryAcceptanceRestartApi35",
+                "process-restart",
+                emulator_base,
+                asset_dir,
+                device_log,
+                test_class=RESTART_CLASS,
+                orchestrator=True,
+                expected_test_count=2,
+            )
+        )
+        print("Offline edits survived an app-process restart and drained after Retry.", flush=True)
         result = 0
     except Exception as error:
         print(f"Acceptance probe failed ({type(error).__name__}); see private task logs.", file=sys.stderr)
@@ -329,7 +363,6 @@ def main() -> int:
                     "endedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                     "backend": "isolated PostgreSQL-backed local server",
                     "accountDeleted": account_deleted,
-                    "testClass": PROBE_CLASS,
                     "managedDevices": device_results,
                 }
                 private_file(proof_path, json.dumps(proof, indent=2).encode())
