@@ -16,11 +16,14 @@ import app.logdate.client.sync.datalayer.RemoteCameraDeviceDataMapper
 import app.logdate.wear.presentation.camera.WearRemoteCameraCaptureResultStore
 import app.logdate.wear.presentation.camera.WearRemoteCameraDeviceStore
 import com.google.android.gms.wearable.CapabilityInfo
+import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
+import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -28,6 +31,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 /**
@@ -36,6 +40,9 @@ import kotlinx.coroutines.withContext
  * Handles notes, journals, and journal-content associations.
  * Uses [SyncableJournalNotesRepository.createFromSync] (and equivalents) to
  * avoid re-triggering outbound sync.
+ *
+ * Only changes the phone made are applied: the Data Layer also reports the watch's own writes back
+ * to it, and deletions are ignored (see [isChangeFromAnotherDevice]).
  *
  * Messages from the phone (note acknowledgements, sync requests) and the phone becoming reachable
  * again go to [WearPhoneMessageHandler].
@@ -49,6 +56,9 @@ class WearDataLayerListenerService : WearableListenerService() {
     private val noteDataMapper = NoteDataMapper()
     private val journalDataMapper = JournalDataMapper()
     private val associationDataMapper = AssociationDataMapper()
+
+    @Volatile
+    private var cachedLocalNodeId: String? = null
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
         serviceScope.launch {
@@ -76,16 +86,19 @@ class WearDataLayerListenerService : WearableListenerService() {
         // Snapshot events before they are recycled by the system
         val events = mutableListOf<SnapshotDataEvent>()
         for (event in dataEvents) {
-            val path = event.dataItem.uri.path ?: continue
-            val stringMap = extractStringMap(event)
-            events.add(SnapshotDataEvent(path, stringMap))
+            val uri = event.dataItem.uri
+            val path = uri.path ?: continue
+            val data = if (event.type == DataEvent.TYPE_CHANGED) extractStringMap(event) else emptyMap()
+            events.add(SnapshotDataEvent(path, data, event.type, uri.host))
         }
 
         if (events.isEmpty()) return
 
         serviceScope.launch {
+            val localNodeId = localNodeId()
             val syncEvents = mutableListOf<SnapshotDataEvent>()
             for (event in events) {
+                if (!isChangeFromAnotherDevice(event.type, event.sourceNodeId, localNodeId)) continue
                 when (event.path) {
                     RemoteCameraDeviceDataMapper.PATH_CAMERA_DEVICES -> handleRemoteCameraDevices(event.data)
                     RemoteCameraCaptureResultDataMapper.PATH_CAMERA_CAPTURE_RESULT -> {
@@ -302,7 +315,28 @@ class WearDataLayerListenerService : WearableListenerService() {
         return null
     }
 
-    private fun extractStringMap(event: com.google.android.gms.wearable.DataEvent): Map<String, String> {
+    /**
+     * The watch's own Data Layer node, whose writes come back to it as data events, or null when Play
+     * services cannot say, in which case every change is acted on.
+     */
+    private suspend fun localNodeId(): String? {
+        cachedLocalNodeId?.let { return it }
+        return try {
+            Wearable
+                .getNodeClient(this)
+                .localNode
+                .await()
+                .id
+                .also { cachedLocalNodeId = it }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.w("Could not read this watch's Data Layer node; acting on every data change", e)
+            null
+        }
+    }
+
+    private fun extractStringMap(event: DataEvent): Map<String, String> {
         val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap
         val stringMap = mutableMapOf<String, String>()
         for (key in dataMap.keySet()) {
@@ -318,12 +352,14 @@ class WearDataLayerListenerService : WearableListenerService() {
     }
 
     /**
-     * Snapshot of a data event's path and payload.
+     * Snapshot of a data event's path, payload, type and writer.
      * Created before [DataEventBuffer] is recycled by the system.
      */
     private data class SnapshotDataEvent(
         val path: String,
         val data: Map<String, String>,
+        val type: Int,
+        val sourceNodeId: String?,
     )
 
     private companion object {

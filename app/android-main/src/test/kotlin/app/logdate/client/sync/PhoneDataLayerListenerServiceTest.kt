@@ -32,6 +32,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
+import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -633,6 +634,78 @@ class PhoneDataLayerListenerServiceTest {
             confirmVerified(ingestor)
         }
 
+    @Test
+    fun `a note the phone wrote itself is not treated as one from the watch`() =
+        runTest {
+            val note = textNote()
+            val ingestor = mockk<WatchNoteIngestor>(relaxed = true)
+            val service =
+                TestPhoneDataLayerListenerService(
+                    serviceScope = this,
+                    syncDependencies = dependencies(noteIngestor = ingestor),
+                )
+
+            mockkStatic(DataMapItem::class)
+            try {
+                val dataItem = mockDataItem(uriPath = NoteDataMapper.notePath(note.uid), host = "phone-node")
+                every { DataMapItem.fromDataItem(dataItem) } returns mockDataMapItem(noteDataMapper.toDataMap(note))
+
+                service.onDataChanged(mockDataEventBuffer(mockDataEvent(dataItem)))
+                advanceUntilIdle()
+
+                coVerify(exactly = 0) { ingestor.onNoteMetadata(any()) }
+            } finally {
+                unmockkStatic(DataMapItem::class)
+            }
+        }
+
+    @Test
+    fun `a deleted data item is ignored without reading its contents`() =
+        runTest {
+            val ingestor = mockk<WatchNoteIngestor>(relaxed = true)
+            val service =
+                TestPhoneDataLayerListenerService(
+                    serviceScope = this,
+                    syncDependencies = dependencies(noteIngestor = ingestor),
+                )
+
+            mockkStatic(DataMapItem::class)
+            try {
+                val dataItem = mockDataItem(uriPath = NoteDataMapper.notePath(Uuid.random()))
+
+                service.onDataChanged(mockDataEventBuffer(mockDataEvent(dataItem, type = DataEvent.TYPE_DELETED)))
+                advanceUntilIdle()
+
+                confirmVerified(ingestor)
+                verify(exactly = 0) { DataMapItem.fromDataItem(any()) }
+            } finally {
+                unmockkStatic(DataMapItem::class)
+            }
+        }
+
+    @Test
+    fun `changes are applied when the phone's own node cannot be read`() =
+        runTest {
+            val note = textNote()
+            val ingestor = mockk<WatchNoteIngestor>(relaxed = true)
+            val service =
+                TestPhoneDataLayerListenerService(
+                    serviceScope = this,
+                    syncDependencies = dependencies(noteIngestor = ingestor),
+                    localNode = null,
+                )
+
+            service.processEvents(
+                PhoneDataLayerSnapshotEvent(
+                    path = NoteDataMapper.notePath(note.uid),
+                    data = noteDataMapper.toDataMap(note),
+                    sourceNodeId = "phone-node",
+                ),
+            )
+
+            coVerify(exactly = 1) { ingestor.onNoteMetadata(noteDataMapper.toDataMap(note)) }
+        }
+
     private fun serviceWithDependencies(
         noteIngestor: WatchNoteIngestor = mockk(relaxed = true),
         journalRepository: JournalRepository = mockk<SyncableJournalRepository>(relaxed = true),
@@ -747,16 +820,24 @@ class PhoneDataLayerListenerServiceTest {
             every { iterator() } returns events.toMutableList().iterator()
         }
 
-    private fun mockDataEvent(dataItem: DataItem): DataEvent =
+    private fun mockDataEvent(
+        dataItem: DataItem,
+        type: Int = DataEvent.TYPE_CHANGED,
+    ): DataEvent =
         mockk {
             every { this@mockk.dataItem } returns dataItem
+            every { this@mockk.type } returns type
         }
 
-    private fun mockDataItem(uriPath: String?): DataItem =
-        mockk {
-            val uri = mockk<Uri> { every { path } returns uriPath }
-            every { this@mockk.uri } returns uri
-        }
+    private fun mockDataItem(
+        uriPath: String?,
+        host: String? = "watch-node",
+    ): DataItem {
+        val itemUri = mockk<Uri>()
+        every { itemUri.path } returns uriPath
+        every { itemUri.host } returns host
+        return mockk { every { uri } returns itemUri }
+    }
 
     private fun mockDataMapItem(payload: Map<String, String>): DataMapItem {
         val dataMap =
@@ -781,6 +862,7 @@ class PhoneDataLayerListenerServiceTest {
         private val onLaunchCamera: () -> Unit = {},
         private val onCameraCommand: (CameraRemoteCommand) -> Unit = {},
         private val channelBytes: ByteArray = ByteArray(0),
+        private val localNode: String? = "phone-node",
     ) : PhoneDataLayerListenerService() {
         val closedChannels = mutableListOf<ChannelClient.Channel>()
 
@@ -797,6 +879,8 @@ class PhoneDataLayerListenerServiceTest {
         override suspend fun resolvePhoneWearSyncBridge(): PhoneWearSyncBridge? = syncBridge
 
         override suspend fun resolveSyncDependencies(): PhoneDataLayerSyncDependencies? = syncDependencies
+
+        override suspend fun localNodeId(): String? = localNode
 
         override fun launchCamera() {
             onLaunchCamera()

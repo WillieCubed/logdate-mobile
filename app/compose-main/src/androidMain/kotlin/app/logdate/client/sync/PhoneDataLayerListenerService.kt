@@ -17,12 +17,14 @@ import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import app.logdate.feature.editor.ui.camera.CameraRemoteCommand
 import com.google.android.gms.wearable.ChannelClient
+import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -54,6 +56,9 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
     private val journalDataMapper = JournalDataMapper()
     private val associationDataMapper = AssociationDataMapper()
     private val healthSnapshotDataMapper = HealthSnapshotDataMapper()
+
+    @Volatile
+    private var cachedLocalNodeId: String? = null
 
     companion object {
         private const val PATH_CAMERA_OPEN = "/logdate/camera/open"
@@ -185,9 +190,10 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
         // Snapshot events before they are recycled by the system
         val events = mutableListOf<PhoneDataLayerSnapshotEvent>()
         for (event in dataEvents) {
-            val path = event.dataItem.uri.path ?: continue
-            val stringMap = extractStringMap(event)
-            events.add(PhoneDataLayerSnapshotEvent(path, stringMap))
+            val uri = event.dataItem.uri
+            val path = uri.path ?: continue
+            val data = if (event.type == DataEvent.TYPE_CHANGED) extractStringMap(event) else emptyMap()
+            events.add(PhoneDataLayerSnapshotEvent(path, data, type = event.type, sourceNodeId = uri.host))
         }
 
         if (events.isEmpty()) return
@@ -204,7 +210,9 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
             return
         }
 
+        val localNodeId = localNodeId()
         for (event in events) {
+            if (!event.isChangeFromAnotherDevice(localNodeId)) continue
             processSnapshotEvent(event, dependencies)
         }
     }
@@ -412,6 +420,27 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
 
     protected open suspend fun resolvePhoneWearSyncBridge(): PhoneWearSyncBridge? = resolveKoin()?.get()
 
+    /**
+     * The phone's own Data Layer node, whose writes come back to it as data events, or null when Play
+     * services cannot say, in which case every change is acted on.
+     */
+    protected open suspend fun localNodeId(): String? {
+        cachedLocalNodeId?.let { return it }
+        return try {
+            Wearable
+                .getNodeClient(this)
+                .localNode
+                .await()
+                .id
+                .also { cachedLocalNodeId = it }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.w("Could not read this phone's Data Layer node; acting on every data change", e)
+            null
+        }
+    }
+
     protected open suspend fun openChannelInput(channel: ChannelClient.Channel): InputStream =
         Wearable.getChannelClient(this).getInputStream(channel).await()
 
@@ -426,7 +455,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
 
     protected open fun sendCameraCommand(command: CameraRemoteCommand): Boolean = RemoteCameraSessionController.send(command)
 
-    private fun extractStringMap(event: com.google.android.gms.wearable.DataEvent): Map<String, String> {
+    private fun extractStringMap(event: DataEvent): Map<String, String> {
         val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap
         val stringMap = mutableMapOf<String, String>()
         for (key in dataMap.keySet()) {
@@ -443,13 +472,24 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
 }
 
 /**
- * Snapshot of a data event's path and payload.
+ * Snapshot of a data event's path, payload, type and writer.
  * Created before [DataEventBuffer] is recycled by the system.
  */
 data class PhoneDataLayerSnapshotEvent(
     val path: String,
     val data: Map<String, String>,
-)
+    val type: Int = DataEvent.TYPE_CHANGED,
+    /** The node that wrote the data item: the host of its URI. */
+    val sourceNodeId: String? = null,
+) {
+    /**
+     * Whether the phone acts on this event: only a change another device made. The Data Layer
+     * reports the phone's own writes, such as the notes it publishes for the watch, back to the
+     * phone. A deletion has no payload; LogDate announces removals with explicit `/delete` items.
+     */
+    fun isChangeFromAnotherDevice(localNodeId: String?): Boolean =
+        type == DataEvent.TYPE_CHANGED && (localNodeId == null || sourceNodeId != localNodeId)
+}
 
 data class PhoneDataLayerSyncDependencies(
     val noteIngestor: WatchNoteIngestor,
