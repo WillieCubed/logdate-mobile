@@ -26,7 +26,6 @@ import app.logdate.client.sync.SyncStatus
 import app.logdate.client.sync.SyncTokenRefresher
 import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.SyncUploader
-import app.logdate.client.sync.cloud.AccountKeyMaterialDto
 import app.logdate.client.sync.cloud.AssociationChangesResponse
 import app.logdate.client.sync.cloud.AssociationDeleteRequest
 import app.logdate.client.sync.cloud.AssociationUploadRequest
@@ -366,19 +365,6 @@ internal fun testSyncUploader(
  * All responses are successful by default; configure failures via [configureContentSyncFailure].
  */
 open class FakeCloudApiClient : CloudApiClient {
-    var accountKeysResponse: Result<AccountKeyMaterialDto?> = Result.success(null)
-    var publishedAccountKeys: AccountKeyMaterialDto? = null
-
-    override suspend fun getAccountKeys(accessToken: String): Result<AccountKeyMaterialDto?> = accountKeysResponse
-
-    override suspend fun putAccountKeys(
-        accessToken: String,
-        keys: AccountKeyMaterialDto,
-    ): Result<Unit> {
-        publishedAccountKeys = keys
-        return Result.success(Unit)
-    }
-
     var uploadContentResponse: Result<ContentUploadResponse> =
         Result.success(ContentUploadResponse("test-id", 1, Clock.System.now().toEpochMilliseconds()))
 

@@ -8,6 +8,9 @@ internal fun safeCloudErrorCode(code: String): String = if (code in SAFE_CLOUD_E
 
 internal val SAFE_CLOUD_ERROR_CODES =
     setOf(
+        "ENVELOPE_EXISTS",
+        "INVALID_ENVELOPE",
+        "UNAVAILABLE",
         "ACCOUNT_KEYS_FAILED",
         "ACCOUNT_KEYS_MISSING",
         "ACCOUNT_KEYS_UNAVAILABLE",

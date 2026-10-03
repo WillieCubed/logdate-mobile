@@ -34,6 +34,10 @@ interface PasskeyManager {
      */
     suspend fun authenticateWithPasskey(options: PasskeyAuthenticationOptions): Result<String>
 
+    /** Credential JSON is safe to send to the server; the optional unlock secret stays local. */
+    suspend fun authenticateWithUnlock(options: PasskeyAuthenticationOptions): Result<PasskeyAuthenticationResult> =
+        authenticateWithPasskey(options).mapCatching(::parsePasskeyAuthenticationResult)
+
     /**
      * Get availability status of passkey features
      */

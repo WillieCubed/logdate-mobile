@@ -34,12 +34,11 @@ object ServerProtocolFeature {
      */
     const val ATPROTO_PLC_PUBLISHING_V1 = "atprotoPlcPublishingV1"
 
-    /**
-     * The server holds an encrypted copy of each account's encryption keys at `/api/v1/account/keys`,
-     * so a newly signed-in device can recover them. Without it those requests answer
-     * `503 ACCOUNT_KEYS_UNAVAILABLE`, and clients must not rely on server-held keys.
-     */
+    /** Legacy flag retained for compatibility; servers never advertise server custody of keys. */
     const val ACCOUNT_KEY_VAULT_V1 = "accountKeyVaultV1"
+
+    /** Account-bound passkey envelopes contain ciphertext only, unlocked locally with the PRF. */
+    const val ENCRYPTED_ACCOUNT_KEYS_V1 = "encryptedAccountKeysV1"
 }
 
 @Serializable

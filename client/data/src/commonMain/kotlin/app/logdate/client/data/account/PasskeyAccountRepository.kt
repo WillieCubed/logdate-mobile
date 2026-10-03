@@ -60,6 +60,7 @@ class DefaultPasskeyAccountRepository(
      */
     private val createsRestoreKey: Boolean = true,
     private val adoptCanonicalOwner: (suspend (String) -> Boolean)? = null,
+    private val accountKeyUnlockCoordinator: AccountKeyUnlockCoordinator? = null,
 ) : PasskeyAccountRepository {
     private val sessionState = PasskeyAccountSessionState()
     override val currentAccount: StateFlow<LogDateAccount?> = sessionState.currentAccount
@@ -112,6 +113,7 @@ class DefaultPasskeyAccountRepository(
             createRestoreKey = { if (createsRestoreKey) createRestoreKey() else Result.success(Unit) },
             updateTokensOrRegisterPlatformAccount = sessionRefreshCoordinator::updateTokensOrRegisterPlatformAccount,
             deviceName = deviceName,
+            accountKeyUnlockCoordinator = accountKeyUnlockCoordinator,
         )
 
     private val enrollmentCoordinator =

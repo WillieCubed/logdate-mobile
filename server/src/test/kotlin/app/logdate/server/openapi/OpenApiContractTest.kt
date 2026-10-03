@@ -358,7 +358,7 @@ class OpenApiContractTest {
         private val XRPC_ALWAYS_AVAILABLE = setOf("resolveHandle", "describeAtprotoServer", "describeRepo")
 
         /** Operations whose success status is the whole answer, so they reply with an empty body. */
-        private val SUCCESS_WITHOUT_BODY = setOf("revokeOAuthToken", "storeAccountKeys")
+        private val SUCCESS_WITHOUT_BODY = setOf("revokeOAuthToken", "putAccountKeyEnvelope")
 
         /** Operations that answer 201 without a Location header because the created thing has no URL of its own. */
         private val CREATED_WITHOUT_LOCATION =

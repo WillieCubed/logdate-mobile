@@ -56,6 +56,11 @@ class MediaPayloadKeyProvider(
         secureStorage.remove(KEY_STORAGE_KEY)
     }
 
+    suspend fun canInstallAccountKey(key: ByteArray): Boolean {
+        val existing = secureStorage.getBytes(KEY_STORAGE_KEY)
+        return key.size == KEY_LENGTH_BYTES && (existing == null || existing.contentEquals(key))
+    }
+
     suspend fun installAccountKey(key: ByteArray) {
         require(key.size == KEY_LENGTH_BYTES) { "Invalid media key length" }
         val existing = secureStorage.getBytes(KEY_STORAGE_KEY)

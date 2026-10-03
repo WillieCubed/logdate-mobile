@@ -16,6 +16,7 @@ import app.logdate.shared.model.CompleteAuthenticationRequest
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyAuthenticationOptions
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.flow.first
 
 /**
  * Creates LogDate Cloud accounts and authenticates existing ones using WebAuthn passkeys.
@@ -42,6 +43,7 @@ internal class PasskeyRegistrationCoordinator(
         backendUrl: String,
     ) -> Unit,
     private val deviceName: () -> String?,
+    private val accountKeyUnlockCoordinator: AccountKeyUnlockCoordinator? = null,
 ) {
     suspend fun createAccountWithPasskey(request: AccountCreationRequest): Result<LogDateAccount> {
         return try {
@@ -127,8 +129,11 @@ internal class PasskeyRegistrationCoordinator(
         username: String?,
         adoptLocalData: Boolean,
     ): Result<LogDateAccount> {
+        var unlockSecret: ByteArray? = null
         return try {
             bindingGuard.requireCanonicalOwnerBinding()
+            val originalOwner = canonicalOwnerProvider.getCanonicalOwnerId()
+            val apiBaseUrl = configRepository.apiBaseUrl.first()
             // Step 1: Begin authentication
             val beginRequest = BeginAuthenticationRequest(username = username)
             val beginResult = apiClient.beginAuthentication(beginRequest)
@@ -149,13 +154,14 @@ internal class PasskeyRegistrationCoordinator(
                 )
 
             // Step 3: Authenticate with passkey
-            val authResult = passkeyManager.authenticateWithPasskey(authOptions)
+            val authResult = passkeyManager.authenticateWithUnlock(authOptions)
             if (authResult.isFailure) {
                 return Result.failure(authResult.exceptionOrNull()!!)
             }
 
-            val assertionJson = authResult.getOrThrow()
-            val assertion = credentialCodec.parseAssertionResponse(assertionJson)
+            val localAssertion = authResult.getOrThrow()
+            unlockSecret = localAssertion.unlockSecret
+            val assertion = credentialCodec.parseAssertionResponse(localAssertion.credentialJson)
 
             // Step 4: Complete authentication
             val completeRequest =
@@ -177,6 +183,16 @@ internal class PasskeyRegistrationCoordinator(
                 CanonicalOwnerBindingGuard.OwnerBinding.REFUSED ->
                     return Result.failure(CanonicalOwnerMismatchException())
             }
+
+            require(configRepository.apiBaseUrl.first() == apiBaseUrl) { "The connected server changed during sign-in" }
+            accountKeyUnlockCoordinator?.unlockOrProvision(
+                apiBaseUrl = apiBaseUrl,
+                accountId = completeData.account.id.toString(),
+                accessToken = completeData.tokens.accessToken,
+                credentialId = assertion.id,
+                unlockSecret = unlockSecret,
+                mayPublishLocalKeys = originalOwner == completeData.account.id.toString(),
+            )
 
             // Step 5: Store session and account data
             persistSession(
@@ -203,6 +219,8 @@ internal class PasskeyRegistrationCoordinator(
         } catch (e: Exception) {
             Napier.w("Failed to authenticate with passkey", e)
             Result.failure(e)
+        } finally {
+            unlockSecret?.fill(0)
         }
     }
 

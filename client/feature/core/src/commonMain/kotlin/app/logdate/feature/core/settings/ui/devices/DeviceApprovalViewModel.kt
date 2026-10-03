@@ -65,7 +65,7 @@ sealed interface DeviceApprovalUiState {
 /**
  * Approves a new device from this signed-in phone.
  *
- * Two connection codes exist. A signed-in device shows `logdate-device-enrollment:<id>` for a request
+ * Two connection codes exist. A signed-in device shows `logdate-device-enrollment:v2:<payload>` for a request
  * it already created. A signed-out device shows `logdate-device-connect:<payload>` with its one-time
  * key; this phone creates the request for it and, on approval, mints a separate session for the new
  * device so it signs in without sharing this phone's tokens.
@@ -172,7 +172,7 @@ class DeviceApprovalViewModel(
         if (!account.id.equals(session.accountId, ignoreCase = true)) throw ApprovalFailure(DeviceApprovalFailure.AccountMismatch)
         val request =
             when (code) {
-                is DeviceApprovalCode.ExistingRequest -> enrollmentApi.get(code.id.toString(), session.accessToken)
+                is DeviceApprovalCode.ExistingRequest -> enrollmentApi.get(code.code.id, session.accessToken)
                 is DeviceApprovalCode.NewDevice ->
                     enrollmentApi.createFromPhone(
                         deviceName = code.deviceName,
@@ -183,6 +183,13 @@ class DeviceApprovalViewModel(
                     )
             }
         if (request.status != PENDING_STATUS || request.expiresAt <= now()) throw ApprovalFailure(DeviceApprovalFailure.Expired)
+        if (code is DeviceApprovalCode.ExistingRequest) {
+            try {
+                code.code.verify(request, session.accountId)
+            } catch (_: IllegalArgumentException) {
+                throw ApprovalFailure(DeviceApprovalFailure.ServerError)
+            }
+        }
         if (code is DeviceApprovalCode.NewDevice &&
             (request.publicKey != code.publicKey || request.confirmationCode != code.confirmationCode)
         ) {

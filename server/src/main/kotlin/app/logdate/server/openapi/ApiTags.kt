@@ -104,8 +104,8 @@ internal val apiTagGroups: List<ApiTagGroup> =
                     new device may consume it only once before the request expires. A new device that is not yet
                     signed in receives its own account session in that envelope, so each device signs out on its own.
 
-                    Servers that advertise `accountKeyVaultV1` also keep an encrypted copy of the account's keys, so a
-                    device that signs in directly can recover them without another device.
+                    Account-key envelopes contain only client-encrypted ciphertext. A compatible passkey unlocks
+                    them locally; the server never receives a journal key or a passkey unlock secret.
                     """.trimIndent(),
                 ),
             ),

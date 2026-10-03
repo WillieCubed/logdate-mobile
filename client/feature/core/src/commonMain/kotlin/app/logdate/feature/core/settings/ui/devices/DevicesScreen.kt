@@ -239,77 +239,80 @@ private fun DeviceItem(
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(48.dp)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), RoundedCornerShape(16.dp)),
-                contentAlignment = Alignment.Center,
+        Column(modifier = Modifier.fillMaxWidth().padding(Spacing.lg)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Outlined.Devices, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(device.name, style = MaterialTheme.typography.titleMedium)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
+                Box(
+                    modifier =
+                        Modifier
+                            .size(48.dp)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), RoundedCornerShape(16.dp)),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Text(device.platformName, style = MaterialTheme.typography.bodyMedium)
-                    if (device.isCurrentDevice) {
-                        Text(
-                            text = stringResource(Res.string.this_device),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier =
-                                Modifier
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(50))
-                                    .padding(horizontal = 7.dp, vertical = 2.dp),
-                        )
+                    Icon(Icons.Outlined.Devices, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(device.name, style = MaterialTheme.typography.titleMedium)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(device.platformName, style = MaterialTheme.typography.bodyMedium)
+                        if (device.isCurrentDevice) {
+                            Text(
+                                text = stringResource(Res.string.this_device),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier =
+                                    Modifier
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(50))
+                                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                            )
+                        }
                     }
                 }
-                Text(
-                    text = stringResource(Res.string.last_active_label, device.lastActiveFormatted),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 2.dp).testTag("device-supplemental-row"),
-                )
-            }
-            Box {
-                IconButton(onClick = { showOptions = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(Res.string.sync_device_options_label))
-                }
-                DropdownMenu(expanded = showOptions, onDismissRequest = { showOptions = false }) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(Res.string.sync_device_rename_label)) },
-                        onClick = {
-                            showOptions = false
-                            onRenameClick()
-                        },
-                    )
-                    if (device.isCurrentDevice) {
+                Box {
+                    IconButton(onClick = { showOptions = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = stringResource(Res.string.sync_device_options_label))
+                    }
+                    DropdownMenu(expanded = showOptions, onDismissRequest = { showOptions = false }) {
                         DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.reset_device_id)) },
+                            text = { Text(stringResource(Res.string.sync_device_rename_label)) },
                             onClick = {
                                 showOptions = false
-                                onShowResetDialog()
+                                onRenameClick()
                             },
                         )
-                    } else {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.sync_device_remove_label)) },
-                            onClick = {
-                                showOptions = false
-                                onRemoveClick()
-                            },
-                        )
+                        if (device.isCurrentDevice) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(Res.string.reset_device_id)) },
+                                onClick = {
+                                    showOptions = false
+                                    onShowResetDialog()
+                                },
+                            )
+                        } else {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(Res.string.sync_device_remove_label)) },
+                                onClick = {
+                                    showOptions = false
+                                    onRemoveClick()
+                                },
+                            )
+                        }
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = stringResource(Res.string.last_active_label, device.lastActiveFormatted),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("device-supplemental-row"),
+            )
         }
     }
 }

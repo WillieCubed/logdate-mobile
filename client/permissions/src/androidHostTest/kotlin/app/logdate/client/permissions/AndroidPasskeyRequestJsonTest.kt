@@ -18,6 +18,53 @@ import kotlin.test.assertEquals
  */
 class AndroidPasskeyRequestJsonTest {
     @Test
+    fun `new credentials request PRF support for later encrypted unlock`() {
+        val request =
+            Json
+                .parseToJsonElement(
+                    buildRegistrationRequestJson(
+                        PasskeyRegistrationOptions(
+                            challenge = "AQ",
+                            rpId = "logdate.app",
+                            rpName = "LogDate",
+                            user = PasskeyUser("AQ", "fixture", "Fixture"),
+                        ),
+                    ),
+                ).jsonObject
+        assertEquals(
+            "{}",
+            request
+                .getValue("extensions")
+                .jsonObject
+                .getValue("prf")
+                .toString(),
+        )
+    }
+
+    @Test
+    fun `unlock request evaluates the same local PRF input as the native Mac`() {
+        val request =
+            Json
+                .parseToJsonElement(
+                    buildAuthenticationRequestJson(
+                        PasskeyAuthenticationOptions(challenge = "AQ", rpId = "logdate.app"),
+                        requestUnlock = true,
+                    ),
+                ).jsonObject
+        val first =
+            request
+                .getValue("extensions")
+                .jsonObject
+                .getValue("prf")
+                .jsonObject
+                .getValue("eval")
+                .jsonObject
+                .getValue("first")
+                .jsonPrimitive.content
+        assertEquals(PasskeyUnlockInput.first, first)
+    }
+
+    @Test
     fun `authentication request describes each allowed credential`() {
         val json =
             Json

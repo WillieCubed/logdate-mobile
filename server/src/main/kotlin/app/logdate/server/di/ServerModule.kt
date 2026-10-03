@@ -1,9 +1,8 @@
 package app.logdate.server.di
 
 import app.logdate.server.ServerDescriptorConfig
-import app.logdate.server.accountkeys.AccountKeyRepository
-import app.logdate.server.accountkeys.AccountKeyVault
-import app.logdate.server.accountkeys.InMemoryAccountKeyRepository
+import app.logdate.server.accountkeys.AccountKeyEnvelopeRepository
+import app.logdate.server.accountkeys.InMemoryAccountKeyEnvelopeRepository
 import app.logdate.server.atproto.AtprotoPasswordCredentialRepository
 import app.logdate.server.atproto.AtprotoPasswordService
 import app.logdate.server.atproto.AtprotoPdsSessionService
@@ -34,10 +33,9 @@ import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.TokenService
 import app.logdate.server.config.RuntimeProfile
 import app.logdate.server.config.profileAwareBoolEnv
-import app.logdate.server.crypto.EnvironmentKeyring
 import app.logdate.server.database.DatabaseConfig
 import app.logdate.server.database.PostgreSQLAccountIdentityRepository
-import app.logdate.server.database.PostgreSQLAccountKeyRepository
+import app.logdate.server.database.PostgreSQLAccountKeyEnvelopeRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
 import app.logdate.server.database.PostgreSQLAtprotoPasswordCredentialRepository
 import app.logdate.server.database.PostgreSQLAtprotoSessionRepository
@@ -284,10 +282,9 @@ fun serverModule(isDatabaseAvailable: Boolean) =
         single<DeviceEnrollmentRepository> {
             if (isDatabaseAvailable) PostgreSQLDeviceEnrollmentRepository() else InMemoryDeviceEnrollmentRepository()
         }
-        single<AccountKeyRepository> {
-            if (isDatabaseAvailable) PostgreSQLAccountKeyRepository() else InMemoryAccountKeyRepository()
+        single<AccountKeyEnvelopeRepository> {
+            if (isDatabaseAvailable) PostgreSQLAccountKeyEnvelopeRepository() else InMemoryAccountKeyEnvelopeRepository()
         }
-        single { AccountKeyVault(get(), EnvironmentKeyring.fromEnvironmentOrNull()) }
         single { GoogleVcJwksCache() }
         single {
             DigitalCredentialVerifier(

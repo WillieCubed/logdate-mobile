@@ -87,10 +87,19 @@ class AndroidPasskeyManager(
         }
 
     override suspend fun authenticateWithPasskey(options: PasskeyAuthenticationOptions): Result<String> =
+        requestAssertion(options, requestUnlock = false).map { it.credentialJson }
+
+    override suspend fun authenticateWithUnlock(options: PasskeyAuthenticationOptions): Result<PasskeyAuthenticationResult> =
+        requestAssertion(options, requestUnlock = true)
+
+    private suspend fun requestAssertion(
+        options: PasskeyAuthenticationOptions,
+        requestUnlock: Boolean,
+    ): Result<PasskeyAuthenticationResult> =
         try {
             val getPublicKeyCredentialOption =
                 GetPublicKeyCredentialOption(
-                    requestJson = buildAuthenticationRequestJson(options),
+                    requestJson = buildAuthenticationRequestJson(options, requestUnlock),
                 )
 
             val getCredentialRequest =
@@ -106,7 +115,7 @@ class AndroidPasskeyManager(
 
             when (val credential = result.credential) {
                 is PublicKeyCredential -> {
-                    Result.success(credential.authenticationResponseJson)
+                    Result.success(parsePasskeyAuthenticationResult(credential.authenticationResponseJson))
                 }
                 else -> {
                     Result.failure(PasskeyException("Unexpected credential type", PasskeyErrorCodes.UNKNOWN_ERROR))
@@ -207,20 +216,24 @@ internal fun buildRegistrationRequestJson(options: PasskeyRegistrationOptions): 
                 "residentKey": "preferred",
                 "userVerification": "preferred"
             },
+            "extensions": {"prf": {}},
             "attestation": "none"
         }
         """.trimIndent()
 }
 
-internal fun buildAuthenticationRequestJson(options: PasskeyAuthenticationOptions): String {
-    // Build the WebAuthn authentication request JSON
+internal fun buildAuthenticationRequestJson(
+    options: PasskeyAuthenticationOptions,
+    requestUnlock: Boolean = false,
+): String {
+    val extensions = if (requestUnlock) ",\n\"extensions\":{\"prf\":{\"eval\":{\"first\":\"${PasskeyUnlockInput.first}\"}}}" else ""
     return """
         {
             "challenge": "${options.challenge}",
             "timeout": ${options.timeout},
             "rpId": "${options.rpId}",
             "allowCredentials": ${credentialDescriptors(options.allowCredentials)},
-            "userVerification": "preferred"
+            "userVerification": "${if (requestUnlock) "required" else "preferred"}"$extensions
         }
         """.trimIndent()
 }

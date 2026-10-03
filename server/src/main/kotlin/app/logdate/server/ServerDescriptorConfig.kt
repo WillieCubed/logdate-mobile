@@ -9,6 +9,7 @@ import app.logdate.shared.model.ServerProtocolFeature
 
 data class ServerDescriptorConfig(
     val deploymentKind: DeploymentKind = DeploymentKind.SELF_HOSTED,
+    val encryptedAccountKeysEnabled: Boolean = false,
     val displayName: String = defaultDisplayName(DeploymentKind.SELF_HOSTED),
     val privacyPolicyUrl: String? = null,
     val termsOfServiceUrl: String? = null,
@@ -18,7 +19,6 @@ data class ServerDescriptorConfig(
         webAuthnRpId: String,
         webAuthnRpName: String,
         diagnosticReportsEnabled: Boolean = false,
-        accountKeyVaultEnabled: Boolean = false,
     ): ServerDescriptor {
         val serverOrigin = identityConfig.pdsServiceEndpoint.trimEnd('/')
         val capabilities =
@@ -51,8 +51,8 @@ data class ServerDescriptorConfig(
                     if (diagnosticReportsEnabled) {
                         add(ServerProtocolFeature.DIAGNOSTIC_REPORTS_V1)
                     }
-                    if (accountKeyVaultEnabled) {
-                        add(ServerProtocolFeature.ACCOUNT_KEY_VAULT_V1)
+                    if (encryptedAccountKeysEnabled) {
+                        add(ServerProtocolFeature.ENCRYPTED_ACCOUNT_KEYS_V1)
                     }
                     if (identityConfig.publishesPlcOperations) {
                         add(ServerProtocolFeature.ATPROTO_PLC_PUBLISHING_V1)
@@ -69,6 +69,7 @@ data class ServerDescriptorConfig(
             displayName: String? = System.getenv("LOGDATE_SERVER_DISPLAY_NAME"),
             privacyPolicyUrl: String? = System.getenv("LOGDATE_PRIVACY_POLICY_URL"),
             termsOfServiceUrl: String? = System.getenv("LOGDATE_TERMS_OF_SERVICE_URL"),
+            encryptedAccountKeysEnabled: Boolean = System.getenv("LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED") == "true",
         ): ServerDescriptorConfig {
             val resolvedDeploymentKind =
                 when (deploymentKind?.trim()?.lowercase()) {
@@ -78,6 +79,7 @@ data class ServerDescriptorConfig(
                 }
             return ServerDescriptorConfig(
                 deploymentKind = resolvedDeploymentKind,
+                encryptedAccountKeysEnabled = encryptedAccountKeysEnabled,
                 displayName =
                     displayName
                         ?.trim()

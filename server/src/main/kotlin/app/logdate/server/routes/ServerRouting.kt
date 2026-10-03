@@ -1,7 +1,7 @@
 package app.logdate.server.routes
 
 import app.logdate.server.ServerDescriptorConfig
-import app.logdate.server.accountkeys.AccountKeyVault
+import app.logdate.server.accountkeys.AccountKeyEnvelopeRepository
 import app.logdate.server.atproto.AtprotoSessionTokenService
 import app.logdate.server.auth.AccountDeletionService
 import app.logdate.server.auth.AccountIdentityRepository
@@ -31,6 +31,7 @@ import app.logdate.server.oauth.OAuthConfig
 import app.logdate.server.oauth.OAuthDpopVerifier
 import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthNonceService
+import app.logdate.server.passkeys.PasskeyRepository
 import app.logdate.server.passkeys.RestoreCredentialService
 import app.logdate.server.passkeys.WebAuthnConfig
 import app.logdate.server.passkeys.WebAuthnPasskeyService
@@ -120,13 +121,15 @@ internal fun Application.accountApiRoutes() {
     val emailVerificationService by inject<EmailVerificationService>()
     val signingKeyService by inject<SigningKeyService>()
     val deviceEnrollmentRepository by inject<DeviceEnrollmentRepository>()
-    val accountKeyVault by inject<AccountKeyVault>()
+    val accountKeyEnvelopes by inject<AccountKeyEnvelopeRepository>()
+    val passkeys by inject<PasskeyRepository>()
+    val descriptorConfig by inject<ServerDescriptorConfig>()
 
     routing {
         route("/api/v1") {
             serverInfoRoutes(serverDescriptor())
             deviceEnrollmentRoutes(tokenService, deviceEnrollmentRepository, accountRepository)
-            accountKeyRoutes(tokenService, accountKeyVault)
+            accountKeyEnvelopeRoutes(tokenService, passkeys, accountKeyEnvelopes, descriptorConfig.encryptedAccountKeysEnabled)
             planRoutes(planCatalogService)
             authV1Routes(
                 accountRepository = accountRepository,
@@ -217,5 +220,4 @@ private fun Application.serverDescriptor() =
         webAuthnRpId = inject<WebAuthnConfig>().value.relyingPartyId,
         webAuthnRpName = inject<WebAuthnConfig>().value.relyingPartyName,
         diagnosticReportsEnabled = inject<app.logdate.server.diagnostics.DiagnosticReportAvailability>().value.enabled,
-        accountKeyVaultEnabled = inject<AccountKeyVault>().value.isAvailable,
     )

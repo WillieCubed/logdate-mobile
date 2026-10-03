@@ -30,11 +30,17 @@ class DeviceApprovalViewModelTest {
     private val requestId = "4d90d8dc-49b2-4ba1-8c20-529b80c77542"
     private val accountId = "61ad68f2-6d4b-42dd-b263-f838195714ad"
     private val now = 1_000_000L
-    private val macFirstCode = "logdate-device-enrollment:$requestId"
+    private val recipientKey = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(ByteArray(32) { 3 })
+    private val macFirstCode =
+        "logdate-device-enrollment:v2:" +
+            Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(
+                """{"id":"$requestId","accountId":"$accountId","deviceName":"Willie's Mac",
+                "publicKey":"$recipientKey","confirmationCode":"413827"}""".encodeToByteArray(),
+            )
     private val phoneFirstCode =
         "logdate-device-connect:" +
             Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(
-                """{"deviceName":"Willie's Mac","publicKey":"mac-public-key","claimSecret":"claim-secret","confirmationCode":"413827"}"""
+                """{"deviceName":"Willie's Mac","publicKey":"$recipientKey","claimSecret":"claim-secret","confirmationCode":"413827"}"""
                     .encodeToByteArray(),
             )
 
@@ -62,7 +68,18 @@ class DeviceApprovalViewModelTest {
     private fun pendingRequest(
         status: String = "pending",
         expiresAt: Long = now + 60_000,
-    ) = DeviceEnrollmentRequest(requestId, "Willie's Mac", "mac-public-key", "413827", expiresAt, status)
+    ) = DeviceEnrollmentRequest(requestId, "Willie's Mac", recipientKey, "413827", expiresAt, status)
+
+    @Test
+    fun `a substituted recipient never reaches confirmation or seals keys`() =
+        runTest {
+            api.request =
+                pendingRequest().copy(publicKey = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(ByteArray(32) { 4 }))
+            viewModel.onCodeScanned(macFirstCode)
+            assertTrue(viewModel.uiState.value is DeviceApprovalUiState.Failed)
+            viewModel.approve()
+            assertTrue(sealer.sealed.isEmpty())
+        }
 
     @Test
     fun `existing request is confirmed then approved without minting a session`() =
@@ -76,7 +93,7 @@ class DeviceApprovalViewModelTest {
             assertEquals(DeviceApprovalUiState.Done("Willie's Mac", connected = true), viewModel.uiState.value)
             val sealed = sealer.sealed.single()
             assertNull(sealed.session)
-            assertEquals("mac-public-key", sealed.recipientPublicKey)
+            assertEquals(recipientKey, sealed.recipientPublicKey)
             assertEquals(accountId, sealed.accountId)
             assertEquals(requestId, sealed.requestId.toString())
             assertEquals("413827", sealed.confirmationCode)
@@ -89,7 +106,7 @@ class DeviceApprovalViewModelTest {
         runTest {
             viewModel.onCodeScanned(phoneFirstCode)
             assertEquals(DeviceApprovalUiState.Confirm("Willie's Mac", "Willie", "413827"), viewModel.uiState.value)
-            assertEquals("create:Willie's Mac:mac-public-key:claim-secret:413827:phone-access", api.calls.single())
+            assertEquals("create:Willie's Mac:$recipientKey:claim-secret:413827:phone-access", api.calls.single())
 
             viewModel.approve()
 

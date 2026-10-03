@@ -1,6 +1,7 @@
 package app.logdate.client.data.di
 
 import android.content.Context
+import app.logdate.client.data.account.AccountKeyUnlockCoordinator
 import app.logdate.client.data.account.DefaultAccountIdentityRepository
 import app.logdate.client.data.account.DefaultAccountRepository
 import app.logdate.client.data.account.DefaultPasskeyAccountRepository
@@ -48,9 +49,11 @@ import app.logdate.client.data.user.DefaultUserDeviceRepository
 import app.logdate.client.data.user.OfflineFirstUserStateRepository
 import app.logdate.client.database.databaseModule
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.device.crypto.AccountKeyEnvelopeCipher
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.device.identity.userVisibleDeviceName
 import app.logdate.client.di.datastoreModule
+import app.logdate.client.networking.DefaultAccountKeyEnvelopeApi
 import app.logdate.client.networking.EmailVerificationApiClient
 import app.logdate.client.networking.EmailVerificationApiClientContract
 import app.logdate.client.networking.IdentityApiClient
@@ -222,6 +225,7 @@ actual val dataModule: Module =
         single<UserStateRepository> { OfflineFirstUserStateRepository(get()) }
 
         // Networking
+        single { AccountKeyUnlockCoordinator(DefaultAccountKeyEnvelopeApi(httpClient), AccountKeyEnvelopeCipher(get()), get(), get()) }
         single<PasskeyApiClientContract> { PasskeyApiClient(httpClient, get(), get()) }
         single<EmailVerificationApiClientContract> { EmailVerificationApiClient(httpClient, get()) }
         single<IdentityApiClientContract> { IdentityApiClient(httpClient, get(), get()) }
@@ -256,6 +260,7 @@ actual val dataModule: Module =
                 googleSignInManager = get(),
                 serverClientId = DefaultLogDateConfigRepository.GOOGLE_SERVER_CLIENT_ID,
                 deviceName = { context.userVisibleDeviceName() },
+                accountKeyUnlockCoordinator = get(),
             )
         }
         single<ServerScopedAccounts> {

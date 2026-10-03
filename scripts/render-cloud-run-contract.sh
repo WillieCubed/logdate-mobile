@@ -587,10 +587,13 @@ try:
         "SYNC_MEDIA_SIGNED_URL_TTL_HOURS",
         "AUTO_MIGRATE",
     }
-    allowed_env_keys = required_env_keys
+    allowed_env_keys = required_env_keys | {"LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED"}
     unexpected_env = set(env_vars) - allowed_env_keys
     if unexpected_env:
         fail("environment contract contains unexpected keys")
+    if "LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED" in env_vars:
+        if env_vars["LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED"] not in ("true", "false"):
+            fail("LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED must be true or false")
     for key in sorted(required_env_keys):
         if key not in env_vars:
             fail(f"required environment variable {key} is missing")

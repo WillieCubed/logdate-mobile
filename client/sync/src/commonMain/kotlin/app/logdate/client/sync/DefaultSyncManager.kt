@@ -169,15 +169,6 @@ class DefaultSyncManager(
         }
     }
 
-    private val accountKeys =
-        AccountKeySync(
-            mediaPayloadKeyProvider = mediaPayloadKeyProvider,
-            syncMetadataService = syncMetadataService,
-            identityRecoveryNeededStore = identityRecoveryNeededStore,
-            unreadableCloudRecordStore = unreadableCloudRecordStore,
-            downloadInbox = downloadInbox,
-        )
-
     /**
      * Every note, journal, and draft is encrypted with a key derived from this device's identity
      * key, so a device without one fails every upload. Onboarding provisions it for new devices;
@@ -201,18 +192,12 @@ class DefaultSyncManager(
         val manager = identityKeyManager ?: return
         val client = cloudApiClient
         val accountId = sessionStorage.getSession()?.accountId
-        val vault = client?.getAccountKeys(accessToken)
-        if (vault?.isFailure == true) {
-            Napier.w("Could not read the account key; will retry on the next sync")
-            if (!manager.hasIdentityKey()) return
-        }
-        val remote = vault?.getOrNull()
         if (manager.hasIdentityKey()) {
-            accountKeys.reconcile(manager, client, accessToken, accountId, remote, vaultRead = vault?.isSuccess == true)
-            return
-        }
-        if (remote != null && accountId != null) {
-            accountKeys.install(manager, accountId, remote)
+            if (accountId != null && !manager.bindToAccount(accountId)) {
+                identityRecoveryNeededStore.setNeeded(true)
+                return
+            }
+            if (identityRecoveryNeededStore.isNeeded()) identityRecoveryNeededStore.setNeeded(false)
             return
         }
 
@@ -222,6 +207,10 @@ class DefaultSyncManager(
                     "records the old, now-replaced identity could not read re-arrive and get " +
                     "another chance",
             )
+            if (accountId != null && !manager.bindToAccount(accountId)) {
+                identityRecoveryNeededStore.setNeeded(true)
+                return
+            }
             mediaPayloadKeyProvider?.clearCachedKey()
             syncMetadataService.resetAllCursors()
             identityRecoveryNeededStore.setNeeded(false)
@@ -246,7 +235,7 @@ class DefaultSyncManager(
             false -> {
                 runCatching { manager.setupNewIdentity() }
                     .onFailure { Napier.e("Could not provision an identity key; uploads will fail") }
-                if (manager.hasIdentityKey()) accountKeys.publish(client, accessToken, manager)
+                if (manager.hasIdentityKey() && accountId != null) manager.bindToAccount(accountId)
             }
             null -> {
                 // Could not tell (offline, a server error). Leave things as they are; the next
@@ -313,7 +302,7 @@ class DefaultSyncManager(
             try {
                 val accessToken = tokenRefresher.getAccessToken() ?: return authError()
                 provisionIdentityKey(accessToken)
-                if (identityRecoveryNeededStore.isNeeded()) {
+                if (identityRecoveryNeededStore.isNeeded() || identityKeyManager?.hasIdentityKey() == false) {
                     return SyncResult(success = false)
                 }
                 body(accessToken)
@@ -465,7 +454,7 @@ class DefaultSyncManager(
             try {
                 val accessToken = tokenRefresher.getAccessToken() ?: return@withLock authError()
                 provisionIdentityKey(accessToken)
-                if (identityRecoveryNeededStore.isNeeded()) {
+                if (identityRecoveryNeededStore.isNeeded() || identityKeyManager?.hasIdentityKey() == false) {
                     return@withLock SyncResult(success = false)
                 }
 

@@ -34,7 +34,12 @@ class IdentityKeyManager(
      */
     suspend fun hasIdentityKey(): Boolean = secureStorage.getBytes(KEY_IDENTITY_KEY) != null
 
-    /** Bind a locally held key to one account before publishing it to that account's vault. */
+    suspend fun canUseForAccount(accountId: String): Boolean {
+        val owner = secureStorage.getString(KEY_ACCOUNT_ID)
+        return owner == null || owner == accountId
+    }
+
+    /** Bind a locally held key to one account before provisioning an encrypted unlock envelope. */
     suspend fun bindToAccount(accountId: String): Boolean =
         identityMutex.withLock {
             val owner = secureStorage.getString(KEY_ACCOUNT_ID)
@@ -54,8 +59,10 @@ class IdentityKeyManager(
             require(owner == null || owner == accountId) { "Identity key belongs to a different account" }
             val existing = secureStorage.getBytes(KEY_IDENTITY_KEY)
             require(existing == null || existing.contentEquals(key)) { "Local identity key conflicts with account key" }
-            secureStorage.putBytes(KEY_IDENTITY_KEY, key)
             secureStorage.putString(KEY_ACCOUNT_ID, accountId)
+            if (existing != null) return@withLock
+            backupStore.clear()
+            secureStorage.putBytes(KEY_IDENTITY_KEY, key)
             secureStorage.remove(KEY_RECOVERY_PHRASE)
             secureStorage.remove(KEY_RECOVERY_VERIFIED)
         }
@@ -175,8 +182,7 @@ class IdentityKeyManager(
     /**
      * Retrieves the user's recovery phrase from local secure storage.
      *
-     * This is intentionally local-only. The server never receives the phrase and cannot use this
-     * method to decrypt user content.
+     * This is local-only. Account key sync transfers the derived key, never the phrase.
      */
     suspend fun getStoredRecoveryPhrase(): RecoveryPhrase? {
         val phrase =

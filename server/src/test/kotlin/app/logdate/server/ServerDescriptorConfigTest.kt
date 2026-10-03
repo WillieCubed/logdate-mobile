@@ -1,9 +1,5 @@
 package app.logdate.server
 
-import app.logdate.server.accountkeys.AccountKeyVault
-import app.logdate.server.accountkeys.InMemoryAccountKeyRepository
-import app.logdate.server.crypto.EncryptionKey
-import app.logdate.server.crypto.EncryptionKeyring
 import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.HostedAccountDidMethod
 import app.logdate.shared.model.DeploymentKind
@@ -36,29 +32,15 @@ class ServerDescriptorConfigTest {
     }
 
     @Test
-    fun `account key vault is advertised only when its keyring is configured`() {
-        val keyring =
-            object : EncryptionKeyring {
-                private val key = EncryptionKey("vault-key", ByteArray(32) { it.toByte() })
-
-                override fun getActiveKey(): EncryptionKey = key
-
-                override fun getKey(keyId: String): EncryptionKey? = key.takeIf { it.keyId == keyId }
-            }
-        val configured = AccountKeyVault(InMemoryAccountKeyRepository(), keyring)
-        val unconfigured = AccountKeyVault(InMemoryAccountKeyRepository(), keyring = null)
+    fun `encrypted unlock is opt in and never advertises server custody`() {
         val identity = AtprotoIdentityConfig()
-
-        fun descriptor(vault: AccountKeyVault) =
-            ServerDescriptorConfig().toDescriptor(identity, "logdate.app", "LogDate", accountKeyVaultEnabled = vault.isAvailable)
-
-        val advertised = descriptor(configured)
-        val withheld = descriptor(unconfigured)
-
-        assertTrue(advertised.hasProtocolFeature(ServerProtocolFeature.ACCOUNT_KEY_VAULT_V1))
-        assertFalse(withheld.hasProtocolFeature(ServerProtocolFeature.ACCOUNT_KEY_VAULT_V1))
-        assertFalse(descriptorFor(identity).hasProtocolFeature(ServerProtocolFeature.ACCOUNT_KEY_VAULT_V1))
-        assertEquals(withheld.capabilities, advertised.capabilities)
+        val baseline = ServerDescriptorConfig().toDescriptor(identity, "logdate.app", "LogDate")
+        val enabled = ServerDescriptorConfig(encryptedAccountKeysEnabled = true).toDescriptor(identity, "logdate.app", "LogDate")
+        assertFalse(baseline.hasProtocolFeature(ServerProtocolFeature.ENCRYPTED_ACCOUNT_KEYS_V1))
+        assertTrue(enabled.hasProtocolFeature(ServerProtocolFeature.ENCRYPTED_ACCOUNT_KEYS_V1))
+        assertFalse(baseline.hasProtocolFeature(ServerProtocolFeature.ACCOUNT_KEY_VAULT_V1))
+        assertFalse(enabled.hasProtocolFeature(ServerProtocolFeature.ACCOUNT_KEY_VAULT_V1))
+        assertEquals(baseline.capabilities, enabled.capabilities)
     }
 
     @Test

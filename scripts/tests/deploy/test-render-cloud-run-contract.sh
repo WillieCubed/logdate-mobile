@@ -1098,6 +1098,22 @@ expect_failure negative-scaling staging "$RELEASE_SHA" negative-scaling.json "ru
 jq '.unexpected = true' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/unexpected-top-level.json"
 expect_failure unexpected-top-level staging "$RELEASE_SHA" unexpected-top-level.json "Terraform source projection contains unexpected keys"
 
+# Encrypted unlock is an explicit opt-in; a deployed contract must preserve the boolean verbatim.
+for enabled in true false; do
+    jq --arg enabled "$enabled" '.env_vars.LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED = $enabled' \
+        "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/encrypted-unlock-$enabled.json"
+    output="$TMP_DIR/encrypted-unlock-$enabled.out.json"
+    if ! run_renderer staging "$RELEASE_SHA" "encrypted-unlock-$enabled.json" "$output" "$LOG_DIR/encrypted-unlock-$enabled.err"; then
+        cat "$LOG_DIR/encrypted-unlock-$enabled.err" >&2
+        fail "encrypted unlock opt-in could not be rendered"
+    fi
+    assert_equals "$enabled" "$(jq -r '.env_vars.LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED' "$output")"
+done
+jq '.env_vars.LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED = "yes"' \
+    "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/invalid-encrypted-unlock.json"
+expect_failure invalid-encrypted-unlock staging "$RELEASE_SHA" invalid-encrypted-unlock.json \
+    "LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED must be true or false"
+
 jq '.env_vars.UNEXPECTED_ENV = "value"' "$FIXTURE_DIR/staging-source.json" >"$FIXTURE_DIR/unexpected-env.json"
 expect_failure unexpected-env staging "$RELEASE_SHA" unexpected-env.json "environment contract contains unexpected keys"
 
