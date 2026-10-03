@@ -1,6 +1,7 @@
 package app.logdate.wear.e2e
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -192,6 +193,39 @@ class MoodCheckInScreenTest {
 
         composeRule.onNodeWithText("Open recorder").assertIsDisplayed()
         composeRule.onNodeWithText("Skip").assertIsDisplayed()
+    }
+
+    @Test
+    fun `voice prompt disables both buttons while the mood is saving`() {
+        composeRule.setContent {
+            MaterialTheme {
+                VoicePromptContent(
+                    selectedMood = Feeling.GOOD,
+                    onAttachVoice = {},
+                    onSkip = {},
+                    isSaving = true,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Open recorder").assertIsNotEnabled()
+        composeRule.onNodeWithText("Skip").assertIsNotEnabled()
+    }
+
+    @Test
+    fun `voice prompt says when the mood could not be saved`() {
+        composeRule.setContent {
+            MaterialTheme {
+                VoicePromptContent(
+                    selectedMood = Feeling.GOOD,
+                    onAttachVoice = {},
+                    onSkip = {},
+                    saveFailed = true,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Couldn't save your feeling").assertIsDisplayed()
     }
 
     // -----------------------------------------------------------------------

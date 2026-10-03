@@ -35,6 +35,7 @@ data class MoodCheckInUiState(
     val selectedMood: Feeling? = null,
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,
+    val saveFailed: Boolean = false,
     val saveFeedback: SaveFeedback? = null,
 )
 
@@ -70,12 +71,13 @@ class MoodCheckInViewModel(
 
     fun skipVoiceAttachment() {
         val mood = _uiState.value.selectedMood ?: return
+        if (_uiState.value.isSaving) return
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true) }
+            _uiState.update { it.copy(isSaving = true, saveFailed = false) }
             val feedback = saveMood(mood)
             if (feedback == null) {
-                _uiState.update { it.copy(isSaving = false) }
+                _uiState.update { it.copy(isSaving = false, saveFailed = true) }
                 return@launch
             }
             _uiState.update {
@@ -94,11 +96,12 @@ class MoodCheckInViewModel(
     /** Saves the mood, then opens the recorder so a voice note can follow it. */
     fun attachVoice() {
         val mood = _uiState.value.selectedMood ?: return
+        if (_uiState.value.isSaving) return
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true) }
+            _uiState.update { it.copy(isSaving = true, saveFailed = false) }
             val feedback = saveMood(mood)
-            _uiState.update { it.copy(isSaving = false, isSaved = feedback != null, saveFeedback = feedback) }
+            _uiState.update { it.copy(isSaving = false, saveFailed = feedback == null) }
             if (feedback == null) return@launch
             _events.emit(MoodCheckInEvent.NavigateToVoiceNote)
         }

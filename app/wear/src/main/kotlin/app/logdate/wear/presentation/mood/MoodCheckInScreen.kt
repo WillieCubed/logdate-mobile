@@ -67,6 +67,8 @@ fun MoodCheckInScreen(
         MoodCheckInStep.VOICE_PROMPT ->
             VoicePromptContent(
                 selectedMood = uiState.selectedMood,
+                isSaving = uiState.isSaving,
+                saveFailed = uiState.saveFailed,
                 onAttachVoice = { viewModel.attachVoice() },
                 onSkip = { viewModel.skipVoiceAttachment() },
             )
@@ -109,6 +111,8 @@ internal fun VoicePromptContent(
     selectedMood: Feeling?,
     onAttachVoice: () -> Unit,
     onSkip: () -> Unit,
+    isSaving: Boolean = false,
+    saveFailed: Boolean = false,
 ) {
     Column(
         modifier =
@@ -131,18 +135,29 @@ internal fun VoicePromptContent(
         }
         Button(
             onClick = onAttachVoice,
+            enabled = !isSaving,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(text = stringResource(R.string.wear_mood_add_voice))
         }
         OutlinedButton(
             onClick = onSkip,
+            enabled = !isSaving,
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp),
         ) {
             Text(text = stringResource(R.string.wear_mood_skip))
+        }
+        if (saveFailed) {
+            Text(
+                text = stringResource(R.string.wear_mood_save_failed),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp),
+            )
         }
     }
 }

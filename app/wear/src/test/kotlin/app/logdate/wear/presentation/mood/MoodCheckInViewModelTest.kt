@@ -11,6 +11,7 @@ import app.logdate.wear.sync.WearDataLayerClient
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -23,6 +24,7 @@ import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
 /**
@@ -172,8 +174,119 @@ class MoodCheckInViewModelTest {
                 expectNoEvents()
             }
 
+            coVerify(exactly = 1) { notesRepository.create(any()) }
+            val state = viewModel.uiState.value
+            assertEquals(MoodCheckInStep.VOICE_PROMPT, state.step)
+            assertFalse(state.isSaving)
+            assertFalse(state.isSaved)
+            assertNull(state.saveFeedback)
+        }
+
+    @Test
+    fun `a failed save after Open recorder is reported on the prompt`() =
+        runTest {
+            coEvery { notesRepository.create(any()) } throws IllegalStateException("The database is closed")
+            viewModel.selectMood(Feeling.GOOD)
+
+            viewModel.attachVoice()
+
+            assertTrue(viewModel.uiState.value.saveFailed)
+        }
+
+    @Test
+    fun `a failed save after Skip is reported on the prompt`() =
+        runTest {
+            coEvery { notesRepository.create(any()) } throws IllegalStateException("The database is closed")
+            viewModel.selectMood(Feeling.GOOD)
+
+            viewModel.skipVoiceAttachment()
+
+            assertTrue(viewModel.uiState.value.saveFailed)
+        }
+
+    @Test
+    fun `a retry after a failed save clears the failure and saves`() =
+        runTest {
+            coEvery { notesRepository.create(any()) } throws IllegalStateException("The database is closed") andThen Uuid.random()
+            viewModel.selectMood(Feeling.GOOD)
+            viewModel.attachVoice()
+
+            viewModel.events.test {
+                viewModel.attachVoice()
+                assertEquals(MoodCheckInEvent.NavigateToVoiceNote, awaitItem())
+            }
+
+            assertFalse(viewModel.uiState.value.saveFailed)
+        }
+
+    @Test
+    fun `tapping Open recorder twice while the save is pending saves one mood`() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            coEvery { notesRepository.create(any()) } coAnswers
+                {
+                    gate.await()
+                    Uuid.random()
+                }
+            viewModel.selectMood(Feeling.GREAT)
+
+            viewModel.events.test {
+                viewModel.attachVoice()
+                viewModel.attachVoice()
+                gate.complete(Unit)
+
+                assertEquals(MoodCheckInEvent.NavigateToVoiceNote, awaitItem())
+                expectNoEvents()
+            }
+
+            coVerify(exactly = 1) { notesRepository.create(any()) }
+        }
+
+    @Test
+    fun `tapping Skip while Open recorder is saving saves one mood and opens the recorder once`() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            coEvery { notesRepository.create(any()) } coAnswers
+                {
+                    gate.await()
+                    Uuid.random()
+                }
+            viewModel.selectMood(Feeling.GREAT)
+
+            viewModel.events.test {
+                viewModel.attachVoice()
+                viewModel.skipVoiceAttachment()
+                gate.complete(Unit)
+
+                assertEquals(MoodCheckInEvent.NavigateToVoiceNote, awaitItem())
+                expectNoEvents()
+            }
+
+            coVerify(exactly = 1) { notesRepository.create(any()) }
             assertEquals(MoodCheckInStep.VOICE_PROMPT, viewModel.uiState.value.step)
-            assertFalse(viewModel.uiState.value.isSaving)
+        }
+
+    @Test
+    fun `tapping Open recorder while Skip is saving saves one mood and navigates back once`() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            coEvery { notesRepository.create(any()) } coAnswers
+                {
+                    gate.await()
+                    Uuid.random()
+                }
+            viewModel.selectMood(Feeling.GREAT)
+
+            viewModel.events.test {
+                viewModel.skipVoiceAttachment()
+                viewModel.attachVoice()
+                gate.complete(Unit)
+
+                assertEquals(MoodCheckInEvent.NavigateBack, awaitItem())
+                expectNoEvents()
+            }
+
+            coVerify(exactly = 1) { notesRepository.create(any()) }
         }
 
     @Test
