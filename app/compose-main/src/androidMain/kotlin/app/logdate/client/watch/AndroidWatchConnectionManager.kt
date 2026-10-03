@@ -71,7 +71,7 @@ class AndroidWatchConnectionManager(
 
     /** Asks every reachable watch running LogDate to send what it has waiting. */
     override suspend fun requestSync() {
-        check(messageSender.send(WearAudioRequestPaths.SYNC_REQUEST_PATH)) {
+        check(messageSender.send(WearAudioRequestPaths.SYNC_REQUEST_PATH, ByteArray(0))) {
             "No watch running LogDate received the sync request"
         }
     }

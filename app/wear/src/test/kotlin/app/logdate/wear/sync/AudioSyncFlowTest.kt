@@ -156,7 +156,7 @@ class AudioSyncFlowTest {
             coVerify(exactly = 0) { syncMetadataService.settleIfCurrent(any(), any(), any(), any()) }
 
             // 6. The phone's acknowledgement clears it
-            syncManager.onNoteAcknowledged(noteId)
+            syncManager.onNoteAcknowledged(noteId, null)
             coVerify {
                 syncMetadataService.settleIfCurrent(
                     EntityType.NOTE,
@@ -287,7 +287,7 @@ class AudioSyncFlowTest {
 
             // Nothing is marked synced until the phone acknowledges each note
             coVerify(exactly = 0) { syncMetadataService.settleIfCurrent(any(), any(), any(), any()) }
-            for ((id, _) in notes) syncManager.onNoteAcknowledged(id)
+            for ((id, _) in notes) syncManager.onNoteAcknowledged(id, null)
             coVerify(exactly = 5) {
                 syncMetadataService.settleIfCurrent(EntityType.NOTE, any(), any(), any())
             }

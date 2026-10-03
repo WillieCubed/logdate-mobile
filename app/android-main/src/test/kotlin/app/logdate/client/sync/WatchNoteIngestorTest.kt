@@ -23,6 +23,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -436,6 +438,29 @@ class WatchNoteIngestorTest {
             ByteArrayInputStream(audio.encodeToByteArray()).copyToDigesting(ByteArrayOutputStream()),
         )
 
+    @Test
+    fun `the acknowledgement names the version of the note the phone stored`() =
+        runTest {
+            val note = watchAudioNote()
+
+            ingestor.onNoteMetadata(mapper.toDataMap(note))
+            ingestor.onAudioBytes(note.uid, bytes("m4a"))
+
+            assertEquals(listOf(note.lastUpdated), acknowledger.versions)
+        }
+
+    @Test
+    fun `a repeated delivery is acknowledged with the version already stored`() =
+        runTest {
+            val note = watchAudioNote()
+            ingestor.onNoteMetadata(mapper.toDataMap(note))
+            ingestor.onAudioBytes(note.uid, bytes("m4a"))
+
+            ingestor.onNoteMetadata(mapper.toDataMap(note.copy(lastUpdated = note.lastUpdated + 5.seconds)))
+
+            assertEquals(listOf(note.lastUpdated, note.lastUpdated), acknowledger.versions)
+        }
+
     private fun bytes(text: String): InputStream = ByteArrayInputStream(text.encodeToByteArray())
 
     private fun watchAudioNote(id: Uuid = Uuid.random()): JournalNote.Audio {
@@ -456,9 +481,14 @@ class WatchNoteIngestorTest {
 
     private class RecordingAcknowledger : WatchNoteAcknowledger {
         val acknowledged = mutableListOf<Uuid>()
+        val versions = mutableListOf<Instant>()
 
-        override suspend fun acknowledge(noteId: Uuid) {
+        override suspend fun acknowledge(
+            noteId: Uuid,
+            lastUpdated: Instant,
+        ) {
             acknowledged += noteId
+            versions += lastUpdated
         }
     }
 

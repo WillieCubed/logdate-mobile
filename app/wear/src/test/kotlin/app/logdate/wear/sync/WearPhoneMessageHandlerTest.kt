@@ -1,6 +1,7 @@
 package app.logdate.wear.sync
 
 import app.logdate.client.sync.SyncManager
+import app.logdate.client.sync.datalayer.NoteAckPayload
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -22,14 +23,34 @@ class WearPhoneMessageHandlerTest {
     private val handler = WearPhoneMessageHandler(ackHandler, syncManager)
 
     @Test
-    fun `ack message acknowledges the note`() =
+    fun `an ack names the version of the note the phone stored`() =
+        runTest {
+            val noteId = Uuid.random()
+
+            handler.onMessage(WearAudioRequestPaths.noteAckPath(noteId), NoteAckPayload(1_710_000_000_123).encode())
+
+            coVerify(exactly = 1) { ackHandler.onNoteAcknowledged(noteId, NoteAckPayload(1_710_000_000_123)) }
+            confirmVerified(syncManager)
+        }
+
+    @Test
+    fun `an ack from an older phone has no version`() =
         runTest {
             val noteId = Uuid.random()
 
             handler.onMessage(WearAudioRequestPaths.noteAckPath(noteId))
 
-            coVerify(exactly = 1) { ackHandler.onNoteAcknowledged(noteId) }
-            confirmVerified(syncManager)
+            coVerify(exactly = 1) { ackHandler.onNoteAcknowledged(noteId, null) }
+        }
+
+    @Test
+    fun `an ack payload this build cannot read is handled like an older phone's`() =
+        runTest {
+            val noteId = Uuid.random()
+
+            handler.onMessage(WearAudioRequestPaths.noteAckPath(noteId), "garbage".encodeToByteArray())
+
+            coVerify(exactly = 1) { ackHandler.onNoteAcknowledged(noteId, null) }
         }
 
     @Test
@@ -44,11 +65,11 @@ class WearPhoneMessageHandlerTest {
     fun `ack message that fails to record does not propagate`() =
         runTest {
             val noteId = Uuid.random()
-            coEvery { ackHandler.onNoteAcknowledged(noteId) } throws IllegalStateException("database closed")
+            coEvery { ackHandler.onNoteAcknowledged(noteId, any()) } throws IllegalStateException("database closed")
 
             handler.onMessage(WearAudioRequestPaths.noteAckPath(noteId))
 
-            coVerify(exactly = 1) { ackHandler.onNoteAcknowledged(noteId) }
+            coVerify(exactly = 1) { ackHandler.onNoteAcknowledged(noteId, any()) }
         }
 
     @Test

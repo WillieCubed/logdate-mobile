@@ -152,7 +152,7 @@ class AndroidWatchConnectionManagerTest {
             nodeClient = nodeClient,
             capabilityClient = capabilityClient,
             messageSender =
-                WatchMessageSender { path ->
+                WatchMessageSender { path, _ ->
                     sentMessages += path
                     messageDelivered
                 },

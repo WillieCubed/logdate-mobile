@@ -8,9 +8,11 @@ import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.Node
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -29,7 +31,7 @@ class GoogleWatchMessageSenderTest {
             givenWatches(watch("pixel-watch"), watch("galaxy-watch"))
             every { messageClient.sendMessage(any(), PATH, any()) } returns Tasks.forResult(1)
 
-            assertTrue(sender.send(PATH))
+            assertTrue(sender.send(PATH, ByteArray(0)))
 
             verify(exactly = 1) { messageClient.sendMessage("pixel-watch", PATH, any()) }
             verify(exactly = 1) { messageClient.sendMessage("galaxy-watch", PATH, any()) }
@@ -43,7 +45,7 @@ class GoogleWatchMessageSenderTest {
                 Tasks.forException(IllegalStateException("TARGET_NODE_NOT_CONNECTED"))
             every { messageClient.sendMessage("pixel-watch", PATH, any()) } returns Tasks.forResult(1)
 
-            assertTrue(sender.send(PATH))
+            assertTrue(sender.send(PATH, ByteArray(0)))
 
             verify(exactly = 1) { messageClient.sendMessage("pixel-watch", PATH, any()) }
         }
@@ -53,7 +55,7 @@ class GoogleWatchMessageSenderTest {
         runTest {
             givenWatches()
 
-            assertFalse(sender.send(PATH))
+            assertFalse(sender.send(PATH, ByteArray(0)))
 
             verify(exactly = 0) { messageClient.sendMessage(any(), any(), any()) }
         }
@@ -65,7 +67,7 @@ class GoogleWatchMessageSenderTest {
             every { messageClient.sendMessage("pixel-watch", PATH, any()) } returns
                 Tasks.forException(IllegalStateException("TARGET_NODE_NOT_CONNECTED"))
 
-            assertFalse(sender.send(PATH))
+            assertFalse(sender.send(PATH, ByteArray(0)))
         }
 
     @Test
@@ -73,7 +75,19 @@ class GoogleWatchMessageSenderTest {
         runTest {
             every { capabilityClient.getCapability(any(), any()) } returns Tasks.forException(IllegalStateException("API_UNAVAILABLE"))
 
-            assertFalse(sender.send(PATH))
+            assertFalse(sender.send(PATH, ByteArray(0)))
+        }
+
+    @Test
+    fun `the payload reaches each watch unchanged`() =
+        runTest {
+            givenWatches(watch("pixel-watch"))
+            val sent = slot<ByteArray>()
+            every { messageClient.sendMessage("pixel-watch", PATH, capture(sent)) } returns Tasks.forResult(1)
+
+            sender.send(PATH, PAYLOAD)
+
+            assertContentEquals(PAYLOAD, sent.captured)
         }
 
     private fun givenWatches(vararg watches: Node) {
@@ -91,5 +105,6 @@ class GoogleWatchMessageSenderTest {
 
     private companion object {
         const val PATH = "/logdate/notes/550e8400-e29b-41d4-a716-446655440000/ack"
+        val PAYLOAD = """{"lastUpdated":1710000000123}""".encodeToByteArray()
     }
 }

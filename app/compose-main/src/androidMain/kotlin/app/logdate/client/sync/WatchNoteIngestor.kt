@@ -9,6 +9,7 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.InputStream
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -59,7 +60,11 @@ interface WatchAudioStore {
 
 /** Tells the watch a note is stored on the phone, so the watch can stop retrying it. */
 fun interface WatchNoteAcknowledger {
-    suspend fun acknowledge(noteId: Uuid)
+    /** [lastUpdated] is the version of the note the phone stored. */
+    suspend fun acknowledge(
+        noteId: Uuid,
+        lastUpdated: Instant,
+    )
 }
 
 fun interface WatchNoteNotifier {
@@ -127,8 +132,9 @@ class WatchNoteIngestor(
             Napier.d("Dropping audio for note $noteId: the watch deleted it")
             return@withNoteLock
         }
-        if (notesRepository.getNoteById(noteId) != null) {
-            acknowledger.acknowledge(noteId)
+        val existing = notesRepository.getNoteById(noteId)
+        if (existing != null) {
+            acknowledger.acknowledge(noteId, existing.lastUpdated)
             return@withNoteLock
         }
         if (!audioStore.writeAudio(noteId, source)) {
@@ -151,8 +157,9 @@ class WatchNoteIngestor(
         note: JournalNote.Audio,
         data: Map<String, String>,
     ) {
-        if (notesRepository.getNoteById(note.uid) != null) {
-            acknowledger.acknowledge(note.uid)
+        val existing = notesRepository.getNoteById(note.uid)
+        if (existing != null) {
+            acknowledger.acknowledge(note.uid, existing.lastUpdated)
             return
         }
         audioStore.stashMetadata(note.uid, data)
@@ -177,7 +184,7 @@ class WatchNoteIngestor(
         val note = watchNote.copy(mediaRef = audioStore.audioPath(noteId))
         notesRepository.create(note)
         audioStore.clearMetadata(noteId)
-        acknowledger.acknowledge(noteId)
+        acknowledger.acknowledge(noteId, note.lastUpdated)
         notifier.noteReceived(note)
     }
 

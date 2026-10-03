@@ -13,6 +13,7 @@ import app.logdate.client.sync.datalayer.AssociationDataMapper
 import app.logdate.client.sync.datalayer.AudioFileDigest
 import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
 import app.logdate.client.sync.datalayer.JournalDataMapper
+import app.logdate.client.sync.datalayer.NoteAckPayload
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
@@ -25,6 +26,7 @@ import app.logdate.client.sync.metadata.UploadScope
 import app.logdate.shared.model.Journal
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -42,6 +44,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -543,16 +546,89 @@ class WearDataLayerSyncManagerTest {
         }
 
     @Test
-    fun `acknowledged audio note is marked synced and its retry schedule cleared`() =
+    fun `an acknowledgement of the version the watch has clears the note`() =
         runTest {
-            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
-                listOf(PendingUpload(noteId.toString(), PendingOperation.CREATE))
+            givenQueuedNote(PendingOperation.CREATE)
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote
+            coEvery { deadLetterStore.list() } returns listOf(deadLetter())
 
-            syncManager.onNoteAcknowledged(noteId)
+            syncManager.onNoteAcknowledged(noteId, NoteAckPayload(fixedTime.toEpochMilliseconds()))
 
             coVerify { syncMetadataService.settleIfCurrent(EntityType.NOTE, match { it.entityId == noteId.toString() }, any(), any()) }
             coVerify { retryScheduleStore.clear(EntityType.NOTE, noteId.toString()) }
+            coVerify { deadLetterStore.remove("NOTE:$noteId") }
         }
+
+    @Test
+    fun `an acknowledgement of an older version leaves a newer change queued`() =
+        runTest {
+            givenQueuedNote(PendingOperation.UPDATE)
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote.copy(lastUpdated = fixedTime + 5.seconds)
+
+            syncManager.onNoteAcknowledged(noteId, NoteAckPayload(fixedTime.toEpochMilliseconds()))
+
+            coVerify(exactly = 0) { syncMetadataService.settleIfCurrent(any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `an acknowledgement without a version clears the note, as with older phones`() =
+        runTest {
+            givenQueuedNote(PendingOperation.CREATE)
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote.copy(lastUpdated = fixedTime + 5.seconds)
+
+            syncManager.onNoteAcknowledged(noteId, null)
+
+            coVerify(exactly = 1) {
+                syncMetadataService.settleIfCurrent(EntityType.NOTE, match { it.entityId == noteId.toString() }, any(), any())
+            }
+        }
+
+    @Test
+    fun `an acknowledgement never clears a queued removal`() =
+        runTest {
+            givenQueuedNote(PendingOperation.DELETE)
+
+            syncManager.onNoteAcknowledged(noteId, null)
+
+            coVerify(exactly = 0) { syncMetadataService.settleIfCurrent(any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `an acknowledgement that arrives during an upload waits for the upload's own bookkeeping`() =
+        runTest {
+            givenQueuedNote(PendingOperation.CREATE)
+            coEvery { notesRepository.getNoteById(noteId) } returns audioNote
+            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            coEvery { dataLayerClient.sendFile(any(), any()) } coAnswers {
+                gate.await()
+                true
+            }
+            val manager = fixedClockSyncManager()
+
+            val upload = async { manager.uploadPendingChanges() }
+            runCurrent()
+            val ack = async { manager.onNoteAcknowledged(noteId, NoteAckPayload(fixedTime.toEpochMilliseconds())) }
+            runCurrent()
+
+            coVerify(exactly = 0) { syncMetadataService.settleIfCurrent(any(), any(), any(), any()) }
+            gate.complete(Unit)
+            upload.await()
+            ack.await()
+            coVerifyOrder {
+                retryScheduleStore.setNextAttemptAt(
+                    EntityType.NOTE,
+                    noteId.toString(),
+                    fixedTime.toEpochMilliseconds() + WearDataLayerSyncManager.ACK_TIMEOUT_MS,
+                )
+                syncMetadataService.settleIfCurrent(EntityType.NOTE, match { it.entityId == noteId.toString() }, any(), any())
+                retryScheduleStore.clear(EntityType.NOTE, noteId.toString())
+            }
+        }
+
+    private fun givenQueuedNote(operation: PendingOperation) {
+        coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+            listOf(PendingUpload(noteId.toString(), operation))
+    }
 
     @Test
     fun `upload fails for audio note when metadata put fails`() =
@@ -1209,7 +1285,7 @@ class WearDataLayerSyncManagerTest {
     @Test
     fun `an acknowledgement for a note that is not queued changes nothing`() =
         runTest {
-            syncManager.onNoteAcknowledged(noteId)
+            syncManager.onNoteAcknowledged(noteId, null)
 
             coVerify(exactly = 0) { syncMetadataService.settleIfCurrent(any(), any(), any(), any()) }
             coVerify(exactly = 0) { syncMetadataService.markAsSynced(any(), any(), any(), any()) }

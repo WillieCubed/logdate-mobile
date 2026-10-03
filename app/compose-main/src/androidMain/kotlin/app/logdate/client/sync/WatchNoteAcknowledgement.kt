@@ -1,6 +1,7 @@
 package app.logdate.client.sync
 
 import android.content.Context
+import app.logdate.client.sync.datalayer.NoteAckPayload
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import app.logdate.client.watch.WatchNodeSelector
 import com.google.android.gms.wearable.MessageClient
@@ -9,18 +10,30 @@ import com.google.android.gms.wearable.Wearable
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-/** Delivers a payload-free message to the paired watch. Returns false when nothing was sent. */
+/** Delivers a message to the watches running LogDate. Returns false when no watch received it. */
 fun interface WatchMessageSender {
-    suspend fun send(path: String): Boolean
+    suspend fun send(
+        path: String,
+        data: ByteArray,
+    ): Boolean
 }
 
+/**
+ * Tells the watch a note is stored on the phone, and which version: the watch clears the note only
+ * if it has not changed since. Watches that predate versioned acknowledgements ignore the payload.
+ */
 class MessageWatchNoteAcknowledger(
     private val sender: WatchMessageSender,
 ) : WatchNoteAcknowledger {
-    override suspend fun acknowledge(noteId: Uuid) {
-        if (!sender.send(WearAudioRequestPaths.noteAckPath(noteId))) {
+    override suspend fun acknowledge(
+        noteId: Uuid,
+        lastUpdated: Instant,
+    ) {
+        val payload = NoteAckPayload.of(lastUpdated).encode()
+        if (!sender.send(WearAudioRequestPaths.noteAckPath(noteId), payload)) {
             Napier.w("Watch did not receive the acknowledgement for note $noteId; it will retry")
         }
     }
@@ -39,7 +52,10 @@ class GoogleWatchMessageSender(
         messageClient = Wearable.getMessageClient(context),
     )
 
-    override suspend fun send(path: String): Boolean {
+    override suspend fun send(
+        path: String,
+        data: ByteArray,
+    ): Boolean {
         val watches =
             try {
                 watchNodeSelector.reachableWatches()
@@ -53,15 +69,16 @@ class GoogleWatchMessageSender(
             Napier.w("No reachable watch runs LogDate; $path was not sent")
             return false
         }
-        return watches.count { watch -> deliver(watch, path) } > 0
+        return watches.count { watch -> deliver(watch, path, data) } > 0
     }
 
     private suspend fun deliver(
         watch: Node,
         path: String,
+        data: ByteArray,
     ): Boolean =
         try {
-            messageClient.sendMessage(watch.id, path, ByteArray(0)).await()
+            messageClient.sendMessage(watch.id, path, data).await()
             true
         } catch (e: CancellationException) {
             throw e

@@ -14,6 +14,7 @@ import app.logdate.client.sync.datalayer.AssociationDataMapper
 import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
 import app.logdate.client.sync.datalayer.HealthSnapshotSyncData
 import app.logdate.client.sync.datalayer.JournalDataMapper
+import app.logdate.client.sync.datalayer.NoteAckPayload
 import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
@@ -141,17 +142,42 @@ class WearDataLayerSyncManager(
         }
     }
 
-    override suspend fun onNoteAcknowledged(noteId: Uuid) {
+    /**
+     * Clears a note the phone confirmed. It runs under the same lock as uploads, so a confirmation can
+     * neither land in the middle of an upload's own bookkeeping nor clear a version newer than the one
+     * the phone stored. A queued removal is never cleared by the confirmation of a create, and a
+     * confirmation without a version, from an older phone, clears the note as before.
+     */
+    override suspend fun onNoteAcknowledged(
+        noteId: Uuid,
+        ack: NoteAckPayload?,
+    ) = syncLock.withLock {
         val pending = queuedNote(noteId)
         if (pending == null) {
             Napier.d("Note $noteId was confirmed but is no longer queued")
-            return
+            return@withLock
+        }
+        if (pending.operation == PendingOperation.DELETE) {
+            Napier.i("Note $noteId was confirmed, but its removal has not reached the phone yet; the removal stays queued")
+            return@withLock
+        }
+        if (ack != null && isNewerThan(noteId, ack)) {
+            Napier.i("Note $noteId changed after the version the phone confirmed; it stays queued")
+            return@withLock
         }
         settle(EntityType.NOTE, pending, version = 1)
     }
 
     private suspend fun queuedNote(noteId: Uuid): PendingUpload? =
         syncMetadataService.getPendingUploads(EntityType.NOTE).firstOrNull { it.entityId == noteId.toString() }
+
+    private suspend fun isNewerThan(
+        noteId: Uuid,
+        ack: NoteAckPayload,
+    ): Boolean {
+        val local = notesRepository.getNoteById(noteId) ?: return false
+        return local.lastUpdated.toEpochMilliseconds() > ack.lastUpdated
+    }
 
     override suspend fun downloadRemoteChanges(): SyncResult {
         // Downloads are handled reactively by WearDataLayerListenerService.

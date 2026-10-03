@@ -61,8 +61,9 @@ class WearDataLayerListenerService : WearableListenerService() {
     private var cachedLocalNodeId: String? = null
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
+        val data = messageEvent.data ?: ByteArray(0)
         serviceScope.launch {
-            withContext(NonCancellable) { resolvePhoneMessageHandler()?.onMessage(messageEvent.path) }
+            withContext(NonCancellable) { resolvePhoneMessageHandler()?.onMessage(messageEvent.path, data) }
         }
     }
 
