@@ -1,6 +1,8 @@
 package app.logdate.feature.core.di
 
 import app.logdate.feature.core.settings.ui.labs.LabsSettingsViewModel
+import app.logdate.feature.core.settings.ui.labs.labsFlags
+import app.logdate.ui.platform.currentPlatform
 import org.koin.core.module.Module
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -10,5 +12,5 @@ import org.koin.dsl.module
  */
 val labsSettingsModule: Module =
     module {
-        viewModel { LabsSettingsViewModel(get()) }
+        viewModel { LabsSettingsViewModel(get(), labsFlags(currentPlatform)) }
     }

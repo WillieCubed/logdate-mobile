@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.ui.platform.PlatformKind
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -36,11 +37,11 @@ sealed interface LabsUiState {
  * Release builds have no other switch for an unfinished feature, so this is how a tester tries one
  * before it ships.
  *
- * @param flags the flags to offer; [labsFlags] everywhere except tests
+ * @param flags the flags to offer, from [labsFlags] for the platform the app runs on
  */
 class LabsSettingsViewModel(
     private val featureFlagStore: FeatureFlagStore,
-    flags: List<FeatureFlag> = labsFlags(),
+    flags: List<FeatureFlag>,
 ) : ViewModel() {
     val uiState: StateFlow<LabsUiState> =
         observe(flags).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LabsUiState.Loading)
@@ -61,11 +62,23 @@ class LabsSettingsViewModel(
 }
 
 /**
- * The flags Labs offers: off by default, allowed to turn on, and given wording in [labsCopy].
+ * The flags Labs offers on [platform]: off by default, allowed to turn on, given wording in
+ * [labsCopy], and with a feature that exists there.
  *
  * A flag deferred from launch is left out: the store reports it off whatever is saved, so its
  * switch would do nothing. A flag without Labs wording is left out too, so a feature that is still
- * being built behind its own flag does not appear here until someone decides to offer it.
+ * being built behind its own flag does not appear here until someone decides to offer it. The
+ * redesigned watch app is offered on Android only, because a Wear OS watch does not pair with an
+ * iPhone and a desktop has none, so a switch for it elsewhere would do nothing either.
  */
-fun labsFlags(entries: List<FeatureFlag> = FeatureFlag.entries): List<FeatureFlag> =
-    entries.filter { it.availableForLaunch && !it.defaultEnabled && it.labsCopy() != null }
+fun labsFlags(
+    platform: PlatformKind,
+    entries: List<FeatureFlag> = FeatureFlag.entries,
+): List<FeatureFlag> =
+    entries.filter { flag -> flag.availableForLaunch && !flag.defaultEnabled && flag.labsCopy() != null && flag.existsOn(platform) }
+
+private fun FeatureFlag.existsOn(platform: PlatformKind): Boolean =
+    when (this) {
+        FeatureFlag.WATCH_EXPERIENCE_V2 -> platform == PlatformKind.Android
+        else -> true
+    }

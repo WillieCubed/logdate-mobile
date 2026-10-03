@@ -1,13 +1,9 @@
 package app.logdate.feature.core.settings.ui.labs
 
 import app.logdate.client.datastore.featureflags.FeatureFlag
-import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.ui.platform.PlatformKind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -36,8 +32,8 @@ class LabsSettingsViewModelTest {
     }
 
     @Test
-    fun `Labs offers flags that are off by default and allowed to turn on`() {
-        val offered = labsFlags()
+    fun `Android offers flags that are off by default and allowed to turn on`() {
+        val offered = labsFlags(PlatformKind.Android)
 
         assertTrue(FeatureFlag.WATCH_EXPERIENCE_V2 in offered)
         assertFalse(FeatureFlag.LIBRARY in offered, "a launched feature is not offered")
@@ -45,13 +41,43 @@ class LabsSettingsViewModelTest {
     }
 
     @Test
+    fun `the filter drops flags that are on by default or deferred from launch`() {
+        val candidates =
+            listOf(
+                FeatureFlag.LIBRARY,
+                FeatureFlag.EVENTS,
+                FeatureFlag.CAMPFIRE_STREAKS,
+                FeatureFlag.WATCH_EXPERIENCE_V2,
+            )
+
+        assertEquals(listOf(FeatureFlag.WATCH_EXPERIENCE_V2), labsFlags(PlatformKind.Android, candidates))
+    }
+
+    @Test
+    fun `iOS and desktop have no watch to pair so they do not offer the watch switch`() {
+        val platformsWithoutWatch =
+            listOf(
+                PlatformKind.Ios,
+                PlatformKind.IpadOs,
+                PlatformKind.MacCatalyst,
+                PlatformKind.Desktop,
+            )
+
+        platformsWithoutWatch.forEach { platform ->
+            assertFalse(FeatureFlag.WATCH_EXPERIENCE_V2 in labsFlags(platform), "$platform offers the watch switch")
+        }
+    }
+
+    @Test
     fun `every flag Labs offers has a title and description`() {
-        assertTrue(labsFlags().all { flag -> flag.labsCopy() != null })
+        val offeredAnywhere = PlatformKind.entries.flatMap { platform -> labsFlags(platform) }.distinct()
+
+        assertTrue(offeredAnywhere.all { flag -> flag.labsCopy() != null })
     }
 
     @Test
     fun `a flag without Labs wording is not offered even when it is off by default`() {
-        val offered = labsFlags()
+        val offered = labsFlags(PlatformKind.Android)
         val withoutWording = FeatureFlag.entries.filter { it.labsCopy() == null }
 
         assertTrue(withoutWording.isNotEmpty(), "the repo has flags that Labs does not describe")
@@ -118,19 +144,4 @@ class LabsSettingsViewModelTest {
 
             assertEquals(LabsUiState.Ready(emptyList()), viewModel.uiState.value)
         }
-}
-
-private class FakeFeatureFlagStore : FeatureFlagStore {
-    private val values = MutableStateFlow<Map<FeatureFlag, Boolean>>(emptyMap())
-    val writes = mutableListOf<Pair<FeatureFlag, Boolean>>()
-
-    override fun observe(flag: FeatureFlag): Flow<Boolean> = values.map { stored -> stored[flag] ?: flag.defaultEnabled }
-
-    override suspend fun setEnabled(
-        flag: FeatureFlag,
-        enabled: Boolean,
-    ) {
-        writes += flag to enabled
-        values.update { stored -> stored + (flag to enabled) }
-    }
 }
