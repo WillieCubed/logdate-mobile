@@ -267,6 +267,7 @@ actual val appModule: Module =
             AndroidWatchConnectionManager(
                 context = androidContext(),
                 associationManager = get(),
+                messageSender = get(),
                 ioDispatcher = get(qualifier = watchConnectionIoDispatcherQualifier),
             )
         }

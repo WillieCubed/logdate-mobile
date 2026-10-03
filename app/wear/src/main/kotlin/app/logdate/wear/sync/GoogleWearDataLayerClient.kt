@@ -63,6 +63,8 @@ class GoogleWearDataLayerClient(
         audioTransferTimeoutMs = audioTransferTimeoutMs,
     )
 
+    private val phoneNodeSelector = PhoneNodeSelector(capabilityClient, nodeClient)
+
     override suspend fun putDataItem(
         path: String,
         data: Map<String, String>,
@@ -141,10 +143,9 @@ class GoogleWearDataLayerClient(
         data: ByteArray,
     ): Boolean {
         return try {
-            val nodes = nodeClient.connectedNodes.await()
             val phoneNode =
-                nodes.firstOrNull() ?: run {
-                    Napier.w("No connected nodes for message")
+                phoneNodeSelector.select() ?: run {
+                    Napier.w("No reachable phone for message $path")
                     return false
                 }
             messageClient
@@ -247,10 +248,9 @@ class GoogleWearDataLayerClient(
         localFilePath: String,
     ): Boolean {
         return try {
-            val nodes = nodeClient.connectedNodes.await()
             val phoneNode =
-                nodes.firstOrNull() ?: run {
-                    Napier.w("No connected nodes for file transfer")
+                phoneNodeSelector.select() ?: run {
+                    Napier.w("No reachable phone for file transfer $channelPath")
                     return false
                 }
 

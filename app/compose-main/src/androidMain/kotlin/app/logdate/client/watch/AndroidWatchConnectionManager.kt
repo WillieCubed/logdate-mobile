@@ -4,12 +4,13 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.wear.remote.interactions.RemoteActivityHelper
+import app.logdate.client.sync.WatchMessageSender
+import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionState
 import app.logdate.feature.core.settings.ui.watch.WatchRequestFailure
 import app.logdate.feature.core.settings.ui.watch.WatchRequestResult
 import com.google.android.gms.wearable.CapabilityClient
-import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.NodeClient
 import com.google.android.gms.wearable.Wearable
@@ -25,8 +26,6 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
-private const val WATCH_CAPABILITY = "logdate_watch_app"
-private const val SYNC_REQUEST_PATH = "/logdate/sync/request"
 private const val REMOTE_START_TIMEOUT_SECONDS = 15L
 
 /** Opens LogDate on the watch at Today. The watch's MainActivity declares a matching VIEW filter. */
@@ -51,10 +50,10 @@ fun watchLinkIntent(link: String): Intent =
 class AndroidWatchConnectionManager(
     private val context: Context,
     private val associationManager: WatchCompanionAssociationManager,
+    private val messageSender: WatchMessageSender,
     private val ioDispatcher: CoroutineDispatcher,
     private val nodeClient: NodeClient = Wearable.getNodeClient(context),
     private val capabilityClient: CapabilityClient = Wearable.getCapabilityClient(context),
-    private val messageClient: MessageClient = Wearable.getMessageClient(context),
     private val remoteActivityHelper: RemoteActivityHelper = RemoteActivityHelper(context),
     private val linkIntent: (String) -> Intent = ::watchLinkIntent,
 ) : WatchConnectionManager {
@@ -70,11 +69,10 @@ class AndroidWatchConnectionManager(
         associationManager.beginAssociation()
     }
 
+    /** Asks every reachable watch running LogDate to send what it has waiting. */
     override suspend fun requestSync() {
-        val nodes = nodeClient.connectedNodes.await()
-        for (node in nodes) {
-            messageClient.sendMessage(node.id, SYNC_REQUEST_PATH, byteArrayOf()).await()
-            Napier.d { "Sent sync request to ${node.displayName}" }
+        check(messageSender.send(WearAudioRequestPaths.SYNC_REQUEST_PATH)) {
+            "No watch running LogDate received the sync request"
         }
     }
 
@@ -118,7 +116,7 @@ class AndroidWatchConnectionManager(
             val connected = nodeClient.connectedNodes.await()
             val withAppIds =
                 capabilityClient
-                    .getCapability(WATCH_CAPABILITY, CapabilityClient.FILTER_ALL)
+                    .getCapability(WatchNodeSelector.WATCH_CAPABILITY, CapabilityClient.FILTER_ALL)
                     .await()
                     .nodes
                     .map { it.id }
@@ -156,7 +154,7 @@ class AndroidWatchConnectionManager(
                 }
             capabilityClient.addListener(
                 capabilityListener,
-                Uri.parse("wear://*/$WATCH_CAPABILITY"),
+                Uri.parse("wear://*/${WatchNodeSelector.WATCH_CAPABILITY}"),
                 CapabilityClient.FILTER_ALL,
             )
 
@@ -178,7 +176,7 @@ class AndroidWatchConnectionManager(
                 }
             val appNodes =
                 capabilityClient
-                    .getCapability(WATCH_CAPABILITY, CapabilityClient.FILTER_ALL)
+                    .getCapability(WatchNodeSelector.WATCH_CAPABILITY, CapabilityClient.FILTER_ALL)
                     .await()
                     .nodes
                     .map { node ->

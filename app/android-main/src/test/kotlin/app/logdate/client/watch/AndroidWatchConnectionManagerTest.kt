@@ -3,12 +3,13 @@ package app.logdate.client.watch
 import android.content.Context
 import android.content.Intent
 import androidx.wear.remote.interactions.RemoteActivityHelper
+import app.logdate.client.sync.WatchMessageSender
+import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import app.logdate.feature.core.settings.ui.watch.WatchRequestFailure
 import app.logdate.feature.core.settings.ui.watch.WatchRequestResult
 import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.CapabilityInfo
-import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.NodeClient
 import com.google.common.util.concurrent.ListenableFuture
@@ -20,6 +21,7 @@ import kotlinx.coroutines.test.runTest
 import java.util.concurrent.ExecutionException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 /**
  * "Open LogDate on watch" sent an ACTION_MAIN intent, which RemoteActivityHelper refuses before
@@ -35,6 +37,8 @@ class AndroidWatchConnectionManagerTest {
     private val linkIntent = mockk<Intent>()
     private val sentLinks = mutableListOf<String>()
     private val accepted = mockk<ListenableFuture<Void>> { every { get(any(), any()) } returns null }
+    private val sentMessages = mutableListOf<String>()
+    private var messageDelivered = true
 
     @Test
     fun `open sends the Today link to the watch that has LogDate`() =
@@ -116,6 +120,24 @@ class AndroidWatchConnectionManagerTest {
             assertEquals(WatchRequestResult.Failed(WatchRequestFailure.NO_WATCH_CONNECTED), manager().openAppOnWatch())
         }
 
+    @Test
+    fun `a sync request goes to the watches running LogDate`() =
+        runTest {
+            manager().requestSync()
+
+            assertEquals(listOf(WearAudioRequestPaths.SYNC_REQUEST_PATH), sentMessages)
+        }
+
+    @Test
+    fun `a sync request no watch received fails with the reason`() =
+        runTest {
+            messageDelivered = false
+
+            val error = assertFailsWith<IllegalStateException> { manager().requestSync() }
+
+            assertEquals("No watch running LogDate received the sync request", error.message)
+        }
+
     private fun connected(vararg watches: Node) {
         every { nodeClient.connectedNodes } returns Tasks.forResult(watches.toList())
         val withApp = mockk<CapabilityInfo> { every { nodes } returns watches.filter { it === withLogDate }.toSet() }
@@ -129,7 +151,11 @@ class AndroidWatchConnectionManagerTest {
             ioDispatcher = Dispatchers.Unconfined,
             nodeClient = nodeClient,
             capabilityClient = capabilityClient,
-            messageClient = mockk<MessageClient>(),
+            messageSender =
+                WatchMessageSender { path ->
+                    sentMessages += path
+                    messageDelivered
+                },
             remoteActivityHelper = remoteActivityHelper,
             linkIntent = { link ->
                 sentLinks += link

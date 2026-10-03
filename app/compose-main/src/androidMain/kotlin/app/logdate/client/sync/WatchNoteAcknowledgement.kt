@@ -2,11 +2,12 @@ package app.logdate.client.sync
 
 import android.content.Context
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
-import com.google.android.gms.wearable.CapabilityClient
+import app.logdate.client.watch.WatchNodeSelector
 import com.google.android.gms.wearable.MessageClient
-import com.google.android.gms.wearable.NodeClient
+import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
 import kotlin.uuid.Uuid
 
@@ -26,41 +27,46 @@ class MessageWatchNoteAcknowledger(
 }
 
 /**
- * Messages every reachable node that has the LogDate watch app, or every connected node when the
- * capability lookup finds none.
+ * Messages every reachable watch running LogDate, each on its own, so a watch that cannot be reached
+ * does not stop the message reaching another.
  */
 class GoogleWatchMessageSender(
-    private val capabilityClient: CapabilityClient,
-    private val nodeClient: NodeClient,
+    private val watchNodeSelector: WatchNodeSelector,
     private val messageClient: MessageClient,
 ) : WatchMessageSender {
     constructor(context: Context) : this(
-        capabilityClient = Wearable.getCapabilityClient(context),
-        nodeClient = Wearable.getNodeClient(context),
+        watchNodeSelector = WatchNodeSelector(Wearable.getCapabilityClient(context)),
         messageClient = Wearable.getMessageClient(context),
     )
 
-    override suspend fun send(path: String): Boolean =
-        runCatching {
-            val nodeIds = watchNodeIds()
-            nodeIds.forEach { nodeId -> messageClient.sendMessage(nodeId, path, byteArrayOf()).await() }
-            nodeIds.isNotEmpty()
-        }.getOrElse { error ->
-            Napier.w("Failed to message watch at path: $path", error)
+    override suspend fun send(path: String): Boolean {
+        val watches =
+            try {
+                watchNodeSelector.reachableWatches()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Napier.w("Could not look up reachable watches for $path", e)
+                return false
+            }
+        if (watches.isEmpty()) {
+            Napier.w("No reachable watch runs LogDate; $path was not sent")
+            return false
+        }
+        return watches.count { watch -> deliver(watch, path) } > 0
+    }
+
+    private suspend fun deliver(
+        watch: Node,
+        path: String,
+    ): Boolean =
+        try {
+            messageClient.sendMessage(watch.id, path, ByteArray(0)).await()
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.w("Could not message watch ${watch.displayName} at $path", e)
             false
         }
-
-    private suspend fun watchNodeIds(): List<String> {
-        val capabilityNodes =
-            capabilityClient
-                .getCapability(WATCH_CAPABILITY, CapabilityClient.FILTER_REACHABLE)
-                .await()
-                .nodes
-        if (capabilityNodes.isNotEmpty()) return capabilityNodes.map { it.id }
-        return nodeClient.connectedNodes.await().map { it.id }
-    }
-
-    private companion object {
-        const val WATCH_CAPABILITY = "logdate_watch_app"
-    }
 }

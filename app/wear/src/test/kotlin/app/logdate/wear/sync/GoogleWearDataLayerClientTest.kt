@@ -24,6 +24,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import kotlin.io.path.createTempDirectory
 import kotlin.io.path.writeBytes
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -47,6 +48,13 @@ class GoogleWearDataLayerClientTest {
     private val capabilityClient = mockk<CapabilityClient>()
     private val nodeClient = mockk<NodeClient>()
     private val messageClient = mockk<MessageClient>()
+
+    @BeforeTest
+    fun noNodeAdvertisesThePhoneAppByDefault() {
+        every {
+            capabilityClient.getCapability(WearDataLayerClient.PHONE_CAPABILITY, CapabilityClient.FILTER_REACHABLE)
+        } returns Tasks.forResult(mockk<CapabilityInfo> { every { nodes } returns emptySet() })
+    }
 
     @Test
     fun `putDataItem returns true when wearable data client succeeds`() =
@@ -132,7 +140,7 @@ class GoogleWearDataLayerClientTest {
     fun `getConnectedPhoneName returns capability node name when available`() =
         runTest {
             val node =
-                mockk<Node> {
+                mockk<Node>(relaxed = true) {
                     every { displayName } returns "Pixel Watch Phone"
                 }
             val capabilityInfo =
@@ -164,7 +172,7 @@ class GoogleWearDataLayerClientTest {
     fun `getConnectedPhoneName falls back to connected node when capability lookup fails`() =
         runTest {
             val node =
-                mockk<Node> {
+                mockk<Node>(relaxed = true) {
                     every { displayName } returns "Pixel"
                 }
             every { capabilityClient.getCapability(any(), any()) } returns Tasks.forException(IllegalStateException("boom"))
@@ -190,7 +198,7 @@ class GoogleWearDataLayerClientTest {
     fun `sendMessage returns true when a connected phone node accepts the message`() =
         runTest {
             val phoneNode =
-                mockk<Node> {
+                mockk<Node>(relaxed = true) {
                     every { id } returns "phone-node"
                 }
             every { nodeClient.connectedNodes } returns Tasks.forResult(listOf(phoneNode))
@@ -218,7 +226,7 @@ class GoogleWearDataLayerClientTest {
     fun `sendMessage returns false when wearable message client throws`() =
         runTest {
             val phoneNode =
-                mockk<Node> {
+                mockk<Node>(relaxed = true) {
                     every { id } returns "phone-node"
                 }
             every { nodeClient.connectedNodes } returns Tasks.forResult(listOf(phoneNode))
@@ -262,7 +270,7 @@ class GoogleWearDataLayerClientTest {
         runTest {
             val noteId = Uuid.random()
             val phoneNode =
-                mockk<Node> {
+                mockk<Node>(relaxed = true) {
                     every { id } returns "phone-node"
                 }
             every { nodeClient.connectedNodes } returns Tasks.forResult(listOf(phoneNode))
@@ -291,7 +299,7 @@ class GoogleWearDataLayerClientTest {
             val payload = "phone-synced-audio".encodeToByteArray()
             val callback = slot<ChannelClient.ChannelCallback>()
             val phoneNode =
-                mockk<Node> {
+                mockk<Node>(relaxed = true) {
                     every { id } returns "phone-node"
                 }
             val channel =
@@ -328,7 +336,7 @@ class GoogleWearDataLayerClientTest {
             val payload = "phone-synced-audio".encodeToByteArray()
             val callback = slot<ChannelClient.ChannelCallback>()
             val phoneNode =
-                mockk<Node> {
+                mockk<Node>(relaxed = true) {
                     every { id } returns "phone-node"
                 }
             val unrelatedChannel =
@@ -369,7 +377,7 @@ class GoogleWearDataLayerClientTest {
             val requestPath = WearAudioRequestPaths.audioRequestPath(noteId)
             val callback = slot<ChannelClient.ChannelCallback>()
             val phoneNode =
-                mockk<Node> {
+                mockk<Node>(relaxed = true) {
                     every { id } returns "phone-node"
                 }
             val channel =
@@ -406,7 +414,7 @@ class GoogleWearDataLayerClientTest {
             source.writeBytes(payload)
 
             val phoneNode =
-                mockk<Node> {
+                mockk<Node>(relaxed = true) {
                     every { id } returns "phone-node"
                 }
             val channel = mockk<ChannelClient.Channel>()
@@ -443,7 +451,7 @@ class GoogleWearDataLayerClientTest {
             source.writeBytes(payload)
 
             val phoneNode =
-                mockk<Node> {
+                mockk<Node>(relaxed = true) {
                     every { id } returns "phone-node"
                 }
             val channel = mockk<ChannelClient.Channel>()
@@ -481,6 +489,40 @@ class GoogleWearDataLayerClientTest {
             assertTrue(client.putDataItem(path = "/logdate/journals/1", data = mapOf("id" to "1"), urgent = false))
 
             verify(exactly = 0) { request.setUrgent() }
+        }
+
+    @Test
+    fun `sendMessage goes to the phone advertising LogDate rather than the first connected node`() =
+        runTest {
+            val other = mockk<Node>(relaxed = true) { every { id } returns "other-node" }
+            val phone = mockk<Node>(relaxed = true) { every { id } returns "phone-node" }
+            every {
+                capabilityClient.getCapability(WearDataLayerClient.PHONE_CAPABILITY, CapabilityClient.FILTER_REACHABLE)
+            } returns Tasks.forResult(mockk<CapabilityInfo> { every { nodes } returns setOf(phone) })
+            every { nodeClient.connectedNodes } returns Tasks.forResult(listOf(other, phone))
+            every { messageClient.sendMessage("phone-node", "/logdate/test", any()) } returns Tasks.forResult(1)
+
+            assertTrue(createClient(this).sendMessage(path = "/logdate/test"))
+            verify(exactly = 0) { messageClient.sendMessage("other-node", any(), any()) }
+        }
+
+    @Test
+    fun `sendFile goes to the phone advertising LogDate rather than the first connected node`() =
+        runTest {
+            val source = createTempDirectory().resolve("note.m4a").apply { writeBytes("audio".encodeToByteArray()) }
+            val other = mockk<Node>(relaxed = true) { every { id } returns "other-node" }
+            val phone = mockk<Node>(relaxed = true) { every { id } returns "phone-node" }
+            val channel = mockk<ChannelClient.Channel>()
+            every {
+                capabilityClient.getCapability(WearDataLayerClient.PHONE_CAPABILITY, CapabilityClient.FILTER_REACHABLE)
+            } returns Tasks.forResult(mockk<CapabilityInfo> { every { nodes } returns setOf(phone) })
+            every { nodeClient.connectedNodes } returns Tasks.forResult(listOf(other, phone))
+            every { channelClient.openChannel("phone-node", "/logdate/notes/1/audio") } returns Tasks.forResult(channel)
+            every { channelClient.getOutputStream(channel) } returns Tasks.forResult(ByteArrayOutputStream())
+            every { channelClient.close(channel) } returns Tasks.forResult<Void>(null)
+
+            assertTrue(createClient(this).sendFile(channelPath = "/logdate/notes/1/audio", localFilePath = source.toString()))
+            verify(exactly = 0) { channelClient.openChannel("other-node", any()) }
         }
 
     private fun createClient(
