@@ -147,6 +147,7 @@ private fun PlayButton(
         }
     IconButton(
         onClick = if (blocked) onOpenBluetoothSettings else onPlayPause,
+        enabled = blocked || playback !is WearPlaybackUiState.Preparing,
         modifier = Modifier.size(PLAY_BUTTON_SIZE),
         colors =
             IconButtonDefaults.iconButtonColors(
