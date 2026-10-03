@@ -3,8 +3,10 @@
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -132,7 +134,7 @@ fun SettingsOverviewContent(
         modifier = modifier,
         minPaneWidth = 320.dp,
         startPane = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                 SettingsIdentityCard(
                     userProfile = userProfile,
                     onboardedDate = onboardedDate,
@@ -156,7 +158,7 @@ fun SettingsOverviewContent(
             }
         },
         endPane = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                 SettingsPrivacySection(
                     userProfile = userProfile,
                     onNavigateToPrivacy = onNavigateToPrivacy,
