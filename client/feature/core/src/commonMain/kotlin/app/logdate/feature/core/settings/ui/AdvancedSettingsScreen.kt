@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -43,14 +44,17 @@ import logdate.client.feature.core.generated.resources.app_version_label
 import logdate.client.feature.core.generated.resources.check_for_updates
 import logdate.client.feature.core.generated.resources.developer_tools
 import logdate.client.feature.core.generated.resources.developer_tools_description
+import logdate.client.feature.core.generated.resources.labs_settings_description
+import logdate.client.feature.core.generated.resources.labs_settings_title
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
-/** App information and updates, with deliberate access to developer tools. */
+/** App information and updates, with deliberate access to developer tools and Labs. */
 @Composable
 fun AdvancedSettingsScreen(
     onBack: () -> Unit,
     onNavigateToDeveloperTools: () -> Unit = {},
+    onNavigateToLabs: () -> Unit = {},
     viewModel: AdvancedSettingsViewModel = koinViewModel(),
 ) {
     val appUpdateUiState by viewModel.appUpdateUiState.collectAsState()
@@ -58,6 +62,7 @@ fun AdvancedSettingsScreen(
     AdvancedSettingsContent(
         onBack = onBack,
         onNavigateToDeveloperTools = onNavigateToDeveloperTools,
+        onNavigateToLabs = onNavigateToLabs,
         appUpdateUiState = appUpdateUiState,
         onCheckForAppUpdates = viewModel::checkForAppUpdates,
         onCompleteAppUpdate = viewModel::completeAppUpdate,
@@ -71,6 +76,7 @@ fun AdvancedSettingsContent(
     onCheckForAppUpdates: () -> Unit,
     onCompleteAppUpdate: () -> Unit,
     onNavigateToDeveloperTools: () -> Unit = {},
+    onNavigateToLabs: () -> Unit = {},
 ) {
     var versionTaps by rememberSaveable { mutableIntStateOf(0) }
     SettingsScaffold(title = stringResource(Res.string.about_logdate), onBack = onBack) {
@@ -86,6 +92,12 @@ fun AdvancedSettingsContent(
                         description = stringResource(Res.string.developer_tools_description),
                         icon = { Icon(Icons.Outlined.Code, contentDescription = null) },
                         onClick = onNavigateToDeveloperTools,
+                    )
+                    SettingsNavigationItem(
+                        title = stringResource(Res.string.labs_settings_title),
+                        description = stringResource(Res.string.labs_settings_description),
+                        icon = { Icon(Icons.Outlined.Science, contentDescription = null) },
+                        onClick = onNavigateToLabs,
                     )
                 }
             }

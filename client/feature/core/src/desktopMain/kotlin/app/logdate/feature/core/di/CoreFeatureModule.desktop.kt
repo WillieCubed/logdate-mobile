@@ -78,6 +78,7 @@ actual val coreFeatureModule: Module =
         includes(domainModule)
         includes(accountModule)
         includes(devicesModule)
+        includes(labsSettingsModule)
         includes(locationSettingsModule)
 
         // TODO: Refactor to separate auth module

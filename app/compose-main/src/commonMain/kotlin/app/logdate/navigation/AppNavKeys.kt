@@ -24,6 +24,7 @@ import app.logdate.feature.core.settings.navigation.EventsCalendarRoute
 import app.logdate.feature.core.settings.navigation.EventsSettingsRoute
 import app.logdate.feature.core.settings.navigation.ExportSettingsRoute
 import app.logdate.feature.core.settings.navigation.HostingRoute
+import app.logdate.feature.core.settings.navigation.LabsSettingsRoute
 import app.logdate.feature.core.settings.navigation.LibrarySettingsRoute
 import app.logdate.feature.core.settings.navigation.LocationAdvancedRoute
 import app.logdate.feature.core.settings.navigation.LocationIntervalRoute
@@ -149,6 +150,7 @@ val appNavSavedStateConfiguration: SavedStateConfiguration =
                     subclass(LocationAdvancedRoute::class, LocationAdvancedRoute.serializer())
                     subclass(AdvancedSettingsRoute::class, AdvancedSettingsRoute.serializer())
                     subclass(DeveloperToolsRoute::class, DeveloperToolsRoute.serializer())
+                    subclass(LabsSettingsRoute::class, LabsSettingsRoute.serializer())
                     subclass(MemoriesSettingsRoute::class, MemoriesSettingsRoute.serializer())
                     subclass(VoiceNotesSettingsRoute::class, VoiceNotesSettingsRoute.serializer())
                     subclass(StreakSettingsRoute::class, StreakSettingsRoute.serializer())

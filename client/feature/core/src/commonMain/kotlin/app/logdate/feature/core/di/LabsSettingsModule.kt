@@ -1,0 +1,14 @@
+package app.logdate.feature.core.di
+
+import app.logdate.feature.core.settings.ui.labs.LabsSettingsViewModel
+import org.koin.core.module.Module
+import org.koin.core.module.dsl.viewModel
+import org.koin.dsl.module
+
+/**
+ * Dependency injection for the Labs page that About LogDate opens.
+ */
+val labsSettingsModule: Module =
+    module {
+        viewModel { LabsSettingsViewModel(get()) }
+    }

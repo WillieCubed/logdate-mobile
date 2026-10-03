@@ -43,6 +43,7 @@ Core Feature Module
 - `PrivacySettingsScreen.kt` - Privacy controls
 - `DataSettingsScreen.kt` - Data management
 - `DevicesScreen.kt` - Connected device management
+- `settings/ui/labs/` - Labs page: switches for unreleased feature flags, shown in About LogDate after tapping the version seven times
 
 ### Platform Integration
 

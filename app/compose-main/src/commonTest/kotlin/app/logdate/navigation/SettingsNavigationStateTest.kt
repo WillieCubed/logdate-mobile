@@ -9,6 +9,7 @@ import app.logdate.feature.core.settings.navigation.AdvancedSettingsRoute
 import app.logdate.feature.core.settings.navigation.DeleteAccountRoute
 import app.logdate.feature.core.settings.navigation.DeveloperToolsRoute
 import app.logdate.feature.core.settings.navigation.HostingRoute
+import app.logdate.feature.core.settings.navigation.LabsSettingsRoute
 import app.logdate.feature.core.settings.navigation.MoveServerRoute
 import app.logdate.feature.core.settings.navigation.RecoveryPhraseEntrySettingsRoute
 import app.logdate.feature.core.settings.navigation.RecoveryPhraseRoute
@@ -45,6 +46,17 @@ abstract class SettingsNavigationStateTest {
     @Test
     fun `developer tools back stack survives saved state restoration`() {
         val stack: List<NavKey> = listOf(HomeRoute, SettingsRoute(), AdvancedSettingsRoute, DeveloperToolsRoute)
+        val serializer = ListSerializer(PolymorphicSerializer(NavKey::class))
+
+        val saved = encodeToSavedState(serializer, stack, appNavSavedStateConfiguration)
+        val restored = decodeFromSavedState(serializer, saved, appNavSavedStateConfiguration)
+
+        assertEquals(stack, restored)
+    }
+
+    @Test
+    fun `labs back stack survives saved state restoration`() {
+        val stack: List<NavKey> = listOf(HomeRoute, SettingsRoute(), AdvancedSettingsRoute, LabsSettingsRoute)
         val serializer = ListSerializer(PolymorphicSerializer(NavKey::class))
 
         val saved = encodeToSavedState(serializer, stack, appNavSavedStateConfiguration)

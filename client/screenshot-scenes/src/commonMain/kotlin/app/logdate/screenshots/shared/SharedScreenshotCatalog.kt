@@ -87,6 +87,9 @@ import app.logdate.feature.core.settings.ui.devices.DeviceInfoUiState
 import app.logdate.feature.core.settings.ui.devices.DevicesScreenContent
 import app.logdate.feature.core.settings.ui.devices.DevicesUiState
 import app.logdate.feature.core.settings.ui.osIntegrationPreviewFlags
+import app.logdate.feature.core.settings.ui.labs.LabsFlag
+import app.logdate.feature.core.settings.ui.labs.LabsSettingsContent
+import app.logdate.feature.core.settings.ui.labs.LabsUiState
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionState
 import app.logdate.feature.core.settings.ui.watch.WatchNotificationSettingsContent
 import app.logdate.feature.core.settings.ui.watch.WatchSettingsContent
@@ -213,6 +216,7 @@ enum class SharedScreenshotSceneId(
     RecommendationSettings("recommendation-settings"),
     BirthdaySettings("birthday-settings"),
     AdvancedSettings("advanced-settings"),
+    LabsSettings("labs-settings"),
     WatchSettings("watch-settings"),
     WatchSyncSettings("watch-sync-settings"),
     WatchNotificationSettings("watch-notification-settings"),
@@ -1166,6 +1170,13 @@ object SharedScreenshotCatalog {
                         ),
                     onCheckForAppUpdates = {},
                     onCompleteAppUpdate = {},
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.LabsSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                LabsSettingsContent(
+                    uiState = LabsUiState.Ready(listOf(LabsFlag(FeatureFlag.WATCH_EXPERIENCE_V2, enabled = true))),
+                    onBack = {},
+                    onSetEnabled = { _, _ -> },
                 )
             },
             sharedScene(SharedScreenshotSceneId.WatchSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {

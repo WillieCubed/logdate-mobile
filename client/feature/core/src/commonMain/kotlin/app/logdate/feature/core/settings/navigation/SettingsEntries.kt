@@ -41,6 +41,7 @@ import app.logdate.feature.core.settings.ui.SyncSettingsScreen
 import app.logdate.feature.core.settings.ui.TimelineSettingsScreen
 import app.logdate.feature.core.settings.ui.VoiceNotesSettingsScreen
 import app.logdate.feature.core.settings.ui.devices.DevicesScreen
+import app.logdate.feature.core.settings.ui.labs.LabsSettingsScreen
 import app.logdate.feature.events.ui.calendar.EventsCalendarScreen
 import app.logdate.feature.events.ui.calendarsync.CalendarSyncActivityScreen
 import app.logdate.feature.events.ui.calendarsync.CalendarSyncCalendarsScreen
@@ -158,10 +159,17 @@ fun EntryProviderScope<NavKey>.settingsEntries(
         )
     }
     taggedEntry<AdvancedSettingsRoute> {
-        AdvancedSettingsScreen(onBack = onBack, onNavigateToDeveloperTools = { onNavigateTo(DeveloperToolsRoute) })
+        AdvancedSettingsScreen(
+            onBack = onBack,
+            onNavigateToDeveloperTools = { onNavigateTo(DeveloperToolsRoute) },
+            onNavigateToLabs = { onNavigateTo(LabsSettingsRoute) },
+        )
     }
     taggedEntry<DeveloperToolsRoute> {
         DeveloperToolsScreen(onBack = onBack)
+    }
+    taggedEntry<LabsSettingsRoute> {
+        LabsSettingsScreen(onBack = onBack)
     }
     taggedEntry<LocationSettingsRoute> {
         LocationSettingsScreen(

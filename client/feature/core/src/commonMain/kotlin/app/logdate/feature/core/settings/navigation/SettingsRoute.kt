@@ -48,6 +48,9 @@ data object AdvancedSettingsRoute : NavKey
 data object DeveloperToolsRoute : NavKey
 
 @Serializable
+data object LabsSettingsRoute : NavKey
+
+@Serializable
 data object MemoriesSettingsRoute : NavKey
 
 @Serializable
