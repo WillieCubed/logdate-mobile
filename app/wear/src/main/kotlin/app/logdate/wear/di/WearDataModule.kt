@@ -1,6 +1,7 @@
 package app.logdate.wear.di
 
 import android.content.Context
+import androidx.work.WorkManager
 import app.logdate.client.data.journals.LocalFirstDraftRepository
 import app.logdate.client.data.journals.OfflineFirstJournalRepository
 import app.logdate.client.data.journals.RemoteJournalDataSource
@@ -43,12 +44,15 @@ import app.logdate.wear.sync.CapabilityPhoneReachability
 import app.logdate.wear.sync.GoogleWearDataLayerClient
 import app.logdate.wear.sync.NoteDataMapper
 import app.logdate.wear.sync.PhoneReachability
+import app.logdate.wear.sync.WatchSyncScheduler
+import app.logdate.wear.sync.WatchSyncWork
 import app.logdate.wear.sync.WearDataLayerClient
 import app.logdate.wear.sync.WearDataLayerSyncManager
 import app.logdate.wear.sync.WearDeadLetterMigration
 import app.logdate.wear.sync.WearNoteAckHandler
 import app.logdate.wear.sync.WearNoteRemovalNotifier
 import app.logdate.wear.sync.WearPhoneMessageHandler
+import app.logdate.wear.sync.WorkManagerWatchSyncWork
 import com.google.android.gms.wearable.Wearable
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.json.Json
@@ -111,6 +115,16 @@ val wearDataModule =
         } binds arrayOf(SyncManager::class, WearNoteAckHandler::class, WearNoteRemovalNotifier::class)
         single { WearPhoneMessageHandler(ackHandler = get(), syncManager = get()) }
         single { WearDeadLetterMigration(deadLetterStore = get(), syncMetadataService = get()) }
+        single<WatchSyncWork> { WorkManagerWatchSyncWork(WorkManager.getInstance(get<Context>())) }
+        single {
+            WatchSyncScheduler(
+                work = get(),
+                syncStatus = get<SyncManager>().syncStatusFlow,
+                syncMetadataService = get(),
+                retryScheduleStore = get(),
+                dataLayerClient = get(),
+            )
+        }
 
         // Health sensor manager: use Health Services when available, then degrade gracefully.
         single<WearHealthSensorManager> {

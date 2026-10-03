@@ -10,6 +10,7 @@ import app.logdate.wear.di.wearDataModule
 import app.logdate.wear.di.wearExperienceModule
 import app.logdate.wear.recording.WearRecordingRecovery
 import app.logdate.wear.reminders.LegacyPromptAlarms
+import app.logdate.wear.sync.WatchSyncScheduler
 import app.logdate.wear.sync.WearDeadLetterMigration
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
@@ -88,13 +89,17 @@ class LogDateWearApplication : Application() {
         }
     }
 
-    /** Puts captures an older version dropped after repeated failures back in the outbox. */
+    /**
+     * Puts captures an older version dropped after repeated failures back in the outbox, then wakes
+     * the watch whenever something in it is due.
+     */
     private fun startSync() {
         val koin =
             org.koin.java.KoinJavaComponent
                 .getKoin()
         koin.get<CoroutineScope>().launch {
             requeueSetAsideCaptures(koin.get())
+            koin.get<WatchSyncScheduler>().start(this)
         }
     }
 

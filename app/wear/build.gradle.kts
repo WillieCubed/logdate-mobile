@@ -200,6 +200,9 @@ dependencies {
     implementation(libs.media3.common)
     implementation(libs.media3.session)
 
+    // WorkManager wakes the watch when a sync retry is due
+    implementation(libs.androidx.work.runtime)
+
     // Unit test dependencies
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -216,6 +219,7 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.kotlin.test.junit)
+    androidTestImplementation(libs.androidx.work.testing)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
     debugImplementation(libs.androidx.tiles.tooling)
