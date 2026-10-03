@@ -5,6 +5,7 @@ import com.android.build.api.dsl.ManagedVirtualDevice
 import dev.detekt.gradle.DetektCreateBaselineTask
 import dev.detekt.gradle.extensions.DetektExtension
 import org.jlleitschuh.gradle.ktlint.KtlintExtension
+import org.jlleitschuh.gradle.ktlint.tasks.BaseKtLintCheckTask
 import org.gradle.api.Project
 import org.gradle.api.tasks.testing.Test
 import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
@@ -48,6 +49,31 @@ plugins.withType<WasmYarnPlugin> {
 // build-logic is an included build, so a root `./gradlew test` never reaches its tests. They cover
 // release signing resolution, which decides what the Play publish uploads with, so the root `test`
 // task runs them too.
+tasks.register("verifyKtlintCoversKotlinSources") {
+    group = "verification"
+    description = "Fails if a module has Kotlin sources that none of its ktlint tasks reads."
+    notCompatibleWithConfigurationCache("Inspects the ktlint tasks of every project.")
+    doLast {
+        val uncovered = subprojects.filter { module ->
+            val hasKotlinSources = module.fileTree("src") { include("**/*.kt") }.files.isNotEmpty()
+            if (!hasKotlinSources) return@filter false
+            val ktlintTasks = module.tasks.withType<BaseKtLintCheckTask>()
+            val sourceSetTasks = ktlintTasks.any {
+                it.name.startsWith("runKtlintCheckOver") && !it.name.endsWith("OverKotlinScripts")
+            }
+            val scriptTaskReadsKotlin = ktlintTasks.any { task ->
+                task.name.endsWith("OverKotlinScripts") && task.source.files.any { it.extension == "kt" }
+            }
+            !sourceSetTasks && !scriptTaskReadsKotlin
+        }
+        if (uncovered.isNotEmpty()) {
+            throw GradleException(
+                "ktlintCheck does not lint the Kotlin sources of: " + uncovered.joinToString { it.path },
+            )
+        }
+    }
+}
+
 tasks.register("test") {
     group = "verification"
     description = "Runs the build-logic tests, which the subprojects' test tasks do not reach."
@@ -64,6 +90,21 @@ subprojects {
     configure<KtlintExtension> {
         filter {
             exclude { it.file.path.contains("/build/") }
+        }
+    }
+
+    // Modules on AGP's built-in Kotlin never apply a Kotlin plugin, so the ktlint plugin finds no Kotlin
+    // source sets and registers only the Kotlin-script tasks. Point those tasks at the module's
+    // Kotlin sources too, so `ktlintCheck` and `ktlintFormat` cover them.
+    afterEvaluate {
+        val coversKotlinSources = tasks.names.any {
+            it.startsWith("runKtlintCheckOver") && it != "runKtlintCheckOverKotlinScripts"
+        }
+        if (coversKotlinSources) return@afterEvaluate
+        tasks.withType<BaseKtLintCheckTask>().configureEach {
+            if (name.endsWith("OverKotlinScripts")) {
+                source(fileTree("src") { include("**/*.kt") })
+            }
         }
     }
 

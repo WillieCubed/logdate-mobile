@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# Verifies that every included Gradle module exposes a ktlintCheck task.
+# Verifies that every included Gradle module exposes a ktlintCheck task, and that every module with
+# Kotlin sources has a ktlint task that actually reads them.
 
 set -euo pipefail
 
@@ -39,3 +40,6 @@ if [[ ${#missing[@]} -gt 0 ]]; then
 fi
 
 echo "All included modules expose ktlintCheck."
+
+./gradlew verifyKtlintCoversKotlinSources --quiet
+echo "Every module with Kotlin sources has a ktlint task that reads them."
