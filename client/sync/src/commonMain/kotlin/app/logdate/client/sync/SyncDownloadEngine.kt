@@ -638,6 +638,10 @@ internal class SyncDownloadEngine(
                             source = source,
                         )
                     }
+                    // Only an app update reads a record a newer version wrote. The inbox stores it
+                    // and offers it again, so this sync has nothing left to finish. Without an inbox
+                    // nothing stores it, and the page must stay unfinished.
+                    if (failure.reason == DiagnosticReason.UNSUPPORTED_FORMAT && downloadScope != null) continue
                     errors += SyncError(SyncErrorType.UNKNOWN_ERROR, "Remote record remains queued for recovery")
                 }
                 // Without a durable inbox there is nowhere safe to retain failed records.

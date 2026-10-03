@@ -7,6 +7,7 @@ import app.logdate.client.database.entities.sync.DownloadCheckpointEntity
 import app.logdate.client.database.entities.sync.PendingUploadEntity
 import app.logdate.client.database.getRoomDatabase
 import app.logdate.client.sync.RoomSyncTransactionManager
+import app.logdate.shared.model.diagnostics.DiagnosticReason
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
 import kotlin.test.Test
@@ -91,6 +92,35 @@ class RoomDownloadInboxTest {
                 val restarted = DownloadInbox(database.downloadInboxDao(), RoomSyncTransactionManager(database), scope, { 1L })
                 assertEquals(10L, restarted.cursor("JOURNAL"))
                 assertEquals("encrypted-wire", restarted.pending("JOURNAL").single().payload)
+            } finally {
+                database.close()
+                Files.deleteIfExists(path)
+                Files.deleteIfExists(path.resolveSibling("${path.fileName}-wal"))
+                Files.deleteIfExists(path.resolveSibling("${path.fileName}-shm"))
+            }
+        }
+
+    @Test
+    fun `entries waiting for an app update are offered again but are not unfinished recovery`() =
+        runTest {
+            val path = Files.createTempFile("logdate-inbox-update-test", ".db")
+            Files.delete(path)
+            val database = getRoomDatabase(Room.databaseBuilder<LogDateDatabase>(path.toString()))
+            try {
+                var now = 1L
+                val scope = { DownloadScope("disposable-owner", "disposable-server") }
+                val inbox = DownloadInbox(database.downloadInboxDao(), RoomSyncTransactionManager(database), scope, { now })
+                inbox.stage(
+                    "NOTE",
+                    2,
+                    listOf(WireDownload("newer-kind", 1, false, "{}"), WireDownload("storage-failure", 2, false, "{}")),
+                )
+                inbox.failed("NOTE", "newer-kind", DiagnosticReason.UNSUPPORTED_FORMAT.name, 1)
+                inbox.failed("NOTE", "storage-failure", DiagnosticReason.LOCAL_STORAGE.name, 2)
+
+                assertEquals(1, inbox.count(), "Only the record this version can still finish counts")
+                now += 60 * 60 * 1_000L
+                assertEquals(setOf("newer-kind", "storage-failure"), inbox.pending("NOTE").map { it.entityId }.toSet())
             } finally {
                 database.close()
                 Files.deleteIfExists(path)

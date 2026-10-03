@@ -116,7 +116,8 @@ class DownloadInboxTest {
         ) = rows.count {
             it.ownerId == owner &&
                 it.serverOrigin == origin &&
-                it.state != "APPLIED"
+                it.state != "APPLIED" &&
+                it.reason != "UNSUPPORTED_FORMAT"
         }
 
         override suspend fun put(row: DownloadInboxEntity) {

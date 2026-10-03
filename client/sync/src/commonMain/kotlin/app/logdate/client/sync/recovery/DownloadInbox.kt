@@ -366,6 +366,7 @@ class DownloadInbox(
             DiagnosticReason.LOCAL_STORAGE -> DiagnosticAction.RETRY
             DiagnosticReason.KEY_RECOVERY_REQUIRED -> DiagnosticAction.RECOVER_KEY
             DiagnosticReason.INCOMPATIBLE_SERVER -> DiagnosticAction.UPDATE_SERVER
+            DiagnosticReason.UNSUPPORTED_FORMAT -> DiagnosticAction.UPDATE_APP
             DiagnosticReason.CONFLICT -> DiagnosticAction.REVIEW_CONFLICT
             else -> DiagnosticAction.RETRY
         }

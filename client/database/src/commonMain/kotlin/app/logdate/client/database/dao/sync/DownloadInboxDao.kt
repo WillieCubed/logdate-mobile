@@ -27,7 +27,16 @@ interface DownloadInboxDao {
         now: Long,
     ): List<DownloadInboxEntity>
 
-    @Query("SELECT COUNT(*) FROM sync_download_inbox WHERE ownerId = :owner AND serverOrigin = :origin AND state != 'APPLIED'")
+    /**
+     * Rows this version can still finish. A row whose reason is `UNSUPPORTED_FORMAT` (the name of
+     * `DiagnosticReason.UNSUPPORTED_FORMAT`) contains a record a newer version of LogDate wrote: it
+     * stays in the inbox and [pending] offers it again, so an app update that reads it applies it,
+     * but nothing this version does finishes it.
+     */
+    @Query(
+        "SELECT COUNT(*) FROM sync_download_inbox WHERE ownerId = :owner AND serverOrigin = :origin " +
+            "AND state != 'APPLIED' AND reason != 'UNSUPPORTED_FORMAT'",
+    )
     suspend fun count(
         owner: String,
         origin: String,
