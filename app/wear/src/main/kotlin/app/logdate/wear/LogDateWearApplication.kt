@@ -8,6 +8,7 @@ import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.wear.di.wearAudioModule
 import app.logdate.wear.di.wearDataModule
 import app.logdate.wear.di.wearExperienceModule
+import app.logdate.wear.di.wearV2Module
 import app.logdate.wear.recording.WearRecordingRecovery
 import app.logdate.wear.reminders.LegacyPromptAlarms
 import app.logdate.wear.sync.WatchSyncScheduler
@@ -45,6 +46,7 @@ class LogDateWearApplication : Application() {
                 wearDataModule,
                 wearAudioModule,
                 wearExperienceModule,
+                wearV2Module,
             )
         }
 
