@@ -17,9 +17,11 @@ import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.PendingUpload
+import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
+import app.logdate.client.sync.metadata.UploadScope
 import app.logdate.shared.model.Journal
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -125,6 +127,8 @@ class WearDataLayerSyncManagerTest {
         coEvery { healthSnapshotDao.getAfter(any()) } returns emptyList()
         coEvery { retryScheduleStore.nextAttemptAt(any(), any()) } returns null
         coEvery { deadLetterStore.list() } returns emptyList()
+        coEvery { syncMetadataService.settleIfCurrent(any(), any(), any(), any()) } returns true
+        coEvery { syncMetadataService.incrementRetryIfCurrent(any(), any()) } returns true
 
         syncManager =
             WearDataLayerSyncManager(
@@ -258,11 +262,11 @@ class WearDataLayerSyncManagerTest {
             syncManager.uploadPendingChanges()
 
             coVerify {
-                syncMetadataService.markAsSynced(
-                    entityId = noteId.toString(),
-                    entityType = EntityType.NOTE,
-                    syncedAt = any(),
-                    version = any(),
+                syncMetadataService.settleIfCurrent(
+                    EntityType.NOTE,
+                    match { it.entityId == noteId.toString() },
+                    any(),
+                    any(),
                 )
             }
         }
@@ -369,8 +373,8 @@ class WearDataLayerSyncManagerTest {
 
             assertFalse(result.success)
             assertEquals(0, result.uploadedItems)
-            coVerify { syncMetadataService.incrementRetryCount(noteId.toString(), EntityType.NOTE) }
-            coVerify(exactly = 0) { syncMetadataService.markAsSynced(any(), any(), any(), any()) }
+            coVerify { syncMetadataService.incrementRetryIfCurrent(EntityType.NOTE, match { it.entityId == noteId.toString() }) }
+            coVerify(exactly = 0) { syncMetadataService.settleIfCurrent(any(), any(), any(), any()) }
         }
 
     @Test
@@ -386,7 +390,7 @@ class WearDataLayerSyncManagerTest {
 
             assertTrue(result.success)
             assertEquals(0, result.uploadedItems)
-            coVerify(exactly = 0) { syncMetadataService.markAsSynced(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { syncMetadataService.settleIfCurrent(any(), any(), any(), any()) }
         }
 
     @Test
@@ -541,9 +545,12 @@ class WearDataLayerSyncManagerTest {
     @Test
     fun `acknowledged audio note is marked synced and its retry schedule cleared`() =
         runTest {
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(PendingUpload(noteId.toString(), PendingOperation.CREATE))
+
             syncManager.onNoteAcknowledged(noteId)
 
-            coVerify { syncMetadataService.markAsSynced(noteId.toString(), EntityType.NOTE, any(), any()) }
+            coVerify { syncMetadataService.settleIfCurrent(EntityType.NOTE, match { it.entityId == noteId.toString() }, any(), any()) }
             coVerify { retryScheduleStore.clear(EntityType.NOTE, noteId.toString()) }
         }
 
@@ -703,7 +710,7 @@ class WearDataLayerSyncManagerTest {
             syncManager.uploadPendingChanges()
 
             coVerify {
-                syncMetadataService.markAsSynced(noteId.toString(), EntityType.NOTE, any(), any())
+                syncMetadataService.settleIfCurrent(EntityType.NOTE, match { it.entityId == noteId.toString() }, any(), any())
             }
         }
 
@@ -762,7 +769,7 @@ class WearDataLayerSyncManagerTest {
             syncManager.uploadPendingChanges()
 
             coVerify {
-                syncMetadataService.incrementRetryCount(noteId.toString(), EntityType.NOTE)
+                syncMetadataService.incrementRetryIfCurrent(EntityType.NOTE, match { it.entityId == noteId.toString() })
             }
         }
 
@@ -795,7 +802,7 @@ class WearDataLayerSyncManagerTest {
 
             // Missing note should be marked as synced (cleared from outbox)
             coVerify {
-                syncMetadataService.markAsSynced(noteId.toString(), EntityType.NOTE, any(), any())
+                syncMetadataService.settleIfCurrent(EntityType.NOTE, match { it.entityId == noteId.toString() }, any(), any())
             }
         }
 
@@ -1037,4 +1044,185 @@ class WearDataLayerSyncManagerTest {
 
             assertNull(NoteDataMapper.audioDigest(sentData.single()))
         }
+
+    // =======================================================================
+    // Items that fail repeatedly
+    // =======================================================================
+
+    @Test
+    fun `an item that fails repeatedly is set aside but stays queued for a retry in six hours`() =
+        runTest {
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(
+                    PendingUpload(
+                        noteId.toString(),
+                        PendingOperation.CREATE,
+                        retryCount = WearDataLayerSyncManager.MAX_RETRY_ATTEMPTS - 1,
+                    ),
+                )
+            coEvery { notesRepository.getNoteById(noteId) } returns textNote
+            coEvery { dataLayerClient.putDataItem(any(), any(), any()) } returns false
+
+            fixedClockSyncManager().uploadPendingChanges()
+
+            coVerify { deadLetterStore.add(match { it.id == "NOTE:$noteId" && it.entityId == noteId.toString() }) }
+            coVerify(exactly = 0) { syncMetadataService.settleIfCurrent(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { syncMetadataService.markAsSynced(any(), any(), any(), any()) }
+            coVerify {
+                retryScheduleStore.setNextAttemptAt(
+                    EntityType.NOTE,
+                    noteId.toString(),
+                    fixedTime.toEpochMilliseconds() + WearDataLayerSyncManager.DEAD_LETTER_RETRY_INTERVAL_MS,
+                )
+            }
+        }
+
+    @Test
+    fun `a set-aside operation is named by its operation id, as on the phone`() =
+        runTest {
+            val scope = UploadScope(ownerId = "owner", serverOrigin = "https://logdate.example")
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(
+                    PendingUpload(
+                        noteId.toString(),
+                        PendingOperation.CREATE,
+                        retryCount = WearDataLayerSyncManager.MAX_RETRY_ATTEMPTS - 1,
+                        scope = scope,
+                        operationId = "operation-1",
+                    ),
+                )
+            coEvery { notesRepository.getNoteById(noteId) } returns textNote
+            coEvery { dataLayerClient.putDataItem(any(), any(), any()) } returns false
+
+            syncManager.uploadPendingChanges()
+
+            coVerify {
+                deadLetterStore.add(match { it.id == "operation-1" && it.operationId == "operation-1" && it.scope == scope })
+            }
+        }
+
+    @Test
+    fun `a failed attempt at an operation a newer change replaced is not counted`() =
+        runTest {
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(
+                    PendingUpload(
+                        noteId.toString(),
+                        PendingOperation.CREATE,
+                        retryCount = WearDataLayerSyncManager.MAX_RETRY_ATTEMPTS - 1,
+                    ),
+                )
+            coEvery { notesRepository.getNoteById(noteId) } returns textNote
+            coEvery { dataLayerClient.putDataItem(any(), any(), any()) } returns false
+            coEvery { syncMetadataService.incrementRetryIfCurrent(any(), any()) } returns false
+
+            syncManager.uploadPendingChanges()
+
+            coVerify(exactly = 0) { deadLetterStore.add(any()) }
+            coVerify(exactly = 0) { retryScheduleStore.setNextAttemptAt(any(), any(), any()) }
+        }
+
+    @Test
+    fun `a delivered note settles only the operation that was sent`() =
+        runTest {
+            val pending = PendingUpload(noteId.toString(), PendingOperation.CREATE, operationId = "operation-1")
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns listOf(pending)
+            coEvery { notesRepository.getNoteById(noteId) } returns textNote
+
+            syncManager.uploadPendingChanges()
+
+            coVerify { syncMetadataService.settleIfCurrent(EntityType.NOTE, pending, any(), 1L) }
+            coVerify(exactly = 0) { syncMetadataService.markAsSynced(any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `delivering an item that was set aside clears its record`() =
+        runTest {
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(
+                    PendingUpload(
+                        noteId.toString(),
+                        PendingOperation.CREATE,
+                        retryCount = WearDataLayerSyncManager.MAX_RETRY_ATTEMPTS,
+                    ),
+                )
+            coEvery { notesRepository.getNoteById(noteId) } returns textNote
+            coEvery { deadLetterStore.list() } returns listOf(deadLetter())
+
+            syncManager.uploadPendingChanges()
+
+            coVerify { deadLetterStore.remove("NOTE:$noteId") }
+        }
+
+    @Test
+    fun `discarding a set-aside item takes it out of the outbox`() =
+        runTest {
+            val pending = PendingUpload(noteId.toString(), PendingOperation.CREATE)
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns listOf(pending)
+            coEvery { deadLetterStore.list() } returns listOf(deadLetter())
+
+            syncManager.discardDeadLetter("NOTE:$noteId")
+
+            coVerify { syncMetadataService.settleIfCurrent(EntityType.NOTE, pending, any(), 0L) }
+            coVerify { retryScheduleStore.clear(EntityType.NOTE, noteId.toString()) }
+            coVerify { deadLetterStore.remove("NOTE:$noteId") }
+        }
+
+    @Test
+    fun `discarding leaves a change made after the item was set aside queued`() =
+        runTest {
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(PendingUpload(noteId.toString(), PendingOperation.CREATE, operationId = "operation-2"))
+            coEvery { deadLetterStore.list() } returns listOf(deadLetter().copy(id = "operation-1", operationId = "operation-1"))
+
+            syncManager.discardDeadLetter("operation-1")
+
+            coVerify(exactly = 0) { syncMetadataService.settleIfCurrent(any(), any(), any(), any()) }
+            coVerify { deadLetterStore.remove("operation-1") }
+        }
+
+    @Test
+    fun `retrying a set-aside item makes it due now`() =
+        runTest {
+            coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
+                listOf(PendingUpload(noteId.toString(), PendingOperation.CREATE))
+            coEvery { deadLetterStore.list() } returns listOf(deadLetter())
+
+            syncManager.retryDeadLetter("NOTE:$noteId")
+
+            coVerify { retryScheduleStore.clear(EntityType.NOTE, noteId.toString()) }
+            coVerify { deadLetterStore.remove("NOTE:$noteId") }
+            coVerify(exactly = 0) { syncMetadataService.enqueuePending(any(), any(), any()) }
+        }
+
+    @Test
+    fun `retrying an item that is no longer queued queues it again`() =
+        runTest {
+            coEvery { deadLetterStore.list() } returns listOf(deadLetter())
+
+            syncManager.retryDeadLetter("NOTE:$noteId")
+
+            coVerify { syncMetadataService.enqueuePending(noteId.toString(), EntityType.NOTE, PendingOperation.CREATE) }
+            coVerify { deadLetterStore.remove("NOTE:$noteId") }
+        }
+
+    @Test
+    fun `an acknowledgement for a note that is not queued changes nothing`() =
+        runTest {
+            syncManager.onNoteAcknowledged(noteId)
+
+            coVerify(exactly = 0) { syncMetadataService.settleIfCurrent(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { syncMetadataService.markAsSynced(any(), any(), any(), any()) }
+        }
+
+    private fun deadLetter(): SyncDeadLetterRecord =
+        SyncDeadLetterRecord(
+            id = "NOTE:$noteId",
+            entityType = EntityType.NOTE.name,
+            entityId = noteId.toString(),
+            operation = PendingOperation.CREATE.name,
+            retryCount = WearDataLayerSyncManager.MAX_RETRY_ATTEMPTS,
+            lastError = "Failed to sync note $noteId",
+            failedAt = fixedTime.toEpochMilliseconds(),
+        )
 }

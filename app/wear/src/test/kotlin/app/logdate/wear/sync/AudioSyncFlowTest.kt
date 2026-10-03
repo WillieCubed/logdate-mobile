@@ -72,6 +72,8 @@ class AudioSyncFlowTest {
         coEvery { healthSnapshotDao.getAfter(any()) } returns emptyList()
         coEvery { retryScheduleStore.nextAttemptAt(any(), any()) } returns null
         coEvery { deadLetterStore.list() } returns emptyList()
+        coEvery { syncMetadataService.settleIfCurrent(any(), any(), any(), any()) } returns true
+        coEvery { syncMetadataService.incrementRetryIfCurrent(any(), any()) } returns true
 
         syncManager =
             WearDataLayerSyncManager(
@@ -151,16 +153,16 @@ class AudioSyncFlowTest {
             assertEquals(audioFilePath, capturedFilePath.captured)
 
             // 5. Note stays in the outbox until the phone confirms it has the note and its audio
-            coVerify(exactly = 0) { syncMetadataService.markAsSynced(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { syncMetadataService.settleIfCurrent(any(), any(), any(), any()) }
 
             // 6. The phone's acknowledgement clears it
             syncManager.onNoteAcknowledged(noteId)
             coVerify {
-                syncMetadataService.markAsSynced(
-                    entityId = noteId.toString(),
-                    entityType = EntityType.NOTE,
-                    syncedAt = any(),
-                    version = any(),
+                syncMetadataService.settleIfCurrent(
+                    EntityType.NOTE,
+                    match { it.entityId == noteId.toString() },
+                    any(),
+                    any(),
                 )
             }
 
@@ -202,7 +204,7 @@ class AudioSyncFlowTest {
 
             // Note stays in outbox (not marked as synced)
             coVerify(exactly = 0) {
-                syncMetadataService.markAsSynced(any(), any(), any(), any())
+                syncMetadataService.settleIfCurrent(any(), any(), any(), any())
             }
 
             // No data sent
@@ -243,8 +245,8 @@ class AudioSyncFlowTest {
             assertEquals(0, result.uploadedItems)
             assertTrue(result.errors.first().retryable)
 
-            coVerify(exactly = 0) { syncMetadataService.markAsSynced(any(), any(), any(), any()) }
-            coVerify { syncMetadataService.incrementRetryCount(noteId.toString(), EntityType.NOTE) }
+            coVerify(exactly = 0) { syncMetadataService.settleIfCurrent(any(), any(), any(), any()) }
+            coVerify { syncMetadataService.incrementRetryIfCurrent(EntityType.NOTE, match { it.entityId == noteId.toString() }) }
         }
 
     // =======================================================================
@@ -284,10 +286,10 @@ class AudioSyncFlowTest {
             coVerify(exactly = 5) { dataLayerClient.sendFile(any(), any()) }
 
             // Nothing is marked synced until the phone acknowledges each note
-            coVerify(exactly = 0) { syncMetadataService.markAsSynced(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { syncMetadataService.settleIfCurrent(any(), any(), any(), any()) }
             for ((id, _) in notes) syncManager.onNoteAcknowledged(id)
             coVerify(exactly = 5) {
-                syncMetadataService.markAsSynced(any(), EntityType.NOTE, any(), any())
+                syncMetadataService.settleIfCurrent(EntityType.NOTE, any(), any(), any())
             }
         }
 
@@ -315,7 +317,7 @@ class AudioSyncFlowTest {
 
             // Should clear the orphaned outbox entry
             coVerify {
-                syncMetadataService.markAsSynced(noteId.toString(), EntityType.NOTE, any(), any())
+                syncMetadataService.settleIfCurrent(EntityType.NOTE, match { it.entityId == noteId.toString() }, any(), any())
             }
 
             // Should not attempt any data transfer

@@ -10,8 +10,11 @@ import app.logdate.wear.di.wearDataModule
 import app.logdate.wear.di.wearExperienceModule
 import app.logdate.wear.recording.WearRecordingRecovery
 import app.logdate.wear.reminders.LegacyPromptAlarms
+import app.logdate.wear.sync.WearDeadLetterMigration
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
@@ -53,6 +56,7 @@ class LogDateWearApplication : Application() {
         }
 
         recoverInterruptedRecordings(launchedAtMs)
+        startSync()
 
         runCatching { LegacyPromptAlarms.cancel(this) }
             .onFailure { error -> Napier.w("Failed to remove the legacy journal prompts", error) }
@@ -81,6 +85,25 @@ class LogDateWearApplication : Application() {
             } catch (e: Exception) {
                 Napier.e("Recovering interrupted recordings failed", e)
             }
+        }
+    }
+
+    /** Puts captures an older version dropped after repeated failures back in the outbox. */
+    private fun startSync() {
+        val koin =
+            org.koin.java.KoinJavaComponent
+                .getKoin()
+        koin.get<CoroutineScope>().launch {
+            requeueSetAsideCaptures(koin.get())
+        }
+    }
+
+    private suspend fun requeueSetAsideCaptures(migration: WearDeadLetterMigration) {
+        try {
+            val requeued = migration.migrate()
+            if (requeued > 0) Napier.i("Queued $requeued capture(s) again that an older version set aside")
+        } catch (e: Exception) {
+            Napier.e("Queueing set-aside captures again failed", e)
         }
     }
 

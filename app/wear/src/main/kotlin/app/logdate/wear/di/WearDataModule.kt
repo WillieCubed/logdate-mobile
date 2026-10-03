@@ -42,6 +42,7 @@ import app.logdate.wear.sync.GoogleWearDataLayerClient
 import app.logdate.wear.sync.NoteDataMapper
 import app.logdate.wear.sync.WearDataLayerClient
 import app.logdate.wear.sync.WearDataLayerSyncManager
+import app.logdate.wear.sync.WearDeadLetterMigration
 import app.logdate.wear.sync.WearNoteAckHandler
 import app.logdate.wear.sync.WearNoteRemovalNotifier
 import app.logdate.wear.sync.WearPhoneMessageHandler
@@ -102,6 +103,7 @@ val wearDataModule =
             )
         } binds arrayOf(SyncManager::class, WearNoteAckHandler::class, WearNoteRemovalNotifier::class)
         single { WearPhoneMessageHandler(ackHandler = get(), syncManager = get()) }
+        single { WearDeadLetterMigration(deadLetterStore = get(), syncMetadataService = get()) }
 
         // Health sensor manager: use Health Services when available, then degrade gracefully.
         single<WearHealthSensorManager> {

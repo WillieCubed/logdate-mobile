@@ -42,7 +42,10 @@ import kotlin.uuid.Uuid
  *
  * Resilience features:
  * - Exponential backoff (5s base, 5min cap) for transient failures
- * - Dead letter queue for permanently failed items (after 5 attempts)
+ * - Items that fail [MAX_RETRY_ATTEMPTS] times are recorded as dead letters and retried every
+ *   [DEAD_LETTER_RETRY_INTERVAL_MS]; they leave the outbox only when delivered or discarded
+ * - Only the operation an attempt sent is settled or charged with a failure, so a change queued
+ *   while an attempt is in flight is never lost or counted against
  * - Parent-before-child ordering (journals → notes → associations → health)
  * - Audio notes stay pending until the phone acknowledges them, and are resent after
  *   [ACK_TIMEOUT_MS] without one
@@ -139,14 +142,16 @@ class WearDataLayerSyncManager(
     }
 
     override suspend fun onNoteAcknowledged(noteId: Uuid) {
-        syncMetadataService.markAsSynced(
-            entityId = noteId.toString(),
-            entityType = EntityType.NOTE,
-            syncedAt = clock.now(),
-            version = 1,
-        )
-        retryScheduleStore.clear(EntityType.NOTE, noteId.toString())
+        val pending = queuedNote(noteId)
+        if (pending == null) {
+            Napier.d("Note $noteId was confirmed but is no longer queued")
+            return
+        }
+        settle(EntityType.NOTE, pending, version = 1)
     }
+
+    private suspend fun queuedNote(noteId: Uuid): PendingUpload? =
+        syncMetadataService.getPendingUploads(EntityType.NOTE).firstOrNull { it.entityId == noteId.toString() }
 
     override suspend fun downloadRemoteChanges(): SyncResult {
         // Downloads are handled reactively by WearDataLayerListenerService.
@@ -296,22 +301,49 @@ class WearDataLayerSyncManager(
 
     override fun observeDeadLetters(): Flow<List<SyncDeadLetterRecord>> = deadLetterStore.observe()
 
-    override suspend fun retryDeadLetter(id: String) {
-        val record = deadLetterStore.list().firstOrNull { it.id == id } ?: return
-        val entityType = runCatching { EntityType.valueOf(record.entityType) }.getOrNull()
-        val operation = runCatching { PendingOperation.valueOf(record.operation) }.getOrNull()
-        if (entityType == null || operation == null) {
-            Napier.w("Cannot retry dead-letter $id with type=${record.entityType} op=${record.operation}")
+    override suspend fun retryDeadLetter(id: String) =
+        syncLock.withLock {
+            val record = deadLetterStore.list().firstOrNull { it.id == id } ?: return@withLock
+            val entityType = runCatching { EntityType.valueOf(record.entityType) }.getOrNull()
+            val operation = runCatching { PendingOperation.valueOf(record.operation) }.getOrNull()
+            if (entityType == null || operation == null) {
+                Napier.w("Cannot retry dead-letter $id with type=${record.entityType} op=${record.operation}")
+                deadLetterStore.remove(id)
+                return@withLock
+            }
+            if (syncMetadataService.getPendingUploads(entityType).none { it.entityId == record.entityId }) {
+                syncMetadataService.enqueuePending(record.entityId, entityType, operation)
+            }
+            retryScheduleStore.clear(entityType, record.entityId)
             deadLetterStore.remove(id)
-            return
         }
-        syncMetadataService.enqueuePending(record.entityId, entityType, operation)
-        deadLetterStore.remove(id)
-    }
 
-    override suspend fun discardDeadLetter(id: String) {
-        deadLetterStore.remove(id)
-    }
+    /**
+     * Abandons a set-aside item: the only way one leaves the outbox without reaching the phone. Only
+     * the operation that was set aside goes; a change made to the item since stays queued.
+     */
+    override suspend fun discardDeadLetter(id: String) =
+        syncLock.withLock {
+            val record = deadLetterStore.list().firstOrNull { it.id == id }
+            deadLetterStore.remove(id)
+            if (record == null) return@withLock
+            val entityType = runCatching { EntityType.valueOf(record.entityType) }.getOrNull()
+            if (entityType == null) {
+                Napier.w("Cannot discard dead-letter $id with type=${record.entityType}")
+                return@withLock
+            }
+            val pending = setAsideOperation(entityType, record) ?: return@withLock
+            settle(entityType, pending, version = 0)
+        }
+
+    /** The queued operation [record] set aside, if it is still the one waiting. */
+    private suspend fun setAsideOperation(
+        entityType: EntityType,
+        record: SyncDeadLetterRecord,
+    ): PendingUpload? =
+        syncMetadataService.getPendingUploads(entityType).firstOrNull { pending ->
+            pending.entityId == record.entityId && (record.operationId == null || pending.operationId == record.operationId)
+        }
 
     /**
      * Pushes recent health snapshots to the phone.
@@ -526,12 +558,15 @@ class WearDataLayerSyncManager(
     }
 
     /**
-     * Handles a failed sync attempt with exponential backoff and dead letter queue.
+     * Handles a failed sync attempt with exponential backoff.
      *
-     * After [MAX_RETRY_ATTEMPTS] failures, the item is moved to the dead letter queue
-     * and removed from the pending outbox.
+     * A failure counts only against the operation the attempt sent: when the item changed while it
+     * was in flight, the newer change starts with a fresh budget and is tried next. After
+     * [MAX_RETRY_ATTEMPTS] failures the item is recorded as a dead letter, so the failure shows as a
+     * sync issue, and it is tried again every [DEAD_LETTER_RETRY_INTERVAL_MS]. It stays in the
+     * outbox: it still counts as waiting, and it still reaches the phone once whatever broke it is fixed.
      *
-     * @return true if the item was dead-lettered (caller should not retry), false otherwise
+     * @return true if the item was dead-lettered, false if it is scheduled for a normal retry or was replaced
      */
     private suspend fun handleSyncFailure(
         pending: PendingUpload,
@@ -539,30 +574,33 @@ class WearDataLayerSyncManager(
         errorMessage: String,
         retryDelayMs: Long? = null,
     ): Boolean {
+        if (!syncMetadataService.incrementRetryIfCurrent(entityType, pending)) {
+            Napier.i("${entityType.name} ${pending.entityId} changed while it was being sent; the newer change is tried next")
+            return false
+        }
         val nextRetryCount = pending.retryCount + 1
-        syncMetadataService.incrementRetryCount(pending.entityId, entityType)
 
         if (nextRetryCount >= MAX_RETRY_ATTEMPTS) {
-            Napier.w("Dead-lettering ${entityType.name} ${pending.entityId} after $nextRetryCount failures")
+            Napier.w("Setting aside ${entityType.name} ${pending.entityId} after $nextRetryCount failures; it stays queued")
             deadLetterStore.add(
                 SyncDeadLetterRecord(
-                    id = "${entityType.name}_${pending.entityId}",
+                    id = deadLetterId(entityType, pending),
                     entityType = entityType.name,
                     entityId = pending.entityId,
                     operation = pending.operation.name,
                     retryCount = nextRetryCount,
                     lastError = errorMessage,
                     failedAt = clock.now().toEpochMilliseconds(),
+                    scope = pending.scope,
+                    operationId = pending.operationId,
+                    expectedServerVersion = pending.expectedServerVersion,
                 ),
             )
-            // Remove from pending queue so it stops blocking other items
-            syncMetadataService.markAsSynced(
-                entityId = pending.entityId,
-                entityType = entityType,
-                syncedAt = clock.now(),
-                version = 0L,
+            retryScheduleStore.setNextAttemptAt(
+                entityType,
+                pending.entityId,
+                clock.now().toEpochMilliseconds() + DEAD_LETTER_RETRY_INTERVAL_MS,
             )
-            retryScheduleStore.clear(entityType, pending.entityId)
             return true
         }
 
@@ -613,23 +651,9 @@ class WearDataLayerSyncManager(
         when (outcome) {
             UploadOutcome.SUCCESS -> {
                 onSuccess()
-                syncMetadataService.markAsSynced(
-                    entityId = pending.entityId,
-                    entityType = entityType,
-                    syncedAt = clock.now(),
-                    version = 1,
-                )
-                retryScheduleStore.clear(entityType, pending.entityId)
+                settle(entityType, pending, version = 1)
             }
-            UploadOutcome.SKIPPED -> {
-                syncMetadataService.markAsSynced(
-                    entityId = pending.entityId,
-                    entityType = entityType,
-                    syncedAt = clock.now(),
-                    version = 0,
-                )
-                retryScheduleStore.clear(entityType, pending.entityId)
-            }
+            UploadOutcome.SKIPPED -> settle(entityType, pending, version = 0)
             UploadOutcome.AWAITING_ACK -> {
                 val errorMsg = "Phone did not confirm ${entityType.name.lowercase()} ${pending.entityId}"
                 val deadLettered = handleSyncFailure(pending, entityType, errorMsg, retryDelayMs = ACK_TIMEOUT_MS)
@@ -650,6 +674,40 @@ class WearDataLayerSyncManager(
             }
         }
     }
+
+    /**
+     * Takes the operation [pending] captured out of the outbox for good: delivered, acknowledged,
+     * unsendable or discarded. A change queued while it was in flight is a newer operation; it stays
+     * queued and is due at once. The item's dead letters go, because the phone now has what failed or
+     * it was given up on purpose.
+     */
+    private suspend fun settle(
+        entityType: EntityType,
+        pending: PendingUpload,
+        version: Long,
+    ) {
+        if (!syncMetadataService.settleIfCurrent(entityType, pending, clock.now(), version)) {
+            Napier.i("${entityType.name} ${pending.entityId} changed while it was being sent; the newer change stays queued")
+        }
+        retryScheduleStore.clear(entityType, pending.entityId)
+        removeDeadLetters(entityType, pending.entityId)
+    }
+
+    private suspend fun removeDeadLetters(
+        entityType: EntityType,
+        entityId: String,
+    ) {
+        deadLetterStore
+            .list()
+            .filter { it.entityType == entityType.name && it.entityId == entityId }
+            .forEach { deadLetterStore.remove(it.id) }
+    }
+
+    /** The phone's form, so a record names an operation the same way on both devices. */
+    private fun deadLetterId(
+        entityType: EntityType,
+        pending: PendingUpload,
+    ): String = pending.operationId ?: "${entityType.name}:${pending.entityId}"
 
     private fun parseUuid(value: String): Uuid? =
         try {
@@ -674,5 +732,8 @@ class WearDataLayerSyncManager(
         const val MAX_RETRY_ATTEMPTS = 5
         const val RETRY_BASE_DELAY_MS = 5_000L
         const val RETRY_MAX_DELAY_MS = 300_000L
+
+        /** How long an item set aside after [MAX_RETRY_ATTEMPTS] failures waits before it is tried again. */
+        const val DEAD_LETTER_RETRY_INTERVAL_MS = 6L * 60 * 60 * 1000
     }
 }
