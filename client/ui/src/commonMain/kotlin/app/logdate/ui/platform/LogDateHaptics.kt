@@ -25,14 +25,27 @@ interface LogDateHaptics {
     fun transcriptionReady()
 
     fun confirmDestruction()
+
+    fun recordingLocked()
+
+    fun recordingPaused()
+
+    fun recordingResumed()
+
+    fun momentMarked()
+
+    fun limitApproaching()
+
+    fun actionRejected()
+
+    fun detentTick()
 }
 
 /**
  * Default mapping from semantic events to platform primitives. The [reduceMotion] callback
  * is consulted on every fire; when it returns `true`, only events in
- * [HapticEvent.criticalEvents] survive — see the design rationale in
- * `docs/superpowers/specs/...` (recording lifecycle and destructive confirmations are the
- * only delight-irrelevant events left after the haptics audit).
+ * [HapticEvent.criticalEvents] survive. The watch also returns `true` while its haptics setting
+ * is Essential.
  */
 class DefaultLogDateHaptics(
     private val controller: PlatformHapticsController,
@@ -52,6 +65,20 @@ class DefaultLogDateHaptics(
     override fun transcriptionReady() = fire(HapticEvent.TranscriptionReady)
 
     override fun confirmDestruction() = fire(HapticEvent.ConfirmDestruction)
+
+    override fun recordingLocked() = fire(HapticEvent.RecordingLocked)
+
+    override fun recordingPaused() = fire(HapticEvent.Paused)
+
+    override fun recordingResumed() = fire(HapticEvent.Resumed)
+
+    override fun momentMarked() = fire(HapticEvent.MomentMarked)
+
+    override fun limitApproaching() = fire(HapticEvent.LimitApproaching)
+
+    override fun actionRejected() = fire(HapticEvent.ActionRejected)
+
+    override fun detentTick() = fire(HapticEvent.DetentTick)
 }
 
 /** Composition-local handle to the semantic haptics facade. */

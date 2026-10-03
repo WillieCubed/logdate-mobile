@@ -9,5 +9,5 @@ actual fun createPlatformHapticsController(): PlatformHapticsController = NoOpPl
 @Composable
 actual fun rememberPlatformHapticsController(): PlatformHapticsController {
     val context = LocalContext.current.applicationContext
-    return remember(context) { AndroidPlatformHaptics(context) }
+    return remember(context) { createAndroidPlatformHapticsController(context) }
 }

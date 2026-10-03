@@ -123,6 +123,72 @@ class LogDateHapticsTest {
             "Critical events must always fire — got ${recorder.events.size}: ${recorder.events}",
         )
     }
+
+    @Test
+    fun `recordingLocked fires a rigid impact`() {
+        assertEquals(listOf<RecordedHaptic>(RecordedHaptic.Impact(HapticImpactStrength.Rigid)), firedBy { recordingLocked() })
+    }
+
+    @Test
+    fun `recordingPaused fires a soft impact`() {
+        assertEquals(listOf<RecordedHaptic>(RecordedHaptic.Impact(HapticImpactStrength.Soft)), firedBy { recordingPaused() })
+    }
+
+    @Test
+    fun `recordingResumed fires a light impact`() {
+        assertEquals(listOf<RecordedHaptic>(RecordedHaptic.Impact(HapticImpactStrength.Light)), firedBy { recordingResumed() })
+    }
+
+    @Test
+    fun `momentMarked fires a success notification`() {
+        assertEquals(listOf<RecordedHaptic>(RecordedHaptic.Notification(HapticNotificationType.Success)), firedBy { momentMarked() })
+    }
+
+    @Test
+    fun `limitApproaching fires a warning notification`() {
+        assertEquals(listOf<RecordedHaptic>(RecordedHaptic.Notification(HapticNotificationType.Warning)), firedBy { limitApproaching() })
+    }
+
+    @Test
+    fun `actionRejected fires an error notification`() {
+        assertEquals(listOf<RecordedHaptic>(RecordedHaptic.Notification(HapticNotificationType.Error)), firedBy { actionRejected() })
+    }
+
+    @Test
+    fun `detentTick fires a tick`() {
+        assertEquals(listOf<RecordedHaptic>(RecordedHaptic.Tick), firedBy { detentTick() })
+    }
+
+    @Test
+    fun `reduce-motion still fires recording mark and refusal events`() {
+        val recorder = RecordingPlatformHaptics()
+        val haptics = DefaultLogDateHaptics(recorder, reduceMotion = { true })
+
+        haptics.recordingLocked()
+        haptics.recordingPaused()
+        haptics.recordingResumed()
+        haptics.momentMarked()
+        haptics.limitApproaching()
+        haptics.actionRejected()
+
+        assertEquals(6, recorder.events.size, "Got: ${recorder.events}")
+    }
+
+    @Test
+    fun `reduce-motion drops detent ticks`() {
+        val recorder = RecordingPlatformHaptics()
+        val haptics = DefaultLogDateHaptics(recorder, reduceMotion = { true })
+
+        haptics.detentTick()
+
+        assertTrue(recorder.events.isEmpty(), "Got: ${recorder.events}")
+    }
+
+    private fun firedBy(action: LogDateHaptics.() -> Unit): List<RecordedHaptic> {
+        val recorder = RecordingPlatformHaptics()
+        DefaultLogDateHaptics(recorder).action()
+        return recorder.events
+    }
 }
 
 /** Records every primitive call so tests can assert exact mapping behavior. */

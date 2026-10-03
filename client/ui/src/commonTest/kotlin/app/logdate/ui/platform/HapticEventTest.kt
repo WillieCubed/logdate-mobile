@@ -24,6 +24,12 @@ class HapticEventTest {
                 HapticEvent.RecordingStarted,
                 HapticEvent.RecordingFinished,
                 HapticEvent.ConfirmDestruction,
+                HapticEvent.RecordingLocked,
+                HapticEvent.Paused,
+                HapticEvent.Resumed,
+                HapticEvent.MomentMarked,
+                HapticEvent.LimitApproaching,
+                HapticEvent.ActionRejected,
             )
 
         assertEquals(
@@ -40,6 +46,7 @@ class HapticEventTest {
             listOf(
                 HapticEvent.SaveSucceeded,
                 HapticEvent.TranscriptionReady,
+                HapticEvent.DetentTick,
             )
 
         for (event in nonCritical) {

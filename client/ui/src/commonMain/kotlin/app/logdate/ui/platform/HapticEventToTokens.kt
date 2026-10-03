@@ -15,5 +15,12 @@ internal fun PlatformHapticsController.fire(event: HapticEvent) {
         HapticEvent.RecordingFinished -> notification(HapticNotificationType.Success)
         HapticEvent.TranscriptionReady -> tick()
         HapticEvent.ConfirmDestruction -> impact(HapticImpactStrength.Heavy)
+        HapticEvent.RecordingLocked -> impact(HapticImpactStrength.Rigid)
+        HapticEvent.Paused -> impact(HapticImpactStrength.Soft)
+        HapticEvent.Resumed -> impact(HapticImpactStrength.Light)
+        HapticEvent.MomentMarked -> notification(HapticNotificationType.Success)
+        HapticEvent.LimitApproaching -> notification(HapticNotificationType.Warning)
+        HapticEvent.ActionRejected -> notification(HapticNotificationType.Error)
+        HapticEvent.DetentTick -> tick()
     }
 }
