@@ -1,6 +1,7 @@
 package app.logdate.client.sync.cloud
 
 import app.logdate.client.device.crypto.IdentityKeyNotFoundException
+import app.logdate.client.sync.crypto.LegacyUnreadablePayloadException
 import app.logdate.client.sync.crypto.UnreadablePayloadException
 import app.logdate.client.sync.crypto.UnsupportedPayloadVersionException
 import app.logdate.client.sync.crypto.WrongKeyPayloadException
@@ -42,8 +43,10 @@ internal suspend fun <C, T> List<C>.readEach(
             throw missing
         } catch (failure: Exception) {
             val id = idOf(change)
-            val wrongKey = failure is UnreadablePayloadException && failure.cause is WrongKeyPayloadException
-            val parsed = if (wrongKey) runCatching { Uuid.parse(id) }.getOrNull() else null
+            val repairable =
+                failure is UnreadablePayloadException &&
+                    (failure.cause is WrongKeyPayloadException || failure.cause is LegacyUnreadablePayloadException)
+            val parsed = if (repairable) runCatching { Uuid.parse(id) }.getOrNull() else null
             if (parsed != null) {
                 unreadable += parsed
                 unreadableVersions[parsed] = versionOf(change)

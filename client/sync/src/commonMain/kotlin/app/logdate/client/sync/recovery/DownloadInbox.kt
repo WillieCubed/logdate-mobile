@@ -39,6 +39,16 @@ class DownloadInbox(
 ) {
     fun currentScope(): DownloadScope = scope()
 
+    suspend fun rewindForLegacyAudit(selected: DownloadScope = scope()) {
+        check(selected == scope()) { "Download scope changed" }
+        transactions.withTransaction {
+            for (type in listOf("NOTE", "JOURNAL")) {
+                dao.checkpoint(DownloadCheckpointEntity(selected.owner, selected.origin, type, 0))
+            }
+            dao.release(selected.owner, selected.origin)
+        }
+    }
+
     internal fun captureDiagnosticSource(selected: DownloadScope): DiagnosticSource? =
         try {
             diagnosticSource().takeIf { source ->
@@ -90,7 +100,14 @@ class DownloadInbox(
             transactions.withTransaction {
                 for (record in records) {
                     val existing = dao.get(selected.owner, selected.origin, type, record.id)
-                    if (existing != null && existing.version >= record.version) continue
+                    val reconsiderLegacy =
+                        existing?.state == "APPLIED" &&
+                            existing.version == record.version &&
+                            !record.deleted &&
+                            (existing.payload.isEmpty() || existing.payload == record.payload) &&
+                            (type == "NOTE" || type == "JOURNAL") &&
+                            record.payload.contains("LDSE1:")
+                    if (existing != null && existing.version >= record.version && !reconsiderLegacy) continue
                     val row = waitingRow(selected, type, record)
                     dao.put(row)
                     staged += row

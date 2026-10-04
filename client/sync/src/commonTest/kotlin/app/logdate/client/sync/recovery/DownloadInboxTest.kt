@@ -16,6 +16,26 @@ import kotlin.test.assertTrue
 
 class DownloadInboxTest {
     @Test
+    fun `a legacy wire record can be reconsidered after an earlier applied checkpoint`() =
+        runTest {
+            val db = Database()
+            val inbox = DownloadInbox(db, db, { DownloadScope("owner", "origin") }, { 1L })
+            val records =
+                listOf(
+                    WireDownload("legacy", 1, false, "{\"content\":\"LDSE1:encrypted\"}"),
+                    WireDownload("current", 1, false, "{\"content\":\"LDSE2:encrypted\"}"),
+                )
+            inbox.stage("NOTE", 100, records)
+            inbox.applied("NOTE", "legacy", 1, enqueueMedia = false)
+            inbox.applied("NOTE", "current", 1, enqueueMedia = false)
+
+            inbox.stage("NOTE", 100, records)
+
+            assertEquals(listOf("legacy"), inbox.pending("NOTE").map { it.entityId })
+            assertTrue(inbox.isAppliedVersion("NOTE", "current", 1))
+        }
+
+    @Test
     fun `replaying applied rich draft restores a missing media recovery row`() =
         runTest {
             val db = Database()

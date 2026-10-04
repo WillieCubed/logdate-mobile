@@ -15,6 +15,16 @@ import app.logdate.client.datastore.KeyValueStorage
  * downloads ever succeed.
  */
 interface FirstSyncEnqueueStore {
+    suspend fun hasAuditedLegacyScope(
+        ownerId: String,
+        serverOrigin: String,
+    ): Boolean
+
+    suspend fun markAuditedLegacyScope(
+        ownerId: String,
+        serverOrigin: String,
+    )
+
     suspend fun hasEnqueued(entityType: EntityType): Boolean
 
     /** Marks [entityType]'s sweep complete. Call only after it actually finished without error. */
@@ -32,6 +42,20 @@ interface FirstSyncEnqueueStore {
 }
 
 class InMemoryFirstSyncEnqueueStore : FirstSyncEnqueueStore {
+    private val legacyScopes = mutableSetOf<Pair<String, String>>()
+
+    override suspend fun hasAuditedLegacyScope(
+        ownerId: String,
+        serverOrigin: String,
+    ): Boolean = (ownerId to serverOrigin) in legacyScopes
+
+    override suspend fun markAuditedLegacyScope(
+        ownerId: String,
+        serverOrigin: String,
+    ) {
+        legacyScopes += ownerId to serverOrigin
+    }
+
     private val enqueued = mutableSetOf<EntityType>()
     private val draftScopes = mutableSetOf<Pair<String, String>>()
 
@@ -57,6 +81,23 @@ class InMemoryFirstSyncEnqueueStore : FirstSyncEnqueueStore {
 class KeyValueFirstSyncEnqueueStore(
     private val storage: KeyValueStorage,
 ) : FirstSyncEnqueueStore {
+    override suspend fun hasAuditedLegacyScope(
+        ownerId: String,
+        serverOrigin: String,
+    ): Boolean = storage.getBoolean(legacyKey(ownerId, serverOrigin), false)
+
+    override suspend fun markAuditedLegacyScope(
+        ownerId: String,
+        serverOrigin: String,
+    ) {
+        storage.putBoolean(legacyKey(ownerId, serverOrigin), true)
+    }
+
+    private fun legacyKey(
+        ownerId: String,
+        serverOrigin: String,
+    ): String = "sync_legacy_audit_v1_${ownerId.length}:$ownerId:${serverOrigin.length}:$serverOrigin"
+
     override suspend fun hasEnqueued(entityType: EntityType): Boolean = storage.getBoolean(key(entityType), false)
 
     override suspend fun markEnqueued(entityType: EntityType) {

@@ -49,6 +49,77 @@ private val SWIFT_TEXT =
 
 class MacTextClientServerE2ETest {
     @Test
+    fun `legacy text can be repaired under the current identity without changing its ID or overwriting a newer version`() =
+        runTest {
+            withServerClientHarness {
+                val account = apiClient.createAccountWithSyntheticPasskey("legacy_text_${Random.nextInt(100000, 999999)}").data
+                val token = account.tokens.accessToken
+                val id = Uuid.random()
+                val now = Instant.fromEpochMilliseconds(System.currentTimeMillis())
+                val crypto = DesktopCryptoManager()
+
+                suspend fun cipher(seed: Int): SyncPayloadCipher {
+                    val secrets = MemorySecrets()
+                    secrets.putBytes("identity_key_v1", ByteArray(32) { (it + seed).toByte() })
+                    val identity = IdentityKeyManager(secrets, crypto)
+                    return SyncPayloadCipher(ContentEncryptionService(identity, KeyDerivation(crypto), crypto), identity, crypto)
+                }
+
+                val oldSecrets = MemorySecrets()
+                oldSecrets.putBytes("identity_key_v1", ByteArray(32) { it.toByte() })
+                val oldIdentity = IdentityKeyManager(oldSecrets, crypto)
+                val oldEncryption = ContentEncryptionService(oldIdentity, KeyDerivation(crypto), crypto)
+                val legacy = "LDSE1:" + Json.encodeToString(oldEncryption.encryptContent("sync:note:$id:text", "Surviving local entry"))
+                val created =
+                    httpClient.put("$baseUrl/contents/$id") {
+                        header(HttpHeaders.Authorization, "Bearer $token")
+                        header(HttpHeaders.IfNoneMatch, "*")
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                            """{"id":"$id","type":"TEXT","content":${Json.encodeToString(legacy)},"mediaUri":null,
+                            "createdAt":${now.toEpochMilliseconds()},"lastUpdated":${now.toEpochMilliseconds()},"deviceId":"android"}""",
+                        )
+                    }
+                assertEquals(HttpStatusCode.Created, created.status)
+
+                val cloud = DefaultCloudContentDataSource(apiClient, cipher(64))
+                val start = Instant.fromEpochMilliseconds(0)
+                val unreadable = cloud.getContentChanges(token, start).getOrThrow()
+                assertEquals(listOf(id), unreadable.unreadable)
+                assertTrue(unreadable.failures.isEmpty())
+                val local =
+                    JournalNote.Text(
+                        uid = id,
+                        creationTimestamp = now,
+                        lastUpdated = now,
+                        content = "Surviving local entry",
+                        syncVersion = unreadable.unreadableVersions.getValue(id),
+                    )
+                val repaired = cloud.updateNote(token, local).getOrThrow()
+                val otherDevice = DefaultCloudContentDataSource(apiClient, cipher(64))
+                val downloaded =
+                    otherDevice
+                        .getContentChanges(token, start)
+                        .getOrThrow()
+                        .changes
+                        .single() as JournalNote.Text
+                assertEquals(id, downloaded.uid)
+                assertEquals(local.content, downloaded.content)
+                assertEquals(repaired.serverVersion, downloaded.syncVersion)
+
+                cloud.updateNote(token, downloaded.copy(content = "Newer edit")).getOrThrow()
+                assertTrue(cloud.updateNote(token, local).isFailure)
+                val latest =
+                    otherDevice
+                        .getContentChanges(token, start)
+                        .getOrThrow()
+                        .changes
+                        .single() as JournalNote.Text
+                assertEquals("Newer edit", latest.content)
+            }
+        }
+
+    @Test
     fun `Mac timeline text without a journal link becomes readable by Android sync`() =
         runTest {
             withServerClientHarness {

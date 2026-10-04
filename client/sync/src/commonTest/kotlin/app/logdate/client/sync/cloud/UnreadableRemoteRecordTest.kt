@@ -16,6 +16,8 @@ import app.logdate.client.sync.test.testDefaultSyncManager
 import app.logdate.shared.model.sync.ContentChange
 import app.logdate.shared.model.sync.ContentChangesResponse
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -31,6 +33,76 @@ import kotlin.uuid.Uuid
  * backed up at all. The phone holds the originals, so it repairs the cloud copy instead.
  */
 class UnreadableRemoteRecordTest {
+    @Test
+    fun `malformed or substituted legacy envelopes never enter automatic repair`() =
+        runTest {
+            val cipher = cipherFor("old")
+            val substituted =
+                "LDSE1:" +
+                    Json.parseToJsonElement(cipher.encryptString("another-field", "original").removePrefix("LDSE2:")).jsonObject["env"]
+            for (payload in listOf("LDSE1:invalid", substituted)) {
+                val id = Uuid.random()
+                val api =
+                    fakeCloudApiClient {
+                        getContentChangesResponse = Result.success(ContentChangesResponse(listOf(textChange(id, payload)), emptyList(), 10))
+                    }
+                val page =
+                    DefaultCloudContentDataSource(api, cipherFor("current"))
+                        .getContentChanges("token", Instant.fromEpochMilliseconds(0))
+                        .getOrThrow()
+                assertTrue(page.unreadable.isEmpty())
+                assertEquals(1, page.failures.size)
+            }
+        }
+
+    @Test
+    fun `legacy records held on this device enter versioned repair instead of corruption`() =
+        runTest {
+            val oldKey = cipherFor("old")
+            val currentKey = cipherFor("current")
+            val heldHere = Uuid.random()
+            val onlyInCloud = Uuid.random()
+
+            fun legacy(encrypted: String): String = "LDSE1:" + Json.parseToJsonElement(encrypted.removePrefix("LDSE2:")).jsonObject["env"]
+            val api = fakeCloudApiClient()
+            api.getContentChangesResponse =
+                Result.success(
+                    ContentChangesResponse(
+                        listOf(
+                            textChange(heldHere, legacy(oldKey.encryptString(textFieldId(heldHere), "local original"))),
+                            textChange(onlyInCloud, legacy(oldKey.encryptString(textFieldId(onlyInCloud), "cloud original"))),
+                        ),
+                        emptyList(),
+                        10L,
+                    ),
+                )
+            val notes = FakeJournalNotesRepository()
+            notes.create(
+                JournalNote.Text(
+                    uid = heldHere,
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                    content = "local original",
+                ),
+            )
+            val metadata = fakeSyncMetadataService()
+            val cloudOnly = InMemoryUnreadableCloudRecordStore()
+            val manager =
+                testDefaultSyncManager(
+                    cloudContentDataSource = DefaultCloudContentDataSource(api, currentKey),
+                    journalNotesRepository = notes,
+                    syncMetadataService = metadata,
+                    unreadableCloudRecordStore = cloudOnly,
+                )
+
+            manager.downloadRemoteChanges()
+
+            assertEquals(listOf(heldHere.toString()), metadata.getPendingUploads(EntityType.NOTE).map { it.entityId })
+            assertEquals(1L, metadata.getPendingUploads(EntityType.NOTE).single().expectedServerVersion)
+            assertEquals(1, cloudOnly.count())
+            assertEquals("local original", (notes.getNoteById(heldHere) as JournalNote.Text).content)
+        }
+
     @Test
     fun `corrupt location does not silently become a successfully recovered note`() =
         runTest {

@@ -372,6 +372,7 @@ class DefaultSyncManager(
             operationName = "Download",
             exceptionLabel = "Download failed",
         ) { accessToken ->
+            auditLegacyRecordsIfNeeded()
             val journalSince = cursorFor(EntityType.JOURNAL)
             val contentSince = cursorFor(EntityType.NOTE)
             val associationSince = cursorFor(EntityType.ASSOCIATION)
@@ -586,6 +587,16 @@ class DefaultSyncManager(
     }
 
     suspend fun isLocationHistorySyncEnabled(): Boolean = locationHistorySyncEngine?.isEnabled() == true
+
+    private suspend fun auditLegacyRecordsIfNeeded() {
+        val inbox = downloadInbox ?: return
+        if (identityKeyManager?.hasIdentityKey() != true) return
+        val selected = inbox.currentScope()
+        if (firstSyncEnqueueStore.hasAuditedLegacyScope(selected.owner, selected.origin)) return
+        inbox.rewindForLegacyAudit(selected)
+        check(selected == inbox.currentScope()) { "Download scope changed" }
+        firstSyncEnqueueStore.markAuditedLegacyScope(selected.owner, selected.origin)
+    }
 
     override suspend fun getSyncStatus(): SyncStatus {
         statusPublisher.publish()

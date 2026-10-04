@@ -89,9 +89,17 @@ class SyncPayloadCipher(
     private suspend fun decryptV1(
         fieldId: String,
         payload: String,
-    ): String =
-        try {
+    ): String {
+        var validLegacyEnvelope = false
+        return try {
             val envelope = json.decodeFromString<EncryptedEnvelope>(payload)
+            validLegacyEnvelope =
+                envelope.version == 1 &&
+                envelope.algorithm == "AES-GCM" &&
+                Base64.decode(envelope.iv).size == 12 &&
+                Base64.decode(envelope.ciphertext).size >= 16 &&
+                Base64.decode(envelope.aad).contentEquals("type=CONTENT|v=1|id=$fieldId".encodeToByteArray())
+            require(validLegacyEnvelope) { "Invalid legacy envelope" }
             contentEncryptionService.decryptContent(fieldId, envelope)
         } catch (e: CancellationException) {
             throw e
@@ -100,8 +108,10 @@ class SyncPayloadCipher(
             // set aside for.
             throw e
         } catch (e: Exception) {
-            throw UnreadablePayloadException(fieldId, e)
+            val cause = if (validLegacyEnvelope) LegacyUnreadablePayloadException(e) else e
+            throw UnreadablePayloadException(fieldId, cause)
         }
+    }
 
     /**
      * A short, non-reversible marker for the current identity key: not the key itself (this
@@ -118,6 +128,11 @@ class SyncPayloadCipher(
         const val FINGERPRINT_BYTES = 8
     }
 }
+
+/** A valid pre-fingerprint envelope; a surviving local copy can repair it with a version check. */
+class LegacyUnreadablePayloadException(
+    cause: Throwable,
+) : Exception("Cannot read legacy encrypted value", cause)
 
 /** A synced value made with an identity key this device no longer has. */
 class WrongKeyPayloadException(
