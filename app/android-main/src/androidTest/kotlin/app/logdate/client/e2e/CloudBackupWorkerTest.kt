@@ -60,6 +60,7 @@ class CloudBackupWorkerTest {
     private val archiveCipher = CloudArchiveCipher { ByteArray(32) { 7 } }
     private val verifiedIdentity = mockk<IdentityKeyManager> {
         coEvery { isRecoveryPhraseVerified() } returns true
+        coEvery { hasIdentityKey() } returns true
     }
 
     @Test
@@ -632,10 +633,37 @@ class CloudBackupWorkerTest {
     }
 
     @Test
-    fun `backup does not upload before recovery phrase verification`() = runTest {
+    fun backupWithExistingIdentityDoesNotRequirePhraseVerification() = runTest {
         val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L)))
         val unverifiedIdentity = mockk<IdentityKeyManager> {
             coEvery { isRecoveryPhraseVerified() } returns false
+            coEvery { hasIdentityKey() } returns true
+        }
+        val params = mockk<WorkerParameters>(relaxed = true)
+        every { params.id } returns UUID.randomUUID()
+        val worker = CloudBackupWorker(
+            context,
+            params,
+            v2Exporter("{\"schemaVersion\":\"2.0\"}"),
+            cloud,
+            FakeSessionStorage(UserSession("access", "refresh", "account")),
+            FakeDeviceIdProvider(),
+            unverifiedIdentity,
+            archiveCipher,
+        )
+
+        assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Success)
+        assertEquals(0, cloud.uploadCalls)
+        assertEquals(1, cloud.fileUploadCalls)
+        assertEquals("LDCB2", cloud.uploadedFileHeader)
+    }
+
+    @Test
+    fun backupWithoutIdentityWaitsForTrustedDevice() = runTest {
+        val cloud = FakeCloudBackupDataSource(Result.success(BackupUploadResult("unused", 1L, 1L)))
+        val missingIdentity = mockk<IdentityKeyManager> {
+            coEvery { isRecoveryPhraseVerified() } returns false
+            coEvery { hasIdentityKey() } returns false
         }
         val params = mockk<WorkerParameters>(relaxed = true)
         every { params.id } returns UUID.randomUUID()
@@ -646,11 +674,11 @@ class CloudBackupWorkerTest {
             cloud,
             FakeSessionStorage(UserSession("access", "refresh", "account")),
             FakeDeviceIdProvider(),
-            unverifiedIdentity,
+            missingIdentity,
             archiveCipher,
         )
-
-        assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Success)
+        assertTrue(worker.doWork() is androidx.work.ListenableWorker.Result.Retry)
+        assertEquals(0, cloud.fileUploadCalls)
         assertEquals(0, cloud.uploadCalls)
     }
 

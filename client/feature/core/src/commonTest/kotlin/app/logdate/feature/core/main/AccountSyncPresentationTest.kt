@@ -3,6 +3,7 @@ package app.logdate.feature.core.main
 import app.logdate.feature.core.sync.AccountSyncStatus
 import app.logdate.feature.core.sync.SyncAction
 import app.logdate.feature.core.sync.SyncPresentation
+import app.logdate.feature.core.sync.messageResource
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.sync_account_waiting
 import kotlin.test.Test

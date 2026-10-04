@@ -33,12 +33,12 @@ class AndroidCloudArchiveStatusSource(
             archiveWorkState(immediate, periodic)
         }.map { workState ->
             try {
-                if (!identityKeyManager.isRecoveryPhraseVerified()) {
+                if (!identityKeyManager.hasIdentityKey()) {
                     return@map CloudArchiveStatus(CloudArchivePhase.NEEDS_RECOVERY)
                 }
                 val remote = cloudBackupDataSource.listBackups(session.accessToken)
                 resolveCloudArchiveStatus(
-                    recoveryVerified = true,
+                    identityKeyAvailable = true,
                     workState = workState,
                     serverCompletedAt =
                         remote.getOrNull()?.let { backups ->

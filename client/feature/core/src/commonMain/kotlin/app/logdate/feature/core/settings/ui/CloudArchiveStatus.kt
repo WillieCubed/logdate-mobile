@@ -56,12 +56,12 @@ fun scopedCloudArchiveStatus(
 
 /** A completed worker is not proof that an archive exists on the server. */
 fun resolveCloudArchiveStatus(
-    recoveryVerified: Boolean,
+    identityKeyAvailable: Boolean,
     workState: ArchiveWorkState,
     serverCompletedAt: Long?,
     serverLookupFailed: Boolean,
 ): CloudArchiveStatus {
-    if (!recoveryVerified) return CloudArchiveStatus(CloudArchivePhase.NEEDS_RECOVERY)
+    if (!identityKeyAvailable) return CloudArchiveStatus(CloudArchivePhase.NEEDS_RECOVERY)
     val confirmedAt = if (serverLookupFailed) null else serverCompletedAt
     val phase =
         when (workState) {

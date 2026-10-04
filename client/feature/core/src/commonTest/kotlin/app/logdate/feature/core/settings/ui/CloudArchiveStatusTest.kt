@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 
 class CloudArchiveStatusTest {
     @Test
-    fun `unverified recovery never reports a successful archive`() {
+    fun `missing identity never reports a successful archive`() {
         val status = resolveCloudArchiveStatus(false, ArchiveWorkState.SUCCEEDED, 1234L, false)
 
         assertEquals(CloudArchivePhase.NEEDS_RECOVERY, status.phase)

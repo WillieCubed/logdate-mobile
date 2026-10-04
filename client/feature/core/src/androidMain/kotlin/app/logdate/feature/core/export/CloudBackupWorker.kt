@@ -44,7 +44,7 @@ class CloudBackupWorker(
     override suspend fun doWork(): Result {
         pruneAbandonedCloudArchives(context)
         val originBoundSession = sessionStorage.getOriginBoundSession() ?: return unboundSessionResult()
-        recoveryNotReadyResult()?.let { return it }
+        identityNotReadyResult()?.let { return it }
         return backUp(originBoundSession)
     }
 
@@ -57,20 +57,19 @@ class CloudBackupWorker(
             Result.retry()
         }
 
-    /** Returns the result to finish with when backups must wait for recovery setup, or null to continue. */
-    private suspend fun recoveryNotReadyResult(): Result? {
-        val recoveryVerified =
+    private suspend fun identityNotReadyResult(): Result? {
+        val hasIdentity =
             try {
-                identityKeyManager.isRecoveryPhraseVerified()
+                identityKeyManager.hasIdentityKey()
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: Throwable) {
-                Napier.w("CloudBackupWorker: could not check recovery setup")
+                Napier.w("CloudBackupWorker: could not check encryption identity")
                 return Result.retry()
             }
-        if (recoveryVerified) return null
-        Napier.d("CloudBackupWorker: recovery setup is incomplete; skipping backup")
-        return Result.success()
+        if (hasIdentity) return null
+        Napier.d("CloudBackupWorker: waiting for encryption identity; retrying")
+        return Result.retry()
     }
 
     private suspend fun backUp(originBoundSession: OriginBoundSession): Result {

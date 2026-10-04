@@ -2,7 +2,6 @@
 
 package app.logdate.feature.core.settings.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,24 +37,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import app.logdate.client.sync.SyncPausedReason
 import app.logdate.feature.core.sync.SyncProgressIndicator
+import app.logdate.feature.core.sync.accountSyncStatus
+import app.logdate.feature.core.sync.messageResource
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
-import app.logdate.util.toReadableDateTimeShort
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.backing_up_progress
 import logdate.client.feature.core.generated.resources.create_account
-import logdate.client.feature.core.generated.resources.entry_sync_now
 import logdate.client.feature.core.generated.resources.entry_sync_title
-import logdate.client.feature.core.generated.resources.last_sync_failed
-import logdate.client.feature.core.generated.resources.last_synced_time
-import logdate.client.feature.core.generated.resources.never_synced
 import logdate.client.feature.core.generated.resources.sign_in
 import logdate.client.feature.core.generated.resources.sync_and_backup
-import logdate.client.feature.core.generated.resources.sync_background_limited
 import logdate.client.feature.core.generated.resources.sync_devices_subtitle
 import logdate.client.feature.core.generated.resources.sync_feature_access
 import logdate.client.feature.core.generated.resources.sync_feature_backup
@@ -66,22 +59,8 @@ import logdate.client.feature.core.generated.resources.sync_feedback_sign_in_act
 import logdate.client.feature.core.generated.resources.sync_feedback_started
 import logdate.client.feature.core.generated.resources.sync_feedback_succeeded
 import logdate.client.feature.core.generated.resources.sync_feedback_up_to_date
-import logdate.client.feature.core.generated.resources.sync_paused_background_data_off
-import logdate.client.feature.core.generated.resources.sync_paused_background_data_off_fix
-import logdate.client.feature.core.generated.resources.sync_paused_media_waiting_for_wifi
-import logdate.client.feature.core.generated.resources.sync_paused_needs_recovery_phrase
-import logdate.client.feature.core.generated.resources.sync_paused_needs_recovery_phrase_fix
-import logdate.client.feature.core.generated.resources.sync_paused_offline
-import logdate.client.feature.core.generated.resources.sync_paused_signed_out
-import logdate.client.feature.core.generated.resources.sync_status_queued
-import logdate.client.feature.core.generated.resources.sync_status_retry_scheduled
-import logdate.client.feature.core.generated.resources.sync_status_unavailable
-import logdate.client.feature.core.generated.resources.sync_status_waiting
-import logdate.client.feature.core.generated.resources.syncing
-import logdate.client.feature.core.generated.resources.syncing_remaining
 import logdate.client.ui.generated.resources.common_loading
 import org.jetbrains.compose.resources.getString
-import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import logdate.client.ui.generated.resources.Res as UiRes
@@ -421,26 +400,14 @@ private fun SyncStatusItem(
     onNavigateToRecoveryPhrase: () -> Unit,
 ) {
     ListItem(
-        // The state itself is the headline. There used to be a "Sync Status" label above it,
-        // which named the row rather than telling anyone anything, and pushed the one line that
-        // matters into the small print.
         headlineContent = { SyncStatusText(syncStatus, onNavigateToRecoveryPhrase) },
         leadingContent = {
-            // Shown only while something is actually happening, so the row is quiet at rest.
             if (syncStatus?.isSyncing == true) {
                 SyncProgressIndicator(
                     total = syncStatus.totalForRun,
                     completed = syncStatus.completedInRun,
                     modifier = Modifier.size(28.dp),
                 )
-            }
-        },
-        trailingContent = {
-            Button(
-                onClick = onSyncNow,
-                enabled = syncStatus?.isSyncing != true,
-            ) {
-                Text(stringResource(Res.string.entry_sync_now))
             }
         },
     )
@@ -452,108 +419,9 @@ private fun SyncStatusText(
     onNavigateToRecoveryPhrase: () -> Unit,
 ) {
     syncStatus?.let { status ->
-        val pausedReason = status.pausedReason
-        if (status.isSyncing) {
-            // A bare "Syncing..." says nothing about whether 6 or 600 entries are left, which on
-            // a first sync is the difference between a moment and an hour. Prefer a real
-            // fraction; fall back to the count left, and only then to the bare word.
-            val total = status.totalForRun
-            val remaining = status.pendingUploads
-            Text(
-                text =
-                    when {
-                        total != null -> stringResource(Res.string.backing_up_progress, status.completedInRun, total)
-                        remaining > 0 -> stringResource(Res.string.syncing_remaining, remaining)
-                        else -> stringResource(Res.string.syncing)
-                    },
-                color = MaterialTheme.colorScheme.primary,
-            )
-        } else if (pausedReason != null) {
-            // A paused backup used to render as "Last synced <hours ago>", which reads as
-            // healthy while nothing is being backed up at all. Say what is holding it up, and
-            // for the one cause the user can actually clear, say what to do about it.
-            Column {
-                Text(
-                    text =
-                        when (pausedReason) {
-                            SyncPausedReason.BACKGROUND_DATA_OFF ->
-                                stringResource(Res.string.sync_paused_background_data_off)
-
-                            SyncPausedReason.OFFLINE -> stringResource(Res.string.sync_paused_offline)
-                            SyncPausedReason.MEDIA_WAITING_FOR_WIFI ->
-                                stringResource(Res.string.sync_paused_media_waiting_for_wifi)
-                            SyncPausedReason.NOT_SIGNED_IN -> stringResource(Res.string.sync_paused_signed_out)
-                            SyncPausedReason.NEEDS_RECOVERY_PHRASE ->
-                                stringResource(Res.string.sync_paused_needs_recovery_phrase)
-                        },
-                    // Only the states the user has to do something about are coloured as
-                    // problems. Waiting for Wi-Fi resolves itself, and dressing it up as an error
-                    // teaches people to ignore the line that matters.
-                    color =
-                        when (pausedReason) {
-                            SyncPausedReason.BACKGROUND_DATA_OFF,
-                            SyncPausedReason.NOT_SIGNED_IN,
-                            SyncPausedReason.NEEDS_RECOVERY_PHRASE,
-                            -> MaterialTheme.colorScheme.error
-
-                            SyncPausedReason.OFFLINE,
-                            SyncPausedReason.MEDIA_WAITING_FOR_WIFI,
-                            -> MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                )
-                if (pausedReason == SyncPausedReason.BACKGROUND_DATA_OFF) {
-                    Text(
-                        text = stringResource(Res.string.sync_paused_background_data_off_fix),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (pausedReason == SyncPausedReason.NEEDS_RECOVERY_PHRASE) {
-                    Text(
-                        text = stringResource(Res.string.sync_paused_needs_recovery_phrase_fix),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable(onClick = onNavigateToRecoveryPhrase),
-                    )
-                }
-            }
-        } else {
-            val statusText =
-                if (!status.queueReadable) {
-                    stringResource(Res.string.sync_status_unavailable)
-                } else if (status.requestState == app.logdate.client.sync.BackupRequestState.QUEUED) {
-                    stringResource(Res.string.sync_status_queued)
-                } else if (status.requestState == app.logdate.client.sync.BackupRequestState.RETRYING) {
-                    stringResource(Res.string.sync_status_retry_scheduled)
-                } else if (status.requestState == app.logdate.client.sync.BackupRequestState.FAILED) {
-                    stringResource(Res.string.last_sync_failed)
-                } else if (status.hasErrors) {
-                    stringResource(Res.string.last_sync_failed)
-                } else if (status.pendingUploads > 0) {
-                    // "All backed up" with items still in the queue told people there was nothing
-                    // left to wait for.
-                    pluralStringResource(Res.plurals.sync_status_waiting, status.pendingUploads, status.pendingUploads)
-                } else {
-                    status.lastSyncTime?.let {
-                        stringResource(Res.string.last_synced_time, it.toReadableDateTimeShort())
-                    } ?: stringResource(Res.string.never_synced)
-                }
-            Text(
-                text = statusText,
-                color =
-                    if (status.hasErrors) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-            )
-            if (status.backgroundWorkLimited && status.pendingUploads > 0) {
-                Text(
-                    text = stringResource(Res.string.sync_background_limited),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        Text(
+            text = stringResource(accountSyncStatus(status).messageResource()),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     } ?: Text(stringResource(UiRes.string.common_loading), color = MaterialTheme.colorScheme.onSurfaceVariant)
 }

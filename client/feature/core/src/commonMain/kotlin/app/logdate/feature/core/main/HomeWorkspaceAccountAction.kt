@@ -18,19 +18,18 @@ import androidx.compose.ui.unit.dp
 import app.logdate.feature.core.sync.AccountSyncStatus
 import app.logdate.feature.core.sync.SyncAction
 import app.logdate.feature.core.sync.SyncPresentation
+import app.logdate.feature.core.sync.messageResource
 import app.logdate.ui.streak.CampfirePresentation
 import app.logdate.ui.workspace.WorkspaceAccountAction
 import app.logdate.ui.workspace.WorkspaceAccountIndicator
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.settings
-import logdate.client.feature.core.generated.resources.sync_account_disabled
 import logdate.client.feature.core.generated.resources.sync_account_signed_out
 import logdate.client.feature.core.generated.resources.sync_account_waiting
 import logdate.client.feature.core.generated.resources.sync_banner_enter_recovery_phrase
 import logdate.client.feature.core.generated.resources.sync_banner_manage
 import logdate.client.feature.core.generated.resources.sync_banner_review
 import logdate.client.feature.core.generated.resources.sync_feedback_sign_in_action
-import logdate.client.feature.core.generated.resources.sync_feedback_up_to_date
 import logdate.client.feature.core.generated.resources.syncing
 import logdate.client.feature.core.generated.resources.workspace_journaling_streak
 import org.jetbrains.compose.resources.StringResource
@@ -100,26 +99,6 @@ internal fun SyncPresentation.accountSummaryResource(): StringResource? =
         is SyncPresentation.StorageError -> Res.string.sync_account_waiting
         is SyncPresentation.ConflictError -> Res.string.sync_account_waiting
         is SyncPresentation.NetworkError -> Res.string.sync_account_waiting
-    }
-
-internal fun AccountSyncStatus.messageResource(): StringResource =
-    when (this) {
-        AccountSyncStatus.UP_TO_DATE -> Res.string.sync_feedback_up_to_date
-        AccountSyncStatus.SYNCING -> Res.string.syncing
-        AccountSyncStatus.WAITING -> Res.string.sync_account_waiting
-        AccountSyncStatus.OFFLINE -> Res.string.sync_account_waiting
-        AccountSyncStatus.SERVER_UNAVAILABLE -> Res.string.sync_account_waiting
-        AccountSyncStatus.CONNECTION_UNAVAILABLE -> Res.string.sync_account_waiting
-        AccountSyncStatus.SIGN_IN_REQUIRED -> Res.string.sync_account_signed_out
-        AccountSyncStatus.STORAGE_FULL -> Res.string.sync_account_waiting
-        AccountSyncStatus.WAITING_FOR_WIFI -> Res.string.sync_account_waiting
-        AccountSyncStatus.BACKGROUND_RESTRICTED -> Res.string.sync_account_waiting
-        AccountSyncStatus.DEVICE_ACCESS_REQUIRED -> Res.string.sync_account_waiting
-        AccountSyncStatus.CONFLICT -> Res.string.sync_account_waiting
-        AccountSyncStatus.LOCAL_DATA_UNAVAILABLE -> Res.string.sync_account_waiting
-        AccountSyncStatus.MEDIA_TOO_LARGE -> Res.string.sync_account_waiting
-        AccountSyncStatus.UNKNOWN -> Res.string.sync_account_waiting
-        AccountSyncStatus.DISABLED -> Res.string.sync_account_disabled
     }
 
 @Composable
