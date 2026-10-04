@@ -35,6 +35,57 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class)
 class RepoBackedLogDateCollectionsRepositoryTest {
     @Test
+    fun `retry indexes a canonical create interrupted before its sync metadata was saved`() =
+        runTest {
+            val accounts = InMemoryAccountRepository()
+            val identity = identityService(accounts)
+            val account =
+                identity.ensureIdentity(
+                    accounts.save(
+                        Account(
+                            id = Uuid.random(),
+                            username = "recovery",
+                            displayName = "Recovery",
+                            createdAt = Clock.System.now(),
+                        ),
+                    ),
+                )
+            val backing = InMemoryLogDateCollectionsMetadataStore()
+            var fail = true
+            val metadata =
+                object : LogDateCollectionsMetadataStore by backing {
+                    override suspend fun upsert(
+                        userId: UUID,
+                        repoDid: AtprotoDid,
+                        collection: LogDateCollectionKind,
+                        recordKey: String,
+                    ): LogDateCollectionMetadata {
+                        if (fail) {
+                            fail = false
+                            error("Interrupted index write")
+                        }
+                        return backing.upsert(userId, repoDid, collection, recordKey)
+                    }
+                }
+            val repository =
+                RepoBackedLogDateCollectionsRepository(
+                    accounts,
+                    identity,
+                    SigningKeyService(InMemorySigningKeyRepository(), "test-kek"),
+                    InMemoryRepoBlockStore(),
+                    metadata,
+                )
+            val userId = account.id.toJavaUUID()
+            val entry = LogDateEntry("legacy-entry", "TEXT", "Opaque encrypted entry", null, 0, 10, 20, 0, DeviceId("device"))
+
+            assertFailsWith<IllegalStateException> { repository.createEntryIfAbsent(userId, entry) }
+            assertNull(repository.createEntryIfAbsent(userId, entry))
+            assertEquals(entry.content, repository.getEntry(userId, entry.id)?.content)
+            assertEquals(entry.createdAt, repository.getEntry(userId, entry.id)?.createdAt)
+            assertEquals(1, repository.entryChanges(userId, 0, 20).changes.size)
+        }
+
+    @Test
     fun `entries become canonical repo records while preserving sync change feeds`() =
         runTest {
             val accountRepository = InMemoryAccountRepository()
@@ -79,6 +130,7 @@ class RepoBackedLogDateCollectionsRepositoryTest {
                         ),
                 )
 
+            assertNull(repository.createEntryIfAbsent(userId, stored.copy(content = "Stale legacy copy")))
             val fetched = repository.getEntry(userId = userId, id = "entry-1")
             val snapshot = repository.listEntries(userId)
             val changes = repository.entryChanges(userId = userId, since = 0L, limit = 20)

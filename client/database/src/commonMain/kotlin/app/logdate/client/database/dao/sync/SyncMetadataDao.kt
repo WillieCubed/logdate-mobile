@@ -83,7 +83,7 @@ interface SyncMetadataDao {
     @Query(
         """INSERT OR IGNORE INTO pending_uploads
         (ownerId, serverOrigin, entityType, entityId, operation, createdAt, retryCount, expectedServerVersion, operationId)
-        SELECT :ownerId, :serverOrigin, :entityType, :entityId, 'UPDATE', :createdAt, 0, :expectedServerVersion, :operationId
+        SELECT :ownerId, :serverOrigin, :entityType, :entityId, :operation, :createdAt, 0, :expectedServerVersion, :operationId
         WHERE NOT EXISTS (
             SELECT 1 FROM pending_uploads WHERE (ownerId = :ownerId OR ownerId = '')
             AND serverOrigin = :serverOrigin AND entityType = :entityType AND entityId = :entityId
@@ -97,7 +97,30 @@ interface SyncMetadataDao {
         createdAt: Long,
         expectedServerVersion: Long? = null,
         operationId: String = Uuid.random().toString(),
+        operation: String = "UPDATE",
     )
+
+    @Transaction
+    suspend fun bindCreateToServerVersion(
+        ownerId: String,
+        serverOrigin: String,
+        entityType: String,
+        entityId: String,
+        operationId: String,
+        serverVersion: Long,
+    ): Boolean {
+        val pending = getPending(ownerId, serverOrigin, entityType, entityId) ?: return false
+        if (pending.operation != "CREATE" || pending.operationId != operationId) return false
+        insertPending(
+            pending.copy(
+                operation = "UPDATE",
+                expectedServerVersion = serverVersion,
+                operationId = Uuid.random().toString(),
+                retryCount = 0,
+            ),
+        )
+        return true
+    }
 
     @Query(
         "DELETE FROM pending_uploads WHERE ownerId = :ownerId AND serverOrigin = :serverOrigin AND entityType = :entityType AND entityId = :entityId",

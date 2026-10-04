@@ -881,6 +881,20 @@ class FakeSyncMetadataService(
         updatePendingCount()
     }
 
+    override suspend fun bindCreateToServerVersion(
+        entityType: EntityType,
+        pending: PendingUpload,
+        serverVersion: Long,
+    ): Boolean {
+        if (pending.operation != PendingOperation.CREATE || !isCurrentOperation(entityType, pending)) return false
+        pendingUploads.getValue(entityType)[pending.entityId] = PendingOperation.UPDATE
+        if (trackOperationIdentity) operationIds[entityType to pending.entityId] = Uuid.random().toString()
+        repairVersions[entityType to pending.entityId] = serverVersion
+        retryCounts[entityType]?.set(pending.entityId, 0)
+        updatePendingCount()
+        return true
+    }
+
     override suspend fun enqueueRepairIfAbsent(
         entityId: String,
         entityType: EntityType,

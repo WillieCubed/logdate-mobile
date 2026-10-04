@@ -170,16 +170,7 @@ internal class SyncUploader(
                     -> {
                         val journal = journalsById[pending.entityId]
                         if (journal == null) {
-                            // Queued for upload but absent locally. Settling it is right -- there is
-                            // nothing left to send -- but it must not happen silently: the entry
-                            // never reached the server and this is the only trace it existed.
-                            Napier.w("Dropping queued journal: no longer present locally")
-                            retryCoordinator.markUploadSettled(
-                                EntityType.JOURNAL,
-                                pending,
-                                Clock.System.now(),
-                                0L,
-                            )
+                            errors.add(retryCoordinator.recordUnavailableOutboxEntry(EntityType.JOURNAL, pending))
                             continue
                         }
 
@@ -331,13 +322,7 @@ internal class SyncUploader(
                     -> {
                         val note = notesById[pending.entityId]
                         if (note == null) {
-                            Napier.w("Dropping queued note: no longer present locally")
-                            retryCoordinator.markUploadSettled(
-                                EntityType.NOTE,
-                                pending,
-                                Clock.System.now(),
-                                0L,
-                            )
+                            errors.add(retryCoordinator.recordUnavailableOutboxEntry(EntityType.NOTE, pending))
                             continue
                         }
                         val mediaRef = note.mediaRefOrNull()
@@ -523,10 +508,9 @@ internal class SyncUploader(
             if (EntityType.JOURNAL in neverSynced) {
                 val journals = journalRepository.allJournalsObserved.first()
                 journals.forEach { journal ->
-                    syncMetadataService.enqueuePending(
+                    syncMetadataService.enqueueCreateIfAbsent(
                         entityId = journal.id.toString(),
                         entityType = EntityType.JOURNAL,
-                        operation = PendingOperation.CREATE,
                     )
                 }
                 // Marked only once the loop above has fully succeeded -- if it throws partway,
@@ -537,10 +521,9 @@ internal class SyncUploader(
             if (EntityType.NOTE in neverSynced) {
                 val notes = journalNotesRepository.allNotesObserved.first()
                 notes.forEach { note ->
-                    syncMetadataService.enqueuePending(
+                    syncMetadataService.enqueueCreateIfAbsent(
                         entityId = note.uid.toString(),
                         entityType = EntityType.NOTE,
-                        operation = PendingOperation.CREATE,
                     )
                 }
                 firstSyncEnqueueStore.markEnqueued(EntityType.NOTE)
@@ -549,6 +532,7 @@ internal class SyncUploader(
             enqueueDraftsForRichSync()
         }.onFailure { error ->
             Napier.w("Could not queue existing entries for the first sync")
+            throw error
         }
     }
 

@@ -5,12 +5,14 @@ import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.KeyDerivation
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.sync.cloud.CloudApiClient
+import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
 import app.logdate.client.sync.cloud.InMemorySecureStorage
 import app.logdate.client.sync.cloud.TestCryptoManager
 import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.InMemoryFirstSyncEnqueueStore
+import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.test.FakeJournalNotesRepository
 import app.logdate.client.sync.test.fakeCloudApiClient
 import app.logdate.client.sync.test.fakeSyncMetadataService
@@ -19,6 +21,8 @@ import app.logdate.shared.model.sync.ContentChange
 import app.logdate.shared.model.sync.ContentChangesResponse
 import app.logdate.shared.model.sync.ContentUpdateRequest
 import app.logdate.shared.model.sync.ContentUpdateResponse
+import app.logdate.shared.model.sync.ContentUploadRequest
+import app.logdate.shared.model.sync.ContentUploadResponse
 import app.logdate.shared.model.sync.VersionConstraint
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -32,7 +36,12 @@ import kotlin.uuid.Uuid
 
 class LegacyRepairCycleTest {
     @Test
-    fun `legacy repair is downloaded and verified on the next full sync without losing local content`() =
+    fun `legacy repair is downloaded and verified on the next full sync without losing local content`() = repairCycle(false)
+
+    @Test
+    fun `a previously queued create cannot block recovery of its existing legacy cloud record`() = repairCycle(true)
+
+    private fun repairCycle(queuedCreate: Boolean) =
         runTest {
             suspend fun cipher(seed: String): SyncPayloadCipher {
                 val crypto = TestCryptoManager()
@@ -69,6 +78,12 @@ class LegacyRepairCycleTest {
                             ),
                         )
 
+                    override suspend fun uploadContent(
+                        accessToken: String,
+                        content: ContentUploadRequest,
+                    ): Result<ContentUploadResponse> =
+                        Result.failure(CloudApiException("CONTENT_EXISTS", "Already exists", statusCode = 412))
+
                     override suspend fun updateContent(
                         accessToken: String,
                         contentId: String,
@@ -97,6 +112,7 @@ class LegacyRepairCycleTest {
                 )
             val notes = FakeJournalNotesRepository().apply { create(local) }
             val metadata = fakeSyncMetadataService()
+            if (queuedCreate) metadata.enqueuePending(id.toString(), EntityType.NOTE, PendingOperation.CREATE)
             val firstSync =
                 InMemoryFirstSyncEnqueueStore().apply {
                     markEnqueued(EntityType.NOTE)

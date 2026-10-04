@@ -1,5 +1,6 @@
 package app.logdate.client.sync
 
+import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncBackoff
@@ -36,6 +37,47 @@ class SyncDeadLetterRetentionTest {
         )
 
     private val entityId = Uuid.random().toString()
+
+    @Test
+    fun `an update resumes a retained repair after repeated interruption without a crash loop`() =
+        runTest {
+            metadataService.enqueueRepairIfAbsent(entityId, EntityType.NOTE, expectedServerVersion = 42)
+            val pending = metadataService.getPendingUploads(EntityType.NOTE).single()
+            coordinator.beginUpload(EntityType.NOTE, pending)
+            coordinator.beginUpload(EntityType.NOTE, pending)
+            assertTrue(coordinator.beginUpload(EntityType.NOTE, pending) != null)
+            assertFalse(coordinator.shouldAttempt(EntityType.NOTE, pending))
+
+            coordinator.releaseBackoff(afterUpgrade = true)
+
+            assertTrue(coordinator.shouldAttempt(EntityType.NOTE, pending))
+            assertEquals(null, coordinator.beginUpload(EntityType.NOTE, pending), "Updated code gets a fresh attempt")
+            assertEquals(pending.operationId, metadataService.getPendingUploads(EntityType.NOTE).single().operationId)
+            assertEquals(42L, metadataService.getPendingUploads(EntityType.NOTE).single().expectedServerVersion)
+            coordinator.beginUpload(EntityType.NOTE, pending)
+            assertTrue(coordinator.beginUpload(EntityType.NOTE, pending) != null, "Repeated interruption is still throttled")
+        }
+
+    @Test
+    fun `restored connectivity releases a retained network failure without changing the repair operation`() =
+        runTest {
+            metadataService.enqueueRepairIfAbsent(entityId, EntityType.NOTE, expectedServerVersion = 42)
+            val pending = metadataService.getPendingUploads(EntityType.NOTE).single()
+            coordinator.handleRetryFailure(
+                EntityType.NOTE,
+                pending,
+                CloudApiException("NETWORK_ERROR", "Offline"),
+                permanent = true,
+            )
+            assertFalse(coordinator.shouldAttempt(EntityType.NOTE, pending))
+
+            coordinator.releaseBackoff()
+
+            assertTrue(coordinator.shouldAttempt(EntityType.NOTE, pending))
+            assertEquals(pending.operationId, metadataService.getPendingUploads(EntityType.NOTE).single().operationId)
+            assertEquals(42L, metadataService.getPendingUploads(EntityType.NOTE).single().expectedServerVersion)
+            assertEquals(1, deadLetterStore.list().size, "The failure remains recorded until a successful upload")
+        }
 
     /** Fails uploads until the coordinator gives up, so the test never restates the retry budget. */
     private suspend fun exhaustRetries(operation: PendingOperation = PendingOperation.CREATE) {

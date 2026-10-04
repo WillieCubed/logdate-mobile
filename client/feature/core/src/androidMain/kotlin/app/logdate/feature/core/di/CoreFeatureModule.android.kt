@@ -76,9 +76,7 @@ import app.logdate.feature.core.settings.ui.VoiceNotesSettingsViewModel
 import app.logdate.feature.core.settings.ui.devices.CodeScannerAvailability
 import app.logdate.feature.core.settings.ui.devices.PlayServicesCodeScannerAvailability
 import app.logdate.feature.core.streak.CampfireViewModel
-import app.logdate.feature.core.sync.SyncIssuesViewModel
 import app.logdate.feature.core.sync.SyncPresentationViewModel
-import app.logdate.feature.core.sync.SyncStatusViewModel
 import app.logdate.shared.config.LogDateConfigRepository
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.workmanager.dsl.workerOf
@@ -253,17 +251,7 @@ actual val coreFeatureModule: Module =
         viewModel { PeopleDirectoryViewModel(get(), get()) }
         viewModel { PeopleInboxViewModel(get()) }
         viewModel { PersonDetailViewModel(get(), get()) }
-        viewModel { SyncIssuesViewModel(get(), get(), get(), get()) }
         viewModel { SyncPresentationViewModel(syncManager = get(), sessionStorage = get()) }
-        viewModel {
-            SyncStatusViewModel(
-                syncManager = get(),
-                syncMetadataService = get(),
-                sessionStorage = get(),
-                journalRepository = get(),
-                journalNotesRepository = get(),
-            )
-        }
         viewModel { CampfireViewModel(observeCampfire = get(), featureFlagStore = get()) }
     }
 

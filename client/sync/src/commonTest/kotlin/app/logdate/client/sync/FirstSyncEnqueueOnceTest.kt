@@ -16,6 +16,7 @@ import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -34,6 +35,38 @@ import kotlin.test.assertTrue
  * per entity type.
  */
 class FirstSyncEnqueueOnceTest {
+    @Test
+    fun `legacy sweep preserves an existing deletion and the identity of a pending edit`() =
+        runTest {
+            val journals = fakeJournalRepository().apply { create(Journal(title = "Existing journal")) }
+            val notes = fakeJournalNotesRepository("surviving entry")
+            val metadata =
+                app.logdate.client.sync.test
+                    .FakeSyncMetadataService(trackOperationIdentity = true)
+            val journalId =
+                journals.allJournalsObserved
+                    .first()
+                    .single()
+                    .id
+                    .toString()
+            val noteId =
+                notes.allNotesObserved
+                    .first()
+                    .single()
+                    .uid
+                    .toString()
+            metadata.enqueuePending(journalId, EntityType.JOURNAL, PendingOperation.DELETE)
+            metadata.enqueueRepairIfAbsent(noteId, EntityType.NOTE, expectedServerVersion = 42)
+            val deletion = metadata.getPendingUploads(EntityType.JOURNAL).single()
+            val repair = metadata.getPendingUploads(EntityType.NOTE).single()
+            val uploader = testSyncUploader(journalRepository = journals, journalNotesRepository = notes, syncMetadataService = metadata)
+
+            uploader.enqueueEverythingOnFirstSync()
+
+            assertEquals(deletion, metadata.getPendingUploads(EntityType.JOURNAL).single())
+            assertEquals(repair, metadata.getPendingUploads(EntityType.NOTE).single())
+        }
+
     @Test
     fun `failed draft read leaves scoped sweep unmarked for retry`() =
         runTest {
@@ -203,9 +236,8 @@ class FirstSyncEnqueueOnceTest {
                     firstSyncEnqueueStore = firstSyncStore,
                 )
 
-            // The journal sweep runs first and succeeds; the note sweep throws before it enqueues
-            // anything. enqueueEverythingOnFirstSync swallows the failure (it must not fail sync).
-            uploader.enqueueEverythingOnFirstSync()
+            // A failed inventory must fail the run, so it cannot report skipped records as backed up.
+            assertFailsWith<IllegalStateException> { uploader.enqueueEverythingOnFirstSync() }
 
             assertTrue(firstSyncStore.hasEnqueued(EntityType.JOURNAL), "the journal sweep completed and must be marked done")
             assertFalse(firstSyncStore.hasEnqueued(EntityType.NOTE), "the note sweep threw and must not be marked done")

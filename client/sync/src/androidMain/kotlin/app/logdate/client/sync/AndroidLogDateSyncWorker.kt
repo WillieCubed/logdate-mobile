@@ -13,11 +13,11 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.Operation
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.SessionStorage
+import app.logdate.client.device.AppInfoProvider
 import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
@@ -52,6 +52,8 @@ class AndroidLogDateSyncWorker(
 ) : CoroutineWorker(context, params),
     KoinComponent {
     private val syncManager: DefaultSyncManager by inject()
+    private val appInfoProvider: AppInfoProvider by inject()
+    private val upgradeResumption: SyncUpgradeResumption by inject()
 
     override suspend fun getForegroundInfo(): ForegroundInfo =
         SyncForegroundNotification.info(
@@ -62,6 +64,8 @@ class AndroidLogDateSyncWorker(
     override suspend fun doWork(): Result =
         try {
             Napier.i("Starting Android background sync worker")
+            val appInfo = appInfoProvider.getAppInfo()
+            syncManager.resumeAfterUpgrade("${appInfo.versionCode}:${appInfo.versionName}", upgradeResumption)
             // Without this the sync is ordinary background work and dies when the app leaves the
             // screen - part way through, with the queue half drained. Failing to promote is not
             // fatal (the permission may be denied); the sync just goes back to being cancellable.
@@ -227,7 +231,16 @@ class AndroidSyncManager(
             ) { authenticated, mode -> periodicScheduleDecider.next(authenticated, mode) }
                 .collect { change ->
                     when (change) {
-                        is PeriodicSyncScheduleChange.Enable -> setupPeriodicSync(change.requirement)
+                        is PeriodicSyncScheduleChange.Enable -> {
+                            try {
+                                setupPeriodicSync(change.requirement)
+                                resumeScheduledSync()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                Napier.e("Could not schedule authenticated sync")
+                            }
+                        }
                         PeriodicSyncScheduleChange.Disable -> disableBackgroundSync()
                         PeriodicSyncScheduleChange.Unchanged -> Unit
                     }
@@ -262,21 +275,19 @@ class AndroidSyncManager(
     }
 
     /**
-     * Handles network restoration by triggering a sync retry if the last sync
-     * failed due to a transient error (not authentication).
+     * Resumes retained work and fetches changes when connectivity returns, even if a previous
+     * process lost its last-error state or the scheduler is still waiting in backoff.
      */
     private suspend fun handleNetworkRestored() {
         Napier.i("Network stable after offline period, checking if sync retry needed")
-        val lastError = defaultSyncManager.getLastSyncError()
-
-        // Only retry if last error was transient (not auth)
-        if (lastError != null && lastError.type != SyncErrorType.AUTHENTICATION_ERROR) {
-            Napier.d("Retrying after network restoration")
-            scheduleImmediateSync(AndroidLogDateSyncWorker.SYNC_TYPE_FULL)
-        } else if (lastError == null) {
-            Napier.d("No previous sync error or last sync succeeded, skipping retry")
-        } else {
-            Napier.d("Last sync failed with auth error, not retrying on network restoration")
+        if (sessionStorage.getSession() == null) return
+        try {
+            defaultSyncManager.releaseUploadBackoff()
+            resumeScheduledSync()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            Napier.e("Could not resume sync after network restoration")
         }
     }
 
@@ -305,19 +316,32 @@ class AndroidSyncManager(
      * asked for attempts them.
      */
     private suspend fun backUpNow(): Operation {
-        runCatching { defaultSyncManager.releaseUploadBackoff() }
-            .onFailure { Napier.e("Could not release upload backoff for a manual backup") }
-        val running =
-            runCatching {
-                workManager
-                    .getWorkInfosForUniqueWorkFlow(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC)
-                    .first()
-                    .any { it.state == WorkInfo.State.RUNNING }
-            }.getOrDefault(false)
-        return scheduleImmediateSync(
-            AndroidLogDateSyncWorker.SYNC_TYPE_FULL,
-            policy = if (running) ExistingWorkPolicy.KEEP else ExistingWorkPolicy.REPLACE,
-        )
+        try {
+            defaultSyncManager.releaseUploadBackoff()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            Napier.e("Could not release upload backoff for a manual backup")
+        }
+        return resumeScheduledSync()
+    }
+
+    private suspend fun resumeScheduledSync(): Operation {
+        val policy =
+            try {
+                val states =
+                    workManager
+                        .getWorkInfosForUniqueWorkFlow(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC)
+                        .first()
+                        .map { it.state }
+                immediateSyncPolicy(states)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                Napier.e("Could not inspect scheduled sync; preserving any active request")
+                ExistingWorkPolicy.KEEP
+            }
+        return scheduleImmediateSync(AndroidLogDateSyncWorker.SYNC_TYPE_FULL, policy = policy)
     }
 
     /**

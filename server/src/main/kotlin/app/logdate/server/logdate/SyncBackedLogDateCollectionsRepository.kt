@@ -9,6 +9,8 @@ import app.logdate.server.sync.ContentRecord
 import app.logdate.server.sync.JournalDeletionMarker
 import app.logdate.server.sync.JournalRecord
 import app.logdate.server.sync.SyncRepository
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
 /**
@@ -20,6 +22,8 @@ import java.util.UUID
 class SyncBackedLogDateCollectionsRepository(
     private val syncRepository: SyncRepository,
 ) : LogDateCollectionsRepository {
+    private val creationMutex = Mutex()
+
     override suspend fun status(userId: UUID): LogDateCollectionsStatus =
         syncRepository.status(userId).let { status ->
             LogDateCollectionsStatus(
@@ -37,6 +41,19 @@ class SyncBackedLogDateCollectionsRepository(
         )
 
     override suspend fun upsertEntry(
+        userId: UUID,
+        entry: LogDateEntry,
+    ): LogDateEntry = creationMutex.withLock { writeEntry(userId, entry) }
+
+    override suspend fun createEntryIfAbsent(
+        userId: UUID,
+        entry: LogDateEntry,
+    ): LogDateEntry? =
+        creationMutex.withLock {
+            if (getEntry(userId, entry.id) != null) null else writeEntry(userId, entry)
+        }
+
+    private fun writeEntry(
         userId: UUID,
         entry: LogDateEntry,
     ): LogDateEntry =
@@ -83,6 +100,19 @@ class SyncBackedLogDateCollectionsRepository(
         loadAllJournals(userId = userId, changes = syncRepository::journalChanges)
 
     override suspend fun upsertJournal(
+        userId: UUID,
+        journal: LogDateJournal,
+    ): LogDateJournal = creationMutex.withLock { writeJournal(userId, journal) }
+
+    override suspend fun createJournalIfAbsent(
+        userId: UUID,
+        journal: LogDateJournal,
+    ): LogDateJournal? =
+        creationMutex.withLock {
+            if (getJournal(userId, journal.id) != null) null else writeJournal(userId, journal)
+        }
+
+    private fun writeJournal(
         userId: UUID,
         journal: LogDateJournal,
     ): LogDateJournal =

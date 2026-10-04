@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.sync.SyncManager
+import app.logdate.client.sync.metadata.effectiveReason
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
 /**
@@ -19,6 +21,11 @@ class SyncPresentationViewModel(
     syncManager: SyncManager,
     sessionStorage: SessionStorage,
 ) : ViewModel() {
+    val accountStatus: StateFlow<AccountSyncStatus?> =
+        combine(syncManager.syncStatusFlow, sessionStorage.getSessionFlow(), syncManager.observeDeadLetters()) { status, session, records ->
+            if (session == null) null else accountSyncStatus(status, records.map { it.effectiveReason() }.toSet())
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     val presentation: StateFlow<SyncPresentation> =
         observeSyncPresentation(syncManager, sessionStorage)
             .stateIn(

@@ -66,6 +66,8 @@ internal class DownloadStrategy<T : Any>(
     val hydrate: suspend (accessToken: String, item: T) -> T = { _, item -> item },
     val afterDelete: suspend (Uuid) -> Unit = {},
     val localItem: suspend (Uuid) -> T? = { id -> localItems()[id] },
+    val sameUploadedFields: suspend (local: T, remote: T) -> Boolean = { _, _ -> false },
+    val acknowledgeUpload: suspend (local: T, remote: T) -> Boolean = { _, _ -> false },
 )
 
 /**
@@ -118,20 +120,16 @@ internal class SyncDownloadEngine(
         selected: app.logdate.client.sync.recovery.DownloadScope? = downloadInbox?.currentScope(),
         observedVersions: Map<Uuid, Long> = emptyMap(),
     ) {
-        if (unreadable.isEmpty()) return
-        val (repairable, cloudOnly) = unreadable.partition { it in heldLocally }
-        for (id in repairable) {
-            ensureScope(selected)
-            val version = observedVersions[id]
-            if (selected != null && version == null) continue
-            syncMetadataService.enqueueRepairIfAbsent(id.toString(), entityType, version, selected?.origin)
-        }
-        if (cloudOnly.isNotEmpty()) {
-            unreadableCloudRecordStore.record(entityType, cloudOnly)
-        }
-        Napier.w(
-            "${repairable.size} unreadable $logLabel(s) queued to re-upload from this device; " +
-                "${cloudOnly.size} exist only in the cloud and were left in place",
+        enqueueUnreadableRepairs(
+            entityType,
+            logLabel,
+            unreadable,
+            heldLocally,
+            selected,
+            observedVersions,
+            syncMetadataService,
+            unreadableCloudRecordStore,
+            ::ensureScope,
         )
     }
 
@@ -155,7 +153,7 @@ internal class SyncDownloadEngine(
                     null
                 }
             // Promote legacy pending rows before entering any Room apply transaction.
-            syncMetadataService.getPendingUploads(strategy.entityType)
+            val pendingById = syncMetadataService.getPendingUploads(strategy.entityType).associateBy { it.entityId }
             val localById = strategy.localItems().toMutableMap()
 
             var cursor = downloadInbox?.cursor(strategy.entityType.name)?.let(Instant::fromEpochMilliseconds) ?: since
@@ -209,7 +207,7 @@ internal class SyncDownloadEngine(
                 val skippedIds = mutableSetOf<String>()
                 val failedIds = mutableSetOf<String>()
 
-                if (downloadScope != null) check(downloadScope == downloadInbox?.currentScope()) { "Download scope changed" }
+                if (downloadScope != null) check(downloadScope == downloadInbox.currentScope()) { "Download scope changed" }
                 val batchResult =
                     run {
                         var downloadedCount = 0
@@ -243,6 +241,19 @@ internal class SyncDownloadEngine(
                                         val id = strategy.idOf(item)
                                         val existing = strategy.localItem(id)
                                         val pendingLocal = syncMetadataService.hasPending(strategy.entityType, id.toString())
+
+                                        if (existing != null &&
+                                            acknowledgeUploadedOperation(
+                                                strategy,
+                                                existing,
+                                                item,
+                                                pendingById[id.toString()],
+                                                syncMetadataService,
+                                            )
+                                        ) {
+                                            localById[id] = strategy.localItem(id) ?: existing
+                                            return@record
+                                        }
 
                                         if (existing == null && pendingLocal) {
                                             skippedIds += id.toString()
@@ -602,7 +613,7 @@ internal class SyncDownloadEngine(
                 for (id in page.unreadable) {
                     page.unreadableVersions[id]?.let { version ->
                         if (downloadScope != null) {
-                            downloadInbox?.failed(
+                            downloadInbox.failed(
                                 strategy.entityType.name,
                                 id.toString(),
                                 DiagnosticReason.KEY_RECOVERY_REQUIRED.name,
@@ -616,7 +627,7 @@ internal class SyncDownloadEngine(
                 for (failure in page.failures) {
                     ensureScope(downloadScope)
                     if (downloadScope != null) {
-                        downloadInbox?.failed(
+                        downloadInbox.failed(
                             strategy.entityType.name,
                             failure.entityId,
                             failure.reason.name,
@@ -644,6 +655,7 @@ internal class SyncDownloadEngine(
                     Napier.w(
                         "Remote pagination did not advance",
                     )
+                    errors += SyncError(SyncErrorType.SERVER_ERROR, "Remote inventory remains incomplete", retryable = true)
                     break
                 }
 
@@ -695,16 +707,16 @@ internal class SyncDownloadEngine(
             ),
         )
     }
-
-    private fun conflictTimestamps(
-        localSyncVersion: Long,
-        localUpdatedAt: Instant,
-        remoteSyncVersion: Long,
-        remoteUpdatedAt: Instant,
-    ): Pair<Instant, Instant> =
-        if (localSyncVersion > 0L && remoteSyncVersion > 0L) {
-            Instant.fromEpochMilliseconds(localSyncVersion) to Instant.fromEpochMilliseconds(remoteSyncVersion)
-        } else {
-            localUpdatedAt to remoteUpdatedAt
-        }
 }
+
+private fun conflictTimestamps(
+    localSyncVersion: Long,
+    localUpdatedAt: Instant,
+    remoteSyncVersion: Long,
+    remoteUpdatedAt: Instant,
+): Pair<Instant, Instant> =
+    if (localSyncVersion > 0L && remoteSyncVersion > 0L) {
+        Instant.fromEpochMilliseconds(localSyncVersion) to Instant.fromEpochMilliseconds(remoteSyncVersion)
+    } else {
+        localUpdatedAt to remoteUpdatedAt
+    }

@@ -161,6 +161,46 @@ class DatabaseSyncMetadataService(
         }
     }
 
+    override suspend fun enqueueCreateIfAbsent(
+        entityId: String,
+        entityType: EntityType,
+    ) {
+        val origin = currentOrigin()
+        val owner = currentOwnerId()
+        dao.insertRepairIfAbsent(
+            owner,
+            origin,
+            entityType.name,
+            entityId,
+            Clock.System.now().toEpochMilliseconds(),
+            operation = PendingOperation.CREATE.name,
+        )
+    }
+
+    override suspend fun bindCreateToServerVersion(
+        entityType: EntityType,
+        pending: PendingUpload,
+        serverVersion: Long,
+    ): Boolean {
+        val selected = pending.scope ?: return false
+        val operationId = pending.operationId ?: return false
+        if (pending.operation != PendingOperation.CREATE ||
+            serverVersion <= 0 ||
+            selected.ownerId != currentOwnerId() ||
+            selected.serverOrigin != currentOrigin()
+        ) {
+            return false
+        }
+        return dao.bindCreateToServerVersion(
+            selected.ownerId,
+            selected.serverOrigin,
+            entityType.name,
+            pending.entityId,
+            operationId,
+            serverVersion,
+        )
+    }
+
     override suspend fun enqueueRepairIfAbsent(
         entityId: String,
         entityType: EntityType,

@@ -11,16 +11,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -72,11 +65,7 @@ import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.transcription.TranscriptionStatus
 import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.feature.core.sync.SyncAction
-import app.logdate.feature.core.sync.SyncErrorBanner
-import app.logdate.feature.core.sync.SyncPresentation
 import app.logdate.feature.core.sync.SyncPresentationViewModel
-import app.logdate.feature.core.sync.SyncStatusButton
-import app.logdate.feature.core.sync.SyncStatusSheet
 import app.logdate.feature.journals.ui.JournalClickCallback
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
 import app.logdate.feature.rewind.ui.RewindOverviewScreen
@@ -157,7 +146,6 @@ fun HomeScreen(
     onOpenDraft: (draftId: String) -> Unit = {},
     onImportBackup: () -> Unit = {},
     onOpenMediaDetail: (Uuid) -> Unit = {},
-    onOpenSyncIssues: () -> Unit = {},
     onOpenSyncSettings: () -> Unit = {},
     onOpenDay: (LocalDate) -> Unit = {},
     onOpenStreak: () -> Unit = {},
@@ -171,6 +159,7 @@ fun HomeScreen(
     // Held as State and read only inside the slots below, so a sync or streak update recomposes
     // the status button and banner rather than the whole home shell.
     val syncPresentation = syncPresentationViewModel.presentation.collectAsStateWithLifecycle()
+    val accountSyncStatus = syncPresentationViewModel.accountStatus.collectAsStateWithLifecycle()
     val campfire = campfireViewModel.presentation.collectAsStateWithLifecycle()
     val isLibraryEnabled by viewModel.isLibraryEnabled.collectAsStateWithLifecycle()
     val visibleDestinations = HomeRouteDestination.visibleEntries(isLibraryEnabled)
@@ -185,41 +174,17 @@ fun HomeScreen(
         }
     }
     val snackbarHostState = remember { SnackbarHostState() }
-    var showSyncStatus by rememberSaveable { mutableStateOf(false) }
-    if (showSyncStatus) {
-        SyncStatusSheet(
-            onDismiss = { showSyncStatus = false },
-            onOpenSyncSettings = onOpenSyncSettings,
-            onOpenSyncIssues = onOpenSyncIssues,
-            onSignIn = onOpenSettings,
-        )
-    }
     val onSyncAction: (SyncAction) -> Unit = { action ->
         when (action) {
             SyncAction.SignIn,
             SyncAction.ManageStorage,
             -> onOpenSettings()
-            SyncAction.ReviewConflicts, SyncAction.ReviewIssues -> onOpenSyncIssues()
-            SyncAction.OpenStatus -> showSyncStatus = true
+            SyncAction.ReviewConflicts, SyncAction.ReviewIssues -> Unit
+            SyncAction.OpenStatus -> onOpenSyncSettings()
             SyncAction.EnterRecoveryPhrase -> onOpenSyncSettings()
         }
     }
-    val syncBanner: @Composable () -> Unit = {
-        SyncErrorBanner(
-            presentation = syncPresentation.value,
-            onAction = onSyncAction,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 560.dp),
-        )
-    }
     val timelineStatusActions: @Composable RowScope.() -> Unit = {
-        SyncStatusButton(
-            presentation = syncPresentation.value,
-            onClick = { onSyncAction(SyncAction.OpenStatus) },
-            modifier = Modifier.padding(end = 4.dp),
-        )
         campfire.value?.let { presentation ->
             CampfireChip(
                 presentation = presentation,
@@ -251,7 +216,14 @@ fun HomeScreen(
             createLabel = if (currentDestination == HomeRouteDestination.Journals) "Create journal" else "Add a memory",
             onSearch = onOpenSearch,
             actions = {
-                HomeWorkspaceAccountAction(syncPresentation.value, campfire.value, onOpenSettings, onOpenStreak, onSyncAction)
+                HomeWorkspaceAccountAction(
+                    syncPresentation.value,
+                    campfire.value,
+                    onOpenSettings,
+                    onOpenStreak,
+                    onSyncAction,
+                    accountSyncStatus.value,
+                )
             },
             modifier = modifier,
         ) {
@@ -339,25 +311,7 @@ fun HomeScreen(
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         modifier = modifier,
     ) { innerPadding ->
-        // Action-required sync states (auth lapsed, quota exceeded, conflicts) need to surface
-        // on every home tab — the auth banner can't only render on Timeline. The Timeline tab
-        // itself still renders the banner inside TimelinePane (which is also used standalone in
-        // the desktop pane), so we suppress the home-level banner there to avoid duplication.
-        val showHomeLevelSyncBanner =
-            currentDestination != HomeRouteDestination.Timeline &&
-                when (val presentation = syncPresentation.value) {
-                    SyncPresentation.AuthError,
-                    SyncPresentation.NeedsRecovery,
-                    is SyncPresentation.StorageError,
-                    is SyncPresentation.ConflictError,
-                    -> true
-                    is SyncPresentation.NetworkError -> presentation.pendingCount > 0
-                    else -> false
-                }
         Column(modifier = Modifier.padding(innerPadding)) {
-            if (showHomeLevelSyncBanner) {
-                Box(Modifier.statusBarsPadding()) { syncBanner() }
-            }
             NavigationSuiteScaffold(
                 layoutType = navLayoutType,
                 containerColor = Color.Transparent,
@@ -470,7 +424,6 @@ fun HomeScreen(
                                             onImportBackup = onImportBackup,
                                             timelineSuggestion = uiState.timelineSuggestion,
                                             statusActions = timelineStatusActions,
-                                            banner = syncBanner,
                                         )
                                     }
                                 }
@@ -480,17 +433,7 @@ fun HomeScreen(
                                 locationContent(
                                     Modifier
                                         .applyScreenStyles()
-                                        .then(
-                                            if (showHomeLevelSyncBanner) {
-                                                Modifier.windowInsetsPadding(
-                                                    WindowInsets.safeDrawing.only(
-                                                        WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
-                                                    ),
-                                                )
-                                            } else {
-                                                Modifier.safeDrawingPadding()
-                                            },
-                                        ),
+                                        .safeDrawingPadding(),
                                 )
                             }
 

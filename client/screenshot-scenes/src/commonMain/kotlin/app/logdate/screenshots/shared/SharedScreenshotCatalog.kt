@@ -30,8 +30,6 @@ import app.logdate.client.repository.account.LinkedSignInProvider
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.sync.SyncStatus
-import app.logdate.client.sync.metadata.SyncDeadLetterReason
-import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.feature.core.account.CloudAccountSignInContent
 import app.logdate.feature.core.account.CloudAccountWelcomeContent
 import app.logdate.feature.core.account.PasskeyAccountCreationFinalContent
@@ -90,7 +88,6 @@ import app.logdate.feature.core.settings.ui.watch.WatchSyncSettingsContent
 import app.logdate.feature.core.settings.ui.watch.WatchTroubleshootingContent
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
-import app.logdate.feature.core.sync.SyncIssuesContent
 import app.logdate.feature.events.ui.calendarsync.CalendarSyncOverviewUiState
 import app.logdate.feature.events.ui.calendarsync.CalendarSyncSettingsContent
 import app.logdate.feature.events.ui.calendarsync.PermissionState
@@ -189,7 +186,6 @@ enum class SharedScreenshotSceneId(
     MemoriesSettings("memories-settings"),
     VoiceNotesSettings("voice-notes-settings"),
     SyncSettings("sync-settings"),
-    SyncIssues("sync-issues"),
     LocationSettings("location-settings"),
     LocationTrackingOptions("location-tracking-options"),
     LocationInterval("location-interval"),
@@ -932,51 +928,6 @@ object SharedScreenshotCatalog {
                         ),
                     isQuotaAvailable = true,
                     snackbarHostState = remember { SnackbarHostState() },
-                )
-            },
-            sharedScene(SharedScreenshotSceneId.SyncIssues, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
-                SyncIssuesContent(
-                    records =
-                        listOf(
-                            SyncDeadLetterRecord(
-                                id = "dead-letter-1",
-                                entityType = "NOTE",
-                                entityId = "note-2026-06-14",
-                                operation = "UPDATE",
-                                retryCount = 3,
-                                lastError = "Service Unavailable",
-                                failedAt = baseInstant.toEpochMilliseconds(),
-                                reason = SyncDeadLetterReason.SERVER_UNAVAILABLE,
-                            ),
-                            SyncDeadLetterRecord(
-                                id = "dead-letter-2",
-                                entityType = "MEDIA",
-                                entityId = "media-summer-video",
-                                operation = "CREATE",
-                                retryCount = 2,
-                                lastError = "No such file",
-                                failedAt = baseInstant.toEpochMilliseconds(),
-                                reason = SyncDeadLetterReason.MISSING_FILE,
-                            ),
-                            SyncDeadLetterRecord(
-                                id = "dead-letter-3",
-                                entityType = "JOURNAL",
-                                entityId = "journal-family",
-                                operation = "UPDATE",
-                                retryCount = 1,
-                                lastError = "Unauthorized",
-                                failedAt = baseInstant.toEpochMilliseconds(),
-                                reason = SyncDeadLetterReason.SIGN_IN_REQUIRED,
-                            ),
-                        ),
-                    labels =
-                        mapOf(
-                            "dead-letter-1" to "Summer trip notes",
-                            "dead-letter-3" to "Family journal",
-                        ),
-                    onRetry = {},
-                    onDiscard = {},
-                    onGoBack = {},
                 )
             },
             sharedScene(SharedScreenshotSceneId.LocationSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {

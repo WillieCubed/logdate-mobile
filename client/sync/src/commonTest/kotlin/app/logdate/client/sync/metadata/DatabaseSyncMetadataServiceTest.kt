@@ -18,6 +18,27 @@ import kotlin.time.Instant
 
 class DatabaseSyncMetadataServiceTest {
     @Test
+    fun `legacy create binding preserves newer mutations and makes old settlement stale`() =
+        runTest {
+            val dao = InMemorySyncMetadataDao()
+            val metadata = service(dao, "owner", "https://first.example")
+            metadata.enqueuePending("legacy", EntityType.NOTE, PendingOperation.CREATE)
+            val captured = metadata.getPendingUploads(EntityType.NOTE).single()
+            assertTrue(metadata.bindCreateToServerVersion(EntityType.NOTE, captured, 42))
+            val repair = metadata.getPendingUploads(EntityType.NOTE).single()
+            assertEquals(PendingOperation.UPDATE, repair.operation)
+            assertEquals(42L, repair.expectedServerVersion)
+            kotlin.test.assertNotEquals(captured.operationId, repair.operationId)
+            kotlin.test.assertFalse(metadata.settleIfCurrent(EntityType.NOTE, captured, Instant.fromEpochMilliseconds(10), 42))
+            metadata.enqueuePending("legacy", EntityType.NOTE, PendingOperation.DELETE)
+            val deletion = metadata.getPendingUploads(EntityType.NOTE).single()
+            kotlin.test.assertFalse(metadata.bindCreateToServerVersion(EntityType.NOTE, captured, 43))
+            assertEquals(deletion, metadata.getPendingUploads(EntityType.NOTE).single())
+            val anotherServer = service(dao, "owner", "https://other.example")
+            kotlin.test.assertFalse(anotherServer.bindCreateToServerVersion(EntityType.NOTE, captured, 43))
+        }
+
+    @Test
     fun `delete remains queued when a create may already have reached the server`() =
         runTest {
             val dao = InMemorySyncMetadataDao()
@@ -40,7 +61,7 @@ class DatabaseSyncMetadataServiceTest {
             assertNotNull(captured.operationId)
             assertTrue(
                 app.logdate.shared.model.diagnostics.DiagnosticReportCodec
-                    .isCorrelationId(captured.operationId!!),
+                    .isCorrelationId(captured.operationId),
             )
             first.incrementRetryCount("note", EntityType.NOTE)
             val reopened = service(dao, "owner", "https://first.example")
@@ -286,6 +307,7 @@ class DatabaseSyncMetadataServiceTest {
             createdAt: Long,
             expectedServerVersion: Long?,
             operationId: String,
+            operation: String,
         ) {
             if (pendingRows.none {
                     (it.ownerId == ownerId || it.ownerId.isEmpty()) &&
@@ -300,7 +322,7 @@ class DatabaseSyncMetadataServiceTest {
                         serverOrigin,
                         entityType,
                         entityId,
-                        "UPDATE",
+                        operation,
                         createdAt,
                         expectedServerVersion = expectedServerVersion,
                     ),

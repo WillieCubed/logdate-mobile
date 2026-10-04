@@ -78,6 +78,21 @@ interface SyncMetadataService {
         operation: PendingOperation,
     )
 
+    /** Backfills a surviving local record without replacing an edit, deletion, or repair. */
+    suspend fun enqueueCreateIfAbsent(
+        entityId: String,
+        entityType: EntityType,
+    ) {
+        if (!hasPending(entityType, entityId)) enqueuePending(entityId, entityType, PendingOperation.CREATE)
+    }
+
+    /** Bind a captured CREATE to an observed encrypted legacy version without replacing a newer mutation. */
+    suspend fun bindCreateToServerVersion(
+        entityType: EntityType,
+        pending: PendingUpload,
+        serverVersion: Long,
+    ): Boolean = false
+
     /** Enqueues recovery of a surviving local copy without replacing a user mutation. */
     suspend fun enqueueRepairIfAbsent(
         entityId: String,

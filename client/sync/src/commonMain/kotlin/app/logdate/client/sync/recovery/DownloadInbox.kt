@@ -39,6 +39,15 @@ class DownloadInbox(
 ) {
     fun currentScope(): DownloadScope = scope()
 
+    suspend fun hasRecord(
+        type: String,
+        id: String,
+        selected: DownloadScope,
+    ): Boolean {
+        check(selected == scope()) { "Download scope changed" }
+        return dao.get(selected.owner, selected.origin, type, id) != null
+    }
+
     suspend fun rewindForLegacyAudit(selected: DownloadScope = scope()) {
         check(selected == scope()) { "Download scope changed" }
         transactions.withTransaction {

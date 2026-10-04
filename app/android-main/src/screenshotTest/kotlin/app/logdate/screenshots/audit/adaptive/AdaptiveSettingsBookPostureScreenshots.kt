@@ -181,13 +181,6 @@ fun A28_SyncSettingsBookPosture() {
 }
 
 @PreviewTest
-@Preview(name = "Sync issues book posture", showBackground = true, device = BOOK_FOLDABLE)
-@Composable
-fun A29_SyncIssuesBookPosture() {
-    BookPostureSettingsScene(SharedScreenshotSceneId.SyncIssues)
-}
-
-@PreviewTest
 @Preview(name = "Location settings book posture", showBackground = true, device = BOOK_FOLDABLE)
 @Composable
 fun A30_LocationSettingsBookPosture() {

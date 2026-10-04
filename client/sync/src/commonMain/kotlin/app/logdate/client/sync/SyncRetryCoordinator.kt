@@ -11,6 +11,8 @@ import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
+import app.logdate.client.sync.metadata.UploadScope
+import app.logdate.client.sync.metadata.effectiveReason
 import app.logdate.client.sync.metadata.retryKey
 import app.logdate.shared.model.diagnostics.DiagnosticAction
 import app.logdate.shared.model.diagnostics.DiagnosticOutcome
@@ -52,15 +54,25 @@ internal class SyncRetryCoordinator(
     private val diagnostics: (SyncDiagnosticEvent, DiagnosticSource?) -> Unit = { _, _ -> },
 ) {
     /**
-     * Lets every waiting entry be attempted on the next pass, for when the user asks to back up
-     * now. Entries already set aside in Sync issues keep their schedule: they failed for a reason
-     * the user has been shown, and retrying them there is the user's call.
+     * Reconsiders transient failures when connectivity returns. A new build also reconsiders
+     * retained failures, including interrupted uploads, once after its durable upgrade check.
      */
-    suspend fun releaseBackoff() {
+    suspend fun releaseBackoff(
+        afterUpgrade: Boolean = false,
+        expectedScope: UploadScope? = null,
+    ) {
         val setAside = deadLetterStore.list()
         for (entityType in EntityType.entries) {
             for (pending in syncMetadataService.getPendingUploads(entityType)) {
-                if (setAside.any { it.entityType == entityType.name && it.matches(pending) }) continue
+                if (expectedScope != null && pending.scope != expectedScope) continue
+                val retained = setAside.firstOrNull { it.entityType == entityType.name && it.matches(pending) }
+                if (!afterUpgrade && retained != null && retained.effectiveReason() !in TRANSIENT_REASONS) continue
+                if (!syncMetadataService.isCurrentOperation(entityType, pending)) continue
+                if (afterUpgrade) {
+                    retryScheduleStore.clear(entityType, pending.retryKey())
+                    clearFailureKind(entityType, pending.retryKey())
+                    continue
+                }
                 if (retryScheduleStore.nextAttemptAt(entityType, pending.retryKey()) != null) {
                     retryScheduleStore.setNextAttemptAt(entityType, pending.retryKey(), 0L)
                 }
@@ -393,18 +405,22 @@ internal class SyncRetryCoordinator(
         markUploadSettled(entityType, pending, syncedAt, version)
     }
 
-    /**
-     * An outbox entry's own ID/key couldn't be parsed. Nothing will ever fix that by retrying, so
-     * this settles it immediately (no retry state was ever scheduled for it, hence no
-     * [retryScheduleStore] clear) and returns the [SyncError] to report for it.
-     */
+    /** Retain unsupported legacy identifiers so a later compatibility repair can recover them. */
     suspend fun recordUnparsableOutboxEntry(
         entityType: EntityType,
         pending: PendingUpload,
         description: String,
     ): SyncError {
-        markUploadSettled(entityType, pending, Clock.System.now(), 0L, DiagnosticOutcome.FAILED)
+        handleRetryFailure(entityType, pending, IllegalArgumentException("Invalid $description"), permanent = true)
         return SyncError(SyncErrorType.UNKNOWN_ERROR, "Invalid queued upload", retryable = false)
+    }
+
+    suspend fun recordUnavailableOutboxEntry(
+        entityType: EntityType,
+        pending: PendingUpload,
+    ): SyncError {
+        handleRetryFailure(entityType, pending, IllegalStateException("Local upload record is unavailable"), permanent = true)
+        return SyncError(SyncErrorType.UNKNOWN_ERROR, "Local upload record is unavailable", retryable = false)
     }
 
     /**
@@ -473,6 +489,12 @@ internal class SyncRetryCoordinator(
             expectedServerVersion == pending.expectedServerVersion
 
     private companion object {
+        val TRANSIENT_REASONS =
+            setOf(
+                SyncDeadLetterReason.NETWORK_UNAVAILABLE,
+                SyncDeadLetterReason.SERVER_UNAVAILABLE,
+                SyncDeadLetterReason.SIGN_IN_REQUIRED,
+            )
         const val MAX_RETRY_ATTEMPTS = 9
 
         /** Consecutive attempts that never finished before an entry is set aside. */

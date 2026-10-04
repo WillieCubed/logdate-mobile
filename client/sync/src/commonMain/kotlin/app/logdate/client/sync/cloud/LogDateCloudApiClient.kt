@@ -87,8 +87,8 @@ class LogDateCloudApiClient(
             (accessToken != null || refreshToken != null) &&
             (
                 bound?.origin != origin ||
-                    (accessToken != null && bound?.session?.accessToken != accessToken) ||
-                    (refreshToken != null && bound?.session?.refreshToken != refreshToken)
+                    (accessToken != null && bound.session.accessToken != accessToken) ||
+                    (refreshToken != null && bound.session.refreshToken != refreshToken)
             )
         ) {
             throw scopeChanged()
@@ -415,6 +415,7 @@ class LogDateCloudApiClient(
             val response =
                 transport.put("$baseUrl/contents/${content.id}") {
                     headers.append("Authorization", "Bearer $accessToken")
+                    headers.append(HttpHeaders.IfNoneMatch, "*")
                     contentType(ContentType.Application.Json)
                     setBody(content)
                 }
@@ -536,6 +537,7 @@ class LogDateCloudApiClient(
             val response =
                 transport.put("$baseUrl/journals/${journal.id}") {
                     headers.append("Authorization", "Bearer $accessToken")
+                    headers.append(HttpHeaders.IfNoneMatch, "*")
                     contentType(ContentType.Application.Json)
                     setBody(journal)
                 }

@@ -15,6 +15,18 @@ import app.logdate.client.datastore.KeyValueStorage
  * downloads ever succeed.
  */
 interface FirstSyncEnqueueStore {
+    suspend fun hasEnqueuedLocalScope(
+        ownerId: String,
+        serverOrigin: String,
+        entityType: EntityType,
+    ): Boolean
+
+    suspend fun markEnqueuedLocalScope(
+        ownerId: String,
+        serverOrigin: String,
+        entityType: EntityType,
+    )
+
     suspend fun hasEnqueuedAssociationScope(
         ownerId: String,
         serverOrigin: String,
@@ -52,6 +64,22 @@ interface FirstSyncEnqueueStore {
 }
 
 class InMemoryFirstSyncEnqueueStore : FirstSyncEnqueueStore {
+    private val localScopes = mutableSetOf<Triple<String, String, EntityType>>()
+
+    override suspend fun hasEnqueuedLocalScope(
+        ownerId: String,
+        serverOrigin: String,
+        entityType: EntityType,
+    ): Boolean = Triple(ownerId, serverOrigin, entityType) in localScopes
+
+    override suspend fun markEnqueuedLocalScope(
+        ownerId: String,
+        serverOrigin: String,
+        entityType: EntityType,
+    ) {
+        localScopes += Triple(ownerId, serverOrigin, entityType)
+    }
+
     private val associationScopes = mutableSetOf<Pair<String, String>>()
 
     override suspend fun hasEnqueuedAssociationScope(
@@ -105,6 +133,26 @@ class InMemoryFirstSyncEnqueueStore : FirstSyncEnqueueStore {
 class KeyValueFirstSyncEnqueueStore(
     private val storage: KeyValueStorage,
 ) : FirstSyncEnqueueStore {
+    override suspend fun hasEnqueuedLocalScope(
+        ownerId: String,
+        serverOrigin: String,
+        entityType: EntityType,
+    ): Boolean = storage.getBoolean(localKey(ownerId, serverOrigin, entityType), false)
+
+    override suspend fun markEnqueuedLocalScope(
+        ownerId: String,
+        serverOrigin: String,
+        entityType: EntityType,
+    ) {
+        storage.putBoolean(localKey(ownerId, serverOrigin, entityType), true)
+    }
+
+    private fun localKey(
+        ownerId: String,
+        serverOrigin: String,
+        entityType: EntityType,
+    ): String = "sync_local_backfill_v1_${entityType.name}_${ownerId.length}:$ownerId:${serverOrigin.length}:$serverOrigin"
+
     override suspend fun hasEnqueuedAssociationScope(
         ownerId: String,
         serverOrigin: String,

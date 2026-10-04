@@ -51,7 +51,7 @@
         <item quantity="one">%1$d item needs attention</item>
         <item quantity="other">%1$d items need attention</item>
     </plurals>
-    <string name="sync_status_failed_items_detail">These items have not backed up. Open Sync issues to see why and retry them.</string>
+    <string name="sync_status_failed_items_detail">These changes remain on this device. LogDate keeps trying automatically.</string>
     <plurals name="sync_status_unreadable_cloud_items">
         <item quantity="one">%1$d item from another setup can\'t be read here</item>
         <item quantity="other">%1$d items from another setup can\'t be read here</item>
@@ -166,51 +166,11 @@
     <string name="separator_pipe"> | </string>
 
     <!-- Sync issues screen -->
-    <string name="sync_issues_title">Sync issues</string>
-    <string name="sync_issue_review_queue_title">Review sync queue</string>
-    <plurals name="sync_issue_items_need_attention">
-        <item quantity="one">%1$d item needs attention.</item>
-        <item quantity="other">%1$d items need attention.</item>
-    </plurals>
-    <string name="sync_issue_review_queue_description">These items are still on this device. Review the reason for each item below, then retry it.</string>
-    <string name="sync_issue_discard">Stop trying</string>
-    <string name="sync_issue_discard_title">Stop backing up this item?</string>
-    <string name="sync_issue_discard_description">It will stay on this device, but this change will be removed from the backup queue. You can edit it later to try again.</string>
-    <string name="sync_issue_retry_requested">Retry requested. Waiting for backup to start.</string>
-    <string name="sync_issue_retry_failed">Couldn't start the retry. The item remains on this device.</string>
 
     <!-- Sync issues: what kind of thing failed, and how many -->
-    <plurals name="sync_issue_count_note"><item quantity="one">%1$d entry</item><item quantity="other">%1$d entries</item></plurals>
-    <plurals name="sync_issue_count_journal"><item quantity="one">%1$d journal</item><item quantity="other">%1$d journals</item></plurals>
-    <plurals name="sync_issue_count_media"><item quantity="one">%1$d photo or recording</item><item quantity="other">%1$d photos or recordings</item></plurals>
-    <plurals name="sync_issue_count_draft"><item quantity="one">%1$d draft</item><item quantity="other">%1$d drafts</item></plurals>
-    <plurals name="sync_issue_count_association"><item quantity="one">%1$d entry link</item><item quantity="other">%1$d entry links</item></plurals>
-    <plurals name="sync_issue_count_health"><item quantity="one">%1$d health record</item><item quantity="other">%1$d health records</item></plurals>
-    <plurals name="sync_issue_count_other"><item quantity="one">%1$d item</item><item quantity="other">%1$d items</item></plurals>
 
-    <string name="sync_issue_missing_file_note">This entry's file is missing</string>
-    <string name="sync_issue_missing_file_journal">This journal's file is missing</string>
-    <string name="sync_issue_missing_file_media">This photo or recording's file is missing</string>
-    <string name="sync_issue_missing_file_draft">This draft's file is missing</string>
-    <string name="sync_issue_missing_file_association">This entry link's file is missing</string>
-    <string name="sync_issue_missing_file_health">This health record's file is missing</string>
-    <string name="sync_issue_missing_file_other">This item's file is missing</string>
 
-    <string name="sync_issue_upload_failed_note">This entry didn't upload</string>
-    <string name="sync_issue_upload_failed_journal">This journal didn't upload</string>
-    <string name="sync_issue_upload_failed_media">This photo or recording didn't upload</string>
-    <string name="sync_issue_upload_failed_draft">This draft didn't upload</string>
-    <string name="sync_issue_upload_failed_association">This entry link didn't upload</string>
-    <string name="sync_issue_upload_failed_health">This health record didn't upload</string>
-    <string name="sync_issue_upload_failed_other">This item didn't upload</string>
 
-    <string name="sync_issue_explain_missing_file">The file it points to is no longer on this device, so there is nothing left to upload. Stop trying to remove this change from the backup queue. The entry stays on this device.</string>
-    <string name="sync_issue_explain_app_closed">LogDate closed while uploading it twice in a row, so it was set aside to let everything else back up. It is tried again once a day. Retry after updating LogDate, or stop trying if you no longer need this change backed up.</string>
-    <string name="sync_issue_explain_failed">LogDate could not identify the cause of this upload failure. The item is still on this device. Retry now; if it fails again, leave it in the queue and check for an app update.</string>
-    <string name="sync_issue_explain_server_unavailable">LogDate Cloud could not finish this upload. The entry is still on this device. Retry now; if the service is still unavailable, it will stay in the backup queue.</string>
-    <string name="sync_issue_explain_sign_in_required">Your sign-in may have expired. Sign in again, then retry this entry. It is still on this device.</string>
-    <string name="sync_issue_explain_network_unavailable">The connection failed during upload. This item is still on your device. Reconnect and retry.</string>
-    <string name="sync_issue_explain_file_too_large">This file is too large for backup. It remains on this device. Choose a smaller file before trying again.</string>
     <string name="sync_paused_background_data_off">Automatic backup may wait on mobile data</string>
     <string name="sync_paused_background_data_off_fix">You can still back up while LogDate is open, or connect to Wi-Fi.</string>
     <string name="sync_paused_offline">Paused — waiting for a connection</string>
@@ -265,4 +225,18 @@
     <string name="sync_diagnostic_action_update_app">Update LogDate</string>
     <string name="sync_diagnostic_action_review_conflict">Review the affected entry</string>
     <string name="sync_diagnostic_action_contact_support">Contact support</string>
+    <string name="sync_account_waiting">Waiting to sync</string>
+    <string name="sync_account_offline">Sync paused: this device is offline. It resumes automatically when connected.</string>
+    <string name="sync_account_server_unavailable">Sync paused: LogDate’s cloud service is unavailable. Retrying automatically.</string>
+    <string name="sync_account_connection_unavailable">Sync paused: unable to connect to LogDate. Retrying automatically.</string>
+    <string name="sync_account_signed_out">Sync paused: sign-in has expired.</string>
+    <string name="sync_account_storage_full">Sync paused: your cloud storage is full.</string>
+    <string name="sync_account_wifi">Photos and recordings will sync when this device is on Wi-Fi.</string>
+    <string name="sync_account_background">Sync paused: background network access is restricted on this device.</string>
+    <string name="sync_account_device_access">Some existing entries are not unlocked on this device yet.</string>
+    <string name="sync_account_conflict">Sync could not merge an entry edited on another device. Both copies are saved.</string>
+    <string name="sync_account_local_unavailable">Sync is incomplete: some local data is unavailable on this device.</string>
+    <string name="sync_account_media_too_large">Sync is incomplete: an attachment exceeds the current upload limit.</string>
+    <string name="sync_account_unknown">Sync could not finish. LogDate will try again automatically.</string>
+    <string name="sync_account_disabled">Sync is turned off.</string>
 </resources>

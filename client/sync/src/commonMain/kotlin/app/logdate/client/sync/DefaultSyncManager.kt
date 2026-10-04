@@ -20,7 +20,6 @@ import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
 import app.logdate.client.sync.diagnostics.SyncRunDiagnostics
 import app.logdate.client.sync.location.LocationHistorySyncEngine
-import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.FirstSyncEnqueueStore
 import app.logdate.client.sync.metadata.IdentityRecoveryNeededStore
@@ -49,7 +48,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -384,8 +382,10 @@ class DefaultSyncManager(
             // was enough on its own to starve every request thread it had.
             val journalResult = downloader.downloadJournals(accessToken, journalSince)
             val contentResult = downloader.downloadContent(accessToken, contentSince)
+            if (journalResult.success) legacyBackfill.enqueueRecordsIfNeeded(EntityType.JOURNAL)
+            if (contentResult.success) legacyBackfill.enqueueRecordsIfNeeded(EntityType.NOTE)
             val associationResult = downloader.downloadAssociations(accessToken, associationSince)
-            if (associationResult.success) enqueueLegacyMembershipsIfNeeded()
+            if (associationResult.success) legacyBackfill.enqueueMembershipsIfNeeded()
             val historyResult = locationHistorySyncEngine?.download(accessToken) ?: SyncResult(success = true)
             recoverMedia(accessToken, EntityType.NOTE)
             val totalDownloaded =
@@ -591,24 +591,15 @@ class DefaultSyncManager(
 
     suspend fun isLocationHistorySyncEnabled(): Boolean = locationHistorySyncEngine?.isEnabled() == true
 
-    private suspend fun enqueueLegacyMembershipsIfNeeded() {
-        val inbox = downloadInbox ?: return
-        val selected = inbox.currentScope()
-        if (firstSyncEnqueueStore.hasEnqueuedAssociationScope(selected.owner, selected.origin)) return
-        val ids = journalNotesRepository.allNotesObserved.first().map { it.uid }
-        for (chunk in ids.chunked(500)) {
-            val memberships = journalContentRepository.observeJournalsForContents(chunk.toSet()).first()
-            for ((contentId, journals) in memberships) {
-                for (journal in journals) {
-                    check(selected == inbox.currentScope()) { "Download scope changed" }
-                    val id = AssociationPendingKey(journal.id, contentId).toPendingId()
-                    syncMetadataService.enqueueRepairIfAbsent(id, EntityType.ASSOCIATION, serverOrigin = selected.origin)
-                }
-            }
-        }
-        check(selected == inbox.currentScope()) { "Download scope changed" }
-        firstSyncEnqueueStore.markEnqueuedAssociationScope(selected.owner, selected.origin)
-    }
+    private val legacyBackfill =
+        LegacyLocalBackfill(
+            downloadInbox,
+            firstSyncEnqueueStore,
+            journalRepository,
+            journalNotesRepository,
+            journalContentRepository,
+            syncMetadataService,
+        )
 
     private suspend fun auditLegacyRecordsIfNeeded() {
         val inbox = downloadInbox ?: return
@@ -638,11 +629,35 @@ class DefaultSyncManager(
             }
         }
 
-    /** See [SyncRetryCoordinator.releaseBackoff]. Called when the user asks to back up now. */
+    /** Reconsider transient work after connectivity returns or an immediate backup is requested. */
     suspend fun releaseUploadBackoff() {
-        diagnostics?.record(SyncDiagnosticEvent(DiagnosticPhase.SCHEDULING, DiagnosticOutcome.QUEUED))
-        retryCoordinator.releaseBackoff()
-        downloadInbox?.release()
+        syncMutex.withLock {
+            diagnostics?.record(SyncDiagnosticEvent(DiagnosticPhase.SCHEDULING, DiagnosticOutcome.QUEUED))
+            retryCoordinator.releaseBackoff()
+            downloadInbox?.release()
+        }
+    }
+
+    internal suspend fun resumeAfterUpgrade(
+        version: String,
+        resumption: SyncUpgradeResumption,
+    ) {
+        val bound = sessionStorage.getOriginBoundSession() ?: return
+        val selected =
+            app.logdate.client.sync.metadata
+                .UploadScope(bound.session.accountId, bound.origin)
+
+        fun isCurrent(): Boolean =
+            sessionStorage.getOriginBoundSession()?.let {
+                it.origin == selected.serverOrigin && it.session.accountId == selected.ownerId
+            } == true
+        syncMutex.withLock {
+            resumption.resume(version, selected, ::isCurrent) {
+                retryCoordinator.releaseBackoff(afterUpgrade = true, expectedScope = selected)
+                check(isCurrent()) { "Sync scope changed" }
+                downloadInbox?.release()
+            }
+        }
     }
 
     override suspend fun retryDeadLetter(id: String) = retryCoordinator.retryDeadLetter(id)

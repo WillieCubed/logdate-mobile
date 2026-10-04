@@ -6,6 +6,7 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalRepository
+import app.logdate.client.repository.journals.mediaRefOrNull
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.CloudAssociationDataSource
 import app.logdate.client.sync.cloud.CloudContentDataSource
@@ -109,6 +110,15 @@ internal class SyncDownloader(
                     syncVersionOf = { it.syncVersion },
                     lastUpdatedOf = { it.lastUpdated },
                     conflictResolver = journalConflictResolver,
+                    sameUploadedFields = ::sameJournalFields,
+                    acknowledgeUpload = { local, remote ->
+                        if (syncableRepository != null) {
+                            syncableRepository.updateSyncMetadata(local.id, remote.syncVersion, remote.lastUpdated)
+                            true
+                        } else {
+                            false
+                        }
+                    },
                     applyCreate = { journal ->
                         if (syncableRepository != null) syncableRepository.createFromSync(journal) else journalRepository.create(journal)
                     },
@@ -161,6 +171,8 @@ internal class SyncDownloader(
                     syncVersionOf = { it.syncVersion },
                     lastUpdatedOf = { it.lastUpdated },
                     conflictResolver = noteConflictResolver,
+                    sameUploadedFields = ::sameNoteFields,
+                    acknowledgeUpload = ::acknowledgeNoteCreate,
                     hydrate = { token, note -> if (downloadInbox == null) mediaTransfer.downloadIfNeeded(token, note) else note },
                     applyCreate = { note ->
                         if (syncableRepository != null) syncableRepository.createFromSync(note) else journalNotesRepository.create(note)
@@ -186,6 +198,36 @@ internal class SyncDownloader(
         )
     }
 
+    private fun sameJournalFields(
+        local: Journal,
+        remote: Journal,
+    ): Boolean =
+        local.copy(
+            syncVersion = remote.syncVersion,
+            isFavorited = remote.isFavorited,
+            coverImageUri = remote.coverImageUri,
+            created = local.created.wirePrecision(),
+            lastUpdated = local.lastUpdated.wirePrecision(),
+        ) == remote
+
+    private suspend fun sameNoteFields(
+        local: JournalNote,
+        remote: JournalNote,
+    ): Boolean {
+        val mapping = mediaSyncRefStore.get(local.uid)
+        val ref = mapping?.takeIf { it.localUri == local.mediaRefOrNull() }?.remoteUrl ?: local.mediaRefOrNull()
+        return local.uploadedFields(remote.syncVersion, ref) == remote.uploadedFields(remote.syncVersion, remote.mediaRefOrNull())
+    }
+
+    private suspend fun acknowledgeNoteCreate(
+        local: JournalNote,
+        remote: JournalNote,
+    ): Boolean {
+        val repository = journalNotesRepository as? SyncableJournalNotesRepository ?: return false
+        repository.updateSyncMetadata(local.withVersion(remote.syncVersion), remote.syncVersion, remote.lastUpdated)
+        return true
+    }
+
     suspend fun downloadDrafts(
         accessToken: String,
         since: Instant,
@@ -205,5 +247,62 @@ internal class SyncDownloader(
          * cheap to serve again.
          */
         const val SYNC_PAGE_SIZE = 25
+    }
+}
+
+private fun Instant.wirePrecision(): Instant = Instant.fromEpochMilliseconds(toEpochMilliseconds())
+
+private fun JournalNote.withVersion(version: Long): JournalNote =
+    when (this) {
+        is JournalNote.Text -> copy(syncVersion = version)
+        is JournalNote.Image -> copy(syncVersion = version)
+        is JournalNote.Video -> copy(syncVersion = version)
+        is JournalNote.Audio -> copy(syncVersion = version)
+    }
+
+/** Compare only fields carried by the existing content contract, after resolving cached media. */
+private fun JournalNote.uploadedFields(
+    version: Long,
+    ref: String?,
+): JournalNote {
+    val created = creationTimestamp.wirePrecision()
+    val updated = lastUpdated.wirePrecision()
+    val uploadedLocation = location?.takeIf { it.hasLocation }
+    return when (this) {
+        is JournalNote.Text ->
+            copy(
+                syncVersion = version,
+                creationTimestamp = created,
+                lastUpdated = updated,
+                location = uploadedLocation,
+                timeZoneId = null,
+            )
+        is JournalNote.Image ->
+            copy(
+                syncVersion = version,
+                creationTimestamp = created,
+                lastUpdated = updated,
+                mediaRef = ref.orEmpty(),
+                location = uploadedLocation,
+                timeZoneId = null,
+            )
+        is JournalNote.Video ->
+            copy(
+                syncVersion = version,
+                creationTimestamp = created,
+                lastUpdated = updated,
+                mediaRef = ref.orEmpty(),
+                location = uploadedLocation,
+                timeZoneId = null,
+            )
+        is JournalNote.Audio ->
+            copy(
+                syncVersion = version,
+                creationTimestamp = created,
+                lastUpdated = updated,
+                mediaRef = ref.orEmpty(),
+                location = uploadedLocation,
+                timeZoneId = null,
+            )
     }
 }

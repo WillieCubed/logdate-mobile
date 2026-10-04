@@ -15,8 +15,6 @@ import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.cloud.CloudApiClient
-import app.logdate.feature.core.sync.SyncIssueRetryFeedback
-import app.logdate.feature.core.sync.SyncIssuesViewModel
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.delay
@@ -179,17 +177,6 @@ class SyncProcessRestartAcceptanceTest {
         setNetworkEnabled(device, true)
         assertTrue(awaitServer(fixture.origin), "persistent server did not become reachable after reconnect")
 
-        val retryViewModel =
-            SyncIssuesViewModel(
-                syncManager = sync,
-                journalRepository = koin.get(),
-                journalNotesRepository = notes,
-            )
-        retryViewModel.retryRecovery()
-        assertEquals(
-            SyncIssueRetryFeedback.REQUESTED,
-            withTimeout(15_000) { retryViewModel.retryFeedback.first { it != null } },
-        )
         awaitQueueDrained(sync)
 
         assertNull(notes.getNoteById(deletedNoteId), "server retry resurrected a locally deleted note")

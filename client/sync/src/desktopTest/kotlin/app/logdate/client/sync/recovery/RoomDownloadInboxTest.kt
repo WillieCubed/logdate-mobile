@@ -29,6 +29,7 @@ class RoomDownloadInboxTest {
                     val deletion = PendingUploadEntity(owner, "server", "DRAFT", id, "DELETE", 10, 7)
                     dao.insertPending(deletion)
                     dao.insertRepairIfAbsent("owner", "server", "DRAFT", id, 20)
+                    dao.insertRepairIfAbsent("owner", "server", "DRAFT", id, 30, operation = "CREATE")
                     assertEquals(deletion, dao.getPending(owner, "server", "DRAFT", id))
                     if (owner.isEmpty()) assertEquals(null, dao.getPending("owner", "server", "DRAFT", id))
                 }
@@ -37,8 +38,18 @@ class RoomDownloadInboxTest {
                 assertEquals("UPDATE", dao.getPending("owner", "server", "DRAFT", "recoverable")?.operation)
                 dao.insertRepairIfAbsent("owner", "server", "DRAFT", "recoverable", 30)
                 assertEquals(20L, dao.getPending("owner", "server", "DRAFT", "recoverable")?.createdAt)
+                dao.insertRepairIfAbsent("owner", "server", "NOTE", "new-legacy-entry", 40, operation = "CREATE")
+                val initial = requireNotNull(dao.getPending("owner", "server", "NOTE", "new-legacy-entry"))
+                kotlin.test.assertTrue(dao.bindCreateToServerVersion("owner", "server", "NOTE", initial.entityId, initial.operationId, 42))
+                kotlin.test.assertFalse(dao.deletePendingIfCurrent("owner", "server", "NOTE", initial.entityId, initial.operationId))
                 database.close()
                 database = open()
+                assertEquals("UPDATE", database.syncMetadataDao().getPending("owner", "server", "NOTE", "new-legacy-entry")?.operation)
+                assertEquals(
+                    42L,
+                    database.syncMetadataDao().getPending("owner", "server", "NOTE", "new-legacy-entry")?.expectedServerVersion,
+                )
+                assertEquals("DELETE", database.syncMetadataDao().getPending("owner", "server", "DRAFT", "deleted-owner")?.operation)
                 assertEquals(2L, database.syncMetadataDao().getPending("owner", "server", "DRAFT", "recoverable")?.expectedServerVersion)
             } finally {
                 database.close()

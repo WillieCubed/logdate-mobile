@@ -5,6 +5,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
+import app.logdate.feature.core.sync.AccountSyncStatus
 import app.logdate.feature.core.sync.SyncAction
 import app.logdate.feature.core.sync.SyncPresentation
 import app.logdate.ui.streak.CampfirePhase
@@ -17,7 +18,7 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class HomeWorkspaceAccountActionTest {
-    @Test fun backupAndStreakRemainAvailableWithoutDedicatedHeaderControls() =
+    @Test fun syncFactsAndStreakRemainAvailableWithoutAStatusScreen() =
         runDesktopComposeUiTest(width = 411, height = 891) {
             var action: SyncAction? = null
             var openedStreak = false
@@ -37,21 +38,30 @@ class HomeWorkspaceAccountActionTest {
             onNodeWithTag("logdate_home_sync_status").assertDoesNotExist()
             onNodeWithText("Journaling streak").assertDoesNotExist()
             onNodeWithTag("workspace_account").performClick()
-            onNodeWithText("Backup status").performClick()
-            assertEquals(SyncAction.OpenStatus, action)
-            onNodeWithTag("workspace_account").performClick()
+            onNodeWithText("Waiting to sync").assertExists()
+            onNodeWithText("Backup status").assertDoesNotExist()
+            onNodeWithText("2 items waiting to back up").assertDoesNotExist()
+            assertEquals(null, action)
             onNodeWithText("Journaling streak").performClick()
             assertTrue(openedStreak)
         }
 
-    @Test fun recoveryCanBeOpenedFromTheQuietAccountIndicator() =
+    @Test fun lockedEntriesExplainWhyWithoutARecoveryChore() =
         runDesktopComposeUiTest(width = 720, height = 900) {
-            var action: SyncAction? = null
             setContent {
-                LogDateTheme { HomeWorkspaceAccountAction(SyncPresentation.NeedsRecovery, null, {}, {}, { action = it }) }
+                LogDateTheme {
+                    HomeWorkspaceAccountAction(
+                        SyncPresentation.NeedsRecovery,
+                        null,
+                        {},
+                        {},
+                        {},
+                        accountStatus = AccountSyncStatus.DEVICE_ACCESS_REQUIRED,
+                    )
+                }
             }
             onNodeWithTag("workspace_account").performClick()
-            onNodeWithText("Enter phrase").performClick()
-            assertEquals(SyncAction.EnterRecoveryPhrase, action)
+            onNodeWithText("Some existing entries are not unlocked on this device yet.").assertExists()
+            onNodeWithText("Enter phrase").assertDoesNotExist()
         }
 }

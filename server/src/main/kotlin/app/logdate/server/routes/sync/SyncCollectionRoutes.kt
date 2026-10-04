@@ -96,25 +96,28 @@ private fun Route.contentRoutes(
                     )
                 }
                 Napier.d("Content upsert completed")
-                val stored =
-                    collectionsRepository.upsertEntry(
-                        userId = userId,
-                        entry =
-                            LogDateEntry(
-                                id = contentId,
-                                type = req.type,
-                                content = req.content,
-                                mediaUri = req.mediaUri,
-                                durationMs = req.durationMs,
-                                createdAt = req.createdAt,
-                                lastUpdated = req.lastUpdated,
-                                version = 0L,
-                                deviceId = req.deviceId,
-                                caption = req.caption,
-                                photoPresentation = req.photoPresentation,
-                                location = req.location,
-                            ),
+                val entry =
+                    LogDateEntry(
+                        id = contentId,
+                        type = req.type,
+                        content = req.content,
+                        mediaUri = req.mediaUri,
+                        durationMs = req.durationMs,
+                        createdAt = req.createdAt,
+                        lastUpdated = req.lastUpdated,
+                        version = 0L,
+                        deviceId = req.deviceId,
+                        caption = req.caption,
+                        photoPresentation = req.photoPresentation,
+                        location = req.location,
                     )
+                val stored =
+                    if (call.request.header(HttpHeaders.IfNoneMatch) == "*") {
+                        collectionsRepository.createEntryIfAbsent(userId, entry)
+                            ?: return@put call.respond(HttpStatusCode.PreconditionFailed, error("CONTENT_EXISTS", "Content already exists"))
+                    } else {
+                        collectionsRepository.upsertEntry(userId, entry)
+                    }
                 val response =
                     ContentUploadResponse(
                         id = stored.id,
@@ -257,20 +260,23 @@ private fun Route.journalRoutes(
                     )
                 }
                 Napier.d("Journal upsert completed")
-                val stored =
-                    collectionsRepository.upsertJournal(
-                        userId = userId,
-                        journal =
-                            LogDateJournal(
-                                id = journalId,
-                                title = req.title,
-                                description = req.description,
-                                createdAt = req.createdAt,
-                                lastUpdated = req.lastUpdated,
-                                version = 0L,
-                                deviceId = req.deviceId,
-                            ),
+                val journal =
+                    LogDateJournal(
+                        id = journalId,
+                        title = req.title,
+                        description = req.description,
+                        createdAt = req.createdAt,
+                        lastUpdated = req.lastUpdated,
+                        version = 0L,
+                        deviceId = req.deviceId,
                     )
+                val stored =
+                    if (call.request.header(HttpHeaders.IfNoneMatch) == "*") {
+                        collectionsRepository.createJournalIfAbsent(userId, journal)
+                            ?: return@put call.respond(HttpStatusCode.PreconditionFailed, error("JOURNAL_EXISTS", "Journal already exists"))
+                    } else {
+                        collectionsRepository.upsertJournal(userId, journal)
+                    }
                 val response = JournalUploadResponse(journalId, stored.version, stored.lastUpdated)
                 if (wasCreated) {
                     call.response.headers.append(HttpHeaders.Location, "/api/v1/journals/$journalId")

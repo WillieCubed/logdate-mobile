@@ -9,6 +9,7 @@ import app.logdate.client.sync.RecoverIdentityUseCase
 import app.logdate.client.sync.RoomSyncTransactionManager
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncTransactionManager
+import app.logdate.client.sync.SyncUpgradeResumption
 import app.logdate.client.sync.cloud.di.cloudAccountModule
 import app.logdate.client.sync.conflict.KeyValueSyncConflictStore
 import app.logdate.client.sync.conflict.SyncConflictStore
@@ -46,6 +47,7 @@ actual val syncModule: Module =
         }
         single<SyncDeadLetterStore> { KeyValueSyncDeadLetterStore(get()) }
         single<SyncRetryScheduleStore> { KeyValueSyncRetryScheduleStore(get()) }
+        single { SyncUpgradeResumption(get()) }
         single<SyncTransactionManager> {
             val database = get<LogDateDatabase>()
             RoomSyncTransactionManager(database)

@@ -125,6 +125,12 @@ interface LogDateCollectionsRepository {
         entry: LogDateEntry,
     ): LogDateEntry
 
+    /** Creates while the canonical record is absent; null preserves an existing record. */
+    suspend fun createEntryIfAbsent(
+        userId: UUID,
+        entry: LogDateEntry,
+    ): LogDateEntry?
+
     suspend fun getEntry(
         userId: UUID,
         id: String,
@@ -160,6 +166,11 @@ interface LogDateCollectionsRepository {
         userId: UUID,
         journal: LogDateJournal,
     ): LogDateJournal
+
+    suspend fun createJournalIfAbsent(
+        userId: UUID,
+        journal: LogDateJournal,
+    ): LogDateJournal?
 
     suspend fun getJournal(
         userId: UUID,

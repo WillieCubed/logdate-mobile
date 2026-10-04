@@ -36,6 +36,36 @@ import kotlin.uuid.Uuid
  * Smoke tests for auth-relevant API mappings in [LogDateCloudApiClient].
  */
 class BasicCloudApiClientTest {
+    @Test
+    fun `creating content uses the existing create-only server precondition`() =
+        runTest {
+            val client =
+                createApiClient(
+                    MockEngine { request ->
+                        assertEquals("*", request.headers[HttpHeaders.IfNoneMatch])
+                        respond(
+                            """{"id":"entry","serverVersion":42,"uploadedAt":2}""",
+                            HttpStatusCode.Created,
+                            headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        )
+                    },
+                )
+            assertTrue(
+                client
+                    .uploadContent(
+                        "token",
+                        app.logdate.shared.model.sync.ContentUploadRequest(
+                            id = "entry",
+                            type = "TEXT",
+                            content = "Original entry",
+                            mediaUri = null,
+                            createdAt = 1,
+                            lastUpdated = 2,
+                        ),
+                    ).isSuccess,
+            )
+        }
+
     private val baseUrl = "https://api.logdate.example.com/v1"
     private val json =
         Json {
