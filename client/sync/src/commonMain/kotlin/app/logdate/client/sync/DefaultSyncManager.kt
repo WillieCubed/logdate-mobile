@@ -20,6 +20,7 @@ import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
 import app.logdate.client.sync.diagnostics.SyncRunDiagnostics
 import app.logdate.client.sync.location.LocationHistorySyncEngine
+import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.FirstSyncEnqueueStore
 import app.logdate.client.sync.metadata.IdentityRecoveryNeededStore
@@ -48,6 +49,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -383,6 +385,7 @@ class DefaultSyncManager(
             val journalResult = downloader.downloadJournals(accessToken, journalSince)
             val contentResult = downloader.downloadContent(accessToken, contentSince)
             val associationResult = downloader.downloadAssociations(accessToken, associationSince)
+            if (associationResult.success) enqueueLegacyMembershipsIfNeeded()
             val historyResult = locationHistorySyncEngine?.download(accessToken) ?: SyncResult(success = true)
             recoverMedia(accessToken, EntityType.NOTE)
             val totalDownloaded =
@@ -587,6 +590,25 @@ class DefaultSyncManager(
     }
 
     suspend fun isLocationHistorySyncEnabled(): Boolean = locationHistorySyncEngine?.isEnabled() == true
+
+    private suspend fun enqueueLegacyMembershipsIfNeeded() {
+        val inbox = downloadInbox ?: return
+        val selected = inbox.currentScope()
+        if (firstSyncEnqueueStore.hasEnqueuedAssociationScope(selected.owner, selected.origin)) return
+        val ids = journalNotesRepository.allNotesObserved.first().map { it.uid }
+        for (chunk in ids.chunked(500)) {
+            val memberships = journalContentRepository.observeJournalsForContents(chunk.toSet()).first()
+            for ((contentId, journals) in memberships) {
+                for (journal in journals) {
+                    check(selected == inbox.currentScope()) { "Download scope changed" }
+                    val id = AssociationPendingKey(journal.id, contentId).toPendingId()
+                    syncMetadataService.enqueueRepairIfAbsent(id, EntityType.ASSOCIATION, serverOrigin = selected.origin)
+                }
+            }
+        }
+        check(selected == inbox.currentScope()) { "Download scope changed" }
+        firstSyncEnqueueStore.markEnqueuedAssociationScope(selected.owner, selected.origin)
+    }
 
     private suspend fun auditLegacyRecordsIfNeeded() {
         val inbox = downloadInbox ?: return

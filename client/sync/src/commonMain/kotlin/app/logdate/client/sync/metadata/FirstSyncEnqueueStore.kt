@@ -15,6 +15,16 @@ import app.logdate.client.datastore.KeyValueStorage
  * downloads ever succeed.
  */
 interface FirstSyncEnqueueStore {
+    suspend fun hasEnqueuedAssociationScope(
+        ownerId: String,
+        serverOrigin: String,
+    ): Boolean
+
+    suspend fun markEnqueuedAssociationScope(
+        ownerId: String,
+        serverOrigin: String,
+    )
+
     suspend fun hasAuditedLegacyScope(
         ownerId: String,
         serverOrigin: String,
@@ -42,6 +52,20 @@ interface FirstSyncEnqueueStore {
 }
 
 class InMemoryFirstSyncEnqueueStore : FirstSyncEnqueueStore {
+    private val associationScopes = mutableSetOf<Pair<String, String>>()
+
+    override suspend fun hasEnqueuedAssociationScope(
+        ownerId: String,
+        serverOrigin: String,
+    ): Boolean = (ownerId to serverOrigin) in associationScopes
+
+    override suspend fun markEnqueuedAssociationScope(
+        ownerId: String,
+        serverOrigin: String,
+    ) {
+        associationScopes += ownerId to serverOrigin
+    }
+
     private val legacyScopes = mutableSetOf<Pair<String, String>>()
 
     override suspend fun hasAuditedLegacyScope(
@@ -81,6 +105,23 @@ class InMemoryFirstSyncEnqueueStore : FirstSyncEnqueueStore {
 class KeyValueFirstSyncEnqueueStore(
     private val storage: KeyValueStorage,
 ) : FirstSyncEnqueueStore {
+    override suspend fun hasEnqueuedAssociationScope(
+        ownerId: String,
+        serverOrigin: String,
+    ): Boolean = storage.getBoolean(associationKey(ownerId, serverOrigin), false)
+
+    override suspend fun markEnqueuedAssociationScope(
+        ownerId: String,
+        serverOrigin: String,
+    ) {
+        storage.putBoolean(associationKey(ownerId, serverOrigin), true)
+    }
+
+    private fun associationKey(
+        ownerId: String,
+        serverOrigin: String,
+    ): String = "sync_association_backfill_v1_${ownerId.length}:$ownerId:${serverOrigin.length}:$serverOrigin"
+
     override suspend fun hasAuditedLegacyScope(
         ownerId: String,
         serverOrigin: String,
