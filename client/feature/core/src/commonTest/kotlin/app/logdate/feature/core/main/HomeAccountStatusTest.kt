@@ -16,16 +16,16 @@ class HomeAccountStatusTest {
         assertEquals(WorkspaceAccountIndicator.Waiting, SyncPresentation.Pending(4).accountIndicator())
     }
 
-    @Test fun everyBlockedStateRemainsDiscoverableFromTheAccount() {
+    @Test fun automaticFailuresKeepAQuietWaitingMarker() {
         val blocked =
             listOf(
-                SyncPresentation.AuthError,
                 SyncPresentation.NeedsRecovery,
                 SyncPresentation.StatusUnavailable,
                 SyncPresentation.StorageError(0),
                 SyncPresentation.ConflictError(1),
                 SyncPresentation.NetworkError(0),
             )
-        blocked.forEach { assertEquals(WorkspaceAccountIndicator.Attention, it.accountIndicator()) }
+        blocked.forEach { assertEquals(WorkspaceAccountIndicator.Waiting, it.accountIndicator()) }
+        assertEquals(WorkspaceAccountIndicator.Attention, SyncPresentation.AuthError.accountIndicator())
     }
 }

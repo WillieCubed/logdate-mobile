@@ -46,7 +46,7 @@ class HomeWorkspaceAccountActionTest {
             assertTrue(openedStreak)
         }
 
-    @Test fun lockedEntriesExplainWhyWithoutARecoveryChore() =
+    @Test fun lockedEntriesWaitWithoutAnUnusableExplanation() =
         runDesktopComposeUiTest(width = 720, height = 900) {
             setContent {
                 LogDateTheme {
@@ -61,7 +61,8 @@ class HomeWorkspaceAccountActionTest {
                 }
             }
             onNodeWithTag("workspace_account").performClick()
-            onNodeWithText("Some existing entries are not unlocked on this device yet.").assertExists()
+            onNodeWithText("Some existing entries are not unlocked on this device yet.").assertDoesNotExist()
+            onNodeWithText("Waiting to sync").assertExists()
             onNodeWithText("Enter phrase").assertDoesNotExist()
         }
 }

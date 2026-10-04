@@ -23,20 +23,9 @@ import app.logdate.ui.workspace.WorkspaceAccountAction
 import app.logdate.ui.workspace.WorkspaceAccountIndicator
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.settings
-import logdate.client.feature.core.generated.resources.sync_account_background
-import logdate.client.feature.core.generated.resources.sync_account_conflict
-import logdate.client.feature.core.generated.resources.sync_account_connection_unavailable
-import logdate.client.feature.core.generated.resources.sync_account_device_access
 import logdate.client.feature.core.generated.resources.sync_account_disabled
-import logdate.client.feature.core.generated.resources.sync_account_local_unavailable
-import logdate.client.feature.core.generated.resources.sync_account_media_too_large
-import logdate.client.feature.core.generated.resources.sync_account_offline
-import logdate.client.feature.core.generated.resources.sync_account_server_unavailable
 import logdate.client.feature.core.generated.resources.sync_account_signed_out
-import logdate.client.feature.core.generated.resources.sync_account_storage_full
-import logdate.client.feature.core.generated.resources.sync_account_unknown
 import logdate.client.feature.core.generated.resources.sync_account_waiting
-import logdate.client.feature.core.generated.resources.sync_account_wifi
 import logdate.client.feature.core.generated.resources.sync_banner_enter_recovery_phrase
 import logdate.client.feature.core.generated.resources.sync_banner_manage
 import logdate.client.feature.core.generated.resources.sync_banner_review
@@ -56,7 +45,7 @@ fun HomeWorkspaceAccountAction(
     onSyncAction: (SyncAction) -> Unit,
     accountStatus: AccountSyncStatus? = null,
 ) {
-    val summary = accountStatus?.let { stringResource(it.messageResource()) } ?: sync.accountSummary()
+    val summary = accountStatus?.let { stringResource(it.messageResource()) } ?: sync.accountSummaryResource()?.let { stringResource(it) }
     WorkspaceAccountAction(accountStatus?.indicator() ?: sync.accountIndicator(), summary) { dismiss ->
         summary?.let {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -95,42 +84,41 @@ internal fun SyncPresentation.accountRecoveryAction(): SyncAction? =
     when (this) {
         SyncPresentation.AuthError -> SyncAction.SignIn
         SyncPresentation.NeedsRecovery -> null
-        is SyncPresentation.StorageError -> SyncAction.ManageStorage
+        is SyncPresentation.StorageError -> null
         is SyncPresentation.ConflictError, is SyncPresentation.NetworkError -> null
         else -> null
     }
 
-@Composable
-private fun SyncPresentation.accountSummary(): String? =
+internal fun SyncPresentation.accountSummaryResource(): StringResource? =
     when (this) {
         SyncPresentation.Hidden -> null
-        is SyncPresentation.Syncing -> stringResource(Res.string.syncing)
-        is SyncPresentation.Pending -> stringResource(Res.string.sync_account_waiting)
-        SyncPresentation.StatusUnavailable -> stringResource(Res.string.sync_account_local_unavailable)
-        SyncPresentation.AuthError -> stringResource(Res.string.sync_account_signed_out)
-        SyncPresentation.NeedsRecovery -> stringResource(Res.string.sync_account_device_access)
-        is SyncPresentation.StorageError -> stringResource(Res.string.sync_account_storage_full)
-        is SyncPresentation.ConflictError -> stringResource(Res.string.sync_account_conflict)
-        is SyncPresentation.NetworkError -> stringResource(Res.string.sync_account_unknown)
+        is SyncPresentation.Syncing -> Res.string.syncing
+        is SyncPresentation.Pending -> Res.string.sync_account_waiting
+        SyncPresentation.StatusUnavailable -> Res.string.sync_account_waiting
+        SyncPresentation.AuthError -> Res.string.sync_account_signed_out
+        SyncPresentation.NeedsRecovery -> Res.string.sync_account_waiting
+        is SyncPresentation.StorageError -> Res.string.sync_account_waiting
+        is SyncPresentation.ConflictError -> Res.string.sync_account_waiting
+        is SyncPresentation.NetworkError -> Res.string.sync_account_waiting
     }
 
-private fun AccountSyncStatus.messageResource(): StringResource =
+internal fun AccountSyncStatus.messageResource(): StringResource =
     when (this) {
         AccountSyncStatus.UP_TO_DATE -> Res.string.sync_feedback_up_to_date
         AccountSyncStatus.SYNCING -> Res.string.syncing
         AccountSyncStatus.WAITING -> Res.string.sync_account_waiting
-        AccountSyncStatus.OFFLINE -> Res.string.sync_account_offline
-        AccountSyncStatus.SERVER_UNAVAILABLE -> Res.string.sync_account_server_unavailable
-        AccountSyncStatus.CONNECTION_UNAVAILABLE -> Res.string.sync_account_connection_unavailable
+        AccountSyncStatus.OFFLINE -> Res.string.sync_account_waiting
+        AccountSyncStatus.SERVER_UNAVAILABLE -> Res.string.sync_account_waiting
+        AccountSyncStatus.CONNECTION_UNAVAILABLE -> Res.string.sync_account_waiting
         AccountSyncStatus.SIGN_IN_REQUIRED -> Res.string.sync_account_signed_out
-        AccountSyncStatus.STORAGE_FULL -> Res.string.sync_account_storage_full
-        AccountSyncStatus.WAITING_FOR_WIFI -> Res.string.sync_account_wifi
-        AccountSyncStatus.BACKGROUND_RESTRICTED -> Res.string.sync_account_background
-        AccountSyncStatus.DEVICE_ACCESS_REQUIRED -> Res.string.sync_account_device_access
-        AccountSyncStatus.CONFLICT -> Res.string.sync_account_conflict
-        AccountSyncStatus.LOCAL_DATA_UNAVAILABLE -> Res.string.sync_account_local_unavailable
-        AccountSyncStatus.MEDIA_TOO_LARGE -> Res.string.sync_account_media_too_large
-        AccountSyncStatus.UNKNOWN -> Res.string.sync_account_unknown
+        AccountSyncStatus.STORAGE_FULL -> Res.string.sync_account_waiting
+        AccountSyncStatus.WAITING_FOR_WIFI -> Res.string.sync_account_waiting
+        AccountSyncStatus.BACKGROUND_RESTRICTED -> Res.string.sync_account_waiting
+        AccountSyncStatus.DEVICE_ACCESS_REQUIRED -> Res.string.sync_account_waiting
+        AccountSyncStatus.CONFLICT -> Res.string.sync_account_waiting
+        AccountSyncStatus.LOCAL_DATA_UNAVAILABLE -> Res.string.sync_account_waiting
+        AccountSyncStatus.MEDIA_TOO_LARGE -> Res.string.sync_account_waiting
+        AccountSyncStatus.UNKNOWN -> Res.string.sync_account_waiting
         AccountSyncStatus.DISABLED -> Res.string.sync_account_disabled
     }
 
@@ -149,6 +137,6 @@ private fun AccountSyncStatus.indicator(): WorkspaceAccountIndicator =
     when (this) {
         AccountSyncStatus.UP_TO_DATE -> WorkspaceAccountIndicator.None
         AccountSyncStatus.SYNCING -> WorkspaceAccountIndicator.Working
-        AccountSyncStatus.WAITING, AccountSyncStatus.WAITING_FOR_WIFI -> WorkspaceAccountIndicator.Waiting
-        else -> WorkspaceAccountIndicator.Attention
+        AccountSyncStatus.SIGN_IN_REQUIRED -> WorkspaceAccountIndicator.Attention
+        else -> WorkspaceAccountIndicator.Waiting
     }

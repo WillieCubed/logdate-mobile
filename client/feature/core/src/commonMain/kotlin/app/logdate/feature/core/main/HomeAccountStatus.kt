@@ -8,5 +8,6 @@ internal fun SyncPresentation.accountIndicator(): WorkspaceAccountIndicator =
         SyncPresentation.Hidden -> WorkspaceAccountIndicator.None
         is SyncPresentation.Pending -> if (pendingCount > 0) WorkspaceAccountIndicator.Waiting else WorkspaceAccountIndicator.None
         is SyncPresentation.Syncing -> WorkspaceAccountIndicator.Working
-        else -> WorkspaceAccountIndicator.Attention
+        SyncPresentation.AuthError -> WorkspaceAccountIndicator.Attention
+        else -> WorkspaceAccountIndicator.Waiting
     }
