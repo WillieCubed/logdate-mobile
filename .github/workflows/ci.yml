@@ -154,6 +154,15 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check changed source file sizes
+        env:
+          SOURCE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          python3 scripts/tests/validation/test_source_file_sizes.py
+          python3 scripts/validation/check-source-file-sizes.py --base "$SOURCE_BASE"
 
       - name: Materialize Firebase config
         uses: ./.github/actions/setup-firebase-configs
