@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.time.Instant
 
 /**
@@ -66,6 +68,7 @@ internal class SyncStatusPublisher(
      */
     private var mediaDeferredForNetwork = false
     private val queueObservationFailed = MutableStateFlow(false)
+    private val publicationMutex = Mutex()
 
     /** What the current upload run set out to do, and how far through it is. See [SyncStatus]. */
     var runTotal: Int? = null
@@ -135,30 +138,31 @@ internal class SyncStatusPublisher(
      * when there's a session to drain it to. Without a session, we report disabled regardless
      * of the local preference.
      */
-    suspend fun publish() {
-        val authenticated = sessionStorage.getSession() != null
-        val pendingCountResult =
-            runCatching { syncMetadataService.getPendingCount() }
-                .onFailure { Napier.e("Could not read the pending upload count") }
-        val recovery = runCatching { pendingRecoveryCount() }
-        _syncStatusFlow.value =
-            SyncStatus(
-                isEnabled = authenticated && isEnabled(),
-                lastSyncTime = latestSyncTime(),
-                pendingUploads = pendingCountResult.getOrDefault(0),
-                queueReadable = pendingCountResult.isSuccess && recovery.isSuccess && !queueObservationFailed.value,
-                pendingDownloads = recovery.getOrDefault(0),
-                backgroundWorkLimited = backgroundWorkLimited(),
-                isSyncing = syncStateFlow.value is SyncState.Syncing,
-                hasErrors = lastErrorFlow.value != null || recovery.getOrDefault(0) > 0 || recovery.isFailure,
-                lastError = lastErrorFlow.value,
-                pausedReason = currentPausedReason(authenticated),
-                totalForRun = runTotal,
-                completedInRun = runCompleted,
-                conflictCount = currentConflictCount(),
-                unreadableCloudCount = runCatching { unreadableCloudRecordStore.count() }.getOrDefault(0),
-            )
-    }
+    suspend fun publish() =
+        publicationMutex.withLock {
+            val authenticated = sessionStorage.getSession() != null
+            val pendingCountResult =
+                runCatching { syncMetadataService.getPendingCount() }
+                    .onFailure { Napier.e("Could not read the pending upload count") }
+            val recovery = runCatching { pendingRecoveryCount() }
+            _syncStatusFlow.value =
+                SyncStatus(
+                    isEnabled = authenticated && isEnabled(),
+                    lastSyncTime = latestSyncTime(),
+                    pendingUploads = pendingCountResult.getOrDefault(0),
+                    queueReadable = pendingCountResult.isSuccess && recovery.isSuccess && !queueObservationFailed.value,
+                    pendingDownloads = recovery.getOrDefault(0),
+                    backgroundWorkLimited = backgroundWorkLimited(),
+                    isSyncing = syncStateFlow.value is SyncState.Syncing,
+                    hasErrors = lastErrorFlow.value != null || recovery.getOrDefault(0) > 0 || recovery.isFailure,
+                    lastError = lastErrorFlow.value,
+                    pausedReason = currentPausedReason(authenticated),
+                    totalForRun = runTotal,
+                    completedInRun = runCompleted,
+                    conflictCount = currentConflictCount(),
+                    unreadableCloudCount = runCatching { unreadableCloudRecordStore.count() }.getOrDefault(0),
+                )
+        }
 
     private suspend fun currentConflictCount(): Int =
         runCatching { conflictStore.list().size }
