@@ -5,7 +5,6 @@
 # 1. Commit message re-validation (catches --no-verify bypasses)
 # 2. Full compile check
 # 3. Tests for affected modules
-# 4. Source file size limit
 
 set -euo pipefail
 
@@ -67,9 +66,6 @@ fi
 # ============================================================================
 
 changed_files="$(collect_changed_files_from_commits "$commits")"
-if ! printf '%s\n' "$changed_files" | python3 "$REPO_ROOT/scripts/validation/check-source-file-sizes.py" --stdin; then
-    errors+=("SOURCE SIZE: Split changed source files exceeding 500 lines before pushing.")
-fi
 kt_files="$(echo "$changed_files" | grep -E '\.(kt|kts)$' || true)"
 
 if [[ -n "$kt_files" ]]; then

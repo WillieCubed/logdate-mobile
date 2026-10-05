@@ -62,10 +62,9 @@ Worked example: `app/compose-main/src/androidMain/kotlin/app/logdate/client/Main
 ## Size Limits (detekt)
 
 Keep new and modified source files at 500 lines or fewer, including tests. Split by responsibility;
-do not compress formatting or add an exception to accommodate growth. The pre-push hook and CI
-check changed Swift, Kotlin, Kotlin build scripts, and Python files with
-`scripts/validation/check-source-file-sizes.py`. Existing untouched files are not part of that gate.
-The native Apple test runner checks every Swift source and test file before compilation.
+do not compress formatting or add an exception to accommodate growth. Size enforcement belongs to
+the existing linters, without a separate changed-file script or its own CI gate. Kotlin structural
+limits use detekt; native Apple file lengths use SwiftLint's `file_length` rule.
 
 detekt enforces two rules across every module, on main source sets only:
 

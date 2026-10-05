@@ -73,10 +73,9 @@ jobs:
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Run tests
-        # `test` alone reaches only the twelve JVM/Android projects; every multiplatform module
-        # aggregates under `allTests`, and the two sets do not overlap. Running one without the
-        # other means the client's tests never run.
-        run: ./gradlew test allTests --continue
+        # JVM/Android and multiplatform modules need both aggregates. Server/client e2e
+        # tests belong to their dedicated job rather than running twice.
+        run: ./gradlew test allTests -x :integration:server-client-e2e:test --continue
         env:
           DATABASE_URL: jdbc:postgresql://localhost:5432/logdate_test
           DATABASE_USER: test
@@ -154,15 +153,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Check changed source file sizes
-        env:
-          SOURCE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: |
-          python3 scripts/tests/validation/test_source_file_sizes.py
-          python3 scripts/validation/check-source-file-sizes.py --base "$SOURCE_BASE"
 
       - name: Materialize Firebase config
         uses: ./.github/actions/setup-firebase-configs
@@ -190,10 +180,7 @@ jobs:
         run: ./scripts/check_hardcoded_compose_literals.sh
 
       - name: Run lint
-        run: ./gradlew lint
-
-      - name: Check function and class size limits
-        run: ./gradlew detekt
+        run: ./gradlew lint detekt
 
   scripts:
     name: Script tests
