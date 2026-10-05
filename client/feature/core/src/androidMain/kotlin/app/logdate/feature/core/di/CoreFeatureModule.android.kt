@@ -251,7 +251,7 @@ actual val coreFeatureModule: Module =
         viewModel { PeopleDirectoryViewModel(get(), get()) }
         viewModel { PeopleInboxViewModel(get()) }
         viewModel { PersonDetailViewModel(get(), get()) }
-        viewModel { SyncPresentationViewModel(syncManager = get(), sessionStorage = get()) }
+        viewModel { SyncPresentationViewModel(syncManager = get(), sessionStorage = get(), cloudArchiveStatusSource = get()) }
         viewModel { CampfireViewModel(observeCampfire = get(), featureFlagStore = get()) }
     }
 

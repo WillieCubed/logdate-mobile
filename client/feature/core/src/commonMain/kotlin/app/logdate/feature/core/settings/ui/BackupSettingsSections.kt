@@ -16,33 +16,25 @@ import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import app.logdate.feature.core.sync.SyncProgressIndicator
-import app.logdate.feature.core.sync.accountSyncStatus
-import app.logdate.feature.core.sync.messageResource
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.account_sign_in_to_enable_sync
-import logdate.client.feature.core.generated.resources.cloud_archive_title
 import logdate.client.feature.core.generated.resources.create_account
-import logdate.client.feature.core.generated.resources.entry_sync_title
 import logdate.client.feature.core.generated.resources.sign_in
+import logdate.client.feature.core.generated.resources.sync_and_backup
 import logdate.client.feature.core.generated.resources.sync_feature_access
 import logdate.client.feature.core.generated.resources.sync_feature_backup
 import logdate.client.feature.core.generated.resources.sync_feature_sync
-import logdate.client.ui.generated.resources.common_loading
 import org.jetbrains.compose.resources.stringResource
-import logdate.client.ui.generated.resources.Res as UiRes
 
 @Composable
 private fun SyncFeatureRow(
@@ -71,14 +63,15 @@ private fun SyncFeatureRow(
 @Composable
 internal fun SyncSettingsSection(
     syncStatus: app.logdate.client.sync.SyncStatus?,
+    cloudArchiveStatus: CloudArchiveStatus,
     isAuthenticated: Boolean,
-    onSyncNow: () -> Unit,
+    onSyncUsingMobileData: () -> Unit = {},
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     SettingsSection(
-        title = stringResource(Res.string.entry_sync_title),
+        title = stringResource(Res.string.sync_and_backup),
         modifier = modifier,
     ) {
         if (!isAuthenticated) {
@@ -118,52 +111,8 @@ internal fun SyncSettingsSection(
             }
         } else {
             Column {
-                SyncStatusItem(
-                    syncStatus = syncStatus,
-                    onSyncNow = onSyncNow,
-                )
+                BackupStatusItem(syncStatus, cloudArchiveStatus, onSyncUsingMobileData = onSyncUsingMobileData)
             }
         }
     }
-}
-
-@Composable
-private fun SyncStatusItem(
-    syncStatus: app.logdate.client.sync.SyncStatus?,
-    onSyncNow: () -> Unit,
-) {
-    ListItem(
-        headlineContent = { SyncStatusText(syncStatus) },
-        leadingContent = {
-            if (syncStatus?.isSyncing == true) {
-                SyncProgressIndicator(
-                    total = syncStatus.totalForRun,
-                    completed = syncStatus.completedInRun,
-                    modifier = Modifier.size(28.dp),
-                )
-            }
-        },
-    )
-}
-
-@Composable
-internal fun CloudArchiveSection(
-    status: CloudArchiveStatus,
-    onArchiveBackupNow: () -> Unit,
-    onNavigateToRecoveryPhrase: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    SettingsSection(title = stringResource(Res.string.cloud_archive_title), modifier = modifier) {
-        ListItem(headlineContent = { Text(stringResource(status.messageResource())) })
-    }
-}
-
-@Composable
-private fun SyncStatusText(syncStatus: app.logdate.client.sync.SyncStatus?) {
-    syncStatus?.let { status ->
-        Text(
-            text = stringResource(accountSyncStatus(status).messageResource()),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    } ?: Text(stringResource(UiRes.string.common_loading), color = MaterialTheme.colorScheme.onSurfaceVariant)
 }

@@ -225,7 +225,10 @@
     <string name="sync_diagnostic_action_update_app">Update LogDate</string>
     <string name="sync_diagnostic_action_review_conflict">Review the affected entry</string>
     <string name="sync_diagnostic_action_contact_support">Contact support</string>
-    <string name="sync_account_waiting">Waiting to sync</string>
+    <string name="sync_account_retrying">Sync is retrying automatically.</string>
+    <string name="sync_account_mobile_data">Sync using mobile data</string>
+    <string name="sync_account_checking">Preparing to sync…</string>
+    <string name="sync_account_waiting">Sync is scheduled.</string>
     <string name="sync_account_offline">Sync paused: this device is offline. It resumes automatically when connected.</string>
     <string name="sync_account_server_unavailable">Sync paused: LogDate’s cloud service is unavailable. Retrying automatically.</string>
     <string name="sync_account_connection_unavailable">Sync paused: unable to connect to LogDate. Retrying automatically.</string>
@@ -233,10 +236,16 @@
     <string name="sync_account_storage_full">Sync paused: your cloud storage is full.</string>
     <string name="sync_account_wifi">Photos and recordings will sync when this device is on Wi-Fi.</string>
     <string name="sync_account_background">Sync paused: background network access is restricted on this device.</string>
-    <string name="sync_account_device_access">Some existing entries are not unlocked on this device yet.</string>
+    <string name="sync_account_device_access">Sync paused while this device gets access to your journal.</string>
     <string name="sync_account_conflict">Sync could not merge an entry edited on another device. Both copies are saved.</string>
     <string name="sync_account_local_unavailable">Sync is incomplete: some local data is unavailable on this device.</string>
     <string name="sync_account_media_too_large">Sync is incomplete: an attachment exceeds the current upload limit.</string>
     <string name="sync_account_unknown">Sync could not finish. LogDate will try again automatically.</string>
     <string name="sync_account_disabled">Sync is turned off.</string>
+    <string name="sync_heading_wifi">Waiting for Wi-Fi</string>
+    <string name="sync_heading_offline">Waiting for a connection</string>
+    <string name="sync_heading_background">Background data is restricted</string>
+    <string name="sync_heading_storage">Cloud storage is full</string>
+    <string name="sync_heading_failed">Sync couldn't finish</string>
+    <string name="sync_retry_automatic_detail">LogDate will try again automatically.</string>
 </resources>

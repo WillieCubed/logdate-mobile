@@ -88,6 +88,8 @@ sealed class SyncPresentation {
 
 /** What the user can do with a [SyncPresentation] surface. */
 sealed class SyncAction {
+    data object UseMobileData : SyncAction()
+
     data object SignIn : SyncAction()
 
     data object ManageStorage : SyncAction()

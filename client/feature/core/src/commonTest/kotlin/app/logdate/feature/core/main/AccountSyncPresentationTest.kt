@@ -5,37 +5,31 @@ import app.logdate.feature.core.sync.SyncAction
 import app.logdate.feature.core.sync.SyncPresentation
 import app.logdate.feature.core.sync.messageResource
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.sync_account_waiting
+import logdate.client.feature.core.generated.resources.sync_account_offline
+import logdate.client.feature.core.generated.resources.sync_account_unknown
+import logdate.client.feature.core.generated.resources.sync_account_wifi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class AccountSyncPresentationTest {
     @Test
-    fun `technical failures present waiting without troubleshooting`() {
-        for (state in listOf(
-            AccountSyncStatus.SERVER_UNAVAILABLE,
-            AccountSyncStatus.CONNECTION_UNAVAILABLE,
-            AccountSyncStatus.DEVICE_ACCESS_REQUIRED,
-            AccountSyncStatus.CONFLICT,
-            AccountSyncStatus.LOCAL_DATA_UNAVAILABLE,
-            AccountSyncStatus.MEDIA_TOO_LARGE,
-            AccountSyncStatus.UNKNOWN,
-        )) {
-            assertEquals(Res.string.sync_account_waiting, state.messageResource())
-        }
+    fun `known pauses explain why syncing cannot proceed`() {
+        assertEquals(Res.string.sync_account_offline, AccountSyncStatus.OFFLINE.messageResource())
+        assertEquals(Res.string.sync_account_wifi, AccountSyncStatus.WAITING_FOR_WIFI.messageResource())
+        assertEquals(Res.string.sync_account_unknown, AccountSyncStatus.SERVER_UNAVAILABLE.messageResource())
     }
 
     @Test
-    fun `fallback cannot expose failures while account status initializes`() {
-        for (state in listOf(
-            SyncPresentation.StatusUnavailable,
-            SyncPresentation.NeedsRecovery,
-            SyncPresentation.StorageError(1),
-            SyncPresentation.ConflictError(1),
-            SyncPresentation.NetworkError(1),
+    fun `fallback uses the same explanation without creating troubleshooting chores`() {
+        for ((presentation, status) in listOf(
+            SyncPresentation.StatusUnavailable to AccountSyncStatus.LOCAL_DATA_UNAVAILABLE,
+            SyncPresentation.NeedsRecovery to AccountSyncStatus.DEVICE_ACCESS_REQUIRED,
+            SyncPresentation.StorageError(1) to AccountSyncStatus.STORAGE_FULL,
+            SyncPresentation.ConflictError(1) to AccountSyncStatus.CONFLICT,
+            SyncPresentation.NetworkError(1) to AccountSyncStatus.CONNECTION_UNAVAILABLE,
         )) {
-            assertEquals(Res.string.sync_account_waiting, state.accountSummaryResource())
-            assertEquals(null, state.accountRecoveryAction())
+            assertEquals(status.messageResource(), presentation.accountSummaryResource())
+            assertEquals(null, presentation.accountRecoveryAction())
         }
         assertEquals(SyncAction.SignIn, SyncPresentation.AuthError.accountRecoveryAction())
     }

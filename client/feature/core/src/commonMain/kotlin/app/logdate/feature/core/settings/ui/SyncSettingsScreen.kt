@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CloudDone
@@ -21,7 +19,6 @@ import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHostState
@@ -37,16 +34,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import app.logdate.feature.core.sync.SyncProgressIndicator
-import app.logdate.feature.core.sync.accountSyncStatus
-import app.logdate.feature.core.sync.messageResource
-import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
-import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.create_account
-import logdate.client.feature.core.generated.resources.entry_sync_title
 import logdate.client.feature.core.generated.resources.sign_in
 import logdate.client.feature.core.generated.resources.sync_and_backup
 import logdate.client.feature.core.generated.resources.sync_devices_subtitle
@@ -59,11 +50,9 @@ import logdate.client.feature.core.generated.resources.sync_feedback_sign_in_act
 import logdate.client.feature.core.generated.resources.sync_feedback_started
 import logdate.client.feature.core.generated.resources.sync_feedback_succeeded
 import logdate.client.feature.core.generated.resources.sync_feedback_up_to_date
-import logdate.client.ui.generated.resources.common_loading
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
-import logdate.client.ui.generated.resources.Res as UiRes
 
 /**
  * Sync settings screen.
@@ -142,7 +131,8 @@ fun SyncSettingsScreen(
         syncStatus = uiState.syncStatus,
         cloudArchiveStatus = uiState.cloudArchiveStatus,
         isAuthenticated = isAuthenticated,
-        onSyncNow = viewModel::syncNow,
+        onSyncNow = { viewModel.syncNow() },
+        onSyncUsingMobileData = { viewModel.syncNow(allowMeteredMedia = true) },
         onArchiveBackupNow = viewModel::backupArchiveNow,
         onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
         onNavigateToSignIn = onNavigateToSignIn,
@@ -160,6 +150,7 @@ fun SyncSettingsContent(
     cloudArchiveStatus: CloudArchiveStatus = CloudArchiveStatus(CloudArchivePhase.CHECKING),
     isAuthenticated: Boolean,
     onSyncNow: () -> Unit,
+    onSyncUsingMobileData: () -> Unit = {},
     onArchiveBackupNow: () -> Unit = {},
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit,
@@ -169,111 +160,29 @@ fun SyncSettingsContent(
     snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier,
 ) {
-    FoldableBookLayout(
-        modifier = modifier.fillMaxSize(),
-        minPaneWidth = 320.dp,
-        startPane = {
+    SettingsScaffold(
+        title = stringResource(Res.string.sync_and_backup),
+        onBack = onBack,
+        snackbarHostState = snackbarHostState,
+        modifier = modifier,
+    ) {
+        item {
             if (!isAuthenticated) {
                 SyncPromoContent(
                     onCreateAccount = onNavigateToCloudAccountCreation,
                     onSignIn = onNavigateToSignIn,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillParentMaxHeight(),
                 )
             } else {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(vertical = Spacing.lg),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-                ) {
-                    CloudSyncSection(
-                        syncStatus = syncStatus,
-                        onSyncNow = onSyncNow,
-                        onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    )
-                    CloudArchiveSection(
-                        status = cloudArchiveStatus,
-                        onArchiveBackupNow = onArchiveBackupNow,
-                        onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    )
-                }
-            }
-        },
-        endPane = {
-            if (!isAuthenticated) {
-                SyncFeatureList(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
+                BackupStatusItem(
+                    syncStatus = syncStatus,
+                    cloudArchiveStatus = cloudArchiveStatus,
+                    onSyncUsingMobileData = onSyncUsingMobileData,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
-            } else {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(vertical = Spacing.lg),
-                ) {
-                    if (isQuotaAvailable) {
-                        QuotaUsageBlock(
-                            quotaUsage = quotaUsage,
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
-                        )
-                    }
-                }
             }
-        },
-        standardContent = {
-            SettingsScaffold(
-                title = stringResource(Res.string.sync_and_backup),
-                onBack = onBack,
-                snackbarHostState = snackbarHostState,
-                modifier = modifier,
-            ) {
-                if (!isAuthenticated) {
-                    item {
-                        SyncPromoContent(
-                            onCreateAccount = onNavigateToCloudAccountCreation,
-                            onSignIn = onNavigateToSignIn,
-                            modifier = Modifier.fillParentMaxHeight(),
-                        )
-                    }
-                } else {
-                    if (isQuotaAvailable) {
-                        item {
-                            QuotaUsageBlock(
-                                quotaUsage = quotaUsage,
-                                modifier = Modifier.padding(horizontal = Spacing.lg),
-                            )
-                        }
-                    }
-
-                    item {
-                        CloudSyncSection(
-                            syncStatus = syncStatus,
-                            onSyncNow = onSyncNow,
-                            onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
-                        )
-                    }
-                    item {
-                        CloudArchiveSection(
-                            status = cloudArchiveStatus,
-                            onArchiveBackupNow = onArchiveBackupNow,
-                            onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
-                        )
-                    }
-                }
-            }
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -374,54 +283,4 @@ private fun SyncFeatureRow(
             style = MaterialTheme.typography.bodyMedium,
         )
     }
-}
-
-@Composable
-private fun CloudSyncSection(
-    syncStatus: app.logdate.client.sync.SyncStatus?,
-    onSyncNow: () -> Unit,
-    onNavigateToRecoveryPhrase: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    SettingsSection(
-        title = stringResource(Res.string.entry_sync_title),
-        modifier = modifier,
-    ) {
-        Column {
-            SyncStatusItem(syncStatus = syncStatus, onSyncNow = onSyncNow, onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase)
-        }
-    }
-}
-
-@Composable
-private fun SyncStatusItem(
-    syncStatus: app.logdate.client.sync.SyncStatus?,
-    onSyncNow: () -> Unit,
-    onNavigateToRecoveryPhrase: () -> Unit,
-) {
-    ListItem(
-        headlineContent = { SyncStatusText(syncStatus, onNavigateToRecoveryPhrase) },
-        leadingContent = {
-            if (syncStatus?.isSyncing == true) {
-                SyncProgressIndicator(
-                    total = syncStatus.totalForRun,
-                    completed = syncStatus.completedInRun,
-                    modifier = Modifier.size(28.dp),
-                )
-            }
-        },
-    )
-}
-
-@Composable
-private fun SyncStatusText(
-    syncStatus: app.logdate.client.sync.SyncStatus?,
-    onNavigateToRecoveryPhrase: () -> Unit,
-) {
-    syncStatus?.let { status ->
-        Text(
-            text = stringResource(accountSyncStatus(status).messageResource()),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    } ?: Text(stringResource(UiRes.string.common_loading), color = MaterialTheme.colorScheme.onSurfaceVariant)
 }

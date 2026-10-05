@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
+import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.AppInfoProvider
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.coroutineScope
@@ -22,6 +23,7 @@ class AndroidLogDateSyncWorker(
 ) : CoroutineWorker(context, params),
     KoinComponent {
     private val syncManager: DefaultSyncManager by inject()
+    private val sessionStorage: SessionStorage by inject()
     private val appInfoProvider: AppInfoProvider by inject()
     private val upgradeResumption: SyncUpgradeResumption by inject()
 
@@ -45,7 +47,11 @@ class AndroidLogDateSyncWorker(
                     .isSuccess
 
             val syncType = inputData.getString(KEY_SYNC_TYPE) ?: SYNC_TYPE_FULL
-            val result = if (promoted) withProgressNotification { runSync(syncType) } else runSync(syncType)
+            val consent = mobileDataSyncScope(inputData, sessionStorage.getOriginBoundSession())
+            val run: suspend () -> SyncResult = {
+                if (consent != null) withMobileDataConsent(consent) { runSync(syncType) } else runSync(syncType)
+            }
+            val result = if (promoted) withProgressNotification(run) else run()
 
             if (result.success && result.hasMorePending) {
                 Result.retry()

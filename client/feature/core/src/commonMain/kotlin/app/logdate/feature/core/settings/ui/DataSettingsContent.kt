@@ -61,6 +61,7 @@ fun DataSettingsContent(
     cloudArchiveStatus: CloudArchiveStatus = CloudArchiveStatus(CloudArchivePhase.CHECKING),
     isAuthenticated: Boolean = false,
     onSyncNow: () -> Unit = {},
+    onSyncUsingMobileData: () -> Unit = {},
     onArchiveBackupNow: () -> Unit = {},
     onNavigateToRecoveryPhrase: () -> Unit = {},
     onNavigateToCloudAccountCreation: () -> Unit = {},
@@ -136,16 +137,11 @@ fun DataSettingsContent(
             ) {
                 SyncSettingsSection(
                     syncStatus = syncStatus,
+                    cloudArchiveStatus = cloudArchiveStatus,
+                    onSyncUsingMobileData = onSyncUsingMobileData,
                     isAuthenticated = isAuthenticated,
-                    onSyncNow = onSyncNow,
                     onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
                     onNavigateToSignIn = onNavigateToSignIn,
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                )
-                CloudArchiveSection(
-                    status = cloudArchiveStatus,
-                    onArchiveBackupNow = onArchiveBackupNow,
-                    onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
             }
@@ -185,18 +181,11 @@ fun DataSettingsContent(
                 item {
                     SyncSettingsSection(
                         syncStatus = syncStatus,
+                        cloudArchiveStatus = cloudArchiveStatus,
+                        onSyncUsingMobileData = onSyncUsingMobileData,
                         isAuthenticated = isAuthenticated,
-                        onSyncNow = onSyncNow,
                         onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
                         onNavigateToSignIn = onNavigateToSignIn,
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    )
-                }
-                item {
-                    CloudArchiveSection(
-                        status = cloudArchiveStatus,
-                        onArchiveBackupNow = onArchiveBackupNow,
-                        onNavigateToRecoveryPhrase = onNavigateToRecoveryPhrase,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }

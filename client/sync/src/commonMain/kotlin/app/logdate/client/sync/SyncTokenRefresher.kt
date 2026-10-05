@@ -25,6 +25,8 @@ internal class SyncTokenRefresher(
     private val sessionStorage: SessionStorage,
     private val cloudAccountRepository: CloudAccountRepository,
 ) {
+    fun currentUploadScope(): UploadScope? = sessionStorage.getOriginBoundSession()?.let { UploadScope(it.session.accountId, it.origin) }
+
     suspend fun <T> withFreshToken(
         operation: suspend (accessToken: String) -> Result<T>,
         operationName: String,

@@ -33,7 +33,8 @@ interface SyncManager {
     fun sync(startNow: Boolean = false)
 
     /** Requests a manual backup; Android waits for its scheduler to accept the request. */
-    suspend fun requestBackup() {
+    suspend fun requestBackup(allowMeteredMedia: Boolean = false) {
+        require(!allowMeteredMedia) { "This sync manager does not support mobile data consent" }
         sync(startNow = true)
     }
 

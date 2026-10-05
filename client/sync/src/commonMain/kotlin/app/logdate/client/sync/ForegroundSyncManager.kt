@@ -79,6 +79,25 @@ class ForegroundSyncManager(
         }
     }
 
+    override suspend fun requestBackup(allowMeteredMedia: Boolean) {
+        if (!allowMeteredMedia) {
+            sync(startNow = true)
+            return
+        }
+        val session = requireNotNull(sessionStorage.getOriginBoundSession())
+        val scope =
+            app.logdate.client.sync.metadata
+                .UploadScope(session.session.accountId, session.origin)
+        withMobileDataConsent(scope) {
+            defaultSyncManager.releaseUploadBackoff()
+            do {
+                val result = defaultSyncManager.fullSync()
+                if (!result.success || !result.hasMorePending) break
+                delay(1_000)
+            } while (true)
+        }
+    }
+
     override suspend fun uploadPendingChanges(): SyncResult = defaultSyncManager.uploadPendingChanges()
 
     override suspend fun downloadRemoteChanges(): SyncResult = defaultSyncManager.downloadRemoteChanges()

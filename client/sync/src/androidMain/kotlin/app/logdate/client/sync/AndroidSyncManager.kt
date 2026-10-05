@@ -18,6 +18,7 @@ import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.networking.NetworkState
+import app.logdate.client.sync.metadata.UploadScope
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -158,8 +159,15 @@ class AndroidSyncManager(
         }
     }
 
-    override suspend fun requestBackup() {
-        val operation = backUpNow()
+    override suspend fun requestBackup(allowMeteredMedia: Boolean) {
+        val consent =
+            if (allowMeteredMedia) {
+                val session = requireNotNull(sessionStorage.getOriginBoundSession())
+                UploadScope(session.session.accountId, session.origin)
+            } else {
+                null
+            }
+        val operation = backUpNow(consent)
         withContext(Dispatchers.IO) { operation.result.get() }
     }
 
@@ -171,7 +179,7 @@ class AndroidSyncManager(
      * prevent). Entries waiting out their own retry backoff are released too, so the run the user
      * asked for attempts them.
      */
-    private suspend fun backUpNow(): Operation {
+    private suspend fun backUpNow(consent: UploadScope? = null): Operation {
         try {
             defaultSyncManager.releaseUploadBackoff()
         } catch (cancelled: CancellationException) {
@@ -179,33 +187,37 @@ class AndroidSyncManager(
         } catch (_: Exception) {
             Napier.e("Could not release upload backoff for a manual backup")
         }
-        return resumeScheduledSync()
+        return resumeScheduledSync(consent)
     }
 
-    private suspend fun resumeScheduledSync(): Operation {
+    private suspend fun resumeScheduledSync(consent: UploadScope? = null): Operation {
         val policy =
             try {
-                val states =
+                val work =
                     workManager
                         .getWorkInfosForUniqueWorkFlow(AndroidLogDateSyncWorker.WORK_NAME_IMMEDIATE_SYNC)
                         .first()
-                        .map { it.state }
-                immediateSyncPolicy(states)
+                immediateSyncPolicy(
+                    work.map { it.state },
+                    hasMobileDataConsent = consent != null,
+                    preserveConsentedRequest = work.any { !it.state.isFinished && MOBILE_DATA_SYNC_TAG in it.tags },
+                )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 Napier.e("Could not inspect scheduled sync; preserving any active request")
-                ExistingWorkPolicy.KEEP
+                if (consent != null) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.KEEP
             }
-        return scheduleImmediateSync(AndroidLogDateSyncWorker.SYNC_TYPE_FULL, policy = policy)
+        return scheduleImmediateSync(AndroidLogDateSyncWorker.SYNC_TYPE_FULL, policy = policy, consent = consent)
     }
 
     /**
      * Schedules immediate sync work with high priority.
      */
-    fun scheduleImmediateSync(
+    internal fun scheduleImmediateSync(
         syncType: String = AndroidLogDateSyncWorker.SYNC_TYPE_FULL,
         policy: ExistingWorkPolicy = ExistingWorkPolicy.KEEP,
+        consent: UploadScope? = null,
     ): Operation {
         val constraints =
             Constraints
@@ -216,6 +228,7 @@ class AndroidSyncManager(
         val inputData =
             Data
                 .Builder()
+                .putAll(mobileDataSyncInput(consent))
                 .putString(AndroidLogDateSyncWorker.KEY_SYNC_TYPE, syncType)
                 .build()
 
@@ -223,6 +236,7 @@ class AndroidSyncManager(
             OneTimeWorkRequestBuilder<AndroidLogDateSyncWorker>()
                 .setConstraints(constraints)
                 .setInputData(inputData)
+                .apply { if (consent != null) addTag(MOBILE_DATA_SYNC_TAG) }
                 // Out of expedited quota, run it as ordinary work rather than drop it. This is what
                 // "Back up now" schedules, and dropping it threw the request away with nothing on
                 // screen changing: the backup waited for the next periodic run, hours later, while

@@ -38,12 +38,32 @@ class HomeWorkspaceAccountActionTest {
             onNodeWithTag("logdate_home_sync_status").assertDoesNotExist()
             onNodeWithText("Journaling streak").assertDoesNotExist()
             onNodeWithTag("workspace_account").performClick()
-            onNodeWithText("Waiting to sync").assertExists()
+            onNodeWithText("Preparing to sync…").assertExists()
             onNodeWithText("Backup status").assertDoesNotExist()
             onNodeWithText("2 items waiting to back up").assertDoesNotExist()
             assertEquals(null, action)
             onNodeWithText("Journaling streak").performClick()
             assertTrue(openedStreak)
+        }
+
+    @Test fun wifiWaitOffersConsentInAccountMenu() =
+        runDesktopComposeUiTest(width = 411, height = 891) {
+            var action: SyncAction? = null
+            setContent {
+                LogDateTheme {
+                    HomeWorkspaceAccountAction(
+                        SyncPresentation.Pending(1),
+                        null,
+                        {},
+                        {},
+                        { action = it },
+                        accountStatus = AccountSyncStatus.WAITING_FOR_WIFI,
+                    )
+                }
+            }
+            onNodeWithTag("workspace_account").performClick()
+            onNodeWithText("Sync using mobile data").performClick()
+            assertEquals(SyncAction.UseMobileData, action)
         }
 
     @Test fun lockedEntriesWaitWithoutAnUnusableExplanation() =
@@ -62,7 +82,7 @@ class HomeWorkspaceAccountActionTest {
             }
             onNodeWithTag("workspace_account").performClick()
             onNodeWithText("Some existing entries are not unlocked on this device yet.").assertDoesNotExist()
-            onNodeWithText("Waiting to sync").assertExists()
+            onNodeWithText("Sync could not finish. LogDate will try again automatically.").assertExists()
             onNodeWithText("Enter phrase").assertDoesNotExist()
         }
 }

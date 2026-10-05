@@ -2,7 +2,6 @@ package app.logdate.client.sync
 
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.networking.DataUsagePolicy
-import app.logdate.client.networking.shouldSyncMedia
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
@@ -325,7 +324,7 @@ internal class SyncUploader(
                         }
                         val mediaRef = note.mediaRefOrNull()
                         val needsMediaUpload = mediaRef != null && !mediaTransfer.isRemoteRef(mediaRef)
-                        if (needsMediaUpload && !dataUsagePolicy.currentMode().shouldSyncMedia()) {
+                        if (needsMediaUpload && !mediaSyncAllowed(dataUsagePolicy.currentMode(), tokenRefresher.currentUploadScope())) {
                             setMediaDeferredForNetwork(true)
                             Napier.d("Deferring media upload for note — data usage policy restricts media sync")
                             continue

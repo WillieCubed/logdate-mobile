@@ -24,13 +24,11 @@ import app.logdate.ui.workspace.WorkspaceAccountAction
 import app.logdate.ui.workspace.WorkspaceAccountIndicator
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.settings
-import logdate.client.feature.core.generated.resources.sync_account_signed_out
-import logdate.client.feature.core.generated.resources.sync_account_waiting
+import logdate.client.feature.core.generated.resources.sync_account_mobile_data
 import logdate.client.feature.core.generated.resources.sync_banner_enter_recovery_phrase
 import logdate.client.feature.core.generated.resources.sync_banner_manage
 import logdate.client.feature.core.generated.resources.sync_banner_review
 import logdate.client.feature.core.generated.resources.sync_feedback_sign_in_action
-import logdate.client.feature.core.generated.resources.syncing
 import logdate.client.feature.core.generated.resources.workspace_journaling_streak
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -50,6 +48,15 @@ fun HomeWorkspaceAccountAction(
             Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
             }
+        }
+        if (accountStatus == AccountSyncStatus.WAITING_FOR_WIFI) {
+            DropdownMenuItem(
+                text = { Text(stringResource(Res.string.sync_account_mobile_data)) },
+                onClick = {
+                    dismiss()
+                    onSyncAction(SyncAction.UseMobileData)
+                },
+            )
         }
         sync.accountRecoveryAction()?.let { action ->
             DropdownMenuItem(text = { Text(action.accountLabel()) }, onClick = {
@@ -91,14 +98,14 @@ internal fun SyncPresentation.accountRecoveryAction(): SyncAction? =
 internal fun SyncPresentation.accountSummaryResource(): StringResource? =
     when (this) {
         SyncPresentation.Hidden -> null
-        is SyncPresentation.Syncing -> Res.string.syncing
-        is SyncPresentation.Pending -> Res.string.sync_account_waiting
-        SyncPresentation.StatusUnavailable -> Res.string.sync_account_waiting
-        SyncPresentation.AuthError -> Res.string.sync_account_signed_out
-        SyncPresentation.NeedsRecovery -> Res.string.sync_account_waiting
-        is SyncPresentation.StorageError -> Res.string.sync_account_waiting
-        is SyncPresentation.ConflictError -> Res.string.sync_account_waiting
-        is SyncPresentation.NetworkError -> Res.string.sync_account_waiting
+        is SyncPresentation.Syncing -> AccountSyncStatus.SYNCING.messageResource()
+        is SyncPresentation.Pending -> AccountSyncStatus.CHECKING.messageResource()
+        SyncPresentation.StatusUnavailable -> AccountSyncStatus.LOCAL_DATA_UNAVAILABLE.messageResource()
+        SyncPresentation.AuthError -> AccountSyncStatus.SIGN_IN_REQUIRED.messageResource()
+        SyncPresentation.NeedsRecovery -> AccountSyncStatus.DEVICE_ACCESS_REQUIRED.messageResource()
+        is SyncPresentation.StorageError -> AccountSyncStatus.STORAGE_FULL.messageResource()
+        is SyncPresentation.ConflictError -> AccountSyncStatus.CONFLICT.messageResource()
+        is SyncPresentation.NetworkError -> AccountSyncStatus.CONNECTION_UNAVAILABLE.messageResource()
     }
 
 @Composable

@@ -119,6 +119,7 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val onSyncAction: (SyncAction) -> Unit = { action ->
         when (action) {
+            SyncAction.UseMobileData -> syncPresentationViewModel.useMobileData()
             SyncAction.SignIn,
             SyncAction.ManageStorage,
             -> onOpenSettings()

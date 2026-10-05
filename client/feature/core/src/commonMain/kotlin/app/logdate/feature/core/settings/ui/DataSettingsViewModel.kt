@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.coroutines.cancellation.CancellationException
 
 data class DataSettingsState(
     val quotaState: CloudStorageQuota?,
@@ -222,15 +223,17 @@ class DataSettingsViewModel(
      * worker survives the app going away. Report whether WorkManager accepted the request;
      * progress and completion come from the live backup status.
      */
-    fun syncNow() {
+    fun syncNow(allowMeteredMedia: Boolean = false) {
         viewModelScope.launch {
             try {
                 if (sessionStorage.getSession() == null) {
                     _syncFeedback.value = SyncFeedback.NeedsAccount
                     return@launch
                 }
-                syncManager.requestBackup()
+                syncManager.requestBackup(allowMeteredMedia)
                 _syncFeedback.value = SyncFeedback.Started
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Napier.e("Could not start sync", e)
                 _syncFeedback.value = SyncFeedback.Failed(describeSyncFailure(null))
