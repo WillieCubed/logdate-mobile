@@ -117,11 +117,6 @@ fun DataSettingsContent(
                     Column {
                         ExportDataItem(onShowExportOptions = onShowExportOptions)
                         ImportBackupItem(onShowRestoreSheet = onShowRestoreSheet)
-                        IntegrityCheckItem(
-                            integrityState = integrityState,
-                            onRunIntegrityCheck = onRunIntegrityCheck,
-                            onRepairIntegrity = onRepairIntegrity,
-                        )
                     }
                 }
             }
@@ -169,11 +164,6 @@ fun DataSettingsContent(
                         Column {
                             ExportDataItem(onShowExportOptions = onShowExportOptions)
                             ImportBackupItem(onShowRestoreSheet = onShowRestoreSheet)
-                            IntegrityCheckItem(
-                                integrityState = integrityState,
-                                onRunIntegrityCheck = onRunIntegrityCheck,
-                                onRepairIntegrity = onRepairIntegrity,
-                            )
                         }
                     }
                 }
