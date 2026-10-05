@@ -151,7 +151,7 @@ class KeyValueFirstSyncEnqueueStore(
         ownerId: String,
         serverOrigin: String,
         entityType: EntityType,
-    ): String = "sync_local_backfill_v1_${entityType.name}_${ownerId.length}:$ownerId:${serverOrigin.length}:$serverOrigin"
+    ): String = "sync_local_backfill_v2_${entityType.name}_${ownerId.length}:$ownerId:${serverOrigin.length}:$serverOrigin"
 
     override suspend fun hasEnqueuedAssociationScope(
         ownerId: String,

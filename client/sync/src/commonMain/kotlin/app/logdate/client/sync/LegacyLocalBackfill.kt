@@ -38,7 +38,7 @@ internal class LegacyLocalBackfill(
         firstSyncEnqueueStore.markEnqueuedAssociationScope(selected.owner, selected.origin)
     }
 
-    /** Recover unqueued, never-synced local records only after completing the cloud inventory. */
+    /** Recover unqueued local records absent from the completed cloud inventory. */
     suspend fun enqueueRecordsIfNeeded(entityType: EntityType) {
         val inbox = downloadInbox ?: return
         val selected = inbox.currentScope()
@@ -49,12 +49,10 @@ internal class LegacyLocalBackfill(
                 EntityType.JOURNAL ->
                     journalRepository.allJournalsObserved
                         .first()
-                        .filter { it.syncVersion == 0L }
                         .map { it.id }
                 EntityType.NOTE ->
                     journalNotesRepository.allNotesObserved
                         .first()
-                        .filter { it.syncVersion == 0L }
                         .map { it.uid }
                 else -> return
             }
