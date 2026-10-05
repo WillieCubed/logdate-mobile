@@ -1,12 +1,17 @@
-# Block device-capable Android commands for LogDate.
+# Scoped adb diagnostics are validated by block_unsafe_android_commands.py.
+# Physical-device access still requires an explicit user override in AGENTS.md.
 prefix_rule(
-    pattern = ["adb"],
+    pattern = ["adb", ["shell", "install", "uninstall", "push", "pull", "reboot", "root", "logcat", "-d", "-e"]],
     decision = "forbidden",
-    justification = "Do not use adb for LogDate from Codex. Use an emulator or Gradle Managed Device workflow instead.",
+    justification = "Use an explicit adb -s target for approved read-only diagnostics; device mutations remain blocked by the Android hook.",
     match = [
-        "adb devices",
         "adb shell pm clear studio.hypertext.logdate",
         "adb install app.apk",
+        "adb -d logcat -d",
+    ],
+    not_match = [
+        "adb devices -l",
+        "adb -s approved-phone shell dumpsys package studio.hypertext.logdate",
     ],
 )
 
