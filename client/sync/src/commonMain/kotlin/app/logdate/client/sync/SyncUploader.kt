@@ -3,7 +3,6 @@ package app.logdate.client.sync
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.networking.shouldSyncMedia
-import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
@@ -19,7 +18,6 @@ import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.FirstSyncEnqueueStore
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.PendingOperation
-import app.logdate.client.sync.metadata.PendingUpload
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.recovery.DownloadScope
 import io.github.aakira.napier.Napier
@@ -481,98 +479,15 @@ internal class SyncUploader(
 
     suspend fun uploadDrafts(accessToken: String): SyncResult = uploadPass("Upload drafts") { draftUploader.uploadPending() }
 
-    /**
-     * Queues everything already on this device the first time it syncs with a server.
-     *
-     * Entries can exist before the device has ever talked to a server: written offline, or restored
-     * from a backup. Nothing enqueues those retrospectively, so without this they sit on the device
-     * for ever while sync reports success and uploads nothing. Signing in on a second device
-     * promises exactly this, and it has to be true.
-     *
-     * Only runs while the server has never been synced with, and enqueueing coalesces, so an entry
-     * already waiting is not queued twice.
-     *
-     * "Never synced" itself is checked two ways: [firstSyncEnqueueStore] records whether this sweep
-     * has ever completed for the entity type, independent of [syncMetadataService]'s download
-     * cursor. The cursor alone isn't enough -- if downloading keeps failing, the cursor never
-     * advances, and without the store's own flag this whole-table scan would repeat on every full
-     * sync attempt for ever, rather than the one time it is meant to run.
-     */
-    suspend fun enqueueEverythingOnFirstSync() {
-        val entityTypes = listOf(EntityType.JOURNAL, EntityType.NOTE)
-        val neverSynced =
-            entityTypes.filter { entityType ->
-                !firstSyncEnqueueStore.hasEnqueued(entityType) && syncMetadataService.getLastSyncTime(entityType) == null
-            }
-        runCatching {
-            if (EntityType.JOURNAL in neverSynced) {
-                val journals = journalRepository.allJournalsObserved.first()
-                journals.forEach { journal ->
-                    syncMetadataService.enqueueCreateIfAbsent(
-                        entityId = journal.id.toString(),
-                        entityType = EntityType.JOURNAL,
-                    )
-                }
-                // Marked only once the loop above has fully succeeded -- if it throws partway,
-                // this line never runs and the next attempt retries the whole type from scratch.
-                firstSyncEnqueueStore.markEnqueued(EntityType.JOURNAL)
-                Napier.i("First sync: queued journals already on this device")
-            }
-            if (EntityType.NOTE in neverSynced) {
-                val notes = journalNotesRepository.allNotesObserved.first()
-                notes.forEach { note ->
-                    syncMetadataService.enqueueCreateIfAbsent(
-                        entityId = note.uid.toString(),
-                        entityType = EntityType.NOTE,
-                    )
-                }
-                firstSyncEnqueueStore.markEnqueued(EntityType.NOTE)
-                Napier.i("First sync: queued entries already on this device")
-            }
-            enqueueDraftsForRichSync()
-        }.onFailure { error ->
-            Napier.w("Could not queue existing entries for the first sync")
-            throw error
-        }
-    }
+    suspend fun enqueueEverythingOnFirstSync() =
+        FirstSyncEnqueuer(
+            journalRepository,
+            journalNotesRepository,
+            syncMetadataService,
+            firstSyncEnqueueStore,
+            draftUploader::enqueueForRichSync,
+        ).enqueue()
 
     /** Queues pre-existing drafts once per signed-in owner/server, preserving pending deletions. */
     suspend fun enqueueDraftsForRichSync() = draftUploader.enqueueForRichSync()
 }
-
-/**
- * Drops entries still inside their retry backoff before callers decide whether there is any
- * work. Dead-lettered entries stay queued indefinitely, so without this an entry that can
- * never upload keeps every sync run loading a whole table to do nothing with.
- */
-internal suspend fun List<PendingUpload>.dueNow(
-    entityType: EntityType,
-    retryCoordinator: SyncRetryCoordinator,
-): List<PendingUpload> = filter { retryCoordinator.shouldAttempt(entityType, it) }
-
-/**
- * Records that an upload of [pending] is starting, before anything that could take the app down with
- * it. Returns false when earlier attempts never finished and the entry has been set aside instead,
- * with the reason added to [errors].
- */
-internal suspend fun SyncRetryCoordinator.beginAttempt(
-    entityType: EntityType,
-    pending: PendingUpload,
-    errors: MutableList<SyncError>,
-): Boolean {
-    val setAside = beginUpload(entityType, pending) ?: return true
-    errors.add(setAside)
-    return false
-}
-
-private fun JournalNote.withRepairVersion(version: Long?): JournalNote =
-    if (version == null) {
-        this
-    } else {
-        when (this) {
-            is JournalNote.Text -> copy(syncVersion = version)
-            is JournalNote.Image -> copy(syncVersion = version)
-            is JournalNote.Video -> copy(syncVersion = version)
-            is JournalNote.Audio -> copy(syncVersion = version)
-        }
-    }
