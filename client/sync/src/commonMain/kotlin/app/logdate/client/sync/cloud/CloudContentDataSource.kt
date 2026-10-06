@@ -190,8 +190,8 @@ class DefaultCloudContentDataSource(
                 },
             caption =
                 when (this) {
-                    is JournalNote.Image -> caption.takeIf { it.isNotBlank() }?.let { encryptNoteCaption(uid, it) }
-                    is JournalNote.Video -> caption.takeIf { it.isNotBlank() }?.let { encryptNoteCaption(uid, it) }
+                    is JournalNote.Image -> encryptNoteCaption(uid, caption)
+                    is JournalNote.Video -> encryptNoteCaption(uid, caption)
                     else -> null
                 },
             photoPresentation = (this as? JournalNote.Image)?.presentation?.name,

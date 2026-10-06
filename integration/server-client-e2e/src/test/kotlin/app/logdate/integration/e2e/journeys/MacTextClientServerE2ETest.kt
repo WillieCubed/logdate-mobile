@@ -49,6 +49,83 @@ private val SWIFT_TEXT =
 
 class MacTextClientServerE2ETest {
     @Test
+    fun `clearing a photo caption is encrypted and reaches another device`() = runTest { verifyCaptionRemoval(video = false) }
+
+    @Test
+    fun `clearing a video caption is encrypted and reaches another device`() = runTest { verifyCaptionRemoval(video = true) }
+
+    private suspend fun verifyCaptionRemoval(video: Boolean) {
+        withServerClientHarness {
+            val token =
+                apiClient
+                    .createAccountWithSyntheticPasskey("caption_${Random.nextInt(100000, 999999)}")
+                    .data.tokens.accessToken
+            val crypto = DesktopCryptoManager()
+
+            suspend fun device(): DefaultCloudContentDataSource {
+                val secrets = MemorySecrets()
+                secrets.putBytes("identity_key_v1", ByteArray(32) { it.toByte() })
+                val identity = IdentityKeyManager(secrets, crypto)
+                return DefaultCloudContentDataSource(
+                    apiClient,
+                    SyncPayloadCipher(ContentEncryptionService(identity, KeyDerivation(crypto), crypto), identity, crypto),
+                )
+            }
+            val writer = device()
+            val reader = device()
+            val now = Instant.fromEpochMilliseconds(System.currentTimeMillis())
+            val id = Uuid.random()
+            val original =
+                if (video) {
+                    JournalNote.Video(id, now, now, mediaRef = "video.mp4", caption = "Private caption")
+                } else {
+                    JournalNote.Image(id, now, now, mediaRef = "photo.jpg", caption = "Private caption")
+                }
+            writer.uploadNote(token, original).getOrThrow()
+            val start = Instant.fromEpochMilliseconds(0)
+            var received =
+                reader
+                    .getContentChanges(token, start)
+                    .getOrThrow()
+                    .changes
+                    .single()
+            for (caption in listOf("", " \n")) {
+                val edited =
+                    when (val note = received) {
+                        is JournalNote.Image -> note.copy(caption = caption)
+                        is JournalNote.Video -> note.copy(caption = caption)
+                        else -> error("Expected a photo or video")
+                    }
+                val upload = writer.updateNote(token, edited).getOrThrow()
+                val wire =
+                    apiClient
+                        .getContentChanges(token, 0)
+                        .getOrThrow()
+                        .changes
+                        .single()
+                assertTrue(wire.caption.orEmpty().startsWith("LDSE2:"))
+                received =
+                    reader
+                        .getContentChanges(token, start)
+                        .getOrThrow()
+                        .changes
+                        .single()
+                val actualCaption =
+                    when (val note = received) {
+                        is JournalNote.Image -> note.caption
+                        is JournalNote.Video -> note.caption
+                        else -> error("Expected a photo or video")
+                    }
+                assertEquals(caption, actualCaption)
+                assertEquals(id, received.uid)
+                assertEquals(now, received.creationTimestamp)
+                assertEquals(upload.serverVersion, received.syncVersion)
+                assertTrue(writer.updateNote(token, edited).isFailure)
+            }
+        }
+    }
+
+    @Test
     fun `legacy text can be repaired under the current identity without changing its ID or overwriting a newer version`() =
         runTest {
             withServerClientHarness {
