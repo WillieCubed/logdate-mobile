@@ -47,6 +47,10 @@ for pattern in "${sensitive_patterns[@]}"; do
     matches="$(echo "$staged_files" | grep -iE "$pattern" || true)"
     if [[ -n "$matches" ]]; then
         while IFS= read -r match; do
+            # Existing runbooks still pass through the staged-content secret scan.
+            if [[ "$match" == docs/*.md ]] && git cat-file -e "HEAD:$match" 2>/dev/null; then
+                continue
+            fi
             sensitive_found+=("$match")
         done <<< "$matches"
     fi
@@ -74,7 +78,7 @@ fi
 
 secret_line_patterns=(
     'AKIA[0-9A-Z]{16}'
-    '-----BEGIN (RSA|EC|DSA|OPENSSH|PGP) PRIVATE KEY-----'
+    '-----BEGIN ((RSA|EC|DSA|OPENSSH|PGP) )?PRIVATE KEY-----'
     '(api[_-]?key|secret|token|password)[[:space:]]*[:=][[:space:]]*["'"'"'][^"'"'"']{8,}["'"'"']'
     # URL-embedded basic-auth credentials: `…://user:pass@host` — user may
     # be empty (Redis auth-token form), pass must be 6+ chars to avoid

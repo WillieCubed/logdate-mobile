@@ -108,7 +108,7 @@ The Apple Distribution certificate the workflow uses to sign the
    Access via Keychain Access → Certificate Assistant → Request a
    Certificate from a Certificate Authority).
 2. In Keychain Access, find the **"Apple Distribution: <Team Name>
-   (39AB9DY3K8)"** identity in the **login** keychain.
+   (T95VDD3A4W)"** identity in the **login** keychain.
 3. Right-click the identity (the row with the disclosure triangle, not
    just the cert) → **Export**.
 4. Format: **Personal Information Exchange (.p12)**.
