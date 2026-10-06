@@ -20,6 +20,7 @@ import app.logdate.feature.journals.ui.picker.JournalContentPickerItemKind
 import app.logdate.feature.journals.ui.picker.JournalContentPickerScreenContent
 import app.logdate.feature.journals.ui.picker.JournalContentPickerUiState
 import app.logdate.feature.journals.ui.picker.contentPickerGridColumnCount
+import app.logdate.feature.journals.ui.picker.contentPickerItemSpan
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.util.formatDateLocalized
 import kotlinx.datetime.LocalDate
@@ -32,12 +33,66 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalTestApi::class)
 class JournalContentPickerScreenTest {
     @Test
-    fun `picker grid uses progressively wider equal tiles and protects large text`() {
+    fun `nonvisual cards prioritize their content over type labels`() =
+        runDesktopComposeUiTest(width = 411, height = 891) {
+            val recording =
+                JournalContentPickerItem(
+                    id = Uuid.random(),
+                    kind = JournalContentPickerItemKind.RECORDING,
+                    timestamp = Instant.parse("2026-10-06T08:00:00Z"),
+                    title = "Rain against the glass",
+                )
+            val photo =
+                JournalContentPickerItem(
+                    id = Uuid.random(),
+                    kind = JournalContentPickerItemKind.PHOTO,
+                    timestamp = Instant.parse("2026-10-06T07:00:00Z"),
+                    title = "Rain on the windowsill",
+                )
+            setContent {
+                LogDateTheme {
+                    JournalContentPickerScreenContent(
+                        state =
+                            JournalContentPickerUiState(
+                                groups =
+                                    listOf(
+                                        JournalContentPickerDateGroup(
+                                            LocalDate(2026, 10, 6),
+                                            items = listOf(sampleWriting, recording, photo),
+                                        ),
+                                    ),
+                            ),
+                    )
+                }
+            }
+
+            onNodeWithText(sampleWriting.title).assertIsDisplayed()
+            onNodeWithText(recording.title).assertIsDisplayed()
+            onNodeWithText(photo.title).assertIsDisplayed()
+            onNodeWithText("Writing").assertDoesNotExist()
+            onNodeWithText("Recording").assertDoesNotExist()
+            onNodeWithText("Photo").assertDoesNotExist()
+        }
+
+    @Test
+    fun `picker grid expands media space while protecting large text`() {
         assertEquals(1, contentPickerGridColumnCount(360.dp, fontScale = 1f))
         assertEquals(2, contentPickerGridColumnCount(411.dp, fontScale = 1f))
         assertEquals(4, contentPickerGridColumnCount(840.dp, fontScale = 1f))
         assertEquals(6, contentPickerGridColumnCount(1280.dp, fontScale = 1f))
         assertEquals(1, contentPickerGridColumnCount(411.dp, fontScale = 2f))
+    }
+
+    @Test
+    fun `picker gives writing more grid space than media on larger panels`() {
+        val photo = sampleWriting.copy(kind = JournalContentPickerItemKind.PHOTO)
+        val recording = sampleWriting.copy(kind = JournalContentPickerItemKind.RECORDING)
+
+        assertEquals(2, contentPickerItemSpan(sampleWriting, gridColumns = 2))
+        assertEquals(2, contentPickerItemSpan(sampleWriting, gridColumns = 4))
+        assertEquals(3, contentPickerItemSpan(sampleWriting, gridColumns = 6))
+        assertEquals(1, contentPickerItemSpan(photo, gridColumns = 6))
+        assertEquals(2, contentPickerItemSpan(recording, gridColumns = 6))
     }
 
     @Test

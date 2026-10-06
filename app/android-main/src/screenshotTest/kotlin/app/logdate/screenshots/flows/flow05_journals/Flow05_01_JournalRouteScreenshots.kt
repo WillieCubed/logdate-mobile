@@ -86,7 +86,11 @@ private val pickerBrowseState =
                             Uuid.parse("00000000-0000-0000-0000-000000000084"),
                             JournalContentPickerItemKind.WRITING,
                             ScreenshotTestData.baseInstant,
-                            "Coffee at the kitchen table while rain made the whole street quiet.",
+                            """Coffee at the kitchen table while rain made the whole street quiet.
+
+                                |The apartment was still enough to hear the kettle click off, then the first drops tapping the glass. I kept writing past the point where I had planned to stop because the morning felt worth keeping in full.
+
+                                |The mug cooled between both hands. Outside, the sidewalk shone and the little maple at the corner shook itself dry every few minutes.""".trimMargin(),
                         ),
                         JournalContentPickerItem(
                             Uuid.parse("00000000-0000-0000-0000-000000000085"),

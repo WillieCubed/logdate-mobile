@@ -25,7 +25,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.GraphicEq
@@ -217,6 +216,9 @@ private fun PickerGallery(
                 items(
                     items = group.items,
                     key = { it.id },
+                    span = { item ->
+                        GridItemSpan(contentPickerItemSpan(item, gridColumns))
+                    },
                 ) { item ->
                     PickerItemTile(
                         item = item,
@@ -242,7 +244,6 @@ private fun PickerItemTile(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f)
                 .semantics {
                     role = Role.Checkbox
                     this.selected = selected
@@ -266,7 +267,7 @@ private fun PickerItemTile(
         border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
     ) {
         if (item.isVisualMedia) {
-            Box(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.secondaryContainer,
@@ -309,16 +310,12 @@ private fun PickerItemTile(
                             contentScale = ContentScale.Crop,
                         )
                 }
-                Surface(
-                    modifier = Modifier.align(Alignment.BottomStart).padding(Spacing.sm),
-                    shape = MaterialTheme.shapes.extraLarge,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                ) {
-                    Text(
-                        text = typeLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                if (item.kind == JournalContentPickerItemKind.VIDEO) {
+                    Icon(
+                        Icons.Rounded.PlayCircle,
+                        contentDescription = null,
+                        modifier = Modifier.align(Alignment.Center).size(28.dp),
+                        tint = MaterialTheme.colorScheme.onSurface,
                     )
                 }
                 SelectionMarker(
@@ -326,43 +323,37 @@ private fun PickerItemTile(
                     modifier = Modifier.align(Alignment.TopEnd).padding(Spacing.sm),
                 )
             }
-        } else {
-            Box(Modifier.fillMaxSize().padding(Spacing.lg)) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.SpaceBetween,
+        } else if (item.kind == JournalContentPickerItemKind.RECORDING) {
+            Box(Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.md)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(end = 36.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        Surface(
-                            modifier = Modifier.size(52.dp),
-                            shape = MaterialTheme.shapes.large,
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    if (item.kind == JournalContentPickerItemKind.RECORDING) {
-                                        Icons.Rounded.GraphicEq
-                                    } else {
-                                        Icons.AutoMirrored.Rounded.Article
-                                    },
-                                    contentDescription = null,
-                                )
-                            }
-                        }
-                        Text(
-                            text = typeLabel,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
+                    Icon(
+                        Icons.Rounded.GraphicEq,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
                     Text(
                         text = item.title,
                         style = MaterialTheme.typography.titleMedium,
-                        maxLines = 4,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                SelectionMarker(selected, Modifier.align(Alignment.TopEnd))
+            }
+        } else {
+            Box(Modifier.fillMaxWidth().padding(Spacing.lg)) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 8,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(end = 36.dp).widthIn(max = 720.dp),
+                )
                 SelectionMarker(selected, Modifier.align(Alignment.TopEnd))
             }
         }
@@ -377,6 +368,18 @@ internal fun contentPickerGridColumnCount(
     val usableWidth = (availableWidth - Spacing.lg * 2).coerceAtLeast(0.dp)
     return (usableWidth / 176.dp).toInt().coerceIn(1, 6)
 }
+
+internal fun contentPickerItemSpan(
+    item: JournalContentPickerItem,
+    gridColumns: Int,
+): Int =
+    when (item.kind) {
+        JournalContentPickerItemKind.WRITING -> ((gridColumns + 1) / 2).coerceAtLeast(2).coerceAtMost(gridColumns)
+        JournalContentPickerItemKind.RECORDING -> if (gridColumns >= 6) 2 else 1
+        JournalContentPickerItemKind.PHOTO,
+        JournalContentPickerItemKind.VIDEO,
+        -> 1
+    }
 
 @Composable
 private fun SelectionMarker(
