@@ -18,6 +18,7 @@ import app.logdate.feature.journals.ui.picker.JournalContentPickerItemKind
 import app.logdate.feature.journals.ui.picker.JournalContentPickerScreenContent
 import app.logdate.feature.journals.ui.picker.JournalContentPickerUiState
 import app.logdate.ui.theme.LogDateTheme
+import app.logdate.util.formatDateLocalized
 import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -26,6 +27,38 @@ import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalTestApi::class)
 class JournalContentPickerScreenTest {
+    @Test
+    fun `picker exposes its search field as a search control`() =
+        runDesktopComposeUiTest(width = 411, height = 891) {
+            setContent {
+                LogDateTheme {
+                    JournalContentPickerScreenContent(
+                        state = JournalContentPickerUiState(),
+                    )
+                }
+            }
+
+            onNodeWithContentDescription("Search existing content").assertIsDisplayed()
+        }
+
+    @Test
+    fun `picker presents date headings in the user's locale`() =
+        runDesktopComposeUiTest(width = 411, height = 891) {
+            val date = LocalDate(2026, 10, 6)
+            setContent {
+                LogDateTheme {
+                    JournalContentPickerScreenContent(
+                        state =
+                            JournalContentPickerUiState(
+                                groups = listOf(JournalContentPickerDateGroup(date, listOf(sampleWriting))),
+                            ),
+                    )
+                }
+            }
+
+            onNodeWithText(formatDateLocalized(date)).assertIsDisplayed()
+        }
+
     @Test
     fun `Add existing content opens the nested picker`() =
         runDesktopComposeUiTest(width = 411, height = 891) {
@@ -105,3 +138,11 @@ class JournalContentPickerScreenTest {
             onNodeWithContentDescription("Remove Morning note from selection").assertDoesNotExist()
         }
 }
+
+private val sampleWriting =
+    JournalContentPickerItem(
+        id = Uuid.random(),
+        kind = JournalContentPickerItemKind.WRITING,
+        timestamp = Instant.parse("2026-10-06T08:00:00Z"),
+        title = "Morning note",
+    )

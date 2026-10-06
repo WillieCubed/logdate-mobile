@@ -1,6 +1,7 @@
 package app.logdate.screenshots.flows.flow05_journals
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import app.logdate.client.R
@@ -116,6 +117,15 @@ private val pickerBrowseState =
                 ),
             ),
     )
+
+@Composable
+private fun pickerPreviewMedia(): Map<Uuid, Painter> {
+    val photo = painterResource(R.drawable.sample_note_photo)
+    return pickerBrowseState.groups
+        .flatMap(JournalContentPickerDateGroup::items)
+        .filter { it.kind == JournalContentPickerItemKind.PHOTO || it.kind == JournalContentPickerItemKind.VIDEO }
+        .associate { it.id to photo }
+}
 
 @PreviewTest
 @ScreenshotPreviewMatrix
@@ -345,9 +355,11 @@ fun S15_JournalDetailMarkdownPreview() {
 @Composable
 fun S16_JournalContentPickerBrowse() {
     ScreenshotTheme {
+        val previewMedia = pickerPreviewMedia()
         JournalContentPickerScreenContent(
             state = pickerBrowseState,
             onBack = {},
+            previewMedia = previewMedia,
         )
     }
 }
@@ -357,9 +369,11 @@ fun S16_JournalContentPickerBrowse() {
 @Composable
 fun S17_JournalContentPickerSelectedReview() {
     ScreenshotTheme {
+        val previewMedia = pickerPreviewMedia()
         JournalContentPickerScreenContent(
             state = pickerBrowseState.copy(selectedItems = pickerBrowseState.groups.flatMap { it.items }.take(2)),
             onBack = {},
+            previewMedia = previewMedia,
         )
     }
 }
@@ -371,14 +385,16 @@ fun S17_JournalContentPickerSelectedReview() {
 @Composable
 fun S18_JournalContentPickerSearch() {
     ScreenshotTheme {
+        val previewMedia = pickerPreviewMedia()
         JournalContentPickerScreenContent(
             state =
                 pickerBrowseState.copy(
                     query = "rain",
                     groups = listOf(pickerBrowseState.groups.first().copy(items = pickerBrowseState.groups.first().items.drop(1))),
                     selectedItems = listOf(pickerBrowseState.groups.first().items.first()),
-                ),
+            ),
             onBack = {},
+            previewMedia = previewMedia,
         )
     }
 }

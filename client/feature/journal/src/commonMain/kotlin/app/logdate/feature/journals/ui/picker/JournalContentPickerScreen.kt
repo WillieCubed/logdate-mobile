@@ -3,15 +3,18 @@
 
 package app.logdate.feature.journals.ui.picker
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -20,6 +23,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Article
@@ -34,18 +39,23 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SearchBar
+import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -54,12 +64,15 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.ui.workspace.PanelHeader
 import app.logdate.ui.workspace.WorkspacePanel
 import app.logdate.ui.workspace.WorkspaceSearchScope
+import app.logdate.util.formatDateLocalized
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.flow.collectLatest
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 import androidx.compose.foundation.lazy.items as lazyItems
@@ -96,13 +109,14 @@ fun JournalContentPickerScreenContent(
     onToggleSelection: (Uuid) -> Unit = {},
     onRemoveSelection: (Uuid) -> Unit = {},
     onAddSelected: () -> Unit = {},
+    previewMedia: Map<Uuid, Painter> = emptyMap(),
     modifier: Modifier = Modifier,
 ) {
     val workspaceEnabled = LocalWorkspaceEnabled.current
     if (workspaceEnabled) {
         WorkspaceSearchScope(
             query = state.query,
-            hint = "Search writing, captions, and recordings",
+            hint = "Search content",
             onQuery = onQueryChange,
         )
     }
@@ -124,17 +138,16 @@ fun JournalContentPickerScreenContent(
                     )
                 }
                 if (!workspaceEnabled) {
-                    OutlinedTextField(
-                        value = state.query,
-                        onValueChange = onQueryChange,
+                    PickerSearchBar(
+                        query = state.query,
+                        onQueryChange = onQueryChange,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg),
-                        singleLine = true,
-                        label = { Text("Search existing content") },
                     )
                 }
                 PickerGallery(
                     state = state,
                     onToggleSelection = onToggleSelection,
+                    previewMedia = previewMedia,
                     modifier = Modifier.weight(1f),
                 )
                 SelectionReview(
@@ -169,9 +182,49 @@ fun JournalContentPickerScreenContent(
 }
 
 @Composable
+private fun PickerSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val searchBarState = rememberSearchBarState()
+    val textFieldState = rememberSaveable(saver = TextFieldState.Saver) { TextFieldState(query) }
+    LaunchedEffect(textFieldState) {
+        snapshotFlow { textFieldState.text.toString() }.collectLatest(onQueryChange)
+    }
+    LaunchedEffect(query) {
+        if (query != textFieldState.text.toString()) {
+            textFieldState.edit { replace(0, length, query) }
+        }
+    }
+    SearchBar(
+        state = searchBarState,
+        inputField = {
+            SearchBarDefaults.InputField(
+                searchBarState = searchBarState,
+                textFieldState = textFieldState,
+                onSearch = {},
+                placeholder = { Text("Search content") },
+                leadingIcon = { Icon(PlatformIcons.search(), contentDescription = null) },
+                trailingIcon = {
+                    if (textFieldState.text.isNotEmpty()) {
+                        IconButton(onClick = textFieldState::clearText) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Clear search")
+                        }
+                    }
+                },
+                modifier = Modifier.semantics { contentDescription = "Search existing content" },
+            )
+        },
+        modifier = modifier,
+    )
+}
+
+@Composable
 private fun PickerGallery(
     state: JournalContentPickerUiState,
     onToggleSelection: (Uuid) -> Unit,
+    previewMedia: Map<Uuid, Painter>,
     modifier: Modifier = Modifier,
 ) {
     val selectedIds = state.selectedItems.mapTo(mutableSetOf()) { it.id }
@@ -185,23 +238,45 @@ private fun PickerGallery(
         }
         return
     }
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(120.dp),
-        modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(Spacing.lg),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        state.groups.forEach { group ->
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Text(group.date.toString(), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.md))
-            }
-            items(group.items, key = { it.id }) { item ->
-                PickerItemTile(
-                    item = item,
-                    selected = item.id in selectedIds,
-                    onClick = { onToggleSelection(item.id) },
-                )
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val compactGrid = maxWidth < 560.dp
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(if (compactGrid) 160.dp else 220.dp),
+            modifier =
+                Modifier
+                    .widthIn(max = 840.dp)
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter),
+            contentPadding = PaddingValues(Spacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            state.groups.forEach { group ->
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        text = formatDateLocalized(group.date),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(top = Spacing.lg, bottom = Spacing.xs),
+                    )
+                }
+                items(
+                    items = group.items,
+                    key = { it.id },
+                    span = { item ->
+                        when {
+                            !item.isVisualMedia -> GridItemSpan(maxLineSpan)
+                            compactGrid -> GridItemSpan(1)
+                            else -> GridItemSpan(minOf(2, maxLineSpan))
+                        }
+                    },
+                ) { item ->
+                    PickerItemTile(
+                        item = item,
+                        selected = item.id in selectedIds,
+                        previewMedia = previewMedia[item.id],
+                        onClick = { onToggleSelection(item.id) },
+                    )
+                }
             }
         }
     }
@@ -211,15 +286,10 @@ private fun PickerGallery(
 private fun PickerItemTile(
     item: JournalContentPickerItem,
     selected: Boolean,
+    previewMedia: Painter?,
     onClick: () -> Unit,
 ) {
-    val typeLabel =
-        when (item.kind) {
-            JournalContentPickerItemKind.WRITING -> "Writing"
-            JournalContentPickerItemKind.PHOTO -> "Photo"
-            JournalContentPickerItemKind.VIDEO -> "Video"
-            JournalContentPickerItemKind.RECORDING -> "Recording"
-        }
+    val typeLabel = item.kind.label
     Card(
         modifier =
             Modifier
@@ -230,66 +300,144 @@ private fun PickerItemTile(
                     contentDescription = "$typeLabel: ${item.title}. ${if (selected) "Selected" else "Not selected"}"
                 }.clickable(onClick = onClick),
     ) {
-        Box(Modifier.fillMaxWidth().height(132.dp)) {
-            val showsMediaThumbnail =
-                item.mediaRef != null &&
-                    (item.kind == JournalContentPickerItemKind.PHOTO || item.kind == JournalContentPickerItemKind.VIDEO)
-            if (showsMediaThumbnail) {
-                Icon(
-                    Icons.Rounded.Image,
-                    contentDescription = null,
-                    modifier = Modifier.align(Alignment.Center).size(36.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                AsyncImage(
-                    model = item.mediaRef,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
-            } else {
-                Column(
-                    Modifier.fillMaxSize().padding(Spacing.md),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Icon(
-                        if (item.kind ==
-                            JournalContentPickerItemKind.RECORDING
-                        ) {
-                            Icons.Rounded.GraphicEq
-                        } else {
-                            Icons.AutoMirrored.Rounded.Article
-                        },
-                        contentDescription = null,
-                    )
-                    Text(item.title, maxLines = 4, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-            if (item.kind == JournalContentPickerItemKind.VIDEO) {
-                Icon(
-                    Icons.Rounded.PlayCircle,
-                    contentDescription = null,
-                    modifier = Modifier.align(Alignment.Center).size(36.dp),
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                )
-            }
-            if (selected) {
+        if (item.isVisualMedia) {
+            Box(Modifier.fillMaxWidth().aspectRatio(4f / 5f)) {
                 Surface(
-                    modifier = Modifier.align(Alignment.TopEnd).padding(Spacing.sm),
-                    shape = MaterialTheme.shapes.extraLarge,
-                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                 ) {
-                    Icon(
-                        Icons.Rounded.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.padding(4.dp).size(20.dp),
-                        tint = MaterialTheme.colorScheme.onPrimary,
+                    Column(
+                        modifier = Modifier.padding(Spacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        Icon(
+                            if (item.kind == JournalContentPickerItemKind.VIDEO) {
+                                Icons.Rounded.PlayCircle
+                            } else {
+                                Icons.Rounded.Image
+                            },
+                            contentDescription = null,
+                            modifier = Modifier.size(36.dp),
+                        )
+                        Text(
+                            text = item.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                when {
+                    previewMedia != null ->
+                        Image(
+                            painter = previewMedia,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                        )
+                    item.mediaRef != null ->
+                        AsyncImage(
+                            model = item.mediaRef,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                        )
+                }
+                Surface(
+                    modifier = Modifier.align(Alignment.BottomStart).padding(Spacing.sm),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ) {
+                    Text(
+                        text = typeLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
                     )
                 }
+                SelectionMarker(
+                    selected = selected,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(Spacing.sm),
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 112.dp).padding(Spacing.lg),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(
+                    modifier = Modifier.size(52.dp),
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            if (item.kind == JournalContentPickerItemKind.RECORDING) {
+                                Icons.Rounded.GraphicEq
+                            } else {
+                                Icons.AutoMirrored.Rounded.Article
+                            },
+                            contentDescription = null,
+                        )
+                    }
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
+                    Text(
+                        text = typeLabel,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                SelectionMarker(selected)
             }
         }
     }
 }
+
+@Composable
+private fun SelectionMarker(
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    if (selected) {
+        Surface(
+            modifier = modifier,
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.primary,
+        ) {
+            Icon(
+                Icons.Rounded.CheckCircle,
+                contentDescription = null,
+                modifier = Modifier.padding(4.dp).size(20.dp),
+                tint = MaterialTheme.colorScheme.onPrimary,
+            )
+        }
+    }
+}
+
+private val JournalContentPickerItem.isVisualMedia: Boolean
+    get() = kind == JournalContentPickerItemKind.PHOTO || kind == JournalContentPickerItemKind.VIDEO
+
+private val JournalContentPickerItemKind.label: String
+    get() =
+        when (this) {
+            JournalContentPickerItemKind.WRITING -> "Writing"
+            JournalContentPickerItemKind.PHOTO -> "Photo"
+            JournalContentPickerItemKind.VIDEO -> "Video"
+            JournalContentPickerItemKind.RECORDING -> "Recording"
+        }
 
 @Composable
 private fun SelectionReview(
@@ -299,35 +447,49 @@ private fun SelectionReview(
     onRemoveSelection: (Uuid) -> Unit,
     onAddSelected: () -> Unit,
 ) {
+    if (selectedItems.isEmpty() && error == null) return
     Surface(tonalElevation = 3.dp) {
-        Column(Modifier.fillMaxWidth().padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            if (selectedItems.isNotEmpty()) {
-                Text("Selected (${selectedItems.size})", style = MaterialTheme.typography.labelLarge)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    lazyItems(selectedItems, key = { it.id }) { item ->
-                        Card(Modifier.widthIn(max = 180.dp)) {
-                            Row(
-                                modifier = Modifier.padding(start = Spacing.sm),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                                IconButton(onClick = { onRemoveSelection(item.id) }) {
-                                    Icon(Icons.Rounded.Close, contentDescription = "Remove ${item.title} from selection")
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Column(
+                modifier = Modifier.widthIn(max = 840.dp).fillMaxWidth().padding(Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                if (selectedItems.isNotEmpty()) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        lazyItems(selectedItems, key = { it.id }) { item ->
+                            Card(Modifier.widthIn(max = 168.dp)) {
+                                Row(
+                                    modifier = Modifier.padding(start = Spacing.sm),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                    IconButton(onClick = { onRemoveSelection(item.id) }) {
+                                        Icon(Icons.Rounded.Close, contentDescription = "Remove ${item.title} from selection")
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-            error?.let {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(it, Modifier.weight(1f), color = MaterialTheme.colorScheme.error)
-                    TextButton(onClick = onAddSelected) { Text("Retry") }
+                error?.let {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(it, Modifier.weight(1f), color = MaterialTheme.colorScheme.error)
+                        TextButton(onClick = onAddSelected) { Text("Retry") }
+                    }
                 }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Button(onClick = onAddSelected, enabled = selectedItems.isNotEmpty() && !isAdding) {
-                    Text(if (isAdding) "Adding…" else "Add ${selectedItems.size}")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.End),
+                ) {
+                    Text(
+                        text = "${selectedItems.size} selected",
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Button(onClick = onAddSelected, enabled = selectedItems.isNotEmpty() && !isAdding) {
+                        Text(if (isAdding) "Adding…" else "Add ${selectedItems.size}")
+                    }
                 }
             }
         }
