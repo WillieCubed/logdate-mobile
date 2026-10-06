@@ -66,21 +66,11 @@ fun WorkspaceSearchBar(
 ) {
     val binding = LocalWorkspaceSearchController.current?.binding
     if (binding != null) {
-        TextField(
-            value = binding.query,
-            onValueChange = binding.onQuery,
-            placeholder = { Text(binding.hint, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            leadingIcon = { Icon(PlatformIcons.search(), null) },
-            singleLine = true,
-            modifier = modifier.searchBarMaxWidth().testTag("workspace_search"),
-            shape = MaterialTheme.shapes.extraLarge,
-            colors =
-                TextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.workspaceContainer(WorkspaceSurface.Raised),
-                    unfocusedContainerColor = MaterialTheme.colorScheme.workspaceContainer(WorkspaceSurface.Raised),
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                ),
+        WorkspaceSearchField(
+            query = binding.query,
+            hint = binding.hint,
+            onQueryChange = binding.onQuery,
+            modifier = modifier,
         )
         return
     }
@@ -106,4 +96,30 @@ fun WorkspaceSearchBar(
             )
         }
     }
+}
+
+/** Shared editable form of the workspace search surface for bounded collection searches. */
+@Composable
+fun WorkspaceSearchField(
+    query: String,
+    hint: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    TextField(
+        value = query,
+        onValueChange = onQueryChange,
+        placeholder = { Text(hint, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        leadingIcon = { Icon(PlatformIcons.search(), null) },
+        singleLine = true,
+        modifier = modifier.searchBarMaxWidth().testTag("workspace_search"),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors =
+            TextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.workspaceContainer(WorkspaceSurface.Raised),
+                unfocusedContainerColor = MaterialTheme.colorScheme.workspaceContainer(WorkspaceSurface.Raised),
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+            ),
+    )
 }

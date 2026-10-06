@@ -3,6 +3,7 @@
 
 package app.logdate.feature.journals.ui.picker
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,7 +15,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -23,8 +23,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.clearText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Article
@@ -35,44 +33,41 @@ import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SearchBar
-import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.ui.workspace.PanelHeader
 import app.logdate.ui.workspace.WorkspacePanel
+import app.logdate.ui.workspace.WorkspaceSearchField
 import app.logdate.ui.workspace.WorkspaceSearchScope
 import app.logdate.util.formatDateLocalized
 import coil3.compose.AsyncImage
-import kotlinx.coroutines.flow.collectLatest
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 import androidx.compose.foundation.lazy.items as lazyItems
@@ -138,11 +133,14 @@ fun JournalContentPickerScreenContent(
                     )
                 }
                 if (!workspaceEnabled) {
-                    PickerSearchBar(
-                        query = state.query,
-                        onQueryChange = onQueryChange,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg),
-                    )
+                    Box(Modifier.fillMaxWidth().padding(horizontal = Spacing.lg)) {
+                        WorkspaceSearchField(
+                            query = state.query,
+                            hint = "Search content",
+                            onQueryChange = onQueryChange,
+                            modifier = Modifier.semantics { contentDescription = "Search existing content" },
+                        )
+                    }
                 }
                 PickerGallery(
                     state = state,
@@ -182,45 +180,6 @@ fun JournalContentPickerScreenContent(
 }
 
 @Composable
-private fun PickerSearchBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val searchBarState = rememberSearchBarState()
-    val textFieldState = rememberSaveable(saver = TextFieldState.Saver) { TextFieldState(query) }
-    LaunchedEffect(textFieldState) {
-        snapshotFlow { textFieldState.text.toString() }.collectLatest(onQueryChange)
-    }
-    LaunchedEffect(query) {
-        if (query != textFieldState.text.toString()) {
-            textFieldState.edit { replace(0, length, query) }
-        }
-    }
-    SearchBar(
-        state = searchBarState,
-        inputField = {
-            SearchBarDefaults.InputField(
-                searchBarState = searchBarState,
-                textFieldState = textFieldState,
-                onSearch = {},
-                placeholder = { Text("Search content") },
-                leadingIcon = { Icon(PlatformIcons.search(), contentDescription = null) },
-                trailingIcon = {
-                    if (textFieldState.text.isNotEmpty()) {
-                        IconButton(onClick = textFieldState::clearText) {
-                            Icon(Icons.Rounded.Close, contentDescription = "Clear search")
-                        }
-                    }
-                },
-                modifier = Modifier.semantics { contentDescription = "Search existing content" },
-            )
-        },
-        modifier = modifier,
-    )
-}
-
-@Composable
 private fun PickerGallery(
     state: JournalContentPickerUiState,
     onToggleSelection: (Uuid) -> Unit,
@@ -239,14 +198,10 @@ private fun PickerGallery(
         return
     }
     BoxWithConstraints(modifier.fillMaxSize()) {
-        val compactGrid = maxWidth < 560.dp
+        val gridColumns = contentPickerGridColumnCount(maxWidth, LocalDensity.current.fontScale)
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(if (compactGrid) 160.dp else 220.dp),
-            modifier =
-                Modifier
-                    .widthIn(max = 840.dp)
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter),
+            columns = GridCells.Fixed(gridColumns),
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(Spacing.lg),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -262,13 +217,6 @@ private fun PickerGallery(
                 items(
                     items = group.items,
                     key = { it.id },
-                    span = { item ->
-                        when {
-                            !item.isVisualMedia -> GridItemSpan(maxLineSpan)
-                            compactGrid -> GridItemSpan(1)
-                            else -> GridItemSpan(minOf(2, maxLineSpan))
-                        }
-                    },
                 ) { item ->
                     PickerItemTile(
                         item = item,
@@ -294,14 +242,31 @@ private fun PickerItemTile(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .aspectRatio(1f)
                 .semantics {
                     role = Role.Checkbox
                     this.selected = selected
                     contentDescription = "$typeLabel: ${item.title}. ${if (selected) "Selected" else "Not selected"}"
                 }.clickable(onClick = onClick),
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    if (selected && !item.isVisualMedia) {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerLow
+                    },
+                contentColor =
+                    if (selected && !item.isVisualMedia) {
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+            ),
+        border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
     ) {
         if (item.isVisualMedia) {
-            Box(Modifier.fillMaxWidth().aspectRatio(4f / 5f)) {
+            Box(Modifier.fillMaxSize()) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.secondaryContainer,
@@ -362,48 +327,55 @@ private fun PickerItemTile(
                 )
             }
         } else {
-            Row(
-                modifier = Modifier.fillMaxWidth().heightIn(min = 112.dp).padding(Spacing.lg),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Surface(
-                    modifier = Modifier.size(52.dp),
-                    shape = MaterialTheme.shapes.large,
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            Box(Modifier.fillMaxSize().padding(Spacing.lg)) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            if (item.kind == JournalContentPickerItemKind.RECORDING) {
-                                Icons.Rounded.GraphicEq
-                            } else {
-                                Icons.AutoMirrored.Rounded.Article
-                            },
-                            contentDescription = null,
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        Surface(
+                            modifier = Modifier.size(52.dp),
+                            shape = MaterialTheme.shapes.large,
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    if (item.kind == JournalContentPickerItemKind.RECORDING) {
+                                        Icons.Rounded.GraphicEq
+                                    } else {
+                                        Icons.AutoMirrored.Rounded.Article
+                                    },
+                                    contentDescription = null,
+                                )
+                            }
+                        }
+                        Text(
+                            text = typeLabel,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
-                }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                ) {
-                    Text(
-                        text = typeLabel,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
                     Text(
                         text = item.title,
                         style = MaterialTheme.typography.titleMedium,
-                        maxLines = 3,
+                        maxLines = 4,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                SelectionMarker(selected)
+                SelectionMarker(selected, Modifier.align(Alignment.TopEnd))
             }
         }
     }
+}
+
+internal fun contentPickerGridColumnCount(
+    availableWidth: Dp,
+    fontScale: Float,
+): Int {
+    if (fontScale >= 1.5f) return 1
+    val usableWidth = (availableWidth - Spacing.lg * 2).coerceAtLeast(0.dp)
+    return (usableWidth / 176.dp).toInt().coerceIn(1, 6)
 }
 
 @Composable

@@ -19,6 +19,7 @@ import app.logdate.feature.journals.ui.settings.JournalSettingsScreenContent
 import app.logdate.feature.journals.ui.settings.JournalSettingsUiState
 import app.logdate.feature.journals.ui.share.ShareJournalScreenContent
 import app.logdate.feature.journals.ui.share.ShareJournalUiState
+import app.logdate.screenshots.common.LargeScreenAuditPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
@@ -100,6 +101,25 @@ private val pickerBrowseState =
                             ScreenshotTestData.baseInstant - 2.hours,
                             "Rain against the glass",
                             "file:///sample-recording.m4a",
+                        ),
+                        JournalContentPickerItem(
+                            Uuid.parse("00000000-0000-0000-0000-000000000088"),
+                            JournalContentPickerItemKind.WRITING,
+                            ScreenshotTestData.baseInstant - 3.hours,
+                            "The warm mug stayed between both hands.",
+                        ),
+                        JournalContentPickerItem(
+                            Uuid.parse("00000000-0000-0000-0000-000000000089"),
+                            JournalContentPickerItemKind.RECORDING,
+                            ScreenshotTestData.baseInstant - 4.hours,
+                            "Kettle starting to sing",
+                            "file:///kettle-recording.m4a",
+                        ),
+                        JournalContentPickerItem(
+                            Uuid.parse("00000000-0000-0000-0000-000000000090"),
+                            JournalContentPickerItemKind.WRITING,
+                            ScreenshotTestData.baseInstant - 5.hours,
+                            "A quiet list for the rest of the day.",
                         ),
                     ),
                 ),
@@ -352,6 +372,7 @@ fun S15_JournalDetailMarkdownPreview() {
 
 @PreviewTest
 @ScreenshotPreviewMatrix
+@LargeScreenAuditPreviewMatrix
 @Composable
 fun S16_JournalContentPickerBrowse() {
     ScreenshotTheme {

@@ -7,9 +7,11 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
+import androidx.compose.ui.unit.dp
 import app.logdate.feature.journals.ui.detail.JournalDetailScreenContent
 import app.logdate.feature.journals.ui.detail.JournalDetailUiState
 import app.logdate.feature.journals.ui.picker.JournalContentPickerDateGroup
@@ -17,16 +19,27 @@ import app.logdate.feature.journals.ui.picker.JournalContentPickerItem
 import app.logdate.feature.journals.ui.picker.JournalContentPickerItemKind
 import app.logdate.feature.journals.ui.picker.JournalContentPickerScreenContent
 import app.logdate.feature.journals.ui.picker.JournalContentPickerUiState
+import app.logdate.feature.journals.ui.picker.contentPickerGridColumnCount
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.util.formatDateLocalized
 import kotlinx.datetime.LocalDate
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalTestApi::class)
 class JournalContentPickerScreenTest {
+    @Test
+    fun `picker grid uses progressively wider equal tiles and protects large text`() {
+        assertEquals(1, contentPickerGridColumnCount(360.dp, fontScale = 1f))
+        assertEquals(2, contentPickerGridColumnCount(411.dp, fontScale = 1f))
+        assertEquals(4, contentPickerGridColumnCount(840.dp, fontScale = 1f))
+        assertEquals(6, contentPickerGridColumnCount(1280.dp, fontScale = 1f))
+        assertEquals(1, contentPickerGridColumnCount(411.dp, fontScale = 2f))
+    }
+
     @Test
     fun `picker exposes its search field as a search control`() =
         runDesktopComposeUiTest(width = 411, height = 891) {
@@ -39,6 +52,7 @@ class JournalContentPickerScreenTest {
             }
 
             onNodeWithContentDescription("Search existing content").assertIsDisplayed()
+            onNodeWithTag("workspace_search").assertIsDisplayed()
         }
 
     @Test
