@@ -29,6 +29,8 @@ import io.ktor.server.request.header
 import io.ktor.server.request.receiveMultipart
 import io.ktor.server.response.respond
 import io.ktor.utils.io.readRemaining
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.io.readByteArray
 import java.util.UUID
 
@@ -306,7 +308,7 @@ private fun buildBinaryDownloadUrl(
     return "${origin.scheme}://${origin.localHost}$portPart$path"
 }
 
-internal fun resolveMediaDownloadUrl(
+internal suspend fun resolveMediaDownloadUrl(
     call: ApplicationCall,
     record: LogDateMedia,
     mediaStorage: LogDateBlobStorage?,
@@ -314,7 +316,7 @@ internal fun resolveMediaDownloadUrl(
 ): String {
     if (accessPolicy.useSignedUrls && mediaStorage != null && record.storagePath != null) {
         return runCatching {
-            mediaStorage.getSignedDownloadUrl(record.storagePath, accessPolicy.signedUrlTtlHours)
+            withContext(Dispatchers.IO) { mediaStorage.getSignedDownloadUrl(record.storagePath, accessPolicy.signedUrlTtlHours) }
         }.getOrElse { error ->
             Napier.e("Media download authorization failed")
             buildMediaDownloadUrl(call, record.mediaId)
@@ -323,7 +325,7 @@ internal fun resolveMediaDownloadUrl(
     return buildMediaDownloadUrl(call, record.mediaId)
 }
 
-internal fun resolveBackupDownloadUrl(
+internal suspend fun resolveBackupDownloadUrl(
     call: ApplicationCall,
     record: LogDateBackup,
     mediaStorage: LogDateBlobStorage?,
@@ -331,7 +333,7 @@ internal fun resolveBackupDownloadUrl(
 ): String {
     if (accessPolicy.useSignedUrls && mediaStorage != null) {
         return runCatching {
-            mediaStorage.getSignedDownloadUrl(record.storagePath, accessPolicy.signedUrlTtlHours)
+            withContext(Dispatchers.IO) { mediaStorage.getSignedDownloadUrl(record.storagePath, accessPolicy.signedUrlTtlHours) }
         }.getOrElse {
             Napier.e("Failed to generate signed URL for backup")
             buildBackupDownloadUrl(call, record.id.toString())

@@ -28,6 +28,8 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.route
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 /**
@@ -98,16 +100,18 @@ internal fun Route.syncMediaRoutes(
                 val storagePath =
                     if (mediaStorage != null) {
                         runCatching {
-                            mediaStorage.putBlob(
-                                LogDateBlobWriteRequest(
-                                    ownerId = userId,
-                                    namespace = LogDateBlobNamespace.MEDIA,
-                                    blobId = mediaId,
-                                    fileName = req.fileName,
-                                    contentType = req.mimeType,
-                                    bytes = encryptedPayload.data,
-                                ),
-                            )
+                            withContext(Dispatchers.IO) {
+                                mediaStorage.putBlob(
+                                    LogDateBlobWriteRequest(
+                                        ownerId = userId,
+                                        namespace = LogDateBlobNamespace.MEDIA,
+                                        blobId = mediaId,
+                                        fileName = req.fileName,
+                                        contentType = req.mimeType,
+                                        bytes = encryptedPayload.data,
+                                    ),
+                                )
+                            }
                         }.getOrElse { error ->
                             Napier.e("Media storage upload failed")
                             return@post call.respond(
@@ -141,7 +145,7 @@ internal fun Route.syncMediaRoutes(
                         )
                     }.getOrElse { error ->
                         if (storagePath != null) {
-                            runCatching { mediaStorage?.deleteBlob(storagePath) }
+                            runCatching { withContext(Dispatchers.IO) { mediaStorage?.deleteBlob(storagePath) } }
                                 .onFailure { deleteError ->
                                     Napier.w("Media rollback failed")
                                 }
@@ -214,7 +218,7 @@ internal fun Route.syncMediaRoutes(
                                     HttpStatusCode.InternalServerError,
                                     error("MEDIA_STORAGE_UNAVAILABLE", "Media storage not configured"),
                                 )
-                        storage.getBlob(record.storagePath)
+                        withContext(Dispatchers.IO) { storage.getBlob(record.storagePath) }
                             ?: return@get call.respond(
                                 HttpStatusCode.NotFound,
                                 error("NOT_FOUND", "Media not found"),
@@ -259,7 +263,7 @@ internal fun Route.syncMediaRoutes(
                                     HttpStatusCode.ServiceUnavailable,
                                     error("MEDIA_STORAGE_UNAVAILABLE", "Media storage not configured"),
                                 )
-                        if (!storage.deleteBlob(storagePath)) {
+                        if (!withContext(Dispatchers.IO) { storage.deleteBlob(storagePath) }) {
                             Napier.w("Media deletion failed")
                             return@delete call.respond(
                                 HttpStatusCode.InternalServerError,
