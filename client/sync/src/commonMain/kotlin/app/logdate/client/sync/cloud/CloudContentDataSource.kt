@@ -153,8 +153,8 @@ class DefaultCloudContentDataSource(
             syncVersion = syncVersion,
             caption =
                 when (this) {
-                    is JournalNote.Image -> caption.takeIf { it.isNotBlank() }
-                    is JournalNote.Video -> caption.takeIf { it.isNotBlank() }
+                    is JournalNote.Image -> caption.takeIf { it.isNotBlank() }?.let { encryptNoteCaption(uid, it) }
+                    is JournalNote.Video -> caption.takeIf { it.isNotBlank() }?.let { encryptNoteCaption(uid, it) }
                     else -> null
                 },
             photoPresentation = (this as? JournalNote.Image)?.presentation?.name,
@@ -190,8 +190,8 @@ class DefaultCloudContentDataSource(
                 },
             caption =
                 when (this) {
-                    is JournalNote.Image -> caption.takeIf { it.isNotBlank() }
-                    is JournalNote.Video -> caption.takeIf { it.isNotBlank() }
+                    is JournalNote.Image -> caption.takeIf { it.isNotBlank() }?.let { encryptNoteCaption(uid, it) }
+                    is JournalNote.Video -> caption.takeIf { it.isNotBlank() }?.let { encryptNoteCaption(uid, it) }
                     else -> null
                 },
             photoPresentation = (this as? JournalNote.Image)?.presentation?.name,
@@ -233,7 +233,7 @@ class DefaultCloudContentDataSource(
                     creationTimestamp = creationTimestamp,
                     lastUpdated = lastUpdated,
                     mediaRef = mediaUri ?: "",
-                    caption = caption.orEmpty(),
+                    caption = decryptNoteCaption(uid, caption.orEmpty()),
                     presentation = PhotoPresentation.entries.firstOrNull { it.name == photoPresentation } ?: PhotoPresentation.EdgeToEdge,
                     location = decryptNoteLocation(uid, location),
                     syncVersion = serverVersion,
@@ -244,7 +244,7 @@ class DefaultCloudContentDataSource(
                     creationTimestamp = creationTimestamp,
                     lastUpdated = lastUpdated,
                     mediaRef = mediaUri ?: "",
-                    caption = caption.orEmpty(),
+                    caption = decryptNoteCaption(uid, caption.orEmpty()),
                     location = decryptNoteLocation(uid, location),
                     syncVersion = serverVersion,
                 )
@@ -271,6 +271,18 @@ class DefaultCloudContentDataSource(
         noteId: Uuid,
         content: String,
     ): String = syncPayloadCipher?.decryptString(noteTextFieldId(noteId), content) ?: content
+
+    private suspend fun encryptNoteCaption(
+        noteId: Uuid,
+        caption: String,
+    ): String = syncPayloadCipher?.encryptString(noteCaptionFieldId(noteId), caption) ?: caption
+
+    private suspend fun decryptNoteCaption(
+        noteId: Uuid,
+        caption: String,
+    ): String = syncPayloadCipher?.decryptString(noteCaptionFieldId(noteId), caption) ?: caption
+
+    private fun noteCaptionFieldId(noteId: Uuid): String = "sync:note:$noteId:caption"
 
     private val locationJson = Json { ignoreUnknownKeys = true }
 
