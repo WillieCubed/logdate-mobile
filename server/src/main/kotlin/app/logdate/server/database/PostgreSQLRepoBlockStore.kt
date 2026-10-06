@@ -27,6 +27,8 @@ import kotlin.time.Clock
  * library can keep speaking pure AT Protocol identifiers.
  */
 class PostgreSQLRepoBlockStore : RepoBlockStore {
+    private val blockCache = RepoBlockReadCache()
+
     // Every method here is blocking JDBC. Run on the caller's thread it held a Ktor request
     // worker for the whole query, and a one-CPU instance sizes that pool at one - so a few
     // in-flight repo writes left nothing to answer /health with, and the liveness probe killed
@@ -122,14 +124,16 @@ class PostgreSQLRepoBlockStore : RepoBlockStore {
         }
 
     override suspend fun readBlock(cid: Cid): Result<RepoBlock?> =
-        runCatching {
-            withContext(Dispatchers.IO) {
-                transaction {
-                    AtprotoRepoBlocksTable
-                        .selectAll()
-                        .where { AtprotoRepoBlocksTable.cid eq cid.toString() }
-                        .singleOrNull()
-                        ?.toRepoBlock()
+        blockCache.read(cid) {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    transaction {
+                        AtprotoRepoBlocksTable
+                            .selectAll()
+                            .where { AtprotoRepoBlocksTable.cid eq cid.toString() }
+                            .singleOrNull()
+                            ?.toRepoBlock()
+                    }
                 }
             }
         }
@@ -137,8 +141,9 @@ class PostgreSQLRepoBlockStore : RepoBlockStore {
     override suspend fun writeBlock(
         repo: AtprotoDid,
         block: RepoBlock,
-    ): Result<Unit> =
-        runCatching {
+    ): Result<Unit> {
+        val generation = blockCache.generation()
+        return runCatching {
             withContext(Dispatchers.IO) {
                 transaction {
                     val cidValue = block.cid.toString()
@@ -173,7 +178,8 @@ class PostgreSQLRepoBlockStore : RepoBlockStore {
                     }
                 }
             }
-        }
+        }.onSuccess { blockCache.remember(block, generation) }
+    }
 
     override suspend fun clearRepo(repo: AtprotoDid): Result<Unit> =
         runCatching {
@@ -183,9 +189,10 @@ class PostgreSQLRepoBlockStore : RepoBlockStore {
                     AtprotoRepoHeadsTable.deleteWhere { AtprotoRepoHeadsTable.repoDid eq repoDid }
                     AtprotoRepoBlockLinksTable.deleteWhere { AtprotoRepoBlockLinksTable.repoDid eq repoDid }
                     AtprotoRepoCommitsTable.deleteWhere { AtprotoRepoCommitsTable.repoDid eq repoDid }
+                    Unit
                 }
             }
-        }
+        }.onSuccess { blockCache.clear() }
 
     override suspend fun listBlocks(repo: AtprotoDid): Result<List<RepoBlock>> =
         runCatching {
