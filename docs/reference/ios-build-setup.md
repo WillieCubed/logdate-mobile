@@ -1,7 +1,8 @@
 # iOS Build Setup
 
-This document covers everything needed to build the iOS app from source — bundle
-identifier, signing, Firebase configuration, and the local-vs-CI workflow.
+LogDate iOS engineers must configure company signing and Firebase before
+building or exporting the app. The bundle identifier stays
+`studio.hypertext.LogDate` when the signing team changes.
 
 ## Prerequisites
 
@@ -19,14 +20,14 @@ Multiplatform Kotlin framework it embeds comes from
 
 The runtime bundle identifier is configured in
 [`iosApp/Configuration/Config.xcconfig`](../../iosApp/Configuration/Config.xcconfig)
-and assembled by `PRODUCT_BUNDLE_IDENTIFIER = "${BUNDLE_ID}${TEAM_ID}"` in the
+and assembled by `PRODUCT_BUNDLE_IDENTIFIER = "${BUNDLE_ID}"` in the
 `iosApp` target.
 
 | Setting | Value |
 | --- | --- |
 | `BUNDLE_ID` | `studio.hypertext.LogDate` |
-| `TEAM_ID` | (empty — set in CI for ad-hoc builds if needed) |
-| Effective bundle | `${BUNDLE_ID}${TEAM_ID}` |
+| `TEAM_ID` | `T95VDD3A4W` |
+| Effective bundle | `${BUNDLE_ID}` |
 
 Before the first build, register the App ID in
 [Apple Developer Console](https://developer.apple.com/account/resources/identifiers/list)
