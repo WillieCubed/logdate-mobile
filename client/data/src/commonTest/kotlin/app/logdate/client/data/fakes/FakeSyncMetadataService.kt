@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlin.time.Instant
 
-class FakeSyncMetadataService : SyncMetadataService {
+open class FakeSyncMetadataService : SyncMetadataService {
     private val pendingUploads = mutableMapOf<EntityType, MutableMap<String, PendingUpload>>()
     private val syncTimes = mutableMapOf<EntityType, Instant>()
     private val _pendingCount = MutableStateFlow(0)
@@ -85,6 +85,16 @@ class FakeSyncMetadataService : SyncMetadataService {
 
     override suspend fun resetAllCursors() {
         syncTimes.clear()
+    }
+
+    fun snapshot(): Map<EntityType, List<PendingUpload>> = pendingUploads.mapValues { (_, uploads) -> uploads.values.toList() }
+
+    fun restore(snapshot: Map<EntityType, List<PendingUpload>>) {
+        pendingUploads.clear()
+        snapshot.forEach { (entityType, uploads) ->
+            pendingUploads[entityType] = uploads.associateByTo(mutableMapOf()) { it.entityId }
+        }
+        updatePendingCount()
     }
 
     private fun updatePendingCount() {

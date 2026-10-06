@@ -47,6 +47,7 @@ import app.logdate.feature.core.settings.navigation.WatchTroubleshootingRoute
 import app.logdate.feature.core.sync.navigation.SyncIssuesRoute
 import app.logdate.feature.editor.navigation.EntryEditorRoute
 import app.logdate.feature.events.navigation.EventDetailRoute
+import app.logdate.feature.journals.navigation.JournalContentPickerRoute
 import app.logdate.feature.journals.navigation.JournalCreationRoute
 import app.logdate.feature.journals.navigation.JournalDetailsRoute
 import app.logdate.feature.journals.navigation.JournalSettingsRoute
@@ -169,6 +170,7 @@ val appNavSavedStateConfiguration: SavedStateConfiguration =
                     // Journals
                     subclass(JournalsOverviewRoute::class, JournalsOverviewRoute.serializer())
                     subclass(JournalDetailsRoute::class, JournalDetailsRoute.serializer())
+                    subclass(JournalContentPickerRoute::class, JournalContentPickerRoute.serializer())
                     subclass(JournalSettingsRoute::class, JournalSettingsRoute.serializer())
                     subclass(JournalCreationRoute::class, JournalCreationRoute.serializer())
                     subclass(NoteDetailRoute::class, NoteDetailRoute.serializer())

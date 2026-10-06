@@ -6,6 +6,7 @@ import app.logdate.feature.journals.ui.creation.JournalCreationViewModel
 import app.logdate.feature.journals.ui.detail.AudioNoteViewerViewModel
 import app.logdate.feature.journals.ui.detail.JournalDetailViewModel
 import app.logdate.feature.journals.ui.detail.NoteViewerViewModel
+import app.logdate.feature.journals.ui.picker.JournalContentPickerViewModel
 import app.logdate.feature.journals.ui.settings.JournalSettingsViewModel
 import app.logdate.feature.journals.ui.share.ShareJournalViewModel
 import org.koin.core.module.Module
@@ -63,4 +64,5 @@ val journalsFeatureModule: Module =
             )
         }
         viewModel { ShareJournalViewModel(get(), get()) }
+        viewModel { JournalContentPickerViewModel(get(), get(), get(), get()) }
     }

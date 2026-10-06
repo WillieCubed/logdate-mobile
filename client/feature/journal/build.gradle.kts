@@ -47,6 +47,7 @@ kotlin {
         }
 
         val desktopMain by getting
+        val desktopTest by getting
 
         commonMain.dependencies {
             // Project dependencies
@@ -89,6 +90,11 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.androidx.datastore.preferences)
+        }
+
+        desktopTest.dependencies {
+            implementation(libs.compose.ui.test)
+            implementation(compose.desktop.currentOs)
         }
 
         androidMain.dependencies {

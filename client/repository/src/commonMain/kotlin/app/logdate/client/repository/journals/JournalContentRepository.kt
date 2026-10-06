@@ -29,6 +29,15 @@ interface JournalContentRepository {
     )
 
     /**
+     * Adds the provided content to a journal without changing the source content or its other
+     * journal memberships. Implementations return how many new associations were created.
+     */
+    suspend fun addContentsToJournal(
+        contentIds: Collection<Uuid>,
+        journalId: Uuid,
+    ): Int = throw UnsupportedOperationException("Batch journal associations are not implemented")
+
+    /**
      * Removes content from a journal.
      */
     suspend fun removeContentFromJournal(

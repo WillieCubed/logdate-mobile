@@ -43,6 +43,7 @@ fun EntryProviderScope<NavKey>.journalEntries(
     onJournalDeleted: () -> Unit,
     onOpenNote: (Uuid) -> Unit,
     onOpenEditorForJournal: (Uuid) -> Unit,
+    onOpenContentPickerForJournal: (Uuid) -> Unit,
     onOpenJournalSettings: (Uuid) -> Unit,
     onShareJournal: (Uuid) -> Unit,
 ) {
@@ -55,6 +56,7 @@ fun EntryProviderScope<NavKey>.journalEntries(
         onJournalDeleted = onJournalDeleted,
         onOpenNote = onOpenNote,
         onOpenEditor = onOpenEditorForJournal,
+        onOpenContentPicker = onOpenContentPickerForJournal,
         onOpenSettings = onOpenJournalSettings,
         onShareJournal = onShareJournal,
     )
@@ -66,6 +68,7 @@ fun EntryProviderScope<NavKey>.journalEntries(
         onBack = onBack,
         onJournalDeleted = onJournalDeleted,
     )
+    journalContentPickerEntry(onBack = onBack)
     shareJournalEntry(onBack = onBack)
     noteDetailEntry(onBack = onBack)
 }

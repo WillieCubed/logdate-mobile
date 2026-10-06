@@ -3,6 +3,7 @@ package app.logdate.navigation.scenes
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.core.main.HomeRoute
 import app.logdate.feature.events.navigation.EventDetailRoute
+import app.logdate.feature.journals.navigation.JournalContentPickerRoute
 import app.logdate.feature.journals.navigation.JournalDetailsRoute
 import app.logdate.feature.journals.navigation.JournalsOverviewRoute
 import app.logdate.feature.journals.navigation.NoteDetailRoute
@@ -22,6 +23,7 @@ private val twoPaneEligibleDetailClasses: Set<KClass<out NavKey>> =
     setOf(
         TimelineDetailRoute::class,
         JournalDetailsRoute::class,
+        JournalContentPickerRoute::class,
         NoteDetailRoute::class,
         EventDetailRoute::class,
         MediaDetailRoute::class,

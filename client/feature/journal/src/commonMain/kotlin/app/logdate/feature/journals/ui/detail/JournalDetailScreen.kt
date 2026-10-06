@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.DeleteOutline
@@ -129,6 +130,7 @@ fun JournalDetailScreen(
     onJournalDeleted: () -> Unit,
     onNavigateToNoteDetail: (noteId: Uuid) -> Unit = { _ -> },
     onOpenEditor: (Uuid) -> Unit = {},
+    onOpenContentPicker: (Uuid) -> Unit = {},
     onNavigateToSettings: (journalId: Uuid) -> Unit = {},
     onNavigateToShare: (journalId: Uuid) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -146,6 +148,7 @@ fun JournalDetailScreen(
         onGoBack = onGoBack,
         onNavigateToNoteDetail = onNavigateToNoteDetail,
         onOpenEditor = { onOpenEditor(journalId) },
+        onOpenContentPicker = { onOpenContentPicker(journalId) },
         onNavigateToSettings = onNavigateToSettings,
         onNavigateToShare = onNavigateToShare,
         onToggleSortOrder = viewModel::toggleSortOrder,
@@ -173,6 +176,7 @@ fun JournalDetailScreenContent(
     onGoBack: () -> Unit,
     onNavigateToNoteDetail: (noteId: Uuid) -> Unit = { _ -> },
     onOpenEditor: () -> Unit = {},
+    onOpenContentPicker: () -> Unit = {},
     onNavigateToSettings: (journalId: Uuid) -> Unit = {},
     onNavigateToShare: (journalId: Uuid) -> Unit = {},
     onToggleSortOrder: () -> Unit = {},
@@ -208,6 +212,7 @@ fun JournalDetailScreenContent(
 
         is JournalDetailUiState.Success -> {
             var showOverflowMenu by remember { mutableStateOf(false) }
+            var showAddMenu by remember { mutableStateOf(false) }
             var selectedTab by rememberSaveable { mutableStateOf(0) }
             val mediaEntries =
                 remember(uiState.entries) {
@@ -220,7 +225,15 @@ fun JournalDetailScreenContent(
                     Column(Modifier.fillMaxSize()) {
                         PanelHeader(uiState.title, actions = {
                             IconButton(onClick = onGoBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back to journals") }
-                            IconButton(onClick = onOpenEditor) { Icon(Icons.Rounded.Edit, "Add a memory") }
+                            Box {
+                                IconButton(onClick = { showAddMenu = true }) { Icon(Icons.Rounded.Add, "Add to journal") }
+                                JournalAddMenu(
+                                    expanded = showAddMenu,
+                                    onDismiss = { showAddMenu = false },
+                                    onCreateEntry = onOpenEditor,
+                                    onAddExistingContent = onOpenContentPicker,
+                                )
+                            }
                             Box {
                                 IconButton(onClick = { showOverflowMenu = true }) { Icon(Icons.Rounded.MoreVert, "Journal options") }
                                 DropdownMenu(showOverflowMenu, { showOverflowMenu = false }) {
@@ -277,8 +290,16 @@ fun JournalDetailScreenContent(
                             },
                     contentWindowInsets = WindowInsets.navigationBars,
                     floatingActionButton = {
-                        FloatingActionButton(onClick = onOpenEditor) {
-                            Icon(Icons.Rounded.Edit, contentDescription = stringResource(Res.string.create_new_entry))
+                        Box {
+                            FloatingActionButton(onClick = { showAddMenu = true }) {
+                                Icon(Icons.Rounded.Add, contentDescription = "Add to journal")
+                            }
+                            JournalAddMenu(
+                                expanded = showAddMenu,
+                                onDismiss = { showAddMenu = false },
+                                onCreateEntry = onOpenEditor,
+                                onAddExistingContent = onOpenContentPicker,
+                            )
                         }
                     },
                     topBar = {
@@ -421,6 +442,33 @@ fun JournalDetailScreenContent(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun JournalAddMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    onCreateEntry: () -> Unit,
+    onAddExistingContent: () -> Unit,
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = { Text("Create entry") },
+            onClick = {
+                onDismiss()
+                onCreateEntry()
+            },
+            leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+        )
+        DropdownMenuItem(
+            text = { Text("Add existing content") },
+            onClick = {
+                onDismiss()
+                onAddExistingContent()
+            },
+            leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null) },
+        )
     }
 }
 

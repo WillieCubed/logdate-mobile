@@ -166,6 +166,7 @@ actual val dataModule: Module =
                 get(),
                 get(),
                 syncMetadataService = get(),
+                transactionManager = get(),
             )
         }
 

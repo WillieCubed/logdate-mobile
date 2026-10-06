@@ -7,6 +7,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.SyncableJournalContentRepository
+import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.metadata.AssociationPendingKey
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingOperation
@@ -30,6 +31,7 @@ class OfflineFirstJournalContentRepository(
     private val journalRepository: JournalRepository,
     private val journalNotesRepository: JournalNotesRepository,
     private val syncMetadataService: SyncMetadataService,
+    private val transactionManager: SyncTransactionManager = PassthroughJournalContentTransactionManager,
     private val dispatcher: CoroutineDispatcher = platformIODispatcher,
 ) : JournalContentRepository,
     SyncableJournalContentRepository {
@@ -61,18 +63,37 @@ class OfflineFirstJournalContentRepository(
         contentId: Uuid,
         journalId: Uuid,
     ) = withContext(dispatcher) {
-        // Create a link in the journal content table using string IDs
-        val link = JournalContentEntityLink(journalId, contentId)
-        journalContentDao.addContentToJournal(link)
-
-        syncMetadataService.enqueuePending(
-            entityId = AssociationPendingKey(journalId, contentId).toPendingId(),
-            entityType = EntityType.ASSOCIATION,
-            operation = PendingOperation.CREATE,
-        )
-
+        addContentsToJournal(listOf(contentId), journalId)
         Unit
     }
+
+    override suspend fun addContentsToJournal(
+        contentIds: Collection<Uuid>,
+        journalId: Uuid,
+    ): Int =
+        withContext(dispatcher) {
+            val uniqueContentIds = contentIds.distinct()
+            if (uniqueContentIds.isEmpty()) return@withContext 0
+
+            transactionManager.withTransaction {
+                val newContentIds =
+                    uniqueContentIds.filterNot { contentId ->
+                        journalContentDao.isContentInJournal(journalId, contentId)
+                    }
+
+                newContentIds.forEach { contentId ->
+                    journalContentDao.addContentToJournal(JournalContentEntityLink(journalId, contentId))
+                }
+                newContentIds.forEach { contentId ->
+                    syncMetadataService.enqueuePending(
+                        entityId = AssociationPendingKey(journalId, contentId).toPendingId(),
+                        entityType = EntityType.ASSOCIATION,
+                        operation = PendingOperation.CREATE,
+                    )
+                }
+                newContentIds.size
+            }
+        }
 
     override suspend fun removeContentFromJournal(
         contentId: Uuid,
@@ -143,4 +164,8 @@ class OfflineFirstJournalContentRepository(
     ) = withContext(dispatcher) {
         journalContentDao.removeContentFromJournal(journalId, contentId)
     }
+}
+
+private object PassthroughJournalContentTransactionManager : SyncTransactionManager {
+    override suspend fun <T> withTransaction(block: suspend () -> T): T = block()
 }

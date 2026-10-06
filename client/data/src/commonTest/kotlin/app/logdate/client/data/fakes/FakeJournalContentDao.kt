@@ -85,6 +85,21 @@ class FakeJournalContentDao : JournalContentDao {
         emitState()
     }
 
+    fun snapshot(): List<JournalContentEntityLink> =
+        journalContent.flatMap { (journalId, contentIds) ->
+            contentIds.map { contentId -> JournalContentEntityLink(journalId, contentId) }
+        }
+
+    fun restore(snapshot: List<JournalContentEntityLink>) {
+        journalContent.clear()
+        contentJournals.clear()
+        snapshot.forEach { link ->
+            journalContent.getOrPut(link.journalId) { mutableSetOf() }.add(link.contentId)
+            contentJournals.getOrPut(link.contentId) { mutableSetOf() }.add(link.journalId)
+        }
+        emitState()
+    }
+
     private fun emitState() {
         state.value = journalContent.mapValues { (_, value) -> value.toSet() }
     }

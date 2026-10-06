@@ -65,6 +65,7 @@ import app.logdate.feature.editor.navigation.EntryEditorRoute
 import app.logdate.feature.editor.navigation.editorEntry
 import app.logdate.feature.events.navigation.EventDetailRoute
 import app.logdate.feature.events.navigation.eventDetailEntry
+import app.logdate.feature.journals.navigation.JournalContentPickerRoute
 import app.logdate.feature.journals.navigation.JournalCreationRoute
 import app.logdate.feature.journals.navigation.JournalDetailsRoute
 import app.logdate.feature.journals.navigation.JournalSettingsRoute
@@ -298,6 +299,9 @@ fun LogDateNavDisplay(
                                         onOpenNote = { backStack.add(NoteDetailRoute(it)) },
                                         onOpenEditorForJournal = { journalId ->
                                             backStack.add(EntryEditorRoute(journalIds = listOf(journalId.toString())))
+                                        },
+                                        onOpenContentPickerForJournal = { journalId ->
+                                            backStack.add(JournalContentPickerRoute(journalId))
                                         },
                                         onOpenJournalSettings = { backStack.add(JournalSettingsRoute(it)) },
                                         onShareJournal = { backStack.add(ShareJournalRoute(it)) },
@@ -588,6 +592,7 @@ private fun <T : Any> rememberWorkspaceRouteDecorator(): NavEntryDecorator<T> =
                     setOf(
                         app.logdate.feature.journals.navigation.JournalsOverviewRoute::class,
                         app.logdate.feature.journals.navigation.JournalDetailsRoute::class,
+                        app.logdate.feature.journals.navigation.JournalContentPickerRoute::class,
                         app.logdate.feature.journals.navigation.NoteDetailRoute::class,
                         app.logdate.feature.library.navigation.LibraryOverviewRoute::class,
                         app.logdate.feature.library.navigation.MediaDetailRoute::class,

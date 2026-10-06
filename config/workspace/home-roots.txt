@@ -9,6 +9,7 @@ client/feature/library/src/commonMain/kotlin/app/logdate/feature/library/ui/Libr
 client/feature/rewind/src/commonMain/kotlin/app/logdate/feature/rewind/ui/RewindScreenContent.kt|RewindScreenContent
 client/feature/timeline/src/commonMain/kotlin/app/logdate/feature/timeline/ui/details/TimelineDayDetailPanel.kt|TimelineDayDetailPanel
 client/feature/journal/src/commonMain/kotlin/app/logdate/feature/journals/ui/detail/JournalDetailScreen.kt|JournalDetailScreenContent
+client/feature/journal/src/commonMain/kotlin/app/logdate/feature/journals/ui/picker/JournalContentPickerScreen.kt|JournalContentPickerScreenContent
 client/feature/journal/src/commonMain/kotlin/app/logdate/feature/journals/ui/detail/NoteViewerScreen.kt|NoteViewerScaffoldContent
 client/feature/library/src/commonMain/kotlin/app/logdate/feature/library/ui/detail/MediaDetailScreen.kt|MediaDetailScreen,MediaDetailContent,MediaDetailLayout,WorkspaceMediaViewer
 client/feature/rewind/src/commonMain/kotlin/app/logdate/feature/rewind/ui/detail/RewindStoryView.kt|RewindStoryView
