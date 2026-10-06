@@ -62,20 +62,7 @@ class AudioDecoder(private val context: Context) {
                     var decodedSamples = false
                     while (!outputDone) {
                         currentCoroutineContext().ensureActive()
-                        if (!inputDone) {
-                            val inIndex = codec.dequeueInputBuffer(DEQUEUE_TIMEOUT_US)
-                            if (inIndex >= 0) {
-                                val input = checkNotNull(codec.getInputBuffer(inIndex))
-                                val size = extractor.readSampleData(input, 0)
-                                if (size < 0) {
-                                    codec.queueInputBuffer(inIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                                    inputDone = true
-                                } else {
-                                    codec.queueInputBuffer(inIndex, 0, size, extractor.sampleTime, 0)
-                                    extractor.advance()
-                                }
-                            }
-                        }
+                        if (!inputDone) inputDone = queueNextFrame(codec, extractor)
                         val outIndex = codec.dequeueOutputBuffer(info, DEQUEUE_TIMEOUT_US)
                         if (outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                             check(!decodedSamples) { "Audio format changed during decoding" }
@@ -110,6 +97,20 @@ class AudioDecoder(private val context: Context) {
                 extractor.release()
             }
         }
+
+    private fun queueNextFrame(codec: MediaCodec, extractor: MediaExtractor): Boolean {
+        val index = codec.dequeueInputBuffer(DEQUEUE_TIMEOUT_US)
+        if (index < 0) return false
+        val input = checkNotNull(codec.getInputBuffer(index))
+        val size = extractor.readSampleData(input, 0)
+        if (size < 0) {
+            codec.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+            return true
+        }
+        codec.queueInputBuffer(index, 0, size, extractor.sampleTime, 0)
+        extractor.advance()
+        return false
+    }
 
     private fun openExtractor(extractor: MediaExtractor, uri: String) {
         when {
