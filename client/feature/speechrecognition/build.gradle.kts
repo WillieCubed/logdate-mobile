@@ -35,6 +35,8 @@ dependencies {
     // Only loaded when this dynamic feature is installed; not in the base APK.
     implementation(libs.commons.compress)
 
+    testImplementation(libs.kotlin.test.junit)
+
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)

@@ -10,6 +10,7 @@ import com.k2fsa.sherpa.onnx.AudioTagging
 import com.k2fsa.sherpa.onnx.AudioTaggingConfig
 import com.k2fsa.sherpa.onnx.AudioTaggingModelConfig
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -21,12 +22,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlin.math.min
 
 /**
  * On-device audio tagging service backed by Sherpa-ONNX's CED (Consistent
@@ -128,48 +128,35 @@ class SherpaOnnxAudioTaggingService(
                 return@flow
             }
 
-            val samples = audioDecoder.decodeToMono16kHz(audioUri)
-            if (samples == null || samples.isEmpty()) {
-                emit(AudioTaggingResult.Error("Could not decode audio at $audioUri"))
-                return@flow
-            }
-
             try {
                 val cumulative = mutableMapOf<String, DetectedSound>()
-                val windowSamples = WINDOW_SECONDS * AudioDecoder.TARGET_SAMPLE_RATE
-                val strideSamples = (WINDOW_SECONDS - WINDOW_OVERLAP_SECONDS) * AudioDecoder.TARGET_SAMPLE_RATE
-                var startSample = 0
-
-                while (startSample < samples.size) {
-                    if (!currentCoroutineContext().isActive) return@flow
-                    val endSample = min(startSample + windowSamples, samples.size)
-                    val windowSize = endSample - startSample
-                    if (windowSize < MIN_WINDOW_SAMPLES) break
-
-                    val window = samples.copyOfRange(startSample, endSample)
-                    val events = tagWindow(tagger, window)
-                    val windowStartMs = (startSample.toLong() * 1000) / AudioDecoder.TARGET_SAMPLE_RATE
-                    val windowDurationMs = (windowSize.toLong() * 1000) / AudioDecoder.TARGET_SAMPLE_RATE
-
+                val windows = AudioSampleWindows(
+                    WINDOW_SECONDS * AudioDecoder.TARGET_SAMPLE_RATE,
+                    (WINDOW_SECONDS - WINDOW_OVERLAP_SECONDS) * AudioDecoder.TARGET_SAMPLE_RATE,
+                    MIN_WINDOW_SAMPLES,
+                )
+                var producedWindow = false
+                suspend fun process(window: AudioSampleWindow) {
+                    currentCoroutineContext().ensureActive()
+                    val events = tagWindow(tagger, window.samples)
+                    val startMs = window.startSample * 1000 / AudioDecoder.TARGET_SAMPLE_RATE
+                    val durationMs = window.samples.size.toLong() * 1000 / AudioDecoder.TARGET_SAMPLE_RATE
                     for (event in events) {
-                        if (event.prob < MIN_CONFIDENCE) continue
-                        if (event.name.equals("Speech", ignoreCase = true)) continue
-                        mergeDetection(cumulative, event.name, event.prob, windowStartMs, windowDurationMs)
+                        if (event.prob < MIN_CONFIDENCE || event.name.equals("Speech", ignoreCase = true)) continue
+                        mergeDetection(cumulative, event.name, event.prob, startMs, durationMs)
                     }
-
-                    val isFinalWindow = endSample == samples.size
-                    emit(
-                        AudioTaggingResult.Success(
-                            sounds = cumulative.values.sortedByDescending { it.confidence },
-                            isFinal = isFinalWindow,
-                        ),
-                    )
-
-                    if (isFinalWindow) break
-                    startSample += strideSamples
+                    producedWindow = true
+                    emit(AudioTaggingResult.Success(cumulative.values.sortedByDescending { it.confidence }, window.isFinal))
                 }
+                audioDecoder.decodeMono16kHz(audioUri).collect { chunk ->
+                    for (window in windows.append(chunk)) process(window)
+                }
+                for (window in windows.finish()) process(window)
+                if (!producedWindow) emit(AudioTaggingResult.Error("The recording is too short to identify sounds."))
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                Napier.e("Audio tagging failed for $audioUri", e)
+                Napier.e("Audio tagging failed")
                 emit(AudioTaggingResult.Error("Audio tagging failed", e))
             }
         }.flowOn(Dispatchers.Default)
