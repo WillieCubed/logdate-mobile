@@ -132,6 +132,7 @@ resource "google_iam_workload_identity_pool_provider" "github" {
 resource "google_project_iam_member" "github_deploy_roles" {
   for_each = local.github_oidc_enabled ? toset([
     "roles/run.admin",
+    "roles/logging.viewer",
     "roles/artifactregistry.writer",
     "roles/iam.serviceAccountUser"
   ]) : toset([])
