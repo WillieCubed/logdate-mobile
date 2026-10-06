@@ -56,11 +56,7 @@ class AndroidLogDateSyncWorker(
             if (result.success && result.hasMorePending) {
                 Result.retry()
             } else if (result.success) {
-                val uploaded = result.uploadedItems
-                val downloaded = result.downloadedItems
-                val conflicts = result.conflictsResolved
-
-                Napier.i("Sync completed successfully: $uploaded uploaded, $downloaded downloaded, $conflicts conflicts resolved")
+                Napier.i("Sync completed successfully")
                 Result.success()
             } else {
                 Napier.w("Sync did not complete")

@@ -1,0 +1,36 @@
+name: Inspect Server Sync
+run-name: Inspect production sync failures
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  inspect:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    steps:
+      - uses: actions/checkout@v6
+      - name: Authenticate with the existing deployment identity
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3
+      - name: Summarize recent failures without exposing log payloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          revision="$(gcloud run services describe logdate-server \
+            --project=logdate --region=us-central1 --format=json |
+            jq -er '.status.traffic[] | select(.percent == 100) | .revisionName')"
+          [[ "$revision" =~ ^logdate-server-[a-z0-9-]+$ ]]
+          gcloud logging read \
+            "resource.type=cloud_run_revision AND resource.labels.revision_name=${revision} AND (severity>=ERROR OR httpRequest.status>=500 OR logName:varlog)" \
+            --project=logdate --freshness=2h --limit=250 --format=json |
+            python3 scripts/summarize-cloud-sync-errors.py
