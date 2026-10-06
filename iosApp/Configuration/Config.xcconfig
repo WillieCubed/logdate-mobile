@@ -5,6 +5,6 @@
 // cleanly before the version script has been run.
 #include? "Version.xcconfig"
 
-TEAM_ID=
+TEAM_ID = T95VDD3A4W
 BUNDLE_ID=studio.hypertext.LogDate
 APP_NAME=LogDate

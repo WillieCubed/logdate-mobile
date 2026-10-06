@@ -32,7 +32,7 @@ CODE_OR_DOC_EXTENSION='\.(sh|bash|py|kt|kts|java|swift|md)$'
 
 SECRET_CONTENT_PATTERNS=(
     'AKIA[0-9A-Z]{16}'
-    '-----BEGIN (RSA|EC|DSA|OPENSSH|PGP) PRIVATE KEY-----'
+    '-----BEGIN ((RSA|EC|DSA|OPENSSH|PGP) )?PRIVATE KEY-----'
     # URL-embedded credentials (`scheme://user:pass@host`); user may be empty.
     '://[^/:@[:space:]"'"'"']*:[^/@[:space:]"'"'"']{6,}@'
     # Query-string credentials such as JDBC `?password=...`.
