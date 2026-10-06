@@ -20,7 +20,6 @@ import app.logdate.feature.journals.ui.picker.JournalContentPickerItemKind
 import app.logdate.feature.journals.ui.picker.JournalContentPickerScreenContent
 import app.logdate.feature.journals.ui.picker.JournalContentPickerUiState
 import app.logdate.feature.journals.ui.picker.contentPickerGridColumnCount
-import app.logdate.feature.journals.ui.picker.contentPickerItemSpan
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.util.formatDateLocalized
 import kotlinx.datetime.LocalDate
@@ -75,24 +74,12 @@ class JournalContentPickerScreenTest {
         }
 
     @Test
-    fun `picker grid expands media space while protecting large text`() {
+    fun `picker keeps a readable number of masonry columns`() {
         assertEquals(1, contentPickerGridColumnCount(360.dp, fontScale = 1f))
-        assertEquals(2, contentPickerGridColumnCount(411.dp, fontScale = 1f))
-        assertEquals(4, contentPickerGridColumnCount(840.dp, fontScale = 1f))
-        assertEquals(6, contentPickerGridColumnCount(1280.dp, fontScale = 1f))
+        assertEquals(1, contentPickerGridColumnCount(411.dp, fontScale = 1f))
+        assertEquals(2, contentPickerGridColumnCount(840.dp, fontScale = 1f))
+        assertEquals(3, contentPickerGridColumnCount(1280.dp, fontScale = 1f))
         assertEquals(1, contentPickerGridColumnCount(411.dp, fontScale = 2f))
-    }
-
-    @Test
-    fun `picker gives writing more grid space than media on larger panels`() {
-        val photo = sampleWriting.copy(kind = JournalContentPickerItemKind.PHOTO)
-        val recording = sampleWriting.copy(kind = JournalContentPickerItemKind.RECORDING)
-
-        assertEquals(2, contentPickerItemSpan(sampleWriting, gridColumns = 2))
-        assertEquals(2, contentPickerItemSpan(sampleWriting, gridColumns = 4))
-        assertEquals(3, contentPickerItemSpan(sampleWriting, gridColumns = 6))
-        assertEquals(1, contentPickerItemSpan(photo, gridColumns = 6))
-        assertEquals(2, contentPickerItemSpan(recording, gridColumns = 6))
     }
 
     @Test

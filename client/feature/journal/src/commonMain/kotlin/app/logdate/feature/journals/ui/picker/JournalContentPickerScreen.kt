@@ -19,10 +19,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -198,15 +198,15 @@ private fun PickerGallery(
     }
     BoxWithConstraints(modifier.fillMaxSize()) {
         val gridColumns = contentPickerGridColumnCount(maxWidth, LocalDensity.current.fontScale)
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(gridColumns),
+        LazyVerticalStaggeredGrid(
+            columns = StaggeredGridCells.Fixed(gridColumns),
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(Spacing.lg),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            verticalItemSpacing = Spacing.md,
         ) {
             state.groups.forEach { group ->
-                item(span = { GridItemSpan(maxLineSpan) }) {
+                item(span = StaggeredGridItemSpan.FullLine) {
                     Text(
                         text = formatDateLocalized(group.date),
                         style = MaterialTheme.typography.titleMedium,
@@ -216,9 +216,6 @@ private fun PickerGallery(
                 items(
                     items = group.items,
                     key = { it.id },
-                    span = { item ->
-                        GridItemSpan(contentPickerItemSpan(item, gridColumns))
-                    },
                 ) { item ->
                     PickerItemTile(
                         item = item,
@@ -267,7 +264,7 @@ private fun PickerItemTile(
         border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
     ) {
         if (item.isVisualMedia) {
-            Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
+            Box(Modifier.fillMaxWidth().aspectRatio(4f / 3f)) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.secondaryContainer,
@@ -366,20 +363,8 @@ internal fun contentPickerGridColumnCount(
 ): Int {
     if (fontScale >= 1.5f) return 1
     val usableWidth = (availableWidth - Spacing.lg * 2).coerceAtLeast(0.dp)
-    return (usableWidth / 176.dp).toInt().coerceIn(1, 6)
+    return (usableWidth / 320.dp).toInt().coerceIn(1, 3)
 }
-
-internal fun contentPickerItemSpan(
-    item: JournalContentPickerItem,
-    gridColumns: Int,
-): Int =
-    when (item.kind) {
-        JournalContentPickerItemKind.WRITING -> ((gridColumns + 1) / 2).coerceAtLeast(2).coerceAtMost(gridColumns)
-        JournalContentPickerItemKind.RECORDING -> if (gridColumns >= 6) 2 else 1
-        JournalContentPickerItemKind.PHOTO,
-        JournalContentPickerItemKind.VIDEO,
-        -> 1
-    }
 
 @Composable
 private fun SelectionMarker(
