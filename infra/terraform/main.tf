@@ -304,6 +304,7 @@ resource "google_cloud_run_v2_service" "server" {
       image = var.cloud_run_image
 
       ports {
+        name           = "h2c"
         container_port = 8080
       }
 

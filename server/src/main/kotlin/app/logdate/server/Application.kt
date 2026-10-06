@@ -15,6 +15,7 @@ import app.logdate.server.routes.contentApiRoutes
 import app.logdate.server.routes.serverMetaRoutes
 import app.logdate.server.sync.SyncMetricsRegistry
 import io.ktor.server.application.Application
+import io.ktor.server.engine.connector
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.routing.routing
@@ -47,9 +48,15 @@ fun main() {
 
 private fun buildMainServer(
     isDatabaseAvailable: Boolean,
-    port: Int,
-    host: String,
-) = embeddedServer(Netty, port = port, host = host) {
+    requestedPort: Int,
+    requestedHost: String,
+) = embeddedServer(Netty, configure = {
+    connector {
+        port = requestedPort
+        host = requestedHost
+    }
+    configureLogDateTransport()
+}) {
     module(isDatabaseAvailable)
 }
 
