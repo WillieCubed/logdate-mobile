@@ -34,9 +34,17 @@ permissions:
 
 jobs:
   android-wear-screenshots:
-    name: Android and Wear screenshots
+    name: ${{ matrix.platform }} screenshots
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Android
+            module: android-main
+          - platform: Wear
+            module: wear
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -61,17 +69,15 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      - name: Validate Android and Wear screenshots
-        run: ./gradlew validateAndroidScreenshots --continue
+      - name: Validate ${{ matrix.platform }} screenshots
+        run: ./gradlew :app:${{ matrix.module }}:validateDebugScreenshotTest --continue
 
-      - name: Upload Android and Wear screenshot reports
-        if: failure()
+      - name: Upload ${{ matrix.platform }} screenshot reports
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: android-wear-screenshot-report
-          path: |
-            app/android-main/build/outputs/screenshotTest-results/
-            app/wear/build/outputs/screenshotTest-results/
+          name: ${{ matrix.module }}-screenshot-report
+          path: app/${{ matrix.module }}/build/outputs/screenshotTest-results/
           retention-days: 14
 
   desktop-screenshots:
@@ -109,7 +115,7 @@ jobs:
   ios-screenshot-validation:
     name: iOS screenshot lane
     runs-on: macos-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
