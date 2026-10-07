@@ -4,11 +4,14 @@ package app.logdate.integration.e2e.harness
 
 import app.logdate.client.data.account.AccountKeyUnlockCoordinator
 import app.logdate.client.data.account.AccountKeyUnlockStatus
+import app.logdate.client.datastore.OriginBoundSession
+import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.crypto.AccountKeyEnvelopeCipher
 import app.logdate.client.device.crypto.ContentEncryptionService
 import app.logdate.client.device.crypto.DesktopCryptoManager
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.KeyDerivation
+import app.logdate.client.device.identity.data.AccountDeviceApi
 import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.networking.DefaultAccountKeyEnvelopeApi
 import app.logdate.client.repository.journals.JournalNote
@@ -150,6 +153,18 @@ object NativeJournalSyncHarness {
                         delay(50)
                     }
                     check(Files.exists(control.resolve("complete"))) { "Mac verification did not finish" }
+                    val macDeviceId = Files.readString(control.resolve("mac-device-id"))
+                    val devices =
+                        AccountDeviceApi(httpClient).list(
+                            OriginBoundSession(
+                                baseUrl.removeSuffix("/api/v1"),
+                                UserSession(token, account.tokens.refreshToken, account.account.id.toString()),
+                            ),
+                        )
+                    check(devices.single().id == macDeviceId && devices.single().platform == "MACOS") {
+                        "Kotlin did not observe the Mac device registration"
+                    }
+                    check(devices.single().name == "Fixture Mac renamed" && devices.single().appVersion == "0.1.1")
                     val macEnvelope = Files.readAllBytes(control.resolve("mac-envelope"))
                     val restored = AccountKeyEnvelopeCipher(crypto).open(account.account.id.toString(), credential, secret, macEnvelope)
                     check(restored.identity.contentEquals(identityKey) && restored.media.contentEquals(mediaKey))
@@ -158,7 +173,10 @@ object NativeJournalSyncHarness {
                     val notes = downloaded.changes.filterIsInstance<JournalNote.Text>()
                     check(notes.any { it.uid == initial.uid && it.content == "Kept Mac draft" })
                     check(notes.any { it.content == "New offline Mac entry" })
-                    Files.writeString(control.resolve("verified"), "Kotlin decrypted the resolved Mac conflict and new offline entry.\n")
+                    Files.writeString(
+                        control.resolve("verified"),
+                        "Kotlin observed the Mac device and decrypted the resolved conflict and new offline entry.\n",
+                    )
                 } finally {
                     fixtureServer.stop(0)
                     Files.deleteIfExists(control.resolve("ready"))
