@@ -3,30 +3,30 @@ package app.logdate.client.media.audio
 import app.logdate.client.media.audio.tagging.AudioTaggingResult
 import app.logdate.client.media.audio.tagging.AudioTaggingService
 import app.logdate.client.media.audio.transcription.TranscriptionFailure
-import app.logdate.client.media.audio.transcription.TranscriptionPersistenceRetrier
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import app.logdate.client.media.audio.transcription.TranscriptionStartResult
 import app.logdate.client.media.audio.transcription.stopLiveTranscriptionWithHandoff
-import app.logdate.client.media.audio.transcription.toTranscriptDocument
 import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.client.repository.audio.AudioTag
 import app.logdate.client.repository.audio.AudioTagRepository
-import app.logdate.client.repository.transcription.TranscriptDocumentStatus
-import app.logdate.client.repository.transcription.TranscriptSource
 import app.logdate.client.repository.transcription.TranscriptionRepository
-import app.logdate.client.repository.transcription.TranscriptionStatus
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -63,6 +63,7 @@ class AndroidAudioRecordingManager(
     private val scope = CoroutineScope(SupervisorJob() + workDispatcher)
     private val sessionMutex = Mutex()
     private val recordingStateFlow = MutableStateFlow(false)
+    private val recordingPausedFlow = MutableStateFlow(false)
     private val audioLevelFlow = MutableStateFlow(0f)
     private val durationFlow = MutableStateFlow(0L)
     private val transcriptionFlow = MutableStateFlow<String?>(null)
@@ -99,6 +100,10 @@ class AndroidAudioRecordingManager(
      */
     @Volatile
     private var startInFlight = false
+    private val recordingStartingFlow = MutableStateFlow(false)
+
+    @Volatile
+    private var sessionGeneration = 0L
 
     @Volatile
     private var liveTranscriptionStarted = false
@@ -112,18 +117,37 @@ class AndroidAudioRecordingManager(
      * they never race a still-initializing transcription session.
      */
     private var transcriptionStartJob: Job? = null
+    private var transcriptionSessionInitialized = false
     private var serviceStateJob: Job? = null
     private var routeSyncJob: Job? = null
-    private var transcriptPersistenceJob: Job? = null
+    private val transcriptPersistenceLock = Any()
+    private val transcriptionInputRouter =
+        TranscriptionInputRouter {
+            structuredTranscriptionFlow.value = TranscriptionResult.Error(TranscriptionFailure.AudioError)
+        }
+    private val transcriptPersistenceJobs = mutableMapOf<Uuid, Job>()
     private var transcriptionCollectorJob: Job? = null
     private var transcriptionWarmUpJob: Job? = null
-    private val persistenceRetrier = TranscriptionPersistenceRetrier()
+    private val transcriptWriter = RecordingTranscriptWriter(transcriptionRepository)
 
     override val isRecording: Boolean
         get() = recordingStateFlow.value
 
+    override val isStartingRecording: Boolean
+        get() = startInFlight
+
+    override fun getRecordingStartingFlow(): StateFlow<Boolean> = recordingStartingFlow.asStateFlow()
+
     override val currentRecordingPath: String?
         get() = recordingTarget?.path
+
+    override val currentRecordingTargetNoteId: Uuid?
+        get() = recordingTarget?.let { sessionTargetNoteId }
+
+    override val currentRecordingPaused: Boolean
+        get() = recordingPausedFlow.value
+
+    override fun getRecordingPausedFlow(): StateFlow<Boolean> = recordingPausedFlow.asStateFlow()
 
     override fun getRecordingStateFlow(): StateFlow<Boolean> = recordingStateFlow.asStateFlow()
 
@@ -147,18 +171,27 @@ class AndroidAudioRecordingManager(
         // that is still mid-utterance when the editor view model goes away continues to
         // flow through here and gets persisted to the database.
         transcriptionCollectorJob?.cancel()
+        val noteId = sessionTargetNoteId
+        val inputHealth = transcriptionInputRouter.health
         transcriptionCollectorJob =
             scope.launch {
-                service.getTranscriptionFlow().collectLatest { result -> onTranscriptionResult(result) }
+                service.getTranscriptionFlow().collectLatest { result -> onTranscriptionResult(result, noteId, inputHealth) }
             }
     }
 
-    private fun onTranscriptionResult(result: TranscriptionResult) {
+    private fun onTranscriptionResult(
+        result: TranscriptionResult,
+        noteId: Uuid?,
+        inputHealth: TranscriptionInputHealth,
+    ) {
+        if (result is TranscriptionResult.Success && !inputHealth.isHealthy) return
+        if (result is TranscriptionResult.Error && result.reason == TranscriptionFailure.AudioError) inputHealth.isHealthy = false
+        if (result is TranscriptionResult.Success) scheduleTranscriptPersistence(result, noteId)
+        if (noteId != sessionTargetNoteId) return
         when (result) {
             is TranscriptionResult.Success -> {
                 transcriptionFlow.value = result.text
                 structuredTranscriptionFlow.value = result
-                scheduleTranscriptPersistence(result)
             }
             is TranscriptionResult.Error -> {
                 Napier.e("Transcription error: ${result.reason}")
@@ -177,22 +210,27 @@ class AndroidAudioRecordingManager(
         withContext(workDispatcher) {
             sessionMutex.withLock {
                 startInFlight = true
+                recordingStartingFlow.value = true
                 try {
                     startSessionLocked(targetNoteId)
                 } finally {
                     startInFlight = false
+                    recordingStartingFlow.value = false
                 }
             }
         }
 
     private suspend fun startSessionLocked(targetNoteId: Uuid?): Boolean {
-        if (recordingStateFlow.value) {
-            Napier.w("Attempted to start recording while already recording")
+        if (recordingStateFlow.value || externallyRecordedPath != null) {
+            Napier.w("Attempted to start recording while a session is active or awaiting handoff")
             return false
         }
+        sessionGeneration++
         val target =
             try {
                 audioStorage.createRecordingTarget()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Napier.e("Could not create a recording target", e)
                 return false
@@ -201,16 +239,29 @@ class AndroidAudioRecordingManager(
         sessionTargetNoteId = targetNoteId
         externallyRecordedPath = null
         liveTranscriptionStarted = false
+        transcriptionInputRouter.reset()
         transcriptionFlow.value = null
         structuredTranscriptionFlow.value = null
 
-        val started = serviceController.start(target.path, audioRouteRepository.inputDevices.value.selectedDeviceId)
-        val confirmed = if (started) awaitServiceStarted() else null
-        if (confirmed == null) {
-            serviceController.shutdown()
-            recordingTarget = null
-            return false
+        var confirmed = false
+        try {
+            val started = serviceController.start(target.path, audioRouteRepository.requestedInputDeviceIds.first())
+            confirmed = started && awaitServiceStarted() != null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.e("Could not start the recording service", e)
+        } finally {
+            if (!confirmed) {
+                try {
+                    serviceController.shutdown()
+                } finally {
+                    recordingTarget = null
+                    sessionTargetNoteId = null
+                }
+            }
         }
+        if (!confirmed) return false
         recordingStateFlow.value = true
         observeService()
         transcriptionStartJob = scope.launch { startLiveTranscription() }
@@ -249,24 +300,35 @@ class AndroidAudioRecordingManager(
                 serviceController.serviceState.collect { state -> onServiceState(state) }
             }
         routeSyncJob?.cancel()
+        val generation = sessionGeneration
         routeSyncJob =
-            scope.launch {
-                audioRouteRepository.inputDevices.collect { selection ->
-                    if (recordingStateFlow.value) {
-                        serviceController.updatePreferredInputDevice(selection.selectedDeviceId)
-                    }
-                }
-            }
+            observeRecordingInputRoutes(
+                scope,
+                audioRouteRepository,
+                serviceController,
+                sessionMutex,
+                isCurrentSession = { generation == sessionGeneration && recordingStateFlow.value },
+                onInputChanged = { updateTranscriptionInput(it) },
+            )
     }
 
+    private fun updateTranscriptionInput(
+        deviceId: String?,
+        verifyActiveInput: Boolean = false,
+    ) = transcriptionInputRouter.update(transcriptionService, deviceId, verifyActiveInput)
+
     private fun onServiceState(state: RecordingServiceState?) {
+        audioRouteRepository.updateRecordingInputDevice(state?.routedInputDeviceId, state?.isRecording == true, state?.inputRoutingError)
+        if (state?.isRecording == true && state.routedInputDeviceId != null) updateTranscriptionInput(state.routedInputDeviceId)
         if (state == null) {
+            recordingPausedFlow.value = false
             if (recordingStateFlow.value) {
                 Napier.w("Recording service went away mid-session")
                 recordingStateFlow.value = false
             }
             return
         }
+        recordingPausedFlow.value = state.isRecording && state.isPaused
         audioLevelFlow.value = state.audioLevel
         durationFlow.value = state.durationSeconds.toLong() * 1000
         if (!state.isRecording && recordingStateFlow.value) {
@@ -285,10 +347,30 @@ class AndroidAudioRecordingManager(
             return
         }
         try {
+            if (transcriptionSessionInitialized) service.cancelTranscription()
+            transcriptionCollectorJob?.cancelAndJoin()
+            val noteId = sessionTargetNoteId
+            val inputHealth = transcriptionInputRouter.health
+            val results = service.getTranscriptionFlow()
+            val outgoingReplayCount = results.replayCache.size
+            transcriptionCollectorJob =
+                scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    results.drop(outgoingReplayCount).collectLatest { result -> onTranscriptionResult(result, noteId, inputHealth) }
+                }
+            transcriptionSessionInitialized = true
             service.resetTranscription()
             if (service.supportsLiveTranscription) {
+                updateTranscriptionInput(
+                    serviceController.serviceState.value?.routedInputDeviceId ?: audioRouteRepository.requestedInputDeviceIds.first(),
+                )
                 applyLiveStart(service.startLiveTranscription())
+                updateTranscriptionInput(
+                    serviceController.serviceState.value?.routedInputDeviceId ?: audioRouteRepository.requestedInputDeviceIds.first(),
+                    verifyActiveInput = true,
+                )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Transcription failed to start; audio recording will continue", e)
             structuredTranscriptionFlow.value = TranscriptionResult.Error(TranscriptionFailure.Unknown)
@@ -307,8 +389,11 @@ class AndroidAudioRecordingManager(
     }
 
     override suspend fun stopRecording(): String? =
-        withContext(workDispatcher) {
-            sessionMutex.withLock { stopSessionLocked() }
+        sessionMutex.withLock {
+            val filePath = withContext(workDispatcher) { stopSessionLocked() }
+            recordingTarget = null
+            externallyRecordedPath = null
+            filePath
         }
 
     private suspend fun stopSessionLocked(): String? {
@@ -319,7 +404,12 @@ class AndroidAudioRecordingManager(
         // A stop that lands while the transcription session is still spinning up (start and
         // stop tapped in immediate succession) must wait for that setup to settle before
         // tearing it down, or the AudioRecord it is about to open would never get closed.
-        transcriptionStartJob?.join()
+        try {
+            transcriptionStartJob?.join()
+        } catch (e: CancellationException) {
+            withContext(NonCancellable) { preserveCancelledRecording() }
+            throw e
+        }
         transcriptionStartJob = null
         serviceStateJob?.cancel()
         serviceStateJob = null
@@ -335,13 +425,17 @@ class AndroidAudioRecordingManager(
             } finally {
                 serviceController.shutdown()
                 recordingStateFlow.value = false
-                recordingTarget = null
-                externallyRecordedPath = null
+                recordingPausedFlow.value = false
+                audioRouteRepository.updateRecordingInputDevice(null, false)
             }
+        externallyRecordedPath = filePath
+        if (filePath == null) recordingTarget = null
 
         val noteId = sessionTargetNoteId
         try {
-            finishTranscription(filePath)
+            finishTranscription(filePath, noteId)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Transcription failed to stop cleanly; the recording is kept", e)
         }
@@ -349,6 +443,35 @@ class AndroidAudioRecordingManager(
             runAmbientTagging(filePath, noteId)
         }
         return filePath
+    }
+
+    private suspend fun preserveCancelledRecording() {
+        transcriptionStartJob?.cancel()
+        serviceStateJob?.cancel()
+        serviceStateJob = null
+        routeSyncJob?.cancel()
+        routeSyncJob = null
+        try {
+            externallyRecordedPath = finalizeServiceRecording()
+        } catch (e: Exception) {
+            Napier.e("Error preserving a cancelled recording", e)
+        } finally {
+            serviceController.shutdown()
+            recordingStateFlow.value = false
+            recordingPausedFlow.value = false
+            audioRouteRepository.updateRecordingInputDevice(null, false)
+            if (externallyRecordedPath == null) recordingTarget = null
+        }
+        transcriptionStartJob?.join()
+        transcriptionStartJob = null
+        try {
+            if (transcriptionService?.supportsLiveTranscription == true) {
+                transcriptionService?.stopLiveTranscription()
+            }
+        } catch (e: Exception) {
+            Napier.e("Error releasing transcription after a cancelled stop", e)
+        }
+        liveTranscriptionStarted = false
     }
 
     /**
@@ -366,17 +489,24 @@ class AndroidAudioRecordingManager(
         return reported
     }
 
-    private suspend fun finishTranscription(filePath: String?) {
+    private suspend fun finishTranscription(
+        filePath: String?,
+        noteId: Uuid?,
+    ) {
         val service = transcriptionService ?: return
-        val liveSessionWasHealthy = liveTranscriptionStarted
+        val liveSessionWasHealthy = liveTranscriptionStarted && transcriptionInputRouter.health.isHealthy
         val stopResult =
             if (service.supportsLiveTranscription) {
                 try {
                     stopLiveTranscriptionWithHandoff(service) { result ->
-                        transcriptionFlow.value = result.text
-                        structuredTranscriptionFlow.value = result
-                        scheduleTranscriptPersistence(result)
+                        if (liveSessionWasHealthy) {
+                            transcriptionFlow.value = result.text
+                            structuredTranscriptionFlow.value = result
+                            scheduleTranscriptPersistence(result, noteId)
+                        }
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     Napier.e("Transcription failed while stopping; recovering from the recorded file", e)
                     TranscriptionResult.Error(TranscriptionFailure.Unknown)
@@ -393,10 +523,12 @@ class AndroidAudioRecordingManager(
             scope.launch {
                 val result = service.transcribeAudioFile(filePath)
                 if (result is TranscriptionResult.Success) {
-                    transcriptionFlow.value = result.text
-                    scheduleTranscriptPersistence(result)
+                    scheduleTranscriptPersistence(result, noteId)
                 }
-                structuredTranscriptionFlow.value = result
+                if (sessionTargetNoteId == noteId) {
+                    if (result is TranscriptionResult.Success) transcriptionFlow.value = result.text
+                    structuredTranscriptionFlow.value = result
+                }
             }
         }
     }
@@ -425,9 +557,25 @@ class AndroidAudioRecordingManager(
                 if (!recordingStateFlow.value) return@withLock false
                 try {
                     val resumed = serviceController.resume()
+                    if (resumed) {
+                        applyRecordingInputRoute(
+                            audioRouteRepository,
+                            serviceController,
+                            audioRouteRepository.requestedInputDeviceIds.first(),
+                        )
+                    }
                     val service = transcriptionService
                     if (resumed && service != null && service.supportsLiveTranscription) {
+                        updateTranscriptionInput(
+                            serviceController.serviceState.value?.routedInputDeviceId
+                                ?: audioRouteRepository.requestedInputDeviceIds.first(),
+                        )
                         applyLiveStart(service.startLiveTranscription())
+                        updateTranscriptionInput(
+                            serviceController.serviceState.value?.routedInputDeviceId
+                                ?: audioRouteRepository.requestedInputDeviceIds.first(),
+                            verifyActiveInput = true,
+                        )
                     }
                     resumed
                 } catch (e: Exception) {
@@ -458,9 +606,16 @@ class AndroidAudioRecordingManager(
         // the Whisper refinement coroutine — already launched on the long-lived
         // transcription service scope — keeps running to completion.
         if (!recordingStateFlow.value && !startInFlight && externallyRecordedPath == null) return
+        val requestedSession = sessionGeneration
         scope.launch {
             try {
-                stopRecording()
+                sessionMutex.withLock {
+                    if (sessionGeneration != requestedSession) return@withLock
+                    transcriptionStartJob?.cancel()
+                    stopSessionLocked()
+                }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Napier.e("Error stopping recording from background request", e)
             }
@@ -473,8 +628,8 @@ class AndroidAudioRecordingManager(
      * the transcription service it was handed, so neither is torn down here.
      */
     override fun release() {
-        transcriptPersistenceJob?.cancel()
-        transcriptPersistenceJob = null
+        val pendingWrite = synchronized(transcriptPersistenceLock) { transcriptPersistenceJobs.remove(sessionTargetNoteId) }
+        pendingWrite?.cancel()
         requestStopRecording()
     }
 
@@ -522,8 +677,8 @@ class AndroidAudioRecordingManager(
     }
 
     /**
-     * Writes a transcription result to the repository under the current
-     * session's [sessionTargetNoteId], so the polished text survives the
+     * Writes a transcription result to the repository under its captured
+     * session note ID, so the polished text survives the
      * editor view model and is visible to any later viewer that loads the
      * note. Skipped when no note id was supplied to [startRecording] (e.g.
      * Wear OS, tests).
@@ -533,79 +688,38 @@ class AndroidAudioRecordingManager(
      * IN_PROGRESS while utterances are still being rewritten so any UI
      * observing the note can show the right state.
      */
-    private suspend fun persistRefinedTranscript(result: TranscriptionResult.Success) {
-        val noteId = sessionTargetNoteId ?: return
-        if (result.text.isBlank()) return
-        // Skip intermediate live-streaming results. The audio note may not be
-        // in the database yet while recording is active (auto-save fires after
-        // the recording stops), so any updateTranscription() call here would
-        // fail. Only the Whisper refinement pass — which runs after recording
-        // has stopped and the note has been auto-saved — should be persisted.
-        if (recordingStateFlow.value) return
-        val status =
-            if (result.isFinal && !result.isRefining) {
-                TranscriptionStatus.COMPLETED
-            } else {
-                TranscriptionStatus.IN_PROGRESS
-            }
-        val persisted =
-            persistenceRetrier.persist {
-                try {
-                    writeTranscript(noteId, result, status)
-                } catch (e: Exception) {
-                    Napier.e("Transcript persistence attempt failed for $noteId", e)
-                    false
+    private suspend fun persistRefinedTranscript(
+        result: TranscriptionResult.Success,
+        noteId: Uuid,
+    ) {
+        if (!transcriptWriter.persist(result, noteId)) {
+            Napier.e("Transcript persistence exhausted retries for $noteId")
+            structuredTranscriptionFlow.value = TranscriptionResult.Error(TranscriptionFailure.PersistenceError)
+        }
+    }
+
+    private fun scheduleTranscriptPersistence(
+        result: TranscriptionResult.Success,
+        noteId: Uuid? = sessionTargetNoteId,
+    ) {
+        if (result.text.isBlank() || noteId == null) return
+        // The active note is saved after recording stops; completed older sessions can
+        // already persist while a new recording runs.
+        if (recordingStateFlow.value && noteId == sessionTargetNoteId) return
+        synchronized(transcriptPersistenceLock) {
+            transcriptPersistenceJobs.remove(noteId)?.cancel()
+            val job =
+                scope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
+                    persistRefinedTranscript(result, noteId)
+                }
+            transcriptPersistenceJobs[noteId] = job
+            job.invokeOnCompletion {
+                synchronized(transcriptPersistenceLock) {
+                    if (transcriptPersistenceJobs[noteId] === job) transcriptPersistenceJobs.remove(noteId)
                 }
             }
-        if (!persisted) {
-            Napier.e("Transcript persistence exhausted retries for $noteId")
-            structuredTranscriptionFlow.value =
-                TranscriptionResult.Error(TranscriptionFailure.PersistenceError)
+            job.start()
         }
-    }
-
-    private suspend fun writeTranscript(
-        noteId: Uuid,
-        result: TranscriptionResult.Success,
-        status: TranscriptionStatus,
-    ): Boolean {
-        val timedTranscript = result.timedTranscript
-        return if (timedTranscript != null) {
-            transcriptionRepository.updateTranscriptDocument(
-                noteId = noteId,
-                document =
-                    timedTranscript.toTranscriptDocument(
-                        status =
-                            if (status == TranscriptionStatus.COMPLETED) {
-                                TranscriptDocumentStatus.FINAL
-                            } else {
-                                TranscriptDocumentStatus.REFINING
-                            },
-                        source =
-                            if (result.isRefining) {
-                                TranscriptSource.LOCAL_REFINEMENT
-                            } else {
-                                TranscriptSource.LOCAL_LIVE
-                            },
-                    ),
-                status = status,
-            )
-        } else {
-            transcriptionRepository.updateTranscription(
-                noteId = noteId,
-                text = result.text,
-                status = status,
-            )
-        }
-    }
-
-    private fun scheduleTranscriptPersistence(result: TranscriptionResult.Success) {
-        if (result.text.isBlank() || recordingStateFlow.value || sessionTargetNoteId == null) return
-        transcriptPersistenceJob?.cancel()
-        transcriptPersistenceJob =
-            scope.launch(Dispatchers.IO) {
-                persistRefinedTranscript(result)
-            }
     }
 
     private companion object {

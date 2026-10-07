@@ -61,6 +61,7 @@ internal fun MemoryBlockContent(
     onAudioResolverReady: (Uuid, PendingAudioResolver) -> Unit,
     onPhotoAspectRatioLoaded: (Uuid, Float) -> Unit = { _, _ -> },
     focusedTextHeight: Dp = 0.dp,
+    unfinishedRecordingHeight: Dp = 420.dp,
 ) {
     Column(Modifier.fillMaxWidth()) {
         when (block) {
@@ -70,7 +71,7 @@ internal fun MemoryBlockContent(
                     isExpanded = false,
                     requestEditingFocus = requestTextFocus || editRequest > 0,
                     focusRequestKey = editRequest,
-                    minEditorHeight = if (isSelected) focusedTextHeight else 0.dp,
+                    minEditorHeight = (if (isSelected) focusedTextHeight else 0.dp).coerceAtLeast(240.dp),
                     onTextChanged = { onUpdate(block.copy(content = it)) },
                     onFocused = onSelect,
                 )
@@ -119,7 +120,7 @@ internal fun MemoryBlockContent(
                     modifier =
                         Modifier.fillMaxWidth().height(
                             if (block.uri == null) {
-                                320.dp
+                                unfinishedRecordingHeight
                             } else if (isSelected) {
                                 420.dp
                             } else {
@@ -165,7 +166,7 @@ internal fun MemoryBlockContent(
 
 @Suppress("ktlint:standard:function-naming")
 @Composable
-private fun MemoryCaptionField(
+internal fun MemoryCaptionField(
     block: MediaBlockUiState,
     onSelect: () -> Unit,
     onUpdate: (EntryBlockUiState) -> Unit,
@@ -173,6 +174,7 @@ private fun MemoryCaptionField(
     modifier: Modifier = Modifier,
     overlay: Boolean = false,
 ) {
+    if (block is AudioBlockUiState && block.uri == null) return
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(editRequest) { if (editRequest > 0) focusRequester.requestFocus() }
     val color =

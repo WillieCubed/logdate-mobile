@@ -78,6 +78,8 @@ internal class InstallTimeTranscriptionService(
         delegate?.cancelTranscription()
     }
 
+    override fun updatePreferredInputDevice(deviceId: String?): Boolean = delegate?.updatePreferredInputDevice(deviceId) == true
+
     override fun getSupportedLanguages(): List<String> = delegate?.getSupportedLanguages().orEmpty()
 
     override fun setLanguage(languageCode: String) {

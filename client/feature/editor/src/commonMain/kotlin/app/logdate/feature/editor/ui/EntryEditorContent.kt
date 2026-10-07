@@ -36,7 +36,9 @@ import app.logdate.feature.editor.ui.content.EditorBottomContent
 import app.logdate.feature.editor.ui.dialog.DraftsBottomSheet
 import app.logdate.feature.editor.ui.dialog.alert.ConfirmEntryExitDialog
 import app.logdate.feature.editor.ui.editor.CameraBlockUiState
+import app.logdate.feature.editor.ui.editor.EditorBackgroundSaveEffect
 import app.logdate.feature.editor.ui.editor.EditorExitReason
+import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.delegate.DefaultAudioBlockFinalizer
 import app.logdate.feature.editor.ui.editor.rememberEditorAutoSave
@@ -53,6 +55,14 @@ import org.koin.compose.viewmodel.koinViewModel
 
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
 val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
+
+internal fun blockUpdateCallback(
+    renderedBlocks: List<EntryBlockUiState>,
+    update: (EntryBlockUiState, EntryBlockUiState?) -> Unit,
+): (EntryBlockUiState) -> Unit =
+    { updated ->
+        update(updated, renderedBlocks.firstOrNull { it.id == updated.id })
+    }
 
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -71,7 +81,7 @@ fun EntryEditorContent(
     val uiState =
         rememberBlocksUiState(
             editorState = editorState,
-            onUpdateBlock = viewModel::updateBlock,
+            onUpdateBlock = blockUpdateCallback(editorState.blocks, viewModel::updateBlock),
             onFocusBlock = { id ->
                 journalSelectorExpanded = false
                 viewModel.setExpandedBlockId(id)
@@ -90,6 +100,9 @@ fun EntryEditorContent(
             it.id == editorState.expandedBlockId && it is CameraBlockUiState && it.uri == null
         }
     val isImmersiveBlockActive = activeCamera
+    LaunchedEffect(editorState.isRecordingAudio) {
+        if (editorState.isRecordingAudio) journalSelectorExpanded = false
+    }
 
     // Single float that drives all immersive chrome interpolation (0 = fully immersive, 1 = normal).
     // During a predictive back gesture it's scrubbed in real-time via snapTo; on non-gesture
@@ -139,6 +152,8 @@ fun EntryEditorContent(
     ) {
         handleEditorBack()
     }
+
+    EditorBackgroundSaveEffect { viewModel.autoSaveLatestEntry() }
 
     val autoSaveState =
         rememberEditorAutoSave(
@@ -231,6 +246,7 @@ fun EntryEditorContent(
     ImmersiveEditorLayout(
         modifier = modifier.noteDropTarget { viewModel.appendTextBlock(it) },
         isImmersiveBlockActive = isImmersiveBlockActive,
+        isAudioRecordingActive = editorState.isRecordingAudio,
         immersiveExitProgress = chromeProgress.value,
         topBarContent = {
             NoteEditorToolbar(
@@ -243,6 +259,7 @@ fun EntryEditorContent(
                 draftCount = editorState.availableDrafts.size,
                 autoSaveStatus = autoSaveState.status,
                 actionsVisible = !isImmersiveBlockActive,
+                optionsVisible = !editorState.isRecordingAudio,
                 actionsEnabled = !editorState.isSaving && !editorState.shouldExit,
             )
         },

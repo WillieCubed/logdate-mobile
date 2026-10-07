@@ -174,9 +174,14 @@ class OfflineFirstJournalNotesRepository(
             }
 
     override fun observeRecentAudioNotes(limit: Int): Flow<List<JournalNote.Audio>> =
-        notePlaceResolver.observeAll().combine(audioNoteDao.getRecentNotes(limit)) { placeLookup, entities ->
-            entities.map { it.toModel(it.placeId?.let(placeLookup::get)) }
-        }
+        notePlaceResolver
+            .observeAll()
+            .combine(audioNoteDao.getRecentNotes(limit)) { placeLookup, entities ->
+                entities.map { it.toModel(it.placeId?.let(placeLookup::get)) }
+            }.combine(mediaCaptionDao.observeAll()) { notes, captions ->
+                val captionMap = captions.associate { it.noteId to it.caption }
+                notes.map { note -> note.copy(caption = captionMap[note.uid] ?: note.caption) }
+            }
 
     override fun observeNotesForDay(day: LocalDate): Flow<List<JournalNote>> {
         val timezone = TimeZone.currentSystemDefault()
@@ -218,6 +223,7 @@ class OfflineFirstJournalNotesRepository(
         ).toNotes(notePlaceResolver.observeAll().first())
             .sortedByDescending(JournalNote::creationTimestamp)
             .take(limit)
+            .map { note -> note.withCaption(mapOf(note.uid to (mediaCaptionDao.getCaption(note.uid)?.caption ?: ""))) }
 
     override suspend fun hasNotesBefore(beforeExclusive: Instant): Boolean {
         val beforeTimestamp = beforeExclusive.toEpochMilliseconds()
@@ -251,8 +257,9 @@ class OfflineFirstJournalNotesRepository(
             }
         }.getOrNull()?.let { return it }
         runCatching {
+            val caption = mediaCaptionDao.getCaption(noteId)?.caption ?: ""
             audioNoteDao.getNoteOneOff(noteId).let { note ->
-                note.toModel(note.placeId?.let { placeId -> notePlaceResolver.get(placeId) })
+                note.toModel(note.placeId?.let { placeId -> notePlaceResolver.get(placeId) }, caption)
             }
         }.getOrNull()?.let { return it }
         runCatching {
@@ -285,6 +292,12 @@ class OfflineFirstJournalNotesRepository(
         note: JournalNote,
         pendingMediaIndex: PendingMediaIndex?,
     ): Uuid {
+        getNoteById(note.uid)?.let { existing ->
+            check(existing.hasSamePersistedContent(note)) {
+                "This note already exists with different content. Keep your changes in a draft or save them as a new entry."
+            }
+            return existing.uid
+        }
         val noteId =
             when (note) {
                 is JournalNote.Text -> {
@@ -302,6 +315,7 @@ class OfflineFirstJournalNotesRepository(
 
                 is JournalNote.Audio -> {
                     audioNoteDao.addNote(note.toEntity())
+                    mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
                     note.uid
                 }
 
@@ -415,6 +429,7 @@ class OfflineFirstJournalNotesRepository(
 
             is JournalNote.Audio -> {
                 audioNoteDao.removeNote(note.uid)
+                mediaCaptionDao.deleteCaption(note.uid)
                 deleteMediaIfUnreferenced(note.mediaRef)
             }
 
@@ -528,7 +543,10 @@ class OfflineFirstJournalNotesRepository(
                     mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
                 }
             }
-            is JournalNote.Audio -> audioNoteDao.addNote(note.toEntity())
+            is JournalNote.Audio -> {
+                audioNoteDao.addNote(note.toEntity())
+                mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
+            }
             is JournalNote.Video -> {
                 videoNoteDao.addNote(note.toEntity())
                 if (note.caption.isNotEmpty()) {
@@ -617,8 +635,27 @@ class OfflineFirstJournalNotesRepository(
         when (this) {
             is JournalNote.Image -> copy(caption = captionMap[uid] ?: caption)
             is JournalNote.Video -> copy(caption = captionMap[uid] ?: caption)
+            is JournalNote.Audio -> copy(caption = captionMap[uid] ?: caption)
             else -> this
         }
+
+    private fun JournalNote.hasSamePersistedContent(other: JournalNote): Boolean {
+        if (creationTimestamp.toEpochMilliseconds() != other.creationTimestamp.toEpochMilliseconds() ||
+            timeZoneId != other.timeZoneId ||
+            location?.coordinates != other.location?.coordinates ||
+            location?.place?.id != other.location?.place?.id
+        ) {
+            return false
+        }
+        return when (this) {
+            is JournalNote.Text -> other is JournalNote.Text && content == other.content
+            is JournalNote.Image ->
+                other is JournalNote.Image && mediaRef == other.mediaRef && caption == other.caption && presentation == other.presentation
+            is JournalNote.Audio ->
+                other is JournalNote.Audio && mediaRef == other.mediaRef && durationMs == other.durationMs && caption == other.caption
+            is JournalNote.Video -> other is JournalNote.Video && mediaRef == other.mediaRef && caption == other.caption
+        }
+    }
 
     private fun triggerAssociationSync() = associationSyncDebouncer.trigger()
 
@@ -662,7 +699,8 @@ class OfflineFirstJournalNotesRepository(
                 .map { it.toModel() }
 
         // Combine all notes
-        val allNotes = textNotes + imageNotes + audioNotes + videoNotes
+        val captionMap = mediaCaptionDao.observeAll().first().associate { it.noteId to it.caption }
+        val allNotes = (textNotes + imageNotes + audioNotes + videoNotes).map { it.withCaption(captionMap) }
 
         // Get all journals
         val journals = journalRepository.allJournalsObserved.first()

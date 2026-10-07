@@ -171,6 +171,19 @@ class DraftManagementTest {
     }
 
     @Test
+    fun `background autosave captures edits before the public editor flow catches up`() =
+        testScope.runTest {
+            val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
+            advanceUntilIdle()
+            viewModel.updateBlock(block.copy(content = "Typed just before Home"))
+            viewModel.autoSaveLatestEntry()
+            advanceUntilIdle()
+
+            val stored = entryDraftRepository.getDrafts().first().single()
+            assertEquals("Typed just before Home", (stored.notes.single() as JournalNote.Text).content)
+        }
+
+    @Test
     fun `draft id survives combine reemission`() =
         testScope.runTest {
             // Create a text block with content

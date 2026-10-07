@@ -54,6 +54,8 @@ fun JournalNote.toDomainBlock(): EntryBlockUiState =
                 timestamp = creationTimestamp,
                 location = null,
                 captureState = AudioCaptureState.Ready(uri = mediaRef, durationMs = durationMs),
+                caption = caption,
+                transcription = transcription,
                 timeZoneId = timeZoneId,
             )
     }
@@ -135,6 +137,8 @@ fun EntryBlockUiState.toJournalNote(): JournalNote? {
                 lastUpdated = now,
                 mediaRef = ready.uri,
                 durationMs = ready.durationMs,
+                caption = caption,
+                transcription = transcription,
                 timeZoneId = timeZoneId,
             )
         }

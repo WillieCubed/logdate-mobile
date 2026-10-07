@@ -2,6 +2,9 @@ package app.logdate.feature.editor.ui.blocks
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -22,15 +25,23 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.BlockType
+import app.logdate.feature.editor.ui.layout.LocalEditorCorners
 import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.close
@@ -52,46 +63,78 @@ internal fun EndOfEntryAddControl(
     onCollapse: () -> Unit,
     onAdd: (BlockType) -> Unit,
     modifier: Modifier = Modifier,
+    onDrag: (Float) -> Unit = {},
+    onDragStopped: (cancelled: Boolean) -> Unit = {},
+    onRevealHeightChanged: (Dp) -> Unit = {},
 ) {
+    val currentOnDrag by rememberUpdatedState(onDrag)
+    val currentOnDragStopped by rememberUpdatedState(onDragStopped)
     val fraction = progress.coerceIn(0f, 1f)
+    val cardRadius = LocalEditorCorners.current.cardRadius
+    val expandedRadius = (cardRadius - 12.dp).coerceAtLeast(8.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val canExpand = !expanded && fraction < 0.05f
+    val surfaceColor =
+        if (canExpand && pressed) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh
+    val dragModifier =
+        Modifier.pointerInput(Unit) {
+            detectVerticalDragGestures(
+                onDragEnd = { currentOnDragStopped(false) },
+                onDragCancel = { currentOnDragStopped(true) },
+                onVerticalDrag = { change, distance ->
+                    change.consume()
+                    currentOnDrag(distance)
+                },
+            )
+        }
     val gatedAdd: (BlockType) -> Unit = { type -> if (expanded && fraction > 0.95f) onAdd(type) }
     BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
         val wide = maxWidth >= 560.dp
         val choiceHeight = if (wide) 96.dp else 176.dp
-        val width = 180.dp + (maxWidth - 180.dp) * fraction
+        LaunchedEffect(choiceHeight) { onRevealHeightChanged(choiceHeight) }
+        val width = maxWidth
         Surface(
             modifier =
                 Modifier
                     .width(width)
                     .height(56.dp + choiceHeight * fraction)
                     .testTag("add_memory_surface"),
-            shape =
-                RoundedCornerShape(
-                    topStart = 28.dp - 12.dp * fraction,
-                    topEnd = 28.dp - 12.dp * fraction,
-                    bottomStart = 28.dp - 12.dp * fraction,
-                    bottomEnd = 28.dp - 12.dp * fraction,
-                ),
-            color = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            shape = RoundedCornerShape(cardRadius + (expandedRadius - cardRadius) * fraction),
+            color = surfaceColor,
+            contentColor = MaterialTheme.colorScheme.onSurface,
         ) {
-            Box(Modifier.fillMaxSize()) {
+            Box(
+                Modifier.fillMaxSize().then(
+                    if (!expanded) {
+                        Modifier.testTag("add_to_entry").then(dragModifier).clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            enabled = canExpand,
+                            role = Role.Button,
+                            onClick = onExpand,
+                        )
+                    } else {
+                        Modifier
+                    },
+                ),
+            ) {
                 Column {
-                    Box(Modifier.fillMaxWidth().height(8.dp).alpha(fraction), contentAlignment = Alignment.Center) {
+                    Box(Modifier.fillMaxWidth().height(8.dp * fraction).alpha(fraction), contentAlignment = Alignment.Center) {
                         Box(
                             Modifier
                                 .width(32.dp)
                                 .height(4.dp)
-                                .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.4f), CircleShape),
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), CircleShape),
                         )
                     }
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .height(48.dp)
-                            .testTag("add_to_entry")
-                            .clickable(enabled = !expanded && fraction < 0.05f, onClick = onExpand)
-                            .padding(start = 16.dp, end = 4.dp),
+                            .height(56.dp - 8.dp * fraction)
+                            .then(if (expanded) Modifier.testTag("add_to_entry").then(dragModifier) else Modifier)
+                            .padding(start = 16.dp, end = if (expanded) 4.dp else 16.dp),
+                        horizontalArrangement = if (expanded) Arrangement.Start else Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Box(Modifier.width(24.dp * (1f - fraction)).height(24.dp).alpha(1f - fraction)) {
@@ -100,7 +143,7 @@ internal fun EndOfEntryAddControl(
                         Spacer(Modifier.width(8.dp * (1f - fraction)))
                         Text(
                             stringResource(Res.string.memory_add),
-                            modifier = Modifier.weight(1f).testTag("add_to_entry_label"),
+                            modifier = (if (expanded) Modifier.weight(1f) else Modifier).testTag("add_to_entry_label"),
                             style = MaterialTheme.typography.titleSmall,
                         )
                         Box(

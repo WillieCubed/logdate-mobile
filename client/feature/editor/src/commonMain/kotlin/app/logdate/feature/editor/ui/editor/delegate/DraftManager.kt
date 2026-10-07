@@ -20,8 +20,6 @@ import app.logdate.shared.model.location.VisitMemoryContext
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
-import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -58,16 +56,16 @@ class DraftManager(
      * @return The draft ID if a draft was created or updated, null if skipped.
      */
     suspend fun autoSave(state: EditorState): Uuid? {
-        val now = Clock.System.now()
         val notes = mutableListOf<JournalNote>()
         val pendingMedia = mutableListOf<PendingMediaRecord>()
         for (block in state.blocks) {
             if (state.isReadOnly(block.id)) continue
+            val position = notes.size + pendingMedia.size
             if (block.hasContent()) {
                 block.toJournalNote()?.let(notes::add)
             }
             if (block is AudioBlockUiState) {
-                block.toPendingMediaRecord(now)?.let(pendingMedia::add)
+                block.toPendingMediaRecord(position)?.let(pendingMedia::add)
             }
         }
 
@@ -125,10 +123,15 @@ class DraftManager(
         try {
             val result = fetchEntryDraft(draftId).first()
             result.map { draft ->
-                val noteBlocks = draft.notes.map { it.toDomainBlock() }
-                val pendingBlocks = draft.pendingMedia.mapNotNull { it.toBlock() }
+                val blocks = draft.notes.map { it.toDomainBlock() }.toMutableList()
+                draft.pendingMedia.sortedBy { it.position ?: Int.MAX_VALUE }.forEach { record ->
+                    record.toBlock()?.let { block ->
+                        val position = record.position?.coerceIn(0, blocks.size) ?: blocks.size
+                        blocks.add(position, block)
+                    }
+                }
                 LoadedDraft(
-                    blocks = noteBlocks + pendingBlocks,
+                    blocks = blocks,
                     draftId = draft.id,
                     selectedJournalIds = draft.selectedJournalIds,
                     visitContext = draft.visitContext,
@@ -196,7 +199,7 @@ class DraftManager(
  * skipped. So are Empty and Ready audio blocks — Empty has no content, and
  * Ready becomes a [JournalNote.Audio] in the draft's notes list.
  */
-private fun AudioBlockUiState.toPendingMediaRecord(now: Instant): PendingMediaRecord? {
+private fun AudioBlockUiState.toPendingMediaRecord(position: Int): PendingMediaRecord? {
     val filePath =
         when (val capture = captureState) {
             is AudioCaptureState.Recording -> capture.filePath
@@ -209,9 +212,12 @@ private fun AudioBlockUiState.toPendingMediaRecord(now: Instant): PendingMediaRe
     return PendingMediaRecord(
         blockId = id,
         mediaType = PendingMediaType.AUDIO,
-        createdAt = now,
+        createdAt = timestamp,
         filePath = filePath,
         timeZoneId = timeZoneId,
+        position = position,
+        caption = caption,
+        transcription = transcription,
     )
 }
 
@@ -229,6 +235,8 @@ private fun PendingMediaRecord.toBlock(): EntryBlockUiState? =
                 id = blockId,
                 timestamp = createdAt,
                 captureState = AudioCaptureState.Stopping(filePath = filePath),
+                caption = caption,
+                transcription = transcription,
                 timeZoneId = timeZoneId,
             )
     }

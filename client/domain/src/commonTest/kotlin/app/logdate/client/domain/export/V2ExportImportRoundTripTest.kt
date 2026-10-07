@@ -27,6 +27,7 @@ class V2ExportImportRoundTripTest : ArchiveExportFixture() {
     @Test
     fun `fresh repositories restore a newly exported v2 archive`() =
         runTest {
+            notesRepository.testNotes = listOf(textNote, imageNote, audioNote.copy(caption = "A walk by the water"), videoNote)
             val archive = InMemoryArchiveContainer()
             val progress =
                 useCase()
@@ -80,6 +81,7 @@ class V2ExportImportRoundTripTest : ArchiveExportFixture() {
             )
             assertTrue((notes.getNoteById(imageNote.uid) as JournalNote.Image).mediaRef.startsWith("file:///restored/"))
             assertEquals(PhotoPresentation.Framed, (notes.getNoteById(imageNote.uid) as JournalNote.Image).presentation)
+            assertEquals("A walk by the water", (notes.getNoteById(audioNote.uid) as JournalNote.Audio).caption)
             assertTrue(result.warnings.any { "not restored" in it || "Skipped" in it })
         }
 }

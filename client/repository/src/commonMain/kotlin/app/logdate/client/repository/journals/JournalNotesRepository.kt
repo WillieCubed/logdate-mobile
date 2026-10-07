@@ -316,6 +316,8 @@ sealed class JournalNote(
         override val syncVersion: Long = 0,
         override val location: NoteLocation? = null,
         override val timeZoneId: String? = null,
+        val caption: String = "",
+        val transcription: String = "",
     ) : JournalNote(NoteType.AUDIO)
 }
 

@@ -200,6 +200,7 @@ class ExportUserDataUseCase(
                                     id = note.uid.toString(),
                                     type = "audio",
                                     mediaPath = note.mediaRef,
+                                    caption = note.caption.takeIf { it.isNotEmpty() },
                                     durationMs = note.durationMs,
                                     createdAt = note.creationTimestamp,
                                     updatedAt = note.lastUpdated,

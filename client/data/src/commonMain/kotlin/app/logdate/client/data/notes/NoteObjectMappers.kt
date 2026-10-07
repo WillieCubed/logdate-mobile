@@ -131,7 +131,10 @@ fun JournalNote.Video.toEntity() =
         timeZoneId = timeZoneId,
     )
 
-fun AudioNoteEntity.toModel(place: NotePlace? = null): JournalNote.Audio =
+fun AudioNoteEntity.toModel(
+    place: NotePlace? = null,
+    caption: String = "",
+): JournalNote.Audio =
     JournalNote.Audio(
         uid = uid,
         mediaRef = contentUri,
@@ -141,6 +144,7 @@ fun AudioNoteEntity.toModel(place: NotePlace? = null): JournalNote.Audio =
         syncVersion = syncVersion,
         location = mapLocation(latitude, longitude, altitude, locationAccuracy, place),
         timeZoneId = timeZoneId,
+        caption = caption,
     )
 
 fun JournalNote.Audio.toEntity() =

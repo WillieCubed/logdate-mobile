@@ -108,6 +108,13 @@ interface TranscriptionService {
     fun getTranscriptionFlow(): SharedFlow<TranscriptionResult>
 
     /**
+     * Routes live audio capture without resetting accumulated transcription.
+     * Returns false when the requested input cannot be confirmed so the caller can
+     * recover text from the saved recording. Null restores the platform default.
+     */
+    fun updatePreferredInputDevice(deviceId: String?): Boolean = false
+
+    /**
      * Starts a transcription session from live audio
      * @return typed acknowledgement of whether the service owns a live session
      */

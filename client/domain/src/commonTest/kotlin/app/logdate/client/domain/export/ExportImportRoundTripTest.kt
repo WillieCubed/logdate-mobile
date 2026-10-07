@@ -198,6 +198,7 @@ class ExportImportRoundTripTest {
             val audio = destNotesRepo.getNoteById(noteAudio)
             assertTrue(audio is JournalNote.Audio, "Should be audio note")
             assertEquals("file:///storage/audio/voice_memo.m4a", audio.mediaRef)
+            assertEquals("A walk by the water", audio.caption)
         }
 
     @Test
@@ -556,6 +557,7 @@ class ExportImportRoundTripTest {
                 mediaRef = "file:///storage/audio/voice_memo.m4a",
                 durationMs = 45000,
                 syncVersion = 17,
+                caption = "A walk by the water",
             )
         val textWithLocationNote =
             JournalNote.Text(

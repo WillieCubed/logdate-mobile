@@ -70,11 +70,16 @@ fun NoteEditorToolbar(
     autoSaveStatus: AutoSaveStatus? = null,
     actionsVisible: Boolean = true,
     actionsEnabled: Boolean = true,
+    optionsVisible: Boolean = true,
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
+    LaunchedEffect(optionsVisible, actionsVisible) {
+        if (!optionsVisible || !actionsVisible) showMenu = false
+    }
+
     Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = Spacing.xs),
+        modifier = modifier.fillMaxWidth().padding(Spacing.md),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -109,7 +114,7 @@ fun NoteEditorToolbar(
                     )
                 }
 
-                if (draftCount > 0) {
+                if (optionsVisible && draftCount > 0) {
                     FilledTonalIconButton(
                         onClick = { onShowDrafts() },
                         enabled = actionsEnabled,
@@ -149,27 +154,29 @@ fun NoteEditorToolbar(
                     )
                 }
 
-                FilledTonalIconButton(
-                    onClick = { showMenu = true },
-                    enabled = actionsEnabled,
-                ) {
-                    Icon(
-                        painter = PlatformIcons.more(),
-                        contentDescription = stringResource(Res.string.more_options),
-                    )
-
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false },
+                if (optionsVisible) {
+                    FilledTonalIconButton(
+                        onClick = { showMenu = true },
+                        enabled = actionsEnabled,
                     ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.manage_drafts)) },
-                            enabled = actionsEnabled,
-                            onClick = {
-                                showMenu = false
-                                onShowDrafts()
-                            },
+                        Icon(
+                            painter = PlatformIcons.more(),
+                            contentDescription = stringResource(Res.string.more_options),
                         )
+
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(Res.string.manage_drafts)) },
+                                enabled = actionsEnabled,
+                                onClick = {
+                                    showMenu = false
+                                    onShowDrafts()
+                                },
+                            )
+                        }
                     }
                 }
             }

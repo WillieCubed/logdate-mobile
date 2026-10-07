@@ -169,7 +169,7 @@ fun TextBlockContent(
                 ),
             readOnly = readOnly,
             decorationBox = { innerTextField ->
-                Box(modifier = Modifier.padding(Spacing.md)) {
+                Box(modifier = Modifier.padding(Spacing.lg)) {
                     if (fieldValue.text.isEmpty()) {
                         Text(
                             text = stringResource(Res.string.whats_on_your_mind),

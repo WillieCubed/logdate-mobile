@@ -183,6 +183,8 @@ enum class PendingMediaType {
  *   recording side.
  * @property timeZoneId IANA id of the zone the device was in when the media was
  *   started, or null for a record written before the zone was stored.
+ * @property position Index among the draft's editable, persisted blocks, or null
+ *   for a record written before block ordering was stored.
  */
 @Serializable
 data class PendingMediaRecord(
@@ -192,4 +194,7 @@ data class PendingMediaRecord(
     val createdAt: Instant,
     val filePath: String? = null,
     val timeZoneId: String? = null,
+    val position: Int? = null,
+    val caption: String = "",
+    val transcription: String = "",
 )

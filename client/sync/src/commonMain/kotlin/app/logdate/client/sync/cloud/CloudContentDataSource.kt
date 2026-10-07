@@ -155,6 +155,7 @@ class DefaultCloudContentDataSource(
                 when (this) {
                     is JournalNote.Image -> caption.takeIf { it.isNotBlank() }?.let { encryptNoteCaption(uid, it) }
                     is JournalNote.Video -> caption.takeIf { it.isNotBlank() }?.let { encryptNoteCaption(uid, it) }
+                    is JournalNote.Audio -> encryptNoteCaption(uid, caption)
                     else -> null
                 },
             photoPresentation = (this as? JournalNote.Image)?.presentation?.name,
@@ -192,6 +193,7 @@ class DefaultCloudContentDataSource(
                 when (this) {
                     is JournalNote.Image -> encryptNoteCaption(uid, caption)
                     is JournalNote.Video -> encryptNoteCaption(uid, caption)
+                    is JournalNote.Audio -> encryptNoteCaption(uid, caption)
                     else -> null
                 },
             photoPresentation = (this as? JournalNote.Image)?.presentation?.name,
@@ -255,6 +257,7 @@ class DefaultCloudContentDataSource(
                     lastUpdated = lastUpdated,
                     mediaRef = mediaUri ?: "",
                     durationMs = durationMs,
+                    caption = decryptNoteCaption(uid, caption.orEmpty()),
                     location = decryptNoteLocation(uid, location),
                     syncVersion = serverVersion,
                 )

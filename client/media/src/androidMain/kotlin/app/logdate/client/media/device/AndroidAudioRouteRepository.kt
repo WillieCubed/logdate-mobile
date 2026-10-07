@@ -5,7 +5,10 @@ import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
 class AndroidAudioRouteRepository(
@@ -15,6 +18,15 @@ class AndroidAudioRouteRepository(
     private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val _inputDevices = MutableStateFlow(buildInputState())
     private val _outputDevices = MutableStateFlow(buildOutputState())
+    private var requestedInputId = _inputDevices.value.selectedDeviceId
+    private val inputRequests =
+        MutableSharedFlow<String?>(replay = 1, extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST).apply {
+            tryEmit(requestedInputId)
+        }
+    private val routeStateLock = Any()
+    private var recordingActive = false
+    private var routedInputId: String? = null
+    private var inputRoutingError: String? = null
 
     private val deviceCallback =
         object : AudioDeviceCallback() {
@@ -29,6 +41,20 @@ class AndroidAudioRouteRepository(
 
     override val inputDevices: StateFlow<MediaDeviceSelectionUiState> = _inputDevices
     override val outputDevices: StateFlow<MediaDeviceSelectionUiState> = _outputDevices
+    override val requestedInputDeviceIds: SharedFlow<String?> = inputRequests
+
+    override fun updateRecordingInputDevice(
+        deviceId: String?,
+        isRecording: Boolean,
+        error: String?,
+    ) {
+        synchronized(routeStateLock) {
+            recordingActive = isRecording
+            routedInputId = deviceId
+            inputRoutingError = error
+            refreshDevices()
+        }
+    }
 
     init {
         audioManager.registerAudioDeviceCallback(deviceCallback, null)
@@ -39,7 +65,11 @@ class AndroidAudioRouteRepository(
         val selectedDevice =
             audioManager
                 .getDevices(AudioManager.GET_DEVICES_INPUTS)
-                .firstOrNull { AndroidAudioRouteDevices.deviceKey(it, MediaDeviceKind.AUDIO_INPUT) == deviceId }
+                .firstOrNull {
+                    it.isSource &&
+                        isMicrophoneInputType(it.type) &&
+                        AndroidAudioRouteDevices.deviceKey(it, MediaDeviceKind.AUDIO_INPUT) == deviceId
+                }
 
         if (selectedDevice == null) {
             Napier.w("Ignored unavailable microphone route selection: $deviceId")
@@ -47,7 +77,7 @@ class AndroidAudioRouteRepository(
         }
 
         AndroidAudioRouteDevices.setPreferredInputDeviceId(appContext, deviceId)
-        refreshDevices()
+        refreshDevices(forceInputRequest = true)
     }
 
     override fun selectOutputDevice(deviceId: String) {
@@ -65,16 +95,28 @@ class AndroidAudioRouteRepository(
         refreshDevices()
     }
 
-    private fun refreshDevices() {
-        _inputDevices.value = buildInputState()
-        _outputDevices.value = buildOutputState()
+    private fun refreshDevices(forceInputRequest: Boolean = false) {
+        synchronized(routeStateLock) {
+            val requested = buildInputState()
+            if (forceInputRequest || requestedInputId != requested.selectedDeviceId) {
+                requestedInputId = requested.selectedDeviceId
+                inputRequests.tryEmit(requestedInputId)
+            }
+            _inputDevices.value =
+                if (recordingActive) {
+                    MediaDeviceSelectionResolver.resolveRecordingAudioInput(requested, routedInputId, inputRoutingError)
+                } else {
+                    requested
+                }
+            _outputDevices.value = buildOutputState()
+        }
     }
 
     private fun buildInputState(): MediaDeviceSelectionUiState {
         val devices =
             audioManager
                 .getDevices(AudioManager.GET_DEVICES_INPUTS)
-                .filter { it.isSource }
+                .filter { it.isSource && isMicrophoneInputType(it.type) }
                 .map { it.toMediaDeviceUiState(MediaDeviceKind.AUDIO_INPUT) }
 
         return MediaDeviceSelectionResolver.resolveAudioInput(
@@ -149,7 +191,9 @@ object AndroidAudioRouteDevices {
         val deviceId = preferredDeviceId ?: getPreferredInputDeviceId(context)
         return audioManager
             .getDevices(AudioManager.GET_DEVICES_INPUTS)
-            .firstOrNull { it.isSource && deviceKey(it, MediaDeviceKind.AUDIO_INPUT) == deviceId }
+            .firstOrNull {
+                it.isSource && isMicrophoneInputType(it.type) && deviceKey(it, MediaDeviceKind.AUDIO_INPUT) == deviceId
+            }
     }
 
     fun findPreferredOutputDevice(
@@ -178,13 +222,29 @@ object AndroidAudioRouteDevices {
 private fun AudioDeviceInfo.isSelectableMediaOutput(): Boolean =
     type != AudioDeviceInfo.TYPE_BUILTIN_EARPIECE && type != AudioDeviceInfo.TYPE_TELEPHONY
 
+/** Source ports also include system capture streams, which cannot serve as microphone routes. */
+internal fun isMicrophoneInputType(type: Int): Boolean =
+    when (type) {
+        AudioDeviceInfo.TYPE_BUILTIN_MIC,
+        AudioDeviceInfo.TYPE_WIRED_HEADSET,
+        AudioDeviceInfo.TYPE_USB_DEVICE,
+        AudioDeviceInfo.TYPE_USB_ACCESSORY,
+        AudioDeviceInfo.TYPE_USB_HEADSET,
+        AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+        AudioDeviceInfo.TYPE_BLE_HEADSET,
+        AudioDeviceInfo.TYPE_LINE_ANALOG,
+        AudioDeviceInfo.TYPE_LINE_DIGITAL,
+        -> true
+        else -> false
+    }
+
 /**
  * Groups the profiles of one physical device together.
  *
  * Bluetooth hardware is reported once per profile — A2DP, hands-free and LE Audio — all sharing
  * one address, so the address is the identity. Anything without an address is its own device.
  */
-private fun AudioDeviceInfo.routeGroupId(): String? = address?.takeIf { it.isNotBlank() }
+private fun AudioDeviceInfo.routeGroupId(): String? = address.takeIf { it.isNotBlank() }
 
 /** Which profile wins when one device is reported several times. Higher is better. */
 private fun AudioDeviceInfo.routeQualityRank(): Int =

@@ -55,9 +55,17 @@ data class MediaDeviceSelectionUiState(
     val selectedDeviceId: String?,
     val isSelectionControllable: Boolean = true,
     val routeControlMessage: String? = null,
+    val isSelectionConfirmed: Boolean = true,
 ) {
     val selectedDevice: MediaDeviceUiState?
-        get() = devices.firstOrNull { it.id == selectedDeviceId } ?: devices.firstOrNull { it.isAvailable }
+        get() =
+            if (isSelectionConfirmed) {
+                devices.firstOrNull {
+                    it.id == selectedDeviceId
+                } ?: devices.firstOrNull { it.isAvailable }
+            } else {
+                null
+            }
 }
 
 object DefaultMediaDevices {

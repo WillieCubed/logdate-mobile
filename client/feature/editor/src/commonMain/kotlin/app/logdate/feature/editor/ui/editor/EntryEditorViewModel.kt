@@ -91,6 +91,7 @@ class EntryEditorViewModel(
     // already initialized this ViewModel so a replay cannot overwrite edits that survived the
     // configuration change. A failed load clears the request and remains retryable.
     private var activeLoadRequest: LoadRequest? = null
+    private var loadGeneration = 0L
     private var initializedPhotoPromptUri: String? = null
 
     init {
@@ -108,8 +109,12 @@ class EntryEditorViewModel(
         viewModelScope.launch {
             val defaults = contentLoader.loadDefaultJournals()
             if (defaults.isNotEmpty()) {
-                mutateEditorContent { state ->
-                    if (state.selectedJournalIds.isEmpty() && !state.hasJournalSelectionChanges) {
+                mutableEditorState.update { state ->
+                    if (!state.isEditingLocked &&
+                        !state.shouldExit &&
+                        state.selectedJournalIds.isEmpty() &&
+                        !state.hasJournalSelectionChanges
+                    ) {
                         state.copy(selectedJournalIds = defaults)
                     } else {
                         state
@@ -295,25 +300,155 @@ class EntryEditorViewModel(
     }
 
     /**
-     * Updates an existing block in the editor.
+     * Updates an existing block in the editor. When [baseBlock] is supplied, only fields
+     * changed from that rendered snapshot are applied to the latest stored block.
      */
-    fun updateBlock(updatedBlock: EntryBlockUiState) {
+    fun updateBlock(
+        updatedBlock: EntryBlockUiState,
+        baseBlock: EntryBlockUiState? = null,
+    ) {
+        if (editorState.value.isReadOnly(updatedBlock.id)) {
+            mutableEditorState.update { it.copy(errorMessage = "This memory has already been saved and cannot be changed here.") }
+            return
+        }
         mutateEditorContent { currentState ->
             if (currentState.isReadOnly(updatedBlock.id)) {
                 currentState
             } else {
-                val existingBlock = currentState.blocks.find { it.id == updatedBlock.id }
-                val hasContentChanged = existingBlock != updatedBlock
+                val existingBlock =
+                    currentState.blocks.find { it.id == updatedBlock.id }
+                        ?: return@mutateEditorContent currentState
+                if (existingBlock::class != updatedBlock::class || existingBlock == updatedBlock) {
+                    return@mutateEditorContent currentState
+                }
 
+                if (baseBlock != null && (baseBlock.id != updatedBlock.id || baseBlock::class != updatedBlock::class)) {
+                    return@mutateEditorContent currentState
+                }
+                val patchedBlock = if (baseBlock == null) updatedBlock else applyBlockChanges(existingBlock, updatedBlock, baseBlock)
+                val effectiveBlock =
+                    mergeCompletedMedia(existingBlock, patchedBlock, baseBlock == null)
+                        ?: return@mutateEditorContent currentState
+                if (effectiveBlock == existingBlock) return@mutateEditorContent currentState
                 currentState.copy(
                     blocks =
                         currentState.blocks.map {
-                            if (it.id == updatedBlock.id) updatedBlock else it
+                            if (it.id == updatedBlock.id) effectiveBlock else it
                         },
-                    isModified = hasContentChanged || currentState.isModified,
+                    isModified = true,
                 )
             }
         }
+    }
+
+    private fun applyBlockChanges(
+        existing: EntryBlockUiState,
+        updated: EntryBlockUiState,
+        base: EntryBlockUiState,
+    ): EntryBlockUiState =
+        when (updated) {
+            is TextBlockUiState -> applyTextChanges(existing as TextBlockUiState, updated, base as TextBlockUiState)
+            is ImageBlockUiState -> {
+                existing as ImageBlockUiState
+                base as ImageBlockUiState
+                existing.copy(
+                    timestamp = changed(existing.timestamp, updated.timestamp, base.timestamp),
+                    location = changed(existing.location, updated.location, base.location),
+                    timeZoneId = changed(existing.timeZoneId, updated.timeZoneId, base.timeZoneId),
+                    uri = changed(existing.uri, updated.uri, base.uri),
+                    caption = changed(existing.caption, updated.caption, base.caption),
+                    presentation = changed(existing.presentation, updated.presentation, base.presentation),
+                )
+            }
+            is VideoBlockUiState -> {
+                existing as VideoBlockUiState
+                base as VideoBlockUiState
+                existing.copy(
+                    timestamp = changed(existing.timestamp, updated.timestamp, base.timestamp),
+                    location = changed(existing.location, updated.location, base.location),
+                    timeZoneId = changed(existing.timeZoneId, updated.timeZoneId, base.timeZoneId),
+                    uri = changed(existing.uri, updated.uri, base.uri),
+                    caption = changed(existing.caption, updated.caption, base.caption),
+                    durationMs = changed(existing.durationMs, updated.durationMs, base.durationMs),
+                )
+            }
+            is CameraBlockUiState -> {
+                existing as CameraBlockUiState
+                base as CameraBlockUiState
+                existing.copy(
+                    timestamp = changed(existing.timestamp, updated.timestamp, base.timestamp),
+                    location = changed(existing.location, updated.location, base.location),
+                    timeZoneId = changed(existing.timeZoneId, updated.timeZoneId, base.timeZoneId),
+                    uri = changed(existing.uri, updated.uri, base.uri),
+                    caption = changed(existing.caption, updated.caption, base.caption),
+                    mediaType = changed(existing.mediaType, updated.mediaType, base.mediaType),
+                    durationMs = changed(existing.durationMs, updated.durationMs, base.durationMs),
+                )
+            }
+            is AudioBlockUiState -> {
+                existing as AudioBlockUiState
+                base as AudioBlockUiState
+                existing.copy(
+                    timestamp = changed(existing.timestamp, updated.timestamp, base.timestamp),
+                    location = changed(existing.location, updated.location, base.location),
+                    timeZoneId = changed(existing.timeZoneId, updated.timeZoneId, base.timeZoneId),
+                    captureState = changed(existing.captureState, updated.captureState, base.captureState),
+                    caption = changed(existing.caption, updated.caption, base.caption),
+                    transcription = changed(existing.transcription, updated.transcription, base.transcription),
+                )
+            }
+        }
+
+    private fun <T> changed(
+        current: T,
+        next: T,
+        original: T,
+    ): T = if (next != original) next else current
+
+    private fun applyTextChanges(
+        existing: TextBlockUiState,
+        updated: TextBlockUiState,
+        base: TextBlockUiState,
+    ): TextBlockUiState =
+        existing.copy(
+            timestamp = changed(existing.timestamp, updated.timestamp, base.timestamp),
+            location = changed(existing.location, updated.location, base.location),
+            timeZoneId = changed(existing.timeZoneId, updated.timeZoneId, base.timeZoneId),
+            content = changed(existing.content, updated.content, base.content),
+        )
+
+    private fun mergeCompletedMedia(
+        existing: EntryBlockUiState,
+        updated: EntryBlockUiState,
+        preserveLegacyMetadata: Boolean,
+    ): EntryBlockUiState? {
+        if (existing is AudioBlockUiState && updated is AudioBlockUiState) {
+            if ((
+                    existing.captureState is AudioCaptureState.Ready &&
+                        (updated.captureState is AudioCaptureState.Recording || updated.captureState is AudioCaptureState.Stopping)
+                ) ||
+                (existing.captureState is AudioCaptureState.Stopping && updated.captureState is AudioCaptureState.Recording)
+            ) {
+                return null
+            }
+            if (preserveLegacyMetadata && existing.captureState != updated.captureState) {
+                return updated.copy(caption = existing.caption, transcription = updated.transcription.ifBlank { existing.transcription })
+            }
+        }
+        if (preserveLegacyMetadata &&
+            existing is MediaBlockUiState &&
+            updated is MediaBlockUiState &&
+            existing.uri == null &&
+            updated.uri != null
+        ) {
+            return when (updated) {
+                is ImageBlockUiState -> updated.copy(caption = existing.caption)
+                is VideoBlockUiState -> updated.copy(caption = existing.caption)
+                is CameraBlockUiState -> updated.copy(caption = existing.caption)
+                is AudioBlockUiState -> updated
+            }
+        }
+        return updated
     }
 
     /**
@@ -338,16 +473,30 @@ class EntryEditorViewModel(
      * Also clears the expanded block ID if the deleted block was currently expanded.
      */
     fun removeBlock(blockId: Uuid) {
-        mutateEditorContent { currentState ->
-            val shouldClearExpanded = currentState.expandedBlockId == blockId
-            val filteredBlocks = currentState.blocks.filterNot { it.id == blockId }
-
-            currentState.copy(
-                blocks = filteredBlocks,
-                expandedBlockId = if (shouldClearExpanded) null else currentState.expandedBlockId,
-                isModified = true,
-            )
+        if (editorState.value.isReadOnly(blockId)) {
+            mutableEditorState.update { it.copy(errorMessage = "This memory has already been saved and cannot be removed here.") }
+            return
         }
+        val block = mutableEditorState.value.blocks.find { it.id == blockId } ?: return
+        if (block is AudioBlockUiState &&
+            (block.captureState is AudioCaptureState.Recording || block.captureState is AudioCaptureState.Stopping)
+        ) {
+            mutableEditorState.update { it.copy(errorMessage = "Finish recording before removing this memory.") }
+            return
+        }
+        val removed =
+            mutateEditorContent { currentState ->
+                if (currentState.blocks.none { it.id == blockId }) return@mutateEditorContent currentState
+                val shouldClearExpanded = currentState.expandedBlockId == blockId
+                val filteredBlocks = currentState.blocks.filterNot { it.id == blockId }
+
+                currentState.copy(
+                    blocks = filteredBlocks,
+                    expandedBlockId = if (shouldClearExpanded) null else currentState.expandedBlockId,
+                    isModified = true,
+                )
+            }
+        if (removed) audioBlockFinalizers.remove(blockId)
     }
 
     /**
@@ -370,6 +519,8 @@ class EntryEditorViewModel(
             }
         }
     }
+
+    fun autoSaveLatestEntry() = autoSaveEntry(currentDraftPersistenceState(editorState.value))
 
     /**
      * Suspends until the local draft repository finishes persisting [state].
@@ -922,18 +1073,20 @@ class EntryEditorViewModel(
     fun loadDraft(draftId: Uuid) {
         val request = LoadRequest.Draft(draftId)
         if (activeLoadRequest == request) return
+        if (mutableEditorState.value.isEditingLocked || mutableEditorState.value.shouldExit) return
         activeLoadRequest = request
+        val generation = ++loadGeneration
         val requestedContentRevision = mutableEditorState.value.contentRevision
         viewModelScope.launch {
             draftPersistenceMutex.withLock {
                 draftManager.loadDraft(draftId).fold(
                     onSuccess = { loaded ->
                         val recoveredBlocks = recoverPendingAudio(loaded.blocks)
-                        if (mutableEditorState.value.contentRevision != requestedContentRevision) {
+                        if (generation != loadGeneration || mutableEditorState.value.contentRevision != requestedContentRevision) {
                             return@withLock
                         }
                         mutateEditorContent { currentState ->
-                            if (currentState.contentRevision != requestedContentRevision) {
+                            if (generation != loadGeneration || currentState.contentRevision != requestedContentRevision) {
                                 currentState
                             } else {
                                 currentState.copy(
@@ -949,6 +1102,7 @@ class EntryEditorViewModel(
                         }
                     },
                     onFailure = { e ->
+                        if (generation != loadGeneration) return@withLock
                         if (activeLoadRequest == request) activeLoadRequest = null
                         Napier.e("Failed to load draft: ${e.message}", e)
                         mutableEditorState.update {
@@ -1196,14 +1350,26 @@ class EntryEditorViewModel(
     ) {
         val request = LoadRequest.Existing(entryId, journalId)
         if (activeLoadRequest == request) return
+        if (mutableEditorState.value.isEditingLocked || mutableEditorState.value.shouldExit) return
         activeLoadRequest = request
+        val generation = ++loadGeneration
+        val requestedContentRevision = mutableEditorState.value.contentRevision
         viewModelScope.launch {
             mutableEditorState.update { it.copy(isLoading = true) }
 
             contentLoader.loadEntry(entryId).fold(
                 onSuccess = { block ->
                     mutableEditorState.update { currentState ->
+                        if (generation != loadGeneration ||
+                            currentState.contentRevision != requestedContentRevision ||
+                            currentState.isEditingLocked ||
+                            currentState.shouldExit
+                        ) {
+                            return@update currentState
+                        }
                         currentState.copy(
+                            contentRevision = currentState.contentRevision + 1,
+                            expandedBlockId = null,
                             blocks = listOf(block),
                             selectedJournalIds = journalId?.let(::listOf) ?: currentState.selectedJournalIds,
                             hasJournalSelectionChanges = false,
@@ -1214,6 +1380,7 @@ class EntryEditorViewModel(
                     }
                 },
                 onFailure = { e ->
+                    if (generation != loadGeneration || mutableEditorState.value.contentRevision != requestedContentRevision) return@fold
                     if (activeLoadRequest == request) activeLoadRequest = null
                     Napier.e("Failed to load existing entry: $entryId", e)
                     mutableEditorState.update {

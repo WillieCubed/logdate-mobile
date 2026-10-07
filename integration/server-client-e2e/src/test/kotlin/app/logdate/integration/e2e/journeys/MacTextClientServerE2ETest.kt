@@ -54,7 +54,14 @@ class MacTextClientServerE2ETest {
     @Test
     fun `clearing a video caption is encrypted and reaches another device`() = runTest { verifyCaptionRemoval(video = true) }
 
-    private suspend fun verifyCaptionRemoval(video: Boolean) {
+    @Test
+    fun `clearing an audio caption is encrypted and reaches another device`() =
+        runTest { verifyCaptionRemoval(video = false, audio = true) }
+
+    private suspend fun verifyCaptionRemoval(
+        video: Boolean,
+        audio: Boolean = false,
+    ) {
         withServerClientHarness {
             val token =
                 apiClient
@@ -76,7 +83,15 @@ class MacTextClientServerE2ETest {
             val now = Instant.fromEpochMilliseconds(System.currentTimeMillis())
             val id = Uuid.random()
             val original =
-                if (video) {
+                if (audio) {
+                    JournalNote.Audio(
+                        uid = id,
+                        creationTimestamp = now,
+                        lastUpdated = now,
+                        mediaRef = "audio.m4a",
+                        caption = "Private caption",
+                    )
+                } else if (video) {
                     JournalNote.Video(id, now, now, mediaRef = "video.mp4", caption = "Private caption")
                 } else {
                     JournalNote.Image(id, now, now, mediaRef = "photo.jpg", caption = "Private caption")
@@ -94,7 +109,8 @@ class MacTextClientServerE2ETest {
                     when (val note = received) {
                         is JournalNote.Image -> note.copy(caption = caption)
                         is JournalNote.Video -> note.copy(caption = caption)
-                        else -> error("Expected a photo or video")
+                        is JournalNote.Audio -> note.copy(caption = caption)
+                        else -> error("Expected a media note")
                     }
                 val upload = writer.updateNote(token, edited).getOrThrow()
                 val wire =
@@ -114,7 +130,8 @@ class MacTextClientServerE2ETest {
                     when (val note = received) {
                         is JournalNote.Image -> note.caption
                         is JournalNote.Video -> note.caption
-                        else -> error("Expected a photo or video")
+                        is JournalNote.Audio -> note.caption
+                        else -> error("Expected a media note")
                     }
                 assertEquals(caption, actualCaption)
                 assertEquals(id, received.uid)

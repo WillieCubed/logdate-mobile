@@ -525,6 +525,7 @@ class RestoreUserDataUseCase(
                     lastUpdated = updatedAt,
                     mediaRef = resolvedMediaRef ?: return null,
                     durationMs = this.durationMs ?: 0,
+                    caption = caption.orEmpty(),
                     timeZoneId = timeZone,
                     syncVersion = syncVersion,
                     location = location,

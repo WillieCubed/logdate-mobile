@@ -111,8 +111,23 @@ interface AudioRecordingManager {
      */
     val isRecording: Boolean
 
+    /** Whether the platform is still confirming a requested recording start. */
+    val isStartingRecording: Boolean
+        get() = false
+
+    fun getRecordingStartingFlow(): Flow<Boolean> = emptyFlow()
+
+    /** Identity of the block owning the current session, when the platform exposes it. */
+    val currentRecordingTargetNoteId: Uuid?
+        get() = null
+
+    val currentRecordingPaused: Boolean
+        get() = false
+
+    fun getRecordingPausedFlow(): Flow<Boolean> = emptyFlow()
+
     /**
-     * Filesystem path of the active recording target, or null when nothing is recording.
+     * Filesystem path of an active or completed recording awaiting handoff, or null.
      *
      * Surfaced so the editor can write the path into the entry draft's pending-media list
      * while a recording is in flight — that's the recovery anchor used to validate or

@@ -7,12 +7,14 @@ import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.media.AudioRouting
 import android.media.MediaRecorder
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import app.logdate.client.media.device.AndroidAudioRouteDevices
+import app.logdate.client.media.device.MediaDeviceKind
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -328,6 +330,7 @@ class AudioRecordingService : Service() {
             }
             var recorder: MediaRecorder? = null
             try {
+                _recordingState.update { it.copy(routedInputDeviceId = null, inputRoutingError = null) }
                 val file = resolveOutputFile(outputPath)
                 outputFile = file
                 recorder = createRecorder(recordingFileFor(file), inputDeviceId)
@@ -347,6 +350,7 @@ class AudioRecordingService : Service() {
                         error = null,
                     )
                 }
+                publishInputRoute(recorder)
                 monitorRecording()
                 Napier.d("Recording started successfully")
             } catch (e: Exception) {
@@ -396,6 +400,14 @@ class AudioRecordingService : Service() {
             setOnInfoListener { _, what, _ -> onRecorderInfo(what) }
             setOnErrorListener { _, what, extra -> onRecorderError(what, extra) }
             applyPreferredInputDevice(inputDeviceId)
+            addOnRoutingChangedListener(
+                AudioRouting.OnRoutingChangedListener { routing ->
+                    synchronized(recorderLock) {
+                        if (routing === mediaRecorder && _recordingState.value.isRecording) publishInputRoute(this)
+                    }
+                },
+                null,
+            )
         }
     }
 
@@ -608,15 +620,30 @@ class AudioRecordingService : Service() {
         synchronized(recorderLock) { mediaRecorder?.applyPreferredInputDevice(inputDeviceId) }
     }
 
+    private fun publishInputRoute(recorder: MediaRecorder) {
+        try {
+            val deviceId = recorder.routedDevice?.let { AndroidAudioRouteDevices.deviceKey(it, MediaDeviceKind.AUDIO_INPUT) }
+            _recordingState.update { state ->
+                state.copy(routedInputDeviceId = deviceId ?: state.routedInputDeviceId.takeIf { state.isPaused })
+            }
+        } catch (e: Exception) {
+            Napier.w("Could not verify the recording microphone route", e)
+        }
+    }
+
     private fun MediaRecorder.applyPreferredInputDevice(inputDeviceId: String?) {
         val preferredDevice = AndroidAudioRouteDevices.findPreferredInputDevice(this@AudioRecordingService, inputDeviceId)
-        if (preferredDevice == null) {
-            Napier.d("Using system microphone route for recording")
-            return
+        try {
+            val applied = setPreferredDevice(preferredDevice)
+            _recordingState.update {
+                it.copy(inputRoutingError = if (applied) null else "Could not switch microphone. Recording continues on the current input.")
+            }
+            if (this === mediaRecorder) publishInputRoute(this)
+            Napier.d("Preferred recording microphone route applied=$applied")
+        } catch (e: Exception) {
+            Napier.e("Could not apply the recording microphone route", e)
+            _recordingState.update { it.copy(inputRoutingError = "Could not switch microphone. Recording continues on the current input.") }
         }
-
-        val applied = setPreferredDevice(preferredDevice)
-        Napier.d("Preferred recording microphone ${preferredDevice.productName} applied=$applied")
     }
 }
 
@@ -631,6 +658,8 @@ data class RecordingServiceState(
     val startTime: Long = 0,
     val durationSeconds: Int = 0,
     val audioLevel: Float = 0f,
+    val routedInputDeviceId: String? = null,
+    val inputRoutingError: String? = null,
     val recordedFilePath: String? = null,
     val error: String? = null,
 )

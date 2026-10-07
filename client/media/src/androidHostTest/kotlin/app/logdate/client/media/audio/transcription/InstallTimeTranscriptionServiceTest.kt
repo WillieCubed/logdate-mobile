@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class InstallTimeTranscriptionServiceTest {
@@ -47,7 +48,28 @@ class InstallTimeTranscriptionServiceTest {
             )
         }
 
+    @Test
+    fun installedFeatureForwardsMicrophoneRequestsAndRejections() =
+        runTest {
+            val delegate = FakeTranscriptionService()
+            val service = InstallTimeTranscriptionService(backgroundScope) { delegate }
+            assertTrue(service.updatePreferredInputDevice("usb"))
+            assertEquals("usb", delegate.inputRequest)
+            delegate.inputAccepted = false
+            assertFalse(service.updatePreferredInputDevice("headset"))
+            assertEquals("headset", delegate.inputRequest)
+            assertFalse(InstallTimeTranscriptionService(backgroundScope) { null }.updatePreferredInputDevice("usb"))
+        }
+
     private class FakeTranscriptionService : TranscriptionService {
+        var inputRequest: String? = null
+        var inputAccepted = true
+
+        override fun updatePreferredInputDevice(deviceId: String?): Boolean {
+            inputRequest = deviceId
+            return inputAccepted
+        }
+
         private val results = MutableSharedFlow<TranscriptionResult>(replay = 1)
 
         override fun getTranscriptionFlow(): SharedFlow<TranscriptionResult> = results

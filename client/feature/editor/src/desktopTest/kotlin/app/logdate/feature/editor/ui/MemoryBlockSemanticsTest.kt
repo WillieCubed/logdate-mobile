@@ -3,6 +3,7 @@ package app.logdate.feature.editor.ui
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
@@ -11,7 +12,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.v2.runDesktopComposeUiTest
+import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.blocks.MemoryBlockSurface
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
@@ -28,7 +29,7 @@ class MemoryBlockSemanticsTest {
     @Test
     fun `every memory type offers the same edit and remove actions`() {
         listOf(TextBlockUiState(), ImageBlockUiState(), AudioBlockUiState(), VideoBlockUiState()).forEach { block ->
-            runDesktopComposeUiTest(width = 500, height = 500) {
+            runSkikoComposeUiTest(size = Size(500f, 500f)) {
                 var selected = false
                 var removed = false
                 setContent {
@@ -51,7 +52,7 @@ class MemoryBlockSemanticsTest {
 
     @Test
     fun `first empty text memory is ready to type`() =
-        runDesktopComposeUiTest(width = 500, height = 700) {
+        runSkikoComposeUiTest(size = Size(500f, 700f)) {
             val block = TextBlockUiState()
             setContent {
                 MaterialTheme {
@@ -79,7 +80,7 @@ class MemoryBlockSemanticsTest {
 
     @Test
     fun `selecting and adding keeps the entry sequence visible`() =
-        runDesktopComposeUiTest(width = 700, height = 900) {
+        runSkikoComposeUiTest(size = Size(700f, 900f)) {
             val first = TextBlockUiState(content = "First memory")
             val second = TextBlockUiState(content = "Second memory")
             val blocks = mutableStateOf(listOf(first, second))
@@ -114,7 +115,7 @@ class MemoryBlockSemanticsTest {
 
     @Test
     fun `focusing a text memory opens a writing surface in the entry`() =
-        runDesktopComposeUiTest(width = 700, height = 900) {
+        runSkikoComposeUiTest(size = Size(700f, 900f)) {
             val first = TextBlockUiState(content = "First memory")
             val second = TextBlockUiState(content = "Second memory")
             val selected = mutableStateOf(first.id)

@@ -68,7 +68,10 @@ fun AudioBlockEditor(
     // (lastTargetNoteId) at a time, so a second block's recording would silently steal ownership
     // from the first.
     val audioViewModel: AudioViewModel = koinViewModel(key = block.id.toString())
-    LaunchedEffect(audioViewModel) { onResolverReady(block.id, audioViewModel) }
+    LaunchedEffect(audioViewModel, block.id) {
+        audioViewModel.attachToRecording(block.id)
+        onResolverReady(block.id, audioViewModel)
+    }
     val audioRouteRepository: AudioRouteRepository = koinInject()
     // Collect audio state from ViewModel
     val audioUiState by audioViewModel.uiState.collectAsState()
@@ -123,12 +126,13 @@ fun AudioBlockEditor(
 
     LaunchedEffect(
         audioUiState.isRecording,
+        audioUiState.isStartingRecording,
         audioUiState.recordingTargetNoteId,
         audioUiState.recordingFilePath,
         block.captureState,
     ) {
         val ownsActiveRecording =
-            audioUiState.isRecording && audioUiState.recordingTargetNoteId == block.id
+            (audioUiState.isRecording || audioUiState.isStartingRecording) && audioUiState.recordingTargetNoteId == block.id
         if (!ownsActiveRecording) return@LaunchedEffect
         val livePath = audioUiState.recordingFilePath
         val current = block.captureState

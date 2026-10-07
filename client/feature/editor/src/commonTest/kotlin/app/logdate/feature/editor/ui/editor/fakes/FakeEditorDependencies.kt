@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -36,6 +37,7 @@ import kotlin.uuid.Uuid
 
 class FakeJournalNotesRepository : JournalNotesRepository {
     private val notesFlow = MutableStateFlow<List<JournalNote>>(emptyList())
+    val getNoteGates = mutableMapOf<Uuid, CompletableDeferred<Unit>>()
     var createFailure: Throwable? = null
     var createGate: CompletableDeferred<Unit>? = null
 
@@ -55,7 +57,7 @@ class FakeJournalNotesRepository : JournalNotesRepository {
     override fun observeNotesInRange(
         start: Instant,
         end: Instant,
-    ): Flow<List<JournalNote>> = notesFlow
+    ): Flow<List<JournalNote>> = notesFlow.map { notes -> notes.filter { it.creationTimestamp in start..end } }
 
     override fun observeNotesPage(
         pageSize: Int,
@@ -66,7 +68,10 @@ class FakeJournalNotesRepository : JournalNotesRepository {
 
     override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = notesFlow
 
-    override suspend fun getNoteById(noteId: Uuid): JournalNote? = notesFlow.value.firstOrNull { it.uid == noteId }
+    override suspend fun getNoteById(noteId: Uuid): JournalNote? {
+        getNoteGates[noteId]?.await()
+        return notesFlow.value.firstOrNull { it.uid == noteId }
+    }
 
     override suspend fun create(note: JournalNote): Uuid {
         createGate?.await()
@@ -108,10 +113,16 @@ class FakeJournalNotesRepository : JournalNotesRepository {
 
 class FakeJournalContentRepository : JournalContentRepository {
     val addedJournalIds = mutableListOf<Uuid>()
+    val journalsByContent = mutableMapOf<Uuid, List<Journal>>()
+    val journalLoadGates = mutableMapOf<Uuid, CompletableDeferred<Unit>>()
 
     override fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>> = flowOf(emptyList())
 
-    override fun observeJournalsForContent(contentId: Uuid): Flow<List<Journal>> = flowOf(emptyList())
+    override fun observeJournalsForContent(contentId: Uuid): Flow<List<Journal>> =
+        flow {
+            journalLoadGates[contentId]?.await()
+            emit(journalsByContent[contentId].orEmpty())
+        }
 
     override suspend fun addContentToJournal(
         contentId: Uuid,

@@ -30,7 +30,7 @@ val editorFeatureModule: Module =
         factoryOf(::DraftManager)
         factoryOf(::ContentLoader)
 
-        factory<PendingAudioRecoverer> { DefaultPendingAudioRecoverer(durationResolver = get()) }
+        factory<PendingAudioRecoverer> { DefaultPendingAudioRecoverer(durationResolver = get(), recordingManager = get()) }
 
         viewModel {
             CameraViewModel(

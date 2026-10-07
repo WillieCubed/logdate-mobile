@@ -207,7 +207,7 @@ fun MainEditorContent(
                                 photoTileId = pickerTileIds.photoId,
                                 audioTileId = pickerTileIds.audioId,
                                 cameraTileId = pickerTileIds.cameraId,
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier.fillMaxSize().padding(start = Spacing.sm, top = Spacing.sm, end = Spacing.sm),
                             )
                         }
 

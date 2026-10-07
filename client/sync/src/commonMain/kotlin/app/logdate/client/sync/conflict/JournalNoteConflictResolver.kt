@@ -143,6 +143,7 @@ class JournalNoteConflictResolver : ConflictResolver<JournalNote> {
     ): ConflictResolution<JournalNote> {
         if (local.mediaRef == remote.mediaRef &&
             local.durationMs == remote.durationMs &&
+            local.caption == remote.caption &&
             local.location == remote.location
         ) {
             return ConflictResolution.KeepRemote(remote)

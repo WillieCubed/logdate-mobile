@@ -17,6 +17,7 @@ import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import app.logdate.client.media.audio.transcription.TranscriptionSessionTerminalizer
 import app.logdate.client.media.audio.transcription.TranscriptionStartResult
+import app.logdate.client.media.device.AndroidAudioRouteDevices
 import com.k2fsa.sherpa.onnx.OnlineRecognizerResult
 import com.k2fsa.sherpa.onnx.OnlineStream
 import io.github.aakira.napier.Napier
@@ -67,6 +68,32 @@ class SherpaOnnxTranscriptionService(
 
     private var stream: OnlineStream? = null
     private var audioRecord: AudioRecord? = null
+    private val inputRouteLock = Any()
+    private var preferredInputDeviceId: String? = null
+
+    override fun updatePreferredInputDevice(deviceId: String?): Boolean {
+        synchronized(inputRouteLock) {
+            preferredInputDeviceId = deviceId
+            return audioRecord?.let(::applyInputRoute) ?: true
+        }
+    }
+
+    private fun applyInputRoute(recorder: AudioRecord): Boolean {
+        return try {
+            val device = AndroidAudioRouteDevices.findPreferredInputDevice(context, preferredInputDeviceId)
+            if (preferredInputDeviceId != null && device == null) return false
+            if (!recorder.setPreferredDevice(device)) {
+                Napier.w("Could not apply the live transcription microphone route")
+                return false
+            }
+            recorder.recordingState != AudioRecord.RECORDSTATE_RECORDING ||
+                (recorder.routedDevice != null && (device == null || recorder.routedDevice.id == device.id))
+        } catch (e: Exception) {
+            Napier.e("Could not switch the live transcription microphone", e)
+            false
+        }
+    }
+
     private var recognitionJob: Job? = null
     private var refinementJob: Job? = null
     private var totalAcceptedSamples: Long = 0L
@@ -427,8 +454,9 @@ class SherpaOnnxTranscriptionService(
 
     override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult =
         withContext(Dispatchers.Default) {
-            val samples = AudioDecoder(context).decodeToMono16kHz(audioUri)
-                ?: return@withContext TranscriptionResult.Error(TranscriptionFailure.AudioError)
+            val samples =
+                AudioDecoder(context).decodeToMono16kHz(audioUri)
+                    ?: return@withContext TranscriptionResult.Error(TranscriptionFailure.AudioError)
             if (samples.isEmpty()) {
                 return@withContext TranscriptionResult.Error(TranscriptionFailure.NoSpeechDetected)
             }
@@ -438,12 +466,13 @@ class SherpaOnnxTranscriptionService(
                 fileVad.ensureInitialized()
                 samples.asSequenceChunks(BUFFER_SIZE_SHORTS).forEach(fileVad::acceptWaveform)
                 fileVad.flush()
-                val utterances = buildList {
-                    while (!fileVad.isEmpty()) {
-                        add(fileVad.front().samples.copyOf())
-                        fileVad.pop()
+                val utterances =
+                    buildList {
+                        while (!fileVad.isEmpty()) {
+                            add(fileVad.front().samples.copyOf())
+                            fileVad.pop()
+                        }
                     }
-                }
                 if (utterances.isEmpty()) {
                     return@withContext TranscriptionResult.Error(TranscriptionFailure.NoSpeechDetected)
                 }
@@ -589,8 +618,16 @@ class SherpaOnnxTranscriptionService(
             throw AudioCaptureException("AudioRecord failed to initialize")
         }
 
-        ar.startRecording()
-        audioRecord = ar
+        synchronized(inputRouteLock) {
+            try {
+                if (!applyInputRoute(ar)) throw AudioCaptureException("Could not apply transcription input")
+                ar.startRecording()
+                audioRecord = ar
+            } catch (e: Exception) {
+                ar.release()
+                throw e
+            }
+        }
         return ar
     }
 
@@ -723,8 +760,7 @@ class SherpaOnnxTranscriptionService(
             timestampsSeconds = result.timestamps.toList(),
         )
 
-    private fun samplesToMs(sampleCount: Long): Long =
-        ((sampleCount * 1000L) / SherpaOnnxRecognizerProvider.SAMPLE_RATE).coerceAtLeast(0L)
+    private fun samplesToMs(sampleCount: Long): Long = ((sampleCount * 1000L) / SherpaOnnxRecognizerProvider.SAMPLE_RATE).coerceAtLeast(0L)
 
     private fun shortsToFloats(
         shorts: ShortArray,
@@ -735,13 +771,21 @@ class SherpaOnnxTranscriptionService(
     }
 
     private fun stopAudioRecord() {
-        try {
-            audioRecord?.stop()
-            audioRecord?.release()
-        } catch (e: Exception) {
-            Napier.e("Error stopping AudioRecord", e)
+        synchronized(inputRouteLock) {
+            val recorder = audioRecord
+            audioRecord = null
+            try {
+                recorder?.stop()
+            } catch (e: Exception) {
+                Napier.e("Error stopping AudioRecord", e)
+            } finally {
+                try {
+                    recorder?.release()
+                } catch (e: Exception) {
+                    Napier.e("Error releasing AudioRecord", e)
+                }
+            }
         }
-        audioRecord = null
     }
 
     private fun releaseStream() {

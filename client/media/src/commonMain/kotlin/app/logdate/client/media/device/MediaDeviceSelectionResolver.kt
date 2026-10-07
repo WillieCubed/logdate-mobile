@@ -29,6 +29,26 @@ internal object MediaDeviceSelectionResolver {
         )
     }
 
+    fun resolveRecordingAudioInput(
+        selection: MediaDeviceSelectionUiState,
+        routedDeviceId: String?,
+        error: String?,
+    ): MediaDeviceSelectionUiState {
+        val routed = selection.devices.firstOrNull { it.id == routedDeviceId && it.isAvailable }
+        return selection.copy(
+            selectedDeviceId = routed?.id,
+            isSelectionConfirmed = routed != null,
+            routeControlMessage =
+                error ?: when {
+                    routed == null -> "Checking active microphone…"
+                    routed.id != selection.selectedDeviceId ->
+                        "Android is using ${routed.label}. " +
+                            "The selected microphone is not active yet."
+                    else -> null
+                },
+        )
+    }
+
     fun resolveAudioOutput(
         devices: List<MediaDeviceUiState>,
         preferredDeviceId: String?,

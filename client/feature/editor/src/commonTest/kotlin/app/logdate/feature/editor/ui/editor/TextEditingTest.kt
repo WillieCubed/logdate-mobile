@@ -30,12 +30,16 @@ import app.logdate.feature.editor.ui.editor.fakes.FakeJournalRepository
 import app.logdate.feature.editor.ui.editor.fakes.FakeLocationHistoryRepository
 import app.logdate.feature.editor.ui.editor.fakes.FakeLocationTrackingSettingsRepository
 import app.logdate.feature.editor.ui.editor.fakes.FakeMediaManager
+import app.logdate.shared.model.Journal
+import app.logdate.shared.model.PhotoPresentation
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlin.test.AfterTest
@@ -58,6 +62,7 @@ class TextEditingTest {
     private lateinit var testScope: TestScope
     private lateinit var viewModel: EntryEditorViewModel
     private lateinit var journalNotesRepository: FakeJournalNotesRepository
+    private lateinit var journalContentRepository: FakeJournalContentRepository
 
     @BeforeTest
     fun setup() {
@@ -65,7 +70,11 @@ class TextEditingTest {
         testScope = TestScope(testDispatcher)
 
         journalNotesRepository = FakeJournalNotesRepository()
-        val journalContentRepository = FakeJournalContentRepository()
+        journalContentRepository = FakeJournalContentRepository()
+        viewModel = createViewModel()
+    }
+
+    private fun createViewModel(): EntryEditorViewModel {
         val journalRepository = FakeJournalRepository()
         val entryDraftRepository = FakeEntryDraftRepository()
 
@@ -131,19 +140,278 @@ class TextEditingTest {
                     ),
             )
 
-        viewModel =
-            EntryEditorViewModel(
-                observeEditorData = observeEditorData,
-                saveEntryUseCase = saveEntryUseCase,
-                draftManager = draftManager,
-                contentLoader = contentLoader,
-            )
+        return EntryEditorViewModel(
+            observeEditorData = observeEditorData,
+            saveEntryUseCase = saveEntryUseCase,
+            draftManager = draftManager,
+            contentLoader = contentLoader,
+        )
     }
 
     @AfterTest
     fun tearDown() {
         Dispatchers.resetMain()
     }
+
+    @Test
+    fun `default journals completing during an entry fetch do not discard the entry`() =
+        testScope.runTest {
+            val noteId = Uuid.random()
+            val timestamp = Instant.parse("2020-01-01T00:00:00Z")
+            journalNotesRepository.seedExternally(
+                JournalNote.Text(uid = noteId, content = "Stored memory", creationTimestamp = timestamp, lastUpdated = timestamp),
+            )
+            val defaultJournal = Journal(id = Uuid.random(), title = "Recent journal")
+            journalContentRepository.journalsByContent[noteId] = listOf(defaultJournal)
+            val defaultsGate = CompletableDeferred<Unit>()
+            journalContentRepository.journalLoadGates[noteId] = defaultsGate
+            val entryGate = CompletableDeferred<Unit>()
+            journalNotesRepository.getNoteGates[noteId] = entryGate
+            viewModel = createViewModel()
+            viewModel.loadExistingEntry(noteId)
+            runCurrent()
+            defaultsGate.complete(Unit)
+            runCurrent()
+            assertEquals(listOf(defaultJournal.id), viewModel.editorState.value.selectedJournalIds)
+            entryGate.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(
+                listOf(noteId),
+                viewModel.editorState.value.blocks
+                    .map { it.id },
+            )
+            val block =
+                viewModel.editorState.value.blocks
+                    .single() as TextBlockUiState
+            assertEquals(noteId, block.id)
+            assertEquals("Stored memory", block.content)
+            assertFalse(viewModel.editorState.value.isModified)
+        }
+
+    @Test
+    fun `delayed entry loading preserves edits made during the fetch`() =
+        testScope.runTest {
+            advanceUntilIdle()
+            val noteId = Uuid.random()
+            val timestamp = Instant.parse("2020-01-01T00:00:00Z")
+            journalNotesRepository.create(
+                JournalNote.Text(uid = noteId, content = "Stored", creationTimestamp = timestamp, lastUpdated = timestamp),
+            )
+            val gate = CompletableDeferred<Unit>()
+            journalNotesRepository.getNoteGates[noteId] = gate
+            viewModel.loadExistingEntry(noteId)
+            runCurrent()
+            val newBlock = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
+            viewModel.updateBlock(newBlock.copy(content = "Keep my new work"))
+            gate.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(
+                "Keep my new work",
+                (
+                    viewModel.editorState.value.blocks
+                        .single() as TextBlockUiState
+                ).content,
+            )
+            assertTrue(viewModel.editorState.value.isDirty)
+        }
+
+    @Test
+    fun `an older fetch cannot replace a newer requested entry`() =
+        testScope.runTest {
+            advanceUntilIdle()
+            val timestamp = Instant.parse("2020-01-01T00:00:00Z")
+            val first =
+                JournalNote.Text(
+                    uid = Uuid.random(),
+                    content = "Old request",
+                    creationTimestamp = timestamp,
+                    lastUpdated = timestamp,
+                )
+            val second = first.copy(uid = Uuid.random(), content = "Latest request")
+            journalNotesRepository.create(first)
+            journalNotesRepository.create(second)
+            val gate = CompletableDeferred<Unit>()
+            journalNotesRepository.getNoteGates[first.uid] = gate
+            viewModel.loadExistingEntry(first.uid)
+            runCurrent()
+            viewModel.loadExistingEntry(second.uid)
+            runCurrent()
+            gate.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(
+                second.uid,
+                viewModel.editorState.value.blocks
+                    .single()
+                    .id,
+            )
+        }
+
+    @Test
+    fun `an externally published block refuses edits that the save pipeline would omit`() =
+        testScope.runTest {
+            val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
+            viewModel.updateBlock(block.copy(content = "Original"))
+            advanceUntilIdle()
+            journalNotesRepository.create(
+                JournalNote.Text(
+                    uid = block.id,
+                    content = "Original",
+                    creationTimestamp = block.timestamp,
+                    lastUpdated = block.timestamp,
+                ),
+            )
+            advanceUntilIdle()
+            assertTrue(viewModel.editorState.value.isReadOnly(block.id))
+            val revision = viewModel.editorState.value.contentRevision
+            viewModel.updateBlock(block.copy(content = "Cannot silently discard this edit"))
+            advanceUntilIdle()
+            assertEquals(
+                "Original",
+                (
+                    viewModel.editorState.value.blocks
+                        .single() as TextBlockUiState
+                ).content,
+            )
+            assertEquals(revision, viewModel.editorState.value.contentRevision)
+        }
+
+    @Test
+    fun `removing an externally published block cannot silently hide a stored memory`() =
+        testScope.runTest {
+            val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
+            viewModel.updateBlock(block.copy(content = "Original"))
+            journalNotesRepository.create(
+                JournalNote.Text(
+                    uid = block.id,
+                    content = "Original",
+                    creationTimestamp = block.timestamp,
+                    lastUpdated = block.timestamp,
+                ),
+            )
+            advanceUntilIdle()
+            assertTrue(viewModel.editorState.value.isReadOnly(block.id))
+            viewModel.removeBlock(block.id)
+            advanceUntilIdle()
+            assertEquals(
+                block.id,
+                viewModel.editorState.value.blocks
+                    .single()
+                    .id,
+            )
+        }
+
+    @Test
+    fun `callbacks for absent blocks do not modify the entry`() =
+        testScope.runTest {
+            advanceUntilIdle()
+            val revision = viewModel.editorState.value.contentRevision
+            viewModel.updateBlock(TextBlockUiState(content = "A disposed block"))
+            viewModel.removeBlock(Uuid.random())
+            advanceUntilIdle()
+            assertEquals(revision, viewModel.editorState.value.contentRevision)
+            assertFalse(viewModel.editorState.value.isModified)
+        }
+
+    @Test
+    fun `removing live audio preserves the recording block`() =
+        testScope.runTest {
+            val block = viewModel.createNewBlock(BlockType.AUDIO) as AudioBlockUiState
+            viewModel.updateBlock(block.copy(captureState = AudioCaptureState.Recording("/recording.m4a")))
+            advanceUntilIdle()
+            viewModel.removeBlock(block.id)
+            advanceUntilIdle()
+            assertEquals(
+                block.id,
+                viewModel.editorState.value.blocks
+                    .single()
+                    .id,
+            )
+            assertNotNull(viewModel.editorState.value.errorMessage)
+        }
+
+    @Test
+    fun `a callback cannot change an existing blocks type`() =
+        testScope.runTest {
+            val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
+            viewModel.updateBlock(block.copy(content = "Keep this text"))
+            viewModel.updateBlock(AudioBlockUiState(id = block.id))
+            advanceUntilIdle()
+            assertEquals(
+                "Keep this text",
+                (
+                    viewModel.editorState.value.blocks
+                        .single() as TextBlockUiState
+                ).content,
+            )
+        }
+
+    @Test
+    fun `a delayed recording callback cannot turn saved audio back into a live recording`() =
+        testScope.runTest {
+            val block = viewModel.createNewBlock(BlockType.AUDIO) as AudioBlockUiState
+            val live = block.copy(captureState = AudioCaptureState.Recording("/recording.m4a"))
+            viewModel.updateBlock(live)
+            viewModel.updateBlock(live.copy(captureState = AudioCaptureState.Ready("file:///recording.m4a", 1000L)))
+            viewModel.updateBlock(live)
+            advanceUntilIdle()
+            assertTrue(
+                (
+                    viewModel.editorState.value.blocks
+                        .single() as AudioBlockUiState
+                ).captureState is AudioCaptureState.Ready,
+            )
+        }
+
+    @Test
+    fun `a caption remains editable while the recording is finishing`() =
+        testScope.runTest {
+            val block = viewModel.createNewBlock(BlockType.AUDIO) as AudioBlockUiState
+            val stopping = block.copy(captureState = AudioCaptureState.Stopping("/recording.m4a"))
+            viewModel.updateBlock(stopping)
+            viewModel.updateBlock(stopping.copy(caption = "Written during Finish"))
+            advanceUntilIdle()
+            assertEquals(
+                "Written during Finish",
+                (
+                    viewModel.editorState.value.blocks
+                        .single() as AudioBlockUiState
+                ).caption,
+            )
+        }
+
+    @Test
+    fun `finishing a recording preserves a caption edited after capture started`() =
+        testScope.runTest {
+            val block = viewModel.createNewBlock(BlockType.AUDIO) as AudioBlockUiState
+            val live = block.copy(captureState = AudioCaptureState.Recording("/recording.m4a"))
+            viewModel.updateBlock(live)
+            viewModel.updateBlock(live.copy(caption = "My current caption"))
+            viewModel.updateBlock(live.copy(captureState = AudioCaptureState.Ready("file:///recording.m4a", 1000L)))
+            advanceUntilIdle()
+            assertEquals(
+                "My current caption",
+                (
+                    viewModel.editorState.value.blocks
+                        .single() as AudioBlockUiState
+                ).caption,
+            )
+        }
+
+    @Test
+    fun `finishing image selection preserves a caption edited while selection was pending`() =
+        testScope.runTest {
+            val block = viewModel.createNewBlock(BlockType.IMAGE) as ImageBlockUiState
+            viewModel.updateBlock(block.copy(caption = "My photo caption"))
+            viewModel.updateBlock(block.copy(uri = "file:///photo.jpg"))
+            advanceUntilIdle()
+            assertEquals(
+                "My photo caption",
+                (
+                    viewModel.editorState.value.blocks
+                        .single() as ImageBlockUiState
+                ).caption,
+            )
+        }
 
     @Test
     fun `create new text block`() =
@@ -498,5 +766,138 @@ class TextEditingTest {
             assertEquals("First drop", (blocks[0] as TextBlockUiState).content)
             assertEquals("Second drop", (blocks[1] as TextBlockUiState).content)
             assertEquals("Third drop", (blocks[2] as TextBlockUiState).content)
+        }
+
+    @Test
+    fun `stale ready audio transcript update preserves newer caption`() =
+        testScope.runTest {
+            val initial = viewModel.createNewBlock(BlockType.AUDIO) as AudioBlockUiState
+            val base =
+                initial.copy(
+                    captureState = AudioCaptureState.Ready("file:///recording.m4a", 1000L),
+                    caption = "Original",
+                    transcription = "Draft",
+                )
+            viewModel.updateBlock(base)
+            viewModel.updateBlock(base.copy(caption = "Edited caption"), base)
+            viewModel.updateBlock(base.copy(transcription = "Final transcript"), base)
+            advanceUntilIdle()
+            val actual =
+                viewModel.editorState.value.blocks
+                    .single() as AudioBlockUiState
+            assertEquals("Edited caption", actual.caption)
+            assertEquals("Final transcript", actual.transcription)
+        }
+
+    @Test
+    fun `stale ready audio caption update preserves newer transcript`() =
+        testScope.runTest {
+            val initial = viewModel.createNewBlock(BlockType.AUDIO) as AudioBlockUiState
+            val base = initial.copy(captureState = AudioCaptureState.Ready("file:///recording.m4a", 1000L), transcription = "Draft")
+            viewModel.updateBlock(base)
+            viewModel.updateBlock(base.copy(transcription = "Final transcript"), base)
+            viewModel.updateBlock(base.copy(caption = "Edited caption"), base)
+            advanceUntilIdle()
+            val actual =
+                viewModel.editorState.value.blocks
+                    .single() as AudioBlockUiState
+            assertEquals("Edited caption", actual.caption)
+            assertEquals("Final transcript", actual.transcription)
+        }
+
+    @Test
+    fun `stale image caption update preserves selected photo`() =
+        testScope.runTest {
+            val base = viewModel.createNewBlock(BlockType.IMAGE) as ImageBlockUiState
+            viewModel.updateBlock(base.copy(uri = "content://photo"), base)
+            viewModel.updateBlock(base.copy(caption = "Edited caption"), base)
+            advanceUntilIdle()
+            val actual =
+                viewModel.editorState.value.blocks
+                    .single() as ImageBlockUiState
+            assertEquals("content://photo", actual.uri)
+            assertEquals("Edited caption", actual.caption)
+        }
+
+    @Test
+    fun `stale video caption update preserves selected video duration`() =
+        testScope.runTest {
+            val base = viewModel.createNewBlock(BlockType.VIDEO) as VideoBlockUiState
+            viewModel.updateBlock(base.copy(uri = "content://video", durationMs = 1234L), base)
+            viewModel.updateBlock(base.copy(caption = "Edited caption"), base)
+            advanceUntilIdle()
+            val actual =
+                viewModel.editorState.value.blocks
+                    .single() as VideoBlockUiState
+            assertEquals("content://video", actual.uri)
+            assertEquals(1234L, actual.durationMs)
+            assertEquals("Edited caption", actual.caption)
+        }
+
+    @Test
+    fun `stale photo selection preserves newer caption`() =
+        testScope.runTest {
+            val base = viewModel.createNewBlock(BlockType.IMAGE) as ImageBlockUiState
+            viewModel.updateBlock(base.copy(caption = "Edited caption"), base)
+            viewModel.updateBlock(base.copy(uri = "content://photo"), base)
+            advanceUntilIdle()
+            val actual =
+                viewModel.editorState.value.blocks
+                    .single() as ImageBlockUiState
+            assertEquals("content://photo", actual.uri)
+            assertEquals("Edited caption", actual.caption)
+        }
+
+    @Test
+    fun `explicit caption clear preserves newer audio transcript`() =
+        testScope.runTest {
+            val initial = viewModel.createNewBlock(BlockType.AUDIO) as AudioBlockUiState
+            viewModel.updateBlock(initial.copy(caption = "Original"))
+            val base =
+                initial.copy(
+                    captureState = AudioCaptureState.Ready("file:///recording.m4a", 1000L),
+                    caption = "Original",
+                    transcription = "Draft",
+                )
+            viewModel.updateBlock(base)
+            viewModel.updateBlock(base.copy(transcription = "Final transcript"), base)
+            viewModel.updateBlock(base.copy(caption = ""), base)
+            advanceUntilIdle()
+            val actual =
+                viewModel.editorState.value.blocks
+                    .single() as AudioBlockUiState
+            assertEquals("", actual.caption)
+            assertEquals("Final transcript", actual.transcription)
+        }
+
+    @Test
+    fun `stale photo presentation update preserves newer caption`() =
+        testScope.runTest {
+            val base = viewModel.createNewBlock(BlockType.IMAGE) as ImageBlockUiState
+            viewModel.updateBlock(base.copy(caption = "Edited caption"), base)
+            viewModel.updateBlock(base.copy(presentation = PhotoPresentation.Framed), base)
+            advanceUntilIdle()
+            val actual =
+                viewModel.editorState.value.blocks
+                    .single() as ImageBlockUiState
+            assertEquals("Edited caption", actual.caption)
+            assertEquals(PhotoPresentation.Framed, actual.presentation)
+        }
+
+    @Test
+    fun `caption callback from recording snapshot preserves completed audio`() =
+        testScope.runTest {
+            val initial = viewModel.createNewBlock(BlockType.AUDIO) as AudioBlockUiState
+            val base = initial.copy(captureState = AudioCaptureState.Recording("/recording.m4a"))
+            val ready = AudioCaptureState.Ready("file:///recording.m4a", 1000L)
+            viewModel.updateBlock(base)
+            viewModel.updateBlock(base.copy(captureState = ready), base)
+            viewModel.updateBlock(base.copy(caption = "Edited caption"), base)
+            advanceUntilIdle()
+            val actual =
+                viewModel.editorState.value.blocks
+                    .single() as AudioBlockUiState
+            assertEquals(ready, actual.captureState)
+            assertEquals("Edited caption", actual.caption)
         }
 }

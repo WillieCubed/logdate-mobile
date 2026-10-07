@@ -17,7 +17,7 @@ import kotlin.uuid.Uuid
 
 class EncryptedCaptionSyncTest {
     @Test
-    fun `photo and video captions are encrypted before create and update`() =
+    fun `media captions are encrypted before create and update`() =
         runTest {
             val manager = TestCryptoManager()
             val identity = IdentityKeyManager(InMemorySecureStorage(), manager)
@@ -30,7 +30,15 @@ class EncryptedCaptionSyncTest {
             val caption = "Private caption\nwith Unicode ☀️"
             val photo = JournalNote.Image(id, now, now, mediaRef = "https://server/media/photo", caption = caption)
             val video = JournalNote.Video(id, now, now, mediaRef = "https://server/media/video", caption = caption)
-            for (note in listOf(photo, video)) {
+            val audio =
+                JournalNote.Audio(
+                    uid = id,
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    mediaRef = "https://server/media/audio",
+                    caption = caption,
+                )
+            for (note in listOf(photo, video, audio)) {
                 assertTrue(source.uploadNote("token", note).isSuccess)
                 assertTrue(source.updateNote("token", note).isSuccess)
             }
@@ -68,6 +76,15 @@ class EncryptedCaptionSyncTest {
                                     caption = value,
                                 ),
                                 ContentChange(
+                                    id = id.toString(),
+                                    type = "AUDIO",
+                                    mediaUri = "https://server/media/audio",
+                                    createdAt = 1,
+                                    lastUpdated = 2,
+                                    serverVersion = 4,
+                                    caption = value,
+                                ),
+                                ContentChange(
                                     id = Uuid.random().toString(),
                                     type = "VIDEO",
                                     mediaUri = "https://server/media/video",
@@ -84,7 +101,8 @@ class EncryptedCaptionSyncTest {
             val result = source.getContentChanges("token", since = Clock.System.now())
             val notes = result.getOrThrow().changes
             assertEquals("Protected caption", (notes[0] as JournalNote.Image).caption)
-            assertEquals("Legacy caption", (notes[1] as JournalNote.Video).caption)
+            assertEquals("Protected caption", (notes[1] as JournalNote.Audio).caption)
+            assertEquals("Legacy caption", (notes[2] as JournalNote.Video).caption)
         }
 
     @Test

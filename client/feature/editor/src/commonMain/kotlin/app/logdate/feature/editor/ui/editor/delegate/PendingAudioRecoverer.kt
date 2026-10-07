@@ -1,8 +1,10 @@
 package app.logdate.feature.editor.ui.editor.delegate
 
 import app.logdate.client.media.audio.AudioDurationResolver
+import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.feature.editor.ui.editor.AudioCaptureState
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 
 /**
  * Resolves audio capture states left behind by a prior session.
@@ -16,7 +18,7 @@ import io.github.aakira.napier.Napier
  * - [AudioCaptureState.Failed] if the path is missing or the file is unreadable —
  *   the user can dismiss the block and the cleanup pass deletes the orphan file.
  *
- * Implementations must not throw; surface errors as [AudioCaptureState.Failed].
+ * Surface recovery errors as [AudioCaptureState.Failed] and propagate cancellation.
  */
 interface PendingAudioRecoverer {
     suspend fun recover(state: AudioCaptureState.Stopping): AudioCaptureState
@@ -30,17 +32,29 @@ interface PendingAudioRecoverer {
  */
 class DefaultPendingAudioRecoverer(
     private val durationResolver: AudioDurationResolver,
+    private val recordingManager: AudioRecordingManager? = null,
 ) : PendingAudioRecoverer {
     override suspend fun recover(state: AudioCaptureState.Stopping): AudioCaptureState {
-        val path = state.filePath ?: return AudioCaptureState.Failed(RECORDING_LOST_REASON)
-        val durationMs =
-            runCatching { durationResolver.resolveDurationMs(path) }
-                .onFailure { Napier.w("Could not resolve duration for recovered audio $path", it) }
-                .getOrNull()
-        return if (durationMs != null) {
-            AudioCaptureState.Ready(uri = path, durationMs = durationMs)
-        } else {
-            AudioCaptureState.Failed(RECORDING_LOST_REASON)
+        var path = state.filePath ?: return AudioCaptureState.Failed(RECORDING_LOST_REASON)
+        val manager = recordingManager
+        try {
+            if (manager?.currentRecordingPath?.removePrefix("file://") == path.removePrefix("file://")) {
+                if (manager.isRecording || manager.isStartingRecording) {
+                    return AudioCaptureState.Recording(filePath = manager.currentRecordingPath)
+                }
+                path = manager.stopRecording() ?: path
+            }
+            val durationMs = durationResolver.resolveDurationMs(path)
+            return if (durationMs != null) {
+                AudioCaptureState.Ready(uri = path, durationMs = durationMs)
+            } else {
+                AudioCaptureState.Failed(RECORDING_LOST_REASON)
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            Napier.w("Could not resolve duration for recovered audio $path", error)
+            return AudioCaptureState.Failed(RECORDING_LOST_REASON)
         }
     }
 

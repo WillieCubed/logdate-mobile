@@ -56,6 +56,13 @@ class EditorState(
     val contentRevision: Long = 0,
     val visitContext: VisitMemoryContext? = null,
 ) {
+    val isRecordingAudio: Boolean
+        get() =
+            blocks.any { block ->
+                block is AudioBlockUiState &&
+                    (block.captureState is AudioCaptureState.Recording || block.captureState is AudioCaptureState.Stopping)
+            }
+
     /**
      * Checks if a block is read-only
      */

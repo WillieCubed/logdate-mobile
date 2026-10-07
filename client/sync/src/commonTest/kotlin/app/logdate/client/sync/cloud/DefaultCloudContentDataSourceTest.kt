@@ -21,6 +21,67 @@ class DefaultCloudContentDataSourceTest {
     private val dataSource = DefaultCloudContentDataSource(mockApiClient)
 
     @Test
+    fun `audio captions are uploaded and cleared explicitly`() =
+        runTest {
+            val note =
+                JournalNote.Audio(
+                    mediaRef = "file:///audio/station.m4a",
+                    creationTimestamp = Clock.System.now(),
+                    lastUpdated = Clock.System.now(),
+                    caption = "At the station",
+                )
+
+            dataSource.uploadNote("test-token", note)
+            assertEquals(
+                "At the station",
+                mockApiClient.uploadCalls
+                    .single()
+                    .second.caption,
+            )
+
+            dataSource.updateNote("test-token", note.copy(caption = ""))
+            assertEquals(
+                "",
+                mockApiClient.updateCalls
+                    .single()
+                    .third.caption,
+            )
+        }
+
+    @Test
+    fun `downloaded audio retains its caption`() =
+        runTest {
+            mockApiClient.contentChangesResponse =
+                Result.success(
+                    ContentChangesResponse(
+                        changes =
+                            listOf(
+                                ContentChange(
+                                    id = Uuid.random().toString(),
+                                    type = "AUDIO",
+                                    mediaUri = "file:///audio/station.m4a",
+                                    createdAt = 1,
+                                    lastUpdated = 2,
+                                    serverVersion = 1,
+                                    caption = "At the station",
+                                ),
+                            ),
+                        deletions = emptyList(),
+                        lastTimestamp = 2,
+                    ),
+                )
+
+            val note =
+                dataSource
+                    .getContentChanges("test-token", Instant.fromEpochMilliseconds(0))
+                    .getOrThrow()
+                    .changes
+                    .single()
+
+            assertEquals("At the station", (note as JournalNote.Audio).caption)
+        }
+
+    @Test
     fun `upload text note`() =
         runTest {
             // Given

@@ -5,10 +5,9 @@ import androidx.room.PrimaryKey
 import kotlin.uuid.Uuid
 
 /**
- * Stores a user-written caption for a visual media note (image or video).
+ * Stores a user-written caption for an image, audio, or video note.
  *
- * Audio notes are excluded — they surface user intent through transcription instead.
- * One row per note; [noteId] is the UID of the corresponding image or video note.
+ * One row per note; [noteId] is the UID of the corresponding media note.
  */
 @Entity(tableName = "media_captions")
 data class MediaCaptionEntity(

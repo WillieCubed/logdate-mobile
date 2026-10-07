@@ -19,14 +19,14 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun VisitMemoryContextBanner(context: VisitMemoryContext) {
-    Surface(color = MaterialTheme.colorScheme.secondaryContainer) {
+    Surface(modifier = Modifier.padding(8.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
         Text(
             stringResource(
                 Res.string.editor_visit_memory_context,
                 context.placeName ?: stringResource(Res.string.editor_visit_memory_unknown_place),
                 context.visitStart.toReadableDateShort(),
             ),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             style = MaterialTheme.typography.bodyMedium,
         )
     }

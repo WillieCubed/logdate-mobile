@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -19,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +38,8 @@ import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
+import app.logdate.feature.editor.ui.layout.LocalEditorCorners
+import app.logdate.feature.editor.ui.layout.LocalEditorRecordingActive
 import app.logdate.shared.model.PhotoPresentation
 import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res
@@ -64,6 +68,10 @@ internal fun MemoryBlockSurface(
     content: @Composable () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
+    val recordingActive = LocalEditorRecordingActive.current
+    LaunchedEffect(recordingActive) {
+        if (recordingActive) menuOpen = false
+    }
     val framed = block is ImageBlockUiState && block.presentation == PhotoPresentation.Framed
     val surfaceColor by animateColorAsState(
         if (framed) Color.White else MaterialTheme.colorScheme.surfaceContainer,
@@ -79,67 +87,69 @@ internal fun MemoryBlockSurface(
                     "memory_block_${block.id}",
                 ).semantics { selected = isSelected }
                 .clickable(onClick = onSelect),
-        shape = MaterialTheme.shapes.medium,
+        shape = RoundedCornerShape(LocalEditorCorners.current.cardRadius),
         color = surfaceColor,
         contentColor = if (framed) Color.Black else MaterialTheme.colorScheme.onSurface,
     ) {
         Box {
             val contentInsets =
                 when (block) {
-                    is TextBlockUiState, is AudioBlockUiState -> Modifier.padding(end = 48.dp)
+                    is TextBlockUiState -> if (recordingActive) Modifier else Modifier.padding(end = 48.dp)
                     is ImageBlockUiState -> Modifier.padding(top = photoTopInset)
                     else -> Modifier
                 }
             Column(contentInsets) { content() }
-            Box(Modifier.align(Alignment.TopEnd).padding(4.dp)) {
-                val overMedia = block is ImageBlockUiState || block is VideoBlockUiState || block is CameraBlockUiState
-                IconButton(
-                    onClick = {
-                        onSelect()
-                        menuOpen = true
-                    },
-                    modifier = Modifier.testTag("block_menu_${block.id}"),
-                    colors =
-                        IconButtonDefaults.iconButtonColors(
-                            containerColor = if (overMedia) Color.Black.copy(alpha = 0.45f) else Color.Transparent,
-                            contentColor = if (overMedia) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                ) {
-                    Icon(PlatformIcons.more(), stringResource(Res.string.more_options))
-                }
-                DropdownMenu(menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(text = { Text(stringResource(Res.string.memory_edit)) }, onClick = {
-                        menuOpen = false
-                        onEdit()
-                    })
-                    if (block is ImageBlockUiState) {
-                        PhotoPresentation.entries.forEach { presentation ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        stringResource(
-                                            if (presentation ==
-                                                PhotoPresentation.Framed
-                                            ) {
-                                                Res.string.photo_framed
-                                            } else {
-                                                Res.string.photo_edge_to_edge
-                                            },
-                                        ),
-                                    )
-                                },
-                                trailingIcon = { if (block.presentation == presentation) Icon(PlatformIcons.check(), null) },
-                                onClick = {
-                                    onUpdate(block.copy(presentation = presentation))
-                                    menuOpen = false
-                                },
-                            )
-                        }
+            if (!recordingActive) {
+                Box(Modifier.align(Alignment.TopEnd).padding(4.dp)) {
+                    val overMedia = block is ImageBlockUiState || block is VideoBlockUiState || block is CameraBlockUiState
+                    IconButton(
+                        onClick = {
+                            onSelect()
+                            menuOpen = true
+                        },
+                        modifier = Modifier.testTag("block_menu_${block.id}"),
+                        colors =
+                            IconButtonDefaults.iconButtonColors(
+                                containerColor = if (overMedia) Color.Black.copy(alpha = 0.45f) else Color.Transparent,
+                                contentColor = if (overMedia) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                    ) {
+                        Icon(PlatformIcons.more(), stringResource(Res.string.more_options))
                     }
-                    DropdownMenuItem(text = { Text(stringResource(Res.string.memory_remove)) }, onClick = {
-                        menuOpen = false
-                        onRemove()
-                    })
+                    DropdownMenu(menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(text = { Text(stringResource(Res.string.memory_edit)) }, onClick = {
+                            menuOpen = false
+                            onEdit()
+                        })
+                        if (block is ImageBlockUiState) {
+                            PhotoPresentation.entries.forEach { presentation ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            stringResource(
+                                                if (presentation ==
+                                                    PhotoPresentation.Framed
+                                                ) {
+                                                    Res.string.photo_framed
+                                                } else {
+                                                    Res.string.photo_edge_to_edge
+                                                },
+                                            ),
+                                        )
+                                    },
+                                    trailingIcon = { if (block.presentation == presentation) Icon(PlatformIcons.check(), null) },
+                                    onClick = {
+                                        onUpdate(block.copy(presentation = presentation))
+                                        menuOpen = false
+                                    },
+                                )
+                            }
+                        }
+                        DropdownMenuItem(text = { Text(stringResource(Res.string.memory_remove)) }, onClick = {
+                            menuOpen = false
+                            onRemove()
+                        })
+                    }
                 }
             }
         }

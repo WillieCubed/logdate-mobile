@@ -90,6 +90,7 @@ internal fun JournalNote.toArchiveNote(
         when (this) {
             is JournalNote.Image -> caption
             is JournalNote.Video -> caption
+            is JournalNote.Audio -> caption
             else -> ""
         }
     return ArchiveNote(

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -40,6 +41,7 @@ import app.logdate.ui.foldable.calculateFoldableSplitLayout
 import app.logdate.ui.foldable.relativeTo
 import app.logdate.ui.foldable.rememberFoldableLayoutInfo
 import app.logdate.ui.foldable.rememberWindowOrigin
+import app.logdate.ui.platform.rememberScreenCornerRadius
 import app.logdate.ui.theme.Spacing
 
 /**
@@ -49,12 +51,16 @@ import app.logdate.ui.theme.Spacing
  */
 internal val LocalEditorIsCompact = compositionLocalOf { false }
 
+internal val LocalEditorRecordingActive = compositionLocalOf { false }
+
+internal val LocalEditorContextControlsVisible = compositionLocalOf { true }
+
 /**
  * A cross-platform immersive editor layout that provides a focused editing experience.
  *
  * Renders a full-screen dark scrim with editor content centered in a width-constrained
- * column. Context content ([bottomContent]) is always shown below the editor and animates
- * away while an immersive block (camera, audio) is active.
+ * column. Context content ([bottomContent]) is shown below the editor and animates
+ * away for full-screen camera capture and compact audio recording. Audio keeps the toolbar visible.
  *
  * Uses [BoxWithConstraints] so breakpoints respond to the container's available width
  * rather than physical screen size, which is correct for split-screen and freeform windows.
@@ -62,10 +68,11 @@ internal val LocalEditorIsCompact = compositionLocalOf { false }
  * @param topBarContent Content for the top action bar area (back button/navigation)
  * @param editorContent The main editor content displayed in the central area
  * @param bottomContent Context content (journal selector) shown below the editor
- * @param isImmersiveBlockActive Whether a full-screen block (camera/audio) is active;
+ * @param isImmersiveBlockActive Whether full-screen camera capture is active;
  *   hides [bottomContent] and collapses chrome
  * @param immersiveExitProgress Float in [0, 1] driving chrome visibility during immersive
  *   exit (0 = fully immersive, 1 = normal)
+ * @param isAudioRecordingActive Whether audio is recording or finalizing; compact layouts hide context controls
  * @param modifier Optional modifier for the root layout
  */
 @Suppress("ktlint:standard:function-naming")
@@ -77,7 +84,9 @@ fun ImmersiveEditorLayout(
     modifier: Modifier = Modifier,
     isImmersiveBlockActive: Boolean = false,
     immersiveExitProgress: Float = if (isImmersiveBlockActive) 0f else 1f,
-    bottomContentTopPadding: Dp = Spacing.sm,
+    bottomContentTopPadding: Dp = Spacing.lg,
+    isAudioRecordingActive: Boolean = false,
+    screenCornerRadius: Dp = rememberScreenCornerRadius(),
 ) {
     val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val (windowOrigin, trackWindowOrigin) = rememberWindowOrigin()
@@ -91,6 +100,7 @@ fun ImmersiveEditorLayout(
                 layoutInfo = foldableLayoutInfo.relativeTo(windowOrigin),
                 minPaneWidth = 320.dp,
             ) as? FoldableSplitLayout.Vertical
+        val contextControlsVisible = !isAudioRecordingActive || (bookLayout?.leftPane?.width ?: containerWidth) >= 600.dp
         val hasSeparatingHinge = foldableLayoutInfo.hinge?.isSeparating == true
         val maxEditorWidth =
             when {
@@ -99,9 +109,10 @@ fun ImmersiveEditorLayout(
             }
 
         val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        val topOffset = lerp(0.dp, statusBarTop + 40.dp, immersiveExitProgress)
+        val topOffset = lerp(0.dp, statusBarTop + 64.dp, immersiveExitProgress)
         val horizontalPadding = lerp(0.dp, Spacing.sm, immersiveExitProgress)
-        val innerTopPadding = lerp(0.dp, Spacing.sm, immersiveExitProgress)
+        val bottomPadding = lerp(0.dp, Spacing.lg, immersiveExitProgress)
+        val bottomInsets = if (isImmersiveBlockActive) WindowInsets.ime else WindowInsets.ime.union(WindowInsets.navigationBars)
         Box(
             modifier =
                 Modifier
@@ -114,17 +125,27 @@ fun ImmersiveEditorLayout(
                         .fillMaxSize()
                         .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal))
                         .padding(top = topOffset)
-                        .windowInsetsPadding(WindowInsets.ime),
+                        .windowInsetsPadding(bottomInsets),
                 contentAlignment = Alignment.Center,
             ) {
-                CompositionLocalProvider(LocalEditorIsCompact provides (maxHeight < 500.dp)) {
+                CompositionLocalProvider(
+                    LocalEditorIsCompact provides (maxHeight < 500.dp),
+                    LocalEditorContextControlsVisible provides contextControlsVisible,
+                    LocalEditorRecordingActive provides isAudioRecordingActive,
+                    LocalEditorCorners provides
+                        if (containerWidth < 600.dp && !hasSeparatingHinge) {
+                            editorCornerGeometry(screenCornerRadius)
+                        } else {
+                            EditorCornerGeometry(24.dp, 8.dp)
+                        },
+                ) {
                     Column(
                         modifier =
                             Modifier
                                 .widthIn(max = maxEditorWidth)
                                 .fillMaxSize()
                                 .padding(horizontal = horizontalPadding)
-                                .padding(top = innerTopPadding),
+                                .padding(bottom = bottomPadding),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Box(
@@ -137,7 +158,7 @@ fun ImmersiveEditorLayout(
                         }
 
                         AnimatedVisibility(
-                            visible = !isImmersiveBlockActive && !keyboardVisible,
+                            visible = !isImmersiveBlockActive && !keyboardVisible && contextControlsVisible,
                             enter = fadeIn(tween(200)) + expandVertically(tween(300, easing = FastOutSlowInEasing)),
                             exit = fadeOut(tween(150)) + shrinkVertically(tween(300, easing = FastOutSlowInEasing)),
                         ) {
@@ -145,8 +166,7 @@ fun ImmersiveEditorLayout(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .windowInsetsPadding(WindowInsets.navigationBars)
-                                        .padding(top = bottomContentTopPadding, bottom = Spacing.md),
+                                        .padding(top = bottomContentTopPadding),
                             ) {
                                 Box(
                                     modifier =
@@ -154,12 +174,20 @@ fun ImmersiveEditorLayout(
                                             if (bookLayout != null) {
                                                 Modifier.width((bookLayout.leftPane.width - horizontalPadding).coerceAtLeast(0.dp))
                                             } else {
-                                                Modifier.widthIn(max = 640.dp).fillMaxWidth()
+                                                Modifier.fillMaxWidth()
                                             }
-                                        ).align(if (bookLayout != null) Alignment.CenterStart else Alignment.Center)
-                                            .padding(horizontal = if (bookLayout != null || containerWidth < 656.dp) 8.dp else 0.dp),
+                                        ).align(if (bookLayout != null) Alignment.CenterStart else Alignment.Center),
+                                    contentAlignment = Alignment.Center,
                                 ) {
-                                    bottomContent()
+                                    Box(
+                                        modifier =
+                                            Modifier
+                                                .widthIn(max = EditorColumnMaxWidth)
+                                                .fillMaxWidth()
+                                                .padding(horizontal = EditorSurfaceInset),
+                                    ) {
+                                        bottomContent()
+                                    }
                                 }
                             }
                         }

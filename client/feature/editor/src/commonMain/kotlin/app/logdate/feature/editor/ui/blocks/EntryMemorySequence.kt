@@ -17,12 +17,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -41,9 +43,14 @@ import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
+import app.logdate.feature.editor.ui.layout.EditorColumnMaxWidth
+import app.logdate.feature.editor.ui.layout.EditorSurfaceInset
+import app.logdate.feature.editor.ui.layout.LocalEditorContextControlsVisible
 import app.logdate.feature.editor.ui.state.BlocksUiState
 import app.logdate.shared.model.PhotoPresentation
 import app.logdate.ui.adaptive.FoldableBookLayout
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
 
 @Suppress("ktlint:standard:function-naming")
@@ -55,41 +62,52 @@ internal fun EntryMemorySequence(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
+    val contextControlsVisible = LocalEditorContextControlsVisible.current
+    val currentContextControlsVisible by rememberUpdatedState(contextControlsVisible)
     val aspectRatios = remember { mutableStateMapOf<Uuid, Float>() }
-    var pullDistance by remember { mutableFloatStateOf(0f) }
-    var addExpanded by remember { mutableStateOf(false) }
-    var isPulling by remember { mutableStateOf(false) }
-    var isCollapsing by remember { mutableStateOf(false) }
-    var collapseDistance by remember { mutableFloatStateOf(0f) }
+    var gesture by remember { mutableStateOf(EntryAddGestureState()) }
     var settleRequest by remember { mutableIntStateOf(0) }
-    var creatingBlock by remember { mutableStateOf(false) }
+    var revealTravel by remember { mutableStateOf(176.dp) }
+    val currentBlockCount by rememberUpdatedState(uiState.blocks.size)
     val settledProgress = remember { Animatable(0f) }
-    val pullThreshold = with(density) { 112.dp.toPx() }
-    val pullLimit = with(density) { 160.dp.toPx() }
-    val collapseThreshold = with(density) { 24.dp.toPx() }
-    val revealProgress =
-        when {
-            isPulling -> (pullDistance / pullThreshold).coerceIn(0f, 1f)
-            isCollapsing -> (1f - collapseDistance / collapseThreshold).coerceIn(0f, 1f)
-            else -> settledProgress.value
+    val scope = rememberCoroutineScope()
+    val travel = with(density) { revealTravel.toPx() }
+    val threshold = minOf(with(density) { 112.dp.toPx() }, travel * 0.72f)
+    val addExpanded = gesture.expanded
+    val revealProgress = if (gesture.dragging) gesture.progress(travel) else settledProgress.value
+    LaunchedEffect(addExpanded, gesture.dragging, settleRequest, contextControlsVisible) {
+        if (!contextControlsVisible) {
+            settledProgress.snapTo(0f)
+            return@LaunchedEffect
         }
-    LaunchedEffect(addExpanded, settleRequest) {
-        if (!isPulling && !isCollapsing) {
-            settledProgress.animateTo(if (addExpanded) 1f else 0f, spring(dampingRatio = 0.82f, stiffness = 350f))
+        if (!gesture.dragging) {
+            settledProgress.animateTo(if (addExpanded) 1f else 0f, spring(dampingRatio = 0.9f, stiffness = 180f))
+            if (addExpanded) listState.animateScrollToItem(currentBlockCount)
         }
     }
+
+    suspend fun settleGesture(cancelled: Boolean = false): Boolean {
+        if (!gesture.dragging || !currentContextControlsVisible) return false
+        settledProgress.snapTo(gesture.progress(travel))
+        gesture = if (cancelled) gesture.cancel() else gesture.release(threshold)
+        settleRequest++
+        return true
+    }
     val pullConnection =
-        remember(listState, pullThreshold, pullLimit, collapseThreshold, settledProgress) {
+        remember(listState, travel, threshold, contextControlsVisible) {
             object : NestedScrollConnection {
                 override fun onPostScroll(
                     consumed: Offset,
                     available: Offset,
                     source: NestedScrollSource,
                 ): Offset {
-                    if (source == NestedScrollSource.UserInput && available.y < 0f && !listState.canScrollForward && !addExpanded) {
-                        creatingBlock = false
-                        isPulling = true
-                        pullDistance = (pullDistance - available.y * 0.72f).coerceAtMost(pullLimit)
+                    if (currentContextControlsVisible &&
+                        source == NestedScrollSource.UserInput &&
+                        available.y < 0f &&
+                        !listState.canScrollForward &&
+                        !gesture.expanded
+                    ) {
+                        gesture = gesture.dragBy(available.y, travel)
                         return Offset(0f, available.y)
                     }
                     return Offset.Zero
@@ -99,39 +117,20 @@ internal fun EntryMemorySequence(
                     available: Offset,
                     source: NestedScrollSource,
                 ): Offset {
-                    if (source != NestedScrollSource.UserInput) return Offset.Zero
-                    if (addExpanded && available.y > 0f) {
-                        isCollapsing = true
-                        collapseDistance = (collapseDistance + available.y * 0.72f).coerceAtMost(collapseThreshold)
+                    if (!currentContextControlsVisible ||
+                        source != NestedScrollSource.UserInput ||
+                        !gesture.dragging ||
+                        gesture.expanded
+                    ) {
+                        return Offset.Zero
+                    }
+                    if (available.y < 0f) {
+                        gesture = gesture.dragBy(available.y, travel)
                         return Offset(0f, available.y)
                     }
-                    if (isCollapsing && available.y < 0f) {
-                        val consumed = minOf(-available.y, collapseDistance / 0.72f)
-                        collapseDistance = (collapseDistance - consumed * 0.72f).coerceAtLeast(0f)
-                        return Offset(0f, -consumed)
-                    }
-                    if (available.y <= 0f || !isPulling) return Offset.Zero
-                    val consumed = minOf(available.y, pullDistance / 0.72f)
-                    pullDistance = (pullDistance - consumed * 0.72f).coerceAtLeast(0f)
+                    val consumed = minOf(available.y, gesture.dragDistance)
+                    gesture = gesture.dragBy(consumed, travel)
                     return Offset(0f, consumed)
-                }
-
-                private suspend fun settleGesture(): Boolean {
-                    if (isCollapsing) {
-                        settledProgress.snapTo((1f - collapseDistance / collapseThreshold).coerceIn(0f, 1f))
-                        addExpanded = collapseDistance < collapseThreshold
-                        collapseDistance = 0f
-                        isCollapsing = false
-                        settleRequest++
-                        return true
-                    }
-                    if (!isPulling) return false
-                    settledProgress.snapTo((pullDistance / pullThreshold).coerceIn(0f, 1f))
-                    addExpanded = pullDistance >= pullThreshold
-                    pullDistance = 0f
-                    isPulling = false
-                    settleRequest++
-                    return true
                 }
 
                 override suspend fun onPreFling(available: Velocity): Velocity = if (settleGesture()) available else Velocity.Zero
@@ -145,9 +144,19 @@ internal fun EntryMemorySequence(
                 }
             }
         }
-    LaunchedEffect(revealProgress, uiState.blocks.size, creatingBlock) {
-        if (!creatingBlock && (isPulling || isCollapsing || addExpanded || revealProgress > 0f)) {
-            listState.scrollToItem(uiState.blocks.size)
+    LaunchedEffect(listState) {
+        var previousFooterHeight = 0
+        snapshotFlow {
+            listState.layoutInfo.visibleItemsInfo
+                .firstOrNull { it.key == "add_memory_footer" }
+                ?.size
+        }.collect { height ->
+            if (height != null) {
+                if (gesture.dragging && !gesture.expanded && previousFooterHeight > 0 && height > previousFooterHeight) {
+                    listState.dispatchRawDelta((height - previousFooterHeight).toFloat())
+                }
+                previousFooterHeight = height
+            }
         }
     }
     var editedBlockId by remember { mutableStateOf<Uuid?>(null) }
@@ -165,12 +174,8 @@ internal fun EntryMemorySequence(
         if (index >= 0) listState.animateScrollToItem(index)
     }
     val selectedId = uiState.expandedBlockId
-    LaunchedEffect(selectedId) {
-        addExpanded = false
-        pullDistance = 0f
-        isPulling = false
-        collapseDistance = 0f
-        isCollapsing = false
+    LaunchedEffect(selectedId, contextControlsVisible) {
+        gesture = EntryAddGestureState()
     }
     LaunchedEffect(selectedId, selectedId?.let { aspectRatios[it] }) {
         val index = uiState.blocks.indexOfFirst { it.id == selectedId }
@@ -179,37 +184,34 @@ internal fun EntryMemorySequence(
         }
     }
     val addBlock: (BlockType) -> Unit = { type ->
-        creatingBlock = true
-        addExpanded = false
-        pullDistance = 0f
-        isPulling = false
-        collapseDistance = 0f
-        isCollapsing = false
+        gesture = EntryAddGestureState()
         val id = Uuid.random()
         uiState.onCreateBlock(type, id)
         uiState.onBlockFocused(id)
         newBlockId = id
     }
     val sequence: @Composable () -> Unit = {
-        Column(Modifier.widthIn(max = 720.dp).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.widthIn(max = EditorColumnMaxWidth).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().nestedScroll(pullConnection)) {
                 val availablePhotoHeight = maxHeight - 16.dp
                 val focusedTextHeight = (maxHeight * 0.62f).coerceIn(220.dp, 480.dp)
+                val footerHeight = if (contextControlsVisible) 56.dp + revealTravel * revealProgress else 0.dp
+                val recordingHeight = unfinishedAudioHeight(maxHeight, maxWidth, footerHeight)
 
                 fun blockWidth(block: EntryBlockUiState): Dp {
                     val photo =
                         block is ImageBlockUiState ||
                             (block is CameraBlockUiState && block.mediaType != CapturedMediaType.VIDEO && block.uri != null)
-                    if (!photo) return 720.dp
+                    if (!photo) return EditorColumnMaxWidth
                     val framed = block is ImageBlockUiState && block.presentation == PhotoPresentation.Framed
                     val photoHeightLimit = (availablePhotoHeight - if (framed) 108.dp else 0.dp).coerceAtLeast(200.dp)
-                    return minOf(720.dp, photoHeightLimit * (aspectRatios[block.id] ?: 4f / 3f))
+                    return minOf(EditorColumnMaxWidth, photoHeightLimit * (aspectRatios[block.id] ?: 4f / 3f))
                 }
 
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize().testTag("editor_block_list"),
-                    contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = if (addExpanded) 0.dp else 8.dp),
+                    contentPadding = PaddingValues(start = EditorSurfaceInset, top = 8.dp, end = EditorSurfaceInset),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     items(uiState.blocks, key = { it.id }) { block ->
@@ -239,37 +241,34 @@ internal fun EntryMemorySequence(
                                     onAudioResolverReady = onAudioResolverReady,
                                     onPhotoAspectRatioLoaded = { id, ratio -> aspectRatios[id] = ratio },
                                     focusedTextHeight = focusedTextHeight,
+                                    unfinishedRecordingHeight = recordingHeight,
                                 )
                             }
                         }
                     }
-                    item(key = "add_memory_footer") {
-                        val footerWidth by animateDpAsState(
-                            uiState.blocks.lastOrNull()?.let(::blockWidth) ?: 720.dp,
-                            label = "addMemoryWidth",
-                        )
-                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-                            EndOfEntryAddControl(
-                                progress = revealProgress,
-                                expanded = addExpanded,
-                                onExpand = {
-                                    creatingBlock = false
-                                    pullDistance = 0f
-                                    isPulling = false
-                                    collapseDistance = 0f
-                                    isCollapsing = false
-                                    addExpanded = true
-                                },
-                                onCollapse = {
-                                    pullDistance = 0f
-                                    isPulling = false
-                                    collapseDistance = 0f
-                                    isCollapsing = false
-                                    addExpanded = false
-                                },
-                                onAdd = addBlock,
-                                modifier = Modifier.widthIn(max = footerWidth),
+                    if (contextControlsVisible) {
+                        item(key = "add_memory_footer") {
+                            val footerWidth by animateDpAsState(
+                                uiState.blocks.lastOrNull()?.let(::blockWidth) ?: EditorColumnMaxWidth,
+                                label = "addMemoryWidth",
                             )
+                            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                                EndOfEntryAddControl(
+                                    progress = revealProgress,
+                                    expanded = addExpanded,
+                                    onExpand = {
+                                        gesture = EntryAddGestureState(expanded = true)
+                                    },
+                                    onCollapse = { gesture = EntryAddGestureState() },
+                                    onDrag = { delta ->
+                                        gesture = gesture.dragBy(delta, travel)
+                                    },
+                                    onDragStopped = { cancelled -> scope.launch { settleGesture(cancelled) } },
+                                    onRevealHeightChanged = { revealTravel = it },
+                                    onAdd = addBlock,
+                                    modifier = Modifier.widthIn(max = footerWidth),
+                                )
+                            }
                         }
                     }
                 }
