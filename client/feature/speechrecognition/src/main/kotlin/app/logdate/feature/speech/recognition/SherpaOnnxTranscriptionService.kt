@@ -3,22 +3,15 @@ package app.logdate.feature.speech.recognition
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.media.AudioFormat
 import android.media.AudioRecord
-import android.media.MediaRecorder
-import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
 import app.logdate.client.media.audio.download.ModelDownloadStatus
-import app.logdate.client.media.audio.transcription.TimedTranscriptBuilder
-import app.logdate.client.media.audio.transcription.TimedUtterance
 import app.logdate.client.media.audio.transcription.TranscriptAccumulator
 import app.logdate.client.media.audio.transcription.TranscriptionFailure
 import app.logdate.client.media.audio.transcription.TranscriptionResult
 import app.logdate.client.media.audio.transcription.TranscriptionService
 import app.logdate.client.media.audio.transcription.TranscriptionSessionTerminalizer
 import app.logdate.client.media.audio.transcription.TranscriptionStartResult
-import app.logdate.client.media.device.AndroidAudioRouteDevices
-import com.k2fsa.sherpa.onnx.OnlineRecognizerResult
 import com.k2fsa.sherpa.onnx.OnlineStream
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
@@ -40,15 +33,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
 /**
  * On-device transcription service using Sherpa-ONNX speech recognition with
  * online punctuation.
  *
- * Uses [AudioRecord] (not [MediaRecorder]) to capture raw PCM audio, which does NOT
- * request audio focus — music playback continues uninterrupted. The PCM stream is fed
+ * Uses [AudioRecord] to capture raw PCM audio without requesting audio focus,
+ * so music playback continues uninterrupted. The PCM stream is fed
  * to a Sherpa-ONNX recognizer (via [SherpaOnnxRecognizerProvider]) for streaming
  * speech-to-text.
  *
@@ -65,59 +57,22 @@ class SherpaOnnxTranscriptionService(
 ) : TranscriptionService {
     private val _transcriptionFlow = MutableSharedFlow<TranscriptionResult>(replay = 1)
     private val terminalizer = TranscriptionSessionTerminalizer(_transcriptionFlow::emit)
+    private val audioCapture = TranscriptionAudioCapture(context)
+    private val transcriptProcessor =
+        SherpaOnnxTranscriptProcessor(context, recognizerProvider, offlineRecognizerProvider, terminalizer)
+    private val liveDecoder = SherpaOnnxLiveDecoder(recognizerProvider, vadProvider, accumulator, terminalizer)
 
     private var stream: OnlineStream? = null
-    private var audioRecord: AudioRecord? = null
-    private val inputRouteLock = Any()
-    private var preferredInputDeviceId: String? = null
 
-    override fun updatePreferredInputDevice(deviceId: String?): Boolean {
-        synchronized(inputRouteLock) {
-            preferredInputDeviceId = deviceId
-            return audioRecord?.let(::applyInputRoute) ?: true
-        }
-    }
-
-    private fun applyInputRoute(recorder: AudioRecord): Boolean {
-        return try {
-            val device = AndroidAudioRouteDevices.findPreferredInputDevice(context, preferredInputDeviceId)
-            if (preferredInputDeviceId != null && device == null) return false
-            if (!recorder.setPreferredDevice(device)) {
-                Napier.w("Could not apply the live transcription microphone route")
-                return false
-            }
-            recorder.recordingState != AudioRecord.RECORDSTATE_RECORDING ||
-                (recorder.routedDevice != null && (device == null || recorder.routedDevice.id == device.id))
-        } catch (e: Exception) {
-            Napier.e("Could not switch the live transcription microphone", e)
-            false
-        }
-    }
+    override fun updatePreferredInputDevice(deviceId: String?): Boolean = audioCapture.updatePreferredInputDevice(deviceId)
 
     private var recognitionJob: Job? = null
     private var refinementJob: Job? = null
-    private var totalAcceptedSamples: Long = 0L
-    private var currentStreamStartMs: Long = 0L
-    private var currentStreamAcceptedSamples: Long = 0L
 
     @Volatile
     private var isListening = false
 
     private val floatBuffer = FloatArray(BUFFER_SIZE_SHORTS)
-
-    /**
-     * Per-utterance PCM buffers captured during the live pass and consumed by
-     * the Whisper refinement pass after recording stops. Each entry corresponds
-     * to one VAD-detected speech segment, giving Whisper a clean utterance to
-     * decode without trailing silence.
-     *
-     * Capped at [MAX_BUFFERED_SAMPLES] (~15 minutes of speech). If exceeded,
-     * the buffer is dropped and refinement is skipped — the streaming text
-     * stands as final.
-     */
-    private var utterancePcmBuffer: ArrayList<FloatArray> = ArrayList()
-    private var bufferedSampleCount: Long = 0
-    private var bufferOverflowed = false
 
     override suspend fun warmUp() {
         recognizerProvider.ensureInitialized()
@@ -146,15 +101,15 @@ class SherpaOnnxTranscriptionService(
         refinementJob?.cancelAndJoin()
         refinementJob = null
         terminalizer.cancel()
-        clearRefinementBuffer()
+        liveDecoder.clearRefinementBuffer()
 
         var sessionAccepted = false
         return try {
             // Start capturing audio immediately so no speech is lost during model init
-            val ar = createAndStartAudioRecord()
+            val ar = audioCapture.start(BUFFER_SIZE_BYTES)
             val acknowledgement = terminalizer.begin()
             if (acknowledgement != TranscriptionStartResult.Started) {
-                stopAudioRecord()
+                audioCapture.stop()
                 return acknowledgement
             }
             sessionAccepted = true
@@ -223,7 +178,7 @@ class SherpaOnnxTranscriptionService(
                         stream = s
 
                         for (samples in preBuffer) {
-                            processSamples(s, samples)
+                            liveDecoder.processSamples(s, samples)
                         }
                         preBuffer.clear()
 
@@ -232,11 +187,11 @@ class SherpaOnnxTranscriptionService(
                             val shortsRead = readSamples()
                             if (shortsRead <= 0) continue
 
-                            processSamples(s, shortsToFloats(shortBuffer, shortsRead))
+                            liveDecoder.processSamples(s, shortsToFloats(shortBuffer, shortsRead))
                         }
                     } catch (e: TimeoutCancellationException) {
                         isListening = false
-                        stopAudioRecord()
+                        audioCapture.stop()
                         Napier.e("Live transcription model initialization timed out", e)
                         terminalizer.fail(TranscriptionFailure.NotAvailable)
                         vadProvider.reset()
@@ -246,7 +201,7 @@ class SherpaOnnxTranscriptionService(
                     } catch (e: Exception) {
                         if (!isListening && e is AudioCaptureException) return@launch
                         isListening = false
-                        stopAudioRecord()
+                        audioCapture.stop()
                         val reason =
                             if (e is AudioCaptureException) {
                                 TranscriptionFailure.AudioError
@@ -264,7 +219,7 @@ class SherpaOnnxTranscriptionService(
             TranscriptionStartResult.Started
         } catch (e: Exception) {
             isListening = false
-            stopAudioRecord()
+            audioCapture.stop()
             Napier.e("Failed to start Sherpa-ONNX transcription", e)
             val reason = TranscriptionFailure.AudioError
             if (sessionAccepted) {
@@ -283,7 +238,7 @@ class SherpaOnnxTranscriptionService(
         isListening = false
 
         // Stop audio first so the recognition loop exits naturally
-        stopAudioRecord()
+        audioCapture.stop()
 
         // Wait for the recognition coroutine to finish before touching the stream
         recognitionJob?.join()
@@ -300,8 +255,8 @@ class SherpaOnnxTranscriptionService(
                 while (!vadProvider.isEmpty()) {
                     val segment = vadProvider.front()
                     vadProvider.pop()
-                    bufferUtteranceForRefinement(segment.samples)
-                    acceptWaveform(s, segment.samples)
+                    liveDecoder.bufferUtteranceForRefinement(segment.samples)
+                    liveDecoder.acceptWaveform(s, segment.samples)
                 }
             }
         } catch (e: Exception) {
@@ -322,7 +277,7 @@ class SherpaOnnxTranscriptionService(
                 val result = recognizerProvider.getResult(s)
                 if (result.text.isNotBlank()) {
                     val punctuated = recognizerProvider.addPunctuation(result.text)
-                    val utterance = buildTimedUtterance(result, punctuated)
+                    val utterance = liveDecoder.buildTimedUtterance(result, punctuated)
                     accumulator.addSegment(punctuated, utterance)
                 }
             }
@@ -337,7 +292,7 @@ class SherpaOnnxTranscriptionService(
         // Decide whether to refine. If Whisper is loaded and the buffer fits,
         // emit the streaming result with isRefining=true and start the
         // background rewrite. Otherwise emit a final-only Success.
-        val canRefine = !bufferOverflowed && utterancePcmBuffer.isNotEmpty() && offlineRecognizerProvider.isAvailable
+        val canRefine = liveDecoder.hasRefinementUtterances && offlineRecognizerProvider.isAvailable
         val streamingText = accumulator.build()
         val streamingResult =
             TranscriptionResult.Success(
@@ -360,22 +315,16 @@ class SherpaOnnxTranscriptionService(
             terminalizer.complete(streamingResult)
         }
 
-        currentStreamStartMs = samplesToMs(totalAcceptedSamples)
-        currentStreamAcceptedSamples = 0L
+        liveDecoder.advanceStreamTiming()
 
         vadProvider.reset()
         releaseStream()
 
         if (canRefine && streamingText.isNotBlank()) {
-            // Hand the buffer off to the refinement pass by swapping in a fresh
-            // ArrayList. The refinement coroutine owns the old reference exclusively
-            // — no copy, no doubled peak memory under the cap.
-            val utterances = utterancePcmBuffer
-            utterancePcmBuffer = ArrayList()
-            bufferedSampleCount = 0
+            val utterances = liveDecoder.takeRefinementUtterances()
             refinementJob =
                 scope.launch(Dispatchers.Default) {
-                    runRefinement(
+                    transcriptProcessor.refine(
                         utterances = utterances,
                         streamingFallback = streamingResult.copy(isRefining = false),
                     )
@@ -384,132 +333,19 @@ class SherpaOnnxTranscriptionService(
         return stopResult
     }
 
-    /**
-     * The refinement pass. Walks the buffered VAD utterances in order, sending
-     * each one through Whisper and replacing the corresponding portion of the
-     * accumulator with the refined text. After every utterance, emits an
-     * updated [TranscriptionResult.Success] so the UI can crossfade the change
-     * in place — the user sees the transcript visibly correcting itself.
-     */
-    private suspend fun runRefinement(
-        utterances: List<FloatArray>,
-        streamingFallback: TranscriptionResult.Success,
-    ) {
-        try {
-            withTimeout(REFINEMENT_TIMEOUT_MS) {
-                // Make sure Whisper is actually loaded before we touch it
-                if (!offlineRecognizerProvider.ensureInitialized()) {
-                    Napier.w("Whisper not available for refinement; keeping streaming text")
-                    terminalizer.complete(streamingFallback)
-                    return@withTimeout
-                }
-
-                // Reset the accumulator so we can rebuild it utterance-by-utterance
-                // with refined text. We do this AFTER the streaming Success was
-                // emitted above, so the UI keeps showing the streaming text until
-                // the first refined chunk arrives.
-                val refinedAccumulator = TranscriptAccumulator()
-
-                for (samples in utterances) {
-                    currentCoroutineContext().ensureActive()
-
-                    val result = offlineRecognizerProvider.transcribe(samples) ?: continue
-                    if (result.text.isBlank()) continue
-
-                    refinedAccumulator.addSegment(result.text)
-
-                    terminalizer.progress(
-                        TranscriptionResult.Success(
-                            text = refinedAccumulator.build(),
-                            timedTranscript = refinedAccumulator.buildTimedTranscript(),
-                            isFinal = true,
-                            isRefining = true,
-                        ),
-                    )
-                }
-                val refinedText = refinedAccumulator.build()
-                terminalizer.complete(
-                    if (refinedText.isBlank()) {
-                        streamingFallback
-                    } else {
-                        TranscriptionResult.Success(
-                            text = refinedText,
-                            timedTranscript = refinedAccumulator.buildTimedTranscript(),
-                            isFinal = true,
-                            isRefining = false,
-                        )
-                    },
-                )
-            }
-        } catch (e: TimeoutCancellationException) {
-            Napier.e("Refinement timed out; keeping streaming text", e)
-            terminalizer.complete(streamingFallback)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Napier.e("Refinement pass failed; keeping streaming text", e)
-            terminalizer.complete(streamingFallback)
-        }
-    }
-
-    override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult =
-        withContext(Dispatchers.Default) {
-            val samples =
-                AudioDecoder(context).decodeToMono16kHz(audioUri)
-                    ?: return@withContext TranscriptionResult.Error(TranscriptionFailure.AudioError)
-            if (samples.isEmpty()) {
-                return@withContext TranscriptionResult.Error(TranscriptionFailure.NoSpeechDetected)
-            }
-
-            val fileVad = SherpaOnnxVadProvider(context)
-            try {
-                fileVad.ensureInitialized()
-                samples.asSequenceChunks(BUFFER_SIZE_SHORTS).forEach(fileVad::acceptWaveform)
-                fileVad.flush()
-                val utterances =
-                    buildList {
-                        while (!fileVad.isEmpty()) {
-                            add(fileVad.front().samples.copyOf())
-                            fileVad.pop()
-                        }
-                    }
-                if (utterances.isEmpty()) {
-                    return@withContext TranscriptionResult.Error(TranscriptionFailure.NoSpeechDetected)
-                }
-
-                val text =
-                    if (offlineRecognizerProvider.ensureInitialized()) {
-                        utterances.mapNotNull { offlineRecognizerProvider.transcribe(it)?.text?.trim() }
-                    } else {
-                        recognizerProvider.ensureInitialized()
-                        utterances.mapNotNull(::transcribeStreamingUtterance)
-                    }.filter(String::isNotBlank)
-                        .joinToString(" ")
-
-                if (text.isBlank()) {
-                    TranscriptionResult.Error(TranscriptionFailure.NoSpeechDetected)
-                } else {
-                    TranscriptionResult.Success(text = text, isFinal = true)
-                }
-            } catch (e: Exception) {
-                Napier.e("On-device file transcription failed", e)
-                TranscriptionResult.Error(TranscriptionFailure.Unknown)
-            } finally {
-                fileVad.release()
-            }
-        }
+    override suspend fun transcribeAudioFile(audioUri: String): TranscriptionResult = transcriptProcessor.transcribeAudioFile(audioUri)
 
     override suspend fun cancelTranscription() {
         isListening = false
         // Stop capture first so the recognition loop exits, then wait for it: the loop
         // touches the native stream and VAD, and releasing them underneath it is a
         // use-after-free in the JNI layer rather than a Kotlin exception.
-        stopAudioRecord()
+        audioCapture.stop()
         recognitionJob?.cancelAndJoin()
         recognitionJob = null
         refinementJob?.cancelAndJoin()
         refinementJob = null
-        clearRefinementBuffer()
+        liveDecoder.clearRefinementBuffer()
         vadProvider.reset()
         releaseStream()
         terminalizer.cancel()
@@ -557,9 +393,7 @@ class SherpaOnnxTranscriptionService(
 
     override suspend fun resetTranscription() {
         accumulator.reset()
-        totalAcceptedSamples = 0L
-        currentStreamStartMs = 0L
-        currentStreamAcceptedSamples = 0L
+        liveDecoder.resetTiming()
 
         if (isListening) {
             stopLiveTranscription()
@@ -570,15 +404,13 @@ class SherpaOnnxTranscriptionService(
     override fun release() {
         isListening = false
         cancelJobs()
-        clearRefinementBuffer()
-        stopAudioRecord()
+        liveDecoder.clearRefinementBuffer()
+        audioCapture.stop()
         releaseStream()
         vadProvider.release()
         offlineRecognizerProvider.release()
         accumulator.reset()
-        totalAcceptedSamples = 0L
-        currentStreamStartMs = 0L
-        currentStreamAcceptedSamples = 0L
+        liveDecoder.resetTiming()
     }
 
     private fun cancelJobs() {
@@ -588,204 +420,12 @@ class SherpaOnnxTranscriptionService(
         refinementJob = null
     }
 
-    private fun clearRefinementBuffer() {
-        utterancePcmBuffer.clear()
-        bufferedSampleCount = 0
-        bufferOverflowed = false
-    }
-
-    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
-    private fun createAndStartAudioRecord(): AudioRecord {
-        val bufferSize =
-            AudioRecord
-                .getMinBufferSize(
-                    SherpaOnnxRecognizerProvider.SAMPLE_RATE,
-                    AudioFormat.CHANNEL_IN_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT,
-                ).coerceAtLeast(BUFFER_SIZE_BYTES)
-
-        val ar =
-            AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                SherpaOnnxRecognizerProvider.SAMPLE_RATE,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                bufferSize,
-            )
-
-        if (ar.state != AudioRecord.STATE_INITIALIZED) {
-            ar.release()
-            throw AudioCaptureException("AudioRecord failed to initialize")
-        }
-
-        synchronized(inputRouteLock) {
-            try {
-                if (!applyInputRoute(ar)) throw AudioCaptureException("Could not apply transcription input")
-                ar.startRecording()
-                audioRecord = ar
-            } catch (e: Exception) {
-                ar.release()
-                throw e
-            }
-        }
-        return ar
-    }
-
-    /**
-     * Routes raw PCM samples through the VAD, then forwards detected speech
-     * segments to the recognizer. Silence is dropped before reaching the
-     * recognizer, eliminating hallucinated tokens during pauses.
-     */
-    private suspend fun processSamples(
-        s: OnlineStream,
-        samples: FloatArray,
-    ) {
-        vadProvider.acceptWaveform(samples)
-        while (!vadProvider.isEmpty()) {
-            val segment = vadProvider.front()
-            vadProvider.pop()
-            bufferUtteranceForRefinement(segment.samples)
-            acceptWaveform(s, segment.samples)
-            while (recognizerProvider.isReady(s)) {
-                recognizerProvider.decode(s)
-            }
-            processEndpointResults(s)
-        }
-    }
-
-    /**
-     * Captures a VAD utterance into the in-memory buffer that the Whisper
-     * refinement pass will consume. Each entry is one speech segment, so
-     * Whisper sees clean utterances without trailing silence padding.
-     *
-     * Drops the buffer entirely if total buffered audio exceeds
-     * [MAX_BUFFERED_SAMPLES] — refinement is skipped for very long recordings
-     * to keep memory bounded. The streaming text remains the final result.
-     */
-    private fun bufferUtteranceForRefinement(samples: FloatArray) {
-        if (bufferOverflowed || samples.isEmpty()) return
-        if (bufferedSampleCount + samples.size > MAX_BUFFERED_SAMPLES) {
-            Napier.w("Refinement buffer exceeded ${MAX_BUFFERED_SAMPLES / SherpaOnnxRecognizerProvider.SAMPLE_RATE}s; dropping")
-            utterancePcmBuffer.clear()
-            bufferedSampleCount = 0
-            bufferOverflowed = true
-            return
-        }
-        // Defensive copy: the FloatArray returned by SpeechSegment is owned by
-        // the VAD/native side and may be reused. We need our own copy to keep
-        // around for the refinement pass.
-        utterancePcmBuffer += samples.copyOf()
-        bufferedSampleCount += samples.size
-    }
-
-    private suspend fun processEndpointResults(s: OnlineStream) {
-        val result = recognizerProvider.getResult(s)
-
-        if (recognizerProvider.isEndpoint(s)) {
-            if (result.text.isNotBlank()) {
-                val punctuated = recognizerProvider.addPunctuation(result.text)
-                val utterance = buildTimedUtterance(result, punctuated)
-                accumulator.addSegment(punctuated, utterance)
-                terminalizer.progress(
-                    TranscriptionResult.Success(
-                        text = accumulator.build(),
-                        timedTranscript = accumulator.buildTimedTranscript(),
-                        isFinal = false,
-                    ),
-                )
-            }
-            currentStreamStartMs = samplesToMs(totalAcceptedSamples)
-            currentStreamAcceptedSamples = 0L
-            recognizerProvider.reset(s)
-        } else if (result.text.isNotBlank()) {
-            accumulator.setPartial(result.text)
-            terminalizer.progress(
-                TranscriptionResult.Success(
-                    text = accumulator.build(),
-                    timedTranscript = accumulator.buildTimedTranscript(),
-                    isFinal = false,
-                ),
-            )
-        }
-    }
-
-    private fun transcribeStreamingUtterance(samples: FloatArray): String? {
-        if (samples.isEmpty()) return null
-        val localStream = recognizerProvider.createStream()
-        return try {
-            localStream.acceptWaveform(samples, SherpaOnnxRecognizerProvider.SAMPLE_RATE)
-            localStream.inputFinished()
-            while (recognizerProvider.isReady(localStream)) {
-                recognizerProvider.decode(localStream)
-            }
-            recognizerProvider
-                .getResult(localStream)
-                .text
-                .takeIf(String::isNotBlank)
-                ?.let(recognizerProvider::addPunctuation)
-        } finally {
-            localStream.release()
-        }
-    }
-
-    private fun FloatArray.asSequenceChunks(chunkSize: Int): Sequence<FloatArray> =
-        sequence {
-            var offset = 0
-            while (offset < size) {
-                val end = (offset + chunkSize).coerceAtMost(size)
-                yield(copyOfRange(offset, end))
-                offset = end
-            }
-        }
-
-    private fun acceptWaveform(
-        stream: OnlineStream,
-        samples: FloatArray,
-    ) {
-        if (samples.isEmpty()) return
-        stream.acceptWaveform(samples, SherpaOnnxRecognizerProvider.SAMPLE_RATE)
-        totalAcceptedSamples += samples.size.toLong()
-        currentStreamAcceptedSamples += samples.size.toLong()
-    }
-
-    private fun buildTimedUtterance(
-        result: OnlineRecognizerResult,
-        punctuatedText: String,
-    ): TimedUtterance? =
-        TimedTranscriptBuilder.buildUtterance(
-            text = punctuatedText,
-            utteranceStartMs = currentStreamStartMs,
-            utteranceConsumedMs = samplesToMs(currentStreamAcceptedSamples),
-            tokens = result.tokens.toList(),
-            timestampsSeconds = result.timestamps.toList(),
-        )
-
-    private fun samplesToMs(sampleCount: Long): Long = ((sampleCount * 1000L) / SherpaOnnxRecognizerProvider.SAMPLE_RATE).coerceAtLeast(0L)
-
     private fun shortsToFloats(
         shorts: ShortArray,
         count: Int,
     ): FloatArray {
         for (i in 0 until count) floatBuffer[i] = shorts[i] / 32768.0f
         return floatBuffer.copyOf(count)
-    }
-
-    private fun stopAudioRecord() {
-        synchronized(inputRouteLock) {
-            val recorder = audioRecord
-            audioRecord = null
-            try {
-                recorder?.stop()
-            } catch (e: Exception) {
-                Napier.e("Error stopping AudioRecord", e)
-            } finally {
-                try {
-                    recorder?.release()
-                } catch (e: Exception) {
-                    Napier.e("Error releasing AudioRecord", e)
-                }
-            }
-        }
     }
 
     private fun releaseStream() {
@@ -803,17 +443,7 @@ class SherpaOnnxTranscriptionService(
         private const val MAX_CONSECUTIVE_EMPTY_READS = 50
         private const val EMPTY_READ_RETRY_DELAY_MS = 10L
         private const val MODEL_INITIALIZATION_TIMEOUT_MS = 30_000L
-        private const val REFINEMENT_TIMEOUT_MS = 5 * 60_000L
 
-        /**
-         * Maximum samples retained in memory for the refinement pass.
-         * 15 minutes at 16kHz mono = ~57 MB of float data. Beyond this, the
-         * buffer is dropped and the streaming text becomes the final result.
-         */
-        private const val MAX_BUFFERED_SAMPLES = 15L * 60 * SherpaOnnxRecognizerProvider.SAMPLE_RATE
+
     }
 }
-
-private class AudioCaptureException(
-    message: String,
-) : IllegalStateException(message)
