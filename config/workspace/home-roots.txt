@@ -15,5 +15,5 @@ client/feature/library/src/commonMain/kotlin/app/logdate/feature/library/ui/deta
 client/feature/rewind/src/commonMain/kotlin/app/logdate/feature/rewind/ui/detail/RewindStoryView.kt|RewindStoryView
 app/compose-main/src/commonMain/kotlin/app/logdate/navigation/scenes/ListDetailHomeScene.kt|HomeWorkspaceSceneContent
 client/feature/library/src/commonMain/kotlin/app/logdate/feature/library/ui/components/MediaThumbnailGrid.kt|MediaThumbnailGrid
-app/compose-main/src/commonMain/kotlin/app/logdate/navigation/LogDateNavDisplay.kt|rememberWorkspaceRouteDecorator
+app/compose-main/src/commonMain/kotlin/app/logdate/navigation/WorkspaceRouteDecorator.kt|rememberWorkspaceRouteDecorator
 client/feature/journal/src/commonMain/kotlin/app/logdate/feature/journals/ui/JournalFilterBar.kt|JournalFilterBar

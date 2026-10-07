@@ -21,8 +21,6 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.navigation3.runtime.NavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -51,7 +49,6 @@ import app.logdate.feature.core.profile.navigation.profileEntry
 import app.logdate.feature.core.requiresUnlock
 import app.logdate.feature.core.settings.navigation.BirthdaySettingsRoute
 import app.logdate.feature.core.settings.navigation.ExportSettingsRoute
-import app.logdate.feature.core.settings.navigation.PersonDetailRoute
 import app.logdate.feature.core.settings.navigation.SettingsRoute
 import app.logdate.feature.core.settings.navigation.StreakSettingsRoute
 import app.logdate.feature.core.settings.navigation.SyncSettingsRoute
@@ -88,19 +85,13 @@ import app.logdate.feature.rewind.navigation.RewindDetailRoute
 import app.logdate.feature.rewind.navigation.rewindDetailEntry
 import app.logdate.feature.search.ui.SearchScreen
 import app.logdate.navigation.scenes.HomeSceneStrategy
-import app.logdate.navigation.scenes.supportsDualPaneHomeScene
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.audio.AudioPlaybackProvider
-import app.logdate.ui.foldable.FoldableSplitLayout
-import app.logdate.ui.foldable.calculateFoldableSplitLayout
-import app.logdate.ui.foldable.rememberFoldableLayoutInfo
-import app.logdate.ui.navigation.routeClass
 import app.logdate.ui.navigation.taggedEntry
 import app.logdate.ui.platform.DefaultLogDateHaptics
 import app.logdate.ui.platform.LocalLogDateHaptics
 import app.logdate.ui.platform.LocalPlatformHaptics
-import app.logdate.ui.platform.currentPlatform
 import app.logdate.ui.platform.iosEdgeSwipeBack
 import app.logdate.ui.platform.rememberPlatformHapticsController
 import app.logdate.ui.platform.rememberSystemReduceMotion
@@ -109,8 +100,6 @@ import app.logdate.ui.workspace.LocalWorkspaceDismissDetail
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import io.github.aakira.napier.Napier
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.koinInject
 import kotlin.uuid.Uuid
 
@@ -444,70 +433,6 @@ private fun <T : Any> rememberNavAnimatedVisibilityScopeEntryDecorator(): NavEnt
     }
 
 /**
- * Default [SceneStrategy] for the LogDate graph. Activates [HomeSceneStrategy]'s two-pane
- * layout when the current window is wide enough; otherwise the strategy returns `null` and
- * `NavDisplay` falls back to its single-pane default.
- *
- * iPad gets a softer threshold because standard iPad portrait widths (e.g. 768pt on a 10.2"
- * model, 834pt on an 11" Pro) sit just below the Material expanded breakpoint of 840dp. On
- * those devices users still expect a list/detail layout, so we drop the activation point to
- * the medium breakpoint (600dp) when the host is iPad. Narrow Split View widths stay below
- * that floor and continue to render single-pane.
- */
-@Composable
-private fun rememberHomeSceneStrategy(): SceneStrategy<NavKey> {
-    val flags: FeatureFlagStore = koinInject()
-    val workspaceEnabled by remember(flags) { flags.observe(FeatureFlag.HOME_WORKSPACE_V2) }
-        .collectAsState(initial = FeatureFlag.HOME_WORKSPACE_V2.defaultEnabled)
-    val windowSize = LocalWindowInfo.current.containerSize
-    val isIpad = currentPlatform.isIpad
-    val foldableLayoutInfo = rememberFoldableLayoutInfo()
-    val density = LocalDensity.current
-    val supportsDualPane =
-        with(density) {
-            val widthDp = windowSize.width.toDp()
-            val heightDp = windowSize.height.toDp()
-            val defaultDualPane =
-                supportsDualPaneHomeScene(width = widthDp, height = heightDp) ||
-                    (isIpad && widthDp.value >= IPAD_DUAL_PANE_MIN_WIDTH_DP)
-            supportsDualPaneHomeScene(
-                width = widthDp,
-                height = heightDp,
-                foldableLayoutInfo = foldableLayoutInfo,
-            ) ||
-                (defaultDualPane && foldableLayoutInfo.hinge?.isSeparating != true)
-        }
-    val foldableSplitLayout =
-        with(density) {
-            calculateFoldableSplitLayout(
-                containerWidth = windowSize.width.toDp(),
-                containerHeight = windowSize.height.toDp(),
-                layoutInfo = foldableLayoutInfo,
-            )
-        }
-    val sceneSplitLayout =
-        when (foldableSplitLayout) {
-            is FoldableSplitLayout.Vertical -> foldableSplitLayout
-            FoldableSplitLayout.None,
-            is FoldableSplitLayout.Horizontal,
-            -> FoldableSplitLayout.None
-        }
-    return remember(workspaceEnabled, supportsDualPane, sceneSplitLayout) {
-        HomeSceneStrategy(
-            supportsDualPane = { workspaceEnabled || supportsDualPane },
-            foldableSplitLayout = { sceneSplitLayout },
-        )
-    }
-}
-
-/**
- * Lower bound (in dp) at which an iPad host should render the two-pane home layout. Set to
- * the Material medium breakpoint so iPad portrait fits comfortably while narrow Split View
- * widths still fall back to single-pane.
- */
-private const val IPAD_DUAL_PANE_MIN_WIDTH_DP = 600
-
-/**
  * Wraps the existing `TimelineDayDetailPanel` (which lives in client/feature/timeline) so the
  * NavDisplay entry stays small. Mirrors the legacy `TimelineDetailScreen` from the
  * androidx.navigation.compose graph.
@@ -549,61 +474,3 @@ private fun TimelineDetailEntry(
         }
     }
 }
-
-/**
- * Dispatches a search-result tap to the most specific entry-detail route available, falling back
- * to the containing day for content types without their own detail screen.
- */
-private fun searchResultRoute(result: SearchResult): NavKey =
-    when (result.contentType) {
-        SearchContentType.JOURNAL -> JournalDetailsRoute(result.uid)
-        SearchContentType.PERSON -> PersonDetailRoute(result.uid)
-        SearchContentType.TEXT_NOTE -> NoteDetailRoute(result.uid)
-        SearchContentType.POSTCARD -> PostcardViewerRoute(result.uid)
-        SearchContentType.REWIND -> RewindDetailRoute(result.uid)
-        SearchContentType.MEDIA_CAPTION -> MediaDetailRoute(result.uid)
-        SearchContentType.TRANSCRIPTION,
-        SearchContentType.AMBIENT_SOUND,
-        SearchContentType.STICKER,
-        SearchContentType.PLACE,
-        -> searchResultDayRoute(result)
-    }
-
-/**
- * Resolves a search result's containing day route, threading the entry's UUID so the timeline
- * panel can scroll to the matching entry when that hook lands. Used both as the fallback in
- * [searchResultRoute] and by the long-press "Open day view" action.
- */
-private fun searchResultDayRoute(result: SearchResult): TimelineDetailRoute {
-    val date =
-        result.created
-            .toLocalDateTime(TimeZone.currentSystemDefault())
-            .date
-    return TimelineDetailRoute(date.toString(), entryId = result.uid.toString())
-}
-
-@Composable
-private fun <T : Any> rememberWorkspaceRouteDecorator(): NavEntryDecorator<T> =
-    remember {
-        NavEntryDecorator { entry ->
-            val route = entry.routeClass()
-            val workspaceRoute =
-                route in
-                    setOf(
-                        app.logdate.feature.journals.navigation.JournalsOverviewRoute::class,
-                        app.logdate.feature.journals.navigation.JournalDetailsRoute::class,
-                        app.logdate.feature.journals.navigation.JournalContentPickerRoute::class,
-                        app.logdate.feature.journals.navigation.NoteDetailRoute::class,
-                        app.logdate.feature.library.navigation.LibraryOverviewRoute::class,
-                        app.logdate.feature.library.navigation.MediaDetailRoute::class,
-                        TimelineDetailRoute::class,
-                        app.logdate.feature.rewind.navigation.RewindDetailRoute::class,
-                    )
-            if (workspaceRoute) {
-                app.logdate.ui.workspace
-                    .WorkspaceRouteFrame { entry.Content() }
-            } else {
-                entry.Content()
-            }
-        }
-    }
