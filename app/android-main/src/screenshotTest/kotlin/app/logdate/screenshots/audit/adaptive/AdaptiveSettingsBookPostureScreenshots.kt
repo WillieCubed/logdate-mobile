@@ -202,10 +202,10 @@ fun A32_LocationIntervalBookPosture() {
 }
 
 @PreviewTest
-@Preview(name = "Location advanced book posture", showBackground = true, device = BOOK_FOLDABLE)
+@Preview(name = "Developer tools book posture", showBackground = true, device = BOOK_FOLDABLE)
 @Composable
-fun A33_LocationAdvancedBookPosture() {
-    BookPostureSettingsScene(SharedScreenshotSceneId.LocationAdvanced)
+fun A33_DeveloperToolsBookPosture() {
+    BookPostureSettingsScene(SharedScreenshotSceneId.DeveloperTools)
 }
 
 @PreviewTest
