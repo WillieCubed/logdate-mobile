@@ -7,7 +7,8 @@ import java.net.URI
  * Server-side configuration for WebAuthn relying-party metadata.
  *
  * [origins] is the full set of client origins the relying party accepts during passkey ceremonies.
- * It always contains the canonical `https://` web origin and may additionally contain Android
+ * It always contains the canonical web origin and the HTTPS relying-party origin used by native
+ * Apple apps. It may additionally contain Android
  * `android:apk-key-hash:<base64url-SHA256(signing-cert)>` origins. A real Android Credential Manager
  * ceremony sends the apk-key-hash as `clientDataJSON.origin` rather than an `https://` URL, so without
  * these entries webauthn4j rejects every on-device passkey. webauthn4j matches the incoming origin
@@ -47,7 +48,7 @@ data class WebAuthnConfig(
             val resolvedOrigin = normalizeOrigin(origin, serverOrigin)
             val resolvedRpId = relyingPartyId?.trim().orEmpty().ifBlank { deriveRpId(resolvedOrigin) ?: "logdate.app" }
             // The canonical web origin always leads so [origin] resolves to it deterministically.
-            val origins = linkedSetOf(resolvedOrigin) + parseAllowedOrigins(allowedOrigins)
+            val origins = linkedSetOf(resolvedOrigin, "$HTTPS_PREFIX$resolvedRpId") + parseAllowedOrigins(allowedOrigins)
             // A ceremony rejected for a mismatched origin reports the origin it presented but not
             // the set it was checked against, which leaves an operator guessing. Record the
             // resolved set once at startup so the two can be compared.

@@ -41,6 +41,27 @@ class WebAuthnPasskeyServiceAndroidOriginTest {
     private val rpId = "cloud-staging.logdate.app"
 
     @Test
+    fun `strict mode accepts the native Apple RP origin without accepting unrelated subdomains`() {
+        val config =
+            WebAuthnConfig.fromEnvironment(
+                relyingPartyId = "logdate.app",
+                relyingPartyName = "LogDate",
+                origin = "https://cloud.logdate.app",
+                allowedOrigins = androidOrigin,
+                serverOrigin = null,
+            )
+        val service =
+            WebAuthnPasskeyService(
+                passkeyRepository = InMemoryPasskeyRepository(),
+                relyingPartyId = config.relyingPartyId,
+                origins = config.origins,
+                strictVerificationEnabled = true,
+            )
+        assertTrue(service.registerWithOrigin("https://logdate.app").success)
+        assertFalse(service.registerWithOrigin("https://untrusted.logdate.app").success)
+    }
+
+    @Test
     fun `strict mode accepts a passkey whose origin is an allowlisted android apk-key-hash`() {
         val service =
             WebAuthnPasskeyService(

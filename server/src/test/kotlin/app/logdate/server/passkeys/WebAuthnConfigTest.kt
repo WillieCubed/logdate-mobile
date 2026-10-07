@@ -14,6 +14,22 @@ import kotlin.test.assertTrue
  */
 class WebAuthnConfigTest {
     @Test
+    fun `native Apple origin is included when the API uses a different subdomain`() {
+        val config =
+            WebAuthnConfig.fromEnvironment(
+                relyingPartyId = "logdate.app",
+                relyingPartyName = "LogDate",
+                origin = "https://cloud.logdate.app",
+                allowedOrigins = "android:apk-key-hash:example",
+                serverOrigin = null,
+            )
+        assertEquals("https://cloud.logdate.app", config.origin)
+        assertTrue("https://logdate.app" in config.origins)
+        assertTrue("android:apk-key-hash:example" in config.origins)
+        assertFalse("https://untrusted.logdate.app" in config.origins)
+    }
+
+    @Test
     fun `derives origin and RP ID from server endpoint when webauthn env is absent`() {
         val config =
             WebAuthnConfig.fromEnvironment(
