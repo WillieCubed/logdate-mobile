@@ -382,8 +382,8 @@ class DefaultSyncManager(
             // was enough on its own to starve every request thread it had.
             val journalResult = downloader.downloadJournals(accessToken, journalSince)
             val contentResult = downloader.downloadContent(accessToken, contentSince)
-            if (journalResult.success) legacyBackfill.enqueueRecordsIfNeeded(EntityType.JOURNAL)
-            if (contentResult.success) legacyBackfill.enqueueRecordsIfNeeded(EntityType.NOTE)
+            if (journalResult.remoteInventoryComplete) legacyBackfill.enqueueRecordsIfNeeded(EntityType.JOURNAL)
+            if (contentResult.remoteInventoryComplete) legacyBackfill.enqueueRecordsIfNeeded(EntityType.NOTE)
             val associationResult = downloader.downloadAssociations(accessToken, associationSince)
             if (associationResult.success) legacyBackfill.enqueueMembershipsIfNeeded()
             val historyResult = locationHistorySyncEngine?.download(accessToken) ?: SyncResult(success = true)

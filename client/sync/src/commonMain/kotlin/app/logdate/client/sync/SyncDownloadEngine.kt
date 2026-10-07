@@ -160,6 +160,7 @@ internal class SyncDownloadEngine(
             var hasMore = true
             var totalDownloaded = 0
             var totalConflicts = 0
+            var remoteInventoryComplete = false
             val errors = mutableListOf<SyncError>()
 
             while (hasMore) {
@@ -648,6 +649,8 @@ internal class SyncDownloadEngine(
                 syncMetadataService.updateLastSyncTime(strategy.entityType, page.lastSyncTimestamp)
 
                 if (!page.hasMore) {
+                    ensureScope(downloadScope)
+                    remoteInventoryComplete = fetchFailure == null || fetchFailure == DiagnosticReason.NONE
                     break
                 }
 
@@ -667,6 +670,7 @@ internal class SyncDownloadEngine(
                 downloadedItems = totalDownloaded,
                 conflictsResolved = totalConflicts,
                 errors = errors,
+                remoteInventoryComplete = remoteInventoryComplete,
             )
         } catch (e: CloudApiException) {
             mapCloudApiError(e)

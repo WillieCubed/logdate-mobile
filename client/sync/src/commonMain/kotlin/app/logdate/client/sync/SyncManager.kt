@@ -126,6 +126,8 @@ data class SyncResult(
     val lastSyncTime: Instant? = null,
     /** Another bounded pass is required; this is progress, not an error. */
     val hasMorePending: Boolean = false,
+    /** Every remote page was fetched and retained; applying individual records may still fail. */
+    val remoteInventoryComplete: Boolean = false,
 )
 
 /**
