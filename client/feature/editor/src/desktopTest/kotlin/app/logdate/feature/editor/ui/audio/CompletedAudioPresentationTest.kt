@@ -78,7 +78,7 @@ class CompletedAudioPresentationTest {
                 "The transcript is the main content",
             )
             val directory =
-                File(System.getProperty("logdate.review.screenshots", "/private/tmp/logdate-review-screenshots"))
+                File(System.getProperty("logdate.review.screenshots", "build/reports/editor-screenshots"))
             directory.mkdirs()
             File(directory, "completed-audio-transcript-portrait.png").writeBytes(
                 requireNotNull(Image.makeFromBitmap(onRoot().captureToImage().asSkiaBitmap()).encodeToData()).bytes,

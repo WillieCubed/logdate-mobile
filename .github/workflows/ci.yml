@@ -89,7 +89,7 @@ jobs:
           name: unit-test-reports
           if-no-files-found: warn
           path: |
-            **/build/test-results/test
+            **/build/test-results/**
             **/build/reports/tests
 
       - name: Generate coverage report

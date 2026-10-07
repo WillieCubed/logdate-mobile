@@ -145,6 +145,10 @@ kotlin {
             implementation(project.dependencies.platform(libs.firebase.bom))
             implementation(libs.firebase.crashlytics)
         }
+        val androidHostTest by getting
+        androidHostTest.dependencies {
+            implementation(libs.robolectric)
+        }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)

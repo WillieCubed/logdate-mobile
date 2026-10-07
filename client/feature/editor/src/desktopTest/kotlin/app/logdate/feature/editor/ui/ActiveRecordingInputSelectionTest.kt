@@ -138,7 +138,7 @@ class ActiveRecordingInputSelectionTest {
             assertEquals(usb.id, selection.value.selectedDeviceId)
             assertEquals(0, restarts)
             assertEquals(0, finishes)
-            val directory = File(System.getProperty("logdate.review.screenshots", "/private/tmp/logdate-review-screenshots"))
+            val directory = File(System.getProperty("logdate.review.screenshots", "build/reports/editor-screenshots"))
             directory.mkdirs()
             File(directory, "microphone-switched-${if (paused) "paused" else "recording"}.png").writeBytes(
                 requireNotNull(Image.makeFromBitmap(onRoot().captureToImage().asSkiaBitmap()).encodeToData()).bytes,

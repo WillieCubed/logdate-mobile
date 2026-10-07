@@ -267,7 +267,7 @@ class FullEditorRecordingLayoutTest {
             }
         }
         waitForIdle()
-        val directory = File(System.getProperty("logdate.review.screenshots", "/private/tmp/logdate-review-screenshots"))
+        val directory = File(System.getProperty("logdate.review.screenshots", "build/reports/editor-screenshots"))
         directory.mkdirs()
         val theme = if (darkTheme) "dark" else "light"
         File(

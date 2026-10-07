@@ -302,7 +302,7 @@ class EntryMotionTest {
 
 @OptIn(ExperimentalTestApi::class)
 private fun androidx.compose.ui.test.ComposeUiTest.screenshot(name: String) {
-    val directory = File("/private/tmp/logdate-entry-motion-screenshots")
+    val directory = File(System.getProperty("logdate.review.screenshots", "build/reports/editor-screenshots/motion"))
     directory.mkdirs()
     File(directory, name).writeBytes(requireNotNull(Image.makeFromBitmap(onRoot().captureToImage().asSkiaBitmap()).encodeToData()).bytes)
 }

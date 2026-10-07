@@ -103,7 +103,7 @@ class CompletedAudioResponsiveTest(
             assertEquals(56.dp, wave.bottom - wave.top, "Playback must use the Material Expressive medium size")
             assertTrue(recording.bottom - recording.top <= (height - 32).dp, "A short transcript must not inflate to fill the pane")
             assertTrue(recording.bottom <= (height - 16).dp, "The block must fit the available pane height")
-            val directory = File(System.getProperty("logdate.review.screenshots", "/private/tmp/logdate-review-screenshots"))
+            val directory = File(System.getProperty("logdate.review.screenshots", "build/reports/editor-screenshots"))
             directory.mkdirs()
             File(directory, "completed-audio-responsive-$name.png").writeBytes(
                 requireNotNull(Image.makeFromBitmap(onRoot().captureToImage().asSkiaBitmap()).encodeToData()).bytes,
@@ -238,7 +238,7 @@ class CompletedAudioResponsiveTest(
                 wave.bottom - wave.top >= 56.dp,
                 "Compact timing must not reduce waveform height",
             )
-            val directory = File(System.getProperty("logdate.review.screenshots", "/private/tmp/logdate-review-screenshots"))
+            val directory = File(System.getProperty("logdate.review.screenshots", "build/reports/editor-screenshots"))
             directory.mkdirs()
             File(directory, "completed-audio-compact-$name.png").writeBytes(
                 requireNotNull(Image.makeFromBitmap(onRoot().captureToImage().asSkiaBitmap()).encodeToData()).bytes,

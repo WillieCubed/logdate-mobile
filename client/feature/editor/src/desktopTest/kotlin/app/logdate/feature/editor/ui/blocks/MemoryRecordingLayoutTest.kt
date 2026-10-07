@@ -80,7 +80,7 @@ class MemoryRecordingLayoutTest {
             onNodeWithContentDescription("Pause").assertIsDisplayed()
             onNodeWithTag("add_to_entry").performScrollTo().assertIsDisplayed()
             if (size.height >= 500f) {
-                val directory = File(System.getProperty("logdate.review.screenshots", "/private/tmp/logdate-review-screenshots"))
+                val directory = File(System.getProperty("logdate.review.screenshots", "build/reports/editor-screenshots"))
                 directory.mkdirs()
                 File(directory, "recording-portrait-offscreen.png").writeBytes(
                     requireNotNull(Image.makeFromBitmap(onRoot().captureToImage().asSkiaBitmap()).encodeToData()).bytes,

@@ -73,7 +73,7 @@ class MobileEditorGutterTest {
                 }
             }
             waitForIdle()
-            val directory = File(System.getProperty("logdate.review.screenshots", "/private/tmp/logdate-review-screenshots"))
+            val directory = File(System.getProperty("logdate.review.screenshots", "build/reports/editor-screenshots"))
             directory.mkdirs()
             File(directory, if (showVisitContext) "editor-visit-context-gutters.png" else "editor-new-entry-gutters.png").writeBytes(
                 requireNotNull(Image.makeFromBitmap(onRoot().captureToImage().asSkiaBitmap()).encodeToData()).bytes,

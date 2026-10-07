@@ -34,6 +34,7 @@ androidx-test-runner = "1.7.0"
 androidx-test-core = "1.7.0"
 androidx-test-espresso = "3.7.0"
 androidx-test-orchestrator = "1.6.1"
+robolectric = "4.17"
 androidx-test-uiautomator = "2.3.0"
 
 # Common (Multiplatform) Dependencies
@@ -159,6 +160,7 @@ nimbusJoseJwt = "9.40"
 vlcj = "4.8.2"
 
 [libraries]
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 desugar_jdk_libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar_jdk_libs" }
 filekit-compose = { module = "io.github.vinceglb:filekit-compose", version.ref = "filekitCompose" }
 google-cloud-storage = { module = "com.google.cloud:google-cloud-storage", version.ref = "googleCloudStorage" }

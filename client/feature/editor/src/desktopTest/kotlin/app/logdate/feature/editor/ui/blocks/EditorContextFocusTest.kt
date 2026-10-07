@@ -143,7 +143,7 @@ class EditorContextFocusTest {
             assertEquals(memory.left, add.left)
             assertEquals(memory.right, add.right)
             assertEquals(16.dp, add.top - memory.bottom)
-            val directory = File(System.getProperty("logdate.review.screenshots", "/private/tmp/logdate-review-screenshots"))
+            val directory = File(System.getProperty("logdate.review.screenshots", "build/reports/editor-screenshots"))
             directory.mkdirs()
             File(directory, "editor-context-restored.png").writeBytes(
                 requireNotNull(Image.makeFromBitmap(onRoot().captureToImage().asSkiaBitmap()).encodeToData()).bytes,

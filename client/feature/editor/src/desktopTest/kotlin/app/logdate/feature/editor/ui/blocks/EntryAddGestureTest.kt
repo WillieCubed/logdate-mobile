@@ -158,7 +158,7 @@ class EntryAddGestureTest {
         name: String,
         image: Image,
     ) {
-        val directory = File(System.getProperty("logdate.review.screenshots", "/private/tmp/logdate-review-screenshots"))
+        val directory = File(System.getProperty("logdate.review.screenshots", "build/reports/editor-screenshots"))
         directory.mkdirs()
         File(directory, name).writeBytes(requireNotNull(image.encodeToData()).bytes)
     }

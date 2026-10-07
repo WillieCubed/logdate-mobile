@@ -19,7 +19,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class SettingsNavigationStateTest {
+abstract class SettingsNavigationStateTest {
     @Test
     fun `account settings back stacks survive saved state restoration`() {
         val destinations =
