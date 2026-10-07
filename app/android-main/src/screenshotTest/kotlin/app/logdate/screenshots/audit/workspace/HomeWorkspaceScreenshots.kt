@@ -341,26 +341,7 @@ fun WorkspacePlaces() =
     }
 
 @PreviewTest @WorkspacePreviewMatrix @Composable
-fun WorkspaceRewindPlayback() {
-    ScreenshotTheme {
-        CompositionLocalProvider(app.logdate.ui.workspace.LocalWorkspaceEnabled provides true) {
-            app.logdate.feature.rewind.ui.detail.RewindDetailScreenContent(
-                uiState =
-                    app.logdate.feature.rewind.ui.RewindDetailUiState.Success(
-                        panels =
-                            listOf(
-                                app.logdate.feature.rewind.ui.SubtitledRewindPanelUiState(
-                                    title = "A few quiet moments",
-                                    subtitle = "September 21–27, 2026",
-                                ),
-                            ),
-                    ),
-                onExitRewind = {},
-                externalPause = true,
-            )
-        }
-    }
-}
+fun WorkspaceRewindPlayback() = ImmersiveRewindScreenshot()
 
 @PreviewTest @WorkspacePreviewMatrix @Composable
 fun WorkspaceLocationsBrowsing() =

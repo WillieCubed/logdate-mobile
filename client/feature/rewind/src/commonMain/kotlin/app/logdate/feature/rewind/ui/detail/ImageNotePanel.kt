@@ -5,9 +5,12 @@ package app.logdate.feature.rewind.ui.detail
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -98,7 +101,8 @@ fun ImageNotePanel(
                 modifier =
                     Modifier
                         .align(Alignment.TopEnd)
-                        .padding(16.dp)
+                        .windowInsetsPadding(WindowInsets.safeDrawing)
+                        .padding(top = 80.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)
                         .clip(RoundedCornerShape(20.dp))
                         .background(Color.Black.copy(alpha = 0.6f))
                         .padding(horizontal = 12.dp, vertical = 6.dp),

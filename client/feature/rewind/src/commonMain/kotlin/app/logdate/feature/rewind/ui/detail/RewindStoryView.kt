@@ -1,4 +1,4 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+@file:Suppress("ktlint:standard:function-naming")
 
 package app.logdate.feature.rewind.ui.detail
 
@@ -18,21 +18,15 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,7 +36,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -53,19 +46,12 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.rewind.ui.ReflectionPromptRewindPanelUiState
 import app.logdate.feature.rewind.ui.RewindPanelUiState
-import app.logdate.ui.adaptive.FoldableBookLayout
-import app.logdate.ui.adaptive.FoldableTabletopLayout
-import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.PlatformPredictiveBackHandler
 import app.logdate.ui.platform.rememberScreenCornerRadius
 import app.logdate.ui.platform.rememberSystemReduceMotion
-import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.ui.workspace.WorkspacePlaybackLayout
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import logdate.client.feature.rewind.generated.resources.*
-import logdate.client.feature.rewind.generated.resources.Res
-import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 
 /**
@@ -146,6 +132,7 @@ fun RewindStoryView(
     var currentPanelIndex by androidx.compose.runtime.saveable
         .rememberSaveable { mutableIntStateOf(0) }
     var isPaused by remember { mutableStateOf(false) }
+    var actionMenuOpen by remember { mutableStateOf(false) }
     // Tracks navigation direction for animation: true = forward, false = backward
     var navigatingForward by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
@@ -240,7 +227,7 @@ fun RewindStoryView(
     // The story stays paused whenever the user is interacting with chrome that lives outside
     // this composable (the share sheet, the reply sheet) so its contents don't tick away
     // while attention is elsewhere.
-    val effectivelyPaused = isPaused || externalPause || reduceMotion
+    val effectivelyPaused = isPaused || actionMenuOpen || externalPause || reduceMotion
 
     LaunchedEffect(currentPanelIndex, effectivelyPaused) {
         if (effectivelyPaused) {
@@ -341,143 +328,10 @@ fun RewindStoryView(
     }
 
     @Composable
-    fun StoryChrome(
-        showNavigationButtons: Boolean,
+    fun TapNavigationLayer(
         modifier: Modifier = Modifier,
+        content: @Composable () -> Unit,
     ) {
-        Column(modifier = modifier.graphicsLayer { alpha = 1f - easeDismiss(dismissProgress.value) }) {
-            StoryProgressIndicators(
-                totalPanels = panels.size,
-                currentPanelIndex = currentPanelIndex,
-                currentPanelProgress = autoAdvanceProgress,
-                color = accentColor,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(modifier = Modifier.weight(1f))
-
-                val activePanel = panels[currentPanelIndex]
-                if (
-                    onReplyToPrompt != null &&
-                    activePanel is ReflectionPromptRewindPanelUiState &&
-                    activePanel.repliesAllowed
-                ) {
-                    IconButton(
-                        onClick = {
-                            isPaused = true
-                            onReplyToPrompt(activePanel)
-                        },
-                    ) {
-                        Icon(
-                            painter = PlatformIcons.reply(),
-                            contentDescription =
-                                stringResource(
-                                    if (activePanel.existingResponse != null) {
-                                        Res.string.reflection_prompt_reply_edit
-                                    } else {
-                                        Res.string.reflection_prompt_reply
-                                    },
-                                ),
-                            tint = Color.White,
-                        )
-                    }
-                }
-
-                if (onShareRewindStats != null) {
-                    IconButton(
-                        onClick = {
-                            isPaused = true
-                            onShareRewindStats()
-                        },
-                    ) {
-                        Icon(
-                            painter = PlatformIcons.photoLibrary(),
-                            contentDescription = stringResource(Res.string.share_rewind_stats),
-                            tint = Color.White,
-                        )
-                    }
-                }
-
-                if (onSharePanel != null) {
-                    IconButton(
-                        onClick = {
-                            isPaused = true
-                            onSharePanel(panels[currentPanelIndex])
-                        },
-                    ) {
-                        Icon(
-                            painter = PlatformIcons.share(),
-                            contentDescription = stringResource(Res.string.share_rewind_panel),
-                            tint = Color.White,
-                        )
-                    }
-                }
-
-                if (onDeleteRewind != null) {
-                    IconButton(
-                        onClick = {
-                            isPaused = true
-                            onDeleteRewind()
-                        },
-                    ) {
-                        Icon(
-                            painter = PlatformIcons.delete(),
-                            contentDescription = stringResource(Res.string.delete_rewind),
-                            tint = Color.White,
-                        )
-                    }
-                }
-
-                IconButton(onClick = onExit) {
-                    Icon(
-                        painter = PlatformIcons.close(),
-                        contentDescription = stringResource(Res.string.close_rewind),
-                        tint = Color.White,
-                    )
-                }
-            }
-
-            if (showNavigationButtons) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(top = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(
-                        onClick = ::goToPreviousPanel,
-                        enabled = currentPanelIndex > 0,
-                    ) {
-                        Icon(
-                            painter = PlatformIcons.back(),
-                            contentDescription = "Previous rewind moment",
-                            tint = Color.White,
-                        )
-                    }
-                    IconButton(onClick = ::goToNextPanel) {
-                        Icon(
-                            painter = PlatformIcons.chevronRight(),
-                            contentDescription = "Next rewind moment",
-                            tint = Color.White,
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    @Composable
-    fun TapNavigationLayer(modifier: Modifier = Modifier) {
         Box(
             modifier =
                 modifier.pointerInput(Unit) {
@@ -499,6 +353,7 @@ fun RewindStoryView(
                         },
                     )
                 },
+            content = { content() },
         )
     }
 
@@ -514,7 +369,6 @@ fun RewindStoryView(
                     scaleY = entranceScale.value
                     alpha = 1f - easeDismiss(dismissProgress.value)
                 }.background(Color.Black)
-                .statusBarsPadding()
                 // Swipe gesture with accumulated drag distance
                 .pointerInput(Unit) {
                     var accumulatedDrag = 0f
@@ -557,116 +411,37 @@ fun RewindStoryView(
                     )
                 },
     ) {
-        if (LocalWorkspaceEnabled.current) {
-            WorkspacePlaybackLayout(focus = {
-                StoryPanel(Modifier.fillMaxSize())
-                TapNavigationLayer(Modifier.fillMaxSize())
-            }, controls = { separated ->
-                StoryChrome(
-                    showNavigationButtons = separated,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        WorkspacePlaybackLayout(
+            focus = {
+                TapNavigationLayer(Modifier.fillMaxSize()) {
+                    StoryPanel(Modifier.fillMaxSize())
+                }
+            },
+            controls = {
+                RewindStoryChrome(
+                    activePanel = panels[currentPanelIndex],
+                    totalPanels = panels.size,
+                    currentPanelIndex = currentPanelIndex,
+                    currentPanelProgress = autoAdvanceProgress,
+                    accentColor = accentColor,
+                    onPause = { isPaused = true },
+                    onExit = onExit,
+                    onMenuPauseChange = { actionMenuOpen = it },
+                    onSharePanel = onSharePanel,
+                    onShareRewindStats = onShareRewindStats,
+                    onReplyToPrompt = onReplyToPrompt,
+                    onDeleteRewind = onDeleteRewind,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer { alpha = 1f - easeDismiss(dismissProgress.value) }
+                            .windowInsetsPadding(WindowInsets.safeDrawing)
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                 )
-            })
-        } else {
-            FoldableTabletopLayout(
-                modifier = Modifier.fillMaxSize(),
-                minPaneHeight = 220.dp,
-                topPane = {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        StoryPanel(
-                            modifier =
-                                Modifier
-                                    .widthIn(max = maxRewindStoryWidth)
-                                    .fillMaxSize(),
-                        )
-                    }
-                    TapNavigationLayer(modifier = Modifier.fillMaxSize())
-                },
-                bottomPane = {
-                    StoryChrome(
-                        showNavigationButtons = true,
-                        modifier =
-                            Modifier
-                                .align(Alignment.Center)
-                                .fillMaxSize()
-                                .widthIn(max = maxRewindStoryWidth)
-                                .navigationBarsPadding()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                    )
-                },
-                standardContent = {
-                    FoldableBookLayout(
-                        modifier = Modifier.fillMaxSize(),
-                        minPaneWidth = 320.dp,
-                        startPane = {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .fillMaxSize()
-                                        .navigationBarsPadding(),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                StoryPanel(
-                                    modifier =
-                                        Modifier
-                                            .widthIn(max = maxRewindStoryWidth)
-                                            .fillMaxSize(),
-                                )
-                            }
-                            TapNavigationLayer(modifier = Modifier.fillMaxSize())
-                        },
-                        endPane = {
-                            StoryChrome(
-                                showNavigationButtons = true,
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.Center)
-                                        .widthIn(max = maxRewindStoryWidth)
-                                        .fillMaxSize()
-                                        .navigationBarsPadding()
-                                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                            )
-                        },
-                        standardContent = {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .fillMaxSize()
-                                        .navigationBarsPadding(),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                StoryPanel(
-                                    modifier =
-                                        Modifier
-                                            .widthIn(max = maxRewindStoryWidth)
-                                            .fillMaxSize(),
-                                )
-                            }
-                            // Tap layer must render below the chrome buttons, otherwise its
-                            // full-screen tap catcher intercepts taps meant for share/reply/
-                            // delete/close before they reach the icons drawn on top of it.
-                            TapNavigationLayer(modifier = Modifier.fillMaxSize())
-                            StoryChrome(
-                                showNavigationButtons = false,
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.TopCenter)
-                                        .fillMaxWidth()
-                                        .widthIn(max = maxRewindStoryWidth)
-                                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                            )
-                        },
-                    )
-                },
-            )
-        }
+            },
+        )
     }
 }
-
-private val maxRewindStoryWidth = 1200.dp
 
 // Small enough to keep the story feeling edge-to-edge and immersive; just enough for the
 // concentric-corner reveal at the panel's edges to register.
@@ -679,55 +454,3 @@ private const val DISMISS_CARD_MAX_SCALE_DOWN = 0.14f
 private const val DISMISS_CARD_MAX_FADE = 0.15f
 
 private fun easeDismiss(progress: Float): Float = dismissEasing.transform(progress.coerceIn(0f, 1f))
-
-/**
- * Progress indicators showing the current position in the story sequence.
- *
- * Displays a row of progress bars, one for each panel in the story. The current
- * panel shows an animated progress bar, completed panels are filled, and future
- * panels remain empty.
- *
- * ## Visual Design:
- * - **Completed panels**: Fully filled white progress bars
- * - **Current panel**: Animated progress bar showing auto-advance timing
- * - **Future panels**: Empty/unfilled progress bars
- * - **Spacing**: 2dp gaps between progress bars for clarity
- *
- * @param totalPanels Total number of panels in the story
- * @param currentPanelIndex Zero-based index of the currently displayed panel
- * @param currentPanelProgress Progress of current panel (0.0 to 1.0)
- * @param modifier Modifier for customizing the progress indicators container
- */
-@Composable
-private fun StoryProgressIndicators(
-    totalPanels: Int,
-    currentPanelIndex: Int,
-    currentPanelProgress: Float,
-    color: Color,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        repeat(totalPanels) { index ->
-            val progress =
-                when {
-                    index < currentPanelIndex -> 1f
-                    index == currentPanelIndex -> currentPanelProgress
-                    else -> 0f
-                }
-
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .height(3.dp)
-                        .clip(RoundedCornerShape(1.5.dp)),
-                color = color,
-                trackColor = color.copy(alpha = 0.3f),
-            )
-        }
-    }
-}

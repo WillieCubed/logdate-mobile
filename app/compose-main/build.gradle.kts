@@ -151,6 +151,7 @@ kotlin {
             implementation(libs.coil.compose)
         }
         desktopTest.dependencies {
+            implementation(libs.compose.ui.test)
             implementation(kotlin("test"))
             implementation(libs.kotlin.test.junit)
             implementation(libs.junit)

@@ -15,42 +15,33 @@ import androidx.compose.ui.unit.IntOffset
 import app.logdate.ui.foldable.rememberFoldableLayoutInfo
 import app.logdate.ui.foldable.rememberWindowOrigin
 
-/** Deliberate immersive playback keeps controls over the focus on phones and beside it when possible. */
+/** Playback overlays controls on the story, spanning narrow book folds to preserve readable width. */
 @Composable
 fun WorkspacePlaybackLayout(
     modifier: Modifier = Modifier,
     focus: @Composable () -> Unit,
-    controls: @Composable (Boolean) -> Unit,
+    controls: @Composable () -> Unit,
 ) {
     val direction = LocalLayoutDirection.current
     val foldable = rememberFoldableLayoutInfo()
     val (origin, originModifier) = rememberWindowOrigin()
     BoxWithConstraints(modifier.fillMaxSize().then(originModifier), contentAlignment = AbsoluteAlignment.TopLeft) {
-        val layout =
-            resolveWorkspaceComposition(
+        val focusBounds =
+            resolveWorkspacePlaybackBounds(
                 maxWidth,
                 maxHeight,
-                PanelConstraints.Visual,
-                PanelConstraints.Browse,
                 foldable = foldable,
                 origin = origin,
                 layoutDirection = direction,
             )
-        val focusBounds = layout.focus
         Box(
             Modifier
                 .absoluteOffset {
                     IntOffset(focusBounds.x.roundToPx(), focusBounds.y.roundToPx())
                 }.size(focusBounds.width, focusBounds.height),
-        ) { focus() }
-        val controlsBounds = layout.browse ?: layout.focus
-        Box(
-            Modifier
-                .absoluteOffset {
-                    IntOffset(controlsBounds.x.roundToPx(), controlsBounds.y.roundToPx())
-                }.size(controlsBounds.width, controlsBounds.height),
         ) {
-            controls(layout.browse != null)
+            focus()
+            controls()
         }
     }
 }

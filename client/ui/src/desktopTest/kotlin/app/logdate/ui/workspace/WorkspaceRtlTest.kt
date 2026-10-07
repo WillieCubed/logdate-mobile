@@ -27,11 +27,6 @@ class WorkspaceRtlTest {
             AdaptiveWorkspaceLayout(browse = support, focus = focus)
         }
 
-    @Test fun playbackAndControlsAreFullyVisibleInRtl() =
-        verifyBounds { focus, support ->
-            WorkspacePlaybackLayout(focus = focus, controls = { support() })
-        }
-
     private fun verifyBounds(layout: @Composable (@Composable () -> Unit, @Composable () -> Unit) -> Unit) =
         runDesktopComposeUiTest(width = 1280, height = 800) {
             setContent {

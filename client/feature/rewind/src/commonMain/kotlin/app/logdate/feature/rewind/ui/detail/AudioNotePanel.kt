@@ -3,36 +3,47 @@
 package app.logdate.feature.rewind.ui.detail
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.audio.AudioWaveformComponent
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.timeline.newstuff.TimelineTranscriptPreview
+import logdate.client.feature.rewind.generated.resources.Res
+import logdate.client.feature.rewind.generated.resources.rewind_pause_audio
+import logdate.client.feature.rewind.generated.resources.rewind_play_audio
+import org.jetbrains.compose.resources.stringResource
 import kotlin.uuid.Uuid
 
 private val AUDIO_PANEL_BACKGROUND = Color(0xFF1A1A1A)
@@ -80,86 +91,113 @@ fun AudioNotePanel(
                 ),
         contentAlignment = Alignment.Center,
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth(0.85f)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color.Black.copy(alpha = 0.3f))
-                    .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+        Box(
+            Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(top = 80.dp, bottom = 24.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            Surface(
-                shape = CircleShape,
-                color = Color.White.copy(alpha = 0.15f),
+            Column(
                 modifier =
                     Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .pointerInput(sourceId, uri) {
-                            detectTapGestures { onTogglePlayback(sourceId, uri) }
-                        },
+                        .fillMaxWidth(0.85f)
+                        .verticalScroll(rememberScrollState())
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Black.copy(alpha = 0.3f))
+                        .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        painter = if (isPlaying) PlatformIcons.pause() else PlatformIcons.play(),
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp),
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            AudioWaveformComponent(
-                audioLevels = cachedAmplitudes.orEmpty(),
-                waveformColor = if (isPlaying) Color.White else Color.White.copy(alpha = 0.6f),
-                minHeight = 56.dp,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            if (isPlaying) {
-                Spacer(modifier = Modifier.height(8.dp))
-                LinearProgressIndicator(
-                    progress = { playbackProgress },
+                Surface(
+                    shape = CircleShape,
+                    color = Color.White.copy(alpha = 0.15f),
                     modifier =
                         Modifier
-                            .fillMaxWidth()
-                            .height(3.dp)
-                            .clip(RoundedCornerShape(1.5.dp)),
-                    color = Color.White,
-                    trackColor = Color.White.copy(alpha = 0.2f),
-                    strokeCap = StrokeCap.Round,
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .clickable(
+                                role = Role.Button,
+                                onClickLabel =
+                                    stringResource(
+                                        if (isPlaying) Res.string.rewind_pause_audio else Res.string.rewind_play_audio,
+                                    ),
+                            ) { onTogglePlayback(sourceId, uri) },
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            painter = if (isPlaying) PlatformIcons.pause() else PlatformIcons.play(),
+                            contentDescription =
+                                stringResource(
+                                    if (isPlaying) Res.string.rewind_pause_audio else Res.string.rewind_play_audio,
+                                ),
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                AudioWaveformComponent(
+                    audioLevels = cachedAmplitudes.orEmpty(),
+                    waveformColor = if (isPlaying) Color.White else Color.White.copy(alpha = 0.6f),
+                    minHeight = 56.dp,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
                 )
-            }
 
-            Spacer(modifier = Modifier.height(12.dp))
+                if (isPlaying) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LinearProgressIndicator(
+                        progress = { playbackProgress },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(3.dp)
+                                .clip(RoundedCornerShape(1.5.dp)),
+                        color = Color.White,
+                        trackColor = Color.White.copy(alpha = 0.2f),
+                        strokeCap = StrokeCap.Round,
+                    )
+                }
 
-            Text(
-                text = formatAudioNoteDuration(durationMs),
-                style = MaterialTheme.typography.labelMedium,
-                color = Color.White.copy(alpha = 0.7f),
-            )
+                Spacer(modifier = Modifier.height(12.dp))
 
-            if (transcriptionText != null) {
+                Text(
+                    text = formatAudioNoteDuration(durationMs),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.7f),
+                )
+
+                if (transcriptionText != null) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    MaterialTheme(
+                        colorScheme =
+                            MaterialTheme.colorScheme.copy(
+                                primary = Color.White,
+                                onSurface = Color.White,
+                                surfaceContainerHighest = AUDIO_PANEL_BACKGROUND,
+                            ),
+                    ) {
+                        CompositionLocalProvider(LocalContentColor provides Color.White) {
+                            TimelineTranscriptPreview(
+                                noteId = sourceId,
+                                fallbackTranscript = transcriptionText,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
-                TimelineTranscriptPreview(
-                    noteId = sourceId,
-                    fallbackTranscript = transcriptionText,
-                    modifier = Modifier.fillMaxWidth(),
+
+                Text(
+                    text = dateFormatted,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontStyle = FontStyle.Italic,
                 )
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = dateFormatted,
-                style = MaterialTheme.typography.labelMedium,
-                color = Color.White.copy(alpha = 0.7f),
-                fontStyle = FontStyle.Italic,
-            )
         }
     }
 }

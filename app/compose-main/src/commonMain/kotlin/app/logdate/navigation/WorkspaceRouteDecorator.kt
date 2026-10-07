@@ -5,6 +5,7 @@ package app.logdate.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.navigation3.runtime.NavEntryDecorator
+import app.logdate.navigation.scenes.isAlwaysFullscreen
 import app.logdate.ui.navigation.routeClass
 
 /** Applies Home framing to routes that participate in the workspace. */
@@ -25,7 +26,7 @@ fun <T : Any> rememberWorkspaceRouteDecorator(): NavEntryDecorator<T> =
                         TimelineDetailRoute::class,
                         app.logdate.feature.rewind.navigation.RewindDetailRoute::class,
                     )
-            if (workspaceRoute) {
+            if (workspaceRoute && !isAlwaysFullscreen(route)) {
                 app.logdate.ui.workspace
                     .WorkspaceRouteFrame { entry.Content() }
             } else {

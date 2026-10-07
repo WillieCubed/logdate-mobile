@@ -103,4 +103,7 @@
     <!-- Icon labels -->
     <string name="text">↓</string>
     <string name="text_2">🎉</string>
+    <string name="rewind_play_audio">Play recording</string>
+    <string name="rewind_pause_audio">Pause recording</string>
+    <string name="rewind_more_actions">More rewind actions</string>
 </resources>

@@ -645,6 +645,8 @@ dependencies {
     screenshotTestImplementation(projects.app.composeMain)
     screenshotTestImplementation(libs.coil.compose)
     screenshotTestImplementation(libs.kotlinx.datetime)
+    screenshotTestImplementation(libs.nav3.ui)
+    androidTestImplementation(libs.nav3.ui)
     screenshotTestImplementation(libs.nav3.runtime)
 }
 
