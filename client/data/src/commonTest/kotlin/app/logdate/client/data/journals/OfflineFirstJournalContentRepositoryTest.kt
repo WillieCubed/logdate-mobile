@@ -44,7 +44,7 @@ class OfflineFirstJournalContentRepositoryTest {
     }
 
     @Test
-    fun `add contents deduplicates requests, preserves existing links, and queues only new associations`() =
+    fun `add contents deduplicates requests and preserves existing links while queuing only new associations`() =
         runTest(dispatcher) {
             val journalId = Uuid.random()
             val existingId = Uuid.random()

@@ -64,7 +64,7 @@ class JournalContentPickerViewModelTest {
     }
 
     @Test
-    fun `shows eligible mixed content newest first, preserves selection across search, and removes review items`() =
+    fun `shows eligible mixed content newest first while preserving selection across search and removing review items`() =
         runTest(dispatcher) {
             backgroundScope.launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
