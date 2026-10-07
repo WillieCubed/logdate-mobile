@@ -52,6 +52,7 @@ internal val SAFE_CLOUD_ERROR_CODES =
         "INVALID_ACCOUNT_KEYS",
         "INVALID_CLAIM",
         "INVALID_CREDENTIAL",
+        "INVALID_DEVICE",
         "INVALID_DRAFT_FORMAT",
         "INVALID_ENROLLMENT",
         "INVALID_ID",

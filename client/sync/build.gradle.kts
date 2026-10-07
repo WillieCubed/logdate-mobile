@@ -1,5 +1,7 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -101,4 +103,12 @@ kotlin {
             implementation(libs.kotlinx.coroutines.swing)
         }
     }
+}
+
+// The error-code contract reads server documentation outside this module.
+tasks.named<Test>("desktopTest") {
+    inputs
+        .dir(rootProject.layout.projectDirectory.dir("server/src/main/kotlin/app/logdate/server/routes/docs"))
+        .withPropertyName("documentedServerErrors")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }
