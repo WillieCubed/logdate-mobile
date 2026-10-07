@@ -3,7 +3,6 @@ package app.logdate.feature.editor.ui.audio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -12,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.media.device.AudioRouteRepository
@@ -21,6 +21,7 @@ import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.AudioCaptureState
 import app.logdate.feature.editor.ui.editor.RecordingState
 import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
+import app.logdate.feature.editor.ui.layout.LocalEditorCorners
 import app.logdate.ui.audio.AudioContextProcessor
 import app.logdate.util.formatDateLocalized
 import io.github.aakira.napier.Napier
@@ -56,6 +57,7 @@ fun AudioBlockEditor(
     modifier: Modifier = Modifier,
     inline: Boolean = false,
     selected: Boolean = false,
+    availableHeight: Dp = Dp.Infinity,
 ) {
     val labelResolver = remember { AudioLabelResolver() }
     val labelResult =
@@ -201,21 +203,6 @@ fun AudioBlockEditor(
                     Napier.w(error) { "Unable to load the recording waveform" }
                 }
             }
-            val hasTranscript =
-                block.transcription.isNotBlank() ||
-                    audioUiState.timedTranscript?.utterances?.any { it.text.isNotBlank() } == true
-            val hasOutputChoice =
-                outputSelection.devices
-                    .filter { it.isAvailable }
-                    .distinctBy { it.groupKey }
-                    .size > 1
-            val completedHeight =
-                when {
-                    selected && hasTranscript -> 420.dp
-                    selected -> if (hasOutputChoice) 224.dp else 164.dp
-                    hasTranscript -> 132.dp
-                    else -> 88.dp
-                }
             AudioBlockContent(
                 block = block,
                 isExpanded = !inline || selected,
@@ -236,12 +223,10 @@ fun AudioBlockEditor(
                 outputSelection = outputSelection,
                 onOutputDeviceSelected = audioRouteRepository::selectOutputDevice,
                 waveformAmplitudes = waveformAmplitudes,
-                modifier =
-                    if (inline) {
-                        Modifier.fillMaxWidth().height(completedHeight)
-                    } else {
-                        Modifier.fillMaxSize()
-                    },
+                availableHeight = availableHeight,
+                cornerRadius = LocalEditorCorners.current.cardRadius,
+                trailingActionInset = if (inline) 40.dp else 0.dp,
+                modifier = Modifier.fillMaxWidth(),
             )
         } else {
             AudioPermissionWrapper {

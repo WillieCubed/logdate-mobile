@@ -19,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import androidx.compose.ui.unit.dp
 import app.logdate.client.media.audio.transcription.TimedTranscript
@@ -73,7 +74,7 @@ class CompletedAudioPresentationTest {
             val waveform = onNodeWithTag("completed_audio_waveform").getUnclippedBoundsInRoot()
             val transcriptBounds = onNodeWithTag("completed_audio_transcript").getUnclippedBoundsInRoot()
             assertTrue(
-                transcriptBounds.bottom - transcriptBounds.top > (waveform.bottom - waveform.top) * 2,
+                transcriptBounds.bottom - transcriptBounds.top > waveform.bottom - waveform.top,
                 "The transcript is the main content",
             )
             val directory =
@@ -98,7 +99,7 @@ class CompletedAudioPresentationTest {
                         onDeleteClicked = {},
                         onSeekPositionChanged = {},
                         onSeekTimestampClicked = {},
-                        modifier = Modifier.fillMaxWidth().height(132.dp),
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
@@ -190,6 +191,48 @@ class CompletedAudioPresentationTest {
                 }
             }
             onNodeWithText(completedBlock.transcription).assertIsDisplayed()
+        }
+
+    @Test
+    fun `short pane keeps transcript readable with alternate output`() =
+        runSkikoComposeUiTest(size = Size(390f, 200f)) {
+            setContent {
+                CompletedAudioFixture {
+                    AudioBlockContent(
+                        block = completedBlock,
+                        timedTranscript = transcript,
+                        isExpanded = true,
+                        isPlaying = false,
+                        onPlayPauseClicked = {},
+                        onDeleteClicked = {},
+                        onSeekPositionChanged = {},
+                        onSeekTimestampClicked = {},
+                        showDeleteAction = false,
+                        availableHeight = 200.dp,
+                        outputSelection =
+                            MediaDeviceSelectionUiState(
+                                kind = MediaDeviceKind.AUDIO_OUTPUT,
+                                devices =
+                                    listOf(
+                                        DefaultMediaDevices.systemOutput,
+                                        MediaDeviceUiState(
+                                            "headphones",
+                                            "Headphones",
+                                            MediaDeviceKind.AUDIO_OUTPUT,
+                                            MediaDeviceCategory.WIRED,
+                                        ),
+                                    ),
+                                selectedDeviceId = DefaultMediaDevices.systemOutput.id,
+                            ),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+            val text = onNodeWithTag("completed_audio_transcript").getUnclippedBoundsInRoot()
+            assertTrue(text.bottom - text.top >= 56.dp, "At least one transcript line and its padding must remain visible")
+            onNodeWithText(transcript.utterances.first().text).assertIsDisplayed()
+            onNodeWithContentDescription("Play").performScrollTo().assertIsDisplayed()
+            onNodeWithText("System output").performScrollTo().assertIsDisplayed()
         }
 
     private val completedBlock =

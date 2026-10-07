@@ -4,46 +4,40 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.logdate.client.media.audio.transcription.TimedTranscript
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.feature.editor.ui.LocalSharedTransitionScope
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
-import app.logdate.feature.editor.ui.formatMediaDuration
-import app.logdate.ui.audio.AudioWaveformComponent
 import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.platform.PlatformIcons
 import logdate.client.ui.generated.resources.common_delete
@@ -69,47 +63,60 @@ fun AudioBlockContent(
     modifier: Modifier = Modifier,
     showDeleteAction: Boolean = true,
     waveformAmplitudes: List<Float> = emptyList(),
+    availableHeight: Dp = Dp.Infinity,
+    cornerRadius: Dp = 32.dp,
+    trailingActionInset: Dp = 0.dp,
 ) {
     val sharedScope = LocalSharedTransitionScope.current
     val content: @Composable SharedTransitionScope.() -> Unit = {
-        AnimatedContent(targetState = isExpanded, modifier = modifier, label = "CompletedAudioExpansion") { expanded ->
-            val playbackModifier =
-                Modifier.sharedElement(
-                    rememberSharedContentState("play_pause_button_${block.id}"),
-                    this@AnimatedContent,
-                )
-            val waveformModifier =
-                Modifier.sharedElement(
-                    rememberSharedContentState("waveform_${block.id}"),
-                    this@AnimatedContent,
-                )
-            if (expanded) {
-                ExpandedAudioContent(
-                    block = block,
-                    isPlaying = isPlaying,
-                    progress = playbackProgress.coerceIn(0f, 1f),
-                    timedTranscript = timedTranscript,
-                    onPlayPauseClicked = onPlayPauseClicked,
-                    onDeleteClicked = onDeleteClicked,
-                    onProgressChanged = onSeekPositionChanged,
-                    onSeekTimestampClicked = onSeekTimestampClicked,
-                    outputSelection = outputSelection,
-                    onOutputDeviceSelected = onOutputDeviceSelected,
-                    waveformAmplitudes = waveformAmplitudes,
-                    showDeleteAction = showDeleteAction,
-                    playbackModifier = playbackModifier,
-                    waveformModifier = waveformModifier,
-                )
-            } else {
-                CollapsedAudioContent(
-                    block,
-                    isPlaying,
-                    timedTranscript,
-                    onPlayPauseClicked,
-                    waveformAmplitudes,
-                    playbackModifier,
-                    waveformModifier,
-                )
+        BoxWithConstraints(modifier.fillMaxWidth()) {
+            val transcriptHeightLimit = (maxWidth * .75f * LocalDensity.current.fontScale).coerceAtMost(400.dp)
+            val blockHeightLimit = minOf(maxHeight, availableHeight, transcriptHeightLimit + 280.dp).coerceAtLeast(0.dp)
+            AnimatedContent(targetState = isExpanded, label = "CompletedAudioExpansion") { expanded ->
+                val playbackModifier =
+                    Modifier.sharedElement(
+                        rememberSharedContentState("play_pause_button_${block.id}"),
+                        this@AnimatedContent,
+                    )
+                val waveformModifier =
+                    Modifier.sharedElement(
+                        rememberSharedContentState("waveform_${block.id}"),
+                        this@AnimatedContent,
+                    )
+                if (expanded) {
+                    ExpandedAudioContent(
+                        block = block,
+                        isPlaying = isPlaying,
+                        progress = playbackProgress.coerceIn(0f, 1f),
+                        timedTranscript = timedTranscript,
+                        onPlayPauseClicked = onPlayPauseClicked,
+                        onDeleteClicked = onDeleteClicked,
+                        onProgressChanged = onSeekPositionChanged,
+                        onSeekTimestampClicked = onSeekTimestampClicked,
+                        outputSelection = outputSelection,
+                        onOutputDeviceSelected = onOutputDeviceSelected,
+                        waveformAmplitudes = waveformAmplitudes,
+                        showDeleteAction = showDeleteAction,
+                        playbackModifier = playbackModifier,
+                        waveformModifier = waveformModifier,
+                        heightLimit = blockHeightLimit,
+                        transcriptHeightLimit = transcriptHeightLimit,
+                        trailingActionInset = trailingActionInset,
+                        transcriptRadius = cornerRadius,
+                    )
+                } else {
+                    CollapsedAudioContent(
+                        block,
+                        isPlaying,
+                        timedTranscript,
+                        onPlayPauseClicked,
+                        waveformAmplitudes,
+                        playbackModifier,
+                        waveformModifier,
+                        trailingActionInset,
+                        cornerRadius,
+                    )
+                }
             }
         }
     }
@@ -130,37 +137,49 @@ private fun CollapsedAudioContent(
     waveformAmplitudes: List<Float>,
     playbackModifier: Modifier,
     waveformModifier: Modifier,
+    trailingActionInset: Dp,
+    transcriptRadius: Dp,
 ) {
+    val transcriptText = timedTranscript?.plainText?.takeIf(String::isNotBlank) ?: block.transcription
     Column(
-        modifier = Modifier.fillMaxWidth().padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            CompletedPlaybackButton(isPlaying, onPlayPauseClicked, Modifier.size(48.dp).then(playbackModifier))
-            CompletedWaveform(waveformAmplitudes, 0f, Modifier.weight(1f).height(48.dp).then(waveformModifier))
-            Text(
-                text = formatMediaDuration(block.duration, true),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        val transcriptText = timedTranscript?.plainText?.takeIf(String::isNotBlank) ?: block.transcription
         if (transcriptText.isNotBlank()) {
-            Text(
-                text = transcriptText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+            Surface(shape = RoundedCornerShape(transcriptRadius), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                Text(
+                    text = transcriptText,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier =
+                        Modifier.fillMaxWidth().padding(
+                            start = 12.dp,
+                            top = 12.dp,
+                            end = 12.dp + trailingActionInset,
+                            bottom = 12.dp,
+                        ),
+                )
+            }
+        }
+        Box(Modifier.padding(12.dp)) {
+            CompletedAudioTransport(
+                block.duration,
+                isPlaying,
+                progress = 0f,
+                amplitudes = waveformAmplitudes,
+                onPlayPauseClicked = onPlayPauseClicked,
+                onProgressChanged = null,
+                playbackModifier = playbackModifier,
+                waveformModifier = waveformModifier,
+                compact = true,
+                trailingActionInset = if (transcriptText.isBlank()) trailingActionInset else 0.dp,
             )
         }
     }
 }
 
 @Suppress("ktlint:standard:function-naming")
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ExpandedAudioContent(
     block: AudioBlockUiState,
@@ -177,20 +196,50 @@ private fun ExpandedAudioContent(
     showDeleteAction: Boolean,
     playbackModifier: Modifier,
     waveformModifier: Modifier,
+    heightLimit: Dp,
+    transcriptHeightLimit: Dp,
+    trailingActionInset: Dp,
+    transcriptRadius: Dp,
 ) {
+    val utterances = timedTranscript?.utterances.orEmpty().filter { it.text.isNotBlank() }
+    val hasTranscript = utterances.isNotEmpty() || block.transcription.isNotBlank()
+    val hasOutputChoice =
+        outputSelection
+            ?.devices
+            ?.filter { it.isAvailable }
+            ?.distinctBy { it.groupKey }
+            ?.size
+            ?.let { it > 1 } == true
+    val density = LocalDensity.current
+    val transcriptReserve =
+        if (hasTranscript) {
+            with(density) {
+                MaterialTheme.typography.bodyLarge.lineHeight
+                    .toDp()
+            } + 32.dp
+        } else {
+            0.dp
+        }
+    val chromeHeight = (if (showDeleteAction) 48.dp else 0.dp) + (if (hasOutputChoice) 64.dp else 0.dp)
+    val minimumTransportHeight =
+        with(density) {
+            (
+                MaterialTheme.typography.labelSmall.lineHeight
+                    .takeIf { it.isSp } ?: 16.sp
+            ).toDp()
+        } + 4.dp + IconButtonDefaults.mediumContainerSize().height
+    val mustScroll = heightLimit < transcriptReserve + chromeHeight + minimumTransportHeight + 24.dp
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(max = heightLimit)
+                .then(if (mustScroll) Modifier.verticalScroll(rememberScrollState()) else Modifier),
     ) {
         if (showDeleteAction) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 if (block.caption.isNotBlank()) {
-                    Text(
-                        block.caption,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
-                    )
+                    Text(block.caption, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                 } else {
                     Box(Modifier.weight(1f))
                 }
@@ -199,54 +248,26 @@ private fun ExpandedAudioContent(
                 }
             }
         }
-        if (outputSelection != null &&
-            outputSelection.devices
-                .filter { it.isAvailable }
-                .distinctBy { it.groupKey }
-                .size > 1
-        ) {
-            MediaDeviceSelector(outputSelection, onOutputDeviceSelected, label = "Audio output")
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            CompletedPlaybackButton(isPlaying, onPlayPauseClicked, Modifier.size(64.dp).then(playbackModifier))
-            CompletedWaveform(waveformAmplitudes, progress, Modifier.weight(1f).height(72.dp).then(waveformModifier))
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                formatMediaDuration((block.duration * progress).toLong(), true),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Slider(
-                value = progress,
-                onValueChange = onProgressChanged,
-                modifier = Modifier.weight(1f),
-                enabled = block.duration > 0,
-            )
-            Text(
-                formatMediaDuration(block.duration, true),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag("audio_block_duration"),
-            )
-        }
-        val utterances = timedTranscript?.utterances.orEmpty().filter { it.text.isNotBlank() }
-        if (utterances.isNotEmpty() || block.transcription.isNotBlank()) {
+        if (hasTranscript) {
             Surface(
-                modifier = Modifier.fillMaxWidth().weight(1f).testTag("completed_audio_transcript"),
-                shape = RoundedCornerShape(20.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .then(if (mustScroll) Modifier else Modifier.weight(1f, fill = false))
+                        .heightIn(min = 132.dp, max = transcriptHeightLimit.coerceAtLeast(132.dp))
+                        .testTag("completed_audio_transcript"),
+                shape = RoundedCornerShape(transcriptRadius),
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
             ) {
                 Column(
-                    modifier = Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
+                    modifier =
+                        Modifier.verticalScroll(rememberScrollState()).padding(
+                            start = 16.dp,
+                            top = 16.dp,
+                            end =
+                                16.dp + trailingActionInset,
+                            bottom = 16.dp,
+                        ),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     if (utterances.isEmpty()) {
@@ -261,16 +282,12 @@ private fun ExpandedAudioContent(
                                         .fillMaxWidth()
                                         .testTag("completed_audio_phrase_$index")
                                         .semantics { selected = active }
-                                        .clickable(enabled = block.duration > 0, onClickLabel = "Play from this phrase") {
-                                            onSeekTimestampClicked(utterance.startMs)
-                                        },
+                                        .clickable(
+                                            enabled = block.duration > 0,
+                                            onClickLabel = "Play from this phrase",
+                                        ) { onSeekTimestampClicked(utterance.startMs) },
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
-                                Box(
-                                    Modifier.width(3.dp).height(24.dp).clip(RoundedCornerShape(2.dp)).background(
-                                        if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerLow,
-                                    ),
-                                )
                                 Text(
                                     utterance.text,
                                     style = MaterialTheme.typography.bodyLarge,
@@ -282,53 +299,23 @@ private fun ExpandedAudioContent(
                 }
             }
         }
-    }
-}
-
-@Suppress("ktlint:standard:function-naming")
-@Composable
-private fun CompletedPlaybackButton(
-    isPlaying: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier,
-) {
-    val corners by animateDpAsState(if (isPlaying) 16.dp else 22.dp, label = "CompletedPlaybackShape")
-    FilledIconButton(
-        onClick = onClick,
-        modifier = modifier.semantics { contentDescription = if (isPlaying) "Pause" else "Play" },
-        shape = RoundedCornerShape(corners),
-    ) {
-        MorphingPlayPauseIcon(isPlaying = isPlaying, size = 32.dp, tint = MaterialTheme.colorScheme.onPrimary)
-    }
-}
-
-@Suppress("ktlint:standard:function-naming")
-@Composable
-private fun CompletedWaveform(
-    amplitudes: List<Float>,
-    progress: Float,
-    modifier: Modifier,
-) {
-    Box(
-        modifier =
-            modifier
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .testTag("completed_audio_waveform"),
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth(progress)
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = .1f)),
-        )
-        AudioWaveformComponent(
-            audioLevels = amplitudes,
-            waveformColor = MaterialTheme.colorScheme.primary,
-            strokeWidth = 3.dp,
-            maxBars = 60,
-            minHeight = 32.dp,
-            modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
-        )
+        if (hasOutputChoice) {
+            Box(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                MediaDeviceSelector(outputSelection, onOutputDeviceSelected, label = "Audio output")
+            }
+        }
+        Box(Modifier.padding(12.dp)) {
+            CompletedAudioTransport(
+                block.duration,
+                isPlaying,
+                progress,
+                waveformAmplitudes,
+                onPlayPauseClicked,
+                onProgressChanged,
+                playbackModifier,
+                waveformModifier,
+                trailingActionInset = if (hasTranscript) 0.dp else trailingActionInset,
+            )
+        }
     }
 }

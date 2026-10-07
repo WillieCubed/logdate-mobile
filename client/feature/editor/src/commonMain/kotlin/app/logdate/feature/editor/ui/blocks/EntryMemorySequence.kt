@@ -268,6 +268,7 @@ internal fun EntryMemorySequence(
                 if (!keyboardVisible) SideEffect { photoViewportHeight = maxHeight }
                 val availablePhotoHeight = (if (keyboardVisible) photoViewportHeight else maxHeight) - 16.dp
                 val focusedTextHeight = 384.dp
+                val availableAudioHeight = (maxHeight - 16.dp).coerceAtLeast(0.dp)
                 val footerHeight = if (contextControlsVisible) 56.dp + revealTravel * revealProgress else 0.dp
                 val recordingHeight =
                     if (presentation.isRecording) {
@@ -363,6 +364,7 @@ internal fun EntryMemorySequence(
                                         onPhotoAspectRatioLoaded = { id, ratio -> aspectRatios[id] = ratio },
                                         focusedTextHeight = focusedTextHeight,
                                         unfinishedRecordingHeight = recordingHeight,
+                                        availableAudioHeight = availableAudioHeight,
                                     )
                                 }
                             }

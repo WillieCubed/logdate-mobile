@@ -102,7 +102,13 @@ internal fun MemoryBlockSurface(
                 }
             Column(contentInsets) { content() }
             if (!recordingActive) {
-                Box(Modifier.align(Alignment.TopEnd).padding(4.dp)) {
+                val menuTopInset =
+                    if (block is AudioBlockUiState && block.uri != null) {
+                        if (isSelected) 8.dp else 4.dp
+                    } else {
+                        4.dp
+                    }
+                Box(Modifier.align(Alignment.TopEnd).padding(top = menuTopInset, end = 4.dp)) {
                     val overMedia = block is ImageBlockUiState || block is VideoBlockUiState || block is CameraBlockUiState
                     IconButton(
                         onClick = {

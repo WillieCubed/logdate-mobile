@@ -289,14 +289,15 @@ class RecordingBackgroundLifecycleE2ETest {
                 assertTrue("A completed recording without transcript must collapse to its controls", bounds.bottom - bounds.top < 240.dp)
             }
             if (includeExistingText) {
-                val retainedText = runBlocking {
-                    draftRepository
-                        .getDrafts()
-                        .first()
-                        .first { draft -> draft.notes.any { it.uid == owner } }
-                        .notes
-                        .filterIsInstance<JournalNote.Text>()
-                }
+                val retainedText =
+                    runBlocking {
+                        draftRepository
+                            .getDrafts()
+                            .first()
+                            .first { draft -> draft.notes.any { it.uid == owner } }
+                            .notes
+                            .filterIsInstance<JournalNote.Text>()
+                    }
                 assertTrue("Existing text must remain durably saved", retainedText.any { it.content == "Before this recording." })
             }
             capture("recording-$label-finalized")

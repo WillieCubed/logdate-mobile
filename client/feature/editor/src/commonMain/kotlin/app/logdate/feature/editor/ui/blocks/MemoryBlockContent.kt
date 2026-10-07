@@ -62,6 +62,7 @@ internal fun MemoryBlockContent(
     onPhotoAspectRatioLoaded: (Uuid, Float) -> Unit = { _, _ -> },
     focusedTextHeight: Dp = 0.dp,
     unfinishedRecordingHeight: Dp = 420.dp,
+    availableAudioHeight: Dp = Dp.Infinity,
 ) {
     Column(Modifier.fillMaxWidth()) {
         when (block) {
@@ -127,6 +128,7 @@ internal fun MemoryBlockContent(
                         ),
                     inline = true,
                     selected = isSelected,
+                    availableHeight = availableAudioHeight,
                 )
             is CameraBlockUiState -> {
                 if (block.mediaType == CapturedMediaType.VIDEO && block.uri != null) {
