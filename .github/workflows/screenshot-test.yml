@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'app/android-main/**'
+      - 'app/wear/**'
       - 'client/feature/**'
       - 'client/ui/**'
       - 'client/theme/**'
@@ -35,7 +36,7 @@ permissions:
 jobs:
   android-wear-screenshots:
     name: ${{ matrix.platform }} screenshots
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -43,8 +44,14 @@ jobs:
         include:
           - platform: Android
             module: android-main
+            runner: ubuntu-latest
+            distribution: temurin
+            java-version: '17'
           - platform: Wear
             module: wear
+            runner: macos-latest
+            distribution: jetbrains
+            java-version: '21'
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -58,11 +65,13 @@ jobs:
           android-maps-api-key: ${{ secrets.LOGDATE_GOOGLE_MAPS_API_KEY_DEBUG }}
           google-server-client-id: ${{ vars.LOGDATE_GOOGLE_SERVER_CLIENT_ID_DEBUG }}
 
-      - name: Set up JDK 17
+      - name: Set up Java
         uses: actions/setup-java@v5
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: ${{ matrix.distribution }}
+          java-version: ${{ matrix.java-version }}
 
       - name: Set up Gradle cache
         uses: gradle/actions/setup-gradle@v6
