@@ -31,23 +31,21 @@ class LocalDiagnosticsViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(LocalDiagnosticsState())
     val state: StateFlow<LocalDiagnosticsState> = _state
-    private var prepared: DiagnosticReportBundle? = null
 
     fun refresh() {
         viewModelScope.launch {
             try {
                 val report = recorder.report()
-                prepared = DiagnosticReportBundles.prepare(report)
+                val prepared = DiagnosticReportBundles.prepare(report)
                 _state.value =
                     LocalDiagnosticsState(
-                        preview = prepared?.summary,
+                        preview = prepared.summary,
                         eventCount = report.events.size,
                         verboseRemainingMillis = verboseMode.remainingMillis(),
                     )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                prepared = null
                 _state.value = LocalDiagnosticsState(feedback = LocalDiagnosticsFeedback.EXPORT_FAILED)
             }
         }
@@ -56,8 +54,9 @@ class LocalDiagnosticsViewModel(
     fun export() {
         viewModelScope.launch {
             try {
-                val bundle = prepared ?: DiagnosticReportBundles.prepare(recorder.report()).also { prepared = it }
-                _state.value = _state.value.copy(preview = bundle.summary)
+                val report = recorder.report()
+                val bundle = DiagnosticReportBundles.prepare(report)
+                _state.value = _state.value.copy(preview = bundle.summary, eventCount = report.events.size)
                 val exported = exporter.export(bundle)
                 _state.value =
                     _state.value.copy(
@@ -76,7 +75,6 @@ class LocalDiagnosticsViewModel(
         viewModelScope.launch {
             try {
                 recorder.clear()
-                prepared = null
                 _state.value =
                     LocalDiagnosticsState(
                         verboseRemainingMillis = verboseMode.remainingMillis(),

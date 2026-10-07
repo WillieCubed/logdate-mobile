@@ -55,8 +55,8 @@ fun DefaultSettingsContentContainer(
         Box(
             modifier =
                 Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 600.dp),
+                    .widthIn(max = 600.dp)
+                    .fillMaxWidth(),
         ) {
             content()
         }

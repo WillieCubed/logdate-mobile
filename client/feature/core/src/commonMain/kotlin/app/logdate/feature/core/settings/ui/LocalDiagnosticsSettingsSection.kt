@@ -94,7 +94,6 @@ internal fun LocalDiagnosticsSettingsSection(
                 icon = Icons.Outlined.FileDownload,
                 title = stringResource(Res.string.diagnostics_export),
                 description = stringResource(Res.string.diagnostics_export_description),
-                enabled = hasHistory,
                 onClick = onExport,
             )
             DiagnosticsActionItem(
@@ -123,7 +122,7 @@ internal fun LocalDiagnosticsSettingsSection(
     }
     if (showPreview) {
         DiagnosticsPreviewDialog(
-            preview = state.preview?.takeIf { hasHistory },
+            preview = state.preview,
             onDismiss = { showPreview = false },
         )
     }

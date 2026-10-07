@@ -23,9 +23,9 @@ import app.logdate.feature.core.settings.ui.BirthdaySettingsScreen
 import app.logdate.feature.core.settings.ui.ClearDataSettingsScreen
 import app.logdate.feature.core.settings.ui.DataSettingsScreen
 import app.logdate.feature.core.settings.ui.DayBoundarySettingsScreen
+import app.logdate.feature.core.settings.ui.DeveloperToolsScreen
 import app.logdate.feature.core.settings.ui.ExportSettingsScreen
 import app.logdate.feature.core.settings.ui.LibrarySettingsScreen
-import app.logdate.feature.core.settings.ui.LocationAdvancedScreen
 import app.logdate.feature.core.settings.ui.LocationIntervalScreen
 import app.logdate.feature.core.settings.ui.LocationSettingsScreen
 import app.logdate.feature.core.settings.ui.LocationTrackingOptionsScreen
@@ -106,6 +106,7 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             onNavigateToTimeline = { onNavigateTo(TimelineSettingsRoute) },
             onNavigateToSync = { onNavigateTo(SyncSettingsRoute) },
             onNavigateToExport = { onNavigateTo(ExportSettingsRoute) },
+            onNavigateToAbout = { onNavigateTo(AdvancedSettingsRoute) },
             onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
             onNavigateToSignIn = onNavigateToSignIn,
         )
@@ -156,7 +157,10 @@ fun EntryProviderScope<NavKey>.settingsEntries(
         )
     }
     taggedEntry<AdvancedSettingsRoute> {
-        AdvancedSettingsScreen(onBack = onBack)
+        AdvancedSettingsScreen(onBack = onBack, onNavigateToDeveloperTools = { onNavigateTo(DeveloperToolsRoute) })
+    }
+    taggedEntry<DeveloperToolsRoute> {
+        DeveloperToolsScreen(onBack = onBack)
     }
     taggedEntry<LocationSettingsRoute> {
         LocationSettingsScreen(
@@ -164,7 +168,6 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             onOpenLocationTimeline = {},
             onNavigateToTrackingOptions = { onNavigateTo(LocationTrackingOptionsRoute) },
             onNavigateToInterval = { onNavigateTo(LocationIntervalRoute) },
-            onNavigateToAdvanced = { onNavigateTo(LocationAdvancedRoute) },
         )
     }
     taggedEntry<LocationTrackingOptionsRoute> {
@@ -174,7 +177,7 @@ fun EntryProviderScope<NavKey>.settingsEntries(
         LocationIntervalScreen(onBack = onBack)
     }
     taggedEntry<LocationAdvancedRoute> {
-        LocationAdvancedScreen(onBack = onBack)
+        DeveloperToolsScreen(onBack = onBack)
     }
     taggedEntry<MemoriesSettingsRoute> {
         MemoriesSettingsScreen(

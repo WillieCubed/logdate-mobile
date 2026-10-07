@@ -39,8 +39,6 @@ import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.location_advanced
-import logdate.client.feature.core.generated.resources.location_advanced_description
 import logdate.client.feature.core.generated.resources.location_background_tracking_description
 import logdate.client.feature.core.generated.resources.location_capture_mode
 import logdate.client.feature.core.generated.resources.location_capture_mode_active
@@ -77,8 +75,6 @@ fun LocationSettingsScreen(
     onShowLocationTimeline: () -> Unit = onOpenLocationTimeline,
     onNavigateToTrackingOptions: () -> Unit = {},
     onNavigateToInterval: () -> Unit = {},
-    @Suppress("UNUSED_PARAMETER")
-    onNavigateToAdvanced: () -> Unit = {},
     viewModel: LocationSettingsViewModel = koinViewModel(),
     modifier: Modifier = Modifier,
 ) {
@@ -92,7 +88,6 @@ fun LocationSettingsScreen(
         onShowLocationTimeline = onShowLocationTimeline,
         onNavigateToTrackingOptions = onNavigateToTrackingOptions,
         onNavigateToInterval = onNavigateToInterval,
-        onNavigateToAdvanced = onNavigateToAdvanced,
         modifier = modifier,
     )
 }
@@ -106,7 +101,6 @@ fun LocationSettingsContent(
     onShowLocationTimeline: () -> Unit,
     onNavigateToTrackingOptions: () -> Unit,
     onNavigateToInterval: () -> Unit,
-    onNavigateToAdvanced: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     FoldableBookLayout(
@@ -136,11 +130,6 @@ fun LocationSettingsContent(
                         title = stringResource(Res.string.location_tracking_options),
                         description = stringResource(Res.string.location_tracking_options_description),
                         onClick = onNavigateToTrackingOptions,
-                    )
-                    LocationSettingsNavItem(
-                        title = stringResource(Res.string.location_advanced),
-                        description = stringResource(Res.string.location_advanced_description),
-                        onClick = onNavigateToAdvanced,
                     )
                 }
 
@@ -246,11 +235,6 @@ fun LocationSettingsContent(
                             title = stringResource(Res.string.location_tracking_options),
                             description = stringResource(Res.string.location_tracking_options_description),
                             onClick = onNavigateToTrackingOptions,
-                        )
-                        LocationSettingsNavItem(
-                            title = stringResource(Res.string.location_advanced),
-                            description = stringResource(Res.string.location_advanced_description),
-                            onClick = onNavigateToAdvanced,
                         )
                     }
                 }

@@ -2,62 +2,62 @@
 
 package app.logdate.feature.core.settings.ui
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.SystemUpdate
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import app.logdate.feature.core.settings.updates.AppUpdateFlowType
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
-import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.MaterialContainer
+import app.logdate.ui.common.SettingsNavigationItem
 import app.logdate.ui.common.SettingsScaffold
+import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.advanced
+import logdate.client.feature.core.generated.resources.about_logdate
 import logdate.client.feature.core.generated.resources.app_update_available
 import logdate.client.feature.core.generated.resources.app_update_check_failed
 import logdate.client.feature.core.generated.resources.app_update_checking
 import logdate.client.feature.core.generated.resources.app_update_downloaded
 import logdate.client.feature.core.generated.resources.app_update_downloading
 import logdate.client.feature.core.generated.resources.app_update_immediate_required
-import logdate.client.feature.core.generated.resources.app_update_manual_label
 import logdate.client.feature.core.generated.resources.app_update_restart_action
 import logdate.client.feature.core.generated.resources.app_update_unsupported
 import logdate.client.feature.core.generated.resources.app_update_up_to_date
 import logdate.client.feature.core.generated.resources.app_updates
+import logdate.client.feature.core.generated.resources.app_updates_description
 import logdate.client.feature.core.generated.resources.app_version_label
 import logdate.client.feature.core.generated.resources.check_for_updates
+import logdate.client.feature.core.generated.resources.developer_tools
+import logdate.client.feature.core.generated.resources.developer_tools_description
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 
-/**
- * Advanced settings screen for app updates and version info.
- *
- * Server configuration has moved to Account & Sign-In.
- * This screen is not shown in the main settings overview — it's accessible
- * as a developer/power-user option.
- */
+/** App information and updates, with deliberate access to developer tools. */
 @Composable
 fun AdvancedSettingsScreen(
     onBack: () -> Unit,
+    onNavigateToDeveloperTools: () -> Unit = {},
     viewModel: AdvancedSettingsViewModel = koinViewModel(),
 ) {
     val appUpdateUiState by viewModel.appUpdateUiState.collectAsState()
 
     AdvancedSettingsContent(
         onBack = onBack,
+        onNavigateToDeveloperTools = onNavigateToDeveloperTools,
         appUpdateUiState = appUpdateUiState,
         onCheckForAppUpdates = viewModel::checkForAppUpdates,
         onCompleteAppUpdate = viewModel::completeAppUpdate,
@@ -70,64 +70,35 @@ fun AdvancedSettingsContent(
     appUpdateUiState: AppUpdateUiState,
     onCheckForAppUpdates: () -> Unit,
     onCompleteAppUpdate: () -> Unit,
+    onNavigateToDeveloperTools: () -> Unit = {},
 ) {
-    FoldableBookLayout(
-        modifier = Modifier.fillMaxSize(),
-        minPaneWidth = 320.dp,
-        startPane = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(vertical = Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Text(
-                    text = stringResource(Res.string.advanced),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
+    var versionTaps by rememberSaveable { mutableIntStateOf(0) }
+    SettingsScaffold(title = stringResource(Res.string.about_logdate), onBack = onBack) {
+        item {
+            MaterialContainer(modifier = Modifier.padding(horizontal = Spacing.lg)) {
+                ListItem(
+                    headlineContent = { Text(stringResource(Res.string.app_version_label, appUpdateUiState.currentVersionName)) },
+                    modifier = Modifier.clickable { versionTaps = (versionTaps + 1).coerceAtMost(7) },
                 )
-                Text(
-                    text = stringResource(Res.string.app_updates),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                )
-            }
-        },
-        endPane = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(vertical = Spacing.lg),
-            ) {
-                AppUpdateSection(
-                    appUpdateUiState = appUpdateUiState,
-                    onCheckForAppUpdates = onCheckForAppUpdates,
-                    onCompleteAppUpdate = onCompleteAppUpdate,
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                )
-            }
-        },
-        standardContent = {
-            SettingsScaffold(
-                title = stringResource(Res.string.advanced),
-                onBack = onBack,
-            ) {
-                item {
-                    AppUpdateSection(
-                        appUpdateUiState = appUpdateUiState,
-                        onCheckForAppUpdates = onCheckForAppUpdates,
-                        onCompleteAppUpdate = onCompleteAppUpdate,
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
+                if (versionTaps >= 7) {
+                    SettingsNavigationItem(
+                        title = stringResource(Res.string.developer_tools),
+                        description = stringResource(Res.string.developer_tools_description),
+                        icon = { Icon(Icons.Outlined.Code, contentDescription = null) },
+                        onClick = onNavigateToDeveloperTools,
                     )
                 }
             }
-        },
-    )
+        }
+        item {
+            AppUpdateSection(
+                appUpdateUiState = appUpdateUiState,
+                onCheckForAppUpdates = onCheckForAppUpdates,
+                onCompleteAppUpdate = onCompleteAppUpdate,
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+            )
+        }
+    }
 }
 
 @Composable
@@ -146,11 +117,7 @@ private fun AppUpdateSection(
 
     val statusMessage =
         when (appUpdateUiState.status) {
-            AppUpdateStatus.Idle ->
-                stringResource(
-                    Res.string.app_version_label,
-                    appUpdateUiState.currentVersionName,
-                )
+            AppUpdateStatus.Idle -> null
             AppUpdateStatus.Checking -> stringResource(Res.string.app_update_checking)
             AppUpdateStatus.UpToDate ->
                 appUpdateUiState.message ?: stringResource(Res.string.app_update_up_to_date)
@@ -169,43 +136,16 @@ private fun AppUpdateSection(
 
     val buttonEnabled = appUpdateUiState.status != AppUpdateStatus.Checking
 
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Text(
-            text = stringResource(Res.string.app_updates),
-            style = MaterialTheme.typography.titleMedium,
+    SettingsSection(title = stringResource(Res.string.app_updates), modifier = modifier) {
+        SettingsNavigationItem(
+            title = actionLabel,
+            description = statusMessage ?: stringResource(Res.string.app_updates_description),
+            icon = { Icon(Icons.Outlined.SystemUpdate, contentDescription = null) },
+            onClick = {
+                if (appUpdateUiState.status == AppUpdateStatus.Downloaded) onCompleteAppUpdate() else onCheckForAppUpdates()
+            },
+            enabled = buttonEnabled,
         )
-
-        MaterialContainer {
-            Column(
-                modifier = Modifier.padding(Spacing.md),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Text(
-                    text = stringResource(Res.string.app_update_manual_label),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Text(
-                    text = statusMessage,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Button(
-                    onClick = {
-                        if (appUpdateUiState.status == AppUpdateStatus.Downloaded) {
-                            onCompleteAppUpdate()
-                        } else {
-                            onCheckForAppUpdates()
-                        }
-                    },
-                    enabled = buttonEnabled,
-                ) {
-                    Text(actionLabel)
-                }
-            }
-        }
     }
 }
 

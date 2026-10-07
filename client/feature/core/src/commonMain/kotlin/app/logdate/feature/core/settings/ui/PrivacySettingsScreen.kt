@@ -3,12 +3,7 @@
 package app.logdate.feature.core.settings.ui
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocationOn
@@ -20,7 +15,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,8 +22,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.common.ToggleSettingsItem
@@ -43,7 +35,6 @@ import logdate.client.feature.core.generated.resources.location_settings
 import logdate.client.feature.core.generated.resources.manage_location_tracking_and_privacy_preferences
 import logdate.client.feature.core.generated.resources.navigate_to_location_settings
 import logdate.client.feature.core.generated.resources.privacy_and_security
-import logdate.client.feature.core.generated.resources.privacy_security_description
 import logdate.client.feature.core.generated.resources.settings_biometric_description
 import logdate.client.feature.core.generated.resources.settings_biometric_label
 import logdate.client.feature.core.generated.resources.system_search_visibility_description
@@ -71,12 +62,8 @@ fun PrivacySettingsScreen(
     onBack: () -> Unit,
     onNavigateToLocationSettings: () -> Unit = {},
     viewModel: PrivacySettingsViewModel = koinViewModel(),
-    diagnosticsViewModel: LocalDiagnosticsViewModel = koinViewModel(),
-    reporting: app.logdate.client.sync.diagnostics.DiagnosticReportingController = org.koin.compose.koinInject(),
 ) {
     val state by viewModel.state.collectAsState()
-    val diagnosticsState by diagnosticsViewModel.state.collectAsState()
-    LaunchedEffect(diagnosticsViewModel) { diagnosticsViewModel.refresh() }
 
     PrivacySettingsContent(
         onBack = onBack,
@@ -86,12 +73,6 @@ fun PrivacySettingsScreen(
         isSystemSearchVisibilityEnabled = state.isSystemSearchVisibilityEnabled,
         showSystemSearchVisibilityToggle = state.showSystemSearchVisibilityToggle,
         onNavigateToLocationSettings = onNavigateToLocationSettings,
-        diagnosticsState = diagnosticsState,
-        onPreviewDiagnostics = diagnosticsViewModel::refresh,
-        onExportDiagnostics = diagnosticsViewModel::export,
-        onClearDiagnostics = diagnosticsViewModel::clear,
-        onSetVerboseDiagnostics = diagnosticsViewModel::setVerboseEnabled,
-        reportingContent = { AutomaticDiagnosticReportingSection(reporting) },
     )
 }
 
@@ -104,209 +85,81 @@ fun PrivacySettingsContent(
     isSystemSearchVisibilityEnabled: Boolean = false,
     showSystemSearchVisibilityToggle: Boolean = false,
     onNavigateToLocationSettings: () -> Unit = {},
-    diagnosticsState: LocalDiagnosticsState = LocalDiagnosticsState(),
-    onPreviewDiagnostics: () -> Unit = {},
-    onExportDiagnostics: () -> Unit = {},
-    onClearDiagnostics: () -> Unit = {},
-    onSetVerboseDiagnostics: (Boolean) -> Unit = {},
-    reportingContent: @Composable () -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     var showDisableBiometricsDialog by remember { mutableStateOf(false) }
 
-    FoldableBookLayout(
-        modifier = Modifier.fillMaxSize(),
-        minPaneWidth = 320.dp,
-        startPane = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(vertical = Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    SettingsScaffold(
+        title = stringResource(Res.string.privacy_and_security),
+        onBack = onBack,
+        snackbarHostState = snackbarHostState,
+    ) {
+        item {
+            SettingsSection(
+                title = stringResource(Res.string.app_security),
+                modifier = Modifier.padding(horizontal = Spacing.lg),
             ) {
-                Text(
-                    text = stringResource(Res.string.privacy_security_description),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                ToggleSettingsItem(
+                    title = stringResource(Res.string.settings_biometric_label),
+                    description = stringResource(Res.string.settings_biometric_description),
+                    checked = isBiometricsEnabled,
+                    onCheckedChange = { enabled ->
+                        if (enabled) {
+                            onSetBiometricsEnabled(true)
+                        } else {
+                            showDisableBiometricsDialog = true
+                        }
+                    },
                 )
+            }
+        }
 
+        if (showSystemSearchVisibilityToggle) {
+            item {
                 SettingsSection(
-                    title = stringResource(Res.string.app_security),
+                    title = stringResource(Res.string.system_search_visibility_section),
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 ) {
                     ToggleSettingsItem(
-                        title = stringResource(Res.string.settings_biometric_label),
-                        description = stringResource(Res.string.settings_biometric_description),
-                        checked = isBiometricsEnabled,
-                        onCheckedChange = { enabled ->
-                            if (enabled) {
-                                onSetBiometricsEnabled(true)
-                            } else {
-                                showDisableBiometricsDialog = true
-                            }
-                        },
+                        title = stringResource(Res.string.system_search_visibility_label),
+                        description = stringResource(Res.string.system_search_visibility_description),
+                        checked = isSystemSearchVisibilityEnabled,
+                        onCheckedChange = onSetSystemSearchVisibilityEnabled,
                     )
-                }
-
-                if (showSystemSearchVisibilityToggle) {
-                    SettingsSection(
-                        title = stringResource(Res.string.system_search_visibility_section),
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    ) {
-                        ToggleSettingsItem(
-                            title = stringResource(Res.string.system_search_visibility_label),
-                            description = stringResource(Res.string.system_search_visibility_description),
-                            checked = isSystemSearchVisibilityEnabled,
-                            onCheckedChange = onSetSystemSearchVisibilityEnabled,
-                        )
-                    }
                 }
             }
-        },
-        endPane = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(vertical = Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        }
+
+        item {
+            SettingsSection(
+                title = stringResource(Res.string.location_privacy),
+                modifier = Modifier.padding(horizontal = Spacing.lg),
             ) {
-                SettingsSection(
-                    title = stringResource(Res.string.location_privacy),
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                ) {
-                    ListItem(
-                        headlineContent = { Text(stringResource(Res.string.location_settings)) },
-                        supportingContent = {
-                            Text(
-                                stringResource(Res.string.manage_location_tracking_and_privacy_preferences),
-                            )
-                        },
-                        leadingContent = {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        },
-                        trailingContent = {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                                contentDescription = stringResource(Res.string.navigate_to_location_settings),
-                            )
-                        },
-                        modifier = Modifier.clickable(onClick = onNavigateToLocationSettings),
-                    )
-                }
-                LocalDiagnosticsSettingsSection(
-                    state = diagnosticsState,
-                    onPreview = onPreviewDiagnostics,
-                    onExport = onExportDiagnostics,
-                    onClear = onClearDiagnostics,
-                    onSetVerboseEnabled = onSetVerboseDiagnostics,
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                ListItem(
+                    headlineContent = { Text(stringResource(Res.string.location_settings)) },
+                    supportingContent = {
+                        Text(
+                            stringResource(Res.string.manage_location_tracking_and_privacy_preferences),
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    },
+                    trailingContent = {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                            contentDescription = stringResource(Res.string.navigate_to_location_settings),
+                        )
+                    },
+                    modifier = Modifier.clickable(onClick = onNavigateToLocationSettings),
                 )
-                reportingContent()
             }
-        },
-        standardContent = {
-            SettingsScaffold(
-                title = stringResource(Res.string.privacy_and_security),
-                onBack = onBack,
-                snackbarHostState = snackbarHostState,
-            ) {
-                item {
-                    Text(
-                        text = stringResource(Res.string.privacy_security_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    )
-                }
-
-                item {
-                    SettingsSection(
-                        title = stringResource(Res.string.app_security),
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    ) {
-                        ToggleSettingsItem(
-                            title = stringResource(Res.string.settings_biometric_label),
-                            description = stringResource(Res.string.settings_biometric_description),
-                            checked = isBiometricsEnabled,
-                            onCheckedChange = { enabled ->
-                                if (enabled) {
-                                    onSetBiometricsEnabled(true)
-                                } else {
-                                    showDisableBiometricsDialog = true
-                                }
-                            },
-                        )
-                    }
-                }
-
-                if (showSystemSearchVisibilityToggle) {
-                    item {
-                        SettingsSection(
-                            title = stringResource(Res.string.system_search_visibility_section),
-                            modifier = Modifier.padding(horizontal = Spacing.lg),
-                        ) {
-                            ToggleSettingsItem(
-                                title = stringResource(Res.string.system_search_visibility_label),
-                                description = stringResource(Res.string.system_search_visibility_description),
-                                checked = isSystemSearchVisibilityEnabled,
-                                onCheckedChange = onSetSystemSearchVisibilityEnabled,
-                            )
-                        }
-                    }
-                }
-
-                item {
-                    SettingsSection(
-                        title = stringResource(Res.string.location_privacy),
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    ) {
-                        ListItem(
-                            headlineContent = { Text(stringResource(Res.string.location_settings)) },
-                            supportingContent = {
-                                Text(
-                                    stringResource(Res.string.manage_location_tracking_and_privacy_preferences),
-                                )
-                            },
-                            leadingContent = {
-                                Icon(
-                                    imageVector = Icons.Default.LocationOn,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            },
-                            trailingContent = {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                                    contentDescription = stringResource(Res.string.navigate_to_location_settings),
-                                )
-                            },
-                            modifier = Modifier.clickable(onClick = onNavigateToLocationSettings),
-                        )
-                    }
-                }
-                item {
-                    LocalDiagnosticsSettingsSection(
-                        state = diagnosticsState,
-                        onPreview = onPreviewDiagnostics,
-                        onExport = onExportDiagnostics,
-                        onClear = onClearDiagnostics,
-                        onSetVerboseEnabled = onSetVerboseDiagnostics,
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
-                    )
-                }
-                item { reportingContent() }
-            }
-        },
-    )
+        }
+    }
 
     if (showDisableBiometricsDialog) {
         AlertDialog(

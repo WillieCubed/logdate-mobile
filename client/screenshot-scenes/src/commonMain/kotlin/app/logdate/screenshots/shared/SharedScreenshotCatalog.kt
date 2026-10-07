@@ -58,9 +58,11 @@ import app.logdate.feature.core.settings.ui.AdvancedSettingsContent
 import app.logdate.feature.core.settings.ui.BirthdaySettingsContent
 import app.logdate.feature.core.settings.ui.DataSettingsContent
 import app.logdate.feature.core.settings.ui.DayBoundarySettingsContent
+import app.logdate.feature.core.settings.ui.DeveloperLocationSection
+import app.logdate.feature.core.settings.ui.DeveloperToolsContent
 import app.logdate.feature.core.settings.ui.IntegrityState
 import app.logdate.feature.core.settings.ui.LibrarySettingsContent
-import app.logdate.feature.core.settings.ui.LocationAdvancedContent
+import app.logdate.feature.core.settings.ui.LocalDiagnosticsState
 import app.logdate.feature.core.settings.ui.LocationIntervalContent
 import app.logdate.feature.core.settings.ui.LocationSettingsContent
 import app.logdate.feature.core.settings.ui.LocationTrackingOptionsContent
@@ -189,7 +191,7 @@ enum class SharedScreenshotSceneId(
     LocationSettings("location-settings"),
     LocationTrackingOptions("location-tracking-options"),
     LocationInterval("location-interval"),
-    LocationAdvanced("location-advanced"),
+    DeveloperTools("developer-tools"),
     DevicesSettings("devices-settings"),
     StreakSettings("streak-settings"),
     CampfireStates("campfire-states"),
@@ -939,7 +941,6 @@ object SharedScreenshotCatalog {
                     onShowLocationTimeline = {},
                     onNavigateToTrackingOptions = {},
                     onNavigateToInterval = {},
-                    onNavigateToAdvanced = {},
                 )
             },
             sharedScene(SharedScreenshotSceneId.LocationTrackingOptions, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
@@ -957,12 +958,21 @@ object SharedScreenshotCatalog {
                     onUpdateTrackingInterval = {},
                 )
             },
-            sharedScene(SharedScreenshotSceneId.LocationAdvanced, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
-                LocationAdvancedContent(
-                    settings = sampleLocationSettings(),
+            sharedScene(SharedScreenshotSceneId.DeveloperTools, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+                DeveloperToolsContent(
                     onBack = {},
-                    onToggleServerAssist = {},
-                    onSetDefaultLocation = {},
+                    state = LocalDiagnosticsState(eventCount = 3),
+                    onPreview = {},
+                    onExport = {},
+                    onClear = {},
+                    onSetVerboseEnabled = {},
+                    locationContent = {
+                        DeveloperLocationSection(
+                            settings = sampleLocationSettings(),
+                            onToggleServerAssist = {},
+                            onSetDefaultLocation = {},
+                        )
+                    },
                 )
             },
             sharedScene(SharedScreenshotSceneId.DevicesSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {

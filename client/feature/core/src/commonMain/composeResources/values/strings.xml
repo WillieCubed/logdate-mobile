@@ -185,4 +185,10 @@
     <string name="diagnostics_export_failed">Could not create the diagnostic ZIP.</string>
     <string name="diagnostics_cleared">Local sync history cleared.</string>
     <string name="diagnostics_clear_failed">Could not change local diagnostic history.</string>
+    <string name="about_logdate">About LogDate</string>
+    <string name="about_logdate_description">Version and app updates</string>
+    <string name="developer_tools">Developer Tools</string>
+    <string name="developer_tools_description">Diagnostics and technical overrides</string>
+    <string name="developer_location">Location overrides</string>
+    <string name="app_updates_description">Get the latest LogDate improvements.</string>
 </resources>

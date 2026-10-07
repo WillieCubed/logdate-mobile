@@ -51,7 +51,7 @@ class LocalDiagnosticsViewModelTest {
     }
 
     @Test
-    fun `preview and export use the same prepared report`() =
+    fun `unchanged history produces matching preview and export summaries`() =
         runTest {
             val history = DiagnosticHistory(Storage(), { 1_000L })
             val recorder = SyncDiagnosticRecorder(history, backgroundScope)
@@ -78,6 +78,39 @@ class LocalDiagnosticsViewModelTest {
             assertEquals(preview, exported.single().entries.getValue("summary.md"))
             assertEquals(1, viewModel.state.value.eventCount)
             assertEquals(LocalDiagnosticsFeedback.EXPORTED, viewModel.state.value.feedback)
+        }
+
+    @Test
+    fun `export includes events recorded after opening settings`() =
+        runTest {
+            val recorder = SyncDiagnosticRecorder(DiagnosticHistory(Storage(), { 1_000L }), backgroundScope)
+            val exported = mutableListOf<DiagnosticReportBundle>()
+            val viewModel =
+                LocalDiagnosticsViewModel(
+                    recorder,
+                    VerboseDiagnosticMode(Storage(), { 1_000L }),
+                    object : DiagnosticArchiveExporter {
+                        override suspend fun export(bundle: DiagnosticReportBundle): Boolean {
+                            exported += bundle
+                            return true
+                        }
+                    },
+                )
+            viewModel.refresh()
+            runCurrent()
+            assertEquals(0, viewModel.state.value.eventCount)
+            recorder.record(SyncDiagnosticEvent(DiagnosticPhase.FETCH, DiagnosticOutcome.FAILED))
+            runCurrent()
+            viewModel.export()
+            runCurrent()
+            assertEquals(1, viewModel.state.value.eventCount)
+            assertTrue(
+                exported
+                    .single()
+                    .entries
+                    .getValue("events.jsonl")
+                    .contains("FETCH"),
+            )
         }
 
     @Test

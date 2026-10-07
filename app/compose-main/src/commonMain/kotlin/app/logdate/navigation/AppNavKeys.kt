@@ -17,26 +17,33 @@ import app.logdate.feature.core.settings.navigation.CalendarSyncSettingsRoute
 import app.logdate.feature.core.settings.navigation.ClearDataSettingsRoute
 import app.logdate.feature.core.settings.navigation.DataSettingsRoute
 import app.logdate.feature.core.settings.navigation.DayBoundarySettingsRoute
+import app.logdate.feature.core.settings.navigation.DeleteAccountRoute
+import app.logdate.feature.core.settings.navigation.DeveloperToolsRoute
 import app.logdate.feature.core.settings.navigation.DevicesRoute
 import app.logdate.feature.core.settings.navigation.EventsCalendarRoute
 import app.logdate.feature.core.settings.navigation.EventsSettingsRoute
 import app.logdate.feature.core.settings.navigation.ExportSettingsRoute
+import app.logdate.feature.core.settings.navigation.HostingRoute
 import app.logdate.feature.core.settings.navigation.LibrarySettingsRoute
 import app.logdate.feature.core.settings.navigation.LocationAdvancedRoute
 import app.logdate.feature.core.settings.navigation.LocationIntervalRoute
 import app.logdate.feature.core.settings.navigation.LocationSettingsRoute
 import app.logdate.feature.core.settings.navigation.LocationTrackingOptionsRoute
 import app.logdate.feature.core.settings.navigation.MemoriesSettingsRoute
+import app.logdate.feature.core.settings.navigation.MoveServerRoute
 import app.logdate.feature.core.settings.navigation.PeopleDirectoryRoute
 import app.logdate.feature.core.settings.navigation.PeopleInboxRoute
 import app.logdate.feature.core.settings.navigation.PeopleSettingsRoute
 import app.logdate.feature.core.settings.navigation.PersonDetailRoute
 import app.logdate.feature.core.settings.navigation.PrivacySettingsRoute
 import app.logdate.feature.core.settings.navigation.RecommendationSettingsRoute
+import app.logdate.feature.core.settings.navigation.RecoveryPhraseEntrySettingsRoute
+import app.logdate.feature.core.settings.navigation.RecoveryPhraseRoute
 import app.logdate.feature.core.settings.navigation.ResetAppSettingsRoute
 import app.logdate.feature.core.settings.navigation.ResetSettingsRoute
 import app.logdate.feature.core.settings.navigation.RewindSettingsRoute
 import app.logdate.feature.core.settings.navigation.SettingsRoute
+import app.logdate.feature.core.settings.navigation.SignInMethodsRoute
 import app.logdate.feature.core.settings.navigation.StreakSettingsRoute
 import app.logdate.feature.core.settings.navigation.SyncSettingsRoute
 import app.logdate.feature.core.settings.navigation.TimelineSettingsRoute
@@ -127,6 +134,12 @@ val appNavSavedStateConfiguration: SavedStateConfiguration =
                     subclass(SettingsRoute::class, SettingsRoute.serializer())
                     subclass(DevicesRoute::class, DevicesRoute.serializer())
                     subclass(AccountSettingsRoute::class, AccountSettingsRoute.serializer())
+                    subclass(SignInMethodsRoute::class, SignInMethodsRoute.serializer())
+                    subclass(RecoveryPhraseRoute::class, RecoveryPhraseRoute.serializer())
+                    subclass(RecoveryPhraseEntrySettingsRoute::class, RecoveryPhraseEntrySettingsRoute.serializer())
+                    subclass(HostingRoute::class, HostingRoute.serializer())
+                    subclass(MoveServerRoute::class, MoveServerRoute.serializer())
+                    subclass(DeleteAccountRoute::class, DeleteAccountRoute.serializer())
                     subclass(PrivacySettingsRoute::class, PrivacySettingsRoute.serializer())
                     subclass(DataSettingsRoute::class, DataSettingsRoute.serializer())
                     subclass(LocationSettingsRoute::class, LocationSettingsRoute.serializer())
@@ -134,6 +147,7 @@ val appNavSavedStateConfiguration: SavedStateConfiguration =
                     subclass(LocationIntervalRoute::class, LocationIntervalRoute.serializer())
                     subclass(LocationAdvancedRoute::class, LocationAdvancedRoute.serializer())
                     subclass(AdvancedSettingsRoute::class, AdvancedSettingsRoute.serializer())
+                    subclass(DeveloperToolsRoute::class, DeveloperToolsRoute.serializer())
                     subclass(MemoriesSettingsRoute::class, MemoriesSettingsRoute.serializer())
                     subclass(VoiceNotesSettingsRoute::class, VoiceNotesSettingsRoute.serializer())
                     subclass(StreakSettingsRoute::class, StreakSettingsRoute.serializer())
