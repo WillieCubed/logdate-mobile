@@ -7,11 +7,13 @@ import app.logdate.client.device.identity.safeDeviceDisplayName
 import app.logdate.client.device.models.DeviceInfo
 import app.logdate.client.device.models.DevicePlatform
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.uuid.Uuid
 
 /**
@@ -22,40 +24,52 @@ class DevicesViewModel(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(DevicesUiState())
     val uiState: StateFlow<DevicesUiState> = _uiState.asStateFlow()
+    private var devicesJob: Job? = null
 
     /**
      * Loads devices associated with the current account.
      */
     fun loadDevices() {
-        _uiState.update { it.copy(isLoading = true) }
+        devicesJob?.cancel()
+        _uiState.update { it.copy(isLoading = it.devices.isEmpty()) }
 
-        viewModelScope.launch {
-            try {
-                // Get current device info
-                val currentDevice = deviceManager.getCurrentDeviceInfo()
+        devicesJob =
+            viewModelScope.launch {
+                try {
+                    // Get current device info
+                    val currentDevice = deviceManager.getCurrentDeviceInfo()
+                    launch { deviceManager.registerWithCloud() }
 
-                // Collect associated devices
-                deviceManager.getAssociatedDevices().collect { devices ->
-                    val allDevices = (listOf(currentDevice) + devices).distinctBy { it.id }
-                    val deviceUiStates = allDevices.map { it.toUiState(it.id == currentDevice.id) }
+                    // Collect associated devices
+                    deviceManager.getAssociatedDevices().collect { devices ->
+                        val registeredCurrent = devices.firstOrNull { it.id == currentDevice.id } ?: currentDevice
+                        val allDevices = (listOf(registeredCurrent) + devices).distinctBy { it.id }
+                        val deviceUiStates = allDevices.map { it.toUiState(it.id == currentDevice.id) }
 
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                devices = deviceUiStates,
+                            )
+                        }
+                    }
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (e: Exception) {
+                    Napier.e("Failed to load devices", e)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            devices = deviceUiStates,
+                            error = "Failed to load devices: ${e.message}",
                         )
                     }
                 }
-            } catch (e: Exception) {
-                Napier.e("Failed to load devices", e)
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = "Failed to load devices: ${e.message}",
-                    )
-                }
             }
-        }
+    }
+
+    fun stopObserving() {
+        devicesJob?.cancel()
+        devicesJob = null
     }
 
     /**

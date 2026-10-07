@@ -1,5 +1,6 @@
 package app.logdate.server.di
 
+import app.logdate.server.devices.accountDeviceModule
 import app.logdate.server.entitlements.entitlementsModule
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
@@ -20,6 +21,7 @@ internal fun Application.installServerKoin(isDatabaseAvailable: Boolean) {
         slf4jLogger()
         modules(
             serverModule(isDatabaseAvailable),
+            accountDeviceModule(isDatabaseAvailable),
             entitlementsModule(databaseAvailable = isDatabaseAvailable),
         )
     }

@@ -1,6 +1,9 @@
 package app.logdate.screenshots.flows.flow07_settings_account
 
 import androidx.compose.runtime.Composable
+import app.logdate.feature.core.settings.ui.devices.DeviceApprovalContent
+import app.logdate.feature.core.settings.ui.devices.DeviceApprovalFailure
+import app.logdate.feature.core.settings.ui.devices.DeviceApprovalUiState
 import app.logdate.feature.core.settings.ui.devices.DeviceInfoUiState
 import app.logdate.feature.core.settings.ui.devices.DevicesScreenContent
 import app.logdate.feature.core.settings.ui.devices.DevicesUiState
@@ -92,6 +95,44 @@ fun S05_DevicesResetDialog() {
             onBackClick = {},
             uiState = DevicesUiState(devices = devices),
             showResetDialog = true,
+        )
+    }
+}
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun S06_ConnectionConfirm() = ConnectionScene(DeviceApprovalUiState.Confirm("Test device", "Morgan", "123456"))
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun S07_ConnectionWorking() = ConnectionScene(DeviceApprovalUiState.Working("Test device", connecting = true))
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun S08_ConnectionApproved() = ConnectionScene(DeviceApprovalUiState.Done("Test device", connected = true))
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun S09_ConnectionRejected() = ConnectionScene(DeviceApprovalUiState.Done("Test device", connected = false))
+
+@PreviewTest
+@ScreenshotPreviewMatrix
+@Composable
+fun S10_ConnectionExpired() = ConnectionScene(DeviceApprovalUiState.Failed(DeviceApprovalFailure.Expired))
+
+@Composable
+private fun ConnectionScene(state: DeviceApprovalUiState) {
+    ScreenshotTheme {
+        DevicesScreenContent(
+            onBackClick = {},
+            uiState = DevicesUiState(devices = devices),
+            connectionAction = {
+                DeviceApprovalContent(state, onConnectClick = {}, onApprove = {}, onReject = {}, onDismiss = {})
+            },
         )
     }
 }

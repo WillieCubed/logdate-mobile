@@ -6,6 +6,28 @@ import app.logdate.server.openapi.SchemaDoc
 internal object DeviceSchemaDocs {
     val docs =
         mapOf(
+            "RegisterDeviceRequest" to
+                SchemaDoc(
+                    "Metadata reported by an authenticated installation. It does not grant account access.",
+                    mapOf(
+                        "name" to "The user-visible operating-system name or a name chosen by the person, at most 120 characters.",
+                        "platform" to
+                            "Explicit platform: ANDROID, IOS, MACOS, WINDOWS, LINUX, WEB or UNKNOWN. Never derived from a device name.",
+                        "appVersion" to "The installed application's public version, at most 64 characters.",
+                    ),
+                ),
+            "RegisteredDevice" to
+                SchemaDoc(
+                    "An installation registered within the authenticated account, retained across server restarts.",
+                    mapOf(
+                        "id" to "The installation's stable UUID, scoped to its account.",
+                        "name" to "The registered user-visible device name.",
+                        "platform" to "The client-reported platform, independent of the device name.",
+                        "appVersion" to "The most recently registered public application version.",
+                        "createdAt" to "The first registration time in Unix epoch milliseconds, preserved on retries.",
+                        "lastActive" to "The latest successful registration time in Unix epoch milliseconds; never moves backwards.",
+                    ),
+                ),
             "CreateEnrollmentRequest" to
                 SchemaDoc(
                     "A new device's request to receive its existing account encryption identity.",

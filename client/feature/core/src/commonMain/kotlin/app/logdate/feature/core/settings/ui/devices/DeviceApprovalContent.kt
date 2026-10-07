@@ -14,30 +14,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.outlined.QrCodeScanner
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.connect_device_account
-import logdate.client.feature.core.generated.resources.connect_device_code
-import logdate.client.feature.core.generated.resources.connect_device_confirm
-import logdate.client.feature.core.generated.resources.connect_device_confirmation_help
-import logdate.client.feature.core.generated.resources.connect_device_confirmation_title
-import logdate.client.feature.core.generated.resources.connect_device_connected
-import logdate.client.feature.core.generated.resources.connect_device_connecting
 import logdate.client.feature.core.generated.resources.connect_device_description
 import logdate.client.feature.core.generated.resources.connect_device_error_account_mismatch
 import logdate.client.feature.core.generated.resources.connect_device_error_already_used
@@ -50,71 +37,26 @@ import logdate.client.feature.core.generated.resources.connect_device_error_scan
 import logdate.client.feature.core.generated.resources.connect_device_error_server
 import logdate.client.feature.core.generated.resources.connect_device_error_signed_out
 import logdate.client.feature.core.generated.resources.connect_device_error_wrong_account_or_expired
-import logdate.client.feature.core.generated.resources.connect_device_looking_up
-import logdate.client.feature.core.generated.resources.connect_device_reject
-import logdate.client.feature.core.generated.resources.connect_device_rejected
-import logdate.client.feature.core.generated.resources.connect_device_rejecting
 import logdate.client.feature.core.generated.resources.connect_device_title
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
-/**
- * The "Connect a device" card, its status line, and the confirmation dialog, shared by every
- * platform that can scan a connection code. [onConnectClick] starts that platform's scanner.
- */
+/** The scanner action and one connection dialog, including progress and completion. */
 @Composable
-internal fun DeviceApprovalContent(
+fun DeviceApprovalContent(
     state: DeviceApprovalUiState,
     onConnectClick: () -> Unit,
     onApprove: () -> Unit,
     onReject: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val busy = state is DeviceApprovalUiState.LookingUp || state is DeviceApprovalUiState.Working
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        ConnectDeviceCard(onClick = onConnectClick, enabled = !busy)
-        statusMessage(state)?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color =
-                    if (state is DeviceApprovalUiState.Failed) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                modifier =
-                    Modifier
-                        .padding(horizontal = Spacing.xs)
-                        .semantics { liveRegion = LiveRegionMode.Polite }
-                        .testTag("connect-device-status"),
-            )
-        }
-    }
-    if (state is DeviceApprovalUiState.Confirm) {
-        ConfirmDeviceDialog(state = state, onApprove = onApprove, onReject = onReject, onDismiss = onDismiss)
+    ConnectDeviceCard(onClick = onConnectClick, enabled = state is DeviceApprovalUiState.Idle)
+    if (state !is DeviceApprovalUiState.Idle) {
+        DeviceConnectionDialog(state, onConnectClick, onApprove, onReject, onDismiss)
     }
 }
 
-@Composable
-private fun statusMessage(state: DeviceApprovalUiState): String? =
-    when (state) {
-        DeviceApprovalUiState.Idle, is DeviceApprovalUiState.Confirm -> null
-        DeviceApprovalUiState.LookingUp -> stringResource(Res.string.connect_device_looking_up)
-        is DeviceApprovalUiState.Working ->
-            stringResource(
-                if (state.connecting) Res.string.connect_device_connecting else Res.string.connect_device_rejecting,
-                state.deviceName,
-            )
-        is DeviceApprovalUiState.Done ->
-            stringResource(
-                if (state.connected) Res.string.connect_device_connected else Res.string.connect_device_rejected,
-                state.deviceName,
-            )
-        is DeviceApprovalUiState.Failed -> stringResource(state.reason.message)
-    }
-
-private val DeviceApprovalFailure.message: StringResource
+internal val DeviceApprovalFailure.message: StringResource
     get() =
         when (this) {
             DeviceApprovalFailure.NotAConnectionCode -> Res.string.connect_device_error_not_a_code
@@ -129,42 +71,6 @@ private val DeviceApprovalFailure.message: StringResource
             DeviceApprovalFailure.ConnectionFailed -> Res.string.connect_device_error_connection_failed
             DeviceApprovalFailure.ServerError -> Res.string.connect_device_error_server
         }
-
-@Composable
-private fun ConfirmDeviceDialog(
-    state: DeviceApprovalUiState.Confirm,
-    onApprove: () -> Unit,
-    onReject: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(Res.string.connect_device_confirmation_title, state.deviceName)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                Text(stringResource(Res.string.connect_device_account, state.accountName))
-                Text(
-                    stringResource(Res.string.connect_device_code, state.code),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(stringResource(Res.string.connect_device_confirmation_help))
-                state.failure?.let { failure ->
-                    Text(
-                        text = stringResource(failure.message),
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(onClick = onApprove) { Text(stringResource(Res.string.connect_device_confirm)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onReject) { Text(stringResource(Res.string.connect_device_reject)) }
-        },
-    )
-}
 
 @Composable
 internal fun ConnectDeviceCard(

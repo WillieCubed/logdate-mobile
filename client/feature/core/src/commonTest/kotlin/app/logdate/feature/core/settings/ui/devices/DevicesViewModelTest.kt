@@ -152,6 +152,20 @@ class DevicesViewModelTest {
         }
 
     @Test
+    fun `closing the screen stops device observation without showing an error`() =
+        testScope.runTest {
+            viewModel.loadDevices()
+            advanceUntilIdle()
+            assertEquals(3, viewModel.uiState.value.devices.size)
+            viewModel.stopObserving()
+            advanceUntilIdle()
+            repository.addAssociatedDevice(deviceInfo(Uuid.random(), "Another device", DevicePlatform.MACOS))
+            advanceUntilIdle()
+            assertEquals(3, viewModel.uiState.value.devices.size)
+            assertNull(viewModel.uiState.value.error)
+        }
+
+    @Test
     fun `renameDevice should update device name`() =
         testScope.runTest {
             // Given

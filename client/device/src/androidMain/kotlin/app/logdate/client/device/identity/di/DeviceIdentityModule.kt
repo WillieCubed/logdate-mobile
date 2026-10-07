@@ -8,7 +8,8 @@ import app.logdate.client.device.identity.DefaultDeviceIdProvider
 import app.logdate.client.device.identity.DefaultDeviceManager
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.device.identity.DeviceRepository
-import app.logdate.client.device.identity.data.InMemoryDeviceRepository
+import app.logdate.client.device.identity.data.AccountDeviceApi
+import app.logdate.client.device.identity.data.CloudDeviceRepository
 import app.logdate.client.device.identity.userVisibleDeviceName
 import app.logdate.client.device.models.DevicePlatform
 import org.koin.android.ext.koin.androidContext
@@ -31,7 +32,7 @@ actual val deviceIdentityModule: Module =
 
         // Repository for device information
         single<DeviceRepository> {
-            InMemoryDeviceRepository()
+            CloudDeviceRepository(AccountDeviceApi(get()), get(), get())
         }
 
         single<DefaultDeviceManager> {

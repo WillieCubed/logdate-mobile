@@ -35,7 +35,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,7 +60,6 @@ import logdate.client.feature.core.generated.resources.reset
 import logdate.client.feature.core.generated.resources.reset_device_id
 import logdate.client.feature.core.generated.resources.reset_device_id_confirmation
 import logdate.client.feature.core.generated.resources.sync_device_options_label
-import logdate.client.feature.core.generated.resources.sync_device_remove_label
 import logdate.client.feature.core.generated.resources.sync_device_remove_title
 import logdate.client.feature.core.generated.resources.sync_device_rename_label
 import logdate.client.feature.core.generated.resources.sync_device_rename_title
@@ -81,8 +80,9 @@ fun DevicesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(Unit) {
+    DisposableEffect(viewModel) {
         viewModel.loadDevices()
+        onDispose { viewModel.stopObserving() }
     }
 
     var showRenameDialog by remember { mutableStateOf(false) }
@@ -147,6 +147,7 @@ fun DevicesScreenContent(
     onDismissRenameDialog: () -> Unit = {},
     onDismissDeleteDialog: () -> Unit = {},
     onDismissResetDialog: () -> Unit = {},
+    connectionAction: @Composable () -> Unit = { DeviceApprovalAction() },
     modifier: Modifier = Modifier,
 ) {
     if (showRenameDialog && selectedDevice != null) {
@@ -194,18 +195,16 @@ fun DevicesScreenContent(
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
-                items(uiState.devices) { device ->
+                items(uiState.devices, key = { it.id }) { device ->
                     DeviceItem(
                         device = device,
                         onRenameClick = { onRenameClick(device) },
-                        onRemoveClick = { onRemoveClick(device) },
-                        onShowResetDialog = onShowResetDialog,
                         modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
                 item {
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg)) {
-                        DeviceApprovalAction()
+                        connectionAction()
                     }
                 }
             }
@@ -229,8 +228,6 @@ private fun LoadingState(modifier: Modifier = Modifier) {
 private fun DeviceItem(
     device: DeviceInfoUiState,
     onRenameClick: () -> Unit,
-    onRemoveClick: () -> Unit,
-    onShowResetDialog: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showOptions by remember { mutableStateOf(false) }
@@ -274,32 +271,17 @@ private fun DeviceItem(
                         }
                     }
                 }
-                Box {
-                    IconButton(onClick = { showOptions = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = stringResource(Res.string.sync_device_options_label))
-                    }
-                    DropdownMenu(expanded = showOptions, onDismissRequest = { showOptions = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(Res.string.sync_device_rename_label)) },
-                            onClick = {
-                                showOptions = false
-                                onRenameClick()
-                            },
-                        )
-                        if (device.isCurrentDevice) {
+                if (device.isCurrentDevice) {
+                    Box {
+                        IconButton(onClick = { showOptions = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(Res.string.sync_device_options_label))
+                        }
+                        DropdownMenu(expanded = showOptions, onDismissRequest = { showOptions = false }) {
                             DropdownMenuItem(
-                                text = { Text(stringResource(Res.string.reset_device_id)) },
+                                text = { Text(stringResource(Res.string.sync_device_rename_label)) },
                                 onClick = {
                                     showOptions = false
-                                    onShowResetDialog()
-                                },
-                            )
-                        } else {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(Res.string.sync_device_remove_label)) },
-                                onClick = {
-                                    showOptions = false
-                                    onRemoveClick()
+                                    onRenameClick()
                                 },
                             )
                         }

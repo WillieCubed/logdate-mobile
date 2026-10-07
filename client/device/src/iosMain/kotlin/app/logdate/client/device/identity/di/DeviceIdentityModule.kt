@@ -6,7 +6,8 @@ import app.logdate.client.device.identity.DefaultCanonicalOwnerProvider
 import app.logdate.client.device.identity.DefaultDeviceIdProvider
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.device.identity.DeviceRepository
-import app.logdate.client.device.identity.data.InMemoryDeviceRepository
+import app.logdate.client.device.identity.data.AccountDeviceApi
+import app.logdate.client.device.identity.data.CloudDeviceRepository
 import org.koin.core.module.Module
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
@@ -26,6 +27,6 @@ actual val deviceIdentityModule: Module =
 
         // Repository for device information
         single<DeviceRepository> {
-            InMemoryDeviceRepository()
+            CloudDeviceRepository(AccountDeviceApi(get()), get(), get())
         }
     }

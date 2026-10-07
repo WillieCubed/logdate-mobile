@@ -12,6 +12,7 @@ import app.logdate.server.auth.GoogleIdTokenVerifier
 import app.logdate.server.auth.RefreshTokenRevocationRepository
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.TokenService
+import app.logdate.server.devices.AccountDeviceRepository
 import app.logdate.server.enrollment.DeviceEnrollmentRepository
 import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.entitlements.EntitlementService
@@ -121,6 +122,7 @@ internal fun Application.accountApiRoutes() {
     val emailVerificationService by inject<EmailVerificationService>()
     val signingKeyService by inject<SigningKeyService>()
     val deviceEnrollmentRepository by inject<DeviceEnrollmentRepository>()
+    val accountDevices by inject<AccountDeviceRepository>()
     val accountKeyEnvelopes by inject<AccountKeyEnvelopeRepository>()
     val passkeys by inject<PasskeyRepository>()
     val descriptorConfig by inject<ServerDescriptorConfig>()
@@ -129,6 +131,7 @@ internal fun Application.accountApiRoutes() {
         route("/api/v1") {
             serverInfoRoutes(serverDescriptor())
             deviceEnrollmentRoutes(tokenService, deviceEnrollmentRepository, accountRepository)
+            accountDeviceRoutes(tokenService, accountDevices)
             accountKeyEnvelopeRoutes(tokenService, passkeys, accountKeyEnvelopes, descriptorConfig.encryptedAccountKeysEnabled)
             planRoutes(planCatalogService)
             authV1Routes(

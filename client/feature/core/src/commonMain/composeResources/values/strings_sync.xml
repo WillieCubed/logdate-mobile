@@ -132,9 +132,14 @@
     <string name="connect_device_scanner_cancel">Cancel</string>
     <string name="connect_device_looking_up">Checking the code…</string>
     <string name="connect_device_connecting">Connecting %1$s…</string>
+    <string name="connect_device_success_title">Connection approved</string>
+    <string name="connect_device_success_body">Sync will start automatically on your other device.</string>
+    <string name="connect_device_rejected_title">Request rejected</string>
+    <string name="connect_device_rejected_body">Your account and journal were not shared with this device.</string>
+    <string name="connect_device_failed_title">Couldn't connect</string>
+    <string name="connect_device_done">Done</string>
+    <string name="connect_device_scan_again">Scan again</string>
     <string name="connect_device_rejecting">Rejecting the request from %1$s…</string>
-    <string name="connect_device_connected">%1$s is connected.</string>
-    <string name="connect_device_rejected">The request from %1$s was rejected.</string>
     <string name="connect_device_error_not_a_code">This QR code isn't a LogDate connection code.</string>
     <string name="connect_device_error_scan_failed">The code couldn't be scanned. Try again.</string>
     <string name="connect_device_error_camera_denied">Camera access is off. Allow camera access for LogDate in Settings, then scan the code again.</string>
