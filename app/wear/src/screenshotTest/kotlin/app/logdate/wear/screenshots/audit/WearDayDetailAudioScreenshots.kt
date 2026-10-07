@@ -14,8 +14,12 @@ import app.logdate.wear.presentation.timeline.WearPlaybackUiState
 import app.logdate.wear.screenshots.WearScreenshotPreviewMatrix
 import com.android.tools.screenshot.PreviewTest
 import kotlinx.datetime.LocalDate
-import kotlin.time.Instant
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 import kotlin.uuid.Uuid
+
+private val previewNoteTime = LocalDateTime(2024, 3, 9, 13, 20).toInstant(TimeZone.currentSystemDefault())
 
 private val wearDayDetail =
     WearDayDetailUiState(
@@ -24,8 +28,8 @@ private val wearDayDetail =
             listOf(
                 JournalNote.Audio(
                     uid = Uuid.parse("00000000-0000-0000-0000-000000000031"),
-                    creationTimestamp = Instant.fromEpochMilliseconds(1_740_000_000_000L),
-                    lastUpdated = Instant.fromEpochMilliseconds(1_740_000_000_000L),
+                    creationTimestamp = previewNoteTime,
+                    lastUpdated = previewNoteTime,
                     mediaRef = "preview://wear/day-detail/audio",
                     durationMs = 15_000,
                 ),
