@@ -17,17 +17,22 @@ fun EditorBottomContent(
     journalSelectorExpanded: Boolean,
     onJournalSelectorExpandedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        JournalSelectorDropdown(
-            availableJournals = availableJournals,
-            selectedJournalIds = selectedJournalIds,
-            onSelectionChanged = onJournalSelectionChanged,
-            expanded = journalSelectorExpanded,
-            onExpandedChange = onJournalSelectorExpandedChange,
-        )
+        if (enabled) {
+            JournalSelectorDropdown(
+                availableJournals = availableJournals,
+                selectedJournalIds = selectedJournalIds,
+                onSelectionChanged = onJournalSelectionChanged,
+                expanded = journalSelectorExpanded,
+                onExpandedChange = onJournalSelectorExpandedChange,
+            )
+        } else {
+            JournalSelectionSummary(availableJournals, selectedJournalIds)
+        }
     }
 }

@@ -7,38 +7,30 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.SeekableTransitionState
 import androidx.compose.animation.core.rememberTransition
-import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.audio.AudioBlockEditor
 import app.logdate.feature.editor.ui.blocks.EntryMemorySequence
 import app.logdate.feature.editor.ui.camera.CameraBlockEditor
-import app.logdate.feature.editor.ui.content.EditorContentFooter
 import app.logdate.feature.editor.ui.content.EmptyEditorStateContent
 import app.logdate.feature.editor.ui.content.matchingPickerTileIdsFor
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
@@ -50,17 +42,14 @@ import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
 import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
 import app.logdate.feature.editor.ui.image.ImageBlockPreview
-import app.logdate.feature.editor.ui.layout.EntryEditorSurface
+import app.logdate.feature.editor.ui.layout.EditorFocus
 import app.logdate.feature.editor.ui.layout.FocusedBlockLayout
-import app.logdate.feature.editor.ui.layout.LocalEditorIsCompact
+import app.logdate.feature.editor.ui.layout.editorFocus
 import app.logdate.feature.editor.ui.state.BlocksUiState
 import app.logdate.feature.editor.ui.text.TextBlockContent
 import app.logdate.feature.editor.ui.video.VideoBlockEditor
-import app.logdate.ui.adaptive.FoldableBookLayout
-import app.logdate.ui.adaptive.FoldableTabletopLayout
 import app.logdate.ui.platform.PlatformPredictiveBackHandler
 import app.logdate.ui.theme.Spacing
-import app.logdate.ui.utils.scrollToEnd
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -97,13 +86,11 @@ fun MainEditorContent(
     onBackCommit: () -> Unit = {},
     onBackCancel: () -> Unit = {},
     onAudioResolverReady: (Uuid, PendingAudioResolver) -> Unit = { _, _ -> },
+    focusState: EditorFocus = editorFocus(uiState.blocks, uiState.expandedBlockId),
 ) {
-    val activeCamera = uiState.blocks.any { it.id == uiState.expandedBlockId && it is CameraBlockUiState && it.uri == null }
-    if (uiState.blocks.isNotEmpty() && !activeCamera) {
-        EntryMemorySequence(uiState, listState, onAudioResolverReady, modifier)
-        return
-    }
-
+    var lastContent by remember { mutableStateOf(uiState) }
+    SideEffect { if (uiState.blocks.isNotEmpty()) lastContent = uiState }
+    val renderedContent = if (uiState.blocks.isEmpty()) lastContent else uiState
     val scope = rememberCoroutineScope()
 
     val expandedBlock =
@@ -114,16 +101,18 @@ fun MainEditorContent(
     val displayState: EditorDisplay =
         when {
             uiState.blocks.isEmpty() -> EditorDisplay.Empty
-            expandedBlock != null -> EditorDisplay.Expanded(expandedBlock)
+            focusState is EditorFocus.Camera && expandedBlock is CameraBlockUiState && expandedBlock.uri == null ->
+                EditorDisplay.Expanded(
+                    expandedBlock,
+                )
             else -> EditorDisplay.List
         }
 
     // SeekableTransitionState lets the predictive back gesture scrub the transition
     val transitionState = remember { SeekableTransitionState(displayState) }
 
-    // Sync ViewModel-driven state changes. displayState is a plain val recomputed on each
-    // recomposition, so snapshotFlow can't track it — use the underlying keys as the effect key.
-    LaunchedEffect(uiState.expandedBlockId, uiState.blocks.isEmpty()) {
+    // Capture completion changes the display mode without changing the block ID.
+    LaunchedEffect(displayState) {
         if (transitionState.targetState != displayState) {
             transitionState.animateTo(displayState)
         }
@@ -136,9 +125,9 @@ fun MainEditorContent(
             EditorDisplay.List
         }
     val pickerTileIds =
-        remember(expandedBlock, shouldReturnToPickerOnBack) {
-            if (shouldReturnToPickerOnBack) {
-                matchingPickerTileIdsFor(expandedBlock)
+        remember(expandedBlock, shouldReturnToPickerOnBack, uiState.blocks.isEmpty(), lastContent) {
+            if (shouldReturnToPickerOnBack || uiState.blocks.isEmpty()) {
+                matchingPickerTileIdsFor(expandedBlock ?: renderedContent.blocks.singleOrNull())
             } else {
                 matchingPickerTileIdsFor(null)
             }
@@ -179,19 +168,13 @@ fun MainEditorContent(
 
     val transition = rememberTransition(transitionState, label = "editorDisplay")
 
-    SharedTransitionLayout(modifier = modifier.fillMaxSize()) {
+    EditorSharedTransitionContainer(modifier = modifier.fillMaxSize()) {
         val sts = this
         CompositionLocalProvider(LocalSharedTransitionScope provides sts) {
             transition.AnimatedContent(
                 contentKey = { it::class },
-                // The shared container morph is the semantic transition here.
-                // All exit transitions use fadeOut(snap()) to instantly remove exiting
-                // content. This prevents a LazyColumn double-measurement crash that
-                // occurs when SharedTransitionLayout's lookahead pass and AnimatedContent
-                // both try to measure LazyColumn items during a transition.
-                // The sharedBounds overlay handles the visual morph independently.
                 transitionSpec = {
-                    EnterTransition.None togetherWith fadeOut(snap())
+                    EnterTransition.None togetherWith fadeOut(tween(220))
                 },
             ) { target ->
                 val avs = this
@@ -203,6 +186,7 @@ fun MainEditorContent(
                                 onStartPhotoBlock = { id -> uiState.onCreateBlock(BlockType.IMAGE, id) },
                                 onStartAudioBlock = { id -> uiState.onCreateBlock(BlockType.AUDIO, id) },
                                 onStartCameraBlock = { id -> uiState.onCreateBlock(BlockType.CAMERA, id) },
+                                retainConsumedTileIds = true,
                                 textTileId = pickerTileIds.textId,
                                 photoTileId = pickerTileIds.photoId,
                                 audioTileId = pickerTileIds.audioId,
@@ -260,172 +244,15 @@ fun MainEditorContent(
                         }
 
                         EditorDisplay.List -> {
-                            AdaptiveEditorListContent(
-                                uiState = uiState,
+                            EntryMemorySequence(
+                                uiState = renderedContent,
                                 listState = listState,
-                                onAddBlock = { type, id ->
-                                    uiState.onCreateBlock(type, id)
-                                    scope.launch { listState.scrollToEnd() }
-                                },
-                                blockSurface = { block, modifier ->
-                                    with(sts) {
-                                        EntryEditorSurface(
-                                            wrapContentHeight = block is ImageBlockUiState,
-                                            modifier =
-                                                modifier
-                                                    .sharedBounds(
-                                                        rememberSharedContentState("block_surface_${block.id}"),
-                                                        animatedVisibilityScope = avs,
-                                                    ),
-                                        ) {
-                                            BlockContentInner(
-                                                block = block,
-                                                isExpanded = false,
-                                                onBlockFocused = uiState.onBlockFocused,
-                                                onBlockUpdated = uiState.onUpdateBlock,
-                                                onBlockDeleted = uiState.onDeleteBlock,
-                                                onAudioResolverReady = onAudioResolverReady,
-                                            )
-                                        }
-                                    }
-                                },
-                                modifier =
-                                    with(sts) {
-                                        Modifier
-                                            .fillMaxSize()
-                                            .skipToLookaheadSize()
-                                            .windowInsetsPadding(WindowInsets.ime)
-                                    },
+                                onAudioResolverReady = onAudioResolverReady,
+                                modifier = Modifier.fillMaxSize(),
                             )
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-@Suppress("ktlint:standard:function-naming")
-@Composable
-private fun AdaptiveEditorListContent(
-    uiState: BlocksUiState,
-    listState: LazyListState,
-    onAddBlock: (BlockType, Uuid) -> Unit,
-    blockSurface: @Composable (EntryBlockUiState, Modifier) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    FoldableTabletopLayout(
-        modifier = modifier,
-        minPaneHeight = 220.dp,
-        topPane = {
-            EditorBlockList(
-                uiState = uiState,
-                listState = listState,
-                onAddBlock = onAddBlock,
-                blockSurface = blockSurface,
-                includeFooter = false,
-                modifier = Modifier.fillMaxSize(),
-            )
-        },
-        bottomPane = {
-            CompositionLocalProvider(LocalEditorIsCompact provides true) {
-                EmptyEditorStateContent(
-                    onStartTextBlock = { onAddBlock(BlockType.TEXT, it) },
-                    onStartPhotoBlock = { onAddBlock(BlockType.IMAGE, it) },
-                    onStartAudioBlock = { onAddBlock(BlockType.AUDIO, it) },
-                    onStartCameraBlock = { onAddBlock(BlockType.CAMERA, it) },
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .padding(Spacing.md),
-                )
-            }
-        },
-        standardContent = {
-            FoldableBookLayout(
-                modifier = Modifier.fillMaxSize(),
-                minPaneWidth = 320.dp,
-                startPane = {
-                    EditorBlockList(
-                        uiState = uiState,
-                        listState = listState,
-                        onAddBlock = onAddBlock,
-                        blockSurface = blockSurface,
-                        includeFooter = false,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                },
-                endPane = {
-                    EmptyEditorStateContent(
-                        onStartTextBlock = { onAddBlock(BlockType.TEXT, it) },
-                        onStartPhotoBlock = { onAddBlock(BlockType.IMAGE, it) },
-                        onStartAudioBlock = { onAddBlock(BlockType.AUDIO, it) },
-                        onStartCameraBlock = { onAddBlock(BlockType.CAMERA, it) },
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .padding(Spacing.md),
-                    )
-                },
-                standardContent = {
-                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                        val showCreationPane = maxWidth >= 840.dp
-                        Row(
-                            modifier = Modifier.fillMaxSize(),
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                        ) {
-                            EditorBlockList(
-                                uiState = uiState,
-                                listState = listState,
-                                onAddBlock = onAddBlock,
-                                blockSurface = blockSurface,
-                                includeFooter = !showCreationPane,
-                                modifier = Modifier.weight(1f).fillMaxHeight(),
-                            )
-                            if (showCreationPane) {
-                                EmptyEditorStateContent(
-                                    onStartTextBlock = { onAddBlock(BlockType.TEXT, it) },
-                                    onStartPhotoBlock = { onAddBlock(BlockType.IMAGE, it) },
-                                    onStartAudioBlock = { onAddBlock(BlockType.AUDIO, it) },
-                                    onStartCameraBlock = { onAddBlock(BlockType.CAMERA, it) },
-                                    modifier = Modifier.width(320.dp).fillMaxHeight(),
-                                )
-                            }
-                        }
-                    }
-                },
-            )
-        },
-    )
-}
-
-@Suppress("ktlint:standard:function-naming")
-@Composable
-private fun EditorBlockList(
-    uiState: BlocksUiState,
-    listState: LazyListState,
-    onAddBlock: (BlockType, Uuid) -> Unit,
-    blockSurface: @Composable (EntryBlockUiState, Modifier) -> Unit,
-    includeFooter: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    LazyColumn(
-        state = listState,
-        modifier = modifier.testTag("editor_block_list"),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        items(
-            items = uiState.blocks,
-            key = { block -> block.id },
-        ) { block ->
-            blockSurface(block, Modifier.animateItem())
-        }
-        if (includeFooter) {
-            item {
-                EditorContentFooter(
-                    scrollState = listState,
-                    onAddBlock = onAddBlock,
-                )
             }
         }
     }
@@ -485,5 +312,19 @@ private fun BlockContentInner(
                 onDeleteRequested = { onBlockDeleted(block.id) },
                 modifier = modifier,
             )
+    }
+}
+
+@Suppress("ktlint:standard:function-naming")
+@Composable
+private fun EditorSharedTransitionContainer(
+    modifier: Modifier,
+    content: @Composable SharedTransitionScope.() -> Unit,
+) {
+    val providedScope = LocalSharedTransitionScope.current
+    if (providedScope == null) {
+        SharedTransitionLayout(modifier, content = content)
+    } else {
+        Box(modifier) { content(providedScope) }
     }
 }

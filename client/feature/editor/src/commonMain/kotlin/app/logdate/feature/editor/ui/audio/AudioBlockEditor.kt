@@ -2,13 +2,17 @@ package app.logdate.feature.editor.ui.audio
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import app.logdate.client.media.audio.AudioPlaybackMetadata
 import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.feature.editor.audio.AudioLabelResolver
@@ -17,7 +21,10 @@ import app.logdate.feature.editor.ui.editor.AudioBlockUiState
 import app.logdate.feature.editor.ui.editor.AudioCaptureState
 import app.logdate.feature.editor.ui.editor.RecordingState
 import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
+import app.logdate.ui.audio.AudioContextProcessor
 import app.logdate.util.formatDateLocalized
+import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.koinInject
@@ -80,7 +87,6 @@ fun AudioBlockEditor(
 
     // Determine if we're in recording mode or playback mode
     val existingAudioUri = block.uri
-    val hasExistingAudio = existingAudioUri != null
     val isRecording = audioUiState.isRecording
 
     // Determine current recording state
@@ -172,6 +178,44 @@ fun AudioBlockEditor(
 
     Box(modifier = modifier) {
         if (existingAudioUri != null) {
+            val audioContextProcessor: AudioContextProcessor = koinInject()
+            val waveformAmplitudes by produceState(
+                initialValue = emptyList<Float>(),
+                block.uri,
+                block.duration,
+                block.timestamp,
+                block.location,
+            ) {
+                try {
+                    audioContextProcessor
+                        .processProgressively(
+                            audioUri = existingAudioUri,
+                            durationMs = block.duration,
+                            createdAt = block.timestamp,
+                            latitude = block.location?.latitude,
+                            longitude = block.location?.longitude,
+                        ).collect { value = it.amplitudes }
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    Napier.w(error) { "Unable to load the recording waveform" }
+                }
+            }
+            val hasTranscript =
+                block.transcription.isNotBlank() ||
+                    audioUiState.timedTranscript?.utterances?.any { it.text.isNotBlank() } == true
+            val hasOutputChoice =
+                outputSelection.devices
+                    .filter { it.isAvailable }
+                    .distinctBy { it.groupKey }
+                    .size > 1
+            val completedHeight =
+                when {
+                    selected && hasTranscript -> 420.dp
+                    selected -> if (hasOutputChoice) 224.dp else 164.dp
+                    hasTranscript -> 132.dp
+                    else -> 88.dp
+                }
             AudioBlockContent(
                 block = block,
                 isExpanded = !inline || selected,
@@ -191,7 +235,13 @@ fun AudioBlockEditor(
                 onDeleteClicked = onDeleteRequested,
                 outputSelection = outputSelection,
                 onOutputDeviceSelected = audioRouteRepository::selectOutputDevice,
-                modifier = if (inline) Modifier else Modifier.fillMaxSize(),
+                waveformAmplitudes = waveformAmplitudes,
+                modifier =
+                    if (inline) {
+                        Modifier.fillMaxWidth().height(completedHeight)
+                    } else {
+                        Modifier.fillMaxSize()
+                    },
             )
         } else {
             AudioPermissionWrapper {

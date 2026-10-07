@@ -1,5 +1,11 @@
+@file:OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+
 package app.logdate.feature.editor.ui.blocks
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -40,6 +46,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.editor.ui.LocalSharedTransitionScope
 import app.logdate.feature.editor.ui.editor.BlockType
 import app.logdate.feature.editor.ui.layout.LocalEditorCorners
 import app.logdate.ui.platform.PlatformIcons
@@ -52,6 +59,7 @@ import logdate.client.feature.editor.generated.resources.memory_record_audio
 import logdate.client.feature.editor.generated.resources.memory_take_photo
 import logdate.client.feature.editor.generated.resources.memory_write
 import org.jetbrains.compose.resources.stringResource
+import kotlin.uuid.Uuid
 
 /** The final item in the entry; a continued pull reveals every block type in place. */
 @Suppress("ktlint:standard:function-naming")
@@ -66,6 +74,8 @@ internal fun EndOfEntryAddControl(
     onDrag: (Float) -> Unit = {},
     onDragStopped: (cancelled: Boolean) -> Unit = {},
     onRevealHeightChanged: (Dp) -> Unit = {},
+    blockIds: Map<BlockType, Uuid> = emptyMap(),
+    consumedType: BlockType? = null,
 ) {
     val currentOnDrag by rememberUpdatedState(onDrag)
     val currentOnDragStopped by rememberUpdatedState(onDragStopped)
@@ -88,7 +98,7 @@ internal fun EndOfEntryAddControl(
                 },
             )
         }
-    val gatedAdd: (BlockType) -> Unit = { type -> if (expanded && fraction > 0.95f) onAdd(type) }
+    val gatedAdd: (BlockType) -> Unit = { type -> if (consumedType == null && expanded && fraction > 0.95f) onAdd(type) }
     BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
         val wide = maxWidth >= 560.dp
         val choiceHeight = if (wide) 96.dp else 176.dp
@@ -174,6 +184,9 @@ internal fun EndOfEntryAddControl(
                                     PlatformIcons.text(),
                                     gatedAdd,
                                     Modifier.weight(1f),
+                                    blockId = blockIds[BlockType.TEXT],
+                                    enabled = consumedType == null && expanded && fraction > 0.95f,
+                                    visible = consumedType != BlockType.TEXT,
                                 )
                                 CreationChoice(
                                     BlockType.IMAGE,
@@ -181,6 +194,9 @@ internal fun EndOfEntryAddControl(
                                     PlatformIcons.photoLibrary(),
                                     gatedAdd,
                                     Modifier.weight(1f),
+                                    blockId = blockIds[BlockType.IMAGE],
+                                    enabled = consumedType == null && expanded && fraction > 0.95f,
+                                    visible = consumedType != BlockType.IMAGE,
                                 )
                                 CreationChoice(
                                     BlockType.AUDIO,
@@ -188,6 +204,9 @@ internal fun EndOfEntryAddControl(
                                     PlatformIcons.mic(),
                                     gatedAdd,
                                     Modifier.weight(1f),
+                                    blockId = blockIds[BlockType.AUDIO],
+                                    enabled = consumedType == null && expanded && fraction > 0.95f,
+                                    visible = consumedType != BlockType.AUDIO,
                                 )
                                 CreationChoice(
                                     BlockType.VIDEO,
@@ -195,6 +214,9 @@ internal fun EndOfEntryAddControl(
                                     PlatformIcons.videoFile(),
                                     gatedAdd,
                                     Modifier.weight(1f),
+                                    blockId = blockIds[BlockType.VIDEO],
+                                    enabled = consumedType == null && expanded && fraction > 0.95f,
+                                    visible = consumedType != BlockType.VIDEO,
                                 )
                                 CreationChoice(
                                     BlockType.CAMERA,
@@ -202,6 +224,9 @@ internal fun EndOfEntryAddControl(
                                     PlatformIcons.camera(),
                                     gatedAdd,
                                     Modifier.weight(1f),
+                                    blockId = blockIds[BlockType.CAMERA],
+                                    enabled = consumedType == null && expanded && fraction > 0.95f,
+                                    visible = consumedType != BlockType.CAMERA,
                                 )
                             }
                         } else {
@@ -213,6 +238,9 @@ internal fun EndOfEntryAddControl(
                                         PlatformIcons.text(),
                                         gatedAdd,
                                         Modifier.weight(1f),
+                                        blockId = blockIds[BlockType.TEXT],
+                                        enabled = consumedType == null && expanded && fraction > 0.95f,
+                                        visible = consumedType != BlockType.TEXT,
                                     )
                                     CreationChoice(
                                         BlockType.IMAGE,
@@ -220,6 +248,9 @@ internal fun EndOfEntryAddControl(
                                         PlatformIcons.photoLibrary(),
                                         gatedAdd,
                                         Modifier.weight(1f),
+                                        blockId = blockIds[BlockType.IMAGE],
+                                        enabled = consumedType == null && expanded && fraction > 0.95f,
+                                        visible = consumedType != BlockType.IMAGE,
                                     )
                                     CreationChoice(
                                         BlockType.AUDIO,
@@ -227,6 +258,9 @@ internal fun EndOfEntryAddControl(
                                         PlatformIcons.mic(),
                                         gatedAdd,
                                         Modifier.weight(1f),
+                                        blockId = blockIds[BlockType.AUDIO],
+                                        enabled = consumedType == null && expanded && fraction > 0.95f,
+                                        visible = consumedType != BlockType.AUDIO,
                                     )
                                 }
                                 Row(Modifier.fillMaxWidth().height(88.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -236,6 +270,9 @@ internal fun EndOfEntryAddControl(
                                         PlatformIcons.videoFile(),
                                         gatedAdd,
                                         Modifier.weight(1f),
+                                        blockId = blockIds[BlockType.VIDEO],
+                                        enabled = consumedType == null && expanded && fraction > 0.95f,
+                                        visible = consumedType != BlockType.VIDEO,
                                     )
                                     CreationChoice(
                                         BlockType.CAMERA,
@@ -243,6 +280,9 @@ internal fun EndOfEntryAddControl(
                                         PlatformIcons.camera(),
                                         gatedAdd,
                                         Modifier.weight(1f),
+                                        blockId = blockIds[BlockType.CAMERA],
+                                        enabled = consumedType == null && expanded && fraction > 0.95f,
+                                        visible = consumedType != BlockType.CAMERA,
                                     )
                                 }
                             }
@@ -262,24 +302,40 @@ private fun CreationChoice(
     icon: Painter,
     onAdd: (BlockType) -> Unit,
     modifier: Modifier = Modifier,
+    blockId: Uuid? = null,
+    visible: Boolean = true,
+    enabled: Boolean = true,
 ) {
-    Column(
-        modifier =
-            modifier
-                .height(80.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .clickable { onAdd(type) }
-                .testTag("add_memory_$type"),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Box(
-            Modifier.size(44.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.75f), CircleShape),
-            contentAlignment = Alignment.Center,
+    val sharedScope = LocalSharedTransitionScope.current
+    AnimatedVisibility(visible, modifier = modifier, enter = fadeIn(tween(180)), exit = fadeOut(tween(180))) {
+        val sharedModifier =
+            if (sharedScope != null && blockId != null) {
+                with(sharedScope) {
+                    Modifier.sharedBounds(rememberSharedContentState("block_surface_$blockId"), this@AnimatedVisibility)
+                }
+            } else {
+                Modifier
+            }
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .then(sharedModifier)
+                    .height(80.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(enabled = enabled) { onAdd(type) }
+                    .testTag("add_memory_$type"),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
+            Box(
+                Modifier.size(44.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = 0.75f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(24.dp))
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
         }
-        Spacer(Modifier.height(4.dp))
-        Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
     }
 }

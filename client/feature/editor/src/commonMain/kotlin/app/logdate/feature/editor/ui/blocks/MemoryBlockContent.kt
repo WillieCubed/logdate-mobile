@@ -118,13 +118,11 @@ internal fun MemoryBlockContent(
                     onRemove,
                     onAudioResolverReady,
                     modifier =
-                        Modifier.fillMaxWidth().height(
+                        Modifier.fillMaxWidth().then(
                             if (block.uri == null) {
-                                unfinishedRecordingHeight
-                            } else if (isSelected) {
-                                420.dp
+                                Modifier.height(unfinishedRecordingHeight)
                             } else {
-                                88.dp
+                                Modifier
                             },
                         ),
                     inline = true,
@@ -174,7 +172,17 @@ internal fun MemoryCaptionField(
     modifier: Modifier = Modifier,
     overlay: Boolean = false,
 ) {
-    if (block is AudioBlockUiState && block.uri == null) return
+    if (block is AudioBlockUiState) {
+        if (block.uri != null && block.caption.isNotBlank()) {
+            Text(
+                text = block.caption,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            )
+        }
+        return
+    }
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(editRequest) { if (editRequest > 0) focusRequester.requestFocus() }
     val color =

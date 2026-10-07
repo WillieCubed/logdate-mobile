@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,8 +44,9 @@ import app.logdate.feature.editor.ui.editor.AudioCaptureState
 import app.logdate.feature.editor.ui.editor.AutoSaveStatus
 import app.logdate.feature.editor.ui.editor.EditorState
 import app.logdate.feature.editor.ui.layout.EditorColumnMaxWidth
+import app.logdate.feature.editor.ui.layout.FocusedEntryPanes
 import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
-import app.logdate.feature.editor.ui.layout.LocalEditorContextControlsVisible
+import app.logdate.feature.editor.ui.layout.LocalEditorFocusPresentation
 import app.logdate.shared.model.Journal
 import app.logdate.ui.media.MediaDeviceSelectorTags
 import app.logdate.ui.platform.DefaultScreenCornerRadius
@@ -150,6 +152,7 @@ class FullEditorRecordingLayoutTest {
                             draftCount = 1,
                             autoSaveStatus = AutoSaveStatus.SAVING,
                             optionsVisible = false,
+                            saveEnabled = false,
                         )
                     },
                     bottomContent = {
@@ -160,101 +163,105 @@ class FullEditorRecordingLayoutTest {
                             false,
                             {},
                             modifier = Modifier.fillMaxWidth().testTag("journal_surface_bounds"),
+                            enabled = false,
                         )
                     },
                     editorContent = {
-                        BoxWithConstraints(
-                            Modifier.fillMaxSize().wrapContentSize(Alignment.TopCenter).widthIn(max = EditorColumnMaxWidth),
-                        ) {
-                            val contextVisible = LocalEditorContextControlsVisible.current
-                            val recordingHeight = unfinishedAudioHeight(maxHeight, maxWidth, if (contextVisible) 56.dp else 0.dp)
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize().testTag("recording_entry"),
-                                contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp),
-                                verticalArrangement = Arrangement.spacedBy(16.dp),
+                        FocusedEntryPanes(focusedContent = {
+                            BoxWithConstraints(
+                                Modifier.fillMaxSize().wrapContentSize(Alignment.TopCenter).widthIn(max = EditorColumnMaxWidth),
                             ) {
-                                item {
-                                    MemoryBlockSurface(block, true, {}, {}, {}) {
-                                        Column {
-                                            ActiveRecordingDisplay(
-                                                isPaused = paused,
-                                                transcriptionHasError = transcriptionError,
-                                                audioLevels =
-                                                    listOf(
-                                                        .05f,
-                                                        .08f,
-                                                        .04f,
-                                                        .12f,
-                                                        .29f,
-                                                        .54f,
-                                                        .78f,
-                                                        .9f,
-                                                        .71f,
-                                                        .42f,
-                                                        .21f,
-                                                        .08f,
-                                                        .04f,
-                                                        .05f,
-                                                        .18f,
-                                                        .38f,
-                                                        .6f,
-                                                        .84f,
-                                                        .68f,
-                                                        .39f,
-                                                        .24f,
-                                                        .1f,
-                                                        .05f,
-                                                        .04f,
-                                                        .09f,
-                                                        .22f,
-                                                        .49f,
-                                                        .7f,
-                                                        .94f,
-                                                        .85f,
-                                                        .61f,
-                                                        .4f,
-                                                        .23f,
-                                                        .1f,
-                                                        .04f,
-                                                        .03f,
-                                                        .05f,
-                                                        .12f,
-                                                        .27f,
-                                                        .46f,
-                                                        .63f,
-                                                        .78f,
-                                                        .59f,
-                                                        .35f,
-                                                        .18f,
-                                                        .09f,
-                                                        .04f,
-                                                        .03f,
-                                                        .04f,
-                                                        .02f,
-                                                    ),
-                                                recordingDuration = 42.seconds,
-                                                onRestart = {},
-                                                onPause = {},
-                                                onFinish = {},
-                                                transcriptionText =
-                                                    "I took the long way home today.\n\n" +
-                                                        "The light was coming through the trees, and for once I wasn't in a hurry.\n\n" +
-                                                        "I want to remember how that felt.",
-                                                inputSelection =
-                                                    MediaDeviceSelectionUiState(
-                                                        MediaDeviceKind.AUDIO_INPUT,
-                                                        microphones,
-                                                        microphone.id,
-                                                    ),
-                                                modifier = Modifier.height(recordingHeight),
-                                            )
-                                            MemoryCaptionField(block, {}, {}, editRequest = 0)
+                                val contextVisible = LocalEditorFocusPresentation.current.entryActionsEnabled
+                                val recordingHeight = unfinishedAudioHeight(maxHeight, maxWidth, if (contextVisible) 56.dp else 0.dp)
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize().testTag("recording_entry"),
+                                    contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                                ) {
+                                    item {
+                                        MemoryBlockSurface(block, true, {}, {}, {}) {
+                                            Column {
+                                                ActiveRecordingDisplay(
+                                                    isPaused = paused,
+                                                    transcriptionHasError = transcriptionError,
+                                                    audioLevels =
+                                                        listOf(
+                                                            .05f,
+                                                            .08f,
+                                                            .04f,
+                                                            .12f,
+                                                            .29f,
+                                                            .54f,
+                                                            .78f,
+                                                            .9f,
+                                                            .71f,
+                                                            .42f,
+                                                            .21f,
+                                                            .08f,
+                                                            .04f,
+                                                            .05f,
+                                                            .18f,
+                                                            .38f,
+                                                            .6f,
+                                                            .84f,
+                                                            .68f,
+                                                            .39f,
+                                                            .24f,
+                                                            .1f,
+                                                            .05f,
+                                                            .04f,
+                                                            .09f,
+                                                            .22f,
+                                                            .49f,
+                                                            .7f,
+                                                            .94f,
+                                                            .85f,
+                                                            .61f,
+                                                            .4f,
+                                                            .23f,
+                                                            .1f,
+                                                            .04f,
+                                                            .03f,
+                                                            .05f,
+                                                            .12f,
+                                                            .27f,
+                                                            .46f,
+                                                            .63f,
+                                                            .78f,
+                                                            .59f,
+                                                            .35f,
+                                                            .18f,
+                                                            .09f,
+                                                            .04f,
+                                                            .03f,
+                                                            .04f,
+                                                            .02f,
+                                                        ),
+                                                    recordingDuration = 42.seconds,
+                                                    onRestart = {},
+                                                    onPause = {},
+                                                    onFinish = {},
+                                                    transcriptionText =
+                                                        "I took the long way home today.\n\n" +
+                                                            "The light was coming through the trees, " +
+                                                            "and for once I wasn't in a hurry.\n\n" +
+                                                            "I want to remember how that felt.",
+                                                    inputSelection =
+                                                        MediaDeviceSelectionUiState(
+                                                            MediaDeviceKind.AUDIO_INPUT,
+                                                            microphones,
+                                                            microphone.id,
+                                                        ),
+                                                    modifier = Modifier.height(recordingHeight),
+                                                )
+                                                MemoryCaptionField(block, {}, {}, editRequest = 0)
+                                            }
                                         }
                                     }
+                                    if (contextVisible) item { EndOfEntryAddControl(0f, false, {}, {}, {}) }
                                 }
-                                if (contextVisible) item { EndOfEntryAddControl(0f, false, {}, {}, {}) }
                             }
-                        }
+                        }, contextContent = { Text("Earlier entry content") })
                     },
                 )
             }
@@ -308,13 +315,10 @@ class FullEditorRecordingLayoutTest {
             val recording = onNodeWithTag("memory_block_${block.id}").getUnclippedBoundsInRoot()
             assertEquals(size.height.dp - 16.dp, recording.bottom, "Focused audio must preserve the safe bottom margin")
         } else if (!verifyGutters && !verifyInnerGutters) {
-            onNodeWithTag("add_to_entry").assertIsDisplayed()
+            onNodeWithTag("add_to_entry").assertDoesNotExist()
             onNodeWithText("Personal").assertIsDisplayed()
             val recording = onNodeWithTag("memory_block_${block.id}").getUnclippedBoundsInRoot()
-            val add = onNodeWithTag("add_memory_surface").getUnclippedBoundsInRoot()
             val journalSurface = onNodeWithTag("journal_surface_bounds").getUnclippedBoundsInRoot()
-            assertEquals(recording.left, add.left)
-            assertEquals(recording.right, add.right)
             assertEquals(recording.left, journalSurface.left)
             assertEquals(recording.right, journalSurface.right)
         }

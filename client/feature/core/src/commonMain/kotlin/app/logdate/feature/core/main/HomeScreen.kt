@@ -158,6 +158,7 @@ fun HomeScreen(
                     { if (currentDestination == HomeRouteDestination.Journals) onCreateJournal() else onNewEntry() }
                 },
             createLabel = if (currentDestination == HomeRouteDestination.Journals) "Create journal" else "Add a memory",
+            createEntryTransition = currentDestination != HomeRouteDestination.Journals,
             onSearch = onOpenSearch,
             actions = {
                 HomeWorkspaceAccountAction(

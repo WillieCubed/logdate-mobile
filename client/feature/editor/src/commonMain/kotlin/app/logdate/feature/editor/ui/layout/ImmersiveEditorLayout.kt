@@ -49,6 +49,8 @@ import app.logdate.ui.theme.Spacing
  * available vertical space is too small to render full-size controls. Components should
  * switch to compact variants (e.g. chip instead of card) when this is `true`.
  */
+internal val LocalEditorKeyboardVisible = compositionLocalOf { false }
+
 internal val LocalEditorIsCompact = compositionLocalOf { false }
 
 internal val LocalEditorRecordingActive = compositionLocalOf { false }
@@ -87,6 +89,9 @@ fun ImmersiveEditorLayout(
     bottomContentTopPadding: Dp = Spacing.lg,
     isAudioRecordingActive: Boolean = false,
     screenCornerRadius: Dp = rememberScreenCornerRadius(),
+    focusState: EditorFocus? = null,
+    hasJournalSelection: Boolean = true,
+    entryLocked: Boolean = false,
 ) {
     val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val (windowOrigin, trackWindowOrigin) = rememberWindowOrigin()
@@ -100,7 +105,19 @@ fun ImmersiveEditorLayout(
                 layoutInfo = foldableLayoutInfo.relativeTo(windowOrigin),
                 minPaneWidth = 320.dp,
             ) as? FoldableSplitLayout.Vertical
-        val contextControlsVisible = !isAudioRecordingActive || (bookLayout?.leftPane?.width ?: containerWidth) >= 600.dp
+        val focus =
+            focusState ?: when {
+                isImmersiveBlockActive -> EditorFocus.Camera()
+                isAudioRecordingActive -> EditorFocus.Recording()
+                else -> EditorFocus.Entry
+            }
+        val secondaryPaneAvailable = bookLayout != null || containerWidth >= 1000.dp
+        val focusPaneWidth =
+            bookLayout?.leftPane?.width
+                ?: if (secondaryPaneAvailable && focus is EditorFocus.Recording) minOf(containerWidth, 1200.dp) / 1.7f else containerWidth
+        val presentation =
+            editorFocusPresentation(focus, focusPaneWidth, secondaryPaneAvailable, keyboardVisible, hasJournalSelection, entryLocked)
+        val contextControlsVisible = presentation.showJournalContext
         val hasSeparatingHinge = foldableLayoutInfo.hinge?.isSeparating == true
         val maxEditorWidth =
             when {
@@ -129,9 +146,11 @@ fun ImmersiveEditorLayout(
                 contentAlignment = Alignment.Center,
             ) {
                 CompositionLocalProvider(
+                    LocalEditorFocusPresentation provides presentation,
+                    LocalEditorKeyboardVisible provides keyboardVisible,
                     LocalEditorIsCompact provides (maxHeight < 500.dp),
                     LocalEditorContextControlsVisible provides contextControlsVisible,
-                    LocalEditorRecordingActive provides isAudioRecordingActive,
+                    LocalEditorRecordingActive provides presentation.isRecording,
                     LocalEditorCorners provides
                         if (containerWidth < 600.dp && !hasSeparatingHinge) {
                             editorCornerGeometry(screenCornerRadius)
@@ -157,36 +176,48 @@ fun ImmersiveEditorLayout(
                             editorContent()
                         }
 
-                        AnimatedVisibility(
-                            visible = !isImmersiveBlockActive && !keyboardVisible && contextControlsVisible,
-                            enter = fadeIn(tween(200)) + expandVertically(tween(300, easing = FastOutSlowInEasing)),
-                            exit = fadeOut(tween(150)) + shrinkVertically(tween(300, easing = FastOutSlowInEasing)),
-                        ) {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = bottomContentTopPadding),
+                        if (!keyboardVisible) {
+                            AnimatedVisibility(
+                                visible = contextControlsVisible,
+                                enter = fadeIn(tween(200)) + expandVertically(tween(300, easing = FastOutSlowInEasing)),
+                                exit = fadeOut(tween(150)) + shrinkVertically(tween(300, easing = FastOutSlowInEasing)),
                             ) {
                                 Box(
                                     modifier =
-                                        (
-                                            if (bookLayout != null) {
-                                                Modifier.width((bookLayout.leftPane.width - horizontalPadding).coerceAtLeast(0.dp))
-                                            } else {
-                                                Modifier.fillMaxWidth()
-                                            }
-                                        ).align(if (bookLayout != null) Alignment.CenterStart else Alignment.Center),
-                                    contentAlignment = Alignment.Center,
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = bottomContentTopPadding),
                                 ) {
                                     Box(
                                         modifier =
-                                            Modifier
-                                                .widthIn(max = EditorColumnMaxWidth)
-                                                .fillMaxWidth()
-                                                .padding(horizontal = EditorSurfaceInset),
+                                            (
+                                                if (bookLayout != null) {
+                                                    Modifier.width((bookLayout.leftPane.width - horizontalPadding).coerceAtLeast(0.dp))
+                                                } else if (presentation.showSecondaryContext) {
+                                                    Modifier.width((minOf(containerWidth, maxEditorWidth) - horizontalPadding * 2) / 1.7f)
+                                                } else {
+                                                    Modifier.fillMaxWidth()
+                                                }
+                                            ).align(
+                                                if (bookLayout != null ||
+                                                    presentation.showSecondaryContext
+                                                ) {
+                                                    Alignment.CenterStart
+                                                } else {
+                                                    Alignment.Center
+                                                },
+                                            ),
+                                        contentAlignment = Alignment.Center,
                                     ) {
-                                        bottomContent()
+                                        Box(
+                                            modifier =
+                                                Modifier
+                                                    .widthIn(max = EditorColumnMaxWidth)
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = EditorSurfaceInset),
+                                        ) {
+                                            bottomContent()
+                                        }
                                     }
                                 }
                             }

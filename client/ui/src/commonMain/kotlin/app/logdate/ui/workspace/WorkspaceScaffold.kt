@@ -1,7 +1,11 @@
 @file:Suppress("ktlint:standard:function-naming")
+@file:OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 
 package app.logdate.ui.workspace
 
+import androidx.compose.animation.BoundsTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -35,6 +39,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.LocalNavAnimatedVisibilityScope
+import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.foldable.rememberFoldableLayoutInfo
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
@@ -56,6 +63,7 @@ fun WorkspaceScaffold(
     modifier: Modifier = Modifier,
     onCreate: (() -> Unit)? = null,
     createLabel: String = "Add a memory",
+    createEntryTransition: Boolean = true,
     onSearch: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
     status: @Composable () -> Unit = {},
@@ -92,7 +100,7 @@ fun WorkspaceScaffold(
                 }
             },
             floatingActionButton = {
-                if (!rail && onCreate != null) WorkspaceCreateAction(onCreate, createLabel)
+                if (!rail && onCreate != null) WorkspaceCreateAction(onCreate, createLabel, createEntryTransition)
             },
         ) { insets ->
             Row(Modifier.fillMaxSize().padding(insets)) {
@@ -106,7 +114,7 @@ fun WorkspaceScaffold(
                         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
                         Text("LogDate", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(Spacing.lg))
-                        onCreate?.let { WorkspaceCreateAction(it, createLabel) }
+                        onCreate?.let { WorkspaceCreateAction(it, createLabel, createEntryTransition) }
                         destinations.forEach { destination ->
                             NavigationDrawerItem(
                                 label = { Text(destination.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -120,7 +128,7 @@ fun WorkspaceScaffold(
                     NavigationRail(
                         containerColor = canvas,
                         windowInsets = WindowInsets(0, 0, 0, 0),
-                        header = { onCreate?.let { WorkspaceCreateAction(it, createLabel) } },
+                        header = { onCreate?.let { WorkspaceCreateAction(it, createLabel, createEntryTransition) } },
                         modifier = Modifier.fillMaxHeight(),
                     ) {
                         destinations.forEach { destination ->
@@ -162,9 +170,26 @@ fun WorkspaceScaffold(
 private fun WorkspaceCreateAction(
     onClick: () -> Unit,
     label: String,
+    createEntryTransition: Boolean,
 ) {
+    val sharedScope = LocalSharedTransitionScope.current
+    val visibilityScope = LocalNavAnimatedVisibilityScope.current
+    val transitionModifier =
+        if (createEntryTransition && sharedScope != null && visibilityScope != null) {
+            with(sharedScope) {
+                Modifier.sharedBounds(
+                    rememberSharedContentState(TransitionKeys.FAB_TO_EDITOR_TRANSITION),
+                    animatedVisibilityScope = visibilityScope,
+                    boundsTransform = BoundsTransform { _, _ -> tween(350, easing = FastOutSlowInEasing) },
+                    clipInOverlayDuringTransition = OverlayClip(MaterialTheme.shapes.large),
+                )
+            }
+        } else {
+            Modifier
+        }
     FloatingActionButton(
         onClick,
+        modifier = transitionModifier,
         containerColor = MaterialTheme.colorScheme.primaryContainer,
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
     ) {

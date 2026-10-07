@@ -7,17 +7,26 @@ import android.content.Intent
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -153,6 +162,28 @@ class RecordingBackgroundLifecycleE2ETest {
         }
     }
 
+    @Test
+    fun recordingAnchorsItsBlockAndKeepsExistingTextAsPassiveContext() {
+        verifyRecordingContinuity("focused-entry", includeExistingText = true) {
+            val list = composeRule.onNodeWithTag("editor_block_list").fetchSemanticsNode()
+            assertFalse("A focused recording must not expose a scroll action", list.config.contains(SemanticsActions.ScrollBy))
+            composeRule.onNodeWithTag("add_to_entry").assertDoesNotExist()
+            composeRule.onNodeWithTag("editor_save_button").assertIsDisplayed().assertIsNotEnabled()
+            val contextNodes = composeRule.onAllNodesWithTag("editor_passive_context").fetchSemanticsNodes()
+            if (contextNodes.isNotEmpty()) {
+                composeRule.onNodeWithText("Before this recording.").assertIsDisplayed()
+            } else {
+                composeRule.onNodeWithText("Before this recording.").assertDoesNotExist()
+            }
+            capture("recording-focused-entry-anchored")
+        }
+        composeRule.onNodeWithTag("editor_block_list").performScrollToIndex(2)
+        composeRule.onNodeWithTag("add_to_entry").assertIsDisplayed()
+        composeRule.onNodeWithTag("editor_block_list").performScrollToIndex(0)
+        composeRule.onNodeWithText("Before this recording.").assertIsDisplayed()
+        capture("recording-focused-entry-text-restored")
+    }
+
     private fun setEmulatedSecondaryMicrophoneConnected(connected: Boolean) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -180,6 +211,7 @@ class RecordingBackgroundLifecycleE2ETest {
 
     private fun verifyRecordingContinuity(
         label: String,
+        includeExistingText: Boolean = false,
         lifecycleChange: () -> Unit,
     ) {
         val manager = GlobalContext.get().get<AudioRecordingManager>()
@@ -188,7 +220,17 @@ class RecordingBackgroundLifecycleE2ETest {
             assertFalse("A previous recording must not own the test microphone", manager.isRecording)
             waitForTag("editor_start_audio_block")
             capture("recording-$label-empty-editor")
-            composeRule.onNodeWithTag("editor_start_audio_block").performClick()
+            if (includeExistingText) {
+                composeRule.onNodeWithContentDescription("Start text entry").performClick()
+                waitForTag("editor_text_input")
+                composeRule.onNodeWithTag("editor_text_input").performTextInput("Before this recording.")
+                Espresso.closeSoftKeyboard()
+                composeRule.onNodeWithTag("add_to_entry").performScrollTo().performClick()
+                waitForTag("add_memory_AUDIO")
+                composeRule.onNodeWithTag("add_memory_AUDIO").performScrollTo().performClick()
+            } else {
+                composeRule.onNodeWithTag("editor_start_audio_block").performClick()
+            }
             waitForTag("audio_record_start_button")
             composeRule.onNodeWithTag("audio_record_start_button").performClick()
             composeRule.waitUntil(timeoutMillis = 15_000) {
@@ -242,6 +284,21 @@ class RecordingBackgroundLifecycleE2ETest {
                     hasTestTag("audio_block_duration") and hasAnyAncestor(hasTestTag("memory_block_$owner")),
                     useUnmergedTree = true,
                 ).assertIsDisplayed()
+            if (composeRule.onAllNodesWithTag("completed_audio_transcript").fetchSemanticsNodes().isEmpty()) {
+                val bounds = composeRule.onNodeWithTag("memory_block_$owner").getUnclippedBoundsInRoot()
+                assertTrue("A completed recording without transcript must collapse to its controls", bounds.bottom - bounds.top < 240.dp)
+            }
+            if (includeExistingText) {
+                val retainedText = runBlocking {
+                    draftRepository
+                        .getDrafts()
+                        .first()
+                        .first { draft -> draft.notes.any { it.uid == owner } }
+                        .notes
+                        .filterIsInstance<JournalNote.Text>()
+                }
+                assertTrue("Existing text must remain durably saved", retainedText.any { it.content == "Before this recording." })
+            }
             capture("recording-$label-finalized")
         } finally {
             try {

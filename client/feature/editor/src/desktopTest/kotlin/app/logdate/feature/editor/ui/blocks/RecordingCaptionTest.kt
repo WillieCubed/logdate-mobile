@@ -2,6 +2,7 @@ package app.logdate.feature.editor.ui.blocks
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
@@ -29,7 +30,7 @@ class RecordingCaptionTest {
         }
 
     @Test
-    fun `completed audio keeps the existing caption available`() =
+    fun `completed audio preserves its caption as quiet read only text`() =
         runSkikoComposeUiTest {
             val block =
                 AudioBlockUiState(captureState = AudioCaptureState.Ready("file:///recording.m4a", 5000), caption = "Retained caption")
@@ -39,5 +40,20 @@ class RecordingCaptionTest {
                 }
             }
             onNodeWithText("Retained caption").assertIsDisplayed()
+            onNodeWithTag("memory_caption_${block.id}").assertDoesNotExist()
+            assertEquals(0, onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size)
+        }
+
+    @Test
+    fun `completed audio without a caption does not prompt for one`() =
+        runSkikoComposeUiTest {
+            val block = AudioBlockUiState(captureState = AudioCaptureState.Ready("file:///recording.m4a", 5000))
+            setContent {
+                LogDateTheme(dynamicColor = false) {
+                    MemoryCaptionField(block, {}, {}, editRequest = 1)
+                }
+            }
+            onNodeWithTag("memory_caption_${block.id}").assertDoesNotExist()
+            assertEquals(0, onAllNodes(hasSetTextAction()).fetchSemanticsNodes().size)
         }
 }

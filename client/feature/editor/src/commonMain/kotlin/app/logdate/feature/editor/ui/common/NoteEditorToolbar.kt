@@ -71,6 +71,7 @@ fun NoteEditorToolbar(
     actionsVisible: Boolean = true,
     actionsEnabled: Boolean = true,
     optionsVisible: Boolean = true,
+    saveEnabled: Boolean = true,
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
@@ -140,7 +141,7 @@ fun NoteEditorToolbar(
 
                 FilledTonalIconButton(
                     onClick = { onSave() },
-                    enabled = actionsEnabled,
+                    enabled = actionsEnabled && saveEnabled,
                     modifier =
                         Modifier
                             .testTag(LOGDATE_EDITOR_SAVE_BUTTON_TAG)

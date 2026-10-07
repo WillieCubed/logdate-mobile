@@ -35,14 +35,15 @@ import app.logdate.feature.editor.ui.common.PlatformBackHandler
 import app.logdate.feature.editor.ui.content.EditorBottomContent
 import app.logdate.feature.editor.ui.dialog.DraftsBottomSheet
 import app.logdate.feature.editor.ui.dialog.alert.ConfirmEntryExitDialog
-import app.logdate.feature.editor.ui.editor.CameraBlockUiState
 import app.logdate.feature.editor.ui.editor.EditorBackgroundSaveEffect
 import app.logdate.feature.editor.ui.editor.EditorExitReason
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.delegate.DefaultAudioBlockFinalizer
 import app.logdate.feature.editor.ui.editor.rememberEditorAutoSave
+import app.logdate.feature.editor.ui.layout.EditorFocus
 import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
+import app.logdate.feature.editor.ui.layout.editorFocus
 import app.logdate.feature.editor.ui.state.rememberBlocksUiState
 import app.logdate.ui.common.noteDropTarget
 import app.logdate.ui.platform.rememberLogDateHaptics
@@ -73,6 +74,7 @@ fun EntryEditorContent(
     viewModel: EntryEditorViewModel = koinViewModel(),
 ) {
     val editorState by viewModel.editorState.collectAsState()
+    val focus = editorState.editorFocus()
     val snackbarHostState = remember { SnackbarHostState() }
     val shouldReturnToPickerOnBack = editorState.shouldReturnToPickerOnBack()
     var journalSelectorExpanded by remember { mutableStateOf(false) }
@@ -95,10 +97,7 @@ fun EntryEditorContent(
         )
 
     // Only live camera capture takes over the entry chrome.
-    val activeCamera =
-        editorState.blocks.any {
-            it.id == editorState.expandedBlockId && it is CameraBlockUiState && it.uri == null
-        }
+    val activeCamera = focus is EditorFocus.Camera
     val isImmersiveBlockActive = activeCamera
     LaunchedEffect(editorState.isRecordingAudio) {
         if (editorState.isRecordingAudio) journalSelectorExpanded = false
@@ -247,6 +246,9 @@ fun EntryEditorContent(
         modifier = modifier.noteDropTarget { viewModel.appendTextBlock(it) },
         isImmersiveBlockActive = isImmersiveBlockActive,
         isAudioRecordingActive = editorState.isRecordingAudio,
+        focusState = focus,
+        hasJournalSelection = uiState.availableJournals.any { it.id in uiState.selectedJournalIds },
+        entryLocked = editorState.isSaving || editorState.shouldExit || editorState.isEditingLocked,
         immersiveExitProgress = chromeProgress.value,
         topBarContent = {
             NoteEditorToolbar(
@@ -259,7 +261,8 @@ fun EntryEditorContent(
                 draftCount = editorState.availableDrafts.size,
                 autoSaveStatus = autoSaveState.status,
                 actionsVisible = !isImmersiveBlockActive,
-                optionsVisible = !editorState.isRecordingAudio,
+                optionsVisible = focus !is EditorFocus.Recording,
+                saveEnabled = focus !is EditorFocus.Recording && !editorState.isEditingLocked,
                 actionsEnabled = !editorState.isSaving && !editorState.shouldExit,
             )
         },
@@ -271,6 +274,7 @@ fun EntryEditorContent(
                 MainEditorContent(
                     modifier = Modifier.weight(1f),
                     uiState = uiState,
+                    focusState = focus,
                     shouldReturnToPickerOnBack = shouldReturnToPickerOnBack,
                     onDismissExpanded = {
                         viewModel.dismissExpandedBlockOrClearSingleEmpty()
@@ -294,10 +298,16 @@ fun EntryEditorContent(
             EditorBottomContent(
                 availableJournals = uiState.availableJournals,
                 selectedJournalIds = uiState.selectedJournalIds,
-                onJournalSelectionChanged = uiState.onJournalSelectionChanged,
+                onJournalSelectionChanged = { if (focus !is EditorFocus.Recording) uiState.onJournalSelectionChanged(it) },
+                enabled =
+                    focus !is EditorFocus.Recording && !editorState.isSaving && !editorState.shouldExit && !editorState.isEditingLocked,
                 journalSelectorExpanded = journalSelectorExpanded,
                 onJournalSelectorExpandedChange = { expanded ->
-                    if (!editorState.isSaving && !editorState.shouldExit) {
+                    if (focus !is EditorFocus.Recording &&
+                        !editorState.isSaving &&
+                        !editorState.shouldExit &&
+                        !editorState.isEditingLocked
+                    ) {
                         journalSelectorExpanded = expanded
                     }
                 },

@@ -98,6 +98,7 @@ fun EmptyEditorStateContent(
     audioTileId: Uuid? = null,
     cameraTileId: Uuid? = null,
     modifier: Modifier = Modifier,
+    retainConsumedTileIds: Boolean = false,
 ) {
     // Stable IDs pre-generated for each tile; used as the shared element key so
     // the tile morphs into the expanded block surface on tap. A generated id is
@@ -112,19 +113,19 @@ fun EmptyEditorStateContent(
 
     val startTextBlock = {
         onStartTextBlock(textId)
-        if (textTileId == null) textId = Uuid.random()
+        if (!retainConsumedTileIds && textTileId == null) textId = Uuid.random()
     }
     val startAudioBlock = {
         onStartAudioBlock(audioId)
-        if (audioTileId == null) audioId = Uuid.random()
+        if (!retainConsumedTileIds && audioTileId == null) audioId = Uuid.random()
     }
     val startCameraBlock = {
         onStartCameraBlock(cameraId)
-        if (cameraTileId == null) cameraId = Uuid.random()
+        if (!retainConsumedTileIds && cameraTileId == null) cameraId = Uuid.random()
     }
     val startPhotoBlock = {
         onStartPhotoBlock(photoId)
-        if (photoTileId == null) photoId = Uuid.random()
+        if (!retainConsumedTileIds && photoTileId == null) photoId = Uuid.random()
     }
 
     val sts = LocalSharedTransitionScope.current

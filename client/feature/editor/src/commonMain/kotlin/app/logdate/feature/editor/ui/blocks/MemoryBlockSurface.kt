@@ -1,10 +1,7 @@
 package app.logdate.feature.editor.ui.blocks
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -74,14 +71,19 @@ internal fun MemoryBlockSurface(
     }
     val framed = block is ImageBlockUiState && block.presentation == PhotoPresentation.Framed
     val surfaceColor by animateColorAsState(
-        if (framed) Color.White else MaterialTheme.colorScheme.surfaceContainer,
+        if (framed) {
+            Color.White
+        } else if (isSelected) {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        },
         label = "memorySurfaceColor",
     )
     val photoTopInset by animateDpAsState(if (framed) 12.dp else 0.dp, label = "photoTopInset")
     Surface(
         modifier =
             modifier
-                .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
                 .fillMaxWidth()
                 .testTag(
                     "memory_block_${block.id}",
