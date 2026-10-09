@@ -17,6 +17,7 @@ data class ContentRecord(
     val lastUpdated: Long,
     val serverVersion: Long,
     val deviceId: DeviceId,
+    val transcript: String? = null,
 )
 
 data class JournalRecord(

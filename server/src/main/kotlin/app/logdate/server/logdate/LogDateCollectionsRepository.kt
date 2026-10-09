@@ -24,6 +24,8 @@ data class LogDateEntry(
     val photoPresentation: String? = null,
     /** Encrypted note location; the server stores and returns it without interpreting it. */
     val location: String? = null,
+    /** Opaque encrypted structured audio transcript. */
+    val transcript: String? = null,
 )
 
 data class LogDateJournal(

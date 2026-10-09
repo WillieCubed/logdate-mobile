@@ -47,7 +47,17 @@ class InMemorySyncRepository : SyncRepository {
         userId: UUID,
         record: ContentRecord,
     ): ContentRecord {
-        val versioned = record.copy(serverVersion = nextVersion(), lastUpdated = record.lastUpdated)
+        val versioned =
+            record.copy(
+                serverVersion = nextVersion(),
+                lastUpdated = record.lastUpdated,
+                transcript =
+                    record.transcript ?: content
+                        .forUser(userId)[record.id]
+                        ?.takeIf {
+                            it.type == record.type && it.mediaUri == record.mediaUri && it.durationMs == record.durationMs
+                        }?.transcript,
+            )
         content.forUser(userId)[record.id] = versioned
         return versioned.copy(serverVersion = versioned.serverVersion, lastUpdated = now())
     }

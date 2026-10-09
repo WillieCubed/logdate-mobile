@@ -120,6 +120,7 @@ class RepoBackedLogDateCollectionsRepositoryTest {
                         LogDateEntry(
                             id = "entry-1",
                             type = "TEXT",
+                            transcript = "LDSE2:opaque-transcript",
                             content = "hello",
                             mediaUri = null,
                             durationMs = 0L,
@@ -131,6 +132,7 @@ class RepoBackedLogDateCollectionsRepositoryTest {
                 )
 
             assertNull(repository.createEntryIfAbsent(userId, stored.copy(content = "Stale legacy copy")))
+            repository.upsertEntry(userId, stored.copy(transcript = null))
             val fetched = repository.getEntry(userId = userId, id = "entry-1")
             val snapshot = repository.listEntries(userId)
             val changes = repository.entryChanges(userId = userId, since = 0L, limit = 20)
@@ -142,11 +144,15 @@ class RepoBackedLogDateCollectionsRepositoryTest {
 
             assertNotNull(fetched)
             assertEquals("hello", fetched.content)
+            assertEquals("LDSE2:opaque-transcript", fetched.transcript)
             assertEquals(listOf(fetched), snapshot)
             assertEquals(listOf(fetched), changes.changes)
             assertTrue(stored.version > 0L)
             assertNotNull(canonicalRecord)
             assertEquals("hello", canonicalRecord.value.stringValue("content"))
+
+            assertNull(repository.upsertEntry(userId, fetched.copy(transcript = null, mediaUri = "replacement.m4a")).transcript)
+            assertNull(repository.getEntry(userId, fetched.id)?.transcript)
 
             val deletedAt = changes.lastTimestamp - 1L
             repository.deleteEntry(userId = userId, id = "entry-1", deletedAt = deletedAt)

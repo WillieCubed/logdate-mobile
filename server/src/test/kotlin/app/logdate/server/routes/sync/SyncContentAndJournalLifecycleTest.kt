@@ -20,6 +20,7 @@ import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -30,6 +31,99 @@ import kotlin.test.assertTrue
  * full and partial (PATCH) updates for both content and journal collections.
  */
 class SyncContentAndJournalLifecycleTest {
+    @Test
+    fun `encrypted transcript survives changes and updates from older clients`() =
+        testApplication {
+            val tokenService = configureInMemorySyncApp()
+            val auth = authHeader(tokenService)
+            val path = "/api/v1/contents/audio-transcript"
+            val upload =
+                """
+                {"id":"audio-transcript","type":"AUDIO","content":null,"mediaUri":"audio.m4a","durationMs":4000,
+                 "createdAt":1,"lastUpdated":2,"transcript":"LDSE2:opaque-transcript"}
+                """.trimIndent()
+            assertEquals(
+                HttpStatusCode.Created,
+                client
+                    .put(path) {
+                        header(HttpHeaders.Authorization, auth)
+                        contentType(ContentType.Application.Json)
+                        setBody(upload)
+                    }.status,
+            )
+            assertTrue(client.get(path) { header(HttpHeaders.Authorization, auth) }.bodyAsText().contains("\"durationMs\":4000"))
+            assertTrue(client.get(path) { header(HttpHeaders.Authorization, auth) }.bodyAsText().contains("LDSE2:opaque-transcript"))
+            assertEquals(
+                HttpStatusCode.OK,
+                client
+                    .patch(path) {
+                        header(HttpHeaders.Authorization, auth)
+                        contentType(ContentType.Application.Json)
+                        setBody("""{"lastUpdated":3,"mediaUri":"audio.m4a"}""")
+                    }.status,
+            )
+            assertTrue(client.get(path) { header(HttpHeaders.Authorization, auth) }.bodyAsText().contains("\"durationMs\":4000"))
+            assertEquals(
+                HttpStatusCode.OK,
+                client
+                    .put(path) {
+                        header(HttpHeaders.Authorization, auth)
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                            """
+                            {"id":"audio-transcript","type":"AUDIO","content":null,
+                             "mediaUri":"audio.m4a","durationMs":4000,"createdAt":1,"lastUpdated":4}
+                            """.trimIndent(),
+                        )
+                    }.status,
+            )
+            assertTrue(
+                client
+                    .get("/api/v1/contents?since=0") {
+                        header(HttpHeaders.Authorization, auth)
+                    }.bodyAsText()
+                    .contains("LDSE2:opaque-transcript"),
+            )
+            assertEquals(
+                HttpStatusCode.OK,
+                client
+                    .patch(path) {
+                        header(HttpHeaders.Authorization, auth)
+                        contentType(ContentType.Application.Json)
+                        setBody("""{"lastUpdated":5,"mediaUri":"replacement.m4a"}""")
+                    }.status,
+            )
+            assertFalse(client.get(path) { header(HttpHeaders.Authorization, auth) }.bodyAsText().contains("LDSE2:opaque-transcript"))
+            client.put(path) {
+                header(HttpHeaders.Authorization, auth)
+                contentType(ContentType.Application.Json)
+                setBody(upload)
+            }
+            client.patch(path) {
+                header(HttpHeaders.Authorization, auth)
+                contentType(ContentType.Application.Json)
+                setBody("""{"lastUpdated":7,"durationMs":5000}""")
+            }
+            assertFalse(client.get(path) { header(HttpHeaders.Authorization, auth) }.bodyAsText().contains("LDSE2:opaque-transcript"))
+            client.put(path) {
+                header(HttpHeaders.Authorization, auth)
+                contentType(ContentType.Application.Json)
+                setBody(upload)
+            }
+            assertEquals(
+                HttpStatusCode.OK,
+                client
+                    .put(path) {
+                        header(HttpHeaders.Authorization, auth)
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                            """{"id":"audio-transcript","type":"AUDIO","content":null,"mediaUri":"other.m4a","createdAt":1,"lastUpdated":6}""",
+                        )
+                    }.status,
+            )
+            assertFalse(client.get(path) { header(HttpHeaders.Authorization, auth) }.bodyAsText().contains("LDSE2:opaque-transcript"))
+        }
+
     @Test
     fun `conditional journal creation preserves a newer title`() =
         testApplication {

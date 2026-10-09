@@ -92,6 +92,8 @@ internal object SyncSchemaDocs {
                         "photoPresentation" to "Photo layout: `EdgeToEdge` or `Framed`. Omit on updates to preserve the current layout.",
                         "caption" to "Caption for an image or video, or `null`. $ENCRYPTED_BY_APPS",
                         "location" to "Where the entry was written, or `null`. $ENCRYPTED_BY_APPS",
+                        "transcript" to
+                            "Structured audio transcript encrypted by the app; omitted values survive only while media is unchanged. $ENCRYPTED_BY_APPS",
                     ),
                 ),
             "ContentUploadResponse" to
@@ -109,7 +111,7 @@ internal object SyncSchemaDocs {
                     mapOf(
                         "content" to "New text, or omit to keep the current text. $ENCRYPTED_BY_APPS",
                         "mediaUri" to "New media reference, or omit to keep the current one.",
-                        "durationMs" to "New duration in milliseconds. Note: defaults to `0` when omitted.",
+                        "durationMs" to "New duration in milliseconds, or omit to keep the current duration. An explicit `0` is retained.",
                         "lastUpdated" to "When the edit was made on the device. $EPOCH_MS",
                         "syncVersion" to SYNC_VERSION_IGNORED,
                         "deviceId" to DEVICE_ID,
@@ -117,6 +119,7 @@ internal object SyncSchemaDocs {
                         "photoPresentation" to "Photo layout: `EdgeToEdge` or `Framed`. Omit on updates to preserve the current layout.",
                         "caption" to "New caption, or omit to keep the current one. $ENCRYPTED_BY_APPS",
                         "location" to "New location, or omit to keep the current one. $ENCRYPTED_BY_APPS",
+                        "transcript" to "Encrypted audio transcript; omit to preserve it while media is unchanged. $ENCRYPTED_BY_APPS",
                     ),
                 ),
             "ContentUpdateResponse" to
@@ -154,6 +157,8 @@ internal object SyncSchemaDocs {
                         "photoPresentation" to "Photo layout: `EdgeToEdge` or `Framed`. Omit on updates to preserve the current layout.",
                         "caption" to "Caption for an image or video, or `null`. $ENCRYPTED_BY_APPS",
                         "location" to "Where the entry was written, or `null`. $ENCRYPTED_BY_APPS",
+                        "transcript" to
+                            "Structured audio transcript encrypted by the app; omitted values survive only while media is unchanged. $ENCRYPTED_BY_APPS",
                     ),
                 ),
             "ContentDeletion" to

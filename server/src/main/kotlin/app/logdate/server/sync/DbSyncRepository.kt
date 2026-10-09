@@ -63,6 +63,13 @@ class DbSyncRepository : SyncRepository {
                         (ContentSyncTable.id eq record.id) and (ContentSyncTable.userId eq userId)
                     }.singleOrNull()
             val serverVersion = nextVersion(existing?.get(ContentSyncTable.serverVersion))
+            val acceptedTranscript =
+                record.transcript ?: existing
+                    ?.takeIf {
+                        it[ContentSyncTable.type] == record.type &&
+                            it[ContentSyncTable.mediaUri] == record.mediaUri &&
+                            it[ContentSyncTable.durationMs] == record.durationMs
+                    }?.get(ContentSyncTable.transcript)
             if (existing == null) {
                 ContentSyncTable.insert {
                     it[id] = record.id
@@ -70,6 +77,7 @@ class DbSyncRepository : SyncRepository {
                     it[type] = record.type
                     it[content] = record.content
                     it[mediaUri] = record.mediaUri
+                    it[transcript] = record.transcript
                     it[durationMs] = record.durationMs
                     it[createdAt] = record.createdAt
                     it[lastUpdated] = record.lastUpdated
@@ -83,6 +91,7 @@ class DbSyncRepository : SyncRepository {
                     it[type] = record.type
                     it[content] = record.content
                     it[mediaUri] = record.mediaUri
+                    it[transcript] = acceptedTranscript
                     it[durationMs] = record.durationMs
                     it[lastUpdated] = record.lastUpdated
                     it[ContentSyncTable.serverVersion] = serverVersion
@@ -91,7 +100,11 @@ class DbSyncRepository : SyncRepository {
                     it[deletedAt] = null
                 }
             }
-            record.copy(serverVersion = serverVersion, lastUpdated = currentTimestamp())
+            record.copy(
+                serverVersion = serverVersion,
+                lastUpdated = currentTimestamp(),
+                transcript = acceptedTranscript,
+            )
         }
 
     override fun getContent(
@@ -655,6 +668,7 @@ class DbSyncRepository : SyncRepository {
             type = this[ContentSyncTable.type],
             content = this[ContentSyncTable.content],
             mediaUri = this[ContentSyncTable.mediaUri],
+            transcript = this[ContentSyncTable.transcript],
             durationMs = this[ContentSyncTable.durationMs],
             createdAt = this[ContentSyncTable.createdAt],
             lastUpdated = this[ContentSyncTable.lastUpdated],

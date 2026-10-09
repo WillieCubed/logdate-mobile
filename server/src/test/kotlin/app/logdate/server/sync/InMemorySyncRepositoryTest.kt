@@ -17,6 +17,21 @@ import kotlin.test.assertTrue
  */
 class InMemorySyncRepositoryTest {
     @Test
+    fun `older clients preserve same media transcript and clear it for replaced audio or type`() {
+        val repository = InMemorySyncRepository()
+        val owner = UUID.randomUUID()
+        val audio = ContentRecord("voice", "AUDIO", null, "audio.m4a", 10, 1, 2, 0, DeviceId("device"), transcript = "LDSE2:opaque")
+        repository.upsertContent(owner, audio)
+        assertEquals("LDSE2:opaque", repository.upsertContent(owner, audio.copy(transcript = null, lastUpdated = 3)).transcript)
+        assertNull(repository.upsertContent(owner, audio.copy(transcript = null, durationMs = 20)).transcript)
+        repository.upsertContent(owner, audio)
+        assertNull(repository.upsertContent(owner, audio.copy(transcript = null, mediaUri = "replacement.m4a")).transcript)
+        assertNull(repository.getContent(owner, audio.id)?.transcript)
+        repository.upsertContent(owner, audio)
+        assertNull(repository.upsertContent(owner, audio.copy(transcript = null, type = "VIDEO")).transcript)
+    }
+
+    @Test
     fun `repository enforces user isolation and supports CRUD flows`() {
         val repository = InMemorySyncRepository()
         val userA = UUID.randomUUID()

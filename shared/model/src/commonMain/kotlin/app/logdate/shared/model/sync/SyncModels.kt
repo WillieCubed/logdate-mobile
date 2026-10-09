@@ -71,6 +71,8 @@ data class ContentUploadRequest(
      * upload and decrypt after download.
      */
     val location: String? = null,
+    /** Encrypted structured audio transcript. Omission preserves it while the source media is unchanged. */
+    val transcript: String? = null,
 )
 
 @Serializable
@@ -84,7 +86,8 @@ data class ContentUploadResponse(
 data class ContentUpdateRequest(
     val content: String? = null,
     val mediaUri: String? = null,
-    val durationMs: Long = 0,
+    /** Omission preserves the saved duration; an explicit zero remains a duration change. */
+    val durationMs: Long? = null,
     val lastUpdated: Long,
     val syncVersion: Long = 0,
     val deviceId: DeviceId = DeviceId.UNKNOWN,
@@ -105,6 +108,8 @@ data class ContentUpdateRequest(
      * upload and decrypt after download.
      */
     val location: String? = null,
+    /** Encrypted structured audio transcript. Omission preserves it while the source media is unchanged. */
+    val transcript: String? = null,
 )
 
 @Serializable
@@ -138,6 +143,8 @@ data class ContentChange(
     val photoPresentation: String? = null,
     /** Encrypted note location; absent for entries without one. */
     val location: String? = null,
+    /** Encrypted structured audio transcript. Omission preserves an existing transcript. */
+    val transcript: String? = null,
 )
 
 @Serializable

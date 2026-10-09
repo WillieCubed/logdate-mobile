@@ -20,6 +20,32 @@ import kotlin.test.assertTrue
  */
 class DbSyncRepositoryTest {
     @Test
+    fun `database retains opaque transcript when an older record omits it`() {
+        withRepository { repository ->
+            val owner = UUID.randomUUID()
+            val audio = ContentRecord("voice", "AUDIO", null, "audio.m4a", 10, 1, 2, 0, DeviceId("device"), transcript = "LDSE2:opaque")
+            repository.upsertContent(owner, audio)
+            repository.upsertContent(owner, audio.copy(transcript = null, lastUpdated = 3))
+            assertEquals("LDSE2:opaque", repository.getContent(owner, audio.id)?.transcript)
+            assertEquals(
+                "LDSE2:opaque",
+                repository
+                    .contentChanges(owner, 0, 10)
+                    .changes
+                    .single()
+                    .transcript,
+            )
+            repository.upsertContent(owner, audio.copy(transcript = null, durationMs = 20, lastUpdated = 4))
+            assertNull(repository.getContent(owner, audio.id)?.transcript)
+            repository.upsertContent(owner, audio)
+            assertNull(repository.upsertContent(owner, audio.copy(transcript = null, mediaUri = "replacement.m4a")).transcript)
+            assertNull(repository.getContent(owner, audio.id)?.transcript)
+            repository.upsertContent(owner, audio)
+            assertNull(repository.upsertContent(owner, audio.copy(transcript = null, type = "VIDEO")).transcript)
+        }
+    }
+
+    @Test
     fun `content journal and association changes include updates and tombstones`() {
         withRepository { repository ->
             val userId = UUID.randomUUID()

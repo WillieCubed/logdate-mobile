@@ -110,6 +110,7 @@ private fun Route.contentRoutes(
                         caption = req.caption,
                         photoPresentation = req.photoPresentation,
                         location = req.location,
+                        transcript = req.transcript,
                     )
                 val stored =
                     if (call.request.header(HttpHeaders.IfNoneMatch) == "*") {
@@ -200,7 +201,7 @@ private fun Route.contentRoutes(
                                 type = existing?.type ?: "TEXT",
                                 content = req.content ?: existing?.content,
                                 mediaUri = req.mediaUri ?: existing?.mediaUri,
-                                durationMs = req.durationMs,
+                                durationMs = req.durationMs ?: existing?.durationMs ?: 0L,
                                 createdAt = existing?.createdAt ?: System.currentTimeMillis(),
                                 lastUpdated = req.lastUpdated,
                                 version = existing?.version ?: 0L,
@@ -208,6 +209,7 @@ private fun Route.contentRoutes(
                                 caption = req.caption ?: existing?.caption,
                                 photoPresentation = req.photoPresentation ?: existing?.photoPresentation,
                                 location = req.location ?: existing?.location,
+                                transcript = req.transcript,
                             ),
                     )
                 call.respond(ContentUpdateResponse(contentId, updated.version, updated.lastUpdated))

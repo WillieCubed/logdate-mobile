@@ -262,6 +262,7 @@ internal fun LogDateEntry.toContentChange(): ContentChange =
         caption = caption,
         photoPresentation = photoPresentation,
         location = location,
+        transcript = transcript,
     )
 
 internal fun LogDateJournal.toJournalChange(): JournalChange =

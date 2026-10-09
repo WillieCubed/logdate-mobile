@@ -71,6 +71,7 @@ class SyncBackedLogDateCollectionsRepository(
                         lastUpdated = entry.lastUpdated,
                         serverVersion = entry.version,
                         deviceId = entry.deviceId,
+                        transcript = entry.transcript,
                     ),
             ).toEntry()
 
@@ -262,6 +263,7 @@ private fun ContentRecord.toEntry(): LogDateEntry =
         lastUpdated = lastUpdated,
         version = serverVersion,
         deviceId = deviceId,
+        transcript = transcript,
     )
 
 private fun JournalRecord.toJournal(): LogDateJournal =

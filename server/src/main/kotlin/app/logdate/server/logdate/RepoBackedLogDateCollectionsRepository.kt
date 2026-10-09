@@ -50,7 +50,15 @@ internal class RepoBackedLogDateCollectionsRepository(
         entry: LogDateEntry,
     ): LogDateEntry {
         val repoDid = canonicalRepoDid(userId)
-        repoEngine.putRecord(entryRecordId(repoDid, entry.id), entry.toRepoJson()).getOrThrow()
+        val preserved =
+            entry.copy(
+                transcript =
+                    entry.transcript ?: getEntry(userId, entry.id)
+                        ?.takeIf {
+                            it.type == entry.type && it.mediaUri == entry.mediaUri && it.durationMs == entry.durationMs
+                        }?.transcript,
+            )
+        repoEngine.putRecord(entryRecordId(repoDid, entry.id), preserved.toRepoJson()).getOrThrow()
         val metadata =
             metadataStore.upsert(
                 userId = userId,
@@ -58,7 +66,7 @@ internal class RepoBackedLogDateCollectionsRepository(
                 collection = LogDateCollectionKind.ENTRY,
                 recordKey = entry.id,
             )
-        return entry.copy(version = metadata.version, lastUpdated = System.currentTimeMillis())
+        return preserved.copy(version = metadata.version, lastUpdated = System.currentTimeMillis())
     }
 
     override suspend fun entryExists(

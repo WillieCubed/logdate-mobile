@@ -1,0 +1,1 @@
+ALTER TABLE sync_content ADD COLUMN IF NOT EXISTS transcript TEXT;

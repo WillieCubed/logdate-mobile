@@ -370,6 +370,7 @@ private object ContentCollectionAdapter : LogDateCollectionAdapter(LogDateRepoSt
                 LogDateEntry(
                     id = requireMatchingId(recordId = recordId, value = value, fieldName = "id"),
                     type = value.stringValue("type") ?: existing?.type ?: DEFAULT_CONTENT_TYPE,
+                    transcript = value.nullableStringValue("transcript"),
                     content = if (value.containsKey("content")) value.nullableStringValue("content") else existing?.content,
                     mediaUri = if (value.containsKey("mediaUri")) value.nullableStringValue("mediaUri") else existing?.mediaUri,
                     durationMs = value.longValue("durationMs") ?: existing?.durationMs ?: DEFAULT_DURATION_MS,

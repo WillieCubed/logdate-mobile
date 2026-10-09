@@ -16,6 +16,7 @@ object ContentSyncTable : Table("sync_content") {
     val type = varchar("type", 32)
     val content = text("content").nullable()
     val mediaUri = text("media_uri").nullable()
+    val transcript = text("transcript").nullable()
     val durationMs = long("duration_ms").nullable()
     val createdAt = long("created_at")
     val lastUpdated = long("last_updated")
