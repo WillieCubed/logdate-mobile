@@ -12,6 +12,13 @@ val transcriptionModule =
     module {
         // Repository implementation
         single<TranscriptionRepository> {
-            OfflineFirstTranscriptionRepository(get(), get(), get())
+            OfflineFirstTranscriptionRepository(
+                get(),
+                get(),
+                get(),
+                syncMetadataService = get(),
+                transactionManager = get(),
+                syncManagerProvider = { get() },
+            )
         }
     }

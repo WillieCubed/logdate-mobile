@@ -2,6 +2,7 @@ package app.logdate.client.sync.cloud
 
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.transcription.TranscriptDocument
 import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.shared.model.PhotoPresentation
 import app.logdate.shared.model.sync.VersionConstraint
@@ -160,6 +161,7 @@ class DefaultCloudContentDataSource(
                 },
             photoPresentation = (this as? JournalNote.Image)?.presentation?.name,
             location = encryptNoteLocation(uid, location),
+            transcript = (this as? JournalNote.Audio)?.transcript?.let { encryptNoteTranscript(uid, it) },
         )
 
     private suspend fun JournalNote.toUpdateRequest(): ContentUpdateRequest =
@@ -198,6 +200,7 @@ class DefaultCloudContentDataSource(
                 },
             photoPresentation = (this as? JournalNote.Image)?.presentation?.name,
             location = encryptNoteLocation(uid, location),
+            transcript = (this as? JournalNote.Audio)?.transcript?.let { encryptNoteTranscript(uid, it) },
         )
 
     private suspend fun ContentChangesResponse.toContentSyncResult(): ContentSyncResult {
@@ -257,6 +260,7 @@ class DefaultCloudContentDataSource(
                     lastUpdated = lastUpdated,
                     mediaRef = mediaUri ?: "",
                     durationMs = durationMs,
+                    transcript = decryptNoteTranscript(uid, transcript),
                     caption = decryptNoteCaption(uid, caption.orEmpty()),
                     location = decryptNoteLocation(uid, location),
                     syncVersion = serverVersion,
@@ -286,6 +290,31 @@ class DefaultCloudContentDataSource(
     ): String = syncPayloadCipher?.decryptString(noteCaptionFieldId(noteId), caption) ?: caption
 
     private fun noteCaptionFieldId(noteId: Uuid): String = "sync:note:$noteId:caption"
+
+    private val transcriptJson =
+        Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = true
+        }
+
+    private suspend fun encryptNoteTranscript(
+        noteId: Uuid,
+        document: TranscriptDocument,
+    ): String {
+        val plaintext = transcriptJson.encodeToString(TranscriptDocument.serializer(), document)
+        return syncPayloadCipher?.encryptString(noteTranscriptFieldId(noteId), plaintext) ?: plaintext
+    }
+
+    private suspend fun decryptNoteTranscript(
+        noteId: Uuid,
+        payload: String?,
+    ): TranscriptDocument? {
+        if (payload == null) return null
+        val plaintext = syncPayloadCipher?.decryptString(noteTranscriptFieldId(noteId), payload) ?: payload
+        return transcriptJson.decodeFromString(TranscriptDocument.serializer(), plaintext)
+    }
+
+    private fun noteTranscriptFieldId(noteId: Uuid): String = "sync:note:${noteId.toString().lowercase()}:transcript"
 
     private val locationJson = Json { ignoreUnknownKeys = true }
 

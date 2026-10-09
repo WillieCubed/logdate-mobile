@@ -21,6 +21,8 @@ data class TranscriptDocument(
     val segments: List<TranscriptSegment> = emptyList(),
     /** Optional speaker catalog used by [TranscriptSegment.speakerId]. */
     val speakers: List<TranscriptSpeaker> = emptyList(),
+    /** Recognition engine metadata, when reported by the local or cloud recognizer. */
+    val engine: TranscriptEngineMetadata? = null,
 ) {
     /** User-visible text assembled from timestamp order. */
     val plainText: String
@@ -192,3 +194,11 @@ data class TranscriptWord(
         require(endMs >= startMs) { "Transcript word endMs must be >= startMs" }
     }
 }
+
+/** Recognition engine identity retained with exported and synced transcripts. */
+@Serializable
+data class TranscriptEngineMetadata(
+    val name: String,
+    val modelId: String? = null,
+    val version: String? = null,
+)

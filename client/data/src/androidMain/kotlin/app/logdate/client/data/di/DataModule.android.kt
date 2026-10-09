@@ -157,6 +157,7 @@ actual val dataModule: Module =
                 get(), // transactionManager
                 syncManagerProvider = { get() },
                 syncMetadataService = get(),
+                transcriptionRepository = get(),
             )
         }
         single<NotePlaceResolver> { DatabaseNotePlaceResolver(get()) }
@@ -289,6 +290,9 @@ actual val dataModule: Module =
                 get(), // transcriptionDao
                 get(), // voiceNoteDao
                 get(), // transcriptionManager
+                syncMetadataService = get(),
+                transactionManager = get(),
+                syncManagerProvider = { get() },
             )
         }
 

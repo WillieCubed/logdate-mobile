@@ -895,6 +895,44 @@ class FakeSyncMetadataService(
         return true
     }
 
+    override suspend fun enqueueTranscriptMutation(noteId: String): Boolean {
+        if (pendingUploads[EntityType.NOTE]?.get(noteId) == PendingOperation.DELETE) return false
+        val expectedVersion = repairVersions[EntityType.NOTE to noteId]
+        enqueuePending(noteId, EntityType.NOTE, PendingOperation.UPDATE)
+        if (expectedVersion != null) repairVersions[EntityType.NOTE to noteId] = expectedVersion
+        return true
+    }
+
+    override suspend fun advancePendingVersionAfterUpload(
+        entityType: EntityType,
+        uploaded: PendingUpload,
+        serverVersion: Long,
+    ): Boolean {
+        val current = getPendingUploads(entityType).firstOrNull { it.entityId == uploaded.entityId } ?: return false
+        val base = uploaded.expectedServerVersion ?: return false
+        if (!trackOperationIdentity ||
+            current.scope != uploaded.scope ||
+            current.operation != PendingOperation.UPDATE ||
+            current.expectedServerVersion != base ||
+            serverVersion <= base
+        ) {
+            return false
+        }
+        repairVersions[entityType to uploaded.entityId] = serverVersion
+        return true
+    }
+
+    override suspend fun isCurrentOperation(
+        entityType: EntityType,
+        pending: PendingUpload,
+    ): Boolean =
+        getPendingUploads(entityType).any {
+            it.entityId == pending.entityId &&
+                it.scope == pending.scope &&
+                it.operationId == pending.operationId &&
+                (trackOperationIdentity || (it.operation == pending.operation && it.expectedServerVersion == pending.expectedServerVersion))
+        }
+
     override suspend fun enqueueRepairIfAbsent(
         entityId: String,
         entityType: EntityType,

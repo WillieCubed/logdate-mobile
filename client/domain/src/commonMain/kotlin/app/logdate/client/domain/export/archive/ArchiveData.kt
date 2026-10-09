@@ -1,5 +1,6 @@
 package app.logdate.client.domain.export.archive
 
+import app.logdate.client.repository.transcription.TranscriptDocument
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.time.Instant
@@ -50,6 +51,7 @@ data class ArchiveNote(
     val photoPresentation: String? = null,
     val media: ArchiveMediaRef? = null,
     val durationMs: Long? = null,
+    val transcript: TranscriptDocument? = null,
     val location: ArchiveLocation? = null,
     /** The journals this note appears in. A note may be in several, or in none. */
     val journalIds: List<String> = emptyList(),

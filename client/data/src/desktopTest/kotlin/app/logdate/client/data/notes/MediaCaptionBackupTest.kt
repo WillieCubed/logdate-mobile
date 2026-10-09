@@ -8,7 +8,11 @@ import app.logdate.client.data.fakes.FakeMediaCaptionDao
 import app.logdate.client.data.fakes.FakeSyncMetadataService
 import app.logdate.client.data.fakes.FakeTextNoteDao
 import app.logdate.client.data.fakes.FakeVideoNoteDao
+import app.logdate.client.data.transcription.FakeTranscriptionDao
+import app.logdate.client.data.transcription.FakeTranscriptionManager
+import app.logdate.client.data.transcription.OfflineFirstTranscriptionRepository
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.transcription.TranscriptDocument
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -35,6 +39,7 @@ class MediaCaptionBackupTest {
                     lastUpdated = recordedAt,
                     mediaRef = "/media/train.m4a",
                     caption = "The train arriving",
+                    transcript = TranscriptDocument.fromPlainText("The spoken train arrival").copy(revision = 9),
                 )
             val video =
                 JournalNote.Video(
@@ -62,21 +67,25 @@ class MediaCaptionBackupTest {
 
                 assertEquals("The station platform", (notes.getValue(image.uid) as JournalNote.Image).caption)
                 assertEquals("The train arriving", (notes.getValue(audio.uid) as JournalNote.Audio).caption)
+                assertEquals(audio.transcript, (notes.getValue(audio.uid) as JournalNote.Audio).transcript)
                 assertEquals("Leaving the station", (notes.getValue(video.uid) as JournalNote.Video).caption)
             } finally {
                 directory.deleteRecursively()
             }
         }
 
-    private fun repository() =
-        OfflineFirstJournalNotesRepository(
+    private fun repository(): OfflineFirstJournalNotesRepository {
+        val audioDao = FakeAudioNoteDao()
+        return OfflineFirstJournalNotesRepository(
             textNoteDao = FakeTextNoteDao(),
             imageNoteDao = FakeImageNoteDao(),
-            audioNoteDao = FakeAudioNoteDao(),
+            audioNoteDao = audioDao,
             videoNoteDao = FakeVideoNoteDao(),
             journalContentDao = FakeJournalContentDao(),
             journalRepository = FakeJournalRepository(),
             mediaCaptionDao = FakeMediaCaptionDao(),
             syncMetadataService = FakeSyncMetadataService(),
+            transcriptionRepository = OfflineFirstTranscriptionRepository(FakeTranscriptionDao(), audioDao, FakeTranscriptionManager(true)),
         )
+    }
 }

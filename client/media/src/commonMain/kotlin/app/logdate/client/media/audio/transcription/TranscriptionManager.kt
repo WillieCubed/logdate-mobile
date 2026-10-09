@@ -20,6 +20,21 @@ interface TranscriptionManager {
         audioUri: String,
     ): Boolean
 
+    /** Distinguishes replacement audio that retains a URI but changes its saved media revision. */
+    suspend fun enqueueTranscription(
+        noteId: Uuid,
+        audioUri: String,
+        mediaRevision: String,
+    ): Boolean = enqueueTranscription(noteId, audioUri)
+
+    /** Foreground requests promote queued work without replacing recognition already in progress. */
+    suspend fun enqueueTranscription(
+        noteId: Uuid,
+        audioUri: String,
+        mediaRevision: String,
+        priority: TranscriptionPriority,
+    ): Boolean = enqueueTranscription(noteId, audioUri, mediaRevision)
+
     /**
      * Cancels a pending transcription job.
      *
@@ -35,3 +50,5 @@ interface TranscriptionManager {
      */
     suspend fun cancelAllTranscriptions(): Int
 }
+
+enum class TranscriptionPriority { RECOVERY, FOREGROUND }

@@ -35,6 +35,10 @@ fun MomentAudioCard(
     val transcriptionState = LocalTranscriptionState.current
     val audioContextProcessor = LocalAudioContextProcessor.current
 
+    LaunchedEffect(audio.noteId, audio.uri, audio.durationMs) {
+        audio.noteId?.let(transcriptionState.requestTranscription)
+    }
+
     val isCurrent = playbackState.currentlyPlayingId == audio.noteId
     val isPlaying = isCurrent && playbackState.isPlaying
     val progress = if (isCurrent) playbackState.progress else 0f

@@ -336,12 +336,13 @@ class AndroidAudioRecordingManagerTest {
             val stored = MutableStateFlow<Map<Uuid, String?>>(emptyMap())
             val repository =
                 object : TranscriptionRepository by FakeTranscriptionRepository() {
-                    override suspend fun updateTranscription(
-                        noteId: Uuid,
-                        text: String?,
+                    override suspend fun persistRecordingTranscript(
+                        work: app.logdate.client.repository.transcription.TranscriptionWorkToken,
+                        document: app.logdate.client.repository.transcription.TranscriptDocument,
                         status: TranscriptionStatus,
-                        errorMessage: String?,
-                    ): Boolean {
+                    ): app.logdate.client.repository.transcription.TranscriptionWorkToken {
+                        val noteId = work.noteId
+                        val text = document.plainText
                         try {
                             if (text == "Old transcript") {
                                 oldWriteStarted.complete(Unit)
@@ -350,7 +351,7 @@ class AndroidAudioRecordingManagerTest {
                             stored.update { it + (noteId to text) }
                             if (text == "Middle transcript") middleWriteFinished.complete(Unit)
                             if (text == "New transcript") newWriteFinished.complete(Unit)
-                            return true
+                            return work
                         } finally {
                             if (text == "Old transcript") oldWriteFinished.complete(Unit)
                         }

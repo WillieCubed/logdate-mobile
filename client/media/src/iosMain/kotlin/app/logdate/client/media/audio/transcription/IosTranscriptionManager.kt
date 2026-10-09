@@ -1,118 +1,22 @@
 package app.logdate.client.media.audio.transcription
 
-import io.github.aakira.napier.Napier
+import app.logdate.client.repository.transcription.TranscriptionRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSURL
-import kotlin.concurrent.AtomicReference
-import kotlin.uuid.Uuid
 
-/**
- * iOS implementation of [TranscriptionManager].
- *
- * This implementation validates local audio files and schedules transcription through the
- * configured [TranscriptionService].
- */
+/** Persists file recognition and keeps real coroutine ownership for cancellation. */
 class IosTranscriptionManager(
-    private val transcriptionService: TranscriptionService,
-) : TranscriptionManager {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val activeJobs = AtomicReference<MutableMap<Uuid, Boolean>>(mutableMapOf())
-
-    override suspend fun enqueueTranscription(
-        noteId: Uuid,
-        audioUri: String,
-    ): Boolean {
-        val currentJobs = activeJobs.value
-        if (currentJobs.containsKey(noteId)) {
-            Napier.w("Transcription job for note $noteId already in progress, ignoring new request")
-            return false
-        }
-
-        // Check if the audio file exists
-        val fileManager = NSFileManager.defaultManager
-        val url =
-            NSURL.URLWithString(audioUri) ?: run {
-                Napier.e("Invalid audio URI: $audioUri")
-                return false
-            }
-
-        if (!fileManager.fileExistsAtPath(url.path ?: "")) {
-            Napier.e("Cannot enqueue transcription: Audio file does not exist at $audioUri")
-            return false
-        }
-
-        Napier.d("Enqueueing transcription for note $noteId with audio at $audioUri")
-
-        // Mark job as active
-        val updatedJobs = currentJobs.toMutableMap()
-        updatedJobs[noteId] = true
-        activeJobs.value = updatedJobs
-
-        // Start the transcription job
-        scope.launch {
-            try {
-                Napier.d("Starting transcription job for note $noteId")
-                val result = transcriptionService.transcribeAudioFile(audioUri)
-
-                // Log the result
-                when (result) {
-                    is TranscriptionResult.Success -> {
-                        Napier.d("Transcription completed for note $noteId: ${result.text}")
-                    }
-                    is TranscriptionResult.Error -> {
-                        Napier.e("Transcription failed for note $noteId: ${result.reason}")
-                    }
-                    is TranscriptionResult.InProgress -> {
-                        Napier.d("Transcription in progress for note $noteId")
-                    }
-                    TranscriptionResult.Cancelled -> {
-                        Napier.d("Transcription cancelled for note $noteId")
-                    }
-                }
-            } catch (e: Exception) {
-                Napier.e("Error in transcription job for note $noteId: ${e.message}")
-            } finally {
-                // Mark job as complete
-                val finalJobs = activeJobs.value.toMutableMap()
-                finalJobs.remove(noteId)
-                activeJobs.value = finalJobs
-            }
-        }
-
-        return true
-    }
-
-    override suspend fun cancelTranscription(noteId: Uuid): Boolean {
-        val currentJobs = activeJobs.value
-        val wasActive = currentJobs.containsKey(noteId)
-
-        if (wasActive) {
-            val updatedJobs = currentJobs.toMutableMap()
-            updatedJobs.remove(noteId)
-            activeJobs.value = updatedJobs
-            Napier.d("Canceled transcription job for note $noteId")
-        } else {
-            Napier.d("No active transcription job found for note $noteId")
-        }
-
-        return wasActive
-    }
-
-    override suspend fun cancelAllTranscriptions(): Int {
-        val currentJobs = activeJobs.value
-        val count = currentJobs.size
-
-        if (count > 0) {
-            Napier.d("Canceling all transcription jobs (count: $count)")
-            activeJobs.value = mutableMapOf()
-        } else {
-            Napier.d("No active transcription jobs to cancel")
-        }
-
-        return count
-    }
-}
+    transcriptionService: TranscriptionService,
+    repository: () -> TranscriptionRepository,
+) : TranscriptionManager by FileTranscriptionScheduler(
+        service = transcriptionService,
+        repository = repository,
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+        fileExists = { uri ->
+            val path = if (uri.startsWith("file:")) NSURL.URLWithString(uri)?.path else uri
+            path != null && NSFileManager.defaultManager.fileExistsAtPath(path)
+        },
+    )

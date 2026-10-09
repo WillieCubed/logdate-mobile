@@ -7,9 +7,12 @@ import app.logdate.client.database.entities.TranscriptionEntity
 import app.logdate.client.database.entities.TranscriptionSegmentEntity
 import app.logdate.client.database.entities.TranscriptionStatus
 import app.logdate.client.media.audio.transcription.TranscriptionManager
+import app.logdate.client.media.audio.transcription.TranscriptionPriority
 import app.logdate.client.repository.transcription.TranscriptDocument
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,8 +22,267 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class OfflineFirstTranscriptionRepositoryTest {
     private val now = Instant.parse("2026-09-01T12:00:00Z")
+
+    @Test
+    fun `startup recovery yields to newly saved and explicitly requested audio`() =
+        runTest {
+            val first = Uuid.random()
+            val notes = FakeAudioNoteDao().apply { addNote(audioNote(first)) }
+            val transcriptions = FakeTranscriptionDao()
+            val manager = FakeTranscriptionManager(true)
+            val repository = OfflineFirstTranscriptionRepository(transcriptions, notes, manager, now = { now })
+            repository.startAutomaticTranscriptions(backgroundScope)
+            runCurrent()
+            assertTrue(repository.requestTranscription(first))
+            repository.beginTranscription(first, audioNote(first).contentUri)
+            val active = transcriptions.getTranscriptionByNoteId(first)
+            assertTrue(repository.requestTranscription(first))
+            assertEquals(active, transcriptions.getTranscriptionByNoteId(first))
+            notes.addNote(audioNote(Uuid.random()))
+            runCurrent()
+            assertEquals(
+                listOf(
+                    TranscriptionPriority.RECOVERY,
+                    TranscriptionPriority.FOREGROUND,
+                    TranscriptionPriority.FOREGROUND,
+                    TranscriptionPriority.FOREGROUND,
+                ),
+                manager.priorities,
+            )
+        }
+
+    @Test
+    fun `failed transcription retries once each repository startup`() =
+        runTest {
+            val id = Uuid.random()
+            val notes = FakeAudioNoteDao().apply { addNote(audioNote(id)) }
+            val transcriptions =
+                FakeTranscriptionDao().apply {
+                    insertTranscription(transcription(id, TranscriptionStatus.FAILED, now))
+                }
+            val manager = FakeTranscriptionManager(false)
+            repeat(2) { attempt ->
+                val repository = OfflineFirstTranscriptionRepository(transcriptions, notes, manager, now = { now })
+                repository.startAutomaticTranscriptions(backgroundScope)
+                runCurrent()
+                assertEquals(attempt + 1, manager.enqueueCount)
+            }
+        }
+
+    @Test
+    fun `invalid completed document is regenerated instead of suppressing work`() =
+        runTest {
+            val id = Uuid.random()
+            val notes = FakeAudioNoteDao().apply { addNote(audioNote(id)) }
+            val transcriptions =
+                FakeTranscriptionDao().apply {
+                    insertTranscription(transcription(id, TranscriptionStatus.COMPLETED, now).copy(documentJson = "{}"))
+                }
+            val manager = FakeTranscriptionManager(true)
+            val repository = OfflineFirstTranscriptionRepository(transcriptions, notes, manager, now = { now })
+            repository.startAutomaticTranscriptions(backgroundScope)
+            runCurrent()
+            assertEquals(1, manager.enqueueCount)
+            assertEquals(TranscriptionStatus.PENDING, transcriptions.getTranscriptionByNoteId(id)?.status)
+        }
+
+    @Test
+    fun `replacing audio invalidates its former completed transcript and schedules the new revision`() =
+        runTest {
+            val id = Uuid.random()
+            val note = audioNote(id)
+            val notes = FakeAudioNoteDao().apply { addNote(note) }
+            val transcriptions = FakeTranscriptionDao()
+            val manager = FakeTranscriptionManager(true)
+            val repository = OfflineFirstTranscriptionRepository(transcriptions, notes, manager, now = { now })
+            repository.acceptSyncedTranscript(id, TranscriptDocument.fromPlainText("Former recording"))
+            repository.startAutomaticTranscriptions(backgroundScope)
+            runCurrent()
+            assertEquals(0, manager.enqueueCount)
+            notes.addNote(note.copy(contentUri = "replacement.m4a", durationMs = note.durationMs + 1000))
+            runCurrent()
+            assertEquals(1, manager.enqueueCount)
+            assertEquals(null, repository.getTranscription(id)?.transcriptDocument)
+        }
+
+    @Test
+    fun `same URI with changed duration is a new media revision after restart`() =
+        runTest {
+            val id = Uuid.random()
+            val note = audioNote(id)
+            val notes = FakeAudioNoteDao().apply { addNote(note) }
+            val transcriptions = FakeTranscriptionDao()
+            val manager = FakeTranscriptionManager(true)
+            val first = OfflineFirstTranscriptionRepository(transcriptions, notes, manager, now = { now })
+            first.acceptSyncedTranscript(id, TranscriptDocument.fromPlainText("Former recording"))
+            notes.addNote(note.copy(durationMs = note.durationMs + 1000))
+            val reopened = OfflineFirstTranscriptionRepository(transcriptions, notes, manager, now = { now })
+            reopened.startAutomaticTranscriptions(backgroundScope)
+            runCurrent()
+            assertEquals(1, manager.enqueueCount)
+        }
+
+    @Test
+    fun `recording refinements renew ownership but cannot replace an incoming transcript`() =
+        runTest {
+            val id = Uuid.random()
+            val note = audioNote(id)
+            val notes = FakeAudioNoteDao()
+            val repository =
+                OfflineFirstTranscriptionRepository(FakeTranscriptionDao(), notes, FakeTranscriptionManager(true), now = { now })
+            val recording = repository.captureRecordingTranscript(id, note.contentUri)
+            notes.addNote(note)
+            val refined =
+                repository.persistRecordingTranscript(
+                    recording,
+                    TranscriptDocument.fromPlainText("First pass"),
+                    app.logdate.client.repository.transcription.TranscriptionStatus.IN_PROGRESS,
+                )!!
+            assertTrue(refined.transcriptRevision > recording.transcriptRevision)
+            val final =
+                repository.persistRecordingTranscript(
+                    refined,
+                    TranscriptDocument.fromPlainText("Final pass"),
+                    app.logdate.client.repository.transcription.TranscriptionStatus.COMPLETED,
+                )!!
+            assertEquals("Final pass", repository.getTranscription(id)?.text)
+            val incoming = TranscriptDocument.fromPlainText("Newer synced words").copy(revision = 12)
+            repository.acceptSyncedTranscript(id, incoming)
+            assertEquals(
+                null,
+                repository.persistRecordingTranscript(
+                    final,
+                    TranscriptDocument.fromPlainText("Delayed refinement"),
+                    app.logdate.client.repository.transcription.TranscriptionStatus.COMPLETED,
+                ),
+            )
+            assertEquals(incoming, repository.getTranscription(id)?.transcriptDocument)
+        }
+
+    @Test
+    fun `delayed recording transcript cannot attach to replaced media`() =
+        runTest {
+            val id = Uuid.random()
+            val note = audioNote(id)
+            val notes = FakeAudioNoteDao().apply { addNote(note) }
+            val repository =
+                OfflineFirstTranscriptionRepository(FakeTranscriptionDao(), notes, FakeTranscriptionManager(true), now = { now })
+            val work = repository.captureRecordingTranscript(id, note.contentUri)
+            notes.updateContentUri(id, "replacement.m4a")
+            assertEquals(
+                null,
+                repository.persistRecordingTranscript(
+                    work,
+                    TranscriptDocument.fromPlainText("Wrong recording"),
+                    app.logdate.client.repository.transcription.TranscriptionStatus.COMPLETED,
+                ),
+            )
+            assertEquals(null, repository.getTranscription(id))
+        }
+
+    @Test
+    fun `repository restart resumes an interrupted recent transcription once`() =
+        runTest {
+            val id = Uuid.random()
+            val notes = FakeAudioNoteDao().apply { addNote(audioNote(id)) }
+            val transcriptions =
+                FakeTranscriptionDao().apply {
+                    insertTranscription(transcription(id, TranscriptionStatus.IN_PROGRESS, now))
+                }
+            val manager = FakeTranscriptionManager(true)
+            val repository = OfflineFirstTranscriptionRepository(transcriptions, notes, manager, now = { now })
+            repository.startAutomaticTranscriptions(backgroundScope)
+            runCurrent()
+            assertEquals(1, manager.enqueueCount)
+            runCurrent()
+            assertEquals(1, manager.enqueueCount)
+        }
+
+    @Test
+    fun `repository lifecycle schedules existing and newly imported audio once`() =
+        runTest {
+            val first = Uuid.random()
+            val second = Uuid.random()
+            val notes = FakeAudioNoteDao().apply { addNote(audioNote(first)) }
+            val transcriptions = FakeTranscriptionDao()
+            val manager = FakeTranscriptionManager(true)
+            val repository = OfflineFirstTranscriptionRepository(transcriptions, notes, manager, now = { now })
+            repository.startAutomaticTranscriptions(backgroundScope)
+            runCurrent()
+            assertEquals(1, manager.enqueueCount)
+            notes.addNote(audioNote(second))
+            runCurrent()
+            assertEquals(2, manager.enqueueCount)
+            repository.startAutomaticTranscriptions(backgroundScope)
+            runCurrent()
+            assertEquals(2, manager.enqueueCount)
+        }
+
+    @Test
+    fun `obsolete recognition cannot replace a transcript accepted during work`() =
+        runTest {
+            val id = Uuid.random()
+            val notes = FakeAudioNoteDao().apply { addNote(audioNote(id)) }
+            val repository =
+                OfflineFirstTranscriptionRepository(FakeTranscriptionDao(), notes, FakeTranscriptionManager(true), now = { now })
+            repository.requestTranscription(id)
+            val work = repository.beginTranscription(id, audioNote(id).contentUri)!!
+            val incoming = TranscriptDocument.fromPlainText("New accepted transcript").copy(revision = 8)
+            assertTrue(repository.acceptSyncedTranscript(id, incoming))
+            assertTrue(
+                repository.completeTranscription(
+                    work,
+                    TranscriptDocument.fromPlainText("Stale words"),
+                    app.logdate.client.repository.transcription.TranscriptionStatus.COMPLETED,
+                ),
+            )
+            assertEquals("New accepted transcript", repository.getTranscription(id)?.text)
+        }
+
+    @Test
+    fun `obsolete recognition cannot write to replaced media or deleted audio`() =
+        runTest {
+            val id = Uuid.random()
+            val notes = FakeAudioNoteDao().apply { addNote(audioNote(id)) }
+            val repository =
+                OfflineFirstTranscriptionRepository(FakeTranscriptionDao(), notes, FakeTranscriptionManager(true), now = { now })
+            repository.requestTranscription(id)
+            val work = repository.beginTranscription(id, audioNote(id).contentUri)!!
+            notes.updateContentUri(id, "replacement.m4a")
+            assertTrue(
+                repository.completeTranscription(
+                    work,
+                    TranscriptDocument.fromPlainText("Stale words"),
+                    app.logdate.client.repository.transcription.TranscriptionStatus.COMPLETED,
+                ),
+            )
+            assertEquals(null, repository.getTranscription(id)?.text)
+            notes.removeNote(id)
+            assertTrue(
+                repository.completeTranscription(
+                    work,
+                    TranscriptDocument.fromPlainText("Deleted words"),
+                    app.logdate.client.repository.transcription.TranscriptionStatus.COMPLETED,
+                ),
+            )
+            assertEquals(null, repository.getTranscription(id)?.text)
+        }
+
+    @Test
+    fun `completed empty transcript is durable and never scheduled again`() =
+        runTest {
+            val id = Uuid.random()
+            val notes = FakeAudioNoteDao().apply { addNote(audioNote(id)) }
+            val manager = FakeTranscriptionManager(true)
+            val repository = OfflineFirstTranscriptionRepository(FakeTranscriptionDao(), notes, manager, now = { now })
+            assertTrue(repository.updateTranscription(id, "", app.logdate.client.repository.transcription.TranscriptionStatus.COMPLETED))
+            assertTrue(repository.getTranscription(id)?.transcriptDocument?.isFinal == true)
+            assertTrue(repository.requestTranscription(id))
+            assertEquals(0, manager.enqueueCount)
+        }
 
     @Test
     fun `a rejected enqueue is persisted as failed instead of stranded pending`() =
@@ -186,10 +448,21 @@ class OfflineFirstTranscriptionRepositoryTest {
     )
 }
 
-private class FakeTranscriptionManager(
+internal class FakeTranscriptionManager(
     private val enqueueResult: Boolean,
 ) : TranscriptionManager {
     var enqueueCount = 0
+    val priorities = mutableListOf<TranscriptionPriority>()
+
+    override suspend fun enqueueTranscription(
+        noteId: Uuid,
+        audioUri: String,
+        mediaRevision: String,
+        priority: TranscriptionPriority,
+    ): Boolean {
+        priorities += priority
+        return enqueueTranscription(noteId, audioUri)
+    }
 
     override suspend fun enqueueTranscription(
         noteId: Uuid,
@@ -204,17 +477,19 @@ private class FakeTranscriptionManager(
     override suspend fun cancelAllTranscriptions(): Int = 0
 }
 
-private class FakeTranscriptionDao(
+internal class FakeTranscriptionDao(
     private val updateRowCount: Int = 1,
     private val throwOnInsert: Boolean = false,
     private val throwOnUpdate: Boolean = false,
 ) : TranscriptionDao {
     private val values = linkedMapOf<Uuid, TranscriptionEntity>()
     private val flows = mutableMapOf<Uuid, MutableStateFlow<TranscriptionEntity?>>()
+    private val allRows = MutableStateFlow<List<TranscriptionEntity>>(emptyList())
 
     override suspend fun insertTranscription(transcription: TranscriptionEntity): Long {
         if (throwOnInsert) error("insert unavailable")
         values[transcription.noteId] = transcription
+        allRows.value = values.values.toList()
         flows.getOrPut(transcription.noteId) { MutableStateFlow(null) }.value = transcription
         return 1
     }
@@ -225,6 +500,7 @@ private class FakeTranscriptionDao(
         if (throwOnUpdate) error("update unavailable")
         if (updateRowCount > 0) {
             values[transcription.noteId] = transcription
+            allRows.value = values.values.toList()
             flows.getOrPut(transcription.noteId) { MutableStateFlow(null) }.value = transcription
         }
         return updateRowCount
@@ -238,6 +514,8 @@ private class FakeTranscriptionDao(
 
     override fun observeTranscriptionByNoteId(noteId: Uuid): Flow<TranscriptionEntity?> =
         flows.getOrPut(noteId) { MutableStateFlow(values[noteId]) }
+
+    override fun observeAllTranscriptions(): Flow<List<TranscriptionEntity>> = allRows
 
     override suspend fun getAllTranscriptions(): List<TranscriptionEntity> = values.values.toList()
 

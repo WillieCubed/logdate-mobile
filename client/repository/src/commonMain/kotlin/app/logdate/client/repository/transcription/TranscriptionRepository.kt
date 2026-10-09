@@ -1,13 +1,72 @@
 package app.logdate.client.repository.transcription
 
 import app.logdate.client.repository.journals.JournalNote
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlin.uuid.Uuid
 
 /**
  * Repository for managing audio transcriptions.
  */
 interface TranscriptionRepository {
+    /** Starts durable missing-transcript recovery with the app's repository lifecycle. */
+    fun startAutomaticTranscriptions(scope: CoroutineScope) = Unit
+
+    fun observeAllTranscriptions(): Flow<List<TranscriptionData>> = flowOf(emptyList())
+
+    /** Keeps a downloaded file's transcript bound when its remote URI becomes a local path. */
+    suspend fun rebindMediaReference(
+        noteId: Uuid,
+        previousUri: String,
+        mediaUri: String,
+    ) = Unit
+
+    /** Captures the audio and transcript revision before background work starts. */
+    suspend fun beginTranscription(
+        noteId: Uuid,
+        audioUri: String,
+    ): TranscriptionWorkToken? = TranscriptionWorkToken(noteId, audioUri, getTranscription(noteId)?.revision ?: 0)
+
+    /** Returns true also when obsolete work was safely discarded. */
+    suspend fun completeTranscription(
+        work: TranscriptionWorkToken,
+        document: TranscriptDocument,
+        status: TranscriptionStatus,
+        errorMessage: String? = null,
+    ): Boolean = updateTranscriptDocument(work.noteId, document, status, errorMessage)
+
+    /** Captures a recording before its audio note is saved. */
+    suspend fun captureRecordingTranscript(
+        noteId: Uuid,
+        audioUri: String,
+    ): TranscriptionWorkToken = TranscriptionWorkToken(noteId, audioUri, getTranscription(noteId)?.revision ?: 0)
+
+    /** Returns renewed ownership after a write, or null when another transcript or media won. */
+    suspend fun persistRecordingTranscript(
+        work: TranscriptionWorkToken,
+        document: TranscriptDocument,
+        status: TranscriptionStatus,
+    ): TranscriptionWorkToken? {
+        check(updateTranscriptDocument(work.noteId, document, status)) { "Could not persist recording transcript" }
+        return work
+    }
+
+    /** Applies a downloaded transcript without queueing another sync upload. */
+    suspend fun acceptSyncedTranscript(
+        noteId: Uuid,
+        document: TranscriptDocument,
+    ): Boolean =
+        updateTranscriptDocument(
+            noteId,
+            document,
+            when (document.status) {
+                TranscriptDocumentStatus.FINAL -> TranscriptionStatus.COMPLETED
+                TranscriptDocumentStatus.FAILED -> TranscriptionStatus.FAILED
+                else -> TranscriptionStatus.IN_PROGRESS
+            },
+        )
+
     /**
      * Requests transcription for an audio note.
      *
@@ -89,3 +148,13 @@ interface TranscriptionRepository {
      */
     suspend fun deleteTranscription(noteId: Uuid): Boolean
 }
+
+/** Work ownership captured before recognizing a specific saved audio file. */
+data class TranscriptionWorkToken(
+    val noteId: Uuid,
+    val audioUri: String,
+    val transcriptRevision: Int,
+    val durationMs: Long? = null,
+    val transcriptionId: Uuid? = null,
+    val documentJson: String? = null,
+)

@@ -158,6 +158,7 @@ private fun V2RestoreBundle.decodeAndMapNotes(): Pair<List<ExportNote>, List<Exp
                         ?.value
                         .takeIf { note.media?.status == ArchiveMediaStatus.INCLUDED },
                 durationMs = note.durationMs,
+                transcript = note.transcript,
                 createdAt = note.createdAt,
                 updatedAt = note.updatedAt,
                 timeZone = note.timeZone,

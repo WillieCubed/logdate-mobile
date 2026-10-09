@@ -1,5 +1,7 @@
 package app.logdate.client.domain.export.archive
 
+import app.logdate.client.repository.transcription.TranscriptDocumentStatus
+import app.logdate.client.repository.transcription.TranscriptSource
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.json.JsonArray
@@ -154,12 +156,50 @@ object ArchiveSchemas {
                                 "text" to string(),
                                 "textFormat" to enumOf(ArchiveTextFormat.serializer()),
                                 "caption" to string(),
+                                "photoPresentation" to string(),
+                                "transcript" to transcript(),
                                 "media" to ref("mediaRef"),
                                 "durationMs" to count(),
                                 "location" to ref("location"),
                                 "journalIds" to array(ref("uuid")),
                             )
                     ),
+        )
+
+    private fun transcript() =
+        obj(
+            emptyList(),
+            "revision" to count(),
+            "status" to enumOf(TranscriptDocumentStatus.serializer()),
+            "language" to string(),
+            "engine" to obj(listOf("name"), "name" to string(), "modelId" to string(), "version" to string()),
+            "speakers" to array(obj(listOf("speakerId", "label"), "speakerId" to string(), "label" to string(), "colorToken" to string())),
+            "segments" to
+                array(
+                    obj(
+                        listOf("segmentId", "text", "startMs", "endMs"),
+                        "segmentId" to string(),
+                        "text" to string(),
+                        "startMs" to count(),
+                        "endMs" to count(),
+                        "speakerId" to string(),
+                        "confidence" to number(minimum = 0.0, maximum = 1.0),
+                        "source" to enumOf(TranscriptSource.serializer()),
+                        "isFinal" to bool(),
+                        "words" to
+                            array(
+                                obj(
+                                    listOf("text", "normalizedText", "startMs", "endMs"),
+                                    "text" to string(),
+                                    "normalizedText" to string(),
+                                    "startMs" to count(),
+                                    "endMs" to count(),
+                                    "confidence" to number(minimum = 0.0, maximum = 1.0),
+                                    "speakerId" to string(),
+                                ),
+                            ),
+                    ),
+                ),
         )
 
     private fun drafts() =

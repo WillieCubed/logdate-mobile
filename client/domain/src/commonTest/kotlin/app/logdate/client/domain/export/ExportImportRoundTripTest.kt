@@ -24,6 +24,7 @@ import app.logdate.client.repository.journals.NotePlace
 import app.logdate.client.repository.location.LocationCapturePipeline
 import app.logdate.client.repository.location.LocationCaptureSource
 import app.logdate.client.repository.location.LocationHistoryItem
+import app.logdate.client.repository.transcription.TranscriptDocument
 import app.logdate.shared.model.AltitudeUnit
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
@@ -203,6 +204,7 @@ class ExportImportRoundTripTest {
             assertTrue(audio is JournalNote.Audio, "Should be audio note")
             assertEquals("file:///storage/audio/voice_memo.m4a", audio.mediaRef)
             assertEquals("A walk by the water", audio.caption)
+            assertEquals(TranscriptDocument.fromPlainText("Spoken walk by the water").copy(revision = 12), audio.transcript)
         }
 
     @Test
@@ -562,6 +564,7 @@ class ExportImportRoundTripTest {
                 durationMs = 45000,
                 syncVersion = 17,
                 caption = "A walk by the water",
+                transcript = TranscriptDocument.fromPlainText("Spoken walk by the water").copy(revision = 12),
             )
         val textWithLocationNote =
             JournalNote.Text(

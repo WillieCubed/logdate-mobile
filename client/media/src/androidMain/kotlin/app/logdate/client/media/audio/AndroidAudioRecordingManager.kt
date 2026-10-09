@@ -129,6 +129,7 @@ class AndroidAudioRecordingManager(
     private var transcriptionCollectorJob: Job? = null
     private var transcriptionWarmUpJob: Job? = null
     private val transcriptWriter = RecordingTranscriptWriter(transcriptionRepository)
+    private var recordingTranscriptSession: RecordingTranscriptSession? = null
 
     override val isRecording: Boolean
         get() = recordingStateFlow.value
@@ -172,10 +173,13 @@ class AndroidAudioRecordingManager(
         // flow through here and gets persisted to the database.
         transcriptionCollectorJob?.cancel()
         val noteId = sessionTargetNoteId
+        val transcriptSession = recordingTranscriptSession
         val inputHealth = transcriptionInputRouter.health
         transcriptionCollectorJob =
             scope.launch {
-                service.getTranscriptionFlow().collectLatest { result -> onTranscriptionResult(result, noteId, inputHealth) }
+                service.getTranscriptionFlow().collectLatest { result ->
+                    onTranscriptionResult(result, noteId, inputHealth, transcriptSession)
+                }
             }
     }
 
@@ -183,10 +187,11 @@ class AndroidAudioRecordingManager(
         result: TranscriptionResult,
         noteId: Uuid?,
         inputHealth: TranscriptionInputHealth,
+        transcriptSession: RecordingTranscriptSession?,
     ) {
         if (result is TranscriptionResult.Success && !inputHealth.isHealthy) return
         if (result is TranscriptionResult.Error && result.reason == TranscriptionFailure.AudioError) inputHealth.isHealthy = false
-        if (result is TranscriptionResult.Success) scheduleTranscriptPersistence(result, noteId)
+        if (result is TranscriptionResult.Success) scheduleTranscriptPersistence(result, noteId, transcriptSession)
         if (noteId != sessionTargetNoteId) return
         when (result) {
             is TranscriptionResult.Success -> {
@@ -237,6 +242,17 @@ class AndroidAudioRecordingManager(
             }
         recordingTarget = target
         sessionTargetNoteId = targetNoteId
+        recordingTranscriptSession =
+            targetNoteId?.let {
+                try {
+                    transcriptWriter.begin(it, target.path)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Napier.e("Could not capture recording transcript ownership; file recovery remains available", e)
+                    null
+                }
+            }
         externallyRecordedPath = null
         liveTranscriptionStarted = false
         transcriptionInputRouter.reset()
@@ -350,12 +366,15 @@ class AndroidAudioRecordingManager(
             if (transcriptionSessionInitialized) service.cancelTranscription()
             transcriptionCollectorJob?.cancelAndJoin()
             val noteId = sessionTargetNoteId
+            val transcriptSession = recordingTranscriptSession
             val inputHealth = transcriptionInputRouter.health
             val results = service.getTranscriptionFlow()
             val outgoingReplayCount = results.replayCache.size
             transcriptionCollectorJob =
                 scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                    results.drop(outgoingReplayCount).collectLatest { result -> onTranscriptionResult(result, noteId, inputHealth) }
+                    results.drop(outgoingReplayCount).collectLatest { result ->
+                        onTranscriptionResult(result, noteId, inputHealth, transcriptSession)
+                    }
                 }
             transcriptionSessionInitialized = true
             service.resetTranscription()
@@ -494,6 +513,7 @@ class AndroidAudioRecordingManager(
         noteId: Uuid?,
     ) {
         val service = transcriptionService ?: return
+        val transcriptSession = recordingTranscriptSession
         val liveSessionWasHealthy = liveTranscriptionStarted && transcriptionInputRouter.health.isHealthy
         val stopResult =
             if (service.supportsLiveTranscription) {
@@ -502,7 +522,7 @@ class AndroidAudioRecordingManager(
                         if (liveSessionWasHealthy) {
                             transcriptionFlow.value = result.text
                             structuredTranscriptionFlow.value = result
-                            scheduleTranscriptPersistence(result, noteId)
+                            scheduleTranscriptPersistence(result, noteId, transcriptSession)
                         }
                     }
                 } catch (e: CancellationException) {
@@ -523,7 +543,7 @@ class AndroidAudioRecordingManager(
             scope.launch {
                 val result = service.transcribeAudioFile(filePath)
                 if (result is TranscriptionResult.Success) {
-                    scheduleTranscriptPersistence(result, noteId)
+                    scheduleTranscriptPersistence(result, noteId, transcriptSession)
                 }
                 if (sessionTargetNoteId == noteId) {
                     if (result is TranscriptionResult.Success) transcriptionFlow.value = result.text
@@ -691,8 +711,9 @@ class AndroidAudioRecordingManager(
     private suspend fun persistRefinedTranscript(
         result: TranscriptionResult.Success,
         noteId: Uuid,
+        transcriptSession: RecordingTranscriptSession,
     ) {
-        if (!transcriptWriter.persist(result, noteId)) {
+        if (!transcriptWriter.persist(result, transcriptSession)) {
             Napier.e("Transcript persistence exhausted retries for $noteId")
             structuredTranscriptionFlow.value = TranscriptionResult.Error(TranscriptionFailure.PersistenceError)
         }
@@ -701,8 +722,9 @@ class AndroidAudioRecordingManager(
     private fun scheduleTranscriptPersistence(
         result: TranscriptionResult.Success,
         noteId: Uuid? = sessionTargetNoteId,
+        transcriptSession: RecordingTranscriptSession? = recordingTranscriptSession,
     ) {
-        if (result.text.isBlank() || noteId == null) return
+        if ((result.text.isBlank() && !result.isFinal) || noteId == null || transcriptSession == null) return
         // The active note is saved after recording stops; completed older sessions can
         // already persist while a new recording runs.
         if (recordingStateFlow.value && noteId == sessionTargetNoteId) return
@@ -710,7 +732,7 @@ class AndroidAudioRecordingManager(
             transcriptPersistenceJobs.remove(noteId)?.cancel()
             val job =
                 scope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
-                    persistRefinedTranscript(result, noteId)
+                    persistRefinedTranscript(result, noteId, transcriptSession)
                 }
             transcriptPersistenceJobs[noteId] = job
             job.invokeOnCompletion {

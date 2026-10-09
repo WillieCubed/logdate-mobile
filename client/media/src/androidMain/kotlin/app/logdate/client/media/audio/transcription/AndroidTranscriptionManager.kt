@@ -1,18 +1,13 @@
 package app.logdate.client.media.audio.transcription
 
 import android.content.Context
-import androidx.work.BackoffPolicy
-import androidx.work.Constraints
-import androidx.work.Data
+import android.os.Build
 import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequest
-import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.util.concurrent.TimeUnit
 import kotlin.uuid.Uuid
 
 /**
@@ -22,33 +17,44 @@ class AndroidTranscriptionManager(
     private val context: Context,
 ) : TranscriptionManager {
     private val workManager by lazy { WorkManager.getInstance(context) }
+    private val workQueue by lazy {
+        AndroidTranscriptionWorkQueue(
+            find = { workManager.getWorkInfosForUniqueWork(it).get() },
+            enqueueUnique = { name, request -> workManager.enqueueUniqueWork(name, ExistingWorkPolicy.KEEP, request).result.get() },
+            update = { workManager.updateWork(it).get() },
+            canExpedite = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
+        )
+    }
 
     companion object {
         const val WORK_NAME_PREFIX = "transcription_"
         const val KEY_NOTE_ID = "noteId"
         const val KEY_AUDIO_URI = "audioUri"
+        const val NOTE_TAG_PREFIX = "transcription_note_"
     }
 
     override suspend fun enqueueTranscription(
         noteId: Uuid,
         audioUri: String,
+    ): Boolean = enqueueTranscription(noteId, audioUri, "")
+
+    override suspend fun enqueueTranscription(
+        noteId: Uuid,
+        audioUri: String,
+        mediaRevision: String,
+    ): Boolean = enqueueTranscription(noteId, audioUri, mediaRevision, TranscriptionPriority.RECOVERY)
+
+    override suspend fun enqueueTranscription(
+        noteId: Uuid,
+        audioUri: String,
+        mediaRevision: String,
+        priority: TranscriptionPriority,
     ): Boolean {
         Napier.d("Enqueuing transcription for note $noteId, URI: $audioUri")
 
         return withContext(Dispatchers.IO) {
             try {
-                val workRequest = buildTranscriptionWorkRequest(noteId, audioUri)
-
-                // Enqueue unique work to ensure only one transcription job runs for this note
-                val workName = WORK_NAME_PREFIX + noteId.toString()
-                workManager
-                    .enqueueUniqueWork(
-                        workName,
-                        ExistingWorkPolicy.REPLACE,
-                        workRequest,
-                    ).result
-                    .get()
-
+                workQueue.enqueue(noteId, audioUri, mediaRevision, priority)
                 true
             } catch (e: Exception) {
                 Napier.e("Failed to enqueue transcription", e)
@@ -62,8 +68,8 @@ class AndroidTranscriptionManager(
 
         return withContext(Dispatchers.IO) {
             try {
-                val workName = WORK_NAME_PREFIX + noteId.toString()
-                workManager.cancelUniqueWork(workName).result.get()
+                workManager.cancelAllWorkByTag(NOTE_TAG_PREFIX + noteId).result.get()
+                workManager.cancelUniqueWork(WORK_NAME_PREFIX + noteId).result.get()
                 true
             } catch (e: Exception) {
                 Napier.e("Failed to cancel transcription", e)
@@ -91,31 +97,4 @@ class AndroidTranscriptionManager(
             }
         }
     }
-}
-
-internal fun buildTranscriptionWorkRequest(
-    noteId: Uuid,
-    audioUri: String,
-): OneTimeWorkRequest {
-    val inputData =
-        Data
-            .Builder()
-            .putString(AndroidTranscriptionManager.KEY_NOTE_ID, noteId.toString())
-            .putString(AndroidTranscriptionManager.KEY_AUDIO_URI, audioUri)
-            .build()
-    val constraints =
-        Constraints
-            .Builder()
-            .setRequiresBatteryNotLow(true)
-            .build()
-
-    return OneTimeWorkRequestBuilder<TranscriptionWorker>()
-        .setInputData(inputData)
-        .setConstraints(constraints)
-        .addTag(TranscriptionWorker.TAG)
-        .setBackoffCriteria(
-            BackoffPolicy.EXPONENTIAL,
-            10,
-            TimeUnit.SECONDS,
-        ).build()
 }

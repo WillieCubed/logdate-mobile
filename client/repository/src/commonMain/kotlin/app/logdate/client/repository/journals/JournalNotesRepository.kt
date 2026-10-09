@@ -1,5 +1,6 @@
 package app.logdate.client.repository.journals
 
+import app.logdate.client.repository.transcription.TranscriptDocument
 import app.logdate.shared.model.PhotoPresentation
 import app.logdate.util.UuidSerializer
 import kotlinx.coroutines.flow.Flow
@@ -318,6 +319,7 @@ sealed class JournalNote(
         override val timeZoneId: String? = null,
         val caption: String = "",
         val transcription: String = "",
+        val transcript: TranscriptDocument? = null,
     ) : JournalNote(NoteType.AUDIO)
 }
 

@@ -177,6 +177,9 @@ class DatabaseSyncMetadataService(
         )
     }
 
+    override suspend fun enqueueTranscriptMutation(noteId: String): Boolean =
+        dao.enqueueTranscriptMutation(currentOwnerId(), currentOrigin(), noteId, Clock.System.now().toEpochMilliseconds())
+
     override suspend fun bindCreateToServerVersion(
         entityType: EntityType,
         pending: PendingUpload,
@@ -197,6 +200,23 @@ class DatabaseSyncMetadataService(
             entityType.name,
             pending.entityId,
             operationId,
+            serverVersion,
+        )
+    }
+
+    override suspend fun advancePendingVersionAfterUpload(
+        entityType: EntityType,
+        uploaded: PendingUpload,
+        serverVersion: Long,
+    ): Boolean {
+        val scope = uploaded.scope ?: return false
+        val base = uploaded.expectedServerVersion ?: return false
+        return dao.advancePendingVersionAfterUpload(
+            scope.ownerId,
+            scope.serverOrigin,
+            entityType.name,
+            uploaded.entityId,
+            base,
             serverVersion,
         )
     }

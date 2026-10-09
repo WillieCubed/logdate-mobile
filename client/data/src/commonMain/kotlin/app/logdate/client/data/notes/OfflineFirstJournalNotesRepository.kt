@@ -21,6 +21,7 @@ import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.NotePlace
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.repository.media.IndexedMediaRepository
+import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.sync.NoOpSyncManager
 import app.logdate.client.sync.SyncDebouncer
 import app.logdate.client.sync.SyncManager
@@ -67,9 +68,14 @@ class OfflineFirstJournalNotesRepository(
     private val syncManagerProvider: () -> SyncManager = { NoOpSyncManager },
     private val syncMetadataService: SyncMetadataService,
     private val syncScope: CoroutineScope = CoroutineScope(Dispatchers.Default),
+    private val transcriptionRepository: TranscriptionRepository? = null,
 ) : JournalNotesRepository,
     ExportableJournalContentRepository,
     SyncableJournalNotesRepository {
+    init {
+        transcriptionRepository?.startAutomaticTranscriptions(syncScope)
+    }
+
     override val allNotesObserved: Flow<List<JournalNote>> =
         notePlaceResolver
             .observeAll()
@@ -85,7 +91,7 @@ class OfflineFirstJournalNotesRepository(
             }.combine(mediaCaptionDao.observeAll()) { notes, captions ->
                 val captionMap = captions.associate { it.noteId to it.caption }
                 notes.map { note -> note.withCaption(captionMap) }
-            }
+            }.withTranscripts(transcriptionRepository)
 
     override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> {
         // Get all notes-to-journal mappings for this journal
@@ -122,7 +128,7 @@ class OfflineFirstJournalNotesRepository(
             }.combine(mediaCaptionDao.observeAll()) { notes, captions ->
                 val captionMap = captions.associate { it.noteId to it.caption }
                 notes.map { note -> note.withCaption(captionMap) }
-            }
+            }.withTranscripts(transcriptionRepository)
     }
 
     override fun observeNotesPage(
@@ -171,7 +177,7 @@ class OfflineFirstJournalNotesRepository(
             }.combine(mediaCaptionDao.observeAll()) { notes, captions ->
                 val captionMap = captions.associate { it.noteId to it.caption }
                 notes.map { note -> note.withCaption(captionMap) }
-            }
+            }.withTranscripts(transcriptionRepository)
 
     override fun observeRecentAudioNotes(limit: Int): Flow<List<JournalNote.Audio>> =
         notePlaceResolver
@@ -181,7 +187,8 @@ class OfflineFirstJournalNotesRepository(
             }.combine(mediaCaptionDao.observeAll()) { notes, captions ->
                 val captionMap = captions.associate { it.noteId to it.caption }
                 notes.map { note -> note.copy(caption = captionMap[note.uid] ?: note.caption) }
-            }
+            }.withTranscripts(transcriptionRepository)
+            .map { it.filterIsInstance<JournalNote.Audio>() }
 
     override fun observeNotesForDay(day: LocalDate): Flow<List<JournalNote>> {
         val timezone = TimeZone.currentSystemDefault()
@@ -208,7 +215,7 @@ class OfflineFirstJournalNotesRepository(
             }.combine(mediaCaptionDao.observeAll()) { notes, captions ->
                 val captionMap = captions.associate { it.noteId to it.caption }
                 notes.map { note -> note.withCaption(captionMap) }
-            }
+            }.withTranscripts(transcriptionRepository)
     }
 
     override suspend fun getNotesBefore(
@@ -223,7 +230,11 @@ class OfflineFirstJournalNotesRepository(
         ).toNotes(notePlaceResolver.observeAll().first())
             .sortedByDescending(JournalNote::creationTimestamp)
             .take(limit)
-            .map { note -> note.withCaption(mapOf(note.uid to (mediaCaptionDao.getCaption(note.uid)?.caption ?: ""))) }
+            .map { note ->
+                note
+                    .withCaption(mapOf(note.uid to (mediaCaptionDao.getCaption(note.uid)?.caption ?: "")))
+                    .withTranscript(transcriptionRepository)
+            }
 
     override suspend fun hasNotesBefore(beforeExclusive: Instant): Boolean {
         val beforeTimestamp = beforeExclusive.toEpochMilliseconds()
@@ -259,7 +270,13 @@ class OfflineFirstJournalNotesRepository(
         runCatching {
             val caption = mediaCaptionDao.getCaption(noteId)?.caption ?: ""
             audioNoteDao.getNoteOneOff(noteId).let { note ->
-                note.toModel(note.placeId?.let { placeId -> notePlaceResolver.get(placeId) }, caption)
+                note
+                    .toModel(
+                        note.placeId?.let { placeId ->
+                            notePlaceResolver.get(placeId)
+                        },
+                        caption,
+                    ).withTranscript(transcriptionRepository)
             }
         }.getOrNull()?.let { return it }
         runCatching {
@@ -316,6 +333,7 @@ class OfflineFirstJournalNotesRepository(
                 is JournalNote.Audio -> {
                     audioNoteDao.addNote(note.toEntity())
                     mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
+                    note.persistTranscript(transcriptionRepository)
                     note.uid
                 }
 
@@ -428,6 +446,7 @@ class OfflineFirstJournalNotesRepository(
             }
 
             is JournalNote.Audio -> {
+                transcriptionRepository?.deleteTranscription(note.uid)
                 audioNoteDao.removeNote(note.uid)
                 mediaCaptionDao.deleteCaption(note.uid)
                 deleteMediaIfUnreferenced(note.mediaRef)
@@ -469,6 +488,7 @@ class OfflineFirstJournalNotesRepository(
 
         textNoteDao.removeNote(noteId)
         imageNoteDao.removeNote(noteId)
+        transcriptionRepository?.deleteTranscription(noteId)
         audioNoteDao.removeNote(noteId)
         videoNoteDao.removeNote(noteId)
         mediaCaptionDao.deleteCaption(noteId)
@@ -546,6 +566,7 @@ class OfflineFirstJournalNotesRepository(
             is JournalNote.Audio -> {
                 audioNoteDao.addNote(note.toEntity())
                 mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
+                note.persistTranscript(transcriptionRepository)
             }
             is JournalNote.Video -> {
                 videoNoteDao.addNote(note.toEntity())
@@ -559,6 +580,7 @@ class OfflineFirstJournalNotesRepository(
     override suspend fun deleteFromSync(noteId: Uuid) {
         textNoteDao.removeNote(noteId)
         imageNoteDao.removeNote(noteId)
+        transcriptionRepository?.deleteTranscription(noteId)
         audioNoteDao.removeNote(noteId)
         videoNoteDao.removeNote(noteId)
         mediaCaptionDao.deleteCaption(noteId)
@@ -614,9 +636,13 @@ class OfflineFirstJournalNotesRepository(
         noteId: Uuid,
         mediaRef: String,
     ) {
-        imageNoteDao.updateContentUri(noteId, mediaRef)
-        audioNoteDao.updateContentUri(noteId, mediaRef)
-        videoNoteDao.updateContentUri(noteId, mediaRef)
+        transactionManager.withTransaction {
+            val previous = (getNoteById(noteId) as? JournalNote.Audio)?.mediaRef
+            if (previous != null) transcriptionRepository?.rebindMediaReference(noteId, previous, mediaRef)
+            imageNoteDao.updateContentUri(noteId, mediaRef)
+            audioNoteDao.updateContentUri(noteId, mediaRef)
+            videoNoteDao.updateContentUri(noteId, mediaRef)
+        }
     }
 
     private val contentSyncDebouncer =
@@ -630,32 +656,6 @@ class OfflineFirstJournalNotesRepository(
         }
 
     private fun triggerContentSync() = contentSyncDebouncer.trigger()
-
-    private fun JournalNote.withCaption(captionMap: Map<Uuid, String>): JournalNote =
-        when (this) {
-            is JournalNote.Image -> copy(caption = captionMap[uid] ?: caption)
-            is JournalNote.Video -> copy(caption = captionMap[uid] ?: caption)
-            is JournalNote.Audio -> copy(caption = captionMap[uid] ?: caption)
-            else -> this
-        }
-
-    private fun JournalNote.hasSamePersistedContent(other: JournalNote): Boolean {
-        if (creationTimestamp.toEpochMilliseconds() != other.creationTimestamp.toEpochMilliseconds() ||
-            timeZoneId != other.timeZoneId ||
-            location?.coordinates != other.location?.coordinates ||
-            location?.place?.id != other.location?.place?.id
-        ) {
-            return false
-        }
-        return when (this) {
-            is JournalNote.Text -> other is JournalNote.Text && content == other.content
-            is JournalNote.Image ->
-                other is JournalNote.Image && mediaRef == other.mediaRef && caption == other.caption && presentation == other.presentation
-            is JournalNote.Audio ->
-                other is JournalNote.Audio && mediaRef == other.mediaRef && durationMs == other.durationMs && caption == other.caption
-            is JournalNote.Video -> other is JournalNote.Video && mediaRef == other.mediaRef && caption == other.caption
-        }
-    }
 
     private fun triggerAssociationSync() = associationSyncDebouncer.trigger()
 
@@ -700,7 +700,10 @@ class OfflineFirstJournalNotesRepository(
 
         // Combine all notes
         val captionMap = mediaCaptionDao.observeAll().first().associate { it.noteId to it.caption }
-        val allNotes = (textNotes + imageNotes + audioNotes + videoNotes).map { it.withCaption(captionMap) }
+        val allNotes =
+            (textNotes + imageNotes + audioNotes + videoNotes).map {
+                it.withCaption(captionMap).withTranscript(transcriptionRepository)
+            }
 
         // Get all journals
         val journals = journalRepository.allJournalsObserved.first()
@@ -781,3 +784,29 @@ private fun JournalNote.mediaRefOrNull(): String? =
         is JournalNote.Audio -> mediaRef
         is JournalNote.Text -> null
     }
+
+private fun JournalNote.withCaption(captionMap: Map<Uuid, String>): JournalNote =
+    when (this) {
+        is JournalNote.Image -> copy(caption = captionMap[uid] ?: caption)
+        is JournalNote.Video -> copy(caption = captionMap[uid] ?: caption)
+        is JournalNote.Audio -> copy(caption = captionMap[uid] ?: caption)
+        else -> this
+    }
+
+private fun JournalNote.hasSamePersistedContent(other: JournalNote): Boolean {
+    if (creationTimestamp.toEpochMilliseconds() != other.creationTimestamp.toEpochMilliseconds() ||
+        timeZoneId != other.timeZoneId ||
+        location?.coordinates != other.location?.coordinates ||
+        location?.place?.id != other.location?.place?.id
+    ) {
+        return false
+    }
+    return when (this) {
+        is JournalNote.Text -> other is JournalNote.Text && content == other.content
+        is JournalNote.Image ->
+            other is JournalNote.Image && mediaRef == other.mediaRef && caption == other.caption && presentation == other.presentation
+        is JournalNote.Audio ->
+            other is JournalNote.Audio && mediaRef == other.mediaRef && durationMs == other.durationMs && caption == other.caption
+        is JournalNote.Video -> other is JournalNote.Video && mediaRef == other.mediaRef && caption == other.caption
+    }
+}

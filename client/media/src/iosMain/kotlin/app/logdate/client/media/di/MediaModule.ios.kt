@@ -24,7 +24,7 @@ actual val mediaModule: Module =
 
         // Transcription manager for iOS
         single<TranscriptionManager> {
-            IosTranscriptionManager(get())
+            IosTranscriptionManager(get(), repository = { get() })
         }
 
         single<RemoteDisplayManager> { UnavailableRemoteDisplayManager() }

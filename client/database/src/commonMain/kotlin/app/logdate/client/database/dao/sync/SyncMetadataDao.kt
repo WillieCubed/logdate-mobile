@@ -80,6 +80,52 @@ interface SyncMetadataDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPending(pending: PendingUploadEntity)
 
+    /** Joins transcript persistence without taking a service mutex while Room owns the writer. */
+    @Transaction
+    suspend fun enqueueTranscriptMutation(
+        ownerId: String,
+        serverOrigin: String,
+        noteId: String,
+        createdAt: Long,
+    ): Boolean {
+        val scoped = getPending(ownerId, serverOrigin, "NOTE", noteId)
+        val legacy = getPending("", serverOrigin, "NOTE", noteId)
+        if (scoped?.operation == "DELETE" || legacy?.operation == "DELETE") return false
+        val existing = scoped ?: legacy
+        insertPending(
+            PendingUploadEntity(
+                ownerId = ownerId,
+                serverOrigin = serverOrigin,
+                entityType = "NOTE",
+                entityId = noteId,
+                operation = if (existing?.operation == "CREATE") "CREATE" else "UPDATE",
+                createdAt = existing?.createdAt ?: createdAt,
+                expectedServerVersion = existing?.expectedServerVersion,
+            ),
+        )
+        return true
+    }
+
+    @Transaction
+    suspend fun advancePendingVersionAfterUpload(
+        ownerId: String,
+        serverOrigin: String,
+        entityType: String,
+        entityId: String,
+        uploadedBaseVersion: Long,
+        serverVersion: Long,
+    ): Boolean {
+        val pending = getPending(ownerId, serverOrigin, entityType, entityId) ?: return false
+        if (pending.operation != "UPDATE" ||
+            pending.expectedServerVersion != uploadedBaseVersion ||
+            serverVersion <= uploadedBaseVersion
+        ) {
+            return false
+        }
+        insertPending(pending.copy(expectedServerVersion = serverVersion))
+        return true
+    }
+
     @Query(
         """INSERT OR IGNORE INTO pending_uploads
         (ownerId, serverOrigin, entityType, entityId, operation, createdAt, retryCount, expectedServerVersion, operationId)

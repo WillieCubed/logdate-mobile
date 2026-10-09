@@ -400,7 +400,7 @@ internal class SyncUploader(
                             }
 
                         val result =
-                            if (pending.operation == PendingOperation.CREATE) {
+                            if (pending.operation == PendingOperation.CREATE && note.syncVersion == 0L) {
                                 tokenRefresher.withFreshToken(
                                     { token -> cloudContentDataSource.uploadNote(token, uploadReadyNote) },
                                     "uploadNote(${note.uid})",
@@ -423,6 +423,8 @@ internal class SyncUploader(
                             val upload = result.getOrThrow()
                             uploadedCount++
                             recordProgress(1)
+                            // Persist the confirmed repair base before note metadata, so restart cannot replay an older base.
+                            syncMetadataService.advancePendingVersionAfterUpload(EntityType.NOTE, pending, upload.serverVersion)
                             syncableRepository?.updateSyncMetadata(note, upload.serverVersion, upload.syncedAt)
                             retryCoordinator.markUploadSettled(EntityType.NOTE, pending, upload.syncedAt, upload.serverVersion)
                             Napier.d("Uploaded content")

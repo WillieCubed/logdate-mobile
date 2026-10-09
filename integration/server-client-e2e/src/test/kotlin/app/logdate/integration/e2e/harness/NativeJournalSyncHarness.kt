@@ -15,6 +15,12 @@ import app.logdate.client.device.identity.data.AccountDeviceApi
 import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.networking.DefaultAccountKeyEnvelopeApi
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.transcription.TranscriptDocument
+import app.logdate.client.repository.transcription.TranscriptDocumentStatus
+import app.logdate.client.repository.transcription.TranscriptEngineMetadata
+import app.logdate.client.repository.transcription.TranscriptSegment
+import app.logdate.client.repository.transcription.TranscriptSource
+import app.logdate.client.repository.transcription.TranscriptSpeaker
 import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
 import app.logdate.client.sync.cloud.MediaUploadRequest
 import app.logdate.client.sync.crypto.AesGcmMediaPayloadCrypto
@@ -31,27 +37,35 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.io.Buffer
 import kotlinx.io.buffered
 import kotlinx.io.readByteArray
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.net.InetSocketAddress
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.util.Base64
 import javax.imageio.ImageIO
+import javax.sound.sampled.AudioSystem
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-/** Disposable loopback journal for verifying the Swift store without opening an app window. */
+/** Disposable loopback journal for headless and signed-app native acceptance. */
 object NativeJournalSyncHarness {
     @JvmStatic
     fun main(args: Array<String>) =
         runBlocking {
-            require(args.size == 1) { "Supply a private temporary control directory" }
-            val control = Path.of(args.single())
+            require(args.size in 1..2 && (args.size == 1 || args[1] == "--interactive")) {
+                "Supply a private temporary control directory and optional --interactive"
+            }
+            val interactive = args.size == 2
+            val control = Path.of(args.first())
             Files.createDirectories(control)
             withServerClientHarness {
                 val account = apiClient.createAccountWithSyntheticPasskey("turnkey_${Random.nextInt(100000, 999999)}").data
@@ -114,6 +128,109 @@ object NativeJournalSyncHarness {
                             ),
                         ).getOrThrow()
                 content.uploadNote(token, photoEntry.copy(mediaRef = upload.mediaId)).getOrThrow()
+                val transcript =
+                    TranscriptDocument(
+                        revision = 1,
+                        status = TranscriptDocumentStatus.FINAL,
+                        language = "en-US",
+                        segments =
+                            listOf(
+                                TranscriptSegment(
+                                    "s0",
+                                    "Kotlin café 🌎 transcript",
+                                    0,
+                                    400,
+                                    speakerId = "speaker-1",
+                                    source = TranscriptSource.LOCAL_REFINEMENT,
+                                    isFinal = true,
+                                ),
+                            ),
+                        speakers = listOf(TranscriptSpeaker("speaker-1", "Speaker 1")),
+                        engine = TranscriptEngineMetadata("kotlin-fixture", modelId = "synthetic"),
+                    )
+                val audioEntry =
+                    JournalNote.Audio(
+                        creationTimestamp = now,
+                        lastUpdated = now,
+                        mediaRef = "",
+                        durationMs = 500,
+                        caption = "Kotlin audio",
+                        transcript = transcript,
+                    )
+                val pcm = ByteArray(24_000)
+                val wav =
+                    ByteBuffer
+                        .allocate(44 + pcm.size)
+                        .order(ByteOrder.LITTLE_ENDIAN)
+                        .put("RIFF".toByteArray())
+                        .putInt(pcm.size + 36)
+                        .put("WAVEfmt ".toByteArray())
+                        .putInt(16)
+                        .putShort(1)
+                        .putShort(1)
+                        .putInt(24_000)
+                        .putInt(48_000)
+                        .putShort(2)
+                        .putShort(16)
+                        .put("data".toByteArray())
+                        .putInt(pcm.size)
+                        .put(pcm)
+                        .array()
+                val encryptedAudio =
+                    AesGcmMediaPayloadCrypto(mediaKey)
+                        .streamEncryptor()
+                        .encrypt(Buffer().apply { write(wav) })
+                        .buffered()
+                        .use { it.readByteArray() }
+                val audioUpload =
+                    apiClient
+                        .uploadMedia(
+                            token,
+                            MediaUploadRequest(
+                                contentId = audioEntry.uid.toString(),
+                                fileName = "fixture.wav",
+                                mimeType = "audio/wav",
+                                sizeBytes = encryptedAudio.size.toLong(),
+                                data = encryptedAudio,
+                            ),
+                        ).getOrThrow()
+                content.uploadNote(token, audioEntry.copy(mediaRef = audioUpload.mediaId)).getOrThrow()
+                val speechImport = control.resolve("speech-import.wav")
+                if (interactive && Files.exists(speechImport)) {
+                    val durationMs =
+                        AudioSystem.getAudioInputStream(speechImport.toFile()).use { audio ->
+                            check(audio.frameLength > 0 && audio.format.frameRate > 0)
+                            (audio.frameLength * 1_000 / audio.format.frameRate).toLong()
+                        }
+                    val imported =
+                        JournalNote.Audio(
+                            creationTimestamp = now,
+                            lastUpdated = now,
+                            mediaRef = "",
+                            durationMs = durationMs,
+                            caption = "Imported speech awaiting automatic transcript",
+                        )
+                    val encrypted =
+                        AesGcmMediaPayloadCrypto(mediaKey)
+                            .streamEncryptor()
+                            .encrypt(Buffer().apply { write(Files.readAllBytes(speechImport)) })
+                            .buffered()
+                            .use { it.readByteArray() }
+                    val upload =
+                        apiClient
+                            .uploadMedia(
+                                token,
+                                MediaUploadRequest(
+                                    imported.uid.toString(),
+                                    "speech-import.wav",
+                                    "audio/wav",
+                                    encrypted.size.toLong(),
+                                    encrypted,
+                                ),
+                            ).getOrThrow()
+                    content.uploadNote(token, imported.copy(mediaRef = upload.mediaId)).getOrThrow()
+                    Files.writeString(control.resolve("speech-import-id"), imported.uid.toString())
+                }
                 val fixture =
                     buildJsonObject {
                         put("owner", account.account.id.toString())
@@ -123,6 +240,7 @@ object NativeJournalSyncHarness {
                         put("entry", initial.uid.toString())
                         put("credential", credential)
                         put("envelope", envelope)
+                        put("audio", audioEntry.uid.toString())
                         put("photo", photoEntry.uid.toString())
                         put("photoHash", Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(photo)))
                     }.toString().toByteArray()
@@ -136,8 +254,39 @@ object NativeJournalSyncHarness {
                 fixtureServer.start()
                 Files.writeString(control.resolve("ready"), "http://127.0.0.1:${fixtureServer.address.port}/fixture")
                 try {
-                    val deadline = System.currentTimeMillis() + 10 * 60 * 1000
+                    suspend fun inspectRecordings(): List<JournalNote.Audio> {
+                        val downloaded = content.getContentChanges(token, Instant.fromEpochMilliseconds(0)).getOrThrow()
+                        check(downloaded.unreadable.isEmpty()) { "Kotlin could not decrypt native records" }
+                        val recordings = downloaded.changes.filterIsInstance<JournalNote.Audio>().filter { it.uid != audioEntry.uid }
+                        val snapshot =
+                            buildJsonArray {
+                                recordings.forEach { note ->
+                                    add(
+                                        buildJsonObject {
+                                            put("id", note.uid.toString())
+                                            put("caption", note.caption)
+                                            put("durationMs", note.durationMs)
+                                            put("text", note.transcript?.plainText)
+                                            put("status", note.transcript?.status?.name)
+                                            put("engine", note.transcript?.engine?.name)
+                                            put("segments", note.transcript?.segments?.size ?: 0)
+                                        },
+                                    )
+                                }
+                            }
+                        Files.writeString(control.resolve("native-recordings.json"), snapshot.toString())
+                        return recordings
+                    }
+                    val deadline = System.currentTimeMillis() + (if (interactive) 60 else 10) * 60 * 1000
                     while (!Files.exists(control.resolve("complete")) && System.currentTimeMillis() < deadline) {
+                        if (interactive && Files.exists(control.resolve("inspect"))) {
+                            val request = Files.readString(control.resolve("inspect"))
+                            val acknowledged = control.resolve("inspected")
+                            if (!Files.exists(acknowledged) || Files.readString(acknowledged) != request) {
+                                inspectRecordings()
+                                Files.writeString(acknowledged, request)
+                            }
+                        }
                         for (round in 1..2) {
                             val requested = Files.exists(control.resolve("phone-edit-$round"))
                             val confirmed = Files.exists(control.resolve("phone-edited-$round"))
@@ -150,9 +299,51 @@ object NativeJournalSyncHarness {
                                 Files.writeString(control.resolve("phone-edited-$round"), "done")
                             }
                         }
+                        if (Files.exists(control.resolve("old-audio-edit")) && !Files.exists(control.resolve("old-audio-edited"))) {
+                            val currentAudio =
+                                content
+                                    .getContentChanges(token, Instant.fromEpochMilliseconds(0))
+                                    .getOrThrow()
+                                    .changes
+                                    .filterIsInstance<JournalNote.Audio>()
+                                    .single { it.uid == audioEntry.uid }
+                            content
+                                .updateNote(
+                                    token,
+                                    currentAudio.copy(
+                                        caption = "Older client caption",
+                                        transcript = null,
+                                        lastUpdated = Clock.System.now(),
+                                    ),
+                                ).getOrThrow()
+                            Files.writeString(control.resolve("old-audio-edited"), "done")
+                        }
                         delay(50)
                     }
                     check(Files.exists(control.resolve("complete"))) { "Mac verification did not finish" }
+                    if (interactive) {
+                        val recorded = inspectRecordings().filter { it.transcript?.status == TranscriptDocumentStatus.FINAL }
+                        check(recorded.any { it.transcript?.plainText?.contains("garden", ignoreCase = true) == true }) {
+                            "A native recording with automatically generated speech did not reach the server"
+                        }
+                        recorded.forEach { note ->
+                            check(note.durationMs > 0 && note.transcript?.engine?.name == "apple-speech")
+                            val uploaded = apiClient.downloadMedia(token, note.mediaRef).getOrThrow().data
+                            check(uploaded.isNotEmpty()) { "Native audio did not upload" }
+                            val opaque =
+                                apiClient
+                                    .getContentChanges(token, 0)
+                                    .getOrThrow()
+                                    .changes
+                                    .single { it.id == note.uid.toString() }
+                            check(opaque.transcript.orEmpty().startsWith("LDSE2:")) { "Transcript did not use encrypted sync" }
+                        }
+                        Files.writeString(
+                            control.resolve("verified"),
+                            "Kotlin decrypted native automatic transcripts and observed uploaded audio.\n",
+                        )
+                        return@withServerClientHarness
+                    }
                     val macDeviceId = Files.readString(control.resolve("mac-device-id"))
                     val devices =
                         AccountDeviceApi(httpClient).list(
@@ -173,6 +364,16 @@ object NativeJournalSyncHarness {
                     val notes = downloaded.changes.filterIsInstance<JournalNote.Text>()
                     check(notes.any { it.uid == initial.uid && it.content == "Kept Mac draft" })
                     check(notes.any { it.content == "New offline Mac entry" })
+                    val roundTripAudio = downloaded.changes.filterIsInstance<JournalNote.Audio>().single { it.uid == audioEntry.uid }
+                    check(roundTripAudio.transcript?.plainText == "Swift café 🌎 transcript")
+                    check(roundTripAudio.transcript?.engine?.name == "swift-fixture")
+                    check(
+                        roundTripAudio.transcript
+                            ?.speakers
+                            ?.single()
+                            ?.label == "Speaker 1",
+                    )
+                    check(roundTripAudio.caption == "Older client caption")
                     Files.writeString(
                         control.resolve("verified"),
                         "Kotlin observed the Mac device and decrypted the resolved conflict and new offline entry.\n",

@@ -62,6 +62,9 @@ data class TranscriptionEntity(
      * Durable transcript document revision.
      */
     val revision: Int = 0,
+    /** Saved audio revision recognized by this row; local hydration updates only the URI. */
+    val mediaUri: String? = null,
+    val mediaDurationMs: Long? = null,
     /**
      * True when a LogDate Cloud pass has improved or produced this transcript.
      */

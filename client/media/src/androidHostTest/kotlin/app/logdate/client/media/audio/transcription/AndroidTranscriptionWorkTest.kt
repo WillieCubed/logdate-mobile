@@ -10,6 +10,22 @@ import kotlin.uuid.Uuid
 
 class AndroidTranscriptionWorkTest {
     @Test
+    fun `final no speech is completed and is not retried`() =
+        runTest {
+            val statuses = mutableListOf<TranscriptionStatus>()
+            val runner =
+                TranscriptionWorkRunner(
+                    update = { _, _, status, _ ->
+                        statuses += status
+                        true
+                    },
+                    transcribe = { TranscriptionResult.Success("", isFinal = true) },
+                )
+            assertEquals(TranscriptionWorkOutcome.Success, runner.run(Uuid.random(), "file:///silent.m4a"))
+            assertEquals(listOf(TranscriptionStatus.IN_PROGRESS, TranscriptionStatus.COMPLETED), statuses)
+        }
+
+    @Test
     fun `on-device transcription work is offline-capable and carries the cancellation tag`() {
         val request = buildTranscriptionWorkRequest(Uuid.random(), "file:///recording.m4a")
 

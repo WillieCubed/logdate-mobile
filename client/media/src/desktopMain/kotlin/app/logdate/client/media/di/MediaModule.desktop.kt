@@ -25,7 +25,7 @@ actual val mediaModule: Module =
 
         // Transcription manager for desktop
         single<TranscriptionManager> {
-            DesktopTranscriptionManager(get())
+            DesktopTranscriptionManager(get(), repository = { get() })
         }
 
         single<RemoteDisplayManager> { UnavailableRemoteDisplayManager() }

@@ -80,6 +80,9 @@ interface TranscriptionDao {
      * @return A list of all transcriptions.
      */
     @Query("SELECT * FROM transcriptions")
+    fun observeAllTranscriptions(): Flow<List<TranscriptionEntity>>
+
+    @Query("SELECT * FROM transcriptions")
     suspend fun getAllTranscriptions(): List<TranscriptionEntity>
 
     /**

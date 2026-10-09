@@ -61,6 +61,7 @@ class TranscriptionWorker(
                     TranscriptionWorkRunner(
                         update = transcriptionRepository::updateTranscription,
                         transcribe = transcriptionService::transcribeAudioFile,
+                        repository = transcriptionRepository,
                     )
                 when (runner.run(noteId, audioUri)) {
                     TranscriptionWorkOutcome.Success -> Result.success()

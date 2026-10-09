@@ -67,6 +67,7 @@ internal class DownloadStrategy<T : Any>(
     val afterDelete: suspend (Uuid) -> Unit = {},
     val localItem: suspend (Uuid) -> T? = { id -> localItems()[id] },
     val sameUploadedFields: suspend (local: T, remote: T) -> Boolean = { _, _ -> false },
+    val sameCreateBaseFields: suspend (local: T, remote: T) -> Boolean = { _, _ -> false },
     val acknowledgeUpload: suspend (local: T, remote: T) -> Boolean = { _, _ -> false },
 )
 
@@ -247,7 +248,7 @@ internal class SyncDownloadEngine(
                                             acknowledgeUploadedOperation(
                                                 strategy,
                                                 existing,
-                                                item,
+                                                remoteItem,
                                                 pendingById[id.toString()],
                                                 syncMetadataService,
                                             )

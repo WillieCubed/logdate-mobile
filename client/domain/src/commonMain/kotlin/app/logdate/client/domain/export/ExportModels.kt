@@ -1,5 +1,6 @@
 package app.logdate.client.domain.export
 
+import app.logdate.client.repository.transcription.TranscriptDocument
 import app.logdate.shared.model.SerializableEntryBlock
 import app.logdate.shared.model.profile.LogDateProfile
 import kotlinx.serialization.SerialName
@@ -48,6 +49,7 @@ data class ExportNote(
     val photoPresentation: String? = null,
     val mediaPath: String? = null, // Path to media file
     val durationMs: Long? = null,
+    val transcript: TranscriptDocument? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
     val timeZone: String? = null,

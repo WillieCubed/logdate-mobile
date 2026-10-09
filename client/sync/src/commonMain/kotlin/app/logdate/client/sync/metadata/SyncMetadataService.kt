@@ -78,6 +78,13 @@ interface SyncMetadataService {
         operation: PendingOperation,
     )
 
+    /** Queue a fresh transcript mutation; durable stores must join the caller's data transaction. */
+    suspend fun enqueueTranscriptMutation(noteId: String): Boolean {
+        if (getPendingUploads(EntityType.NOTE).any { it.entityId == noteId && it.operation == PendingOperation.DELETE }) return false
+        enqueuePending(noteId, EntityType.NOTE, PendingOperation.UPDATE)
+        return true
+    }
+
     /** Backfills a surviving local record without replacing an edit, deletion, or repair. */
     suspend fun enqueueCreateIfAbsent(
         entityId: String,
@@ -90,6 +97,13 @@ interface SyncMetadataService {
     suspend fun bindCreateToServerVersion(
         entityType: EntityType,
         pending: PendingUpload,
+        serverVersion: Long,
+    ): Boolean = false
+
+    /** Advance a surviving scoped repair from a confirmed own upload without changing its identity. */
+    suspend fun advancePendingVersionAfterUpload(
+        entityType: EntityType,
+        uploaded: PendingUpload,
         serverVersion: Long,
     ): Boolean = false
 

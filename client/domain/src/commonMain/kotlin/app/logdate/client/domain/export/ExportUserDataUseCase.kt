@@ -202,6 +202,7 @@ class ExportUserDataUseCase(
                                     mediaPath = note.mediaRef,
                                     caption = note.caption.takeIf { it.isNotEmpty() },
                                     durationMs = note.durationMs,
+                                    transcript = note.transcript,
                                     createdAt = note.creationTimestamp,
                                     updatedAt = note.lastUpdated,
                                     location = note.location?.toExportLocation(),

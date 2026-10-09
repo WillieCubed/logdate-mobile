@@ -41,7 +41,7 @@ internal class SyncDownloader(
     cloudAssociationDataSource: CloudAssociationDataSource,
     private val journalConflictResolver: ConflictResolver<Journal>,
     private val noteConflictResolver: ConflictResolver<JournalNote>,
-    syncMetadataService: SyncMetadataService,
+    private val syncMetadataService: SyncMetadataService,
     transactionManager: SyncTransactionManager,
     private val mediaSyncRefStore: MediaSyncRefStore,
     private val downloadEngine: SyncDownloadEngine,
@@ -172,8 +172,9 @@ internal class SyncDownloader(
                     lastUpdatedOf = { it.lastUpdated },
                     conflictResolver = noteConflictResolver,
                     sameUploadedFields = ::sameNoteFields,
+                    sameCreateBaseFields = ::sameAudioCreateBaseFields,
                     acknowledgeUpload = ::acknowledgeNoteCreate,
-                    hydrate = { token, note -> if (downloadInbox == null) mediaTransfer.downloadIfNeeded(token, note) else note },
+                    hydrate = ::hydrateNote,
                     applyCreate = { note ->
                         if (syncableRepository != null) syncableRepository.createFromSync(note) else journalNotesRepository.create(note)
                     },
@@ -198,6 +199,30 @@ internal class SyncDownloader(
         )
     }
 
+    private suspend fun hydrateNote(
+        accessToken: String,
+        note: JournalNote,
+    ): JournalNote {
+        // Pending work must compare the original remote fields without replacing its media mapping.
+        if (syncMetadataService.hasPending(EntityType.NOTE, note.uid.toString())) return note
+        val accepted = preserveTranscript(note)
+        return if (downloadInbox == null) mediaTransfer.downloadIfNeeded(accessToken, accepted) else accepted
+    }
+
+    private suspend fun preserveTranscript(replacement: JournalNote): JournalNote {
+        val existing = journalNotesRepository.getNoteById(replacement.uid)
+        return if (existing is JournalNote.Audio &&
+            replacement is JournalNote.Audio &&
+            replacement.transcript == null &&
+            remoteMediaRef(existing) == replacement.mediaRef &&
+            existing.durationMs == replacement.durationMs
+        ) {
+            replacement.copy(transcript = existing.transcript)
+        } else {
+            replacement
+        }
+    }
+
     private fun sameJournalFields(
         local: Journal,
         remote: Journal,
@@ -214,9 +239,30 @@ internal class SyncDownloader(
         local: JournalNote,
         remote: JournalNote,
     ): Boolean {
-        val mapping = mediaSyncRefStore.get(local.uid)
-        val ref = mapping?.takeIf { it.localUri == local.mediaRefOrNull() }?.remoteUrl ?: local.mediaRefOrNull()
+        val ref = remoteMediaRef(local)
         return local.uploadedFields(remote.syncVersion, ref) == remote.uploadedFields(remote.syncVersion, remote.mediaRefOrNull())
+    }
+
+    private suspend fun remoteMediaRef(note: JournalNote): String? {
+        val mapping = mediaSyncRefStore.get(note.uid)
+        return mapping?.takeIf { it.localUri == note.mediaRefOrNull() }?.remoteUrl ?: note.mediaRefOrNull()
+    }
+
+    private suspend fun sameAudioCreateBaseFields(
+        local: JournalNote,
+        remote: JournalNote,
+    ): Boolean {
+        val document = (local as? JournalNote.Audio)?.transcript ?: return false
+        if (remote !is JournalNote.Audio ||
+            document.revision <= (remote.transcript?.revision ?: -1)
+        ) {
+            return false
+        }
+        // The server stamps lastUpdated; transcript-only changes do not edit the source fields.
+        return sameNoteFields(
+            local.copy(lastUpdated = remote.lastUpdated, transcript = null, transcription = ""),
+            remote.copy(transcript = null, transcription = ""),
+        )
     }
 
     private suspend fun acknowledgeNoteCreate(

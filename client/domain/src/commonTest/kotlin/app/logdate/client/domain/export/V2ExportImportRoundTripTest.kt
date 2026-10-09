@@ -16,6 +16,7 @@ import app.logdate.client.domain.restore.RestoreTestDeviceIdProvider
 import app.logdate.client.domain.restore.RestoreTestOwnerProvider
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.transcription.TranscriptDocument
 import app.logdate.shared.model.PhotoPresentation
 import app.logdate.shared.model.Place
 import kotlinx.coroutines.flow.toList
@@ -29,7 +30,16 @@ class V2ExportImportRoundTripTest : ArchiveExportFixture() {
     @Test
     fun `fresh repositories restore a newly exported v2 archive`() =
         runTest {
-            notesRepository.testNotes = listOf(textNote, imageNote, audioNote.copy(caption = "A walk by the water"), videoNote)
+            notesRepository.testNotes =
+                listOf(
+                    textNote,
+                    imageNote,
+                    audioNote.copy(
+                        caption = "A walk by the water",
+                        transcript = TranscriptDocument.fromPlainText("Spoken archived audio").copy(revision = 4),
+                    ),
+                    videoNote,
+                )
             val archive = InMemoryArchiveContainer()
             val progress =
                 useCase()
@@ -94,6 +104,10 @@ class V2ExportImportRoundTripTest : ArchiveExportFixture() {
             assertTrue((notes.getNoteById(imageNote.uid) as JournalNote.Image).mediaRef.startsWith("file:///restored/"))
             assertEquals(PhotoPresentation.Framed, (notes.getNoteById(imageNote.uid) as JournalNote.Image).presentation)
             assertEquals("A walk by the water", (notes.getNoteById(audioNote.uid) as JournalNote.Audio).caption)
+            assertEquals(
+                TranscriptDocument.fromPlainText("Spoken archived audio").copy(revision = 4),
+                (notes.getNoteById(audioNote.uid) as JournalNote.Audio).transcript,
+            )
             assertTrue(result.warnings.any { "not restored" in it || "Skipped" in it })
         }
 }

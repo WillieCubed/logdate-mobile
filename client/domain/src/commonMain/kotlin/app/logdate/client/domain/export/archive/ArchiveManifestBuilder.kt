@@ -8,7 +8,6 @@ internal object ArchiveCoverage {
     val notYetSupported: List<ArchiveCategory> =
         listOf(
             ArchiveCategory.EDITOR_DRAFTS,
-            ArchiveCategory.TRANSCRIPTS,
             ArchiveCategory.AUDIO_TAGS,
             ArchiveCategory.PEOPLE,
             ArchiveCategory.EVENTS,
