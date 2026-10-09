@@ -1,5 +1,6 @@
 package app.logdate.server.database
 
+import org.jetbrains.exposed.v1.core.ReferenceOption
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.core.java.javaUUID
 import org.jetbrains.exposed.v1.datetime.timestamp
@@ -386,5 +387,40 @@ object LogDateAtprotoBlobsTable : Table("logdate_atproto_blobs") {
     init {
         index("idx_logdate_atproto_blobs_user", false, userId)
         index("idx_logdate_atproto_blobs_user_created_at", false, userId, createdAt)
+    }
+}
+
+/** Mirrors V34: one row per linked device session. */
+object DeviceSessionsTable : Table("device_sessions") {
+    val id = javaUUID("id")
+    val accountId = javaUUID("account_id").references(AccountsTable.id, onDelete = ReferenceOption.CASCADE)
+    val deviceName = varchar("device_name", 120)
+    val platform = varchar("platform", 32)
+    val createdAt = long("created_at")
+    val lastRefreshedAt = long("last_refreshed_at")
+    val expiresAt = long("expires_at")
+    val revokedAt = long("revoked_at").nullable()
+
+    override val primaryKey = PrimaryKey(id)
+
+    init {
+        index("idx_device_sessions_account", false, accountId)
+    }
+}
+
+/** Mirrors V34: one row per minted link code, keyed by the SHA-256 hash of the code's bytes. */
+object DeviceLinkCodesTable : Table("device_link_codes") {
+    val codeHash = varchar("code_hash", 64)
+    val accountId = javaUUID("account_id").references(AccountsTable.id, onDelete = ReferenceOption.CASCADE)
+    val createdAt = long("created_at")
+    val expiresAt = long("expires_at")
+    val redeemedAt = long("redeemed_at").nullable()
+    val sessionId = javaUUID("session_id").nullable()
+
+    override val primaryKey = PrimaryKey(codeHash)
+
+    init {
+        index("idx_device_link_codes_account_created", false, accountId, createdAt)
+        index("idx_device_link_codes_expires", false, expiresAt)
     }
 }
