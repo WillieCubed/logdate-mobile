@@ -30,7 +30,9 @@ import io.mockk.coVerify
 import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -77,6 +79,13 @@ class WearDataLayerSyncManagerTest {
 
     private val fixedTime = Instant.fromEpochMilliseconds(1_700_000_000_000)
     private val noteId = Uuid.parse("550e8400-e29b-41d4-a716-446655440000")
+
+    /**
+     * Digests audio on the calling thread. The default [FileAudioDigester] switches to [Dispatchers.IO],
+     * a real thread the test scheduler does not wait for, so `runCurrent()` can return while a sync is
+     * still reading the file and has not yet reached the Data Layer.
+     */
+    private val audioDigester = FileAudioDigester(ioDispatcher = Dispatchers.Unconfined)
 
     private val pendingCount = MutableStateFlow(0)
     private val deadLetters = MutableStateFlow<List<SyncDeadLetterRecord>>(emptyList())
@@ -158,6 +167,7 @@ class WearDataLayerSyncManagerTest {
                 mediaFiles = MediaFileResolver(AndroidMediaDirectories(createTempDirectory().toFile())),
                 phoneReachability = PhoneReachability { phone },
                 scope = CoroutineScope(UnconfinedTestDispatcher()),
+                audioDigester = audioDigester,
             )
     }
 
@@ -177,6 +187,7 @@ class WearDataLayerSyncManagerTest {
             mediaFiles = MediaFileResolver(AndroidMediaDirectories(createTempDirectory().toFile())),
             phoneReachability = PhoneReachability { phone },
             scope = CoroutineScope(UnconfinedTestDispatcher()),
+            audioDigester = audioDigester,
             clock =
                 object : Clock {
                     override fun now(): Instant = fixedTime
@@ -540,22 +551,26 @@ class WearDataLayerSyncManagerTest {
             coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
                 listOf(PendingUpload(noteId.toString(), PendingOperation.CREATE))
             coEvery { notesRepository.getNoteById(noteId) } returns audioNote
-            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val sendStarted = CompletableDeferred<Unit>()
+            val gate = CompletableDeferred<Unit>()
             coEvery { dataLayerClient.sendFile(any(), any()) } coAnswers {
+                sendStarted.complete(Unit)
                 gate.await()
                 true
             }
 
             val first = async { syncManager.fullSync() }
-            runCurrent()
+            sendStarted.await()
             val second = async { syncManager.fullSync() }
             runCurrent()
 
             coVerify(exactly = 1) { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId), any(), any()) }
+            coVerify(exactly = 1) { dataLayerClient.sendFile(any(), any()) }
             gate.complete(Unit)
             first.await()
             second.await()
             coVerify(exactly = 2) { dataLayerClient.putDataItem(NoteDataMapper.notePath(noteId), any(), any()) }
+            coVerify(exactly = 2) { dataLayerClient.sendFile(any(), any()) }
         }
 
     @Test
@@ -611,7 +626,7 @@ class WearDataLayerSyncManagerTest {
         runTest {
             givenQueuedNote(PendingOperation.CREATE)
             coEvery { notesRepository.getNoteById(noteId) } returns audioNote
-            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val gate = CompletableDeferred<Unit>()
             coEvery { dataLayerClient.sendFile(any(), any()) } coAnswers {
                 gate.await()
                 true
@@ -1347,7 +1362,7 @@ class WearDataLayerSyncManagerTest {
             coEvery { syncMetadataService.getPendingUploads(EntityType.NOTE) } returns
                 listOf(PendingUpload(noteId.toString(), PendingOperation.CREATE))
             coEvery { notesRepository.getNoteById(noteId) } returns audioNote
-            val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val gate = CompletableDeferred<Unit>()
             coEvery { dataLayerClient.sendFile(any(), any()) } coAnswers {
                 gate.await()
                 true
@@ -1384,6 +1399,7 @@ class WearDataLayerSyncManagerTest {
             mediaFiles = MediaFileResolver(AndroidMediaDirectories(createTempDirectory().toFile())),
             phoneReachability = PhoneReachability { phone },
             scope = scope,
+            audioDigester = audioDigester,
         )
 
     // =======================================================================
