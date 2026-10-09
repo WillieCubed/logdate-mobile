@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +34,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -55,7 +57,7 @@ internal fun CompletedAudioTransport(
     val safeProgress = if (progress.isFinite()) progress.coerceIn(0f, 1f) else 0f
     val shape = IconButtonDefaults.mediumSquareShape
     val containerSize = IconButtonDefaults.mediumContainerSize()
-    val timingStyle = MaterialTheme.typography.labelSmall
+    val timingStyle = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.Ltr)
     val controlSize = containerSize.height
     val elapsed = formatMediaDuration((durationMs * safeProgress).toLong(), true)
     val total = formatMediaDuration(durationMs, true)
@@ -64,13 +66,17 @@ internal fun CompletedAudioTransport(
             Modifier.fillMaxWidth().padding(end = trailingActionInset),
             horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
         ) {
-            if (!compact) Text("$elapsed /", style = timingStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                total,
-                style = timingStyle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag("audio_block_duration"),
-            )
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (!compact) Text("$elapsed /", style = timingStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        total,
+                        style = timingStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("audio_block_duration"),
+                    )
+                }
+            }
         }
         Row(
             Modifier.fillMaxWidth().padding(end = trailingActionInset),

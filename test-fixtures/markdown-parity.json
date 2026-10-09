@@ -1,0 +1,309 @@
+{
+  "version": 1,
+  "offsetEncoding": "utf-16",
+  "fixtures": [
+    {
+      "id": "headings",
+      "source": "# First\n## Second\n### Third\n#### Fourth\n##### Fifth\n###### Sixth",
+      "plainText": "First\nSecond\nThird\nFourth\nFifth\nSixth",
+      "blockKinds": [
+        "HEADING",
+        "HEADING",
+        "HEADING",
+        "HEADING",
+        "HEADING",
+        "HEADING"
+      ],
+      "spans": []
+    },
+    {
+      "id": "nested-formatting",
+      "source": "**bold *thought*** and ~~*old*~~",
+      "plainText": "bold thought and old",
+      "blockKinds": [
+        "PARAGRAPH"
+      ],
+      "spans": [
+        {
+          "kind": "STRONG",
+          "sourceStart": 2,
+          "sourceEnd": 16,
+          "textStart": 0,
+          "textEnd": 12
+        },
+        {
+          "kind": "EMPHASIS",
+          "sourceStart": 8,
+          "sourceEnd": 15,
+          "textStart": 5,
+          "textEnd": 12
+        },
+        {
+          "kind": "STRIKETHROUGH",
+          "sourceStart": 25,
+          "sourceEnd": 30,
+          "textStart": 17,
+          "textEnd": 20
+        },
+        {
+          "kind": "EMPHASIS",
+          "sourceStart": 26,
+          "sourceEnd": 29,
+          "textStart": 17,
+          "textEnd": 20
+        }
+      ]
+    },
+    {
+      "id": "unicode",
+      "source": "# 旅行 👩🏽‍🚀\n\n**Café 🌏** و *ذكريات*",
+      "plainText": "旅行 👩🏽‍🚀\n\nCafé 🌏 و ذكريات",
+      "blockKinds": [
+        "HEADING",
+        "PARAGRAPH"
+      ],
+      "spans": [
+        {
+          "kind": "HEADING_1",
+          "sourceStart": 2,
+          "sourceEnd": 12,
+          "textStart": 0,
+          "textEnd": 10
+        },
+        {
+          "kind": "STRONG",
+          "sourceStart": 16,
+          "sourceEnd": 23,
+          "textStart": 12,
+          "textEnd": 19
+        },
+        {
+          "kind": "EMPHASIS",
+          "sourceStart": 29,
+          "sourceEnd": 35,
+          "textStart": 22,
+          "textEnd": 28
+        }
+      ]
+    },
+    {
+      "id": "escaped-unfinished",
+      "source": "\\*literal\\* and *unfinished\nlater *valid*",
+      "plainText": "*literal* and *unfinished\nlater valid",
+      "blockKinds": [
+        "PARAGRAPH"
+      ],
+      "spans": [
+        {
+          "kind": "EMPHASIS",
+          "sourceStart": 35,
+          "sourceEnd": 40,
+          "textStart": 32,
+          "textEnd": 37
+        }
+      ]
+    },
+    {
+      "id": "newlines",
+      "source": "first line\nsecond line\n\n\nlast line",
+      "plainText": "first line\nsecond line\n\n\nlast line",
+      "blockKinds": [
+        "PARAGRAPH",
+        "PARAGRAPH"
+      ],
+      "spans": []
+    },
+    {
+      "id": "quote-and-task-list",
+      "source": "> A *quiet* thought\n\n- [x] done\n- [ ] todo\n  - nested",
+      "plainText": "A quiet thought\n\n☑ done\n☐ todo\n  • nested",
+      "blockKinds": [
+        "BLOCK_QUOTE",
+        "UNORDERED_LIST"
+      ],
+      "spans": [
+        {
+          "kind": "EMPHASIS",
+          "sourceStart": 5,
+          "sourceEnd": 10,
+          "textStart": 2,
+          "textEnd": 7
+        }
+      ]
+    },
+    {
+      "id": "ordered-list",
+      "source": "1. first\n2. **second**",
+      "plainText": "1. first\n2. second",
+      "blockKinds": [
+        "ORDERED_LIST"
+      ],
+      "spans": []
+    },
+    {
+      "id": "links",
+      "source": "[map](https://logdate.app) and <https://example.com>",
+      "plainText": "map and https://example.com",
+      "blockKinds": [
+        "PARAGRAPH"
+      ],
+      "spans": [
+        {
+          "kind": "LINK",
+          "sourceStart": 1,
+          "sourceEnd": 4,
+          "textStart": 0,
+          "textEnd": 3
+        },
+        {
+          "kind": "LINK",
+          "sourceStart": 32,
+          "sourceEnd": 51,
+          "textStart": 8,
+          "textEnd": 27
+        }
+      ]
+    },
+    {
+      "id": "code",
+      "source": "`**literal**`\n\n~~~kotlin\n# code\n\n**literal**\n~~~",
+      "plainText": "**literal**\n\n# code\n\n**literal**",
+      "blockKinds": [
+        "PARAGRAPH",
+        "CODE_BLOCK"
+      ],
+      "spans": [
+        {
+          "kind": "INLINE_CODE",
+          "sourceStart": 1,
+          "sourceEnd": 12,
+          "textStart": 0,
+          "textEnd": 11
+        },
+        {
+          "kind": "CODE_BLOCK",
+          "sourceStart": 25,
+          "sourceEnd": 44,
+          "textStart": 13,
+          "textEnd": 32
+        }
+      ]
+    },
+    {
+      "id": "unclosed-fence",
+      "source": "Before\n\n```kotlin\n# literal\n**also literal**",
+      "plainText": "Before\n\n# literal\n**also literal**",
+      "blockKinds": [
+        "PARAGRAPH",
+        "CODE_BLOCK"
+      ],
+      "spans": []
+    },
+    {
+      "id": "table-and-divider",
+      "source": "| Name | Value |\n| --- | --- |\n| A | **B** |\n\n---",
+      "plainText": "Name\tValue\nA\tB\n\n—",
+      "blockKinds": [
+        "TABLE",
+        "DIVIDER"
+      ],
+      "spans": [
+        {
+          "kind": "STRONG",
+          "sourceStart": 39,
+          "sourceEnd": 40,
+          "textStart": 13,
+          "textEnd": 14
+        }
+      ]
+    },
+    {
+      "id": "html-and-image",
+      "source": "<div>raw **HTML**</div>\n\n![Café 🌏](https://example.com/photo.png)",
+      "plainText": "<div>raw **HTML**</div>\n\nCafé 🌏",
+      "blockKinds": [
+        "HTML",
+        "PARAGRAPH"
+      ],
+      "spans": []
+    },
+    {
+      "id": "setext-and-intraword",
+      "source": "Title\n=====\n\ntrip_to_paris and user__profile__name",
+      "plainText": "Title\n\ntrip_to_paris and user__profile__name",
+      "blockKinds": [
+        "HEADING",
+        "PARAGRAPH"
+      ],
+      "spans": []
+    },
+    {
+      "id": "code-indentation",
+      "source": "~~~kotlin\n    keep\n      deeper\n~~~",
+      "plainText": "    keep\n      deeper",
+      "blockKinds": [
+        "CODE_BLOCK"
+      ],
+      "spans": [
+        {
+          "kind": "CODE_BLOCK",
+          "sourceStart": 10,
+          "sourceEnd": 31,
+          "textStart": 0,
+          "textEnd": 21
+        }
+      ]
+    },
+    {
+      "id": "ordered-start",
+      "source": "5. fifth\n9. sixth",
+      "plainText": "5. fifth\n6. sixth",
+      "blockKinds": [
+        "ORDERED_LIST"
+      ],
+      "spans": [
+        {
+          "kind": "LIST_MARKER",
+          "sourceStart": 9,
+          "sourceEnd": 11,
+          "textStart": 9,
+          "textEnd": 12
+        }
+      ]
+    },
+    {
+      "id": "code-blank-lines",
+      "source": "~~~\n\nline\n\n~~~",
+      "plainText": "\nline\n",
+      "blockKinds": [
+        "CODE_BLOCK"
+      ],
+      "spans": [
+        {
+          "kind": "CODE_BLOCK",
+          "sourceStart": 4,
+          "sourceEnd": 10,
+          "textStart": 0,
+          "textEnd": 6
+        }
+      ]
+    },
+    {
+      "id": "indented-code",
+      "source": "    a\n\n      b",
+      "plainText": "a\n\n  b",
+      "blockKinds": [
+        "CODE_BLOCK"
+      ],
+      "spans": [
+        {
+          "kind": "CODE_BLOCK",
+          "sourceStart": 0,
+          "sourceEnd": 14,
+          "textStart": 0,
+          "textEnd": 6
+        }
+      ]
+    }
+  ]
+}

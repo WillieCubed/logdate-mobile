@@ -40,9 +40,11 @@ import app.logdate.feature.editor.ui.editor.delegate.PendingAudioResolver
 import app.logdate.feature.editor.ui.image.ImageBlockPreview
 import app.logdate.feature.editor.ui.image.ImagePickerContent
 import app.logdate.feature.editor.ui.text.TextBlockContent
+import app.logdate.feature.editor.ui.text.rememberInlineMarkdownVisualTransformation
 import app.logdate.feature.editor.ui.video.VideoPickerContent
 import app.logdate.feature.editor.ui.video.VideoPlayerContent
 import app.logdate.shared.model.PhotoPresentation
+import app.logdate.ui.common.MarkdownText
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.add_a_caption
 import org.jetbrains.compose.resources.stringResource
@@ -176,10 +178,9 @@ internal fun MemoryCaptionField(
 ) {
     if (block is AudioBlockUiState) {
         if (block.uri != null && block.caption.isNotBlank()) {
-            Text(
-                text = block.caption,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            MarkdownText(
+                content = block.caption,
+                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
                 modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             )
         }
@@ -199,6 +200,7 @@ internal fun MemoryCaptionField(
         }
     BasicTextField(
         value = block.caption,
+        visualTransformation = rememberInlineMarkdownVisualTransformation(),
         onValueChange = { caption ->
             onUpdate(
                 when (block) {

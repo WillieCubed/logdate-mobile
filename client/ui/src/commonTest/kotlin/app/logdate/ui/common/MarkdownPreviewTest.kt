@@ -2,6 +2,7 @@ package app.logdate.ui.common
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -37,7 +38,7 @@ class MarkdownPreviewTest {
             )
 
         assertEquals(
-            "Heading bold\nParagraph with em and link.\n• first\n• second",
+            "Heading bold\n\nParagraph with em and link.\n\n• first\n• second",
             preview.text,
         )
         assertFalse("https://logdate.app" in preview.text)
@@ -56,7 +57,7 @@ class MarkdownPreviewTest {
             )
 
         assertEquals(
-            "A quiet thought\nold and new\nval answer = 42",
+            "A quiet thought\n\nold and new\n\nval answer = 42",
             preview.text,
         )
         assertTrue(preview.hasStyle(styles.quote, "A quiet thought"))
@@ -69,7 +70,7 @@ class MarkdownPreviewTest {
     fun `soft line break keeps adjacent paragraph lines separated`() {
         val preview = buildMarkdownPreview("first line\nsecond line", styles)
 
-        assertEquals("first line second line", preview.text)
+        assertEquals("first line\nsecond line", preview.text)
         assertFalse("linesecond" in preview.text)
     }
 
@@ -100,6 +101,30 @@ class MarkdownPreviewTest {
                 hasVisualOverflow = false,
             ),
         )
+    }
+
+    @Test
+    fun `full reading keeps link actions while compact previews retain card interaction`() {
+        val document = parseMarkdownDocument("Read [map](https://logdate.app/maps).")
+
+        val reading = buildMarkdownPreview(document, styles, clickableLinks = true)
+        val preview = buildMarkdownPreview(document, styles)
+
+        assertEquals("Read map.", reading.text)
+        val link = reading.getLinkAnnotations(0, reading.length).single()
+        assertEquals("https://logdate.app/maps", (link.item as LinkAnnotation.Url).url)
+        assertEquals("map", reading.text.substring(link.start, link.end))
+        assertTrue(preview.getLinkAnnotations(0, preview.length).isEmpty())
+    }
+
+    @Test
+    fun `unsupported link schemes stay readable without click actions`() {
+        val document = parseMarkdownDocument("[label](javascript:alert)")
+
+        val reading = buildMarkdownPreview(document, styles, clickableLinks = true)
+
+        assertEquals("label", reading.text)
+        assertTrue(reading.getLinkAnnotations(0, reading.length).isEmpty())
     }
 
     private fun AnnotatedString.hasStyle(

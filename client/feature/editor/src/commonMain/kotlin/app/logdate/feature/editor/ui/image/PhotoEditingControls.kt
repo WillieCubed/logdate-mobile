@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
+import app.logdate.feature.editor.ui.text.rememberInlineMarkdownVisualTransformation
 import app.logdate.shared.model.PhotoPresentation
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.add_a_caption
@@ -40,6 +41,7 @@ internal fun PhotoEditingControls(
     ) {
         BasicTextField(
             value = block.caption,
+            visualTransformation = rememberInlineMarkdownVisualTransformation(),
             onValueChange = { onBlockUpdated(block.copy(caption = it)) },
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
             textStyle = captionStyle.copy(color = captionColor),

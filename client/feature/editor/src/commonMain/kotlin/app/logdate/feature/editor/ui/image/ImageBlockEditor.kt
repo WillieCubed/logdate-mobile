@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -25,6 +24,8 @@ import app.logdate.feature.editor.ui.common.DeleteMediaButton
 import app.logdate.feature.editor.ui.common.MediaOverlayCaptionArea
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.shared.model.PhotoPresentation
+import app.logdate.ui.common.MarkdownText
+import app.logdate.ui.common.parseMarkdownDocument
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
@@ -91,10 +92,9 @@ fun ImageBlockEditor(
                             wrapToImage = true,
                         )
                         if (block.caption.isNotBlank()) {
-                            Text(
+                            MarkdownText(
                                 block.caption,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = Color.Black,
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.Black),
                                 modifier = Modifier.padding(top = 16.dp, bottom = 12.dp),
                             )
                         }
@@ -141,15 +141,16 @@ internal fun ImageBlockPreview(
     onAspectRatioLoaded: (Float) -> Unit = {},
 ) {
     var loadedRatio by remember(block.uri) { mutableFloatStateOf(0f) }
+    val description = remember(block.caption) { parseMarkdownDocument(block.caption).plainText.ifBlank { "Image" } }
     val intrinsic = painter?.intrinsicSize
     val ratio = if (intrinsic != null) intrinsic.width / intrinsic.height else loadedRatio
     val imageModifier = if (wrapToImage && ratio.isFinite() && ratio > 0f) modifier.aspectRatio(ratio) else modifier
     if (painter != null) {
-        Image(painter, block.caption.ifBlank { "Image" }, imageModifier, contentScale = contentScale)
+        Image(painter, description, imageModifier, contentScale = contentScale)
     } else {
         AsyncImage(
             model = ImageRequest.Builder(LocalPlatformContext.current).data(block.uri).build(),
-            contentDescription = block.caption.ifBlank { "Image" },
+            contentDescription = description,
             contentScale = contentScale,
             modifier = imageModifier,
             onSuccess = { state ->

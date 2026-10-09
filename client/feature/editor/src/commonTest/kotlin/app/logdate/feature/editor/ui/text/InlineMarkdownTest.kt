@@ -97,12 +97,12 @@ class InlineMarkdownTest {
     }
 
     @Test
-    fun `unfinished inline code does not suppress valid code on later lines`() {
+    fun `inline code follows GFM soft newline rules`() {
         val source = "`unfinished\nlater `valid`"
 
         val spans = parseInlineMarkdown(source)
 
-        assertSpan(spans, InlineMarkdownStyle.INLINE_CODE, source, "valid")
+        assertSpan(spans, InlineMarkdownStyle.INLINE_CODE, source, "unfinished\nlater ")
     }
 
     @Test
@@ -132,13 +132,13 @@ class InlineMarkdownTest {
     }
 
     @Test
-    fun `triple asterisks apply strong and emphasis to the same content`() {
+    fun `triple asterisks apply nested strong and emphasis`() {
         val source = "A ***really bright*** morning"
 
         val spans = parseInlineMarkdown(source)
 
         assertSpan(spans, InlineMarkdownStyle.STRONG, source, "really bright")
-        assertSpan(spans, InlineMarkdownStyle.EMPHASIS, source, "really bright")
+        assertSpan(spans, InlineMarkdownStyle.EMPHASIS, source, "**really bright**")
     }
 
     @Test
@@ -149,6 +149,29 @@ class InlineMarkdownTest {
 
         assertSpan(spans, InlineMarkdownStyle.STRONG, source, "旅行 🌏")
         assertSpan(spans, InlineMarkdownStyle.EMPHASIS, source, "ذكريات")
+    }
+
+    @Test
+    fun `nested emphasis follows the same structure as the reader`() {
+        val source = "**bold *thought*** and ~~*old*~~"
+
+        val spans = parseInlineMarkdown(source)
+
+        assertSpan(spans, InlineMarkdownStyle.STRONG, source, "bold *thought*")
+        assertSpan(spans, InlineMarkdownStyle.EMPHASIS, source, "thought")
+        assertSpan(spans, InlineMarkdownStyle.STRIKETHROUGH, source, "*old*")
+        assertSpan(spans, InlineMarkdownStyle.EMPHASIS, source, "old")
+    }
+
+    @Test
+    fun `setext heading and tilde fence use parser block rules`() {
+        val source = "Title\n=====\n\n~~~kotlin\n**literal**\n~~~"
+
+        val spans = parseInlineMarkdown(source)
+
+        assertSpan(spans, InlineMarkdownStyle.HEADING_1, source, "Title")
+        assertSpan(spans, InlineMarkdownStyle.CODE_BLOCK, source, "**literal**")
+        assertFalse(spans.any { it.style == InlineMarkdownStyle.STRONG })
     }
 
     @Test
@@ -187,13 +210,10 @@ class InlineMarkdownTest {
         source: String,
         expectedContent: String,
     ) {
-        val expectedStart = source.indexOf(expectedContent)
-        assertTrue(expectedStart >= 0)
         assertTrue(
             spans.any { span ->
                 span.style == style &&
-                    span.start == expectedStart &&
-                    span.end == expectedStart + expectedContent.length
+                    source.substring(span.start, span.end) == expectedContent
             },
             "Expected $style span for '$expectedContent', but got $spans",
         )

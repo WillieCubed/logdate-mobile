@@ -25,6 +25,7 @@ import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
 import app.logdate.feature.editor.ui.formatMediaDuration
 import app.logdate.feature.editor.ui.image.ImageBlockPreview
+import app.logdate.ui.common.MarkdownPreviewText
 
 /** Passive entry context: it has no editor callbacks and cannot change capture ownership. */
 @Suppress("ktlint:standard:function-naming")
@@ -47,15 +48,14 @@ internal fun EntryContextPreview(
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
             ) {
                 when (block) {
-                    is TextBlockUiState -> Text(block.content, Modifier.padding(24.dp), style = MaterialTheme.typography.bodyLarge)
+                    is TextBlockUiState -> MarkdownPreviewText(block.content, Modifier.padding(24.dp), maxLines = 8)
                     is ImageBlockUiState -> if (block.uri != null) ImageBlockPreview(block, wrapToImage = true)
                     is CameraBlockUiState ->
                         if (block.uri != null) {
                             if (block.mediaType == CapturedMediaType.VIDEO) {
-                                Text(
+                                MarkdownPreviewText(
                                     block.caption.ifBlank { memoryBlockLabel(block) },
                                     Modifier.padding(24.dp),
-                                    style = MaterialTheme.typography.bodyLarge,
                                 )
                             } else {
                                 ImageBlockPreview(ImageBlockUiState(id = block.id, uri = block.uri), wrapToImage = true)
@@ -74,12 +74,11 @@ internal fun EntryContextPreview(
                             }
                         }
                     is VideoBlockUiState ->
-                        Text(
+                        MarkdownPreviewText(
                             block.caption.ifBlank {
                                 memoryBlockLabel(block)
                             },
                             Modifier.padding(24.dp),
-                            style = MaterialTheme.typography.bodyLarge,
                         )
                 }
             }

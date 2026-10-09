@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -38,6 +39,7 @@ import app.logdate.client.media.audio.transcription.TimedTranscript
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
 import app.logdate.feature.editor.ui.LocalSharedTransitionScope
 import app.logdate.feature.editor.ui.editor.AudioBlockUiState
+import app.logdate.ui.common.MarkdownText
 import app.logdate.ui.media.MediaDeviceSelector
 import app.logdate.ui.platform.PlatformIcons
 import logdate.client.ui.generated.resources.common_delete
@@ -148,7 +150,7 @@ private fun CollapsedAudioContent(
             Surface(shape = RoundedCornerShape(transcriptRadius), color = MaterialTheme.colorScheme.surfaceContainerLow) {
                 Text(
                     text = transcriptText,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier =
@@ -239,7 +241,7 @@ private fun ExpandedAudioContent(
         if (showDeleteAction) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 if (block.caption.isNotBlank()) {
-                    Text(block.caption, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    MarkdownText(block.caption, textStyle = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                 } else {
                     Box(Modifier.weight(1f))
                 }
@@ -271,7 +273,10 @@ private fun ExpandedAudioContent(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     if (utterances.isEmpty()) {
-                        Text(block.transcription, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            block.transcription,
+                            style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content),
+                        )
                     } else {
                         val currentPositionMs = (block.duration * progress).toLong()
                         utterances.forEachIndexed { index, utterance ->
@@ -290,7 +295,7 @@ private fun ExpandedAudioContent(
                             ) {
                                 Text(
                                     utterance.text,
-                                    style = MaterialTheme.typography.bodyLarge,
+                                    style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content),
                                     color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                 )
                             }

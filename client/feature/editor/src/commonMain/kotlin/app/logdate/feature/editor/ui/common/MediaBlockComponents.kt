@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
+import app.logdate.feature.editor.ui.text.rememberInlineMarkdownVisualTransformation
 import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.add_a_caption
@@ -56,6 +57,7 @@ fun OverlayCaptionField(
 ) {
     BasicTextField(
         value = caption,
+        visualTransformation = rememberInlineMarkdownVisualTransformation(),
         onValueChange = onCaptionChanged,
         textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
         cursorBrush = SolidColor(Color.White),
@@ -108,6 +110,7 @@ fun MediaCaptionField(
 ) {
     OutlinedTextField(
         value = caption,
+        visualTransformation = rememberInlineMarkdownVisualTransformation(),
         onValueChange = onCaptionChanged,
         placeholder = { Text(stringResource(Res.string.add_a_caption)) },
         modifier =

@@ -26,16 +26,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
@@ -80,48 +75,7 @@ fun TextBlockContent(
         }
     val typography = MaterialTheme.typography
     val colors = MaterialTheme.colorScheme
-    val markdownTransformation =
-        remember(typography, colors) {
-            InlineMarkdownVisualTransformation { style ->
-                when (style) {
-                    InlineMarkdownStyle.HEADING_1 -> typography.headlineMedium.toSpanStyle()
-                    InlineMarkdownStyle.HEADING_2 -> typography.headlineSmall.toSpanStyle()
-                    InlineMarkdownStyle.HEADING_3 -> typography.titleLarge.toSpanStyle()
-                    InlineMarkdownStyle.HEADING_4 -> typography.titleMedium.toSpanStyle()
-                    InlineMarkdownStyle.HEADING_5 -> typography.titleSmall.toSpanStyle()
-                    InlineMarkdownStyle.HEADING_6 -> typography.labelLarge.toSpanStyle()
-                    InlineMarkdownStyle.STRONG -> SpanStyle(fontWeight = FontWeight.Bold)
-                    InlineMarkdownStyle.EMPHASIS -> SpanStyle(fontStyle = FontStyle.Italic)
-                    InlineMarkdownStyle.STRIKETHROUGH -> SpanStyle(textDecoration = TextDecoration.LineThrough)
-                    InlineMarkdownStyle.INLINE_CODE,
-                    InlineMarkdownStyle.CODE_BLOCK,
-                    ->
-                        SpanStyle(
-                            color = colors.onSurfaceVariant,
-                            background = colors.surfaceVariant,
-                            fontFamily = FontFamily.Monospace,
-                        )
-
-                    InlineMarkdownStyle.LINK ->
-                        SpanStyle(
-                            color = colors.primary,
-                            textDecoration = TextDecoration.Underline,
-                        )
-
-                    InlineMarkdownStyle.BLOCK_QUOTE ->
-                        SpanStyle(
-                            color = colors.onSurfaceVariant,
-                            fontStyle = FontStyle.Italic,
-                        )
-
-                    InlineMarkdownStyle.LIST_MARKER ->
-                        SpanStyle(
-                            color = colors.primary,
-                            fontWeight = FontWeight.Bold,
-                        )
-                }
-            }
-        }
+    val markdownTransformation = rememberInlineMarkdownVisualTransformation()
 
     // The container for the text field
     Box(
