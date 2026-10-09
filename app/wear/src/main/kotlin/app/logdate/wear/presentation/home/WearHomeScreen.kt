@@ -8,6 +8,7 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -38,6 +40,9 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +59,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CompactButton
@@ -75,11 +81,14 @@ import app.logdate.wear.presentation.recording.WearRecordingViewModel
 import app.logdate.wear.presentation.recording.formatDuration
 import org.koin.compose.viewmodel.koinViewModel
 
-private val STATUS_SLOT_HEIGHT = 40.dp
+private val STATUS_SLOT_HEIGHT = 52.dp
 private val FOLLOW_UP_SLOT_HEIGHT = 34.dp
 private val STATUS_HORIZONTAL_PADDING = 20.dp
 private val SIDE_CONTROL_SIZE = 36.dp
 private val RECORD_SURFACE_SIZE = 72.dp
+private val READY_CORNER_RADIUS = 24.dp
+private val STOP_CORNER_RADIUS = 16.dp
+private const val PRESSED_SCALE = 0.94f
 
 @Composable
 fun WearHomeScreen(
@@ -210,7 +219,7 @@ private fun RecorderStatusContent(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = formatDuration(recordingState.recordingDurationMs),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.numeralExtraSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 if (recordingState.confirmingDiscard) {
@@ -259,7 +268,7 @@ private fun RecordingStatus(recordingState: RecordingUiState) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = formatDuration(recordingState.recordingDurationMs),
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.numeralSmall,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
@@ -402,6 +411,7 @@ private fun SideControl(
     IconButton(
         onClick = onClick,
         modifier = Modifier.size(SIDE_CONTROL_SIZE),
+        shapes = IconButtonDefaults.animatedShapes(),
         colors = IconButtonDefaults.iconButtonColors(containerColor = containerColor),
     ) {
         Icon(imageVector = icon, contentDescription = description, modifier = Modifier.size(18.dp))
@@ -451,10 +461,22 @@ fun RecordSurface(
     isLatched: Boolean = false,
 ) {
     val isRecording = phase == RecordingPhase.RECORDING
+    var pressed by remember { mutableStateOf(false) }
+    val motion = MaterialTheme.motionScheme
     val scale by animateFloatAsState(
-        targetValue = if (isRecording) 1.1f else 1f,
-        animationSpec = tween(200),
+        targetValue =
+            when {
+                pressed -> PRESSED_SCALE
+                isRecording -> 1.1f
+                else -> 1f
+            },
+        animationSpec = motion.defaultSpatialSpec(),
         label = "recordScale",
+    )
+    val cornerRadius by animateDpAsState(
+        targetValue = recordSurfaceCornerRadius(phase, isLatched, pressed),
+        animationSpec = motion.defaultSpatialSpec(),
+        label = "recordShape",
     )
     val color by animateColorAsState(
         targetValue =
@@ -464,7 +486,7 @@ fun RecordSurface(
                 RecordingPhase.ERROR -> MaterialTheme.colorScheme.errorContainer
                 else -> MaterialTheme.colorScheme.surfaceContainer
             },
-        animationSpec = tween(200),
+        animationSpec = motion.defaultEffectsSpec(),
         label = "recordColor",
     )
     val currentOnPress by rememberUpdatedState(onPress)
@@ -476,19 +498,21 @@ fun RecordSurface(
             modifier
                 .size(RECORD_SURFACE_SIZE)
                 .scale(scale)
-                .clip(CircleShape)
+                .clip(RoundedCornerShape(cornerRadius))
                 .background(color)
                 .pointerInput(Unit) {
                     // Not detectTapGestures: it reports a cancelled press when the finger slides off this
                     // small circle, which would end a hold-to-talk recording while the finger is still down.
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false)
+                        pressed = true
                         currentOnPress()
                         try {
                             do {
                                 val event = awaitPointerEvent()
                             } while (event.changes.any { it.pressed })
                         } finally {
+                            pressed = false
                             currentOnRelease()
                         }
                     }
@@ -506,6 +530,23 @@ fun RecordSurface(
         RecordSurfaceIcon(phase = phase, isLatched = isLatched)
     }
 }
+
+/**
+ * The record control's corner radius for a state, so it morphs between shapes: a soft square when
+ * ready, a circle while it is held or working, and a tighter square once Stop is what a tap does.
+ */
+private fun recordSurfaceCornerRadius(
+    phase: RecordingPhase,
+    isLatched: Boolean,
+    pressed: Boolean,
+): Dp =
+    when {
+        pressed -> RECORD_SURFACE_SIZE / 2
+        phase == RecordingPhase.RECORDING && isLatched -> STOP_CORNER_RADIUS
+        phase == RecordingPhase.PAUSED -> STOP_CORNER_RADIUS
+        phase == RecordingPhase.READY || phase == RecordingPhase.TOO_SHORT || phase == RecordingPhase.ERROR -> READY_CORNER_RADIUS
+        else -> RECORD_SURFACE_SIZE / 2
+    }
 
 @Composable
 private fun RecordSurfaceIcon(

@@ -13,6 +13,7 @@ import app.logdate.wear.presentation.home.WearHomeUiState
 import app.logdate.wear.presentation.recording.RecordingError
 import app.logdate.wear.presentation.recording.RecordingPhase
 import app.logdate.wear.presentation.recording.RecordingUiState
+import app.logdate.wear.presentation.theme.LogDateTheme
 import java.util.Random
 import com.android.tools.screenshot.PreviewTest
 
@@ -201,7 +202,7 @@ private fun HomeWithRecorder(recordingState: RecordingUiState) {
 /** The watch's black background, so the previews show the contrast the screen is designed for. */
 @Composable
 internal fun OnWatchSurface(content: @Composable () -> Unit) {
-    MaterialTheme {
+    LogDateTheme {
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) { content() }
     }
 }
