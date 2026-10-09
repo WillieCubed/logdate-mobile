@@ -45,6 +45,8 @@ class FrozenV1RestoreCompatibilityTest {
                     RoundTripProfileRepository(),
                     RoundTripUserPlacesRepository(),
                     RoundTripLocationHistoryRepository(),
+                    RestoreTestOwnerProvider(),
+                    RestoreTestDeviceIdProvider(),
                 ).restore(archive)
 
             assertEquals(ExportSchemaVersion.V1_0, result.metadata.version)

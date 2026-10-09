@@ -12,6 +12,8 @@ import app.logdate.client.domain.export.support.RoundTripUserPlacesRepository
 import app.logdate.client.domain.restore.MediaImporter
 import app.logdate.client.domain.restore.RestoreArchiveBundle
 import app.logdate.client.domain.restore.RestoreArchiveReader
+import app.logdate.client.domain.restore.RestoreTestDeviceIdProvider
+import app.logdate.client.domain.restore.RestoreTestOwnerProvider
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.shared.model.PhotoPresentation
@@ -51,7 +53,17 @@ class V2ExportImportRoundTripTest : ArchiveExportFixture() {
             val profile = RoundTripProfileRepository()
             val places = RoundTripUserPlacesRepository()
             val locations = RoundTripLocationHistoryRepository()
-            val restore = RestoreUserDataUseCase(journals, notes, links, profile, places, locations)
+            val restore =
+                RestoreUserDataUseCase(
+                    journals,
+                    notes,
+                    links,
+                    profile,
+                    places,
+                    locations,
+                    RestoreTestOwnerProvider(),
+                    RestoreTestDeviceIdProvider(),
+                )
             val result =
                 restore.restore(
                     bundle,

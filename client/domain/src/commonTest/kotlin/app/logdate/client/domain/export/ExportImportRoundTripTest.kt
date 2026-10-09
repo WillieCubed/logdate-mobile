@@ -14,6 +14,8 @@ import app.logdate.client.domain.restore.MediaImporter
 import app.logdate.client.domain.restore.RestoreBundle
 import app.logdate.client.domain.restore.RestoreOptions
 import app.logdate.client.domain.restore.RestoreStrategy
+import app.logdate.client.domain.restore.RestoreTestDeviceIdProvider
+import app.logdate.client.domain.restore.RestoreTestOwnerProvider
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
@@ -131,6 +133,8 @@ class ExportImportRoundTripTest {
                 profileRepository = destProfileRepo,
                 userPlacesRepository = destPlacesRepo,
                 locationHistoryRepository = destLocationHistoryRepo,
+                canonicalOwnerProvider = RestoreTestOwnerProvider(),
+                deviceIdProvider = RestoreTestDeviceIdProvider(),
             )
     }
 

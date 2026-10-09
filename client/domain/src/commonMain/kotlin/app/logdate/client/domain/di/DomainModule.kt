@@ -128,7 +128,7 @@ val domainModule: Module =
         factory { ExportUserDataUseCase(get(), get(), get(), get(), get(), get(), get(), get()) }
         factory { ExportArchiveUseCase(get(), get(), get(), get(), get(), get(), get(), get()) }
         factory { GetExportCountsUseCase(get(), get()) }
-        factory { RestoreUserDataUseCase(get(), get(), get(), get(), get(), get()) }
+        factory { RestoreUserDataUseCase(get(), get(), get(), get(), get(), get(), get(), get()) }
         factory { PreviewArchiveUseCase() }
 
         // Notes

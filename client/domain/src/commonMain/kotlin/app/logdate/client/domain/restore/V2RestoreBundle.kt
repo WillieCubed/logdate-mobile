@@ -59,8 +59,16 @@ internal data class AdaptedV2RestoreBundle(
     val warnings: List<String>,
 )
 
-/** Converts the portable 2.x records into the canonical input already applied by restore. */
-internal fun V2RestoreBundle.adaptForRestore(): AdaptedV2RestoreBundle {
+/**
+ * Converts the portable 2.x records into the canonical input already applied by restore.
+ *
+ * Archive location samples carry no owner or device, so they are attributed to [ownerId] and [deviceId],
+ * the identity of the installation restoring them. Location history is only shown for that identity.
+ */
+internal fun V2RestoreBundle.adaptForRestore(
+    ownerId: String,
+    deviceId: String,
+): AdaptedV2RestoreBundle {
     val manifest = decodeManifest()
     val metadata = buildExportMetadata(manifest)
     val adapterWarnings = mutableListOf<String>()
@@ -69,7 +77,7 @@ internal fun V2RestoreBundle.adaptForRestore(): AdaptedV2RestoreBundle {
     val (exportNotes, journalNoteRelations) = decodeAndMapNotes()
     val exportDrafts = decodeAndMapDrafts(adapterWarnings)
     val exportPlaces = decodeAndMapPlaces()
-    val exportLocationHistory = decodeAndMapLocationHistory()
+    val exportLocationHistory = decodeAndMapLocationHistory(ownerId, deviceId)
     val mediaManifest = decodeAndMapMediaManifest()
     val exportProfile = decodeAndMapProfile()
 
@@ -179,8 +187,13 @@ private fun V2RestoreBundle.decodeAndMapPlaces(): List<ExportPlace> {
     return places.map { ExportPlace(it.id, it.name, it.latitude, it.longitude, it.radiusMeters, it.description) }
 }
 
-private fun V2RestoreBundle.decodeAndMapLocationHistory(): List<ExportLocationHistoryItem> =
-    decodeLocationSamples(locationHistoryJsonLines).map(::toExportLocationHistoryItem)
+private fun V2RestoreBundle.decodeAndMapLocationHistory(
+    ownerId: String,
+    deviceId: String,
+): List<ExportLocationHistoryItem> =
+    decodeLocationSamples(locationHistoryJsonLines).map {
+        toExportLocationHistoryItem(it, ownerId, deviceId)
+    }
 
 private fun V2RestoreBundle.decodeAndMapMediaManifest(): ExportMediaManifest? =
     mediaInventoryJson
@@ -311,11 +324,15 @@ private fun decodeLocationSamples(jsonLines: String?): List<ArchiveLocationSampl
         ?.toList()
         .orEmpty()
 
-private fun toExportLocationHistoryItem(sample: ArchiveLocationSample): ExportLocationHistoryItem =
+private fun toExportLocationHistoryItem(
+    sample: ArchiveLocationSample,
+    ownerId: String,
+    deviceId: String,
+): ExportLocationHistoryItem =
     ExportLocationHistoryItem(
         sampleId = "v2:${sample.timestamp}:${sample.latitude}:${sample.longitude}",
-        userId = "v2-import",
-        deviceId = "v2-import",
+        userId = ownerId,
+        deviceId = deviceId,
         timestamp = sample.timestamp,
         loggedAt = sample.loggedAt,
         latitude = sample.latitude,

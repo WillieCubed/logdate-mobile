@@ -15,6 +15,7 @@ import app.logdate.client.data.places.InMemoryUserPlacesRepository
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.device.AppInfo
 import app.logdate.client.device.AppInfoProvider
+import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.domain.export.ExportProgress
 import app.logdate.client.domain.export.ExportResult
@@ -188,6 +189,8 @@ class ExportImportE2ETest {
             profileRepository = StoredProfileRepository(),
             userPlacesRepository = InMemoryUserPlacesRepository(),
             locationHistoryRepository = InMemoryLocationHistoryRepository(),
+            canonicalOwnerProvider = FixedCanonicalOwnerProvider(),
+            deviceIdProvider = FixedDeviceIdProvider(),
         )
     }
 
@@ -641,6 +644,12 @@ class ExportImportE2ETest {
         private val flow = MutableStateFlow(id)
         override fun getDeviceId(): StateFlow<Uuid> = flow
         override suspend fun refreshDeviceId() {}
+    }
+
+    private class FixedCanonicalOwnerProvider : CanonicalOwnerProvider {
+        override suspend fun getCanonicalOwnerId(): String = "00000000-0000-4000-8000-000000000002"
+
+        override suspend fun hasBoundOwner(): Boolean = true
     }
 
     private class FixedAppInfoProvider : AppInfoProvider {

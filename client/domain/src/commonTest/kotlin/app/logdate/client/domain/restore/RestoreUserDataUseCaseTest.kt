@@ -106,7 +106,17 @@ class RestoreUserDataUseCaseTest {
         profileRepo = FakeProfileRepository()
         placesRepo = FakeUserPlacesRepository()
         locationHistoryRepo = FakeLocationHistoryRepository()
-        useCase = RestoreUserDataUseCase(journalRepo, notesRepo, contentRepo, profileRepo, placesRepo, locationHistoryRepo)
+        useCase =
+            RestoreUserDataUseCase(
+                journalRepo,
+                notesRepo,
+                contentRepo,
+                profileRepo,
+                placesRepo,
+                locationHistoryRepo,
+                RestoreTestOwnerProvider(),
+                RestoreTestDeviceIdProvider(),
+            )
     }
 
     // region Happy path
@@ -312,6 +322,60 @@ class RestoreUserDataUseCaseTest {
         }
 
     @Test
+    fun `v2 restore stores location history under the restoring owner and device`() =
+        runTest {
+            val manifest =
+                ArchiveManifest(
+                    exportedAt = now,
+                    exportTimeZone = "America/Los_Angeles",
+                    generator = ArchiveGenerator(version = "2.0.0"),
+                    owner = ArchiveOwner(displayName = "Willie"),
+                    scope = ArchiveScope(complete = true),
+                    counts =
+                        ArchiveCounts(
+                            journals = 0,
+                            notes = 0,
+                            drafts = 0,
+                            media = 0,
+                            places = 0,
+                            locationSamples = 2,
+                            hasProfile = false,
+                        ),
+                    contents = emptyList(),
+                )
+            val samples =
+                listOf(36.1, 36.2).map { latitude ->
+                    ArchiveLocationSample(
+                        timestamp = now,
+                        loggedAt = now,
+                        latitude = latitude,
+                        longitude = -115.2,
+                        altitudeMeters = 610.0,
+                        confidence = 0.9,
+                        isGenuine = true,
+                        isMock = false,
+                        capturePipeline = "HIGH_DETAIL",
+                        captureSource = "MANUAL",
+                    )
+                }
+
+            useCase.restore(
+                V2RestoreBundle(
+                    manifestJson = ArchiveJson.document.encodeToString(ArchiveManifest.serializer(), manifest),
+                    locationHistoryJsonLines =
+                        samples.joinToString(separator = "") {
+                            ArchiveJson.line.encodeToString(ArchiveLocationSample.serializer(), it) + "\n"
+                        },
+                ),
+            )
+
+            val restored = locationHistoryRepo.entries
+            assertEquals(2, restored.size)
+            assertTrue(restored.all { it.userId == RESTORE_TEST_OWNER_ID }, "owners: ${restored.map { it.userId }}")
+            assertTrue(restored.all { it.deviceId == RESTORE_TEST_DEVICE_ID.toString() }, "devices: ${restored.map { it.deviceId }}")
+        }
+
+    @Test
     fun `restore imports journals notes and relations from valid JSON`() =
         runTest {
             val journalId = Uuid.random()
@@ -443,6 +507,8 @@ class RestoreUserDataUseCaseTest {
                     profileRepo,
                     placesRepo,
                     locationHistoryRepo,
+                    RestoreTestOwnerProvider(),
+                    RestoreTestDeviceIdProvider(),
                 )
 
             syncingUseCase.restore(

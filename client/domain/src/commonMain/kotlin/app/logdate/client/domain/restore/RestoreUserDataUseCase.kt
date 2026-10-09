@@ -1,5 +1,7 @@
 package app.logdate.client.domain.restore
 
+import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.domain.export.ExportDraft
 import app.logdate.client.domain.export.ExportJournalNoteRelation
 import app.logdate.client.domain.export.ExportLocationHistoryItem
@@ -54,6 +56,8 @@ class RestoreUserDataUseCase(
     private val profileRepository: ProfileRepository,
     private val userPlacesRepository: UserPlacesRepository,
     private val locationHistoryRepository: LocationHistoryRepository,
+    private val canonicalOwnerProvider: CanonicalOwnerProvider,
+    private val deviceIdProvider: DeviceIdProvider,
 ) {
     private val migrationRunner = ExportMigrationRunner(exportMigrations)
     private val profileRestorer = ProfileRestorer(profileRepository)
@@ -69,7 +73,7 @@ class RestoreUserDataUseCase(
         mediaImporter: MediaImporter? = null,
         onProgress: (suspend (RestoreProgressPhase) -> Unit)? = null,
     ): RestoreResult {
-        val adapted = bundle.adaptForRestore()
+        val adapted = bundle.adaptForRestore(canonicalOwnerProvider.getCanonicalOwnerId(), deviceIdProvider.getDeviceId().value.toString())
         val restored = restore(adapted.legacy, options, mediaImporter, onProgress)
         return restored.copy(
             metadata = adapted.metadata,
