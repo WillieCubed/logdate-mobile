@@ -238,15 +238,30 @@ enum class ScreenshotSceneGroup {
     SECURITY,
 }
 
+/**
+ * A window a shared scene renders into.
+ *
+ * @property fontScale The text scale, where `2f` is the 200% text size people pick in accessibility
+ *   settings.
+ * @property rightToLeft Whether the scene lays out right-to-left, as it would in Arabic or Hebrew.
+ */
 enum class ScreenshotViewportId(
     val baselineSuffix: String,
     val widthDp: Int,
     val heightDp: Int,
     val darkTheme: Boolean = false,
     val foldablePosture: FoldablePosture? = null,
+    val fontScale: Float = 1f,
+    val rightToLeft: Boolean = false,
 ) {
     PHONE_LIGHT("phone", 411, 891),
     PHONE_DARK("phone-dark", 411, 891, darkTheme = true),
+    COMPACT_PHONE("compact-phone", 320, 568),
+    PHONE_RTL("phone-rtl", 411, 891, rightToLeft = true),
+    PHONE_LARGE_TEXT("phone-large-text", 411, 891, fontScale = 2f),
+
+    /** A floating window about the size Android gives an app bubble. */
+    BUBBLE("bubble", 360, 480),
     PHONE_LANDSCAPE("phone-landscape", 891, 411),
     TABLET("tablet", 1280, 800),
     SPLIT_MEDIUM("split-medium", 700, 900),
@@ -321,6 +336,25 @@ private val standardMatrixVariants =
         ScreenshotSceneVariant(ScreenshotViewportId.PHONE_LANDSCAPE),
         ScreenshotSceneVariant(ScreenshotViewportId.TABLET),
     )
+
+/**
+ * Scenes for Android OS integration surfaces render in the standard matrix plus the configurations
+ * people use system surfaces in: a compact phone, right-to-left, and 200% text.
+ */
+internal val osIntegrationVariants =
+    listOf(
+        ScreenshotSceneVariant(ScreenshotViewportId.PHONE_LIGHT),
+        ScreenshotSceneVariant(ScreenshotViewportId.PHONE_DARK),
+        ScreenshotSceneVariant(ScreenshotViewportId.COMPACT_PHONE),
+        ScreenshotSceneVariant(ScreenshotViewportId.PHONE_LANDSCAPE),
+        ScreenshotSceneVariant(ScreenshotViewportId.TABLET),
+        ScreenshotSceneVariant(ScreenshotViewportId.PHONE_RTL),
+        ScreenshotSceneVariant(ScreenshotViewportId.PHONE_LARGE_TEXT),
+    )
+
+/** OS integration scenes that can appear inside an app bubble also render at bubble size. */
+internal val osIntegrationBubbleVariants =
+    osIntegrationVariants + ScreenshotSceneVariant(ScreenshotViewportId.BUBBLE)
 
 /** Onboarding steps must hold up on a half-folded device as well as the standard matrix. */
 private val onboardingStepVariants =
@@ -714,7 +748,7 @@ object SharedScreenshotCatalog {
                     onSignOut = {},
                 )
             },
-            sharedScene(SharedScreenshotSceneId.PrivacySettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
+            sharedScene(SharedScreenshotSceneId.PrivacySettings, ScreenshotSceneGroup.SETTINGS, osIntegrationVariants) {
                 PrivacySettingsContent(
                     onBack = {},
                     onSetBiometricsEnabled = {},

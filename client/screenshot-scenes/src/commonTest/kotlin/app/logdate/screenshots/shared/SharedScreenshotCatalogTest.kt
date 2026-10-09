@@ -32,4 +32,35 @@ class SharedScreenshotCatalogTest {
 
         assertEquals(baselineNames.size, baselineNames.distinct().size)
     }
+
+    @Test
+    fun `viewport baseline suffixes are unique`() {
+        val suffixes = ScreenshotViewportId.entries.map { it.baselineSuffix }
+        assertEquals(suffixes.size, suffixes.distinct().size)
+    }
+
+    @Test
+    fun `os integration variants cover the accessibility and window configurations`() {
+        val viewports = osIntegrationVariants.map { it.viewport }
+
+        assertTrue(viewports.any { it.rightToLeft }, "OS integration scenes must render right-to-left")
+        assertTrue(viewports.any { it.fontScale >= 2f }, "OS integration scenes must render at 200% text")
+        assertTrue(viewports.any { it.darkTheme }, "OS integration scenes must render in dark theme")
+        assertTrue(ScreenshotViewportId.COMPACT_PHONE in viewports)
+        assertTrue(ScreenshotViewportId.TABLET in viewports)
+    }
+
+    @Test
+    fun `bubble variants add the bubble window to the os integration variants`() {
+        assertEquals(
+            osIntegrationVariants + ScreenshotSceneVariant(ScreenshotViewportId.BUBBLE),
+            osIntegrationBubbleVariants,
+        )
+    }
+
+    @Test
+    fun `privacy settings renders in every os integration variant`() {
+        val privacy = SharedScreenshotCatalog.scene(SharedScreenshotSceneId.PrivacySettings)
+        assertTrue(privacy.variants.containsAll(osIntegrationVariants))
+    }
 }

@@ -5,14 +5,16 @@
 ## Overview
 
 A screenshot test needs a screen in a known state: fake data, fixed dates, and no network. Writing
-that state separately for Android, desktop, and iOS would drift. This module defines each scene once,
-in common Kotlin, and every platform's screenshot lane renders the same scene:
+that state separately for each platform would drift. This module defines each scene once, in common
+Kotlin, and both Compose screenshot lanes render the same scene:
 
 | Lane | Renders scenes with | References |
 | --- | --- | --- |
-| Android | Compose preview screenshot tests in `app/android-main/src/screenshotTest/` | `app/android-main/src/screenshotTestDebug/reference/` |
-| Desktop | `DesktopScreenshotTest` in `app/compose-main/src/desktopTest/` | `app/compose-main/src/desktopTest/reference/` |
-| iOS | `iosSimulatorArm64Test` in the screenshot host modules | validated only |
+| Android | Compose preview screenshot tests in `app/android-main/src/screenshotTest/`, which call `SharedScreenshotScene(id)` | `app/android-main/src/screenshotTestDebug/reference/` |
+| Desktop | `DesktopScreenshotTest` in `app/compose-main/src/desktopTest/`, which renders every scene in `allScenes` | `app/compose-main/src/desktopTest/reference/` |
+
+The module also compiles for iOS, but the iOS screenshot lane (`validateIosScreenshots`) does not
+render these scenes.
 
 ## Architecture
 
@@ -23,7 +25,8 @@ Everything lives in `src/commonMain/kotlin/app/logdate/screenshots/shared/Shared
 | --- | --- |
 | `SharedScreenshotSceneId` | A stable string id per scene, for example `search-idle`. Baseline file names derive from it, so treat it as permanent. |
 | `ScreenshotSceneGroup` | The group a scene belongs to: onboarding, settings, search, and so on |
-| `ScreenshotViewportId` | A named viewport: phone, phone dark, landscape, tablet, split, desktop sizes, and foldable book and tabletop postures (with a synthetic 24dp hinge) |
+| `ScreenshotViewportId` | A named viewport: phone, phone dark, compact phone, right-to-left, 200% text, landscape, tablet, split, bubble, desktop sizes, and foldable book and tabletop postures (with a synthetic 24dp hinge) |
+| `osIntegrationVariants`, `osIntegrationBubbleVariants` | The viewports every Android OS integration scene renders in, without and with the bubble window |
 | `ScreenshotSceneVariant` | One viewport a scene must render in |
 | `SharedScreenshotSceneSpec` | A scene: id, group, variants, and its composable content |
 | `SharedScreenshotCatalog.allScenes` | Every registered scene |

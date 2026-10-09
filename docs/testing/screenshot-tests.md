@@ -95,26 +95,66 @@ fun TimelineScreen_Landscape() {
 
 ## Test Organization
 
-Organize screenshot tests by feature:
+Phone screenshot tests live in `app/android-main/src/screenshotTest/kotlin/app/logdate/screenshots/`:
 
 ```
-app/android-main/src/screenshotTest/kotlin/app/logdate/screenshots/
-├── EditorScreenshots.kt       # Editor feature screenshots
-├── OnboardingScreenshots.kt   # Onboarding flow screenshots
-├── TimelineScreenshots.kt     # Timeline browsing screenshots
-├── JournalScreenshots.kt      # Journal management screenshots
-├── RewindScreenshots.kt       # Rewind feature screenshots
-└── ComponentsScreenshots.kt   # Reusable component screenshots
-
-app/wear/src/screenshotTest/kotlin/app/logdate/wear/screenshots/
-├── WearScreenshotPreviewMatrix.kt  # Multi-preview for small + large round
-├── WearHomeScreenshots.kt          # Home hub states
-├── WalkieTalkieScreenshots.kt      # All walkie-talkie phases
-├── AudioRecordingScreenshots.kt    # Recording screen states
-└── MoodCheckInScreenshots.kt       # Mood check-in flow
+common/                      preview matrices, device specs, ScreenshotTheme, shared fixtures
+flows/flowNN_<area>/         user flows, one file per screen: FlowNN_MM_<Name>Screenshots.kt
+  flow20_os_integration/     Android OS integration surfaces and the screens they open
+components/<area>/           shared components
+audit/adaptive/              foldable posture audits (book and tabletop)
+audit/workspace/             Home workspace audits
 ```
 
-Each file groups related preview functions for a feature or screen.
+Preview functions inside a flow file are numbered in display order (`S01_...`, `S02_...`).
+
+### Preview matrices
+
+Apply a matrix annotation instead of listing `@Preview`s by hand. They live in
+`common/ScreenshotPreviewMatrix.kt`, and the device specs in `common/ScreenshotTestData.kt`.
+
+| Annotation | Configurations | Use it for |
+| --- | --- | --- |
+| `@ScreenshotPreviewMatrix` | Phone, Phone Dark, Landscape, Tablet | Most screens |
+| `@LargeScreenAuditPreviewMatrix` | Split Medium, Tablet Landscape, Tablet Portrait, Desktop Window | Large-screen regressions |
+| `@OsIntegrationPreviewMatrix` | Phone, Phone Dark, Compact Phone, Landscape, Tablet, RTL, Large Text (200%), Dynamic Color | Every Android OS integration feature (required) |
+| `@BubbleWindowPreview` | Bubble (360×480dp) | Added next to `@OsIntegrationPreviewMatrix` for screens that can open in an app bubble |
+
+Wear tests in `app/wear/src/screenshotTest/` use `@WearScreenshotPreviewMatrix` (small round and
+large round).
+
+### Shared scenes
+
+A screen that also renders on desktop should be a shared scene in `client/screenshot-scenes`. Define
+it once, and render it from the Android preview with `SharedScreenshotScene(id)`; the desktop lane
+renders every shared scene automatically. Each scene lists the viewports it must render in. OS
+integration scenes use `osIntegrationVariants`, which adds a compact phone, right-to-left, and 200%
+text to the standard viewports, or `osIntegrationBubbleVariants` for bubble-capable screens. See
+[`client/screenshot-scenes/README.md`](../../client/screenshot-scenes/README.md).
+
+## Android OS integration screenshots
+
+Every feature in the Native Android integration program
+([design](../feature-design/android-os-integration.md)) ships screenshots in the same commit as
+its code. That includes the right-to-left, 200% text, compact, and dynamic color configurations
+that CLAUDE.md requires for UI acceptance.
+
+1. Put the scene in `flows/flow20_os_integration/`, with `@OsIntegrationPreviewMatrix` (plus
+   `@BubbleWindowPreview` where it applies). If it renders on desktop too, make it a shared scene with
+   `osIntegrationVariants`.
+2. Record references:
+
+   ```bash
+   ./gradlew :app:android-main:updateDebugScreenshotTest --tests '*Flow20_*'
+   ./gradlew :app:compose-main:updateDesktopScreenshotTest -Dlogdate.desktopScreenshots.sceneFilter=<scene-id>
+   ```
+
+3. Open every new or changed reference and check it against the intended behavior before committing.
+   A render that succeeded is not the same as a render that is right.
+
+The first OS integration scene is `S01_PrivacySystemSearchVisibility` in
+`Flow20_01_SystemSearchVisibilityScreenshots.kt`. It shows the privacy setting that controls system
+search and assistant access.
 
 ## Guidelines for Screenshot Tests
 
@@ -449,58 +489,17 @@ fun ComposablePreview() {
 
 ## CI/CD Integration
 
-### GitHub Actions
+`.github/workflows/screenshot-test.yml` validates screenshots on pushes to `main`, and on pull requests
+that touch app, feature, UI, theme, or build code. It runs three jobs:
 
-```yaml
-# .github/workflows/screenshot-tests.yml
-name: Screenshot Tests
-on:
-  pull_request:
-    paths:
-      - 'app/android-main/**'
-      - 'app/wear/**'
-      - 'app/compose-main/**'
-      - 'client/feature/**'
+| Job | Runner | Command |
+| --- | --- | --- |
+| `android-wear-screenshots` | Ubuntu (phone), macOS (Wear, whose references match the Mac renderer) | `./gradlew :app:<module>:validateDebugScreenshotTest --continue` |
+| `desktop-screenshots` | macOS | `./gradlew validateDesktopScreenshots --continue` |
+| `ios-screenshot-validation` | macOS | `./gradlew validateIosScreenshots --continue` |
 
-jobs:
-  android-wear-screenshots:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Validate phone screenshots
-        run: ./gradlew :app:android-main:validateDebugScreenshotTest
-      - name: Validate Wear OS screenshots
-        run: ./gradlew :app:wear:validateDebugScreenshotTest
-      - name: Upload results
-        if: failure()
-        uses: actions/upload-artifact@v3
-        with:
-          name: android-wear-screenshot-diffs
-          path: |
-            app/android-main/build/outputs/screenshotTest-results/
-            app/wear/build/outputs/screenshotTest-results/
-
-  desktop-screenshots:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Validate desktop screenshots
-        run: ./gradlew :app:compose-main:validateDesktopScreenshotTest
-      - name: Upload results
-        if: failure()
-        uses: actions/upload-artifact@v3
-        with:
-          name: desktop-screenshot-diffs
-          path: |
-            app/compose-main/build/reports/desktopScreenshotTest/
-
-  ios-screenshot-validation:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Validate iOS screenshot lane
-        run: ./gradlew validateIosScreenshots
-```
+Each job uploads its results (rendered images and diffs) as a build artifact. When a job fails,
+download the artifact and compare the `diffs/` images with the references.
 
 ## Troubleshooting
 

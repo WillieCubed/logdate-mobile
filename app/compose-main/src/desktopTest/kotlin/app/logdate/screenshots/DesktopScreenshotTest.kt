@@ -7,9 +7,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposePanel
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import app.logdate.client.ui.LockableContent
 import app.logdate.screenshots.shared.ScreenshotSceneVariant
@@ -43,7 +48,7 @@ import kotlin.test.assertTrue
  * Features include:
  * - Deterministic rendering with warmup passes.
  * - Pixel-by-pixel image comparison with red-mask diff generation.
- * - Support for dark/light theme variants and custom viewports.
+ * - Support for dark/light theme, right-to-left, font scale, and custom viewport variants.
  */
 class DesktopScreenshotTest {
     @Test
@@ -115,20 +120,28 @@ class DesktopScreenshotTest {
 @Suppress("ktlint:standard:function-naming")
 private fun ScreenshotSurface(
     darkTheme: Boolean,
+    fontScale: Float,
+    rightToLeft: Boolean,
     contentPadding: PaddingValues = PaddingValues(),
     content: @Composable () -> Unit,
 ) {
-    LogDateTheme(
-        dynamicColor = false,
-        darkTheme = darkTheme,
+    val density = LocalDensity.current
+    CompositionLocalProvider(
+        LocalDensity provides Density(density = density.density, fontScale = fontScale),
+        LocalLayoutDirection provides if (rightToLeft) LayoutDirection.Rtl else LayoutDirection.Ltr,
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(contentPadding),
+        LogDateTheme(
+            dynamicColor = false,
+            darkTheme = darkTheme,
         ) {
-            content()
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(contentPadding),
+            ) {
+                content()
+            }
         }
     }
 }
@@ -144,6 +157,8 @@ private fun assertMatchesBaseline(
         width = variant.viewport.widthDp,
         height = variant.viewport.heightDp,
         darkTheme = variant.viewport.darkTheme,
+        fontScale = variant.viewport.fontScale,
+        rightToLeft = variant.viewport.rightToLeft,
         contentPadding = sceneContentPadding(scene),
     ) {
         if (foldableLayoutInfo != null) {
@@ -159,6 +174,8 @@ private fun assertMatchesBaseline(
     width: Int,
     height: Int,
     darkTheme: Boolean,
+    fontScale: Float = 1f,
+    rightToLeft: Boolean = false,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     content: @Composable () -> Unit,
 ) {
@@ -174,6 +191,8 @@ private fun assertMatchesBaseline(
             width = width,
             height = height,
             darkTheme = darkTheme,
+            fontScale = fontScale,
+            rightToLeft = rightToLeft,
             contentPadding = contentPadding,
             content = content,
             frameName = baselineName,
@@ -213,6 +232,8 @@ private fun renderScreenshot(
     width: Int,
     height: Int,
     darkTheme: Boolean,
+    fontScale: Float,
+    rightToLeft: Boolean,
     contentPadding: PaddingValues,
     content: @Composable () -> Unit,
     frameName: String,
@@ -222,6 +243,8 @@ private fun renderScreenshot(
         width = width,
         height = height,
         darkTheme = darkTheme,
+        fontScale = fontScale,
+        rightToLeft = rightToLeft,
         contentPadding = contentPadding,
         content = content,
         frameName = "$frameName-warmup",
@@ -231,6 +254,8 @@ private fun renderScreenshot(
         width = width,
         height = height,
         darkTheme = darkTheme,
+        fontScale = fontScale,
+        rightToLeft = rightToLeft,
         contentPadding = contentPadding,
         content = content,
         frameName = frameName,
@@ -241,6 +266,8 @@ private fun renderSingleScreenshot(
     width: Int,
     height: Int,
     darkTheme: Boolean,
+    fontScale: Float,
+    rightToLeft: Boolean,
     contentPadding: PaddingValues,
     content: @Composable () -> Unit,
     frameName: String,
@@ -262,6 +289,8 @@ private fun renderSingleScreenshot(
                 setContent {
                     ScreenshotSurface(
                         darkTheme = darkTheme,
+                        fontScale = fontScale,
+                        rightToLeft = rightToLeft,
                         contentPadding = contentPadding,
                         content = content,
                     )

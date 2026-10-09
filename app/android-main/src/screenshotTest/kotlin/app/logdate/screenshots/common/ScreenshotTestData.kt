@@ -29,6 +29,9 @@ object ScreenshotTestData {
     /** Desktop-style freeform window spec used for large-screen audits. */
     const val DESKTOP_WINDOW = "spec:width=1440dp,height=900dp"
 
+    /** A floating window about the size Android gives an app bubble. */
+    const val BUBBLE = "spec:width=360dp,height=480dp"
+
     private val baseTimestamp = Instant.fromEpochMilliseconds(1_740_000_000_000L) // ~Feb 2025
 
     val sampleJournal = Journal(
