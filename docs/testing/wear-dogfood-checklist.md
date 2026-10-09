@@ -27,7 +27,11 @@ Bring the phone and watch within range and confirm the watch's Settings screen s
 | Press and hold, speak, let go | Recording only while held, then "Saved" |
 | Tap and lift, then tap again after under half a second | "Too short", and nothing saved |
 | Tap, pause, resume, stop | The timer stops while paused, and the saved length matches what you recorded |
-| Tap, then Discard | Back to ready, nothing saved |
+| Tap, then tap Discard once | The timer stays and "Tap again to discard" replaces the waveform. The recording keeps going |
+| Tap Discard, then tap the red bin within 3 seconds | Back to ready, nothing saved |
+| Tap Discard, then wait 3 seconds | The question goes away and the recording is still running |
+| Tap Discard, then tap Pause or Stop | The question goes away. Stop saves the recording |
+| With a screen reader on, tap Discard once | The question is spoken |
 | Save a recording, then Undo within five seconds | The note is gone from the watch, and from the phone a few seconds later |
 | Record, then swipe back out of the app before stopping | The recording is saved, not lost, and appears in Voice memories |
 | Record, then press the side button, then reopen LogDate | The recording continued while the app was in the background, and the screen still shows it recording |

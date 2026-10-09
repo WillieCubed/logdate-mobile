@@ -1,9 +1,13 @@
 package app.logdate.wear.e2e
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -198,6 +202,106 @@ class WearHomeScreenTest {
     }
 
     @Test
+    fun `a discard question keeps the timer and replaces the waveform with the question`() {
+        composeRule.setContent {
+            MaterialTheme {
+                WearHomeContent(
+                    homeState = home,
+                    recordingState =
+                        RecordingUiState(
+                            phase = RecordingPhase.RECORDING,
+                            isLatched = true,
+                            recordingDurationMs = 84_000,
+                            confirmingDiscard = true,
+                        ),
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("1:24").assertIsDisplayed()
+        composeRule.onNodeWithText("Tap again to discard").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Tap again to discard").assertIsDisplayed()
+        composeRule.onAllNodes(hasContentDescription("Discard recording")).assertCountEquals(0)
+    }
+
+    @Test
+    fun `a discard question is announced to screen readers`() {
+        composeRule.setContent {
+            MaterialTheme {
+                WearHomeContent(
+                    homeState = home,
+                    recordingState =
+                        RecordingUiState(phase = RecordingPhase.RECORDING, isLatched = true, confirmingDiscard = true),
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithText("Tap again to discard")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion))
+    }
+
+    @Test
+    fun `a paused recording being discarded keeps the timer and shows the question`() {
+        composeRule.setContent {
+            MaterialTheme {
+                WearHomeContent(
+                    homeState = home,
+                    recordingState =
+                        RecordingUiState(
+                            phase = RecordingPhase.PAUSED,
+                            isLatched = true,
+                            recordingDurationMs = 12_000,
+                            confirmingDiscard = true,
+                        ),
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("0:12").assertIsDisplayed()
+        composeRule.onNodeWithText("Tap again to discard").assertIsDisplayed()
+        composeRule.onAllNodes(hasText("Paused")).assertCountEquals(0)
+    }
+
+    @Test
+    fun `the confirming control calls back to discard`() {
+        val events = mutableListOf<String>()
+        composeRule.setContent {
+            MaterialTheme {
+                WearHomeContent(
+                    homeState = home,
+                    recordingState =
+                        RecordingUiState(phase = RecordingPhase.RECORDING, isLatched = true, confirmingDiscard = true),
+                    onDiscard = { events += "discard" },
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Tap again to discard").performClick()
+
+        assertEquals(listOf("discard"), events)
+    }
+
+    @Test
+    fun `a full watch offers a way to its storage settings`() {
+        val events = mutableListOf<String>()
+        composeRule.setContent {
+            MaterialTheme {
+                WearHomeContent(
+                    homeState = home,
+                    recordingState =
+                        RecordingUiState(phase = RecordingPhase.ERROR, error = RecordingError.NOT_ENOUGH_STORAGE),
+                    onOpenStorageSettings = { events += "storage" },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Storage").performClick()
+
+        assertEquals(listOf("storage"), events)
+    }
+
+    @Test
     fun `a paused recording offers resume and says who paused it`() {
         composeRule.setContent {
             MaterialTheme {
@@ -269,6 +373,6 @@ class WearHomeScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Watch storage is full").assertIsDisplayed()
+        composeRule.onNodeWithText("Watch storage is full.\nFree up space").assertIsDisplayed()
     }
 }

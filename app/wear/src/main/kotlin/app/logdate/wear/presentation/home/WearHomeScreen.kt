@@ -1,6 +1,10 @@
 package app.logdate.wear.presentation.home
 
 import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
@@ -40,9 +44,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -57,6 +64,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
+import io.github.aakira.napier.Napier
 import app.logdate.wear.R
 import app.logdate.wear.presentation.audio.components.AudioWaveform
 import app.logdate.wear.presentation.common.SaveFeedback
@@ -83,6 +91,7 @@ fun WearHomeScreen(
 ) {
     val homeState by homeViewModel.uiState.collectAsState()
     val recordingState by recordingViewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val microphonePermission =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
@@ -104,7 +113,21 @@ fun WearHomeScreen(
         onDiscard = recordingViewModel::onDiscard,
         onUndo = recordingViewModel::onUndo,
         onAllowMicrophone = { microphonePermission.launch(Manifest.permission.RECORD_AUDIO) },
+        onOpenStorageSettings = { openStorageSettings(context) },
     )
+}
+
+/** Opens the system storage screen, or the main settings when this watch has no storage screen. */
+private fun openStorageSettings(context: Context) {
+    val screens = listOf(Settings.ACTION_INTERNAL_STORAGE_SETTINGS, Settings.ACTION_SETTINGS)
+    for (action in screens) {
+        try {
+            context.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        } catch (e: ActivityNotFoundException) {
+            Napier.w("No screen for $action on this watch", e)
+        }
+    }
 }
 
 @Composable
@@ -120,6 +143,7 @@ fun WearHomeContent(
     onDiscard: () -> Unit = {},
     onUndo: () -> Unit = {},
     onAllowMicrophone: () -> Unit = {},
+    onOpenStorageSettings: () -> Unit = {},
     recordingState: RecordingUiState = RecordingUiState(),
 ) {
     ScreenScaffold(
@@ -145,6 +169,7 @@ fun WearHomeContent(
                 recordingState = recordingState,
                 onUndo = onUndo,
                 onAllowMicrophone = onAllowMicrophone,
+                onOpenStorageSettings = onOpenStorageSettings,
                 onNavigateToMore = onNavigateToMore,
             )
         }
@@ -171,10 +196,6 @@ private fun RecorderStatusContent(
     recordingState: RecordingUiState,
 ) {
     val secondary = MaterialTheme.colorScheme.onSurfaceVariant
-    if (recordingState.confirmingDiscard) {
-        StatusText(stringResource(R.string.wear_recorder_discard_confirm), MaterialTheme.colorScheme.error)
-        return
-    }
     when (recordingState.phase) {
         RecordingPhase.READY -> ReadyStatus(homeState, recordingState.showGestureHint)
         RecordingPhase.STARTING -> StatusText(stringResource(R.string.wear_recorder_starting), secondary)
@@ -192,13 +213,17 @@ private fun RecorderStatusContent(
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Text(
-                    text = stringResource(message),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = secondary,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                )
+                if (recordingState.confirmingDiscard) {
+                    DiscardQuestion()
+                } else {
+                    Text(
+                        text = stringResource(message),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = secondary,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                    )
+                }
             }
         }
         RecordingPhase.SAVING -> StatusText(stringResource(R.string.wear_recording_saving), secondary)
@@ -238,11 +263,28 @@ private fun RecordingStatus(recordingState: RecordingUiState) {
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
-        AudioWaveform(
-            audioLevels = recordingState.audioLevels,
-            modifier = Modifier.width(96.dp),
-        )
+        if (recordingState.confirmingDiscard) {
+            DiscardQuestion()
+        } else {
+            AudioWaveform(
+                audioLevels = recordingState.audioLevels,
+                modifier = Modifier.width(96.dp),
+            )
+        }
     }
+}
+
+/** The discard question under the timer. A live region, so a screen reader speaks it when it appears. */
+@Composable
+private fun DiscardQuestion() {
+    Text(
+        text = stringResource(R.string.wear_recorder_discard_confirm),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.error,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+    )
 }
 
 @Composable
@@ -372,6 +414,7 @@ private fun RecorderFollowUp(
     recordingState: RecordingUiState,
     onUndo: () -> Unit,
     onAllowMicrophone: () -> Unit,
+    onOpenStorageSettings: () -> Unit,
     onNavigateToMore: () -> Unit,
 ) {
     Box(
@@ -387,6 +430,8 @@ private fun RecorderFollowUp(
                 )
             recordingState.phase == RecordingPhase.SAVED && recordingState.undoableNoteId != null ->
                 CompactButton(onClick = onUndo, label = { Text(stringResource(R.string.wear_recorder_undo)) })
+            recordingState.phase == RecordingPhase.ERROR && recordingState.error == RecordingError.NOT_ENOUGH_STORAGE ->
+                CompactButton(onClick = onOpenStorageSettings, label = { Text(stringResource(R.string.wear_recorder_open_storage)) })
             recordingState.phase == RecordingPhase.ERROR && recordingState.error == RecordingError.MICROPHONE_PERMISSION_DENIED ->
                 CompactButton(onClick = onAllowMicrophone, label = { Text(stringResource(R.string.wear_onboarding_permissions_allow)) })
         }
@@ -414,8 +459,8 @@ fun RecordSurface(
     val color by animateColorAsState(
         targetValue =
             when (phase) {
-                RecordingPhase.READY, RecordingPhase.RECORDING -> MaterialTheme.colorScheme.primary
-                RecordingPhase.SAVED -> MaterialTheme.colorScheme.primaryContainer
+                RecordingPhase.RECORDING -> MaterialTheme.colorScheme.primary
+                RecordingPhase.READY, RecordingPhase.SAVED -> MaterialTheme.colorScheme.primaryContainer
                 RecordingPhase.ERROR -> MaterialTheme.colorScheme.errorContainer
                 else -> MaterialTheme.colorScheme.surfaceContainer
             },
@@ -471,8 +516,9 @@ private fun RecordSurfaceIcon(
     val (icon, tint) =
         when {
             phase == RecordingPhase.SAVED -> Icons.Default.Check to MaterialTheme.colorScheme.onPrimaryContainer
+            phase == RecordingPhase.READY -> Icons.Default.Mic to MaterialTheme.colorScheme.onPrimaryContainer
             isRecording && isLatched -> Icons.Default.Stop to MaterialTheme.colorScheme.onPrimary
-            isRecording || phase == RecordingPhase.READY -> Icons.Default.Mic to MaterialTheme.colorScheme.onPrimary
+            isRecording -> Icons.Default.Mic to MaterialTheme.colorScheme.onPrimary
             phase == RecordingPhase.PAUSED -> Icons.Default.Stop to MaterialTheme.colorScheme.onSurface
             else -> Icons.Default.Mic to MaterialTheme.colorScheme.onSurface
         }

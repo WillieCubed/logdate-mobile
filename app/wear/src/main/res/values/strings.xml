@@ -144,6 +144,7 @@
     <string name="wear_recorder_discard">Discard recording</string>
     <string name="wear_recorder_discard_confirm">Tap again to discard</string>
     <string name="wear_recorder_undo">Undo</string>
+    <string name="wear_recorder_open_storage">Storage</string>
     <string name="wear_recorder_error_microphone">Microphone is off</string>
     <string name="wear_recorder_error_storage">Watch storage is full.\nFree up space</string>
     <string name="wear_recorder_error_unavailable">Couldn\'t start.\nTry again</string>
