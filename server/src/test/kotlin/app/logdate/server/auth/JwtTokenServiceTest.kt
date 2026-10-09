@@ -127,6 +127,49 @@ class JwtTokenServiceTest {
     }
 
     @Test
+    fun `every token carries its own jti`() {
+        val service = JwtTokenService(secret = hmacKey, issuer = issuer, audience = audience)
+        val enrollment = service.generateEnrollmentTokens("acc-jti", null, "request-jti", Clock.System.now())
+        val tokens =
+            listOf(
+                service.generateAccessToken("acc-jti"),
+                service.generateRefreshToken("acc-jti"),
+                service.generateSessionToken("session-jti"),
+                enrollment.accessToken,
+                enrollment.refreshToken,
+            )
+
+        val ids = tokens.map { payloadOf(it)["jti"]?.jsonPrimitive?.content }
+
+        assertTrue(ids.none { it.isNullOrBlank() }, "every token needs a jti: $ids")
+        assertEquals(ids.size, ids.toSet().size)
+    }
+
+    @Test
+    fun `access tokens minted together for one account stay distinct`() {
+        val service = JwtTokenService(secret = hmacKey, issuer = issuer, audience = audience)
+
+        val first = service.generateAccessToken("acc-same-second", "did:plc:alice123")
+        val second = service.generateAccessToken("acc-same-second", "did:plc:alice123")
+
+        assertNotEquals(first, second)
+        assertEquals("acc-same-second", service.validateAccessToken(first))
+        assertEquals("acc-same-second", service.validateAccessToken(second))
+    }
+
+    @Test
+    fun `claims this build does not know are ignored once the signature verifies`() {
+        val now = Clock.System.now().epochSeconds
+        val payload =
+            "{\"sub\":\"acc-later\",\"iss\":\"$issuer\",\"aud\":\"$audience\",\"exp\":${now + 600},\"iat\":$now," +
+                "\"type\":\"access\",\"jti\":\"later-1\",\"x-later\":{\"nested\":true},\"cnf\":[1,2]}"
+        val token = buildToken(hmacKey, "{\"alg\":\"HS256\",\"typ\":\"JWT\"}", payload)
+
+        assertEquals("acc-later", JwtTokenService(secret = hmacKey, issuer = issuer, audience = audience).validateAccessToken(token))
+        assertNull(JwtTokenService(secret = "another-secret", issuer = issuer, audience = audience).validateAccessToken(token))
+    }
+
+    @Test
     fun `secret generation yields non-empty random values`() {
         val first = JwtTokenService.generateSecret()
         val second = JwtTokenService.generateSecret()

@@ -24,6 +24,7 @@ import kotlin.uuid.Uuid
  * This implementation generates and validates JWT tokens using HMAC-SHA256.
  * Tokens are structured as standard JWT with header, payload, and signature.
  */
+@OptIn(ExperimentalUuidApi::class)
 class JwtTokenService(
     private val secret: String = generateSecret(),
     private val issuer: String = "logdate.app",
@@ -61,7 +62,7 @@ class JwtTokenService(
         val iat: Long, // issued at (seconds since epoch)
         val type: String, // token type: "access", "refresh", "session"
         val did: String? = null, // AT Protocol DID for user-bound tokens
-        val jti: String? = null, // unique ID, so two refresh tokens minted in the same second stay separately revocable
+        val jti: String? = null, // unique ID, so two tokens minted in the same second stay distinct and separately revocable
     )
 
     override fun generateAccessToken(
@@ -80,12 +81,12 @@ class JwtTokenService(
                 iat = now.epochSeconds,
                 type = "access",
                 did = did,
+                jti = Uuid.random().toString(),
             )
 
         return generateToken(payload)
     }
 
-    @OptIn(ExperimentalUuidApi::class)
     override fun generateRefreshToken(
         accountId: String,
         did: String?,
@@ -123,6 +124,7 @@ class JwtTokenService(
                 iat = issuedAt.epochSeconds,
                 type = "access",
                 did = did,
+                jti = "device-enrollment-access:$enrollmentId",
             )
         val refresh =
             access.copy(
@@ -145,6 +147,7 @@ class JwtTokenService(
                 exp = expiry.epochSeconds,
                 iat = now.epochSeconds,
                 type = "session",
+                jti = Uuid.random().toString(),
             )
 
         return generateToken(payload)
