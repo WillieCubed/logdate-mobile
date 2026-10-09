@@ -7,11 +7,13 @@ import app.logdate.client.domain.streak.ObserveCampfireUseCase
 import app.logdate.ui.platform.LogDateHaptics
 import app.logdate.ui.platform.createAndroidPlatformHapticsController
 import app.logdate.ui.platform.isSystemHapticFeedbackOff
+import app.logdate.wear.v2.flow.FlowViewModel
 import app.logdate.wear.v2.haptics.HapticsPreferenceStore
 import app.logdate.wear.v2.haptics.SharedPreferencesHapticsPreferenceStore
 import app.logdate.wear.v2.haptics.watchHaptics
 import app.logdate.wear.v2.phone.PhoneHandoff
 import app.logdate.wear.v2.phone.PhoneLinkRepository
+import app.logdate.wear.v2.recorder.RecorderViewModel
 import app.logdate.wear.v2.today.DayClock
 import app.logdate.wear.v2.today.TodayViewModel
 import app.logdate.wear.v2.today.WatchDayBoundaryPreferences
@@ -74,4 +76,6 @@ val wearV2Module =
                 phoneHandoff = get(),
             )
         }
+        viewModel { RecorderViewModel() }
+        viewModel { FlowViewModel(dayClock = get(), notesRepository = get()) }
     }

@@ -13,13 +13,19 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.navigation3.rememberSwipeDismissableSceneStrategy
 import app.logdate.ui.platform.LocalLogDateHaptics
 import app.logdate.ui.platform.LogDateHaptics
 import app.logdate.wear.launch.WearLaunchRequest
+import app.logdate.wear.v2.flow.FlowPage
+import app.logdate.wear.v2.flow.FlowViewModel
+import app.logdate.wear.v2.home.HomeScreen
 import app.logdate.wear.v2.navigation.WearRoute
 import app.logdate.wear.v2.navigation.toV2BackStack
+import app.logdate.wear.v2.recorder.RecorderViewModel
+import app.logdate.wear.v2.recorder.locksPaging
 import app.logdate.wear.v2.theme.LogDateWearTheme
 import app.logdate.wear.v2.today.TodayPage
 import app.logdate.wear.v2.today.TodayViewModel
@@ -36,13 +42,15 @@ object WearAppV2Tags {
  *
  * [initialRequest] picks the first back stack; a recreated activity restores the one it saved
  * instead. Each item of [newRequests] replaces the back stack, as a cold launch from a tile does.
- * Swiping right dismisses the top screen. Each screen's view models live as long as its entry.
+ * Swiping right dismisses the top screen. Each screen's view models live as long as its entry; the
+ * recorder is resolved here, outside every entry, so it belongs to the activity.
  */
 @Composable
 fun WearAppV2(
     initialRequest: WearLaunchRequest?,
     newRequests: Flow<WearLaunchRequest>,
 ) {
+    val recorder = koinViewModel<RecorderViewModel>()
     val backStack = rememberNavBackStack(*initialRequest.toV2BackStack().toTypedArray())
     LaunchedEffect(newRequests) {
         newRequests.collect { request ->
@@ -64,7 +72,7 @@ fun WearAppV2(
                     sceneStrategies = listOf(rememberSwipeDismissableSceneStrategy<NavKey>()),
                     entryProvider =
                         entryProvider {
-                            entry<WearRoute.Home> { TodayEntry() }
+                            entry<WearRoute.Home> { HomeEntry(recorder) }
                         },
                 )
             }
@@ -73,7 +81,17 @@ fun WearAppV2(
 }
 
 @Composable
-private fun TodayEntry() {
+private fun HomeEntry(recorder: RecorderViewModel) {
+    val recorderState by recorder.state.collectAsState()
+    HomeScreen(
+        pagingLocked = recorderState.locksPaging,
+        today = { listState -> TodayEntry(listState) },
+        flow = { listState -> FlowEntry(listState) },
+    )
+}
+
+@Composable
+private fun TodayEntry(listState: TransformingLazyColumnState) {
     val viewModel = koinViewModel<TodayViewModel>()
     val state by viewModel.uiState.collectAsState()
     val handoff by viewModel.handoff.collectAsState()
@@ -82,5 +100,13 @@ private fun TodayEntry() {
         handoff = handoff,
         onGetPhoneApp = viewModel::getPhoneApp,
         onHandoffDismissed = viewModel::dismissHandoff,
+        listState = listState,
     )
+}
+
+@Composable
+private fun FlowEntry(listState: TransformingLazyColumnState) {
+    val viewModel = koinViewModel<FlowViewModel>()
+    val state by viewModel.uiState.collectAsState()
+    FlowPage(state = state, listState = listState)
 }

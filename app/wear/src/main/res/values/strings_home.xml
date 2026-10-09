@@ -26,4 +26,9 @@
     <string name="wear_moment_voice">Voice note · %1$s</string>
     <string name="wear_moment_photo">Photo</string>
     <string name="wear_moment_video">Video</string>
+
+    <!-- The moment list, in the new watch app -->
+    <string name="wear_flow_title">Last 7 days</string>
+    <string name="wear_flow_empty">No moments in the last 7 days</string>
+    <string name="wear_flow_failed">Couldn’t load your recent moments</string>
 </resources>
