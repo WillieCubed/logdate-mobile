@@ -1,6 +1,6 @@
 package app.logdate.wear.presentation.memories
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -33,6 +34,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.material3.ButtonGroup
+import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.IconButton
 import androidx.wear.compose.material3.IconButtonDefaults
@@ -78,6 +81,13 @@ internal fun WearMemoryPlayerContent(
     timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) {
     ScreenScaffold(timeText = { TimeText() }) {
+        val active = state.playback as? WearPlaybackUiState.Active
+        if (active != null) {
+            CircularProgressIndicator(
+                progress = { active.progress.coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxSize().padding(PROGRESS_RING_INSET),
+            )
+        }
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -111,20 +121,40 @@ private fun PlayerBody(
     Box(modifier = Modifier.height(TITLE_SLOT_HEIGHT).fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
         Text(
             text = memoryTitle(memory, timeZone),
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             maxLines = 1,
         )
     }
-    Row(
-        modifier = Modifier.padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        PlayerSideButton(Icons.Default.Replay10, R.string.wear_player_skip_back, controlsEnabled, onSkipBack)
-        PlayButton(playback = playback, blocked = blocked, onPlayPause = onPlayPause, onOpenBluetoothSettings = onOpenBluetoothSettings)
-        PlayerSideButton(Icons.Default.Forward10, R.string.wear_player_skip_forward, controlsEnabled, onSkipForward)
+    ButtonGroup(modifier = Modifier.fillMaxWidth(CONTROLS_WIDTH_FRACTION).padding(vertical = 6.dp)) {
+        val backSource = remember { MutableInteractionSource() }
+        val playSource = remember { MutableInteractionSource() }
+        val forwardSource = remember { MutableInteractionSource() }
+        PlayerSideButton(
+            icon = Icons.Default.Replay10,
+            description = R.string.wear_player_skip_back,
+            enabled = controlsEnabled,
+            onClick = onSkipBack,
+            interactionSource = backSource,
+            modifier = Modifier.weight(SIDE_WEIGHT).animateWidth(backSource),
+        )
+        PlayButton(
+            playback = playback,
+            blocked = blocked,
+            onPlayPause = onPlayPause,
+            onOpenBluetoothSettings = onOpenBluetoothSettings,
+            interactionSource = playSource,
+            modifier = Modifier.weight(PLAY_WEIGHT).animateWidth(playSource),
+        )
+        PlayerSideButton(
+            icon = Icons.Default.Forward10,
+            description = R.string.wear_player_skip_forward,
+            enabled = controlsEnabled,
+            onClick = onSkipForward,
+            interactionSource = forwardSource,
+            modifier = Modifier.weight(SIDE_WEIGHT).animateWidth(forwardSource),
+        )
     }
     Box(modifier = Modifier.height(STATUS_SLOT_HEIGHT).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         PlayerStatus(playback = playback, blocked = blocked, memory = memory)
@@ -137,6 +167,8 @@ private fun PlayButton(
     blocked: Boolean,
     onPlayPause: () -> Unit,
     onOpenBluetoothSettings: () -> Unit,
+    interactionSource: MutableInteractionSource,
+    modifier: Modifier = Modifier,
 ) {
     val active = playback as? WearPlaybackUiState.Active
     val (icon, description) =
@@ -148,7 +180,9 @@ private fun PlayButton(
     IconButton(
         onClick = if (blocked) onOpenBluetoothSettings else onPlayPause,
         enabled = blocked || playback !is WearPlaybackUiState.Preparing,
-        modifier = Modifier.size(PLAY_BUTTON_SIZE),
+        modifier = modifier.height(PLAY_BUTTON_SIZE),
+        interactionSource = interactionSource,
+        shapes = IconButtonDefaults.animatedShapes(),
         colors =
             IconButtonDefaults.iconButtonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -165,11 +199,15 @@ private fun PlayerSideButton(
     description: Int,
     enabled: Boolean,
     onClick: () -> Unit,
+    interactionSource: MutableInteractionSource,
+    modifier: Modifier = Modifier,
 ) {
     IconButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.size(SIDE_BUTTON_SIZE),
+        modifier = modifier.height(SIDE_BUTTON_SIZE),
+        interactionSource = interactionSource,
+        shapes = IconButtonDefaults.animatedShapes(),
         colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Icon(imageVector = icon, contentDescription = stringResource(description), modifier = Modifier.size(20.dp))
@@ -188,38 +226,13 @@ private fun PlayerStatus(
         playback is WearPlaybackUiState.Error -> PlayerMessage(stringResource(R.string.wear_playback_retry_download))
         playback is WearPlaybackUiState.Active -> {
             val position = (memory.durationMs * playback.progress).toLong()
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                ProgressBar(progress = playback.progress)
-                Text(
-                    text = stringResource(R.string.wear_player_position, formatDuration(position), formatDuration(memory.durationMs)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
+            Text(
+                text = stringResource(R.string.wear_player_position, formatDuration(position), formatDuration(memory.durationMs)),
+                style = MaterialTheme.typography.numeralExtraSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         else -> PlayerMessage(formatDuration(memory.durationMs))
-    }
-}
-
-@Composable
-private fun ProgressBar(progress: Float) {
-    Box(
-        modifier =
-            Modifier
-                .width(PROGRESS_BAR_WIDTH)
-                .height(4.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainer),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(progress.coerceIn(0f, 1f))
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-        )
     }
 }
 
@@ -246,6 +259,9 @@ private fun memoryTitle(
 
 private val TITLE_SLOT_HEIGHT = 34.dp
 private val STATUS_SLOT_HEIGHT = 34.dp
-private val PLAY_BUTTON_SIZE = 72.dp
-private val SIDE_BUTTON_SIZE = 40.dp
-private val PROGRESS_BAR_WIDTH = 96.dp
+private val PLAY_BUTTON_SIZE = 64.dp
+private val SIDE_BUTTON_SIZE = 36.dp
+private val PROGRESS_RING_INSET = 2.dp
+private const val CONTROLS_WIDTH_FRACTION = 0.86f
+private const val SIDE_WEIGHT = 0.75f
+private const val PLAY_WEIGHT = 1.5f
