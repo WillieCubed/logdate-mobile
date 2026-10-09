@@ -76,7 +76,6 @@
     <string name="wear_memories_empty">No voice memories yet</string>
     <string name="wear_memories_empty_hint">Record one on the home screen</string>
     <string name="wear_memories_older">Older</string>
-    <string name="wear_memories_row_detail">%1$s \u00b7 %2$s</string>
     <string name="wear_memory_not_found">Memory not found</string>
     <string name="wear_player_play">Play</string>
     <string name="wear_player_pause">Pause</string>

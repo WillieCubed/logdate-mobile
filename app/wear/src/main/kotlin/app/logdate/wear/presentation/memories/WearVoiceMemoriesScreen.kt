@@ -1,5 +1,7 @@
 package app.logdate.wear.presentation.memories
 
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -11,15 +13,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
-import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.Button
+import androidx.wear.compose.material3.EdgeButton
 import androidx.wear.compose.material3.Icon
+import androidx.wear.compose.material3.ListHeader
+import androidx.wear.compose.material3.ListSubHeader
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
+import androidx.wear.compose.material3.SurfaceTransformation
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TimeText
+import androidx.wear.compose.material3.lazy.rememberTransformationSpec
+import androidx.wear.compose.material3.lazy.transformedHeight
 import app.logdate.wear.R
 import app.logdate.wear.presentation.recording.formatDuration
 import app.logdate.wear.presentation.timeline.formatDayLabel
@@ -44,44 +52,64 @@ internal fun WearVoiceMemoriesContent(
     onLoadMore: () -> Unit = {},
     timeZone: TimeZone = TimeZone.currentSystemDefault(),
 ) {
-    val listState = rememberScalingLazyListState()
-    ScreenScaffold(timeText = { TimeText() }, scrollState = listState) {
-        ScalingLazyColumn(state = listState, modifier = Modifier.fillMaxWidth()) {
+    val listState = rememberTransformingLazyColumnState()
+    val spec = rememberTransformationSpec()
+    val list: @Composable BoxScope.(PaddingValues) -> Unit = { contentPadding ->
+        TransformingLazyColumn(state = listState, contentPadding = contentPadding) {
             item(key = "title") {
-                Text(
-                    text = stringResource(R.string.wear_memories_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-                )
+                ListHeader(
+                    modifier = Modifier.transformedHeight(this, spec),
+                    transformation = SurfaceTransformation(spec),
+                ) {
+                    Text(text = stringResource(R.string.wear_memories_title))
+                }
             }
             when {
                 !state.isLoaded -> Unit
-                state.memories.isEmpty() -> item(key = "empty") { EmptyMemories() }
-                else -> {
-                    items(items = state.memories, key = { it.noteId.toString() }) { memory ->
-                        MemoryRow(memory = memory, timeZone = timeZone, onClick = { onOpenMemory(memory.noteId) })
-                    }
-                    if (state.hasMore) {
-                        item(key = "older") {
-                            Button(
-                                onClick = onLoadMore,
-                                enabled = !state.isLoadingMore,
-                                modifier = Modifier.fillMaxWidth(),
-                                label = { Text(stringResource(R.string.wear_memories_older)) },
+                state.memories.isEmpty() -> item(key = "empty") { EmptyMemories(Modifier.transformedHeight(this, spec)) }
+                else ->
+                    state.memories.groupBy { it.createdAt.toLocalDateTime(timeZone).date }.forEach { (day, memories) ->
+                        item(key = "day-$day") {
+                            ListSubHeader(
+                                modifier = Modifier.transformedHeight(this, spec),
+                                transformation = SurfaceTransformation(spec),
+                            ) {
+                                Text(text = formatDayLabel(day))
+                            }
+                        }
+                        items(items = memories, key = { it.noteId.toString() }) { memory ->
+                            MemoryRow(
+                                memory = memory,
+                                timeZone = timeZone,
+                                onClick = { onOpenMemory(memory.noteId) },
+                                modifier = Modifier.fillMaxWidth().transformedHeight(this, spec),
+                                transformation = SurfaceTransformation(spec),
                             )
                         }
                     }
-                }
             }
         }
+    }
+    if (state.hasMore) {
+        ScreenScaffold(
+            scrollState = listState,
+            timeText = { TimeText() },
+            edgeButton = {
+                EdgeButton(onClick = onLoadMore, enabled = !state.isLoadingMore) {
+                    Text(stringResource(R.string.wear_memories_older))
+                }
+            },
+            content = list,
+        )
+    } else {
+        ScreenScaffold(scrollState = listState, timeText = { TimeText() }, content = list)
     }
 }
 
 @Composable
-private fun EmptyMemories() {
+private fun EmptyMemories(modifier: Modifier = Modifier) {
     androidx.compose.foundation.layout.Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+        modifier = modifier.fillMaxWidth().padding(top = 12.dp),
         horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
     ) {
         Text(
@@ -103,14 +131,15 @@ private fun MemoryRow(
     memory: VoiceMemoryItem,
     timeZone: TimeZone,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    transformation: SurfaceTransformation? = null,
 ) {
-    val day = memory.createdAt.toLocalDateTime(timeZone).date
-    val time = formatMemoryTime(memory, timeZone)
     Button(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
+        transformation = transformation,
         icon = { Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null) },
-        label = { Text(formatDayLabel(day)) },
-        secondaryLabel = { Text(stringResource(R.string.wear_memories_row_detail, time, formatDuration(memory.durationMs))) },
+        label = { Text(formatMemoryTime(memory, timeZone)) },
+        secondaryLabel = { Text(text = formatDuration(memory.durationMs), style = MaterialTheme.typography.numeralExtraSmall) },
     )
 }
