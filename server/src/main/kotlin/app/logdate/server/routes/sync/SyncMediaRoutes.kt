@@ -31,6 +31,9 @@ import io.ktor.server.routing.route
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import kotlin.coroutines.cancellation.CancellationException
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * `/api/v1/media` endpoints — multipart upload, metadata read, binary download, delete.
@@ -81,6 +84,22 @@ internal fun Route.syncMediaRoutes(
                         .nameUUIDFromBytes("$userId:${req.contentId}:${req.fileName}".encodeToByteArray())
                         .toString()
 
+                @OptIn(ExperimentalUuidApi::class)
+                val storageId = "$mediaId-${Uuid.random()}"
+
+                val previous =
+                    try {
+                        mediaBlobRepository.getMedia(userId, mediaId)
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (cause: Exception) {
+                        Napier.e("Media metadata lookup failed")
+                        return@post call.respond(
+                            HttpStatusCode.InternalServerError,
+                            error("MEDIA_METADATA_READ_FAILED", "Failed to read existing media metadata"),
+                        )
+                    }
+
                 val encryptedPayload =
                     runCatching {
                         encryptionService.processMediaUpload(
@@ -90,6 +109,7 @@ internal fun Route.syncMediaRoutes(
                             req.contentId,
                         )
                     }.getOrElse { error ->
+                        if (error is CancellationException) throw error
                         Napier.e("Media encryption failed")
                         return@post call.respond(
                             HttpStatusCode.InternalServerError,
@@ -105,7 +125,7 @@ internal fun Route.syncMediaRoutes(
                                     LogDateBlobWriteRequest(
                                         ownerId = userId,
                                         namespace = LogDateBlobNamespace.MEDIA,
-                                        blobId = mediaId,
+                                        blobId = storageId,
                                         fileName = req.fileName,
                                         contentType = req.mimeType,
                                         bytes = encryptedPayload.data,
@@ -113,6 +133,7 @@ internal fun Route.syncMediaRoutes(
                                 )
                             }
                         }.getOrElse { error ->
+                            if (error is CancellationException) throw error
                             Napier.e("Media storage upload failed")
                             return@post call.respond(
                                 HttpStatusCode.InternalServerError,
@@ -144,18 +165,25 @@ internal fun Route.syncMediaRoutes(
                             ),
                         )
                     }.getOrElse { error ->
-                        if (storagePath != null) {
-                            runCatching { withContext(Dispatchers.IO) { mediaStorage?.deleteBlob(storagePath) } }
-                                .onFailure { deleteError ->
-                                    Napier.w("Media rollback failed")
-                                }
-                        }
+                        if (error is CancellationException) throw error
+                        // The write may have committed before its acknowledgement failed.
+                        // Retain this immutable blob rather than deleting committed media.
                         Napier.e("Media metadata persistence failed")
                         return@post call.respond(
                             HttpStatusCode.InternalServerError,
                             error("MEDIA_METADATA_WRITE_FAILED", "Failed to store media metadata"),
                         )
                     }
+                val previousPath = previous?.storagePath
+                if (previousPath != null && previousPath != stored.storagePath) {
+                    try {
+                        withContext(Dispatchers.IO) { mediaStorage?.deleteBlob(previousPath) }
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (cause: Exception) {
+                        Napier.w("Superseded media cleanup failed")
+                    }
+                }
                 val downloadUrl = resolveMediaDownloadUrl(call, stored, mediaStorage, mediaAccessPolicy)
                 val response =
                     MediaUploadResponse(

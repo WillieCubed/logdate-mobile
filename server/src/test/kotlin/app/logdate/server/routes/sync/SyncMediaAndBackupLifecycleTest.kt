@@ -5,7 +5,6 @@ import app.logdate.server.crypto.EncryptionService
 import app.logdate.server.crypto.ProcessedPayload
 import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateBlobNamespace
-import app.logdate.server.logdate.LogDateMediaBlobRepository
 import app.logdate.server.logdate.asLogDateBackupRepository
 import app.logdate.server.logdate.asLogDateCollectionsRepository
 import app.logdate.server.logdate.asLogDateMediaBlobRepository
@@ -43,14 +42,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 
-/**
- * Integration tests for the media and backup lifecycle within the Sync API.
- *
- * This class validates the complex interaction between the sync routes, encryption
- * services, and external blob storage. It covers end-to-end scenarios including multipart
- * uploads, storage-level failures, decryption errors, and the retrieval of binaries via
- * both direct downloads and signed URLs.
- */
 class SyncMediaAndBackupLifecycleTest {
     @Test
     fun `media and backup endpoints surface storage failures and preserve backup list behavior`() =
@@ -125,23 +116,18 @@ class SyncMediaAndBackupLifecycleTest {
         }
 
     @Test
-    fun `media and backup uploads roll back blob writes when metadata persistence fails`() =
+    fun `backup uploads roll back blob writes when metadata persistence fails`() =
         testApplication {
             val repository = InMemorySyncRepository()
             val tokenService = JwtTokenService("sync-binary-secret")
             val storage = mockk<GcsMediaStorage>()
-            val mediaBlobRepository = mockk<LogDateMediaBlobRepository>()
             val backupRepository = mockk<LogDateBackupRepository>()
-            val mediaPath = "users/u/media/media-rollback/photo.jpg"
             val backupPath = "users/u/backups/backup-rollback.enc"
 
-            every { storage.putBlob(match { it.namespace == LogDateBlobNamespace.MEDIA }) } returns mediaPath
             every { storage.putBlobFile(match { it.namespace == LogDateBlobNamespace.BACKUP }) } returns backupPath
-            every { storage.deleteBlob(mediaPath) } returns true
             every { storage.deleteBlob(backupPath) } returns true
             every { storage.getBlob(any()) } returns null
             every { storage.getSignedDownloadUrl(any(), any()) } returns "https://signed.example/object"
-            every { mediaBlobRepository.upsertMedia(any(), any()) } throws IllegalStateException("media metadata fail")
             every { backupRepository.createBackup(any(), any()) } throws IllegalStateException("backup metadata fail")
 
             application {
@@ -154,7 +140,7 @@ class SyncMediaAndBackupLifecycleTest {
                             metrics = SyncMetricsRegistry(),
                             mediaAccessPolicy = MediaAccessPolicy(useSignedUrls = true, signedUrlTtlHours = 1),
                             collectionsRepository = repository.asLogDateCollectionsRepository(),
-                            mediaBlobRepository = mediaBlobRepository,
+                            mediaBlobRepository = repository.asLogDateMediaRepository().asLogDateMediaBlobRepository(),
                             backupRepository = backupRepository,
                         )
                     }
@@ -163,26 +149,6 @@ class SyncMediaAndBackupLifecycleTest {
 
             val auth = "Bearer ${tokenService.generateAccessToken(UUID.randomUUID().toString())}"
             val payload = byteArrayOf(1, 2, 3, 4)
-
-            val mediaUpload =
-                client.post("/api/v1/media") {
-                    header(HttpHeaders.Authorization, auth)
-                    setBody(
-                        mediaMultipartWithFields(
-                            includeContentId = true,
-                            includeFileName = true,
-                            includeMimeType = true,
-                            includeSizeBytes = true,
-                            includeDeviceId = true,
-                            includeData = true,
-                            sizeBytes = payload.size.toLong(),
-                            payload = payload,
-                        ),
-                    )
-                }
-            assertEquals(HttpStatusCode.InternalServerError, mediaUpload.status)
-            assertTrue(mediaUpload.bodyAsText().contains("MEDIA_METADATA_WRITE_FAILED"))
-            verify(exactly = 1) { storage.deleteBlob(mediaPath) }
 
             val backupUpload =
                 client.post("/api/v1/backups") {
