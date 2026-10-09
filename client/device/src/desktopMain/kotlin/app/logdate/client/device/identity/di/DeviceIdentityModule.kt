@@ -34,7 +34,7 @@ actual val deviceIdentityModule: Module =
 
         // Repository for device information
         single<DeviceRepository> {
-            CloudDeviceRepository(AccountDeviceApi(get()), get(), get())
+            CloudDeviceRepository(AccountDeviceApi(get(), get()), get(), get())
         }
 
         // Unified device manager

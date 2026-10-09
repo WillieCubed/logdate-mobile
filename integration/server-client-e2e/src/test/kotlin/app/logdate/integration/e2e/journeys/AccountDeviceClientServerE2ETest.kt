@@ -3,11 +3,13 @@
 package app.logdate.integration.e2e.journeys
 
 import app.logdate.client.datastore.OriginBoundSession
+import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.device.identity.data.AccountDeviceApi
 import app.logdate.integration.e2e.fixtures.createAccountWithSyntheticPasskey
 import app.logdate.integration.e2e.harness.withServerClientHarness
 import app.logdate.shared.model.RegisterDeviceRequest
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,6 +17,27 @@ import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
 class AccountDeviceClientServerE2ETest {
+    @Test
+    fun `expired device sessions refresh through the real server and keep devices visible`() =
+        runTest {
+            withServerClientHarness {
+                val account = apiClient.createAccountWithSyntheticPasskey("devices_${Uuid.random().toString().take(8)}").data
+                val session =
+                    OriginBoundSession(
+                        baseUrl.removeSuffix("/api/v1"),
+                        UserSession("expired", account.tokens.refreshToken, account.account.id.toString()),
+                    )
+                val storage = DeviceTestSessionStorage(session)
+                val devices = AccountDeviceApi(httpClient, storage)
+                val id = Uuid.random()
+                assertTrue(devices.register(session, id, RegisterDeviceRequest("Test device", "MACOS", "1")))
+                assertTrue(storage.getSession()!!.accessToken != "expired")
+                storage.saveSession(session.session)
+                assertEquals(id.toString(), devices.list(session).single().id)
+                assertEquals(account.account.id.toString(), storage.getSession()!!.accountId)
+            }
+        }
+
     @Test
     fun `signed in devices persist in the account list without duplicate registrations`() =
         runTest {
@@ -49,4 +72,34 @@ class AccountDeviceClientServerE2ETest {
                 )
             }
         }
+}
+
+private class DeviceTestSessionStorage(
+    private val initial: OriginBoundSession,
+) : SessionStorage {
+    private val current = MutableStateFlow<UserSession?>(initial.session)
+
+    override fun getSession() = current.value
+
+    override fun getOriginBoundSession() = current.value?.let { initial.copy(session = it) }
+
+    override fun getSessionFlow() = current
+
+    override suspend fun hasValidSession() = current.value != null
+
+    override suspend fun saveSession(session: UserSession) {
+        current.value = session
+    }
+
+    override suspend fun clearSession() {
+        current.value = null
+    }
+
+    override suspend fun replaceSessionIfCurrent(
+        expected: OriginBoundSession,
+        updated: UserSession,
+    ): Boolean =
+        expected.origin == initial.origin &&
+            expected.session.accountId == updated.accountId &&
+            current.compareAndSet(expected.session, updated)
 }
