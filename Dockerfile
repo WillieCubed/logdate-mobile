@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.7-labs
 # Multi-stage Dockerfile for LogDate Server
 # Optimized for both local development and Google Cloud Run production deployment
 
