@@ -3,7 +3,7 @@
 # Optimized for both local development and Google Cloud Run production deployment
 
 # Build stage
-FROM gradle:8.10.2-jdk17 AS build
+FROM public.ecr.aws/docker/library/gradle:8.10.2-jdk17@sha256:c2900027f3f0681c2cbfb09d527813851ad67aeafbb409997297efa2df20e748 AS build
 
 WORKDIR /workspace
 ENV GRADLE_USER_HOME=/home/gradle/.gradle
