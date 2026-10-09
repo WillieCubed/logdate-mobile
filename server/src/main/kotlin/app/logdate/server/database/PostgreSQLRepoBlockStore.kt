@@ -6,6 +6,7 @@ import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
@@ -133,6 +134,21 @@ class PostgreSQLRepoBlockStore : RepoBlockStore {
                             .where { AtprotoRepoBlocksTable.cid eq cid.toString() }
                             .singleOrNull()
                             ?.toRepoBlock()
+                    }
+                }
+            }
+        }
+
+    override suspend fun readBlocks(cids: List<Cid>): Result<List<RepoBlock?>> =
+        blockCache.readMany(cids) { missing ->
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    transaction {
+                        AtprotoRepoBlocksTable
+                            .selectAll()
+                            .where { AtprotoRepoBlocksTable.cid inList missing.map(Cid::toString) }
+                            .map { it.toRepoBlock() }
+                            .associateBy(RepoBlock::cid)
                     }
                 }
             }

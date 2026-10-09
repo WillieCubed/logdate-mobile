@@ -31,18 +31,22 @@ public class DefaultRepoEngine(
 
     override suspend fun getRecords(recordIds: List<RepoRecordId>): Result<List<RepoRecord?>> =
         runCatching {
-            // One snapshot per repo, not one per record. Reading a 25-record page used to open the
-            // repo 25 times, and opening it costs a pass over every block in it.
             val snapshots = mutableMapOf<AtprotoDid, RepoSnapshot>()
-            recordIds.map { recordId ->
-                val snapshot = snapshots.getOrPut(recordId.repo) { loadSnapshot(recordId.repo) }
-                val cid =
-                    snapshot.tree.get(recordId.collection, recordId.recordKey)
-                        ?: return@map null
-                val block = blockStore.readBlock(cid).getOrThrow() ?: return@map null
+            val references =
+                recordIds.map { recordId ->
+                    val snapshot = snapshots.getOrPut(recordId.repo) { loadSnapshot(recordId.repo) }
+                    recordId to snapshot.tree.get(recordId.collection, recordId.recordKey)
+                }
+            val cids = references.mapNotNull { it.second }.distinct()
+            if (cids.isEmpty()) return@runCatching references.map { null }
+            val loaded = blockStore.readBlocks(cids).getOrThrow()
+            check(loaded.size == cids.size) { "Block store returned an incomplete batch" }
+            val blocks = cids.zip(loaded).toMap()
+            references.map { (recordId, cid) ->
+                val block = blocks[cid] ?: return@map null
                 RepoRecord(
                     uri = recordId.uri,
-                    cid = cid.toString(),
+                    cid = block.cid.toString(),
                     value = DagCborCodec.decode(block.bytes).jsonObject,
                 )
             }

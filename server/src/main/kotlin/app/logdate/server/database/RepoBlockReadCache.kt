@@ -12,6 +12,32 @@ internal class RepoBlockReadCache(
     private var byteCount = 0
     private var epoch = 0L
 
+    suspend fun readMany(
+        cids: List<Cid>,
+        load: suspend (List<Cid>) -> Result<Map<Cid, RepoBlock>>,
+    ): Result<List<RepoBlock?>> {
+        val (generation, cached) =
+            synchronized(lock) {
+                epoch to
+                    cids
+                        .distinct()
+                        .mapNotNull { cid -> blocks[cid]?.let { cid to it.copyOf() } }
+                        .toMap()
+                        .toMutableMap()
+            }
+        val missing = cids.distinct().filterNot(cached::containsKey)
+        if (missing.isEmpty()) return Result.success(cids.map { cid -> cached[cid]?.let { RepoBlock(cid, it.copyOf()) } })
+        return load(missing).map { loaded ->
+            missing.forEach { cid ->
+                loaded[cid]?.let { block ->
+                    remember(block, generation)
+                    cached[cid] = block.bytes.copyOf()
+                }
+            }
+            cids.map { cid -> cached[cid]?.let { RepoBlock(cid, it.copyOf()) } }
+        }
+    }
+
     suspend fun read(
         cid: Cid,
         load: suspend () -> Result<RepoBlock?>,

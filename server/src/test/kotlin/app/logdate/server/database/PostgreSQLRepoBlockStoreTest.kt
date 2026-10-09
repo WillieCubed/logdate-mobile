@@ -29,6 +29,32 @@ import kotlin.test.assertTrue
  */
 class PostgreSQLRepoBlockStoreTest {
     @Test
+    fun `cold batch reads preserve order duplicates and retry missing blocks`() {
+        withH2Database(AtprotoRepoBlocksTable, AtprotoRepoBlockLinksTable) {
+            val writer = PostgreSQLRepoBlockStore()
+            val reader = PostgreSQLRepoBlockStore()
+            val repo = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
+            val blocks =
+                listOf("first", "second", "later").map { value ->
+                    val bytes = value.encodeToByteArray()
+                    RepoBlock(Cid.sha256(DAG_CBOR_CODEC_VALUE, bytes), bytes)
+                }
+            runBlocking {
+                blocks.take(2).forEach { writer.writeBlock(repo, it).getOrThrow() }
+                val requested = listOf(blocks[1].cid, blocks[2].cid, blocks[0].cid, blocks[1].cid)
+                val loaded = reader.readBlocks(requested).getOrThrow()
+                assertEquals(listOf(blocks[1].cid, null, blocks[0].cid, blocks[1].cid), loaded.map { it?.cid })
+                loaded[0]!!.bytes[0] = 0
+                assertRepoBlockEquals(blocks[1], loaded[3]!!)
+                assertRepoBlockEquals(blocks[1], reader.readBlock(blocks[1].cid).getOrThrow()!!)
+                writer.writeBlock(repo, blocks[2]).getOrThrow()
+                assertRepoBlockEquals(blocks[2], reader.readBlocks(listOf(blocks[2].cid)).getOrThrow().single()!!)
+                assertTrue(reader.readBlocks(emptyList()).getOrThrow().isEmpty())
+            }
+        }
+    }
+
+    @Test
     fun `compare and swap head only advances the expected revision`() {
         withH2Database(AtprotoRepoHeadsTable) {
             val store = PostgreSQLRepoBlockStore()

@@ -35,6 +35,9 @@ public interface RepoBlockStore {
      */
     public suspend fun readBlock(cid: Cid): Result<RepoBlock?>
 
+    /** Reads blocks in request order, preserving duplicates and nulls for missing blocks. */
+    public suspend fun readBlocks(cids: List<Cid>): Result<List<RepoBlock?>> = runCatching { cids.map { readBlock(it).getOrThrow() } }
+
     /**
      * Persists [block] and associates it with [repo].
      */

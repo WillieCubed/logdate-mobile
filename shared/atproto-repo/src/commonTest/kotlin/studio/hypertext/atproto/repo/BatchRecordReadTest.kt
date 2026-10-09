@@ -10,6 +10,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.startCoroutine
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /** A change-feed page reuses one current tree without loading the repo's entire block history. */
 class BatchRecordReadTest {
@@ -20,6 +21,8 @@ class BatchRecordReadTest {
     private class CountingBlockStore : RepoBlockStore by InMemoryRepoBlockStore() {
         private val delegate = InMemoryRepoBlockStore()
         var listBlocksCalls = 0
+            private set
+        var batchReads = 0
             private set
 
         override suspend fun readHead(repo: AtprotoDid) = delegate.readHead(repo)
@@ -32,6 +35,11 @@ class BatchRecordReadTest {
         ) = delegate.compareAndSwapHead(head, expectedRevision)
 
         override suspend fun readBlock(cid: Cid) = delegate.readBlock(cid)
+
+        override suspend fun readBlocks(cids: List<Cid>): Result<List<RepoBlock?>> {
+            batchReads++
+            return delegate.readBlocks(cids)
+        }
 
         override suspend fun writeBlock(
             repo: AtprotoDid,
@@ -103,6 +111,51 @@ class BatchRecordReadTest {
             assertEquals(25, records.size)
             assertEquals(25, records.count { it != null })
             assertEquals(0, blockStore.listBlocksCalls - before)
+            assertEquals(1, blockStore.batchReads)
+        }
+
+    @Test
+    fun `batch reads preserve mixed repository order duplicates and fresh versions`() =
+        runSuspend {
+            val store = CountingBlockStore()
+            val engine = DefaultRepoEngine(store)
+            val otherRepo = AtprotoDid.require("did:plc:7wbylgv44bzg5gkq4h6w3lby")
+            val first = RepoRecordId(repo, collection, RecordKey.require("first"))
+            val second = RepoRecordId(otherRepo, collection, RecordKey.require("second"))
+            val absent = RepoRecordId(repo, collection, RecordKey.require("absent"))
+            engine.putRecord(first, entry("same bytes")).getOrThrow()
+            engine.putRecord(second, entry("same bytes")).getOrThrow()
+            val ids = listOf(second, absent, first, second)
+            val records = engine.getRecords(ids).getOrThrow()
+            assertEquals(listOf(second.uri, null, first.uri, second.uri), records.map { it?.uri })
+            assertEquals(records[0]?.cid, records[2]?.cid)
+            assertEquals(1, store.batchReads)
+            engine.putRecord(first, entry("newer")).getOrThrow()
+            val updated = engine.getRecords(listOf(first, second)).getOrThrow()
+            assertEquals(entry("newer"), updated[0]?.value)
+            assertEquals(entry("same bytes"), updated[1]?.value)
+            assertEquals(emptyList(), engine.getRecords(emptyList()).getOrThrow())
+            assertEquals(2, store.batchReads)
+        }
+
+    @Test
+    fun `failed or incomplete block batches fail the page rather than silently dropping data`() =
+        runSuspend {
+            val backing = CountingBlockStore()
+            val id = RepoRecordId(repo, collection, RecordKey.require("present"))
+            DefaultRepoEngine(backing).putRecord(id, entry("retained")).getOrThrow()
+            val outcomes =
+                listOf(
+                    Result.failure<List<RepoBlock?>>(IllegalStateException("Storage unavailable")),
+                    Result.success(emptyList<RepoBlock?>()),
+                )
+            outcomes.forEach { outcome ->
+                val store =
+                    object : RepoBlockStore by backing {
+                        override suspend fun readBlocks(cids: List<Cid>) = outcome
+                    }
+                assertTrue(DefaultRepoEngine(store).getRecords(listOf(id)).isFailure)
+            }
         }
 
     @Test
