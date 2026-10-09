@@ -8,6 +8,7 @@ This directory contains authoritative standards for LogDate development.
 - **[Commit Scopes Reference](./commit-scopes.md)** — Lookup table for module scope names
 - **[Git Guidelines](./git-guidelines.md)** — Staging safety, atomic workflow, branch management
 - **[Entrypoint Structure](./entrypoint-structure.md)** — Keeping module entrypoints small, and the detekt size limits that enforce it
+- **[Media Quality Checklist](./media-quality-checklist.md)** — Standing rules for every image and video pipeline
 
 ## Quick Reference
 
@@ -43,12 +44,12 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 | `onboarding` | Onboarding feature |
 | `rewind` | Rewind feature |
 | `search` | Search feature |
-| `core` | Core feature (settings, home) |
+| `settings` | App settings screens |
+| `android-widget` | Home screen widgets and launcher shortcuts |
 
 **Other scopes:**
 | Scope | Module |
 |-------|--------|
-| `app` | Main compose app |
 | `wear` | Wear OS app |
 | `server` | Backend server |
 | `sync` | Sync client library |
@@ -59,8 +60,11 @@ See [commit-scopes.md](./commit-scopes.md) for the full list.
 ### Atomic Workflow
 
 ```bash
-git restore --staged . && git add file1.kt file2.kt && git commit -m "type(scope): title"
+git restore --staged . && git add file1.kt file2.kt && git commit -F /path/to/message.txt
 ```
+
+Write the message to a file first, in its own step, and commit with `-F`. Scopes must come from
+[`allowed-scopes.txt`](../../../allowed-scopes.txt); pick the feature the user sees, not the module.
 
 ### Forbidden
 

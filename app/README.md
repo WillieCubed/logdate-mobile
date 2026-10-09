@@ -4,7 +4,7 @@ This directory contains modules for final build targets and application entry po
 
 ## Available Applications
 
-- [`:app:android-main`](./android-main/) - Android application wrapper and entry point.
+- [`:app:android-main`](./android-main/README.md) - Android application wrapper and entry point.
 - [`:app:compose-main`](./compose-main/README.md) - Shared Compose Multiplatform module for Android/iOS/Desktop UI and app logic.
 - [`:app:wear`](./wear/README.md) - The companion Wear OS application for quick journaling from smartwatches.
 
@@ -19,17 +19,19 @@ Each application module provides the platform-specific entry points, navigation 
 # Build debug APK
 ./gradlew :app:android-main:assembleDebug
 
-# Install on connected device
-./gradlew :app:android-main:installDebug
+# Install on an emulator only (check `adb devices` for an emulator-* serial first)
+adb -s emulator-5554 install -r app/android-main/build/outputs/apk/debug/*.apk
 ```
+
+Never install on a physical device; see the Android device safety rules in `CLAUDE.md`.
 
 ### Wear OS App
 ```bash
 # Build debug APK
 ./gradlew :app:wear:assembleDebug
 
-# Install on connected Wear OS device/emulator
-./gradlew :app:wear:installDebug
+# Run the instrumented tests on the Wear OS managed device
+./gradlew :app:wear:wearSmallRoundApi34DebugAndroidTest
 ```
 
 ### Desktop App

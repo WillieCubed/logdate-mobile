@@ -1,0 +1,155 @@
+# Android OS Integration Checklist
+
+Design: [`docs/feature-design/android-os-integration.md`](../feature-design/android-os-integration.md)
+
+Guides: [`docs/reference/android/os-integration.md`](../reference/android/os-integration.md)
+
+Tracking: Docket, Hypertext Studio workspace, initiative **Native Android integration**
+
+Audit created: 2026-10-09
+
+Sources checked: 2026-10-09 against the Android Developers pages for
+[Android 17 features](https://developer.android.com/about/versions/17/features),
+[Android 16 features](https://developer.android.com/about/versions/16/features), and
+[AppFunctions](https://developer.android.com/ai/appfunctions). The local `ctx7` lookup was
+quota-blocked, so the linked official pages are the source of truth.
+
+## Scope
+
+This checklist tracks every surface in the Native Android integration program on Android phones,
+foldables, tablets, Chromebooks, and Android desktop windowing. Wear OS tiles and complications are
+out of scope; they have their own documentation in `app/wear/README.md`.
+
+Agent-driven validation runs only on emulators (`emulator-*` serials) or Gradle Managed Devices,
+never on physical Android devices.
+
+## Status Legend
+
+- `[todo]` Not started, or no evidence recorded.
+- `[partial]` Some behavior ships, or evidence is incomplete. The row says what is missing.
+- `[done]` Behavior ships, and all of the following are recorded in the Evidence column:
+  - the tests;
+  - the Lane 1 references, where the surface has app-drawn UI;
+  - the Lane 2 captures, where the surface has system UI;
+  - the comparison sheet;
+  - the guide section.
+- `[layout-only]` Verified with Compose screenshots that simulate system state (for example, injected
+  caption insets) because no emulator or managed device can show it. This must be stated in the row.
+- `[n/a]` Does not apply. The row says why.
+
+## Evidence rules
+
+A row reaches `[done]` only when its Evidence column lists:
+
+1. **Tests:** the test class names and the command that runs them.
+2. **Lane 1:** the screenshot test functions in `@OsIntegrationPreviewMatrix`, or the Glance host
+   lane references.
+3. **Lane 2:** image paths under `docs/screenshots/android-os-integration/`, with device and API level.
+4. **Comparison sheet:** the path the sheet was generated to, and the date it was reviewed.
+5. **Commit:** the commit SHA, which also appears on the Docket task.
+
+`checkOsIntegrationScreenshotCoverage` verifies that every Lane 1 and Lane 2 item named in
+`config/screenshots/os-integration-coverage.txt` exists.
+
+## Implementation Pointers
+
+- Intent routing:
+  `app/compose-main/src/androidMain/kotlin/app/logdate/client/DeepLinkResolver.kt`,
+  `MainActivity.kt`, and `MainActivity+MultiWindow.kt`
+- Editor route: `client/feature/editor/src/commonMain/kotlin/app/logdate/feature/editor/navigation/EditorNavRoute.kt`
+- Static shortcuts: `app/android-main/src/main/res/xml/shortcuts.xml`
+- Dynamic shortcuts: `client/feature/android-widgets/src/commonMain/kotlin/app/logdate/client/feature/widgets/shortcuts/`
+  and `app/compose-main/src/androidMain/kotlin/app/logdate/client/shortcuts/`
+- Widgets: `client/feature/android-widgets/src/androidMain/kotlin/app/logdate/client/feature/widgets/`
+- Notifications: `client/notifications/` and `client/media/src/androidMain/kotlin/app/logdate/client/media/audio/AndroidAudioNotificationHandler.kt`
+- Feature flags: `client/datastore/src/commonMain/kotlin/app/logdate/client/datastore/featureflags/FeatureFlag.kt`
+- Manifest: `app/android-main/src/main/AndroidManifest.xml`
+
+## Process
+
+| Status | Requirement | Evidence |
+| --- | --- | --- |
+| `[partial]` | Design spec, hub guide, surface guides, and this checklist exist and are linked from `docs/README.md` | This commit. Missing: screenshots in each guide, which arrive with their features. |
+| `[todo]` | `@OsIntegrationPreviewMatrix` covers phone, phone dark, compact, landscape, tablet, RTL, 200% text, dynamic color, and bubble size | |
+| `[todo]` | Glance widgets render to committed references for light, dark, RTL, and 200% text | |
+| `[todo]` | `OsSurfaceScreenshotsTest` captures real system UI on API 37 phone and tablet managed devices with demo mode | |
+| `[todo]` | Desktop windowing capture spike decided | |
+| `[todo]` | `checkOsIntegrationScreenshotCoverage` fails on missing images, missing tests, and stale references | |
+| `[todo]` | `buildScreenshotComparisonSheet` generates labeled sheets per feature | |
+| `[todo]` | `./run` runs every screenshot lane, plus `screenshots:os`, `screenshots:sheet`, and `screenshots:check` | |
+
+## Capture Launch Contract and Platform Hygiene
+
+| Status | Requirement | Evidence |
+| --- | --- | --- |
+| `[partial]` | The editor opens in Text, Voice, Camera, Video, or PhotoPrompt mode from one `EditorLaunchMode` | Voice, Camera, and PhotoPrompt work today through the widget extras (`EntryEditorRoute.widgetRecord`, `widgetCamera`, `widgetPhotoUri`). Video has no launch path. |
+| `[todo]` | `app.logdate.action.CAPTURE` and `logdate://capture` resolve to the editor; legacy widget and ambient extras keep resolving | |
+| `[todo]` | OS integration flags exist with debug-only toggles | |
+| `[todo]` | `PlatformComponentToggler` enables and disables flagged manifest components | |
+| `[todo]` | Manifest declares the touchscreen as optional, `configChanges`, editor `<layout>` minimums, and multi-instance support | |
+| `[todo]` | `ShareReceiver` declares no SEND filters it cannot receive | |
+| `[todo]` | Editor windows are titled in Recents, the taskbar, and desktop captions | |
+| `[todo]` | The compat splash screen on API 30 matches Android 12+ | |
+
+## Launcher Shortcuts and Direct Share
+
+| Status | Requirement | Evidence |
+| --- | --- | --- |
+| `[partial]` | Static shortcuts for New entry, Record voice, and Take photo, with themed icons | `new_note` ships with the plain vector icon `note_stack_add`, which has no adaptive or monochrome layer for themed icons. Record voice and Take photo are missing. |
+| `[partial]` | Dynamic shortcuts for Continue draft, Today, and Last week | Ship today. `DynamicShortcutPublisherTest`. Missing: Lane 2 capture. |
+| `[todo]` | The dynamic shortcut cap leaves room for static shortcuts | |
+| `[todo]` | Drafts are pushed with `pushDynamicShortcut`; share targets carry a `LocusId` | |
+| `[partial]` | Direct Share targets for each journal | Ship today. `SharingShortcutParsersTest`, `IncomingShareE2ETest`. Missing: Lane 2 share sheet capture. |
+| `[todo]` | `reportShortcutUsed` is called on save for each mode and shared journal | |
+| `[todo]` | Journals and widgets can be pinned from inside the app | |
+
+## System Capture Surfaces
+
+| Status | Requirement | Evidence |
+| --- | --- | --- |
+| `[todo]` | Tile microphone start spike decided | |
+| `[todo]` | New entry and Record voice Quick Settings tiles, with an active recording state | |
+| `[todo]` | The recording notification is a Live Update with a status bar chip | |
+| `[todo]` | Export, restore, and sync progress are Live Updates, with semantic colors on API 37 | |
+| `[todo]` | Capture nudges offer Write (direct reply) and Record | |
+| `[todo]` | A capture-only lock-screen and hub widget, showing no journal content | |
+
+## Widgets
+
+| Status | Requirement | Evidence |
+| --- | --- | --- |
+| `[partial]` | New entry, On This Day, and Pinned memory home-screen widgets | Ship today. `OnThisDayWidgetPreviewTest` and `WidgetSetupScreenshotsTest` capture managed-device images, but they are not committed. Missing: Lane 1 Glance references. |
+| `[partial]` | Generated widget previews in the picker | `WidgetPreviewPublisher` ships today. Missing: Lane 2 picker capture. |
+
+## Bubbles
+
+| Status | Requirement | Evidence |
+| --- | --- | --- |
+| `[todo]` | Home, the editor, and the recorder work at App Bubble sizes without being recreated on resize | |
+| `[todo]` | Recording bubble spike decided | |
+| `[todo]` | The voice recorder floats as a bubble with pause, stop, and save | |
+
+## Keyboard, Pointer, Drag and Drop
+
+| Status | Requirement | Evidence |
+| --- | --- | --- |
+| `[partial]` | One keyboard shortcut catalog drives Compose handlers, the Meta+/ helper, and desktop menus | Ctrl/Cmd+F opens Search today (`LogDateNavDisplay.kt`). No `KeyboardShortcutGroup` exists. |
+| `[todo]` | Right-click opens context menus at the pointer; icon-only actions have tooltips | |
+| `[todo]` | Text, photos, videos, and audio can be dropped or pasted into the editor | |
+| `[todo]` | Photos and videos drag out as readable content URIs | |
+| `[todo]` | Stylus handwriting works in the editor | |
+
+## Large Screens and Desktop Windowing
+
+| Status | Requirement | Evidence |
+| --- | --- | --- |
+| `[partial]` | Entries and journals open in a new window, beside the current one when there is room | `EditorActivity` and `EditorManager` ship today, covered by `MultiWindowEditorE2ETest`. The "Open in new window" action is missing. |
+| `[todo]` | The workspace app bar sits in the desktop caption bar | |
+
+## AppFunctions and Cross-Device
+
+| Status | Requirement | Evidence |
+| --- | --- | --- |
+| `[todo]` | Capture AppFunctions: `createTextEntry`, `startVoiceEntry`, and `listJournals` | |
+| `[todo]` | Read AppFunctions refuse without consent or while locked | |
+| `[partial]` | Handoff continues an in-progress entry on another device | `MainActivity` opts into Handoff on API 37 (`MainActivity+Handoff.kt`). Editor Handoff depends on draft sync. |
