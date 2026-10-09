@@ -57,7 +57,7 @@ class ExperienceGateTest {
 
         waitFor { composeRule.onAllNodesWithContentDescription(RECORD_AUDIO) }
         composeRule.onNodeWithContentDescription(RECORD_AUDIO).assertIsDisplayed()
-        composeRule.onAllNodesWithTag(WearAppV2Tags.PLACEHOLDER).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(WearAppV2Tags.SHELL).assertCountEquals(0)
     }
 
     @Test
@@ -66,8 +66,8 @@ class ExperienceGateTest {
 
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
-        waitFor { composeRule.onAllNodesWithTag(WearAppV2Tags.PLACEHOLDER) }
-        composeRule.onNodeWithTag(WearAppV2Tags.PLACEHOLDER).assertIsDisplayed()
+        waitFor { composeRule.onAllNodesWithTag(WearAppV2Tags.SHELL) }
+        composeRule.onNodeWithTag(WearAppV2Tags.SHELL).assertIsDisplayed()
         composeRule.onAllNodesWithContentDescription(RECORD_AUDIO).assertCountEquals(0)
     }
 
@@ -75,12 +75,12 @@ class ExperienceGateTest {
     fun turning_the_flag_off_does_not_swap_an_open_activity() {
         setNewWatchApp(enabled = true)
         val launched = ActivityScenario.launch(MainActivity::class.java).also { scenario = it }
-        waitFor { composeRule.onAllNodesWithTag(WearAppV2Tags.PLACEHOLDER) }
+        waitFor { composeRule.onAllNodesWithTag(WearAppV2Tags.SHELL) }
 
         setNewWatchApp(enabled = false)
         launched.recreate()
 
-        waitFor { composeRule.onAllNodesWithTag(WearAppV2Tags.PLACEHOLDER) }
+        waitFor { composeRule.onAllNodesWithTag(WearAppV2Tags.SHELL) }
         composeRule.onAllNodesWithContentDescription(RECORD_AUDIO).assertCountEquals(0)
     }
 
