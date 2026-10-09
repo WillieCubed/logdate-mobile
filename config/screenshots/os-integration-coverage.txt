@@ -1,0 +1,19 @@
+# Screenshots every Android OS integration feature must have.
+#
+# One requirement per line: feature|lane|target
+#
+#   android  Compose preview under app/android-main/src/screenshotTest/kotlin, as File.kt#Function.
+#            It must use @OsIntegrationPreviewMatrix and have a reference for every configuration.
+#   desktop  Shared scene id. It must have phone, phone-dark, compact-phone, phone-rtl, and
+#            phone-large-text references in app/compose-main/src/desktopTest/reference.
+#   system   Real system UI captured on a Gradle Managed Device, under
+#            docs/screenshots/android-os-integration/<surface>/<state>--<device>-api<N>.png,
+#            or .txt evidence such as cmd app_function output.
+#   glance   Glance widget reference image path.
+#
+# ./gradlew checkOsIntegrationScreenshotCoverage (or ./run screenshots:check) enforces this file.
+# See docs/testing/screenshot-tests.md.
+
+# Privacy settings: system search visibility, which is also the consent for assistant read access.
+privacy-system-search|android|app/logdate/screenshots/flows/flow20_os_integration/Flow20_01_SystemSearchVisibilityScreenshots.kt#S01_PrivacySystemSearchVisibility
+privacy-system-search|desktop|privacy-settings

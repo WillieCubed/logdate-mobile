@@ -50,6 +50,7 @@ test|test:bench:wear|Run managed Wear OS macrobenchmarks|./gradlew managedWearBe
 test|test:bench:micro|Run Android microbenchmarks|./gradlew managedMicroBenchmark
 test|test:screenshots|Validate screenshot tests|./gradlew :app:android-main:validateDebugScreenshotTest
 test|test:screenshots:update|Regenerate golden screenshots|./gradlew :app:android-main:updateDebugScreenshotTest
+test|screenshots:check|Check OS integration screenshot coverage and find stale references|./gradlew checkOsIntegrationScreenshotCoverage
 test|location-replay|Replay exported location history through old and current reconstruction|./scripts/location-replay.sh
 
 quality|lint|Run Android lint|./gradlew lint

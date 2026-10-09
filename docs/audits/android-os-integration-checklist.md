@@ -70,11 +70,11 @@ A row reaches `[done]` only when its Evidence column lists:
 | Status | Requirement | Evidence |
 | --- | --- | --- |
 | `[partial]` | Design spec, hub guide, surface guides, and this checklist exist and are linked from `docs/README.md` | This commit. Missing: screenshots in each guide, which arrive with their features. |
-| `[todo]` | `@OsIntegrationPreviewMatrix` covers phone, phone dark, compact, landscape, tablet, RTL, 200% text, dynamic color, and bubble size | |
+| `[done]` | `@OsIntegrationPreviewMatrix` covers phone, phone dark, compact, landscape, tablet, RTL, 200% text, dynamic color, and bubble size | `2b92186d6`. Matrix and `@BubbleWindowPreview` in `common/ScreenshotPreviewMatrix.kt`; shared viewports in `SharedScreenshotCatalog.kt` (`osIntegrationVariants`), tested by `SharedScreenshotCatalogTest` (7/7). First scene `S01_PrivacySystemSearchVisibility`: 8 Android and 3 new desktop references, each inspected. It found settings descriptions truncating at two lines (Docket bug). |
 | `[todo]` | Glance widgets render to committed references for light, dark, RTL, and 200% text | |
 | `[todo]` | `OsSurfaceScreenshotsTest` captures real system UI on API 37 phone and tablet managed devices with demo mode | |
 | `[todo]` | Desktop windowing capture spike decided | |
-| `[todo]` | `checkOsIntegrationScreenshotCoverage` fails on missing images, missing tests, and stale references | |
+| `[done]` | `checkOsIntegrationScreenshotCoverage` fails on missing images, missing tests, and stale references | `ScreenshotCoverageTest` (13/13, `cd build-logic && ../gradlew test`). Registry `config/screenshots/os-integration-coverage.txt`. Runs in `.githooks/pre-push` and `./run screenshots:check`. Its first run found 157 stale references, deleted in `f273b86a5`. The `ci.yml` step is prepared for the user to commit. |
 | `[todo]` | `buildScreenshotComparisonSheet` generates labeled sheets per feature | |
 | `[todo]` | `./run` runs every screenshot lane, plus `screenshots:os`, `screenshots:sheet`, and `screenshots:check` | |
 

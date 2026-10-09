@@ -152,9 +152,46 @@ that CLAUDE.md requires for UI acceptance.
 3. Open every new or changed reference and check it against the intended behavior before committing.
    A render that succeeded is not the same as a render that is right.
 
+4. Register every screenshot the feature needs in `config/screenshots/os-integration-coverage.txt`,
+   then run the coverage check:
+
+   ```bash
+   ./run screenshots:check
+   ```
+
 The first OS integration scene is `S01_PrivacySystemSearchVisibility` in
 `Flow20_01_SystemSearchVisibilityScreenshots.kt`. It shows the privacy setting that controls system
 search and assistant access.
+
+### The coverage registry
+
+"Every feature ships screenshots" is only a promise until something checks it.
+`config/screenshots/os-integration-coverage.txt` lists the screenshots each feature must have, one per
+line as `feature|lane|target`:
+
+```text
+privacy-system-search|android|app/logdate/screenshots/flows/flow20_os_integration/Flow20_01_SystemSearchVisibilityScreenshots.kt#S01_PrivacySystemSearchVisibility
+privacy-system-search|desktop|privacy-settings
+quick-settings-tiles|system|docs/screenshots/android-os-integration/quick-settings-tiles/shade-active--phone-api37.png
+```
+
+| Lane | Target | What the check requires |
+| --- | --- | --- |
+| `android` | `File.kt#Function` under `app/android-main/src/screenshotTest/kotlin` | The function exists, uses `@OsIntegrationPreviewMatrix`, and has a reference for every configuration in it (plus Bubble when `@BubbleWindowPreview` is applied) |
+| `desktop` | Shared scene id | References for `phone`, `phone-dark`, `compact-phone`, `phone-rtl`, and `phone-large-text` |
+| `system` | Repository path | A real PNG captured from a managed device, or non-empty `.txt` evidence |
+| `glance` | Repository path | A real PNG widget reference |
+
+`checkOsIntegrationScreenshotCoverage` (`./run screenshots:check`) fails when:
+
+- a registered screenshot is missing;
+- a preview in `flows/flow20_os_integration/` uses the OS integration matrix but is not registered;
+- any phone screenshot reference has no matching test.
+
+That last rule keeps the reference set honest: when you rename or delete a preview, delete its
+references in the same commit. The pre-push hook runs the check. The logic lives in
+`build-logic/src/main/kotlin/app/logdate/ScreenshotCoverage.kt`, with tests in
+`build-logic/src/test/kotlin/app/logdate/ScreenshotCoverageTest.kt`.
 
 ## Guidelines for Screenshot Tests
 

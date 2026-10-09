@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnRootExtension
 
 plugins {
     id("app.logdate.home-workspace")
+    id("app.logdate.screenshot-coverage")
     // this is necessary to avoid the plugins to be loaded multiple times
     // in each subproject's classloader
     alias(libs.plugins.kotlin.jvm) apply false

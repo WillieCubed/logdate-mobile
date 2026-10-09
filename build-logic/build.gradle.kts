@@ -30,6 +30,10 @@ gradlePlugin {
             id = "app.logdate.home-workspace"
             implementationClass = "app.logdate.HomeWorkspacePlugin"
         }
+        register("screenshotCoverage") {
+            id = "app.logdate.screenshot-coverage"
+            implementationClass = "app.logdate.ScreenshotCoveragePlugin"
+        }
         register("atprotoPublishedModule") {
             id = "app.logdate.atproto-published-module"
             implementationClass = "app.logdate.AtprotoPublishedModulePlugin"
