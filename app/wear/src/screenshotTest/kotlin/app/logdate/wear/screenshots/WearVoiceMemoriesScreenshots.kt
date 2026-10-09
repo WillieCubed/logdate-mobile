@@ -33,14 +33,14 @@ class WearVoiceMemoriesScreenshots {
     @WearScreenshotPreviewMatrix
     @Composable
     fun S01_MemoriesEmpty() {
-        OnWatch { WearVoiceMemoriesContent(VoiceMemoriesUiState(isLoaded = true), timeZone = PREVIEW_ZONE) }
+        OnWatchSurface { WearVoiceMemoriesContent(VoiceMemoriesUiState(isLoaded = true), timeZone = PREVIEW_ZONE) }
     }
 
     @PreviewTest
     @WearScreenshotPreviewMatrix
     @Composable
     fun S02_MemoriesList() {
-        OnWatch {
+        OnWatchSurface {
             WearVoiceMemoriesContent(
                 VoiceMemoriesUiState(memories = sampleMemories(), isLoaded = true, hasMore = true),
                 timeZone = PREVIEW_ZONE,
@@ -52,7 +52,7 @@ class WearVoiceMemoriesScreenshots {
     @WearScreenshotPreviewMatrix
     @Composable
     fun S03_PlayerPlaying() {
-        OnWatch {
+        OnWatchSurface {
             WearMemoryPlayerContent(
                 playerState(WearPlaybackUiState.Active(memory.noteId, progress = 0.35f, durationMs = 84_000)),
                 timeZone = PREVIEW_ZONE,
@@ -64,7 +64,7 @@ class WearVoiceMemoriesScreenshots {
     @WearScreenshotPreviewMatrix
     @Composable
     fun S04_PlayerPaused() {
-        OnWatch {
+        OnWatchSurface {
             WearMemoryPlayerContent(
                 playerState(WearPlaybackUiState.Active(memory.noteId, progress = 0.35f, durationMs = 84_000, isPaused = true)),
                 timeZone = PREVIEW_ZONE,
@@ -76,21 +76,21 @@ class WearVoiceMemoriesScreenshots {
     @WearScreenshotPreviewMatrix
     @Composable
     fun S05_PlayerPreparing() {
-        OnWatch { WearMemoryPlayerContent(playerState(WearPlaybackUiState.Preparing(memory.noteId)), timeZone = PREVIEW_ZONE) }
+        OnWatchSurface { WearMemoryPlayerContent(playerState(WearPlaybackUiState.Preparing(memory.noteId)), timeZone = PREVIEW_ZONE) }
     }
 
     @PreviewTest
     @WearScreenshotPreviewMatrix
     @Composable
     fun S06_PlayerLoadFailed() {
-        OnWatch { WearMemoryPlayerContent(playerState(WearPlaybackUiState.Error(memory.noteId)), timeZone = PREVIEW_ZONE) }
+        OnWatchSurface { WearMemoryPlayerContent(playerState(WearPlaybackUiState.Error(memory.noteId)), timeZone = PREVIEW_ZONE) }
     }
 
     @PreviewTest
     @WearScreenshotPreviewMatrix
     @Composable
     fun S07_PlayerNoSpeaker() {
-        OnWatch {
+        OnWatchSurface {
             WearMemoryPlayerContent(
                 playerState(WearPlaybackUiState.BlockedOutput(memory.noteId), output = AudioOutputState.Unavailable),
                 timeZone = PREVIEW_ZONE,
@@ -102,7 +102,7 @@ class WearVoiceMemoriesScreenshots {
     @WearScreenshotPreviewMatrix
     @Composable
     fun S08_PlayerNotFound() {
-        OnWatch { WearMemoryPlayerContent(MemoryPlayerUiState(isLoaded = true, memory = null)) }
+        OnWatchSurface { WearMemoryPlayerContent(MemoryPlayerUiState(isLoaded = true, memory = null)) }
     }
 }
 
@@ -124,10 +124,3 @@ private fun sampleMemories(): List<VoiceMemoryItem> =
         VoiceMemoryItem(Uuid.parse("00000000-0000-0000-0000-000000000002"), PREVIEW_NOW - 1.days - 2.hours, 12_000),
         VoiceMemoryItem(Uuid.parse("00000000-0000-0000-0000-000000000003"), PREVIEW_NOW - 5.days, 605_000),
     )
-
-@Composable
-private fun OnWatch(content: @Composable () -> Unit) {
-    MaterialTheme {
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) { content() }
-    }
-}
