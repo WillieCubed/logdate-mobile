@@ -170,6 +170,50 @@ class JwtTokenServiceTest {
     }
 
     @Test
+    fun `linked device tokens carry their session and sync scope`() {
+        val service = JwtTokenService(secret = hmacKey, issuer = issuer, audience = audience)
+
+        val access = service.generateDeviceAccessToken("acc-watch", "did:plc:alice123", "session-1")
+        val refresh = service.generateDeviceRefreshToken("acc-watch", "did:plc:alice123", "session-1")
+
+        val expected = AccessTokenClaims("acc-watch", "did:plc:alice123", "session-1", TokenScope.SYNC)
+        assertEquals(expected, service.decodeAccessToken(access))
+        assertEquals(expected, service.decodeRefreshToken(refresh))
+        assertEquals("session-1", payloadOf(access)["sid"]?.jsonPrimitive?.content)
+        assertEquals("sync", payloadOf(access)["scp"]?.jsonPrimitive?.content)
+        assertNull(service.decodeAccessToken(refresh))
+        assertNull(service.decodeRefreshToken(access))
+    }
+
+    @Test
+    fun `full access checks refuse linked device tokens`() {
+        val service = JwtTokenService(secret = hmacKey, issuer = issuer, audience = audience)
+
+        assertNull(service.validateAccessToken(service.generateDeviceAccessToken("acc-watch", null, "session-1")))
+        assertNull(service.validateRefreshToken(service.generateDeviceRefreshToken("acc-watch", null, "session-1")))
+        assertEquals(
+            AccessTokenClaims.full("acc-phone", "did:plc:alice123"),
+            service.decodeAccessToken(service.generateAccessToken("acc-phone", "did:plc:alice123")),
+        )
+        assertEquals(AccessTokenClaims.full("acc-phone"), service.decodeRefreshToken(service.generateRefreshToken("acc-phone")))
+    }
+
+    @Test
+    fun `unknown scopes and half formed device claims are refused`() {
+        val service = JwtTokenService(secret = hmacKey, issuer = issuer, audience = audience)
+        val now = Clock.System.now().epochSeconds
+        val header = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}"
+
+        val claims = "{\"sub\":\"acc-x\",\"iss\":\"$issuer\",\"aud\":\"$audience\",\"exp\":${now + 600},\"iat\":$now"
+
+        listOf(",\"scp\":\"admin\",\"sid\":\"s\"", ",\"scp\":\"sync\"", ",\"sid\":\"s\"").forEach { extra ->
+            val forged = buildToken(hmacKey, header, "$claims,\"type\":\"access\"$extra}")
+            assertNull(service.validateAccessToken(forged), extra)
+            assertNull(service.decodeAccessToken(forged), extra)
+        }
+    }
+
+    @Test
     fun `secret generation yields non-empty random values`() {
         val first = JwtTokenService.generateSecret()
         val second = JwtTokenService.generateSecret()
@@ -242,11 +286,16 @@ class JwtTokenServiceTest {
                 String::class.java,
                 String::class.java,
                 String::class.java,
+                String::class.java,
+                String::class.java,
             )
         payloadConstructor.isAccessible = true
-        val payload = payloadConstructor.newInstance("acc-1", issuer, audience, 1000L, 900L, "access", "did:plc:alice123", null)
+        val payload =
+            payloadConstructor.newInstance("acc-1", issuer, audience, 1000L, 900L, "access", "did:plc:alice123", null, "session-1", "sync")
         assertEquals(900L, payloadClass.getMethod("getIat").invoke(payload))
         assertEquals("did:plc:alice123", payloadClass.getMethod("getDid").invoke(payload))
+        assertEquals("session-1", payloadClass.getMethod("getSid").invoke(payload))
+        assertEquals("sync", payloadClass.getMethod("getScp").invoke(payload))
     }
 
     private fun buildToken(

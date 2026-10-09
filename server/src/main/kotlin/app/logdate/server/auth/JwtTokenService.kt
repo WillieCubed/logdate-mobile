@@ -11,6 +11,7 @@ import java.util.Base64
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -62,52 +63,38 @@ class JwtTokenService(
         val iat: Long, // issued at (seconds since epoch)
         val type: String, // token type: "access", "refresh", "session"
         val did: String? = null, // AT Protocol DID for user-bound tokens
-        val jti: String? = null, // unique ID, so two tokens minted in the same second stay distinct and separately revocable
+        val jti: String? = null, // unique ID, so two tokens minted in the same second stay separately revocable
+        val sid: String? = null, // linked device session; only on device tokens
+        val scp: String? = null, // scope; "sync" on device tokens, absent on full-access tokens
     )
 
     override fun generateAccessToken(
         accountId: String,
         did: String?,
-    ): String {
-        val now = Clock.System.now()
-        val expiry = now + ACCESS_TOKEN_DURATION
-
-        val payload =
-            JwtPayload(
-                sub = accountId,
-                iss = issuer,
-                aud = audience,
-                exp = expiry.epochSeconds,
-                iat = now.epochSeconds,
-                type = "access",
-                did = did,
-                jti = Uuid.random().toString(),
-            )
-
-        return generateToken(payload)
-    }
+    ): String = generateToken(payload(accountId, did, "access", ACCESS_TOKEN_DURATION))
 
     override fun generateRefreshToken(
         accountId: String,
         did: String?,
-    ): String {
-        val now = Clock.System.now()
-        val expiry = now + REFRESH_TOKEN_DURATION
+    ): String = generateToken(payload(accountId, did, "refresh", REFRESH_TOKEN_DURATION))
 
-        val payload =
-            JwtPayload(
-                sub = accountId,
-                iss = issuer,
-                aud = audience,
-                exp = expiry.epochSeconds,
-                iat = now.epochSeconds,
-                type = "refresh",
-                did = did,
-                jti = Uuid.random().toString(),
-            )
+    override fun generateDeviceAccessToken(
+        accountId: String,
+        did: String?,
+        sessionId: String,
+    ): String =
+        generateToken(
+            payload(accountId, did, "access", ACCESS_TOKEN_DURATION).copy(sid = sessionId, scp = TokenScope.SYNC.claim),
+        )
 
-        return generateToken(payload)
-    }
+    override fun generateDeviceRefreshToken(
+        accountId: String,
+        did: String?,
+        sessionId: String,
+    ): String =
+        generateToken(
+            payload(accountId, did, "refresh", REFRESH_TOKEN_DURATION).copy(sid = sessionId, scp = TokenScope.SYNC.claim),
+        )
 
     override fun generateEnrollmentTokens(
         accountId: String,
@@ -116,48 +103,52 @@ class JwtTokenService(
         issuedAt: Instant,
     ): AccountTokens {
         val access =
-            JwtPayload(
-                sub = accountId,
-                iss = issuer,
-                aud = audience,
-                exp = (issuedAt + ACCESS_TOKEN_DURATION).epochSeconds,
-                iat = issuedAt.epochSeconds,
-                type = "access",
-                did = did,
-                jti = "device-enrollment-access:$enrollmentId",
-            )
-        val refresh =
-            access.copy(
-                exp = (issuedAt + REFRESH_TOKEN_DURATION).epochSeconds,
-                type = "refresh",
-                jti = "device-enrollment:$enrollmentId",
-            )
+            payload(accountId, did, "access", ACCESS_TOKEN_DURATION, issuedAt, jti = "device-enrollment-access:$enrollmentId")
+        val refresh = payload(accountId, did, "refresh", REFRESH_TOKEN_DURATION, issuedAt, jti = "device-enrollment:$enrollmentId")
         return AccountTokens(generateToken(access), generateToken(refresh))
     }
 
-    override fun generateSessionToken(sessionId: String): String {
-        val now = Clock.System.now()
-        val expiry = now + SESSION_TOKEN_DURATION
+    override fun generateSessionToken(sessionId: String): String =
+        generateToken(payload(sessionId, null, "session", SESSION_TOKEN_DURATION))
 
-        val payload =
-            JwtPayload(
-                sub = sessionId,
-                iss = issuer,
-                aud = audience,
-                exp = expiry.epochSeconds,
-                iat = now.epochSeconds,
-                type = "session",
-                jti = Uuid.random().toString(),
-            )
+    override fun validateAccessToken(token: String): String? = decode(token, "access")?.takeIf { it.scope == TokenScope.FULL }?.accountId
 
-        return generateToken(payload)
+    override fun validateRefreshToken(token: String): String? = decode(token, "refresh")?.takeIf { it.scope == TokenScope.FULL }?.accountId
+
+    override fun decodeAccessToken(token: String): AccessTokenClaims? = decode(token, "access")
+
+    override fun decodeRefreshToken(token: String): AccessTokenClaims? = decode(token, "refresh")
+
+    override fun validateSessionToken(token: String): String? = verifiedPayload(token, "session")?.sub
+
+    private fun payload(
+        subject: String,
+        did: String?,
+        type: String,
+        lifetime: Duration,
+        issuedAt: Instant = Clock.System.now(),
+        jti: String = Uuid.random().toString(),
+    ): JwtPayload =
+        JwtPayload(
+            sub = subject,
+            iss = issuer,
+            aud = audience,
+            exp = (issuedAt + lifetime).epochSeconds,
+            iat = issuedAt.epochSeconds,
+            type = type,
+            did = did,
+            jti = jti,
+        )
+
+    private fun decode(
+        token: String,
+        expectedType: String,
+    ): AccessTokenClaims? {
+        val payload = verifiedPayload(token, expectedType) ?: return null
+        val scope = TokenScope.fromClaim(payload.scp) ?: return null
+        if ((scope == TokenScope.SYNC) != (payload.sid != null)) return null
+        return AccessTokenClaims(payload.sub, payload.did, payload.sid, scope)
     }
-
-    override fun validateAccessToken(token: String): String? = validateToken(token, "access")
-
-    override fun validateRefreshToken(token: String): String? = validateToken(token, "refresh")
-
-    override fun validateSessionToken(token: String): String? = validateToken(token, "session")
 
     private fun generateToken(payload: JwtPayload): String {
         try {
@@ -178,10 +169,10 @@ class JwtTokenService(
         }
     }
 
-    private fun validateToken(
+    private fun verifiedPayload(
         token: String,
         expectedType: String,
-    ): String? {
+    ): JwtPayload? {
         try {
             val parts = token.split(".")
             if (parts.size != 3) {
@@ -223,7 +214,7 @@ class JwtTokenService(
                 return null
             }
 
-            return payload.sub
+            return payload
         } catch (_: Exception) {
             Napier.e("Failed to validate JWT token")
             return null

@@ -36,17 +36,37 @@ interface TokenService {
         issuedAt: Instant,
     ): AccountTokens
 
+    /** A 1-hour access token for linked device session [sessionId]; it carries `sid` and `scp=sync`. */
+    fun generateDeviceAccessToken(
+        accountId: String,
+        did: String?,
+        sessionId: String,
+    ): String
+
+    /** A 30-day refresh token for linked device session [sessionId]; it carries `sid` and `scp=sync`. */
+    fun generateDeviceRefreshToken(
+        accountId: String,
+        did: String?,
+        sessionId: String,
+    ): String
+
     /**
-     * Validate an access token and extract the account ID.
-     * Returns null if the token is invalid or expired.
+     * Validate a full-access token and extract the account ID.
+     * Returns null if the token is invalid or expired, and for every linked device token.
      */
     fun validateAccessToken(token: String): String?
 
     /**
-     * Validate a refresh token and extract the account ID.
-     * Returns null if the token is invalid or expired.
+     * Validate a full-access refresh token and extract the account ID.
+     * Returns null if the token is invalid or expired, and for every linked device token.
      */
     fun validateRefreshToken(token: String): String?
+
+    /** Every claim of a valid access token, full or linked device; null when invalid or expired. */
+    fun decodeAccessToken(token: String): AccessTokenClaims? = validateAccessToken(token)?.let { AccessTokenClaims.full(it) }
+
+    /** Every claim of a valid refresh token, full or linked device; null when invalid or expired. */
+    fun decodeRefreshToken(token: String): AccessTokenClaims? = validateRefreshToken(token)?.let { AccessTokenClaims.full(it) }
 
     /**
      * Generate a temporary session token for account creation flow.

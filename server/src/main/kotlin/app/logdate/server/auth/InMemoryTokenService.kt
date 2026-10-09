@@ -1,10 +1,14 @@
 package app.logdate.server.auth
 
 import app.logdate.shared.model.AccountTokens
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * Deterministic [TokenService] for local tests and in-memory server fixtures.
@@ -16,6 +20,9 @@ class InMemoryTokenService(
     private val accessTokenExpiration = 1.hours
     private val refreshTokenExpiration = 720.hours // 30 days
     private val sessionTokenExpiration = 15.minutes
+
+    // The readable test format has no room for a session or scope, so device tokens are looked up here.
+    private val deviceTokens = ConcurrentHashMap<String, AccessTokenClaims>()
 
     override fun generateAccessToken(
         accountId: String,
@@ -59,6 +66,18 @@ class InMemoryTokenService(
         )
     }
 
+    override fun generateDeviceAccessToken(
+        accountId: String,
+        did: String?,
+        sessionId: String,
+    ): String = deviceToken("access", accountId, did, sessionId, accessTokenExpiration)
+
+    override fun generateDeviceRefreshToken(
+        accountId: String,
+        did: String?,
+        sessionId: String,
+    ): String = deviceToken("refresh", accountId, did, sessionId, refreshTokenExpiration)
+
     override fun generateSessionToken(sessionId: String): String {
         val now = Clock.System.now()
         val expiresAt = now + sessionTokenExpiration
@@ -67,15 +86,44 @@ class InMemoryTokenService(
         return "memory_${tokenData.hashCode().toString(16)}_$tokenData"
     }
 
-    override fun validateAccessToken(token: String): String? = validateToken(token, "access")
+    // ConcurrentHashMap's `in` is the legacy contains(value); containsKey is the check that matters here.
+    override fun validateAccessToken(token: String): String? =
+        validateToken(token, "access")?.takeUnless { deviceTokens.containsKey(token) }
 
-    override fun validateRefreshToken(token: String): String? = validateToken(token, "refresh")
+    override fun validateRefreshToken(token: String): String? =
+        validateToken(token, "refresh")?.takeUnless { deviceTokens.containsKey(token) }
+
+    override fun decodeAccessToken(token: String): AccessTokenClaims? = decode(token, "access")
+
+    override fun decodeRefreshToken(token: String): AccessTokenClaims? = decode(token, "refresh")
 
     override fun validateSessionToken(token: String): String? =
         validateToken(token, "session")?.let {
             // For session tokens, return the session ID instead of account ID.
             token.substringAfter("session.").substringBefore(".")
         }
+
+    private fun decode(
+        token: String,
+        type: String,
+    ): AccessTokenClaims? {
+        val accountId = validateToken(token, type) ?: return null
+        return deviceTokens[token] ?: AccessTokenClaims.full(accountId)
+    }
+
+    @OptIn(ExperimentalUuidApi::class)
+    private fun deviceToken(
+        type: String,
+        accountId: String,
+        did: String?,
+        sessionId: String,
+        lifetime: Duration,
+    ): String {
+        val expiresAt = Clock.System.now() + lifetime
+        val token = "memory_${Uuid.random().toHexString()}_$type.$accountId.${expiresAt.epochSeconds}"
+        deviceTokens[token] = AccessTokenClaims(accountId, did, sessionId, TokenScope.SYNC)
+        return token
+    }
 
     private fun validateToken(
         token: String,
@@ -95,7 +143,7 @@ class InMemoryTokenService(
         if (type != expectedType) return null
 
         val now = Clock.System.now()
-        val expiresAt = kotlin.time.Instant.fromEpochSeconds(expiresAtSeconds)
+        val expiresAt = Instant.fromEpochSeconds(expiresAtSeconds)
         if (now > expiresAt) return null
 
         return accountId

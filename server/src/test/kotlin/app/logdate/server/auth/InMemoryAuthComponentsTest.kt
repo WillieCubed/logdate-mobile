@@ -250,4 +250,18 @@ class InMemoryAuthComponentsTest {
         assertNull(service.validateAccessToken("memory_hash_access.acc.not_a_number"))
         assertNull(service.validateRefreshToken(access))
     }
+
+    @Test
+    fun `in-memory device tokens decode with their session and never pass full access checks`() {
+        val service = InMemoryTokenService()
+
+        val access = service.generateDeviceAccessToken("acc-1", null, "session-1")
+        val refresh = service.generateDeviceRefreshToken("acc-1", null, "session-1")
+
+        assertNull(service.validateAccessToken(access))
+        assertNull(service.validateRefreshToken(refresh))
+        assertEquals(AccessTokenClaims("acc-1", null, "session-1", TokenScope.SYNC), service.decodeAccessToken(access))
+        assertEquals("session-1", service.decodeRefreshToken(refresh)?.sessionId)
+        assertEquals(AccessTokenClaims.full("acc-1"), service.decodeAccessToken(service.generateAccessToken("acc-1")))
+    }
 }
