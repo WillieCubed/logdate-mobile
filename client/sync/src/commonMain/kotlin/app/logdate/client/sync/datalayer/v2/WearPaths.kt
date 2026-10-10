@@ -1,0 +1,87 @@
+package app.logdate.client.sync.datalayer.v2
+
+import kotlin.uuid.Uuid
+
+/**
+ * The Data Layer paths of version 2.
+ *
+ * None starts with a prefix a version 1 listener filters on (`/logdate/notes`, `/logdate/journals`,
+ * `/logdate/associations`, `/logdate/health`, `/logdate/camera`, `/logdate/sync`), so a build without
+ * version 2 never wakes for one.
+ */
+object WearPaths {
+    /** Each device's state document, one data item per node. */
+    const val STATE = "/logdate/state"
+
+    const val RECEIPTS = "/logdate/v2/receipts"
+    const val RECEIPTS_PUSH = "/logdate/v2/receipts/push"
+    const val WINDOW_RESYNC = "/logdate/v2/window/resync"
+
+    const val LINK_OFFER = "/logdate/link/offer"
+    const val LINK_BUNDLE = "/logdate/link/bundle"
+
+    const val LIVE_RECORDING = "/logdate/live/recording"
+    const val LIVE_RECORDING_COMMAND = "/logdate/live/recording/command"
+    const val LIVE_PLAYBACK = "/logdate/live/playback"
+    const val LIVE_PLAYBACK_COMMAND = "/logdate/live/playback/command"
+
+    const val REMINDERS_DELIVER = "/logdate/reminders/deliver"
+    const val REMINDERS_CLAIM = "/logdate/reminders/claim"
+    const val PRESENCE = "/logdate/presence"
+    const val DIAG_PING = "/logdate/diag/ping"
+    const val FAVORITES_SET = "/logdate/favorites/set"
+
+    private const val WINDOW_PREFIX = "/logdate/v2/p2w/window/"
+    private const val TOMBSTONE_PREFIX = "/logdate/v2/p2w/tombstone/"
+    private const val RECORD_PREFIX = "/logdate/v2/w2p/record/"
+    private const val BODY_PREFIX = "/logdate/v2/body/"
+    private val SHA256_HEX = Regex("[0-9a-f]{64}")
+
+    /** A record in the watch's library window, written by the phone. */
+    fun windowItem(
+        kind: RecordKind,
+        id: Uuid,
+    ): String = "$WINDOW_PREFIX${kind.pathSegment}/$id"
+
+    /** A record that left the window or was deleted on the phone. */
+    fun windowTombstone(
+        kind: RecordKind,
+        id: Uuid,
+    ): String = "$TOMBSTONE_PREFIX${kind.pathSegment}/$id"
+
+    /** A record made on the watch, on its way to the phone. */
+    fun watchRecord(
+        kind: RecordKind,
+        id: Uuid,
+    ): String = "$RECORD_PREFIX${kind.pathSegment}/$id"
+
+    /** The channel a body too large for a data item travels on. */
+    fun bodyChannel(sha256Hex: String): String {
+        require(SHA256_HEX.matches(sha256Hex)) { "A body channel is named by a lowercase hex SHA-256" }
+        return "$BODY_PREFIX$sha256Hex"
+    }
+
+    fun parseWindowItem(path: String): RecordPath? = parse(path, WINDOW_PREFIX)
+
+    fun parseWindowTombstone(path: String): RecordPath? = parse(path, TOMBSTONE_PREFIX)
+
+    fun parseWatchRecord(path: String): RecordPath? = parse(path, RECORD_PREFIX)
+
+    private fun parse(
+        path: String,
+        prefix: String,
+    ): RecordPath? {
+        if (!path.startsWith(prefix)) return null
+        val parts = path.removePrefix(prefix).split('/')
+        if (parts.size != 2) return null
+        val kind = RecordKind.fromPathSegment(parts[0]) ?: return null
+        val id = runCatching { Uuid.parse(parts[1]) }.getOrNull() ?: return null
+        return RecordPath(kind, id)
+    }
+}
+
+/** The kind and id a record path names. */
+data class RecordPath(
+    val kind: RecordKind,
+    val id: Uuid,
+)
