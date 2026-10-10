@@ -41,6 +41,7 @@ import app.logdate.client.domain.journals.SuggestJournalsUseCase
 import app.logdate.client.domain.journals.UpdateJournalUseCase
 import app.logdate.client.domain.location.ObserveLocationStopsUseCase
 import app.logdate.client.domain.media.IndexMediaForPeriodUseCase
+import app.logdate.client.domain.moments.EnrichMarkLocationUseCase
 import app.logdate.client.domain.notes.AddNoteUseCase
 import app.logdate.client.domain.notes.FetchEntryUseCase
 import app.logdate.client.domain.notes.FetchNotesForDayUseCase
@@ -298,4 +299,5 @@ val domainModule: Module =
         // Preferences shared with a paired watch. The watch app binds its own store with its role.
         single { StampedPreferenceStore(storage = get(), localRole = PeerRole.PHONE) }
         single<WatchPreferencesRepository> { DefaultWatchPreferencesRepository(get()) }
+        factory { EnrichMarkLocationUseCase(marks = get(), locationHistory = get(), watchPreferences = get()) }
     }

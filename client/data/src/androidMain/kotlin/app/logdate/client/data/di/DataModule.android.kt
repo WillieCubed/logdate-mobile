@@ -23,6 +23,7 @@ import app.logdate.client.data.location.OfflineFirstLocationHistoryRepository
 import app.logdate.client.data.location.RoomHistoryRecordStore
 import app.logdate.client.data.maintenance.DataIntegrityService
 import app.logdate.client.data.media.OfflineIndexedMediaRepository
+import app.logdate.client.data.moments.OfflineFirstMarkedMomentRepository
 import app.logdate.client.data.notes.DatabaseNotePlaceResolver
 import app.logdate.client.data.notes.NotePlaceResolver
 import app.logdate.client.data.notes.OfflineFirstJournalNotesRepository
@@ -87,6 +88,7 @@ import app.logdate.client.repository.location.ActivityHistoryRepository
 import app.logdate.client.repository.location.HistoryRecordStore
 import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.media.IndexedMediaRepository
+import app.logdate.client.repository.moments.MarkedMomentRepository
 import app.logdate.client.repository.places.UserPlacesRepository
 import app.logdate.client.repository.profile.ProfileRepository
 import app.logdate.client.repository.quota.RemoteQuotaDataSource
@@ -222,6 +224,7 @@ actual val dataModule: Module =
 
         // Places
         single<UserPlacesRepository> { OfflineFirstUserPlacesRepository(get()) }
+        single<MarkedMomentRepository> { OfflineFirstMarkedMomentRepository(get()) }
 
         // Events
         single<EventRepository> { OfflineFirstEventRepository(get(), get()) }
