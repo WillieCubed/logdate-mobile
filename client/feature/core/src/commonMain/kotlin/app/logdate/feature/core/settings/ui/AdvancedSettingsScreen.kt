@@ -41,6 +41,7 @@ import logdate.client.feature.core.generated.resources.app_update_up_to_date
 import logdate.client.feature.core.generated.resources.app_updates
 import logdate.client.feature.core.generated.resources.app_updates_description
 import logdate.client.feature.core.generated.resources.app_version_label
+import logdate.client.feature.core.generated.resources.app_version_with_build_label
 import logdate.client.feature.core.generated.resources.check_for_updates
 import logdate.client.feature.core.generated.resources.developer_tools
 import logdate.client.feature.core.generated.resources.developer_tools_description
@@ -83,7 +84,7 @@ fun AdvancedSettingsContent(
         item {
             MaterialContainer(modifier = Modifier.padding(horizontal = Spacing.lg)) {
                 ListItem(
-                    headlineContent = { Text(stringResource(Res.string.app_version_label, appUpdateUiState.currentVersionName)) },
+                    headlineContent = { Text(installedVersionLabel(appUpdateUiState)) },
                     modifier = Modifier.clickable { versionTaps = (versionTaps + 1).coerceAtMost(7) },
                 )
                 if (versionTaps >= 7) {
@@ -111,6 +112,13 @@ fun AdvancedSettingsContent(
             )
         }
     }
+}
+
+@Composable
+private fun installedVersionLabel(appUpdateUiState: AppUpdateUiState): String {
+    val versionName = appUpdateUiState.currentVersionName
+    val versionCode = appUpdateUiState.currentVersionCode ?: return stringResource(Res.string.app_version_label, versionName)
+    return stringResource(Res.string.app_version_with_build_label, versionName, versionCode)
 }
 
 @Composable
