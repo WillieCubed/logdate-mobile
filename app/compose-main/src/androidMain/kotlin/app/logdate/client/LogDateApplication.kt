@@ -89,6 +89,14 @@ class LogdateApplication :
         Napier.base(CrashlyticsAntilog())
         initializeKoin()
         Napier.i("Application onCreate: Koin initialized", tag = APP_STARTUP_TAG)
+        startBackgroundWork()
+    }
+
+    /**
+     * Starts the work that runs alongside the app: notification channels, migrations, and the
+     * schedulers. Each part is isolated so one failing to start doesn't stop the others.
+     */
+    private fun startBackgroundWork() {
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             publishWidgetPreviews(this@LogdateApplication)
         }
