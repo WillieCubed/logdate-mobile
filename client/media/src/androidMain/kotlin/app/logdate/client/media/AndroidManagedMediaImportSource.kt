@@ -26,7 +26,9 @@ class AndroidManagedMediaImportSource(
 ) : ManagedMediaImportSource {
     private val applicationContext = context.applicationContext
     private val contentResolver = applicationContext.contentResolver
-    private val stagingDirectory = File(applicationContext.cacheDir, STAGING_DIRECTORY_NAME)
+
+    // Looked up on first use, which is on the IO dispatcher; reading cacheDir touches the disk.
+    private val stagingDirectory by lazy { File(applicationContext.cacheDir, STAGING_DIRECTORY_NAME) }
 
     override suspend fun stage(sourceUri: String): StagedMediaFile {
         var stagedFile: File? = null
