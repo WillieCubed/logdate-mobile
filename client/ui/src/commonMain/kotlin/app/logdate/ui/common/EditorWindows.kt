@@ -12,6 +12,9 @@ import androidx.compose.runtime.staticCompositionLocalOf
 interface EditorWindows {
     /** Opens a new entry in its own window, with [journalId] selected when given. */
     fun openNewEntry(journalId: String?)
+
+    /** Opens the existing entry [entryId] in its own window, for editing beside what is on screen. */
+    fun openEntry(entryId: String)
 }
 
 /** The current [EditorWindows], or null when this platform cannot open another window. */

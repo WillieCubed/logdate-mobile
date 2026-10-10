@@ -32,8 +32,9 @@ covers the window and system side.
   there is text). Android 17's desktop caption bar shows the app's name, LogDate, instead of that
   label, so the label is not visible there.
 - **New windows.** A journal's menu (its overflow menu, a long-press, or a right-click on its cover)
-  offers "New entry in a new window", which opens the editor beside LogDate in split screen when
-  there is room. Launchers and the taskbar offer "New window" for the editor.
+  offers "New entry in a new window", and an entry in a day offers "Open in new window" on a
+  long-press or right-click. Either opens the editor beside LogDate in split screen when there is
+  room. Launchers and the taskbar offer "New window" for the editor.
 - **The caption bar.** In desktop windowing, Search and the account button sit in the caption bar,
   between the system controls.
 
@@ -65,9 +66,10 @@ still reloads correctly.
 
 - `EditorActivity` is a separate document task (`documentLaunchMode="always"`,
   `taskAffinity=".editor"`), so each entry can have its own window.
-- `EditorManager.openNewEditorWindow` and `openEntryInNewWindow` start it. "New entry in a new
-  window" passes the current activity as `adjacentTo` when the app is in multi-window mode or the
-  window is at least 840dp wide. `EditorManager` then adds `FLAG_ACTIVITY_LAUNCH_ADJACENT` and starts
+- `EditorManager.openNewEditorWindow` and `openEntryInNewWindow` start it. Screens reach them
+  through `EditorWindows` (`LocalEditorWindows`, client/ui), which `MainActivity` provides only where
+  another window can open. Both actions pass the current activity as `adjacentTo` when the app is
+  in multi-window mode or the window is at least 840dp wide. `EditorManager` then adds `FLAG_ACTIVITY_LAUNCH_ADJACENT` and starts
   the editor from that activity. On Android 12L and later, that request splits the screen even from
   full screen. The launch must come from the activity: from the application context, Android has no
   window to place the editor beside and opens it full screen.

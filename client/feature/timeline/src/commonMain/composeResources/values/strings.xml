@@ -8,7 +8,7 @@
     <string name="converting_to_text">Converting to text...</string>
     <string name="delete_entry">Delete entry?</string>
     <string name="more">More</string>
-    <string name="open_in_new_window">Open in New Window</string>
+    <string name="open_in_new_window">Open in new window</string>
     <string name="stop">Stop</string>
 
     <!-- Entry metadata labels -->

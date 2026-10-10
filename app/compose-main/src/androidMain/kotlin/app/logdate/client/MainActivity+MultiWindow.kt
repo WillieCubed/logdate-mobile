@@ -66,10 +66,18 @@ internal fun MainActivity.editorWindows(): EditorWindows? {
     return object : EditorWindows {
         override fun openNewEntry(journalId: String?) {
             val journalIds = listOfNotNull(journalId?.let { runCatching { Uuid.parse(it) }.getOrNull() })
-            val adjacent = isInMultiWindowMode || resources.configuration.screenWidthDp >= EXPANDED_WIDTH_DP
-            editorManager.openNewEditorWindow(journalIds = journalIds, adjacentTo = this@editorWindows.takeIf { adjacent })
+            editorManager.openNewEditorWindow(journalIds = journalIds, adjacentTo = adjacentWindowAnchor())
+        }
+
+        override fun openEntry(entryId: String) {
+            val id = runCatching { Uuid.parse(entryId) }.getOrNull() ?: return
+            editorManager.openEntryInNewWindow(id, adjacentTo = adjacentWindowAnchor())
         }
     }
 }
+
+/** This activity when a new window should open beside it: in split screen, or when the window is wide. */
+private fun MainActivity.adjacentWindowAnchor(): MainActivity? =
+    takeIf { isInMultiWindowMode || resources.configuration.screenWidthDp >= EXPANDED_WIDTH_DP }
 
 private const val EXPANDED_WIDTH_DP = 840

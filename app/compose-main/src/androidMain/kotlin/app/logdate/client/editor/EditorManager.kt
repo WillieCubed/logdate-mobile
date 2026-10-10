@@ -51,9 +51,15 @@ class EditorManager(
         }
     }
 
+    /**
+     * Opens the existing entry [entryId] in its own window.
+     *
+     * @param adjacentTo The activity to place the window beside, as for [openNewEditorWindow].
+     */
     fun openEntryInNewWindow(
         entryId: Uuid,
         journalId: Uuid? = null,
+        adjacentTo: Activity? = null,
     ) {
         try {
             val intent =
@@ -62,7 +68,8 @@ class EditorManager(
                     entryId = entryId,
                     journalId = journalId,
                 )
-            context.startActivity(intent)
+            if (adjacentTo != null) intent.addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT)
+            (adjacentTo ?: context).startActivity(intent)
             Napier.d("Opened entry $entryId in new window")
         } catch (e: Exception) {
             Napier.e("Failed to open entry in new window", e)

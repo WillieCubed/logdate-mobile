@@ -22,6 +22,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import app.logdate.shared.model.PhotoPresentation
 import app.logdate.ui.common.AspectRatios
+import app.logdate.ui.common.ContextMenuArea
+import app.logdate.ui.common.ContextMenuItem
+import app.logdate.ui.common.EditorWindows
+import app.logdate.ui.common.LocalEditorWindows
 import app.logdate.ui.common.noteDragSource
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.AudioNoteUiState
@@ -50,24 +54,41 @@ internal fun NotesListSection(
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Text(stringResource(Res.string.notes), style = MaterialTheme.typography.titleSmall)
+        val windows = LocalEditorWindows.current
+        val openInNewWindow = stringResource(Res.string.open_in_new_window)
         notes.forEach { note ->
-            Column(
-                modifier = Modifier.clickable { onNoteClick(note.noteId) },
-            ) {
-                when (note) {
-                    is TextNoteUiState -> TextNoteSnippet(note)
-                    is ImageNoteUiState -> ImageNoteSnippet(note)
-                    is AudioNoteUiState -> {
-                        AudioNoteSnippet(
-                            uiState = note,
-                        )
+            ContextMenuArea(items = noteContextMenuItems(note.noteId, windows, openInNewWindow)) {
+                Column(
+                    modifier = Modifier.clickable { onNoteClick(note.noteId) },
+                ) {
+                    when (note) {
+                        is TextNoteUiState -> TextNoteSnippet(note)
+                        is ImageNoteUiState -> ImageNoteSnippet(note)
+                        is AudioNoteUiState -> {
+                            AudioNoteSnippet(
+                                uiState = note,
+                            )
+                        }
+                        is VideoNoteUiState -> VideoNoteSnippet(note)
                     }
-                    is VideoNoteUiState -> VideoNoteSnippet(note)
+                    JournalBadgeRow(journals = note.journals, onJournalClick = onJournalClick)
                 }
-                JournalBadgeRow(journals = note.journals, onJournalClick = onJournalClick)
             }
         }
     }
+}
+
+/**
+ * Right-click and long-press actions for an entry in a day: "Open in new window" where LogDate can
+ * open another window ([windows] is not null), and nothing otherwise.
+ */
+internal fun noteContextMenuItems(
+    noteId: Uuid,
+    windows: EditorWindows?,
+    openInNewWindowLabel: String,
+): List<ContextMenuItem> {
+    if (windows == null) return emptyList()
+    return listOf(ContextMenuItem(openInNewWindowLabel) { windows.openEntry(noteId.toString()) })
 }
 
 @Composable
