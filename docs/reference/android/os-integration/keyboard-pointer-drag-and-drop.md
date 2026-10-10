@@ -77,7 +77,10 @@ And on an entry in a day, opened beside the timeline:
 - Pasting adds a copied photo, video, or audio file to the entry on Android, whether with a
   keyboard (Ctrl+V) or from the text menu that holding a finger on the text opens. Any copied text
   is pasted into the text as usual. When the clipboard holds media, the text menu shows Paste, or
-  Paste as attachment when it also holds text that the menu's own Paste inserts.
+  Paste as attachment when it also holds text that the menu's own Paste inserts, or when the file
+  was copied as a link that does not name its type.
+- When a dropped, pasted, or keyboard file cannot be added, the editor says so: a file type an entry
+  cannot hold, or a file that could not be read.
 - GIFs, stickers, and other images sent from the on-screen keyboard are added to the entry as
   files, the same as a pasted photo, rather than as links.
 
@@ -218,8 +221,15 @@ bubble use it. Wrap any new icon-only button in it, with the same label as its c
   chosen when the menu opens, from the clipboard's description alone: reading the description,
   unlike reading the clip, does not show Android's "pasted from your clipboard" notice.
   `mediaPasteItem` decides between no item, Paste, and Paste as attachment (when there is also text
-  for the field's own Paste). Either way, the clip goes through the same `routeDroppedItems` and
-  import as a drop (`importIntoEntry`), and the copies are attached.
+  for the field's own Paste, or when the clip is a `text/uri-list` link whose file type only reading
+  the clip would reveal). Either way, the clip goes through the same `routeDroppedItems` and import
+  as a drop (`importIntoEntry`), and the copies are attached. A menu Paste that finds no media
+  reports it; Ctrl+V stays quiet, because the field may have pasted text.
+- **Import results.** `importIntoEntry` returns an `EntryMediaImport`: the copies in LogDate's store,
+  and a `MediaImportProblem` for each file that failed, `Unsupported` for a type an entry cannot
+  hold and `Unreadable` for anything else. The editor attaches the copies and shows a snackbar for
+  the first problem. Each copy's block type comes from its stored file extension
+  (`attachmentBlockType`), which covers every photo, video, and audio format the store writes.
 - **Keyboard GIFs and stickers.** A keyboard sends a file only to a field whose `EditorInfo` lists
   that content type, through `InputConnection.commitContent`. Compose's `Modifier.contentReceiver`
   does this, but only for the state-based `BasicTextField` (`TextFieldState`); the editor's text

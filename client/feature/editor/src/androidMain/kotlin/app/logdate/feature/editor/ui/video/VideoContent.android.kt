@@ -5,7 +5,6 @@ package app.logdate.feature.editor.ui.video
 import android.app.Activity
 import android.app.PictureInPictureParams
 import android.content.Context
-import android.content.ContextWrapper
 import android.net.Uri
 import android.os.Build
 import android.util.Rational
@@ -86,6 +85,7 @@ import app.logdate.client.media.device.systemControlledSelection
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.media.storage.playableUri
 import app.logdate.client.media.video.ExoPlayerPool
+import app.logdate.feature.editor.ui.common.findActivity
 import app.logdate.feature.editor.ui.media.ManagedMediaSelectionController
 import app.logdate.feature.editor.ui.media.ManagedMediaSelectionState
 import app.logdate.ui.media.MediaDeviceSelector
@@ -477,13 +477,6 @@ private fun Float.toPictureInPictureRatio(): Rational {
     val width = (boundedRatio * PIP_RATIO_DENOMINATOR).toInt().coerceAtLeast(1)
     return Rational(width, PIP_RATIO_DENOMINATOR)
 }
-
-private tailrec fun Context.findActivity(): Activity? =
-    when (this) {
-        is Activity -> this
-        is ContextWrapper -> baseContext.findActivity()
-        else -> null
-    }
 
 /**
  * Android implementation of video picker content.

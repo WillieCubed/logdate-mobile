@@ -119,6 +119,8 @@
     <string name="use_video">Use Video</string>
     <string name="undo">Undo</string>
     <string name="paste_as_attachment">Paste as attachment</string>
+    <string name="media_import_unsupported">Only photos, videos, and audio can be added to an entry.</string>
+    <string name="media_import_unreadable">A file couldn’t be read, so it wasn’t added. Try copying or dragging it again.</string>
     <string name="handoff_waiting_title">Opening your entry from another device</string>
     <string name="handoff_waiting_body">It opens here as soon as it downloads from backup.</string>
     <string name="handoff_missing_title">Your entry hasn’t arrived</string>

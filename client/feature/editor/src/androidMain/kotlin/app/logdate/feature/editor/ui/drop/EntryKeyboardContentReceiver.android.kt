@@ -26,7 +26,7 @@ import org.koin.compose.koinInject
 
 @Composable
 actual fun EntryKeyboardContentReceiver(
-    onMediaImported: (List<String>) -> Unit,
+    onMediaImported: (EntryMediaImport) -> Unit,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -38,8 +38,7 @@ actual fun EntryKeyboardContentReceiver(
             KeyboardContentInterceptor { info ->
                 scope.launch {
                     try {
-                        val imported = importIntoEntry(context, mediaManager, listOf(info.contentUri.toString()))
-                        if (imported.isNotEmpty()) currentOnMediaImported(imported)
+                        currentOnMediaImported(importIntoEntry(context, mediaManager, listOf(info.contentUri.toString())))
                     } finally {
                         info.releasePermission()
                     }

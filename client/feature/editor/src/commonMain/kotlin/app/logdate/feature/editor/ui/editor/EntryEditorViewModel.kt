@@ -1296,7 +1296,10 @@ class EntryEditorViewModel(
         }
     }
 
-    /** Creates blocks for attachment URIs supplied when opening the editor. */
+    /**
+     * Creates blocks for attachment URIs: those supplied when opening the editor, and media dropped,
+     * pasted, or sent by the keyboard, already copied into LogDate's store.
+     */
     fun setInitialAttachments(attachmentUris: List<String>) {
         if (attachmentUris.isEmpty()) return
 
@@ -1305,32 +1308,15 @@ class EntryEditorViewModel(
                 attachmentUris.forEach { uri ->
                     // NoteEditorScreen replays initial intent inputs after an Activity
                     // recreation. The ViewModel survives configuration changes, so don't append
-                    // another block for a URI that has already been initialized. User-created
-                    // media blocks are unaffected because this method is only used for launch
-                    // attachments.
+                    // another block for a URI that is already attached. LogDate's store names a file
+                    // by its contents, so the same photo pasted twice is also attached once.
                     val alreadyInitialized =
                         mutableEditorState.value.blocks.any { block ->
                             (block as? MediaBlockUiState)?.uri == uri
                         }
                     if (alreadyInitialized) return@forEach
 
-                    val blockType =
-                        when {
-                            uri.contains(".jpg", ignoreCase = true) ||
-                                uri.contains(".jpeg", ignoreCase = true) ||
-                                uri.contains(".png", ignoreCase = true) ||
-                                uri.contains("image/", ignoreCase = true) -> BlockType.IMAGE
-
-                            uri.contains(".mp4", ignoreCase = true) ||
-                                uri.contains(".mov", ignoreCase = true) ||
-                                uri.contains("video/", ignoreCase = true) -> BlockType.VIDEO
-
-                            uri.contains(".mp3", ignoreCase = true) ||
-                                uri.contains(".wav", ignoreCase = true) ||
-                                uri.contains("audio/", ignoreCase = true) -> BlockType.AUDIO
-
-                            else -> BlockType.IMAGE
-                        }
+                    val blockType = attachmentBlockType(uri)
 
                     when (blockType) {
                         BlockType.IMAGE -> {

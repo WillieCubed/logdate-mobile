@@ -22,29 +22,35 @@ internal fun ClipData.droppedItems(context: Context): List<DroppedItem> =
     }
 
 /**
- * Copies each of [uris], files another app shared by drag and drop or the clipboard, into LogDate's
- * private media store, and returns the copies an entry can attach. A file that cannot be read is
- * left out and logged; the others are still imported.
+ * Copies each of [uris], files another app shared by drag and drop, the clipboard, or the keyboard,
+ * into LogDate's private media store. A file that cannot be copied is left out, logged, and reported
+ * as a [MediaImportProblem]; the others are still imported.
  */
 internal suspend fun importIntoEntry(
     context: Context,
     mediaManager: MediaManager,
     uris: List<String>,
-): List<String> {
+): EntryMediaImport {
     val importer =
         ManagedMediaImporter(
             mediaManager = mediaManager,
             source = AndroidManagedMediaImportSource(context),
             discardManagedMedia = AndroidManagedMediaDiscarder(context, mediaManager)::discard,
         )
-    return uris.mapNotNull { uri ->
+    val imported = mutableListOf<String>()
+    val problems = mutableListOf<MediaImportProblem>()
+    uris.forEach { uri ->
         try {
-            importer.import(uri)
+            imported += importer.import(uri)
         } catch (cancellation: CancellationException) {
             throw cancellation
+        } catch (unsupported: IllegalArgumentException) {
+            Napier.w("The file $uri is not a type an entry can hold", unsupported)
+            problems += MediaImportProblem.Unsupported
         } catch (error: Exception) {
             Napier.w("Could not add the file $uri to the entry", error)
-            null
+            problems += MediaImportProblem.Unreadable
         }
     }
+    return EntryMediaImport(imported, problems)
 }

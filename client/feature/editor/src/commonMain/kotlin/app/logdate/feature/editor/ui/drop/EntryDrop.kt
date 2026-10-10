@@ -7,6 +7,24 @@ data class DroppedItem(
     val text: String?,
 )
 
+/** Why a dropped, pasted, or keyboard file could not be added to the entry. */
+enum class MediaImportProblem {
+    /** The file is not a photo, video, or audio file LogDate can keep. */
+    Unsupported,
+
+    /** The file could not be read, for example because the other app withdrew access. */
+    Unreadable,
+}
+
+/**
+ * What adding dropped, pasted, or keyboard files did: [uris] are the copies in LogDate's store to
+ * attach, and [problems] lists each file that could not be added, so the editor can say so.
+ */
+data class EntryMediaImport(
+    val uris: List<String>,
+    val problems: List<MediaImportProblem> = emptyList(),
+)
+
 /** What a drop adds to an entry: media to import into LogDate's store, and text to insert. */
 data class EntryDrop(
     val mediaUris: List<String>,
@@ -37,11 +55,21 @@ enum class MediaPasteItem {
 /**
  * Which media Paste item the text menu shows for a clipboard holding [clipMimeTypes], or null when
  * there is no photo, video, or audio to attach.
+ *
+ * A clip copied as a raw link (`text/uri-list`) does not name its file's type, and reading the clip
+ * to find out would show Android's clipboard notice every time the menu opens. It gets Paste as
+ * attachment, beside the text field's own Paste of the link, and the type is checked when chosen.
  */
 fun mediaPasteItem(clipMimeTypes: List<String>): MediaPasteItem? {
-    if (clipMimeTypes.none { mime -> mediaPrefixes.any(mime::startsWith) }) return null
-    return if (clipMimeTypes.any { it.startsWith("text/") }) MediaPasteItem.PasteAsAttachment else MediaPasteItem.Paste
+    val hasMedia = clipMimeTypes.any { mime -> mediaPrefixes.any(mime::startsWith) }
+    return when {
+        hasMedia && clipMimeTypes.none { it.startsWith("text/") } -> MediaPasteItem.Paste
+        hasMedia || URI_LIST_MIME_TYPE in clipMimeTypes -> MediaPasteItem.PasteAsAttachment
+        else -> null
+    }
 }
+
+private const val URI_LIST_MIME_TYPE = "text/uri-list"
 
 /** The content types the editor tells keyboards it accepts, so GIF and sticker keys insert files, not links. */
 val keyboardContentMimeTypes: List<String> = mediaPrefixes.map { "$it*" }

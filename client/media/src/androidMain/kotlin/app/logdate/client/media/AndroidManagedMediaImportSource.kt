@@ -129,7 +129,7 @@ class AndroidManagedMediaImportSource(
                 extension?.let(SUPPORTED_FILE_EXTENSIONS::get)
             },
         ) {
-            "Selected URI is not a supported image or video"
+            "Selected URI is not a supported image, video, or audio file"
         }
     }
 }
@@ -163,11 +163,28 @@ private val SUPPORTED_MIME_TYPES =
         "video/x-msvideo" to SupportedMediaType("video/x-msvideo", "avi"),
         "video/x-ms-wmv" to SupportedMediaType("video/x-ms-wmv", "wmv"),
         "video/ogg" to SupportedMediaType("video/ogg", "ogv"),
+        "audio/mp4" to SupportedMediaType("audio/mp4", "m4a"),
+        "audio/m4a" to SupportedMediaType("audio/mp4", "m4a"),
+        "audio/x-m4a" to SupportedMediaType("audio/mp4", "m4a"),
+        "audio/mpeg" to SupportedMediaType("audio/mpeg", "mp3"),
+        "audio/mp3" to SupportedMediaType("audio/mpeg", "mp3"),
+        "audio/ogg" to SupportedMediaType("audio/ogg", "ogg"),
+        "audio/aac" to SupportedMediaType("audio/aac", "aac"),
+        "audio/amr" to SupportedMediaType("audio/amr", "amr"),
+        "audio/flac" to SupportedMediaType("audio/flac", "flac"),
+        "audio/x-flac" to SupportedMediaType("audio/flac", "flac"),
+        "audio/opus" to SupportedMediaType("audio/opus", "opus"),
+        "audio/wav" to SupportedMediaType("audio/wav", "wav"),
+        "audio/x-wav" to SupportedMediaType("audio/wav", "wav"),
+        "audio/wave" to SupportedMediaType("audio/wav", "wav"),
+        "audio/webm" to SupportedMediaType("audio/webm", "weba"),
+        "audio/3gpp" to SupportedMediaType("audio/3gpp", "3gp"),
     )
 
 private val SUPPORTED_FILE_EXTENSIONS =
     buildMap {
-        SUPPORTED_MIME_TYPES.values.forEach { mediaType -> put(mediaType.extension, mediaType) }
+        // An extension both a video and an audio type use (3gp) means the video, as before.
+        SUPPORTED_MIME_TYPES.values.forEach { mediaType -> if (mediaType.extension !in this) put(mediaType.extension, mediaType) }
         put("jpeg", checkNotNull(SUPPORTED_MIME_TYPES["image/jpeg"]))
         put("jpg", checkNotNull(SUPPORTED_MIME_TYPES["image/jpeg"]))
         put("mpeg", checkNotNull(SUPPORTED_MIME_TYPES["video/mpeg"]))

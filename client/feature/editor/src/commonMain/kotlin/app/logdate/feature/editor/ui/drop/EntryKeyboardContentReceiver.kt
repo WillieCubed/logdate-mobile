@@ -15,6 +15,6 @@ import androidx.compose.runtime.Composable
  */
 @Composable
 expect fun EntryKeyboardContentReceiver(
-    onMediaImported: (List<String>) -> Unit,
+    onMediaImported: (EntryMediaImport) -> Unit,
     content: @Composable () -> Unit,
 )

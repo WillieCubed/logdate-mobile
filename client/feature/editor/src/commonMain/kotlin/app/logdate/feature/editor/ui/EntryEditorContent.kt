@@ -40,6 +40,8 @@ import app.logdate.feature.editor.ui.content.EditorBottomContent
 import app.logdate.feature.editor.ui.dialog.DraftsBottomSheet
 import app.logdate.feature.editor.ui.dialog.alert.ConfirmEntryExitDialog
 import app.logdate.feature.editor.ui.drop.EntryKeyboardContentReceiver
+import app.logdate.feature.editor.ui.drop.EntryMediaImport
+import app.logdate.feature.editor.ui.drop.MediaImportProblem
 import app.logdate.feature.editor.ui.drop.entryDropTarget
 import app.logdate.feature.editor.ui.drop.entryPasteTarget
 import app.logdate.feature.editor.ui.editor.EditorBackgroundSaveEffect
@@ -58,6 +60,8 @@ import app.logdate.ui.platform.rememberLogDateHaptics
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.draft_deleted
+import logdate.client.feature.editor.generated.resources.media_import_unreadable
+import logdate.client.feature.editor.generated.resources.media_import_unsupported
 import logdate.client.feature.editor.generated.resources.undo
 import org.jetbrains.compose.resources.getString
 import org.koin.compose.viewmodel.koinViewModel
@@ -253,15 +257,29 @@ fun EntryEditorContent(
     var dropActive by remember { mutableStateOf(false) }
     val canSave =
         focus !is EditorFocus.Recording && !editorState.isEditingLocked && !editorState.isSaving && !editorState.shouldExit
-    EntryKeyboardContentReceiver(onMediaImported = { viewModel.setInitialAttachments(it) }) {
+    // Dropped, pasted, and keyboard media: attach what was copied, and say why anything was not.
+    val onMediaImport: (EntryMediaImport) -> Unit = { result ->
+        viewModel.setInitialAttachments(result.uris)
+        result.problems.firstOrNull()?.let { problem ->
+            scope.launch {
+                val message =
+                    when (problem) {
+                        MediaImportProblem.Unsupported -> Res.string.media_import_unsupported
+                        MediaImportProblem.Unreadable -> Res.string.media_import_unreadable
+                    }
+                snackbarHostState.showSnackbar(getString(message))
+            }
+        }
+    }
+    EntryKeyboardContentReceiver(onMediaImported = onMediaImport) {
         ImmersiveEditorLayout(
             modifier =
                 modifier
                     .entryDropTarget(
                         onText = { viewModel.appendTextBlock(it) },
-                        onMediaImported = { viewModel.setInitialAttachments(it) },
+                        onMediaImported = onMediaImport,
                         onActiveChanged = { dropActive = it },
-                    ).entryPasteTarget(onMediaImported = { viewModel.setInitialAttachments(it) })
+                    ).entryPasteTarget(onMediaImported = onMediaImport)
                     .then(
                         if (dropActive) {
                             Modifier.border(3.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.large)

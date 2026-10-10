@@ -11,7 +11,8 @@ import androidx.compose.ui.Modifier
  * The text field pastes text itself; this handles what it cannot, so copying an image in another
  * app and pasting it into LogDate attaches it. When the clipboard holds media, the text menu gains
  * Paste, or Paste as attachment when there is also text for the field's own Paste. Media is copied
- * into LogDate's private store before [onMediaImported] receives it, as for drops.
+ * into LogDate's private store before [onMediaImported] receives the copies and any failures, as
+ * for drops.
  */
 @Composable
-expect fun Modifier.entryPasteTarget(onMediaImported: (List<String>) -> Unit): Modifier
+expect fun Modifier.entryPasteTarget(onMediaImported: (EntryMediaImport) -> Unit): Modifier

@@ -7,6 +7,6 @@ import androidx.compose.runtime.Composable
 /** Keyboards on this platform insert text only, so the editor is shown unchanged. */
 @Composable
 actual fun EntryKeyboardContentReceiver(
-    onMediaImported: (List<String>) -> Unit,
+    onMediaImported: (EntryMediaImport) -> Unit,
     content: @Composable () -> Unit,
 ) = content()

@@ -55,6 +55,12 @@ class EntryDropTest {
     }
 
     @Test
+    fun `a file copied as a link may be media, so it can be pasted as an attachment`() {
+        // Apps that copy with ClipData.newRawUri describe the clip only as a URI list.
+        assertEquals(MediaPasteItem.PasteAsAttachment, mediaPasteItem(listOf("text/uri-list")))
+    }
+
+    @Test
     fun `keyboards may insert GIFs, stickers, and other images`() {
         listOf("image/gif", "image/png", "image/webp", "video/mp4").forEach { mime ->
             assertTrue(acceptsKeyboardContent(mime), "$mime should be accepted")

@@ -8,6 +8,6 @@ import app.logdate.ui.common.noteDropTarget
 @Composable
 actual fun Modifier.entryDropTarget(
     onText: (String) -> Unit,
-    onMediaImported: (List<String>) -> Unit,
+    onMediaImported: (EntryMediaImport) -> Unit,
     onActiveChanged: (Boolean) -> Unit,
 ): Modifier = noteDropTarget(onText)

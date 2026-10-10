@@ -5,4 +5,4 @@ import androidx.compose.ui.Modifier
 
 /** Text pastes only on this platform, handled by the text field; pasted media is handled on Android. */
 @Composable
-actual fun Modifier.entryPasteTarget(onMediaImported: (List<String>) -> Unit): Modifier = this
+actual fun Modifier.entryPasteTarget(onMediaImported: (EntryMediaImport) -> Unit): Modifier = this

@@ -1,9 +1,6 @@
 package app.logdate.feature.editor.ui.image
 
 import android.Manifest
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -33,6 +30,7 @@ import app.logdate.client.media.AndroidManagedMediaImportSource
 import app.logdate.client.media.ManagedMediaImporter
 import app.logdate.client.media.MediaManager
 import app.logdate.client.permissions.PermissionManager
+import app.logdate.feature.editor.ui.common.findActivity
 import app.logdate.feature.editor.ui.media.ManagedMediaSelectionController
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
@@ -237,11 +235,4 @@ private fun imageLibraryPermissions(): Array<String> =
             arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
         else ->
             arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-    }
-
-private tailrec fun Context.findActivity(): Activity? =
-    when (this) {
-        is Activity -> this
-        is ContextWrapper -> baseContext.findActivity()
-        else -> null
     }

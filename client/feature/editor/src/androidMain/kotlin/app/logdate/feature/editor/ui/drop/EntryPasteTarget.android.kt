@@ -28,22 +28,24 @@ import org.jetbrains.compose.resources.stringResource as resourceString
 private object MediaPasteKey
 
 @Composable
-actual fun Modifier.entryPasteTarget(onMediaImported: (List<String>) -> Unit): Modifier {
+actual fun Modifier.entryPasteTarget(onMediaImported: (EntryMediaImport) -> Unit): Modifier {
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val mediaManager: MediaManager = koinInject()
     val scope = rememberCoroutineScope()
     val pasteLabel = stringResource(android.R.string.paste)
     val pasteAsAttachmentLabel = resourceString(Res.string.paste_as_attachment)
-    val pasteMedia: () -> Unit = {
+    // From the text menu the person asked for media, so a clip with none is reported; Ctrl+V also
+    // pastes text, so it stays quiet when there is no media.
+    val pasteMedia: (fromMenu: Boolean) -> Unit = { fromMenu ->
         scope.launch {
-            val imported = pastedMedia(context, clipboard, mediaManager)
-            if (imported.isNotEmpty()) onMediaImported(imported)
+            val result = pastedMedia(context, clipboard, mediaManager, reportNoMedia = fromMenu)
+            if (result.uris.isNotEmpty() || result.problems.isNotEmpty()) onMediaImported(result)
         }
     }
     return onPreviewKeyEvent { event ->
         val paste = event.type == KeyEventType.KeyDown && event.key == Key.V && (event.isCtrlPressed || event.isMetaPressed)
-        if (paste) pasteMedia()
+        if (paste) pasteMedia(false)
         // The text field still handles the same keys, so any text on the clipboard is pasted too.
         false
     }.appendTextContextMenuComponents {
@@ -59,19 +61,24 @@ actual fun Modifier.entryPasteTarget(onMediaImported: (List<String>) -> Unit): M
             }
         item(key = MediaPasteKey, label = label) {
             close()
-            pasteMedia()
+            pasteMedia(true)
         }
     }
 }
 
-/** Copies the photos, videos, and audio on the clipboard into LogDate's store and returns the copies. */
+/**
+ * Copies the photos, videos, and audio on the clipboard into LogDate's store. With [reportNoMedia],
+ * a clipboard holding none is reported as unsupported rather than ignored.
+ */
 private suspend fun pastedMedia(
     context: Context,
     clipboard: Clipboard,
     mediaManager: MediaManager,
-): List<String> {
-    val clip = clipboard.getClipEntry()?.clipData ?: return emptyList()
+    reportNoMedia: Boolean,
+): EntryMediaImport {
+    val nothing = EntryMediaImport(emptyList(), if (reportNoMedia) listOf(MediaImportProblem.Unsupported) else emptyList())
+    val clip = clipboard.getClipEntry()?.clipData ?: return nothing
     val media = routeDroppedItems(clip.droppedItems(context)).mediaUris
-    if (media.isEmpty()) return emptyList()
+    if (media.isEmpty()) return nothing
     return importIntoEntry(context, mediaManager, media)
 }
