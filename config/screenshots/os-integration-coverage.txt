@@ -47,6 +47,10 @@ live-updates|system|docs/screenshots/android-os-integration/live-updates/recordi
 live-updates|system|docs/screenshots/android-os-integration/live-updates/recording-notification--phone-api37.png
 live-updates|system|docs/screenshots/android-os-integration/live-updates/recording-promotion--phone-api37.txt
 live-updates|system|docs/screenshots/android-os-integration/live-updates/recording-status-chip--tablet-api37.png
+live-updates|system|docs/screenshots/android-os-integration/live-updates/transfer-status-chip--phone-api37.png
+live-updates|system|docs/screenshots/android-os-integration/live-updates/transfer-progress--phone-api37.png
+live-updates|system|docs/screenshots/android-os-integration/live-updates/transfer-finished--phone-api37.png
+live-updates|system|docs/screenshots/android-os-integration/live-updates/transfer-progress--tablet-api37.png
 
 # Bubbles: the Float action, the floating recorder, the tablet Bubble Bar, and LogDate as an App Bubble.
 recording-bubble|system|docs/screenshots/android-os-integration/bubbles/float-action--phone-api37.png
@@ -73,6 +77,9 @@ notification-quick-reply|system|docs/screenshots/android-os-integration/notifica
 
 # Windows: a journal's New entry in a new window, opened beside LogDate in split screen.
 editor-windows|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/side-by-side--tablet-api37.png
+
+# Context menus: a long-press on a journal cover opens its menu instead of the journal.
+context-menus|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/journal-context-menu--tablet-api37.png
 
 # Keyboard shortcuts: Android's Meta+/ helper listing LogDate's group with a USB keyboard attached.
 keyboard-shortcuts|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/shortcut-helper--tablet-api37.png

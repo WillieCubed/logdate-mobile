@@ -2,31 +2,31 @@
 <resources>
     <string name="notification_action_cancel">Cancel</string>
 
-    <string name="export_channel_name">Data Export</string>
+    <string name="export_channel_name">Data export</string>
     <string name="export_channel_description">Exporting user data to file</string>
-    <string name="export_title_progress">Exporting Data</string>
-    <string name="export_title_complete">Export Complete</string>
-    <string name="export_title_failed">Export Failed</string>
+    <string name="export_title_progress">Exporting data</string>
+    <string name="export_title_complete">Export complete</string>
+    <string name="export_title_failed">Export failed</string>
     <string name="export_text_path">Data exported to: %1$s</string>
     <string name="error_with_message">Error: %1$s</string>
 
-    <string name="restore_channel_name">Data Restore</string>
+    <string name="restore_channel_name">Data restore</string>
     <string name="restore_channel_description">Restoring user data from backup</string>
-    <string name="restore_title_progress">Restoring Data</string>
-    <string name="restore_title_complete">Restore Complete</string>
-    <string name="restore_title_failed">Restore Failed</string>
+    <string name="restore_title_progress">Restoring data</string>
+    <string name="restore_title_complete">Restore complete</string>
+    <string name="restore_title_failed">Restore failed</string>
     <string name="restore_notification_complete_message">Your data has been restored.</string>
-    <string name="restore_notification_stage_preparing">Preparing restore...</string>
-    <string name="restore_notification_stage_copying">Copying archive...</string>
-    <string name="restore_notification_stage_opening">Opening archive...</string>
-    <string name="restore_notification_stage_reading">Reading archive contents...</string>
-    <string name="restore_notification_stage_journals">Restoring journals...</string>
-    <string name="restore_notification_stage_notes">Restoring notes...</string>
-    <string name="restore_notification_stage_links">Restoring journal links...</string>
-    <string name="restore_notification_stage_drafts">Restoring drafts...</string>
-    <string name="restore_notification_stage_profile">Restoring profile...</string>
-    <string name="restore_notification_stage_places">Restoring places...</string>
-    <string name="restore_notification_stage_location_history">Restoring location history...</string>
-    <string name="restore_notification_stage_media">Importing media...</string>
+    <string name="restore_notification_stage_preparing">Preparing restore…</string>
+    <string name="restore_notification_stage_copying">Copying archive…</string>
+    <string name="restore_notification_stage_opening">Opening archive…</string>
+    <string name="restore_notification_stage_reading">Reading archive contents…</string>
+    <string name="restore_notification_stage_journals">Restoring journals…</string>
+    <string name="restore_notification_stage_notes">Restoring notes…</string>
+    <string name="restore_notification_stage_links">Restoring journal links…</string>
+    <string name="restore_notification_stage_drafts">Restoring drafts…</string>
+    <string name="restore_notification_stage_profile">Restoring profile…</string>
+    <string name="restore_notification_stage_places">Restoring places…</string>
+    <string name="restore_notification_stage_location_history">Restoring location history…</string>
+    <string name="restore_notification_stage_media">Importing media…</string>
     <string name="share_diagnostic_report">Share sync diagnostic report</string>
 </resources>

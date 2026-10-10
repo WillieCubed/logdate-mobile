@@ -2,13 +2,18 @@ package app.logdate.client.e2e.osintegration
 
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Until
 import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.feature.core.export.ExportNotificationHelper
+import app.logdate.feature.core.restore.RestoreNotificationHelper
+import app.logdate.feature.core.restore.RestoreStage
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlin.uuid.Uuid
 
 /**
  * Real system UI captures for the Android OS integration surfaces.
@@ -116,6 +121,28 @@ class OsSurfaceScreenshotsTest {
         }
     }
 
+    /**
+     * A restore in progress as a Live Update with one bar segment per phase, then the finished and
+     * failed states, whose titles Android 17 colors green and red.
+     */
+    @Test fun transferLiveUpdates() {
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.enableFlags(FeatureFlag.LIVE_UPDATES)
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val restore = RestoreNotificationHelper(context, Uuid.random())
+        val export = ExportNotificationHelper(context, Uuid.random())
+        OsSurfaceCapture.device.pressHome()
+        OsSurfaceCapture.postTransferNotification(restore.createForegroundInfo(RestoreStage.RESTORING_NOTES))
+        OsSurfaceCapture.capture(surface = "live-updates", state = "transfer-status-chip")
+        OsSurfaceCapture.openNotifications()
+        OsSurfaceCapture.waitForText("Restoring data")
+        OsSurfaceCapture.capture(surface = "live-updates", state = "transfer-progress")
+        OsSurfaceCapture.postTransferNotification(restore.createCompletionInfo())
+        OsSurfaceCapture.postTransferNotification(export.createErrorInfo("The folder you chose is no longer available."))
+        OsSurfaceCapture.waitForText("Export failed")
+        OsSurfaceCapture.capture(surface = "live-updates", state = "transfer-finished")
+    }
+
     /** A capture reminder answered from the notification shade with Write. */
     @Test fun notificationQuickReply() {
         OsSurfaceCapture.prepareOnboardedApp()
@@ -133,7 +160,7 @@ class OsSurfaceScreenshotsTest {
         OsSurfaceCapture.capture(surface = "notification-quick-reply", state = "saved")
     }
 
-    /** On a tablet, a journal's "New entry in a new window" opens the editor beside LogDate. */
+    /** On a tablet, a long-press on a journal opens its menu, whose "New entry in a new window" opens the editor beside LogDate. */
     @Test fun editorWindowSideBySide() {
         if (OsSurfaceCapture.formFactor != "tablet") return
         OsSurfaceCapture.prepareOnboardedApp()
@@ -141,7 +168,10 @@ class OsSurfaceScreenshotsTest {
         OsSurfaceCapture.openMainActivity()
         OsSurfaceCapture.waitForText("Journals").click()
         OsSurfaceCapture.longPress(OsSurfaceCapture.waitForText("Summer in Lisbon"))
-        OsSurfaceCapture.waitForText("New entry in a new window").click()
+        val newWindow = OsSurfaceCapture.waitForText("New entry in a new window")
+        Thread.sleep(500L)
+        OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "journal-context-menu")
+        newWindow.click()
         Thread.sleep(4_000L)
         OsSurfaceCapture.capture(surface = "large-screens-and-desktop-windowing", state = "side-by-side")
     }

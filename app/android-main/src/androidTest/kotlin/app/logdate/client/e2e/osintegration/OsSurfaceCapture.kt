@@ -11,6 +11,7 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
+import androidx.work.ForegroundInfo
 import app.logdate.client.ambient.AmbientPromptNotificationCoordinator
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.featureflags.FeatureFlag
@@ -45,6 +46,7 @@ object OsSurfaceCapture {
     const val APP_LABEL = "LogDate"
     private const val TIMEOUT_MS = 10_000L
     private const val RECORDING_NOTIFICATION_ID = 1001
+    private const val DEMO_MODE_ATTEMPTS = 10
 
     val device: UiDevice by lazy { UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()) }
 
@@ -85,7 +87,13 @@ object OsSurfaceCapture {
     /** Pins the status bar to 9:41, full battery, and full signal, with no notification icons. */
     fun enterDemoMode() {
         shell("settings put global sysui_demo_allowed 1")
-        demo("enter")
+        // SystemUI reads that setting asynchronously and ignores demo commands until it has, which a
+        // freshly booted device hits, so enter is repeated until SystemUI reports demo mode on.
+        for (attempt in 1..DEMO_MODE_ATTEMPTS) {
+            demo("enter")
+            if (shell("settings get global sysui_tuner_demo_on").trim() == "1") break
+            Thread.sleep(500L)
+        }
         demo("clock -e hhmm 0941")
         demo("battery -e level 100 -e plugged false")
         demo("network -e wifi show -e level 4 -e mobile show -e datatype none -e level 4")
@@ -280,6 +288,16 @@ object OsSurfaceCapture {
         device.openNotification()
         device.waitForIdle()
         Thread.sleep(800L)
+    }
+
+    /**
+     * Posts [info]'s notification the way a running export or restore worker would, without running
+     * the worker, so each stage of a transfer can be shown on demand.
+     */
+    fun postTransferNotification(info: ForegroundInfo) {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        context.getSystemService(NotificationManager::class.java).notify(info.notificationId, info.notification)
+        Thread.sleep(1_000L)
     }
 
     /** Turns LogDate's system search visibility, the consent assistants need to read entries, on or off. */

@@ -39,6 +39,15 @@ the notification drops into the shade's normal list, where the person can tap it
 | --- | --- |
 | ![A microphone and elapsed-time chip in the status bar](../../../screenshots/android-os-integration/live-updates/recording-status-chip--phone-api37.png) | ![The recording notification at the top of the shade](../../../screenshots/android-os-integration/live-updates/recording-notification--phone-api37.png) |
 
+A restore in progress, on the same phone. The chip shows the percent done, and the bar is split into
+the restore's phases:
+
+| The status bar chip | The promoted notification |
+| --- | --- |
+| ![A download icon and 52% chip in the status bar on the home screen](../../../screenshots/android-os-integration/live-updates/transfer-status-chip--phone-api37.png) | ![Restoring data, Restoring notes…, with a two-segment progress bar and Cancel, at the top of the shade](../../../screenshots/android-os-integration/live-updates/transfer-progress--phone-api37.png) |
+
+`transfer-finished--phone-api37.png` shows the finished and failed notifications that follow.
+
 Android shows the chip only while LogDate is not on screen. The capture also records Android's own
 verdict on the notification in
 [`recording-promotion--phone-api37.txt`](../../../screenshots/android-os-integration/live-updates/recording-promotion--phone-api37.txt):
