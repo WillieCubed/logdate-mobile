@@ -11,6 +11,14 @@ import app.logdate.client.sync.datalayer.HealthSnapshotSyncData
 import app.logdate.client.sync.datalayer.JournalDataMapper
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
+import app.logdate.client.sync.datalayer.v2.WearFeatures
+import app.logdate.client.sync.datalayer.v2.WearPaths
+import app.logdate.client.sync.peer.state.PeerRole
+import app.logdate.client.sync.peer.state.PeerStateStore
+import app.logdate.client.sync.peer.state.PhoneState
+import app.logdate.client.sync.peer.state.StateDocument
+import app.logdate.client.sync.peer.state.StateDocumentCodec
+import app.logdate.client.sync.peer.state.WatchState
 import app.logdate.feature.editor.ui.camera.CameraRemoteCommand
 import app.logdate.shared.model.Journal
 import com.google.android.gms.wearable.ChannelClient
@@ -31,6 +39,7 @@ import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import java.io.ByteArrayInputStream
@@ -39,6 +48,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -618,6 +628,62 @@ class PhoneDataLayerListenerServiceTest {
             coVerify(exactly = 1) { ingestor.onNoteMetadata(noteDataMapper.toDataMap(note)) }
         }
 
+    @Test
+    fun `a state document from the watch is stored for the protocol gate`() =
+        runTest {
+            val peerStates = PeerStateStore()
+            val service = TestPhoneDataLayerListenerService(serviceScope = this, syncDependencies = dependencies(peerStates = peerStates))
+            val document = StateDocument(role = PeerRole.WATCH, writtenAt = 1, watch = WatchState(features = setOf(WearFeatures.RECEIPTS)))
+
+            service.processEvents(
+                PhoneDataLayerSnapshotEvent(
+                    path = WearPaths.STATE,
+                    data = StateDocumentCodec.toDataMap(document),
+                    sourceNodeId = "watch-node",
+                ),
+            )
+
+            assertEquals(setOf(WearFeatures.RECEIPTS), peerStates.features(PeerRole.WATCH).first())
+        }
+
+    @Test
+    fun `the phone's own state document is never taken for a watch's`() =
+        runTest {
+            val peerStates = PeerStateStore()
+            val service = TestPhoneDataLayerListenerService(serviceScope = this, syncDependencies = dependencies(peerStates = peerStates))
+            val document = StateDocument(role = PeerRole.PHONE, writtenAt = 1, phone = PhoneState())
+
+            service.processEvents(
+                PhoneDataLayerSnapshotEvent(
+                    path = WearPaths.STATE,
+                    data = StateDocumentCodec.toDataMap(document),
+                    sourceNodeId = "phone-node",
+                ),
+            )
+
+            assertNull(peerStates.latest(PeerRole.PHONE).first())
+            assertNull(peerStates.latest(PeerRole.WATCH).first())
+        }
+
+    @Test
+    fun `a phone document from another node is not taken for a watch's`() =
+        runTest {
+            val peerStates = PeerStateStore()
+            val service = TestPhoneDataLayerListenerService(serviceScope = this, syncDependencies = dependencies(peerStates = peerStates))
+            val document = StateDocument(role = PeerRole.PHONE, writtenAt = 1, phone = PhoneState())
+
+            service.processEvents(
+                PhoneDataLayerSnapshotEvent(
+                    path = WearPaths.STATE,
+                    data = StateDocumentCodec.toDataMap(document),
+                    sourceNodeId = "other-phone",
+                ),
+            )
+
+            assertNull(peerStates.latest(PeerRole.WATCH).first())
+            assertNull(peerStates.latest(PeerRole.PHONE).first())
+        }
+
     private fun serviceWithDependencies(
         noteIngestor: WatchNoteIngestor = mockk(relaxed = true),
         journalIngestor: WatchJournalIngestor = mockk(relaxed = true),
@@ -637,11 +703,13 @@ class PhoneDataLayerListenerServiceTest {
         noteIngestor: WatchNoteIngestor = mockk(relaxed = true),
         journalIngestor: WatchJournalIngestor = mockk(relaxed = true),
         healthSnapshotDao: HealthSnapshotDao = mockk(relaxed = true),
+        peerStates: PeerStateStore = PeerStateStore(),
     ): PhoneDataLayerSyncDependencies =
         PhoneDataLayerSyncDependencies(
             noteIngestor = noteIngestor,
             journalIngestor = journalIngestor,
             healthSnapshotDao = healthSnapshotDao,
+            peerStates = peerStates,
         )
 
     private fun channel(path: String): ChannelClient.Channel =

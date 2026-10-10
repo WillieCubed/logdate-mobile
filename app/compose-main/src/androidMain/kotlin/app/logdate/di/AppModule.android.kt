@@ -13,6 +13,7 @@ import app.logdate.client.calendar.CalendarImportWorker
 import app.logdate.client.calendar.di.calendarSyncModule
 import app.logdate.client.data.di.appDataModule
 import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.di.deviceModule
 import app.logdate.client.domain.di.accountDomainModule
 import app.logdate.client.domain.di.domainModule
@@ -73,6 +74,15 @@ import app.logdate.client.sync.WatchNoteNotifier
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.tiles.RecordVoiceTileUpdater
 import app.logdate.client.tiles.RecordingWindowTracker
+import app.logdate.client.sync.datalayer.v2.WearProtocol
+import app.logdate.client.sync.datalayer.v2.WearProtocolGate
+import app.logdate.client.sync.peer.state.LocalCapabilities
+import app.logdate.client.sync.peer.state.PeerCapabilityPresence
+import app.logdate.client.sync.peer.state.PeerRole
+import app.logdate.client.sync.peer.state.PeerStateStore
+import app.logdate.client.sync.peer.state.StateDocumentChannel
+import app.logdate.client.sync.v2.PhonePeerLink
+import app.logdate.client.sync.v2.PhoneStatePublisher
 import app.logdate.client.updates.PlayInAppUpdateController
 import app.logdate.client.watch.AndroidCompanionDeviceClient
 import app.logdate.client.watch.AndroidWatchConnectionManager
@@ -93,6 +103,7 @@ import app.logdate.feature.editor.handoff.HandoffDraftReceiver
 import app.logdate.feature.editor.ui.editor.CaptureUsageReporter
 import app.logdate.ui.common.HomeScreenPins
 import coil3.SingletonImageLoader
+import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -103,6 +114,7 @@ import org.koin.androidx.workmanager.koin.workManagerFactory
 import org.koin.core.context.startKoin
 import org.koin.core.module.Module
 import org.koin.core.qualifier.named
+import org.koin.dsl.binds
 import org.koin.dsl.module
 
 private val watchConnectionIoDispatcherQualifier = named("watch-connection-io-dispatcher")
@@ -251,6 +263,30 @@ actual val appModule: Module =
                 noteDataMapper = get(),
                 transport = get(),
                 audioStreamOpener = get(),
+            )
+        }
+        single { PeerStateStore() }
+        single {
+            PhonePeerLink(
+                transport = get(),
+                dataClient = Wearable.getDataClient(androidContext()),
+                capabilityClient = Wearable.getCapabilityClient(androidContext()),
+                nodeClient = Wearable.getNodeClient(androidContext()),
+            )
+        } binds arrayOf(StateDocumentChannel::class, LocalCapabilities::class, PeerCapabilityPresence::class)
+        single {
+            PhoneStatePublisher(
+                v2Enabled = get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),
+                channel = get(),
+                capabilities = get(),
+                peerStates = get(),
+            )
+        }
+        single {
+            WearProtocolGate(
+                flagEnabled = get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),
+                peerHasV2Capability = get<PeerCapabilityPresence>().observe(WearProtocol.WATCH_CAPABILITY_V2),
+                peerFeatures = get<PeerStateStore>().features(PeerRole.WATCH),
             )
         }
 

@@ -10,6 +10,10 @@ import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
 import app.logdate.client.sync.datalayer.JournalDataMapper
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
+import app.logdate.client.sync.datalayer.v2.WearPaths
+import app.logdate.client.sync.peer.state.PeerRole
+import app.logdate.client.sync.peer.state.PeerStateStore
+import app.logdate.client.sync.peer.state.StateDocumentCodec
 import app.logdate.feature.editor.ui.camera.CameraRemoteCommand
 import com.google.android.gms.wearable.ChannelClient
 import com.google.android.gms.wearable.DataEvent
@@ -34,8 +38,8 @@ import java.io.InputStream
 /**
  * Receives data items from the paired Wear OS watch via the Data Layer API.
  *
- * Handles notes, journals, journal-content associations, health snapshots, and the audio files
- * that go with watch audio notes. Notes and audio go through [WatchNoteIngestor], which queues
+ * Handles notes, journals, journal-content associations, health snapshots, the watch's state
+ * document, and the audio files that go with watch audio notes. Notes and audio go through [WatchNoteIngestor], which queues
  * them for cloud backup once they are complete and tells the watch they arrived. Journals and
  * associations go through [WatchJournalIngestor], which queues them for cloud backup too.
  *
@@ -218,6 +222,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
             noteIngestor = koin.get(),
             journalIngestor = koin.get(),
             healthSnapshotDao = koin.get(),
+            peerStates = koin.get(),
         )
     }
 
@@ -240,6 +245,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
                 AssociationDataMapper.isDeletePath(path) -> handleAssociationDelete(path, dependencies.journalIngestor)
                 AssociationDataMapper.isAssociationPath(path) -> handleAssociationSync(event, path, dependencies.journalIngestor)
                 HealthSnapshotDataMapper.isHealthPath(path) -> handleHealthSync(event, path, dependencies.healthSnapshotDao)
+                path == WearPaths.STATE -> acceptWatchState(event, dependencies.peerStates)
             }
         } catch (e: Exception) {
             Napier.e("Unhandled error processing sync event at path: $path", e)
@@ -372,6 +378,18 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
         }
     }
 
+    private fun acceptWatchState(
+        event: PhoneDataLayerSnapshotEvent,
+        peerStates: PeerStateStore,
+    ) {
+        val watchNode = event.sourceNodeId
+        if (watchNode == null) {
+            Napier.w("A state document arrived without the node that wrote it; ignoring it")
+            return
+        }
+        peerStates.accept(watchNode, StateDocumentCodec.fromDataMap(event.data), PeerRole.WATCH)
+    }
+
     /**
      * Resolves the Koin instance, retrying with a short delay if DI isn't ready yet.
      */
@@ -467,4 +485,5 @@ data class PhoneDataLayerSyncDependencies(
     val noteIngestor: WatchNoteIngestor,
     val journalIngestor: WatchJournalIngestor,
     val healthSnapshotDao: HealthSnapshotDao,
+    val peerStates: PeerStateStore,
 )

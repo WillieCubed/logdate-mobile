@@ -250,7 +250,7 @@
             </intent-filter>
         </receiver>
 
-        <!-- Data Layer sync listener: receives notes, journals, associations, health data, and messages from paired Wear OS watch -->
+        <!-- Data Layer sync listener: receives notes, journals, associations, health data, the watch state document, and messages from paired Wear OS watch -->
         <service
             android:name="app.logdate.client.sync.PhoneDataLayerListenerService"
             android:exported="true">
@@ -272,6 +272,10 @@
                     android:scheme="wear"
                     android:host="*"
                     android:pathPrefix="/logdate/health" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:path="/logdate/state" />
             </intent-filter>
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
