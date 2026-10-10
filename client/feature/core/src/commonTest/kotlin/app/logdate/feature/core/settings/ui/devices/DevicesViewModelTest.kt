@@ -131,6 +131,25 @@ class DevicesViewModelTest {
         }
 
     @Test
+    fun `a watch is listed as Wear OS`() =
+        testScope.runTest {
+            val watchId = Uuid.parse("523e4567-e89b-12d3-a456-426614174000")
+            repository.addAssociatedDevice(deviceInfo(id = watchId, name = "Pixel Watch 3", platform = DevicePlatform.WEAR_OS))
+
+            viewModel.loadDevices()
+            advanceUntilIdle()
+
+            assertEquals(
+                "Wear OS",
+                viewModel.uiState
+                    .first()
+                    .devices
+                    .single { it.id == watchId }
+                    .platformName,
+            )
+        }
+
+    @Test
     fun `raw device identifiers are not shown as names`() =
         testScope.runTest {
             repository.addAssociatedDevice(

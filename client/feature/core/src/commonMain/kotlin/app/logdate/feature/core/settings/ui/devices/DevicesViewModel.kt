@@ -147,6 +147,7 @@ class DevicesViewModel(
     private fun getPlatformName(platform: DevicePlatform): String =
         when (platform) {
             DevicePlatform.ANDROID -> "Android"
+            DevicePlatform.WEAR_OS -> "Wear OS"
             DevicePlatform.IOS -> "iOS"
             DevicePlatform.MACOS -> "macOS"
             DevicePlatform.WINDOWS -> "Windows"

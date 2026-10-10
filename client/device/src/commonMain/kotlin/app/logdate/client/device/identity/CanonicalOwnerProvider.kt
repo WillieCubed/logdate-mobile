@@ -34,6 +34,13 @@ interface CanonicalOwnerProvider {
      */
     suspend fun adoptRemoteOwnerIfUninitialized(remoteOwnerId: String): Boolean = getCanonicalOwnerId() == remoteOwnerId
 
+    /**
+     * Forgets this installation's owner and its account binding, as part of erasing a device removed
+     * from its account. The next [getCanonicalOwnerId] creates a new, unbound owner. A provider that
+     * cannot forget its owner throws instead of pretending it did.
+     */
+    suspend fun resetForDeviceWipe(): Unit = throw UnsupportedOperationException("This owner provider cannot forget its owner")
+
     class CorruptCanonicalOwnerException : IllegalStateException("The local LogDate identity is corrupted")
 }
 
@@ -82,6 +89,13 @@ class DefaultCanonicalOwnerProvider(
             storage.putString(CANONICAL_OWNER_BOUND_KEY, BOUND)
             true
         }
+
+    override suspend fun resetForDeviceWipe() {
+        mutex.withLock {
+            storage.remove(CANONICAL_OWNER_ID_KEY)
+            storage.remove(CANONICAL_OWNER_BOUND_KEY)
+        }
+    }
 
     private fun String.requireUuid(): String =
         runCatching { Uuid.parse(this) }

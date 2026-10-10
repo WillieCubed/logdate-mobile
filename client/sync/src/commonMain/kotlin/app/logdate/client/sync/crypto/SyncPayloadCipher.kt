@@ -3,6 +3,7 @@ package app.logdate.client.sync.crypto
 import app.logdate.client.device.crypto.ContentEncryptionService
 import app.logdate.client.device.crypto.CryptoManager
 import app.logdate.client.device.crypto.EncryptedEnvelope
+import app.logdate.client.device.crypto.IdentityKeyFingerprint
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.IdentityKeyNotFoundException
 import io.github.aakira.napier.Napier
@@ -113,19 +114,10 @@ class SyncPayloadCipher(
         }
     }
 
-    /**
-     * A short, non-reversible marker for the current identity key: not the key itself (this
-     * value travels to the server inside every synced field), just enough to tell two keys apart.
-     */
-    private suspend fun currentKeyFingerprint(): String {
-        val mac = cryptoManager.hmacSha256(identityKeyManager.getIdentityKey(), FINGERPRINT_CONTEXT)
-        return Base64.encode(mac.copyOf(FINGERPRINT_BYTES))
-    }
+    private suspend fun currentKeyFingerprint(): String = IdentityKeyFingerprint.of(identityKeyManager.getIdentityKey(), cryptoManager)
 
     private companion object {
         val ENVELOPE_PREFIX = Regex("^LDSE[0-9]+:")
-        val FINGERPRINT_CONTEXT = "sync-payload-fingerprint".encodeToByteArray()
-        const val FINGERPRINT_BYTES = 8
     }
 }
 

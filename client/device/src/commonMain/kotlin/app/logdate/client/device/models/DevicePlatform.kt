@@ -5,6 +5,7 @@ package app.logdate.client.device.models
  */
 enum class DevicePlatform {
     ANDROID,
+    WEAR_OS,
     IOS,
     MACOS,
     WINDOWS,

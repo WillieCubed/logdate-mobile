@@ -40,6 +40,101 @@ class IdentityKeyManagerTest {
         }
 
     @Test
+    fun `a device that never mints refuses to create a key`() =
+        runTest {
+            val linked = linkedManager()
+
+            assertFailsWith<IdentityMintingNotAllowedException> { linked.ensureIdentityKey() }
+            assertFailsWith<IdentityMintingNotAllowedException> { linked.setupNewIdentity() }
+            assertFalse(linked.hasIdentityKey())
+        }
+
+    @Test
+    fun `a linked key is installed when it matches its fingerprint`() =
+        runTest {
+            val linked = linkedManager()
+            val key = ByteArray(32) { 0x31 }
+
+            linked.installLinkedIdentityKey(key, IdentityKeyFingerprint.of(key, cryptoManager))
+
+            assertTrue(linked.getIdentityKey().contentEquals(key))
+            assertEquals(null, linked.getStoredRecoveryPhrase())
+        }
+
+    @Test
+    fun `a linked key that does not match its fingerprint is refused`() =
+        runTest {
+            val linked = linkedManager()
+            val key = ByteArray(32) { 0x31 }
+
+            assertFailsWith<IdentityKeyFingerprintMismatchException> {
+                linked.installLinkedIdentityKey(key, IdentityKeyFingerprint.of(ByteArray(32) { 0x32 }, cryptoManager))
+            }
+            assertFalse(linked.hasIdentityKey())
+        }
+
+    @Test
+    fun `a linked key never replaces a different key`() =
+        runTest {
+            val linked = linkedManager()
+            val key = ByteArray(32) { 0x31 }
+            val other = ByteArray(32) { 0x32 }
+            linked.installLinkedIdentityKey(key, IdentityKeyFingerprint.of(key, cryptoManager))
+
+            assertFailsWith<IllegalStateException> {
+                linked.installLinkedIdentityKey(
+                    other,
+                    IdentityKeyFingerprint.of(other, cryptoManager),
+                )
+            }
+            assertTrue(linked.getIdentityKey().contentEquals(key))
+        }
+
+    @Test
+    fun `installing the same linked key again is harmless`() =
+        runTest {
+            val linked = linkedManager()
+            val key = ByteArray(32) { 0x31 }
+
+            repeat(2) { linked.installLinkedIdentityKey(key, IdentityKeyFingerprint.of(key, cryptoManager)) }
+
+            assertTrue(linked.getIdentityKey().contentEquals(key))
+        }
+
+    @Test
+    fun `a linked key of the wrong length is refused`() =
+        runTest {
+            assertFailsWith<IllegalArgumentException> { linkedManager().installLinkedIdentityKey(ByteArray(16), "unused") }
+        }
+
+    @Test
+    fun `installing the key a device already has leaves its recovery phrase alone`() =
+        runTest {
+            val phrase = manager.setupNewIdentity()
+            val key = manager.getIdentityKey()
+
+            manager.installLinkedIdentityKey(key, IdentityKeyFingerprint.of(key, cryptoManager))
+
+            assertEquals(phrase, manager.getStoredRecoveryPhrase())
+            assertEquals(phrase.toString(), backupStore.readPhrase())
+        }
+
+    @Test
+    fun `a linked key replaces a backup phrase left from before`() =
+        runTest {
+            val staleBackup = InMemoryIdentityKeyBackupStore()
+            staleBackup.writePhrase((1..12).joinToString(" ") { "stale-$it" })
+            val linked = IdentityKeyManager(InMemorySecureStorage(), cryptoManager, staleBackup, IdentityMintPolicy.NEVER)
+            val key = ByteArray(32) { 0x31 }
+
+            linked.installLinkedIdentityKey(key, IdentityKeyFingerprint.of(key, cryptoManager))
+
+            assertEquals(null, staleBackup.readPhrase())
+        }
+
+    private fun linkedManager() = IdentityKeyManager(InMemorySecureStorage(), cryptoManager, mintPolicy = IdentityMintPolicy.NEVER)
+
+    @Test
     fun `no identity key initially`() =
         runTest {
             assertFalse(manager.hasIdentityKey())

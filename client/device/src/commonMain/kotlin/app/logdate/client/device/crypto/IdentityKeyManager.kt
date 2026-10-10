@@ -13,11 +13,14 @@ import kotlinx.serialization.Serializable
  *
  * The identity key is the root of all encryption for the user's data.
  * It's derived from a BIP-39 recovery phrase and stored securely in the device keystore.
+ * A device with [IdentityMintPolicy.NEVER], a linked watch, never derives one of its own: it uses the
+ * key its phone installs with [installLinkedIdentityKey].
  */
 class IdentityKeyManager(
     private val secureStorage: SecureStorage,
     private val cryptoManager: CryptoManager,
     private val backupStore: IdentityKeyBackupStore = NoOpIdentityKeyBackupStore,
+    private val mintPolicy: IdentityMintPolicy = IdentityMintPolicy.ALLOWED,
 ) {
     suspend fun isRecoveryPhraseVerified(): Boolean = hasIdentityKey() && secureStorage.getString(KEY_RECOVERY_VERIFIED) == "true"
 
@@ -68,6 +71,28 @@ class IdentityKeyManager(
         }
     }
 
+    /**
+     * Installs the identity key a phone sent while linking this device, after checking it against the
+     * fingerprint sent with it. A device that already has a different key refuses: it has to be wiped
+     * before it can take another identity. The recovery phrase never travels with the key, so none is stored.
+     */
+    suspend fun installLinkedIdentityKey(
+        key: ByteArray,
+        expectedFingerprint: String,
+    ) {
+        require(key.size == 32) { "Invalid identity key length" }
+        if (IdentityKeyFingerprint.of(key, cryptoManager) != expectedFingerprint) throw IdentityKeyFingerprintMismatchException()
+        identityMutex.withLock {
+            val existing = secureStorage.getBytes(KEY_IDENTITY_KEY)
+            check(existing == null || existing.contentEquals(key)) { "A different identity key is already installed" }
+            if (existing != null) return@withLock
+            backupStore.clear()
+            secureStorage.putBytes(KEY_IDENTITY_KEY, key)
+            secureStorage.remove(KEY_RECOVERY_PHRASE)
+            secureStorage.remove(KEY_RECOVERY_VERIFIED)
+        }
+    }
+
     private val identityMutex = Mutex()
 
     /**
@@ -107,6 +132,7 @@ class IdentityKeyManager(
      * @return The recovery phrase the user must store safely
      */
     suspend fun setupNewIdentity(): RecoveryPhrase {
+        if (mintPolicy == IdentityMintPolicy.NEVER) throw IdentityMintingNotAllowedException()
         require(!hasIdentityKey()) { "Identity key already exists" }
 
         val phrase = cryptoManager.generateRecoveryPhrase()
@@ -260,3 +286,16 @@ data class RecoveryPhrase(
 class IdentityKeyNotFoundException(
     message: String,
 ) : Exception(message)
+
+/** Whether this device may derive an identity key of its own. */
+enum class IdentityMintPolicy {
+    ALLOWED,
+
+    /** A linked watch: it only ever uses the key its phone installed. */
+    NEVER,
+}
+
+class IdentityMintingNotAllowedException :
+    IllegalStateException("This device never creates its own identity key; it is linked from a phone")
+
+class IdentityKeyFingerprintMismatchException : IllegalArgumentException("The identity key does not match the fingerprint sent with it")

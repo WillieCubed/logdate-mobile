@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 
 class CanonicalOwnerProviderTest {
@@ -148,6 +149,19 @@ class CanonicalOwnerProviderTest {
             provider.adoptRemoteOwnerIfUninitialized(remoteOwner)
 
             assertEquals(true, DefaultCanonicalOwnerProvider(storage).hasBoundOwner())
+        }
+
+    @Test
+    fun `a device wipe forgets the owner and its account binding`() =
+        runTest {
+            val provider = DefaultCanonicalOwnerProvider(InMemoryKeyValueStorage())
+            val accountOwner = "a8a3400a-9f3c-4fca-9a7a-7c8cbe5ca24e"
+            provider.adoptRemoteOwnerIfUninitialized(accountOwner)
+
+            provider.resetForDeviceWipe()
+
+            assertFalse(provider.hasBoundOwner())
+            assertNotEquals(accountOwner, provider.getCanonicalOwnerId())
         }
 
     private class InMemoryKeyValueStorage(

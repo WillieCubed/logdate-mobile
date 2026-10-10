@@ -1,6 +1,7 @@
 package app.logdate.client.sync.crypto
 
 import app.logdate.client.device.crypto.ContentEncryptionService
+import app.logdate.client.device.crypto.IdentityKeyFingerprint
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.KeyDerivation
 import app.logdate.client.sync.cloud.InMemorySecureStorage
@@ -8,6 +9,8 @@ import app.logdate.client.sync.cloud.TestCryptoManager
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -82,6 +85,23 @@ class SyncPayloadCipherTest {
             val cipher = SyncPayloadCipher(contentEncryptionService, identityKeyManager, cryptoManager)
 
             assertEquals("hello world", cipher.decryptString("field", legacyPayload))
+        }
+
+    @Test
+    fun `an envelope includes the identity key fingerprint`() =
+        runTest {
+            val cryptoManager = TestCryptoManager()
+            val identityKeyManager = IdentityKeyManager(InMemorySecureStorage(), cryptoManager)
+            identityKeyManager.recoverIdentity((1..12).map { "fingerprint-$it" })
+            val contentEncryptionService = ContentEncryptionService(identityKeyManager, KeyDerivation(cryptoManager), cryptoManager)
+            val cipher = SyncPayloadCipher(contentEncryptionService, identityKeyManager, cryptoManager)
+
+            val envelope = Json.parseToJsonElement(cipher.encryptString("field", "hello").removePrefix("LDSE2:")).jsonObject
+
+            assertEquals(
+                IdentityKeyFingerprint.of(identityKeyManager.getIdentityKey(), cryptoManager),
+                envelope.getValue("fp").jsonPrimitive.content,
+            )
         }
 
     private suspend fun cipherFor(seed: String): SyncPayloadCipher {
