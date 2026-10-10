@@ -2,6 +2,8 @@ package app.logdate.client.e2e.osintegration
 
 import android.app.Notification
 import android.app.NotificationManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -9,6 +11,7 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.view.WindowManager
+import androidx.core.content.FileProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
@@ -135,6 +138,18 @@ object OsSurfaceCapture {
         return file
     }
 
+    /** Saves [image] as [surface] in [state], named like the screen captures. */
+    fun saveImage(
+        surface: String,
+        state: String,
+        image: Bitmap,
+    ): File {
+        val file = File(outputRoot, "$surface/$state--$formFactor-api${Build.VERSION.SDK_INT}.png")
+        file.parentFile?.mkdirs()
+        file.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        return file
+    }
+
     /**
      * Starts LogDate's main screen in a new task and saves the first frame that shows the splash
      * screen, recognized by its [background] color. The splash is up for a fraction of a second, so
@@ -151,10 +166,7 @@ object OsSurfaceCapture {
         while (SystemClock.uptimeMillis() < deadline) {
             val frame = automation.takeScreenshot() ?: continue
             if (frame.getPixel(frame.width / 2, frame.height / 5) != background) continue
-            val file = File(outputRoot, "$surface/$state--$formFactor-api${Build.VERSION.SDK_INT}.png")
-            file.parentFile?.mkdirs()
-            file.outputStream().use { frame.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            return file
+            return saveImage(surface, state, frame)
         }
         error("The splash screen did not appear within ${SPLASH_WAIT_MS}ms")
     }
@@ -383,6 +395,37 @@ object OsSurfaceCapture {
                 timeZoneId = TimeZone.currentSystemDefault().id,
             )
         runBlocking { GlobalContext.get().get<AddNoteUseCase>()(notes = listOf(note), captureCurrentLocation = false) }
+    }
+
+    /**
+     * Puts a photo on the clipboard, the way copying an image in another app does: a content URI
+     * from LogDate's file provider for a copy of the debug build's sample photo.
+     */
+    fun copyPhotoToClipboard() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val photo = File(context.cacheDir, "clipboard-photo.jpg")
+        context.assets.open("sample_note_photo.jpg").use { input -> photo.outputStream().use(input::copyTo) }
+        val uri = FileProvider.getUriForFile(context, "$packageName.provider", photo)
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            context
+                .getSystemService(ClipboardManager::class.java)
+                .setPrimaryClip(ClipData.newUri(context.contentResolver, "Photo", uri))
+        }
+    }
+
+    /**
+     * Runs [block] with the on-screen keyboards switched off, then switches them back on. The
+     * emulator's Gboard stays up next to a physical keyboard, which most people turn off, and would
+     * cover half of a capture.
+     */
+    fun <T> withoutOnScreenKeyboards(block: () -> T): T {
+        val keyboards = shell("ime list -s").lines().filter { it.isNotBlank() }
+        keyboards.forEach { shell("ime disable $it") }
+        try {
+            return block()
+        } finally {
+            keyboards.forEach { shell("ime enable $it") }
+        }
     }
 
     /** Creates a journal named [title] and returns its id. */

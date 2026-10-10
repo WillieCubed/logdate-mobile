@@ -1,8 +1,8 @@
 # Widgets
 
 Status: partial. Three home-screen widgets ship today, and pinning them from Settings works. The
-capture-only lock-screen and hub widget is built, behind `LOCK_SCREEN_CAPTURE_WIDGET`. Committed
-Glance screenshot references are planned.
+capture-only lock-screen and hub widget is built, behind `LOCK_SCREEN_CAPTURE_WIDGET`. Every widget
+has rendered references in light, dark, right-to-left, and 200% text.
 
 ## What it is
 
@@ -36,8 +36,21 @@ The Capture widget in the Android 17 widget picker, below New Entry, whose butto
 
 ![The widget picker listing Capture, 3 × 1, with Write, Record, and Photo buttons and the note that it shows nothing from the journal](../../../screenshots/android-os-integration/widgets/capture-widget-picker--phone-api37.png)
 
-Glance references for each widget in light, dark, right-to-left, and 200% text are added once the
-widget screenshot lane exists, with a lock-screen placement capture.
+Each widget as a launcher draws it, in light, dark, right-to-left, and 200% text:
+
+| | Light | Dark | Right-to-left | 200% text |
+| --- | --- | --- | --- | --- |
+| Capture | ![Capture widget, light](../../../screenshots/android-os-integration/widgets/capture-widget-light--phone-api37.png) | ![Capture widget, dark](../../../screenshots/android-os-integration/widgets/capture-widget-dark--phone-api37.png) | ![Capture widget, right-to-left](../../../screenshots/android-os-integration/widgets/capture-widget-rtl--phone-api37.png) | ![Capture widget, 200% text](../../../screenshots/android-os-integration/widgets/capture-widget-large-text--phone-api37.png) |
+| New Entry | ![New Entry widget, light](../../../screenshots/android-os-integration/widgets/new-entry-widget-light--phone-api37.png) | ![New Entry widget, dark](../../../screenshots/android-os-integration/widgets/new-entry-widget-dark--phone-api37.png) | ![New Entry widget, right-to-left](../../../screenshots/android-os-integration/widgets/new-entry-widget-rtl--phone-api37.png) | ![New Entry widget, 200% text](../../../screenshots/android-os-integration/widgets/new-entry-widget-large-text--phone-api37.png) |
+| On This Day | ![On This Day widget, light](../../../screenshots/android-os-integration/widgets/on-this-day-widget-light--phone-api37.png) | ![On This Day widget, dark](../../../screenshots/android-os-integration/widgets/on-this-day-widget-dark--phone-api37.png) | ![On This Day widget, right-to-left](../../../screenshots/android-os-integration/widgets/on-this-day-widget-rtl--phone-api37.png) | ![On This Day widget, 200% text](../../../screenshots/android-os-integration/widgets/on-this-day-widget-large-text--phone-api37.png) |
+
+The capture buttons have no text, so 200% text leaves them unchanged, and their colored circles are
+the same in light and dark. The On This Day photo, with its caption, is drawn as one tilted image,
+because a widget cannot rotate views; its caption keeps its size at 200% text. In right-to-left, the
+Capture widget's buttons mirror, but the New Entry widget's buttons over its photo keep their
+left-to-right order, as the render shows.
+
+A capture placed on the lock screen or the hub is not captured yet.
 
 ## How it works
 
@@ -90,7 +103,10 @@ Home-screen widgets have no flag. The lock-screen capture widget is behind `LOCK
 
 ## Updating screenshots
 
-- **Widget layouts:** Lane 1, through the host-side Glance renderer in this module, once it exists.
-  Record with `./run test:screenshots:update`.
+- **Widget layouts:** `OsSurfaceScreenshotsTest#widgetRenders` renders each widget's preview on the
+  Android 17 phone managed device, through `WidgetRenders` in the instrumented tests: it composes the
+  RemoteViews, inflates them with a context set to each look, and draws them to an image. This runs
+  on a device rather than on the host because RemoteViews need Android's real view inflation to
+  render faithfully. Record with `./run screenshots:os`.
 - **Real placements:** the home screen, the lock screen, the hub, and the picker are Lane 2 captures,
   recorded with `./run screenshots:os`. They land in `docs/screenshots/android-os-integration/widgets/`.

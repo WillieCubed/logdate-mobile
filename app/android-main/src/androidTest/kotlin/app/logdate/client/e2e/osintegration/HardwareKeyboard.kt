@@ -55,7 +55,9 @@ class HardwareKeyboard : AutoCloseable {
     }
 
     companion object {
+        const val KEY_V = 47
         const val KEY_SLASH = 53
+        const val KEY_LEFTCTRL = 29
         const val KEY_LEFTMETA = 125
 
         private const val DEVICE_ID = 1

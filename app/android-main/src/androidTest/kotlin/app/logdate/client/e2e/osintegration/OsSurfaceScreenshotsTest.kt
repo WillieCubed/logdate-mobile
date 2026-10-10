@@ -6,7 +6,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Until
 import app.logdate.client.datastore.featureflags.FeatureFlag
-import app.logdate.client.sync.R as SyncR
+import app.logdate.client.feature.widgets.CaptureWidget
+import app.logdate.client.feature.widgets.NewEntryWidget
+import app.logdate.client.feature.widgets.OnThisDayWidget
 import app.logdate.client.sync.SyncForegroundNotification
 import app.logdate.feature.core.export.ExportNotificationHelper
 import app.logdate.feature.core.restore.RestoreNotificationHelper
@@ -17,6 +19,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.uuid.Uuid
+import app.logdate.client.sync.R as SyncR
 
 /**
  * Real system UI captures for the Android OS integration surfaces.
@@ -107,11 +110,7 @@ class OsSurfaceScreenshotsTest {
     @Test fun keyboardShortcutHelper() {
         OsSurfaceCapture.prepareOnboardedApp()
         OsSurfaceCapture.openMainActivity()
-        // The emulator's Gboard keeps its on-screen keyboard up even with a keyboard attached, which
-        // most people turn off, so the on-screen keyboards are switched off for this capture.
-        val onScreenKeyboards = OsSurfaceCapture.shell("ime list -s").lines().filter { it.isNotBlank() }
-        onScreenKeyboards.forEach { OsSurfaceCapture.shell("ime disable $it") }
-        try {
+        OsSurfaceCapture.withoutOnScreenKeyboards {
             HardwareKeyboard().use { keyboard ->
                 keyboard.press(HardwareKeyboard.KEY_LEFTMETA, HardwareKeyboard.KEY_SLASH)
                 // The helper opens on the focused app's shortcuts, grouped under its name.
@@ -119,8 +118,6 @@ class OsSurfaceScreenshotsTest {
                 Thread.sleep(1_000L)
                 OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "shortcut-helper")
             }
-        } finally {
-            onScreenKeyboards.forEach { OsSurfaceCapture.shell("ime enable $it") }
         }
     }
 
@@ -260,6 +257,43 @@ class OsSurfaceScreenshotsTest {
         openInNewWindow.click()
         Thread.sleep(4_000L)
         OsSurfaceCapture.capture(surface = "large-screens-and-desktop-windowing", state = "entry-side-by-side")
+    }
+
+    /** A photo copied in another app, pasted into a new entry with Ctrl+V from a USB keyboard. */
+    @Test fun pastePhotoIntoEntry() {
+        if (OsSurfaceCapture.formFactor != "tablet") return
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.copyPhotoToClipboard()
+        OsSurfaceCapture.openCapture("text")
+        OsSurfaceCapture.waitForText("Write something").click()
+        OsSurfaceCapture.waitForText("What's on your mind?")
+        OsSurfaceCapture.withoutOnScreenKeyboards {
+            HardwareKeyboard().use { keyboard ->
+                keyboard.press(HardwareKeyboard.KEY_LEFTCTRL, HardwareKeyboard.KEY_V)
+                Thread.sleep(4_000L)
+                OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "paste-photo")
+            }
+        }
+    }
+
+    /**
+     * Each widget as a launcher draws it, in light, dark, right-to-left, and 200% text. Rendering
+     * does not depend on the screen, so it runs on the phone only.
+     */
+    @Test fun widgetRenders() {
+        if (OsSurfaceCapture.formFactor != "phone") return
+        val widgets =
+            listOf(
+                Triple("capture-widget", CaptureWidget(), 250 to 80),
+                Triple("new-entry-widget", NewEntryWidget(), 250 to 180),
+                Triple("on-this-day-widget", OnThisDayWidget(), 250 to 180),
+            )
+        for ((name, widget, size) in widgets) {
+            for (look in WidgetRenders.Look.entries) {
+                val image = WidgetRenders.render(widget, size.first, size.second, look)
+                OsSurfaceCapture.saveImage(surface = "widgets", state = "$name-${look.label}", image = image)
+            }
+        }
     }
 
     @Test fun captureWidgetInPicker() {
