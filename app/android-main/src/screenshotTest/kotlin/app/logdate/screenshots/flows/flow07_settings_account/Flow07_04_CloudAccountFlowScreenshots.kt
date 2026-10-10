@@ -6,6 +6,7 @@ import app.logdate.feature.core.account.CloudAccountSignInContent
 import app.logdate.feature.core.account.CloudAccountWelcomeContent
 import app.logdate.feature.core.account.PasskeyAccountCreationFinalContent
 import app.logdate.feature.core.settings.ui.ServerSelectionState
+import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData.PHONE
 import app.logdate.screenshots.common.ScreenshotTheme
 import com.android.tools.screenshot.PreviewTest
@@ -110,7 +111,9 @@ fun S05_CloudAccountSignInLoading() {
 // ─── Account Creation Final ─────────────────────────────────────────────────────
 
 @PreviewTest
-@Preview(showBackground = true, device = PHONE)
+@ScreenshotPreviewMatrix
+@Preview(name = "Phone 200% text", showBackground = true, device = PHONE, fontScale = 2f)
+@Preview(name = "Phone RTL", showBackground = true, device = PHONE, locale = "ar")
 @Composable
 fun S06_CloudAccountCreationFinal() {
     ScreenshotTheme {

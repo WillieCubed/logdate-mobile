@@ -253,6 +253,8 @@ fun CloudAccountOnboardingScreen(
                     stepNumber = stepCount,
                     stepCount = stepCount,
                     modifier = modifier,
+                    onEditUsername = viewModel::goToPreviousStep,
+                    onDisplayNameChange = viewModel::updateDisplayName,
                 )
             }
 
