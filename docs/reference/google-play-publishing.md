@@ -239,8 +239,10 @@ not be published.
 ### How it publishes
 
 The `publish-internal` job publishes the phone bundle, then, when
-`LOGDATE_PLAY_WEAR_PUBLISH_ENABLED` is `true`, the watch bundle to the `wear:internal` track.
-Play names a form factor's tracks `wear:<track>`. The two publishes run one after the other in one
+`LOGDATE_PLAY_WEAR_PUBLISH_ENABLED` is `true`, the watch bundle to the `wear:qa` track.
+Play names a form factor's tracks `wear:<default track name>`, and the default name of Internal
+testing is `qa`, so the phone's `internal` is the watch's `wear:qa` (`WearPlayTrack` in `build-logic`).
+Beta and production are `wear:beta` and `wear:production`. The two publishes run one after the other in one
 job because Play assigns both apps version codes from a single sequence, and two uploads racing for
 the next code would collide.
 
@@ -253,12 +255,13 @@ These steps happen in Play Console and cannot be done or checked from this repos
 
 1. Add the Wear OS form factor to the LogDate app.
 2. Create the first Wear OS release, by hand, as the phone's first release had to be.
-3. Confirm your account is on the internal testers list, and that the `wear:internal` track exists.
+3. Confirm your account is on the internal testers list for the Wear OS form factor, and that its
+   Internal testing track exists. Play calls it `wear:qa` in the API.
 4. Set the repository variable `LOGDATE_PLAY_WEAR_PUBLISH_ENABLED` to `true`.
 
-Then install LogDate from the Play Store on the watch. If Gradle Play Publisher rejects the
-`wear:internal` track name on the first publish, upload the bundle by hand for that release and
-publish with the Play Developer API directly until the name is sorted out.
+Then install LogDate from the Play Store on the watch. The track name comes from Google's list of
+form factor tracks (`wear:production`, `wear:beta`, `wear:qa`). If the first publish is rejected anyway,
+upload the bundle by hand for that release.
 
 ### Building locally
 
