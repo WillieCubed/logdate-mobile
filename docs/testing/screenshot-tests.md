@@ -163,6 +163,20 @@ The first OS integration scene is `S01_PrivacySystemSearchVisibility` in
 `Flow20_01_SystemSearchVisibilityScreenshots.kt`. It shows the privacy setting that controls system
 search and assistant access.
 
+### Comparison sheets
+
+Reviewing a feature means comparing its screenshots side by side, not opening forty files one at a
+time. The comparison sheet builder lays out every registered image for a feature on one labeled
+image, scaled to the same height:
+
+```bash
+./run screenshots:sheet -Pfeature=privacy-system-search
+```
+
+Sheets are written to `build/reports/screenshot-sheets/<feature>.png`. Run it without `-Pfeature` to
+get one sheet per feature. Generating and reviewing the sheet is part of every OS integration
+feature's Definition of Done.
+
 ### The coverage registry
 
 "Every feature ships screenshots" is only a promise until something checks it.

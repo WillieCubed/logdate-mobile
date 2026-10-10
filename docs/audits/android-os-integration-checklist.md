@@ -75,7 +75,7 @@ A row reaches `[done]` only when its Evidence column lists:
 | `[todo]` | `OsSurfaceScreenshotsTest` captures real system UI on API 37 phone and tablet managed devices with demo mode | |
 | `[todo]` | Desktop windowing capture spike decided | |
 | `[done]` | `checkOsIntegrationScreenshotCoverage` fails on missing images, missing tests, and stale references | `ScreenshotCoverageTest` (13/13, `cd build-logic && ../gradlew test`). Registry `config/screenshots/os-integration-coverage.txt`. Runs in `.githooks/pre-push` and `./run screenshots:check`. Its first run found 157 stale references, deleted in `f273b86a5`. The `ci.yml` step is prepared for the user to commit. |
-| `[todo]` | `buildScreenshotComparisonSheet` generates labeled sheets per feature | |
+| `[done]` | `buildScreenshotComparisonSheet` generates labeled sheets per feature | `ScreenshotComparisonSheet` and `BuildScreenshotComparisonSheet` in build-logic, tested by `ScreenshotComparisonSheetTest`. `./run screenshots:sheet <feature>`. |
 | `[todo]` | `./run` runs every screenshot lane, plus `screenshots:os`, `screenshots:sheet`, and `screenshots:check` | |
 
 ## Capture Launch Contract and Platform Hygiene
