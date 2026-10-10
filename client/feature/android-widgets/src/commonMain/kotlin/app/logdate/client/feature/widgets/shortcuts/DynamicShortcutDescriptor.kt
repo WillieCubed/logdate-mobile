@@ -66,7 +66,7 @@ sealed interface DynamicShortcutDescriptor {
      * Direct Share target for a specific journal.
      *
      * Each journal gets its own conversation shortcut so the system share sheet
-     * can offer named per-journal targets ("Share to Travel 2026") when the user
+     * can offer named per-journal targets ("Travel 2026") when the user
      * shares text or media from another app. The Android applier resolves
      * [coverImageUri] to a real bitmap when present, or falls back to the same
      * deterministic color the in-app `JournalCover` uses.

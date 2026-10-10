@@ -27,6 +27,11 @@ import org.junit.runner.RunWith
 import java.util.regex.Pattern
 import kotlin.uuid.Uuid
 import app.logdate.client.sync.R as SyncR
+import org.koin.core.context.GlobalContext
+import app.logdate.client.shortcuts.DynamicShortcutScheduler
+import app.logdate.client.feature.widgets.shortcuts.DynamicShortcutDescriptor
+import androidx.core.content.pm.ShortcutManagerCompat
+import android.content.Intent
 
 /**
  * Real system UI captures for the Android OS integration surfaces.
@@ -324,6 +329,33 @@ class OsSurfaceScreenshotsTest {
         OsSurfaceCapture.waitForText("Add a caption...")
         Thread.sleep(1_500L)
         OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "drag-out-dropped")
+    }
+
+    /**
+     * Android's share sheet offering LogDate's journals as Direct Share targets, for text shared
+     * from another app.
+     */
+    @Test fun directShareTargets() {
+        if (OsSurfaceCapture.formFactor != "phone") return
+        OsSurfaceCapture.prepareOnboardedApp()
+        val journal = OsSurfaceCapture.createJournal("Summer in Lisbon")
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val shortcutId = "${DynamicShortcutDescriptor.ShareToJournal.ID_PREFIX}:$journal"
+        GlobalContext.get().get<DynamicShortcutScheduler>().enqueueImmediateRefresh()
+        val deadline = System.currentTimeMillis() + 15_000L
+        while (ShortcutManagerCompat.getDynamicShortcuts(context).none { it.id == shortcutId }) {
+            check(System.currentTimeMillis() < deadline) { "LogDate did not publish the journal's share target" }
+            Thread.sleep(500L)
+        }
+        val share =
+            Intent(Intent.ACTION_SEND)
+                .setType("text/plain")
+                .putExtra(Intent.EXTRA_TEXT, "The first leaves are turning on the walk home.")
+        context.startActivity(Intent.createChooser(share, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        OsSurfaceCapture.waitForText("Summer in Lisbon")
+        Thread.sleep(1_500L)
+        OsSurfaceCapture.capture(surface = "launcher-shortcuts", state = "share-sheet")
+        OsSurfaceCapture.device.pressBack()
     }
 
     /**

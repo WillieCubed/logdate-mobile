@@ -76,7 +76,7 @@ A row reaches `[done]` only when its Evidence column lists:
 | `[done]` | Desktop windowing capture spike decided | A managed device cannot show desktop windowing: it needs a developer setting, a lifted device check, and a restart. `./run screenshots:desktop` runs `OsSurfaceScreenshotsTest#desktopWindows` on its own Android 17 tablet emulator instead. Recorded in `large-screens-and-desktop-windowing.md`. |
 | `[done]` | `checkOsIntegrationScreenshotCoverage` fails on missing images, missing tests, and stale references | `ScreenshotCoverageTest` (13/13, `cd build-logic && ../gradlew test`). Registry `config/screenshots/os-integration-coverage.txt`. Runs in `.githooks/pre-push` and `./run screenshots:check`. Its first run found 157 stale references, deleted in `f273b86a5`. The `ci.yml` step is prepared for the user to commit. |
 | `[done]` | `buildScreenshotComparisonSheet` generates labeled sheets per feature | `ScreenshotComparisonSheet` and `BuildScreenshotComparisonSheet` in build-logic, tested by `ScreenshotComparisonSheetTest`. `./run screenshots:sheet <feature>`. |
-| `[partial]` | `./run` runs every screenshot lane, plus `screenshots:os`, `screenshots:sheet`, and `screenshots:check` | `screenshots:os`, `screenshots:sheet`, and `screenshots:check` exist. Missing: `test:screenshots` covering the Wear and desktop lanes. |
+| `[done]` | `./run` runs every screenshot lane, plus `screenshots:os`, `screenshots:sheet`, and `screenshots:check` | `test:screenshots` and `test:screenshots:update` cover the Android, desktop, and Wear lanes; `screenshots:os`, `screenshots:desktop`, `screenshots:sheet`, and `screenshots:check` exist. |
 
 ## Capture Launch Contract and Platform Hygiene
 
@@ -99,7 +99,7 @@ A row reaches `[done]` only when its Evidence column lists:
 | `[done]` | Dynamic shortcuts for Continue draft, Today, and Last week | Ship today (`DynamicShortcutPublisherTest`). Their icons were bare white glyphs that launchers drew white on white; they now use the same adaptive icons as the static shortcuts (visible in the launcher captures). |
 | `[done]` | The dynamic shortcut cap leaves room for static shortcuts | `DynamicShortcutPublisher` caps dynamic shortcuts at four visible minus three static; `DynamicShortcutPublisherTest`. |
 | `[done]` | Drafts are pushed with `pushDynamicShortcut`; share targets carry a `LocusId` | Share targets carry a `LocusId`. Drafts stay in the atomic `setDynamicShortcuts` call by decision (stable ids keep usage history); recorded in `launcher-shortcuts.md`. The recorder bubble's shortcut survives refreshes. |
-| `[partial]` | Direct Share targets for each journal | Ship today. `SharingShortcutParsersTest`, `IncomingShareE2ETest`. Missing: Lane 2 share sheet capture. |
+| `[done]` | Direct Share targets for each journal | Ship today. `SharingShortcutParsersTest`, `IncomingShareE2ETest`. Lane 2: `launcher-shortcuts/share-sheet--phone-api37.png` (`OsSurfaceScreenshotsTest#directShareTargets`), with the journal's name as the target's only label. |
 | `[done]` | `reportShortcutUsed` is called on save for each mode and shared journal | `CaptureUsageReporter` (editor) and `AndroidCaptureUsageReporter`; ids from `captureShortcutId`, tested in `CaptureLaunchTest`. |
 | `[done]` | Journals and widgets can be pinned from inside the app | Journals: **Add to home screen** through `HomeScreenPins`. Widgets: Settings > Widgets (`AndroidMemoriesWidgetInstallController`). Lane 2: `launcher-shortcuts/{journal-menu,pin-journal}--phone-api37.png`. |
 
@@ -118,8 +118,8 @@ A row reaches `[done]` only when its Evidence column lists:
 
 | Status | Requirement | Evidence |
 | --- | --- | --- |
-| `[partial]` | New entry, On This Day, and Pinned memory home-screen widgets | Ship today. `OnThisDayWidgetPreviewTest` and `WidgetSetupScreenshotsTest` capture managed-device images, but they are not committed. Missing: Lane 1 Glance references. |
-| `[partial]` | Generated widget previews in the picker | `WidgetPreviewPublisher` ships today. Missing: Lane 2 picker capture. |
+| `[done]` | New entry, On This Day, and Pinned memory home-screen widgets | Ship today. `OsSurfaceScreenshotsTest#widgetRenders` renders each widget as a launcher draws it, in light, dark, right-to-left, and 200% text, committed as `widgets/{capture,new-entry,on-this-day,on-this-day-text,pinned-memory}-widget-{light,dark,rtl,large-text}--phone-api37.png`. These are device renders rather than host-side Glance references, because RemoteViews need Android's own inflation; the widgets guide explains why. Not rendered: each widget's other launcher sizes. |
+| `[done]` | Generated widget previews in the picker | `WidgetPreviewPublisher` ships today. Lane 2: `widgets/capture-widget-picker--phone-api37.png` and `--tablet-api37.png` show the generated previews in the Android 17 picker: Pinned Memory's photo print, New Entry's photo with its buttons, and Capture. |
 
 ## Bubbles
 

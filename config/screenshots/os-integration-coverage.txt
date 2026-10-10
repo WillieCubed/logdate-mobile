@@ -28,6 +28,7 @@ feature-previews|desktop|feature-previews
 
 # Launcher shortcuts: the long-press menu with New entry, Record voice, Take photo, and the dynamic shortcut.
 launcher-shortcuts|system|docs/screenshots/android-os-integration/launcher-shortcuts/long-press--phone-api36.png
+direct-share|system|docs/screenshots/android-os-integration/launcher-shortcuts/share-sheet--phone-api37.png
 launcher-shortcuts|system|docs/screenshots/android-os-integration/launcher-shortcuts/long-press--phone-api37.png
 launcher-shortcuts|system|docs/screenshots/android-os-integration/launcher-shortcuts/long-press--tablet-api37.png
 

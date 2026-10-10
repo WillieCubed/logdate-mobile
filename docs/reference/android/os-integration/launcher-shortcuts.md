@@ -28,15 +28,25 @@ how many exist.
   already in that mode, plus one dynamic shortcut. That is Continue draft when a draft changed in the
   last 7 days, otherwise Today. The icons are adaptive icons with a monochrome layer, so launchers
   with themed icons recolor them to match the wallpaper.
-- **Share sheet:** recently used and favorite journals appear as Direct Share targets.
-- **Planned:** journal detail gets "Add to home screen", and widget settings get "Add widget".
+- **Share sheet:** recently used and favorite journals appear as Direct Share targets, named for
+  the journal and marked with LogDate's icon.
+- **Home screen:** a journal's menu offers "Add to home screen", and Settings > Widgets adds widgets
+  (see Pinning below).
 
 | Android 17 phone | Android 17 tablet |
 | --- | --- |
 | ![The long-press menu with Write a new entry, Record a voice entry, Take photo, and Open today's timeline](../../../screenshots/android-os-integration/launcher-shortcuts/long-press--phone-api37.png) | ![The same menu on a tablet](../../../screenshots/android-os-integration/launcher-shortcuts/long-press--tablet-api37.png) |
 
 Every shortcut icon is an adaptive icon in the launcher icon's brown, with a monochrome layer for
-themed icons. The share sheet capture is added when it ships.
+themed icons.
+
+Text shared from another app on an Android 17 phone, with the Summer in Lisbon journal offered as a
+Direct Share target above the apps:
+
+![Android's share sheet sharing a line of text, with a Summer in Lisbon target showing the journal's monogram and a small LogDate badge, above Quick Share, Chrome, and other apps](../../../screenshots/android-os-integration/launcher-shortcuts/share-sheet--phone-api37.png)
+
+A share target has only a short label, the journal's name. The share sheet shows a shortcut's long
+label when it has one, and "Share to Summer in Lisbon" did not fit its two short lines.
 
 ## How it works
 

@@ -187,13 +187,10 @@ class AndroidDynamicShortcutApplier(
                 .build()
         return ShortcutInfoCompat
             .Builder(context, descriptor.id)
+            // The share sheet shows the long label when there is one; a "Share to" prefix there
+            // pushes the journal's name out of its two short lines, so the name is the only label.
             .setShortLabel(descriptor.journalTitle)
-            .setLongLabel(
-                context.getString(
-                    R.string.dynamic_shortcut_share_to_journal_long,
-                    descriptor.journalTitle,
-                ),
-            ).setIcon(icon)
+            .setIcon(icon)
             .setIntent(intent)
             .setRank(rank)
             .setLongLived(true)
