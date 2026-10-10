@@ -5,7 +5,7 @@
 # The captures come from OsSurfaceScreenshotsTest running on Gradle Managed Devices, never a
 # physical device. By default it runs on the Android 17 (API 37) phone and tablet, which have App
 # Bubbles, the Bubble Bar, and Live Update chips; pass managed device names to choose others, and set
-# OS_SURFACE_TEST to run one test method.
+# OS_SURFACE_TEST to run one test method, or several separated by commas.
 #
 # Usage:
 #   scripts/os-surface-screenshots.sh                                  # phone + tablet, every test
@@ -23,7 +23,13 @@ fi
 
 test_class="app.logdate.client.e2e.osintegration.OsSurfaceScreenshotsTest"
 if [[ -n "${OS_SURFACE_TEST:-}" ]]; then
-    test_class="${test_class}#${OS_SURFACE_TEST}"
+    # Several methods are separated by commas; the runner takes a comma-separated Class#method list.
+    methods=()
+    IFS=',' read -r -a names <<<"$OS_SURFACE_TEST"
+    for name in "${names[@]}"; do
+        methods+=("${test_class}#${name}")
+    done
+    test_class="$(IFS=','; echo "${methods[*]}")"
 fi
 
 tasks=()

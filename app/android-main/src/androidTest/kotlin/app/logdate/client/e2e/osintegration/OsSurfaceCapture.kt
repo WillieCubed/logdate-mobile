@@ -57,6 +57,7 @@ object OsSurfaceCapture {
     private const val TIMEOUT_MS = 10_000L
     private const val RECORDING_NOTIFICATION_ID = 1001
     private const val DEMO_MODE_ATTEMPTS = 10
+    private const val RETURN_HOME_STEPS = 6
     private const val SPLASH_WAIT_MS = 5_000L
 
     /** `FLAG_ACTIVITY_NEW_TASK` with `FLAG_ACTIVITY_CLEAR_TASK`, so the activity starts over. */
@@ -362,6 +363,25 @@ object OsSurfaceCapture {
         val center = target.visibleCenter
         device.swipe(center.x, center.y, center.x, center.y, 200)
         device.waitForIdle()
+    }
+
+    /**
+     * Goes back to Home from an editor, discarding anything typed there. The editor may be a screen
+     * of the main activity or a window of its own; leaving the latter can land on the launcher, which
+     * reopens the main screen.
+     */
+    fun returnHome() {
+        repeat(RETURN_HOME_STEPS) {
+            if (device.hasObject(By.text("Search your log"))) return
+            if (device.currentPackageName != packageName) {
+                openMainActivity()
+                return@repeat
+            }
+            device.findObject(By.text("Discard"))?.click() ?: device.pressBack()
+            device.waitForIdle()
+            Thread.sleep(1_000L)
+        }
+        waitForText("Search your log")
     }
 
     /** Opens LogDate's main screen. */

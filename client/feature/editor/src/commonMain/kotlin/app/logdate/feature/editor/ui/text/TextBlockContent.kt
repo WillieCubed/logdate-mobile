@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
+import app.logdate.ui.common.handwritingDelegate
 import app.logdate.ui.theme.Spacing
 import io.github.aakira.napier.Napier
 import logdate.client.feature.editor.generated.resources.Res
@@ -109,6 +110,7 @@ fun TextBlockContent(
                     .then(if (isExpanded) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
                     .heightIn(min = minEditorHeight)
                     .testTag(LOGDATE_EDITOR_TEXT_INPUT_TAG)
+                    .handwritingDelegate()
                     .focusRequester(focusRequester)
                     .onFocusChanged { if (it.isFocused) onFocused() },
             textStyle = typography.bodyLarge.copy(color = colors.onSurface),

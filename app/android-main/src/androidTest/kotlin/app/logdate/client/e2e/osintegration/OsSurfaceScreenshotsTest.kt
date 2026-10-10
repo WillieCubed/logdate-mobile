@@ -1,6 +1,9 @@
 package app.logdate.client.e2e.osintegration
 
+import android.graphics.PointF
+import android.graphics.Rect
 import android.os.Build
+import android.view.accessibility.AccessibilityWindowInfo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -20,6 +23,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.regex.Pattern
 import kotlin.uuid.Uuid
 import app.logdate.client.sync.R as SyncR
 
@@ -279,6 +283,149 @@ class OsSurfaceScreenshotsTest {
     }
 
     /**
+     * "hello" written with a pen in a new entry: once while the pen is still down, with the ink on
+     * screen, and once after the keyboard's handwriting recognition has typed it into the entry.
+     */
+    @Test fun stylusHandwriting() {
+        if (OsSurfaceCapture.formFactor != "tablet") return
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.shell("settings put secure stylus_handwriting_enabled 1")
+        OsSurfaceCapture.openCapture("text")
+        val stylus = Stylus()
+        stylus.tap(OsSurfaceCapture.waitForText("Write something").visibleCenter)
+        dismissStylusTutorial()
+        OsSurfaceCapture.waitForText("What's on your mind?")
+        val field = OsSurfaceCapture.device.findObject(By.clazz("android.widget.EditText")).visibleBounds
+        awaitHandwritingModel(stylus, field)
+        dismissStylusTutorial()
+        hideOnScreenKeyboard()
+        val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+        val baseline = PointF(field.left + HANDWRITING_INSET_DP * density, field.top + HANDWRITING_BASELINE_DP * density)
+        stylus.write(Stylus.hello(origin = baseline, unit = HANDWRITING_X_HEIGHT_DP * density)) {
+            OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "stylus-handwriting")
+        }
+        awaitTypedHello("stylus-handwriting")
+        OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "stylus-handwriting-typed")
+    }
+
+    /**
+     * Writing with a pen on controls that only open a text field: the editor's "Write something"
+     * card starts a text entry, and the Home search pill opens search, each with the handwriting
+     * typed in.
+     */
+    @Test fun stylusWritingOnControls() {
+        if (OsSurfaceCapture.formFactor != "tablet") return
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.shell("settings put secure stylus_handwriting_enabled 1")
+        // Something for the handwritten search to find.
+        OsSurfaceCapture.createTextEntry("Said hello to the new neighbors on the walk home.")
+        val stylus = Stylus()
+        val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+
+        // Gboard's handwriting model is fetched in the search field, which leaves the editor's
+        // "Write something" card untouched for the capture.
+        OsSurfaceCapture.openMainActivity()
+        OsSurfaceCapture.returnHome()
+        OsSurfaceCapture.waitForText("Search your log").click()
+        val searchField = OsSurfaceCapture.device.wait(Until.findObject(By.clazz("android.widget.EditText")), 5_000L)
+        checkNotNull(searchField) { "Search did not open" }
+        awaitHandwritingModel(stylus, searchField.visibleBounds)
+        dismissStylusTutorial()
+        hideOnScreenKeyboard()
+        OsSurfaceCapture.returnHome()
+
+        OsSurfaceCapture.openCapture("text")
+        OsSurfaceCapture.waitForText("Write something")
+        val card = OsSurfaceCapture.device.findObject(By.clickable(true).hasDescendant(By.text("Write something"))).visibleBounds
+        // The card opens a text entry as soon as the pen touches it, so the word is centered to stay
+        // inside the entry's text area while it is written.
+        val wordWidth = Stylus.HELLO_WIDTH * HANDWRITING_X_HEIGHT_DP * density
+        val onCard = PointF(card.exactCenterX() - wordWidth / 2, card.bottom - HANDWRITING_INSET_DP * density)
+        stylus.write(Stylus.hello(origin = onCard, unit = HANDWRITING_X_HEIGHT_DP * density)) {
+            OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "stylus-write-card")
+        }
+        awaitTypedHello("stylus-write-card")
+        OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "stylus-write-card-typed")
+
+        OsSurfaceCapture.returnHome()
+        val pill = OsSurfaceCapture.device.findObject(By.clickable(true).hasDescendant(By.text("Search your log"))).visibleBounds
+        // Smaller writing that starts on the pill; strokes may run past its edges.
+        val onPill = PointF(pill.left + HANDWRITING_INSET_DP * density, pill.bottom - SEARCH_BASELINE_INSET_DP * density)
+        stylus.write(Stylus.hello(origin = onPill, unit = SEARCH_X_HEIGHT_DP * density)) {
+            OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "stylus-search")
+        }
+        awaitTypedHello("stylus-search")
+        OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "stylus-search-typed")
+    }
+
+    /**
+     * Waits for "hello" to be typed in a text field. If it never is, saves the screen and Gboard's
+     * handwriting state under `failures/` and fails.
+     */
+    private fun awaitTypedHello(state: String) {
+        val typed = OsSurfaceCapture.device.wait(Until.findObject(By.text(Pattern.compile("(?i)hello\\s*"))), 10_000L)
+        if (typed != null) {
+            Thread.sleep(1_000L)
+            return
+        }
+        OsSurfaceCapture.capture(surface = "failures", state = "$state-not-typed")
+        val handwriting = OsSurfaceCapture.shell("dumpsys input_method").lines().filter { "tylus" in it || "andwriting" in it }
+        OsSurfaceCapture.writeEvidence(surface = "failures", state = "$state-not-typed", text = handwriting.joinToString("\n"))
+        error("The handwriting was not typed ($state)")
+    }
+
+    /**
+     * Puts the on-screen keyboard away, as a person does before writing with a pen. Back closes the
+     * keyboard and leaves the entry focused. Gboard's small handwriting toolbar is left alone.
+     */
+    private fun hideOnScreenKeyboard() {
+        val screenHeight = OsSurfaceCapture.device.displayHeight
+        val keyboardShown =
+            InstrumentationRegistry.getInstrumentation().uiAutomation.windows.any { window ->
+                val bounds = Rect().also(window::getBoundsInScreen)
+                window.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD && bounds.height() > screenHeight / 4
+            }
+        if (!keyboardShown) return
+        OsSurfaceCapture.device.pressBack()
+        Thread.sleep(1_000L)
+    }
+
+    /** Closes the handwriting tutorial Gboard offers over the app the first time it reads a pen. */
+    private fun dismissStylusTutorial() {
+        OsSurfaceCapture.device.wait(Until.findObject(By.text("Try out your stylus")), 3_000L)?.let {
+            OsSurfaceCapture.waitForText("Cancel").click()
+        }
+    }
+
+    /**
+     * Waits until Gboard can read handwriting. A fresh emulator's Gboard downloads its handwriting
+     * model the first time a pen writes in a text field, and ignores the pen until the download
+     * finishes, so a short stroke in [field] starts the download. Whatever the strokes typed is
+     * cleared again.
+     */
+    private fun awaitHandwritingModel(
+        stylus: Stylus,
+        field: Rect,
+    ) {
+        fun ready() =
+            OsSurfaceCapture.shell("dumpsys input_method").lines().any { "handwriting_recognition" in it && "_reco_" in it }
+        if (ready()) return
+        val y = field.centerY().toFloat()
+        stylus.write(listOf(listOf(PointF(field.left + 100f, y), PointF(field.left + 160f, y))))
+        val deadline = System.currentTimeMillis() + HANDWRITING_MODEL_TIMEOUT_MS
+        while (!ready()) {
+            check(System.currentTimeMillis() < deadline) { "Gboard did not finish downloading its handwriting model" }
+            Thread.sleep(2_000L)
+        }
+        // Gboard offers its handwriting tutorial the first time it reads a pen, which can be now or
+        // during a later capture, so one more stroke brings it up here, where it is closed.
+        stylus.write(listOf(listOf(PointF(field.left + 100f, y), PointF(field.left + 160f, y))))
+        dismissStylusTutorial()
+        Thread.sleep(2_000L)
+        OsSurfaceCapture.device.findObject(By.clazz("android.widget.EditText"))?.clear()
+    }
+
+    /**
      * Each widget as a launcher draws it, in light, dark, right-to-left, and 200% text. Rendering
      * does not depend on the screen, so it runs on the phone only.
      */
@@ -403,6 +550,16 @@ class OsSurfaceScreenshotsTest {
     private companion object {
         /** `WindowConfiguration.WINDOWING_MODE_FREEFORM`, which `am start --windowingMode` takes. */
         const val WINDOWING_MODE_FREEFORM = 5
+
+        /** Where the handwriting starts in the entry's text field, and how large it is, in dp. */
+        const val HANDWRITING_INSET_DP = 48
+        const val HANDWRITING_BASELINE_DP = 160
+        const val HANDWRITING_X_HEIGHT_DP = 40
+        const val HANDWRITING_MODEL_TIMEOUT_MS = 180_000L
+
+        /** Writing on the search pill: smaller, with the baseline just inside the pill's bottom edge. */
+        const val SEARCH_X_HEIGHT_DP = 20
+        const val SEARCH_BASELINE_INSET_DP = 10
 
         /** A memory with no photo, so the widget shows its text, which follows the font size. */
         val TEXT_MEMORY =

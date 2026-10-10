@@ -4,8 +4,9 @@ Status: partial.
 
 - **Built:** the shared shortcut catalog (Compose handlers, Android's Meta+/ helper, and the desktop
   menu bar), right-click menus at the pointer, tooltips on the workspace account button, dropping
-  text and media from other apps into the editor, and dragging photos and videos out as real files.
-- **Planned:** a new-window shortcut and stylus verification.
+  text and media from other apps into the editor, dragging photos and videos out as real files, and
+  writing in the editor with a pen.
+- **Planned:** a new-window shortcut.
 
 ## What it is
 
@@ -76,6 +77,33 @@ A photo copied in another app and pasted with Ctrl+V on a tablet with a USB keyb
 ![A new entry in the editor with the pasted photo of a dog wrapped in a blanket](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/paste-photo--tablet-api37.png)
 
 - Dragging a photo or video out of LogDate into another app sends the actual file, not a path string.
+
+### Stylus
+
+On Android 14 and later, writing with a pen over an entry's text turns the handwriting into typed
+text, through the keyboard's handwriting mode (Gboard on most devices). The keyboard draws the ink
+while the pen is down, then types what it read where the pen wrote, and shows its handwriting toolbar
+instead of the on-screen keyboard.
+
+"hello" written with a pen in a new entry on a Pixel Tablet running Android 17, while the pen is still
+down:
+
+![A new entry with "hello" drawn in thin handwriting ink over the empty text area, and Gboard's handwriting toolbar at the left edge](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/stylus-handwriting--tablet-api37.png)
+
+And once the pen lifts:
+
+![The same entry with "hello" typed as text at the start of the entry](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/stylus-handwriting-typed--tablet-api37.png)
+
+A person can also start writing on two controls that open a text field rather than being one:
+
+- **The editor's "Write something" card.** Writing on it starts a text entry as soon as the pen
+  touches it, and the handwriting is typed into that entry.
+- **Home's search pill.** Writing on it opens search with the handwriting as the query.
+
+| While writing | Once typed |
+| --- | --- |
+| ![Writing "hello" where the Write something card was: the card opened a text entry as soon as the pen touched it, and the ink stays over the entry](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/stylus-write-card--tablet-api37.png) | ![A new text entry with "hello" typed in it](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/stylus-write-card-typed--tablet-api37.png) |
+| ![Search, opened as the pen touched Home's search bar, with "hello" handwritten over its field](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/stylus-search--tablet-api37.png) | ![Search with "hello" typed as the query and the entry it finds](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/stylus-search-typed--tablet-api37.png) |
 
 Screenshots are added here as each part ships: desktop menus, the context menu and tooltip states,
 drop states, and a cross-app drag on a tablet.
@@ -155,9 +183,27 @@ button uses it.
 
 ### Stylus
 
-Compose text fields support stylus handwriting. The editor's text block (`TextBlockContent.kt`) is
-checked on a stylus-enabled emulator. Postcards already have their own pressure-aware ink in
-`InkCapture.kt`.
+LogDate has no handwriting code of its own. Since Compose foundation 1.7, every Compose text field
+on Android 14 and later starts the platform's stylus handwriting when a pen moves over it, or within
+40dp above or below and 10dp to either side. Compose asks the keyboard to start handwriting
+(`InputMethodManager.startStylusHandwriting`), and the keyboard draws the ink and sends the text it
+recognizes through the normal input connection, so the editor sees ordinary typing. The editor's text
+block (`TextBlockContent.kt`) gets this for free.
+
+Handwriting needs three things on the device: a pen (or an emulator touch screen that reports one),
+a keyboard that supports handwriting, and the system setting "Use stylus to write in text fields",
+which is on by default on devices that ship with a pen. Password fields never accept handwriting.
+
+Some controls only open a text field: the editor's "Write something" card and Home's search pill.
+Writing on those uses Android's handwriting delegation. `handwritingDelegator` (client/ui) marks the
+control; when a pen starts writing on it, Android asks the keyboard to get ready for handwriting and
+calls the control's callback, which opens and focuses a text field marked `handwritingDelegate`. That
+field accepts the handwriting, and the keyboard types it there. On Android these are Compose's
+`handwritingDetector` and `handwritingHandler`; desktop and iOS builds have no stylus handwriting, so
+they do nothing there. The editor's text block and the expanded search field are the two delegates.
+A field must be focused as soon as it appears, or the keyboard drops the handwriting.
+
+Postcards have their own pressure-aware ink in `InkCapture.kt`; that is drawing, not text input.
 
 ## Flag and rollout
 
@@ -175,6 +221,9 @@ Dragging out shares only the file the person dragged, with read-only access gran
   clickable card opens the menu without clicking, a tap still clicks, right-click opens the menu, and
   content without items or with `openOnLongPress = false` keeps the press.
 - **Import tests:** MIME routing, partial-failure rollback, and a specific error for unreadable URIs.
+- **Stylus:** `OsSurfaceScreenshotsTest#stylusHandwriting` writes "hello" with pen events and fails
+  if the keyboard does not type it into the entry, and `stylusWritingOnControls` does the same on the
+  "Write something" card and the search pill (see Updating screenshots).
 - **Manual check:** on an API 37 tablet emulator with a hardware keyboard and mouse, press Meta+/ and
   drag between LogDate and Files in split screen.
 
@@ -189,3 +238,12 @@ Dragging out shares only the file the person dragged, with read-only access gran
   Android's virtual keyboard, which has no physical keys, and Android 17's helper then drops every app
   shortcut. The test also switches the on-screen keyboards off while it captures, because the
   emulator's Gboard stays up next to a physical keyboard.
+- The stylus captures write with `Stylus` in the instrumented tests. It sends pen motion events from
+  one of the emulator's touch screens, which also reports itself as a stylus, at a pen's sampling
+  rate (about 120 events a second). Speed matters: strokes sent slowly, for example one
+  `adb shell input` command per point, reach the keyboard as separate words, and it reads them as
+  something else. The tests turn on the handwriting setting and close Gboard's first-use stylus
+  tutorial when it appears. A fresh managed device's Gboard has no handwriting model yet: it
+  downloads one the first time a pen writes in a text field and ignores the pen until then. So the
+  tests write one short stroke in a field, wait up to three minutes for the model (its pack appears
+  in `dumpsys input_method`), clear the field, and put the on-screen keyboard away before writing.

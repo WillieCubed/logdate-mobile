@@ -43,6 +43,7 @@ import app.logdate.feature.editor.ui.editor.CameraBlockUiState
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
 import app.logdate.feature.editor.ui.editor.ImageBlockUiState
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
+import app.logdate.ui.common.handwritingDelegator
 import app.logdate.ui.platform.PlatformIcons
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.capture
@@ -241,7 +242,7 @@ private fun TextEntrySurface(
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.handwritingDelegator(onClick),
         shape = RoundedCornerShape(cornerRadius),
         color = MaterialTheme.colorScheme.surface,
     ) {

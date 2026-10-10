@@ -58,6 +58,7 @@ import app.logdate.client.domain.search.SearchFilters
 import app.logdate.client.repository.search.SearchContentType
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.common.handwritingDelegate
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.PlatformSheet
 import app.logdate.ui.platform.plainTextClipEntry
@@ -256,6 +257,7 @@ fun SearchScreenContent(
                     onSearch = { onCommitSearch() },
                     modifier =
                         Modifier
+                            .handwritingDelegate()
                             .testTag(SEARCH_SCREEN_INPUT_ACCESSIBILITY_TAG)
                             .semantics {
                                 contentDescription = SEARCH_SCREEN_INPUT_ACCESSIBILITY_TAG

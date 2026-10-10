@@ -26,6 +26,7 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.handwritingDelegator
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.search.searchBarMaxWidth
 import app.logdate.ui.theme.Spacing
@@ -76,7 +77,7 @@ fun WorkspaceSearchBar(
     }
     Surface(
         onClick = onSearch,
-        modifier = modifier.searchBarMaxWidth().testTag("workspace_search"),
+        modifier = modifier.searchBarMaxWidth().testTag("workspace_search").handwritingDelegator(onSearch),
         shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.workspaceContainer(WorkspaceSurface.Raised),
         contentColor = MaterialTheme.colorScheme.onSurface,
