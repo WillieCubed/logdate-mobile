@@ -72,6 +72,7 @@ class AndroidMediaDirectoriesTest {
         assertNull(directories.pathInCurrentInstall("/storage/emulated/0/DCIM/a.jpg"))
         assertNull(directories.pathInCurrentInstall("/data/user/0/studio.hypertext.logdate"))
         assertNull(directories.pathInCurrentInstall("/data/local/tmp/a.jpg"))
+        assertNull(directories.pathInCurrentInstall("/data/user/0/com.other.app/files/media/a.jpg"))
     }
 
     @Test

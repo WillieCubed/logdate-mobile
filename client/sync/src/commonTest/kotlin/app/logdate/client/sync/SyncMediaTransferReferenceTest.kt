@@ -12,6 +12,7 @@ import app.logdate.client.sync.test.InMemoryMediaSyncRefStore
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -45,6 +46,14 @@ class SyncMediaTransferReferenceTest {
 
             assertEquals(1, uploads.uploaded.size)
         }
+
+    @Test
+    fun `two spellings of one file are the same local file`() {
+        val transfer = transfer()
+
+        assertTrue(transfer.sameLocalFile("file:///install/media/beach.jpg", "logdate-media://library/beach.jpg"))
+        assertFalse(transfer.sameLocalFile("file:///install/media/beach.jpg", "logdate-media://library/other.jpg"))
+    }
 
     private fun transfer(media: InMemoryMediaManager = InMemoryMediaManager()) = SyncMediaTransfer(media, refs, uploads, references)
 

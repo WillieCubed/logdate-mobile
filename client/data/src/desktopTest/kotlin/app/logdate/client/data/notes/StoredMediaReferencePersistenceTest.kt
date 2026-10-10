@@ -103,6 +103,29 @@ class StoredMediaReferencePersistenceTest {
         }
 
     @Test
+    fun `replaying a create over a row not yet migrated is not a conflict`() =
+        runTest {
+            val legacy = image("file:///install/media/beach.jpg")
+            database.imageNoteDao().addNote(legacy.toEntity())
+
+            assertEquals(legacy.uid, repository.create(legacy))
+            assertEquals("file:///install/media/beach.jpg", contentUriOf(legacy.uid))
+        }
+
+    @Test
+    fun `a media ref update made after the migration read is not overwritten`() =
+        runTest {
+            val dao = database.imageNoteDao()
+            val legacy = image("file:///install/media/old.jpg")
+            dao.addNote(legacy.toEntity())
+            dao.updateContentUri(legacy.uid, "logdate-media://library/repaired.jpg")
+
+            dao.updateContentUriIfUnchanged(legacy.uid, "file:///install/media/old.jpg", "logdate-media://library/old.jpg")
+
+            assertEquals("logdate-media://library/repaired.jpg", contentUriOf(legacy.uid))
+        }
+
+    @Test
     fun `a file is reported in use under any spelling`() =
         runTest {
             repository.create(image("/install/media/beach.jpg"))

@@ -125,4 +125,12 @@ interface AudioNoteDao {
         noteId: Uuid,
         contentUri: String,
     )
+
+    /** Rewrites [previous] to [contentUri] only while the note still stores [previous]. */
+    @Query("UPDATE audio_notes SET contentUri = :contentUri WHERE uid = :noteId AND contentUri = :previous")
+    suspend fun updateContentUriIfUnchanged(
+        noteId: Uuid,
+        previous: String,
+        contentUri: String,
+    )
 }

@@ -10,8 +10,9 @@ import java.io.File
  * - [MediaCollection.Recordings]: `filesDir/audio_notes`
  *
  * App data lives under `/data/user/<user>/<package>` (also spelled `/data/data/<package>` for the
- * primary user), so a path written for another user, profile or package spelling maps to the same
- * place under this install's data directory.
+ * primary user), so a path written for another user, profile or spelling maps to the same place
+ * under this install's data directory. Only LogDate's own package names are recognised, never
+ * another app's.
  */
 class AndroidMediaDirectories(
     filesDir: File,
@@ -20,6 +21,13 @@ class AndroidMediaDirectories(
     private val dataDir = files.parentFile ?: files
     private val library = File(files, "media").path
     private val recordings = File(files, "audio_notes").path
+    private val appDataPath =
+        Regex(
+            "^/data/(?:data|user/\\d+|user_de/\\d+)/(?:${(KNOWN_PACKAGES + dataDir.name).joinToString(
+                "|",
+                transform = Regex::escape,
+            )})/(.+)$",
+        )
 
     override fun directory(collection: MediaCollection): String =
         when (collection) {
@@ -30,13 +38,13 @@ class AndroidMediaDirectories(
     override fun canonicalPath(path: String): String = File(path).canonicalPath
 
     override fun pathInCurrentInstall(path: String): String? {
-        val withinAppData = APP_DATA_PATH.matchEntire(path)?.groupValues?.get(1) ?: return null
+        val withinAppData = appDataPath.matchEntire(path)?.groupValues?.get(1) ?: return null
         return File(dataDir, withinAppData).path
     }
 
     private companion object {
-        /** `/data/data/<package>/…`, `/data/user/<n>/<package>/…` or `/data/user_de/<n>/<package>/…`. */
-        val APP_DATA_PATH = Regex("^/data/(?:data|user/\\d+|user_de/\\d+)/[^/]+/(.+)$")
+        /** The package names LogDate has shipped under; their data directories hold the same layout. */
+        val KNOWN_PACKAGES = listOf("studio.hypertext.logdate", "co.reasonabletech.logdate")
     }
 }
 

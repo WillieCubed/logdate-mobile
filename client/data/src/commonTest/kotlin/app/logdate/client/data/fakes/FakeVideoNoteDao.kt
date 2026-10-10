@@ -107,6 +107,16 @@ class FakeVideoNoteDao : VideoNoteDao {
         updateFlow()
     }
 
+    override suspend fun updateContentUriIfUnchanged(
+        noteId: Uuid,
+        previous: String,
+        contentUri: String,
+    ) {
+        val existing = notes[noteId]?.takeIf { it.contentUri == previous } ?: return
+        notes[noteId] = existing.copy(contentUri = contentUri)
+        updateFlow()
+    }
+
     fun clear() {
         notes.clear()
         updateFlow()

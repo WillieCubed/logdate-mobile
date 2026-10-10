@@ -30,7 +30,7 @@ internal class SyncMediaTransfer(
     private val mediaReferences: StoredMediaReferences = StoredMediaReferences.Unchanged,
 ) {
     /** Whether two stored references name the same local file, however each is spelled. */
-    private fun sameLocalFile(
+    fun sameLocalFile(
         first: String,
         second: String,
     ): Boolean = first == second || mediaReferences.storedReference(first) == mediaReferences.storedReference(second)

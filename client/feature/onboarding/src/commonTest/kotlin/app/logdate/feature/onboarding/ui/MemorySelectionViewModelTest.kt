@@ -295,6 +295,22 @@ class MemorySelectionViewModelTest {
         }
 
     @Test
+    fun `failed note write keeps media another note still references`() =
+        runTest {
+            val memory = sampleImage("shared")
+            fakeMediaManager.queryMediaByDateFlow = { flowOf(listOf(memory)) }
+            val viewModel = createViewModel()
+            viewModel.refreshMemories()
+            advanceUntilIdle()
+            viewModel.toggleMemorySelection(memory.uri)
+            notes.failBeforeCreate = true
+            notes.referencedPaths = setOf("file:///managed/shared")
+
+            assertTrue(viewModel.processSelectedMemories().isFailure)
+            assertTrue(importer.discarded.isEmpty(), "Discarded ${importer.discarded}")
+        }
+
+    @Test
     fun `selected video is copied into a video entry at its capture time`() =
         runTest {
             val video = sampleVideo("clip")
@@ -400,6 +416,9 @@ private class TestJournalNotesRepository : JournalNotesRepository {
     val saved = mutableListOf<JournalNote>()
     var failAfterCreate = false
     var failBeforeCreate = false
+
+    /** Paths some other note references under a different spelling than the one asked about. */
+    var referencedPaths: Set<String> = emptySet()
     override val allNotesObserved = MutableStateFlow<List<JournalNote>>(emptyList())
 
     override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> = allNotesObserved
@@ -449,6 +468,8 @@ private class TestJournalNotesRepository : JournalNotesRepository {
     ) = Unit
 
     override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = emptyList()
+
+    override suspend fun notesReferencingMediaPaths(paths: Set<String>): Set<String> = paths.intersect(referencedPaths)
 }
 
 private class FakeMediaManager : MediaManager {

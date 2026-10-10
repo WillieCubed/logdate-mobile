@@ -278,7 +278,8 @@ internal class SyncDownloader(
 
     private suspend fun remoteMediaRef(note: JournalNote): String? {
         val mapping = mediaSyncRefStore.get(note.uid)
-        return mapping?.takeIf { it.localUri == note.mediaRefOrNull() }?.remoteUrl ?: note.mediaRefOrNull()
+        val localRef = note.mediaRefOrNull()
+        return localRef?.let { mapping?.takeIf { cached -> mediaTransfer.sameLocalFile(cached.localUri, it) }?.remoteUrl } ?: localRef
     }
 
     private suspend fun sameAudioCreateBaseFields(

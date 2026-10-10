@@ -307,15 +307,7 @@ class MemorySelectionViewModel(
             withContext(NonCancellable) {
                 runCatching {
                     val published = notesRepository.getNoteById(noteId) != null
-                    val shared =
-                        notesRepository.allNotesObserved.first().any { existing ->
-                            when (existing) {
-                                is JournalNote.Image -> existing.mediaRef == managedUri
-                                is JournalNote.Video -> existing.mediaRef == managedUri
-                                is JournalNote.Audio -> existing.mediaRef == managedUri
-                                is JournalNote.Text -> false
-                            }
-                        }
+                    val shared = notesRepository.notesReferencingMediaPaths(setOf(managedUri)).isNotEmpty()
                     if (!published && !shared) mediaImporter.discard(managedUri)
                 }.onFailure { error -> Napier.w("Could not clean up an unpublished imported photo or video", error) }
             }

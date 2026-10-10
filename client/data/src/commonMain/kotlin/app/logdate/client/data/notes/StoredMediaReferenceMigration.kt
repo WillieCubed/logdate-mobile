@@ -21,7 +21,8 @@ import kotlin.uuid.Uuid
  * operating system moves the app's storage. Only rows whose file is in one of this install's media
  * collections change ([StoredMediaReferences] leaves every other reference as written), so a
  * missing file keeps its original reference. Rows are updated in place without queueing a sync
- * upload: the media itself has not changed.
+ * upload: the media itself has not changed. A row is rewritten only while it still holds the value
+ * that was read, so a reference changed in the meantime is never overwritten.
  *
  * It only reads rows that still hold a local path, so running it at every launch costs almost
  * nothing once it has finished. See `docs/reference/media-references.md`.
@@ -35,20 +36,20 @@ class StoredMediaReferenceMigration(
     /** Rewrites what it can and returns how many notes changed. */
     suspend fun run(): Int {
         val rewritten =
-            rewrite(imageNoteDao.localFileContentUris(), imageNoteDao::updateContentUri) +
-                rewrite(audioNoteDao.localFileContentUris(), audioNoteDao::updateContentUri) +
-                rewrite(videoNoteDao.localFileContentUris(), videoNoteDao::updateContentUri)
+            rewrite(imageNoteDao.localFileContentUris(), imageNoteDao::updateContentUriIfUnchanged) +
+                rewrite(audioNoteDao.localFileContentUris(), audioNoteDao::updateContentUriIfUnchanged) +
+                rewrite(videoNoteDao.localFileContentUris(), videoNoteDao::updateContentUriIfUnchanged)
         if (rewritten > 0) Napier.i("Stored $rewritten media notes as LogDate media references")
         return rewritten
     }
 
     private suspend fun rewrite(
         rows: List<NoteContentUri>,
-        update: suspend (Uuid, String) -> Unit,
+        update: suspend (Uuid, String, String) -> Unit,
     ): Int =
         rows.count { row ->
             val stored = mediaReferences.storedReference(row.contentUri)
-            if (stored != row.contentUri) update(row.uid, stored)
+            if (stored != row.contentUri) update(row.uid, row.contentUri, stored)
             stored != row.contentUri
         }
 }

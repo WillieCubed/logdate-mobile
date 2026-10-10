@@ -154,7 +154,7 @@ class OfflineFirstJournalNotesRepository(
         pendingMediaIndex: PendingMediaIndex?,
     ): Uuid {
         getNoteById(note.uid)?.let { existing ->
-            check(existing.hasSamePersistedContent(note)) {
+            check(existing.withStoredMediaRef().hasSamePersistedContent(note)) {
                 "This note already exists with different content. Keep your changes in a draft or save them as a new entry."
             }
             return existing.uid
