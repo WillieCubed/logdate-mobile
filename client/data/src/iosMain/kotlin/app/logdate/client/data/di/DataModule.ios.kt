@@ -49,6 +49,7 @@ import app.logdate.client.database.databaseModule
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.device.identity.userVisibleDeviceName
 import app.logdate.client.di.datastoreModule
+import app.logdate.client.media.storage.MediaRescuer
 import app.logdate.client.networking.IdentityApiClient
 import app.logdate.client.networking.IdentityApiClientContract
 import app.logdate.client.networking.PasskeyApiClient
@@ -172,7 +173,17 @@ actual val dataModule: Module =
                 mediaReferences = get(),
             )
         }
-        single { StoredMediaReferenceMigration(get(), get(), get(), get(), get()) }
+        single {
+            StoredMediaReferenceMigration(
+                imageNoteDao = get(),
+                audioNoteDao = get(),
+                videoNoteDao = get(),
+                journalDao = get(),
+                mediaReferences = get(),
+                rescuer = getOrNull<MediaRescuer>() ?: MediaRescuer.None,
+                transcriptions = getOrNull<TranscriptionRepository>(),
+            )
+        }
         single { StoredMediaReferenceMigrationLauncher { get() } }
         single<NotePlaceResolver> { DatabaseNotePlaceResolver(get()) }
         single<JournalContentRepository> {

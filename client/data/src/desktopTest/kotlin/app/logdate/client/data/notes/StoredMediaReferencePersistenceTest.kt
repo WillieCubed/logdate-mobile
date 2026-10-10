@@ -4,6 +4,7 @@ import androidx.room.Room
 import app.logdate.client.data.fakes.FakeJournalRepository
 import app.logdate.client.data.fakes.FakeSyncMetadataService
 import app.logdate.client.database.LogDateDatabase
+import app.logdate.client.database.entities.JournalEntity
 import app.logdate.client.database.getRoomDatabase
 import app.logdate.client.media.InMemoryMediaManager
 import app.logdate.client.media.storage.MediaRescuer
@@ -164,7 +165,7 @@ class StoredMediaReferencePersistenceTest {
             metadata.clearPending()
 
             val rewritten =
-                StoredMediaReferenceMigration(dao, database.audioNoteDao(), database.videoNoteDao(), references).run()
+                migration().run()
 
             assertEquals(1, rewritten)
             assertEquals("logdate-media://library/old.jpg", contentUriOf(legacy.uid))
@@ -172,7 +173,34 @@ class StoredMediaReferencePersistenceTest {
             assertEquals("ph://ABC/L0/001", contentUriOf(photos.uid))
             assertEquals("logdate-media://library/new.jpg", contentUriOf(current.uid))
             assertEquals(0, metadata.getPendingCount(), "Rewriting a local reference must not queue an upload")
-            assertEquals(0, StoredMediaReferenceMigration(dao, database.audioNoteDao(), database.videoNoteDao(), references).run())
+            assertEquals(0, migration().run())
+        }
+
+    @Test
+    fun `migration stores journal covers that are local files and leaves the rest`() =
+        runTest {
+            val journals = database.journalDao()
+            val local = journal("file:///install/media/cover.jpg")
+            val picked = journal("content://media/picker/42")
+            val none = journal(null)
+            listOf(local, picked, none).forEach { journals.create(it) }
+
+            migration().run()
+
+            assertEquals("logdate-media://library/cover.jpg", journals.getJournalById(local.id)?.coverImageUri)
+            assertEquals("content://media/picker/42", journals.getJournalById(picked.id)?.coverImageUri)
+            assertEquals(null, journals.getJournalById(none.id)?.coverImageUri)
+        }
+
+    @Test
+    fun `a journal cover changed after the migration read is not overwritten`() =
+        runTest {
+            val journals = database.journalDao()
+            val cover = journal("file:///install/media/old.jpg")
+            journals.create(cover)
+            journals.updateCoverImageUriIfUnchanged(cover.id, "file:///install/media/other.jpg", "logdate-media://library/other.jpg")
+
+            assertEquals("file:///install/media/old.jpg", journals.getJournalById(cover.id)?.coverImageUri)
         }
 
     @Test
@@ -188,7 +216,7 @@ class StoredMediaReferencePersistenceTest {
                 }
 
             val rewritten =
-                StoredMediaReferenceMigration(dao, database.audioNoteDao(), database.videoNoteDao(), references, rescuer).run()
+                migration(rescuer).run()
 
             assertEquals(1, rewritten)
             assertEquals("logdate-media://library/photo-1.jpg", contentUriOf(cached.uid))
@@ -201,7 +229,7 @@ class StoredMediaReferencePersistenceTest {
             val legacy = image("file:///install/media/old.jpg")
             database.imageNoteDao().addNote(legacy.toEntity())
             val migration =
-                StoredMediaReferenceMigration(database.imageNoteDao(), database.audioNoteDao(), database.videoNoteDao(), references)
+                migration()
 
             StoredMediaReferenceMigrationLauncher(scope = this) { migration }.start().join()
 
@@ -213,7 +241,7 @@ class StoredMediaReferencePersistenceTest {
         runTest {
             var built = 0
             val migration =
-                StoredMediaReferenceMigration(database.imageNoteDao(), database.audioNoteDao(), database.videoNoteDao(), references)
+                migration()
             val launcher =
                 StoredMediaReferenceMigrationLauncher(scope = this) {
                     built++
@@ -226,6 +254,19 @@ class StoredMediaReferencePersistenceTest {
 
             assertEquals(1, built)
         }
+
+    private fun migration(rescuer: MediaRescuer = MediaRescuer.None) =
+        StoredMediaReferenceMigration(
+            imageNoteDao = database.imageNoteDao(),
+            audioNoteDao = database.audioNoteDao(),
+            videoNoteDao = database.videoNoteDao(),
+            journalDao = database.journalDao(),
+            mediaReferences = references,
+            rescuer = rescuer,
+        )
+
+    private fun journal(coverImageUri: String?) =
+        JournalEntity(title = "Trip", description = "", created = created, lastUpdated = created, coverImageUri = coverImageUri)
 
     private suspend fun contentUriOf(uid: Uuid): String? = repository.getNoteById(uid)?.mediaRefOrNull()
 

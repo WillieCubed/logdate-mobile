@@ -14,12 +14,14 @@ import app.logdate.client.database.databaseModule
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.di.datastoreModule
 import app.logdate.client.location.di.locationModule
+import app.logdate.client.media.storage.MediaRescuer
 import app.logdate.client.permissions.di.permissionsModule
 import app.logdate.client.repository.journals.DraftRepository
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.location.LocationHistoryRepository
 import app.logdate.client.repository.rewind.RewindRepository
+import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.datalayer.AssociationDataMapper
 import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
@@ -153,7 +155,17 @@ val wearDataModule =
                 mediaReferences = get(),
             )
         }
-        single { StoredMediaReferenceMigration(get(), get(), get(), get()) }
+        single {
+            StoredMediaReferenceMigration(
+                imageNoteDao = get(),
+                audioNoteDao = get(),
+                videoNoteDao = get(),
+                journalDao = get(),
+                mediaReferences = get(),
+                rescuer = getOrNull<MediaRescuer>() ?: MediaRescuer.None,
+                transcriptions = getOrNull<TranscriptionRepository>(),
+            )
+        }
         single { StoredMediaReferenceMigrationLauncher { get() } }
     }
 

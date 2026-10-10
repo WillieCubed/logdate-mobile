@@ -1,6 +1,7 @@
 package app.logdate.client.data.fakes
 
 import app.logdate.client.database.dao.JournalDao
+import app.logdate.client.database.entities.JournalCoverUri
 import app.logdate.client.database.entities.JournalEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +43,21 @@ class FakeJournalDao : JournalDao {
     ) {
         val existing = journals[journalId] ?: return
         journals[journalId] = existing.copy(syncVersion = syncVersion, lastSynced = lastSynced)
+        updateFlow()
+    }
+
+    override suspend fun localFileCovers(): List<JournalCoverUri> =
+        journals.values
+            .mapNotNull { journal -> journal.coverImageUri?.let { JournalCoverUri(journal.id, it) } }
+            .filter { it.coverImageUri.startsWith("file:") || it.coverImageUri.startsWith("/") || it.coverImageUri.getOrNull(1) == ':' }
+
+    override suspend fun updateCoverImageUriIfUnchanged(
+        journalId: Uuid,
+        previous: String,
+        coverImageUri: String,
+    ) {
+        val existing = journals[journalId]?.takeIf { it.coverImageUri == previous } ?: return
+        journals[journalId] = existing.copy(coverImageUri = coverImageUri)
         updateFlow()
     }
 

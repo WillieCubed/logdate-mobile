@@ -55,6 +55,7 @@ import app.logdate.client.device.crypto.AccountKeyEnvelopeCipher
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.device.identity.userVisibleDeviceName
 import app.logdate.client.di.datastoreModule
+import app.logdate.client.media.storage.MediaRescuer
 import app.logdate.client.networking.DefaultAccountKeyEnvelopeApi
 import app.logdate.client.networking.EmailVerificationApiClient
 import app.logdate.client.networking.EmailVerificationApiClientContract
@@ -177,7 +178,17 @@ actual val dataModule: Module =
                 mediaReferences = get(),
             )
         }
-        single { StoredMediaReferenceMigration(get(), get(), get(), get()) }
+        single {
+            StoredMediaReferenceMigration(
+                imageNoteDao = get(),
+                audioNoteDao = get(),
+                videoNoteDao = get(),
+                journalDao = get(),
+                mediaReferences = get(),
+                rescuer = getOrNull<MediaRescuer>() ?: MediaRescuer.None,
+                transcriptions = getOrNull<TranscriptionRepository>(),
+            )
+        }
         single { StoredMediaReferenceMigrationLauncher { get() } }
         single<NotePlaceResolver> { DatabaseNotePlaceResolver(get()) }
         single<JournalContentRepository> {

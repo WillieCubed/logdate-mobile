@@ -8,7 +8,7 @@ import app.logdate.client.media.audio.transcription.IosTranscriptionManager
 import app.logdate.client.media.audio.transcription.TranscriptionManager
 import app.logdate.client.media.display.RemoteDisplayManager
 import app.logdate.client.media.display.UnavailableRemoteDisplayManager
-import app.logdate.client.media.storage.IosCachedPhotoRescuer
+import app.logdate.client.media.storage.IosOutOfLibraryMediaRescuer
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.media.storage.MediaRescuer
 import app.logdate.client.media.storage.StoredMediaReferences
@@ -25,7 +25,7 @@ actual val mediaModule: Module =
         includes(audioModule)
 
         single { iosMediaFileResolver() }
-        single<MediaRescuer> { IosCachedPhotoRescuer(get()) }
+        single<MediaRescuer> { IosOutOfLibraryMediaRescuer(get()) }
         single<StoredMediaReferences> { get<MediaFileResolver>() }
         single<MediaManager> { IosMediaManager(get()) }
         single<MediaCleaner> { IosMediaCleaner(get()) }

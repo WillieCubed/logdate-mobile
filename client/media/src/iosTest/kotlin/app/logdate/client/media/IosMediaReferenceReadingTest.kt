@@ -2,8 +2,8 @@
 
 package app.logdate.client.media
 
-import app.logdate.client.media.storage.IosCachedPhotoRescuer
 import app.logdate.client.media.storage.IosMediaDirectories
+import app.logdate.client.media.storage.IosOutOfLibraryMediaRescuer
 import app.logdate.client.media.storage.MediaCollection
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.media.storage.fileUrl
@@ -128,31 +128,53 @@ class IosMediaReferenceReadingTest {
     @Test
     fun `a photo an earlier build stored in the cache is moved into the library`() =
         runTest {
-            val cache = "${directories.canonicalPath(NSHomeDirectory())}/Library/Caches/photo-library-renderable"
-            fileManager.createDirectoryAtPath(cache, withIntermediateDirectories = true, attributes = null, error = null)
-            val cached = "$cache/ABC-IMG 0009.jpg"
-            SystemFileSystem.sink(Path(cached)).buffered().use { it.write(byteArrayOf(5)) }
-            created += cached
+            val cached = "$home/Library/Caches/photo-library-renderable/ABC-IMG 0009.jpg"
+            writeFile(cached, byteArrayOf(5))
 
-            val rescued = requireNotNull(IosCachedPhotoRescuer(mediaFiles).rescue("file://$cached"))
+            val rescued = requireNotNull(IosOutOfLibraryMediaRescuer(mediaFiles).rescue("file://$cached"))
             created += "$library/ABC-IMG 0009.jpg"
 
             assertEquals("logdate-media://library/ABC-IMG%200009.jpg", rescued)
             assertContentEquals(byteArrayOf(5), IosMediaManager(mediaFiles).readMedia(rescued).data)
+            assertFalse(fileManager.fileExistsAtPath(cached))
         }
 
     @Test
-    fun `only cached photos that still exist are rescued`() =
+    fun `a capture an earlier build stored in the imports folder is moved into the library`() =
         runTest {
-            val rescuer = IosCachedPhotoRescuer(mediaFiles)
-            val libraryFile = "$library/${createLibraryFile("not-cache.jpg")}"
+            val imported = "$home/Documents/imports/0F1E2D3C.jpg"
+            writeFile(imported, byteArrayOf(6))
+
+            val rescued = requireNotNull(IosOutOfLibraryMediaRescuer(mediaFiles).rescue(imported))
+            created += "$library/0F1E2D3C.jpg"
+
+            assertEquals("logdate-media://library/0F1E2D3C.jpg", rescued)
+            assertContentEquals(byteArrayOf(6), IosMediaManager(mediaFiles).readMedia(rescued).data)
+        }
+
+    @Test
+    fun `a second entry that stored the same cached photo gets the same library reference`() =
+        runTest {
+            val cached = "$home/Library/Caches/photo-library-renderable/DEF-IMG 0010.jpg"
+            writeFile(cached, byteArrayOf(7))
+            val rescuer = IosOutOfLibraryMediaRescuer(mediaFiles)
+
+            val first = rescuer.rescue("file://$cached")
+            created += "$library/DEF-IMG 0010.jpg"
+            val second = rescuer.rescue("file://$cached")
+
+            assertEquals(first, second)
+        }
+
+    @Test
+    fun `only media outside the library that is still there is rescued`() =
+        runTest {
+            val rescuer = IosOutOfLibraryMediaRescuer(mediaFiles)
+            val libraryFile = "$library/${createLibraryFile("not-stray.jpg")}"
 
             assertNull(rescuer.rescue("file://$libraryFile"))
-            assertNull(
-                rescuer.rescue(
-                    "file://${directories.canonicalPath(NSHomeDirectory())}/Library/Caches/photo-library-renderable/missing.jpg",
-                ),
-            )
+            assertNull(rescuer.rescue("file://$home/Library/Caches/photo-library-renderable/missing.jpg"))
+            assertNull(rescuer.rescue("file://$home/Documents/imports/missing.jpg"))
             assertNull(rescuer.rescue("ph://ABC/L0/001"))
         }
 
@@ -172,6 +194,22 @@ class IosMediaReferenceReadingTest {
             assertEquals(first, second)
             assertContentEquals(byteArrayOf(1), manager.readMedia(second).data)
         }
+
+    private val home = directories.canonicalPath(NSHomeDirectory())
+
+    private fun writeFile(
+        path: String,
+        bytes: ByteArray,
+    ) {
+        fileManager.createDirectoryAtPath(
+            path.substringBeforeLast('/'),
+            withIntermediateDirectories = true,
+            attributes = null,
+            error = null,
+        )
+        SystemFileSystem.sink(Path(path)).buffered().use { it.write(bytes) }
+        created += path
+    }
 
     private fun createLibraryFile(name: String): String {
         fileManager.createDirectoryAtPath(library, withIntermediateDirectories = true, attributes = null, error = null)

@@ -183,21 +183,33 @@ requires that:
 ## Legacy references and migration
 
 References written before this format existed are still read: `filePath` opens them, relocating files from an
-earlier install when the file is present. That covers everything that is not migrated, including drafts and
-journal covers.
+earlier install when the file is present.
 
-At every launch, `StoredMediaReferenceMigrationLauncher` starts `StoredMediaReferenceMigration` in the
-background. It rewrites image, audio and video notes whose stored reference is still a local file path into
-`logdate-media://` references when the file is in a collection of this install. The migration is idempotent and
-only reads rows that still hold a local file path, so it costs almost nothing once it has finished. It updates
-the rows in place without queueing a sync upload, because the media itself has not changed. Rows whose file is
-missing, or lives outside every collection (such as camera captures that earlier iOS builds kept in
-`Documents/imports`), keep their original string and are still opened through relocation. If the migration
-fails, it logs the error and tries again at the next launch.
+When the app is in use, `StoredMediaReferenceMigrationLauncher` starts `StoredMediaReferenceMigration` once per
+process, in the background. It rewrites image, audio and video notes and journal covers whose stored reference is
+still a local file path into `logdate-media://` references when the file is in a collection of this install. The
+migration is idempotent and only reads rows that still hold a local file path, so it costs almost nothing once it
+has finished. It updates a row only while the row still holds the value it read, and it does not queue a sync
+upload, because the media itself has not changed. A transcript is bound to the media reference of its audio note,
+so rewriting an audio note's reference rebinds its transcript too. Rows whose file is missing keep their original
+string. If the migration fails, it logs the error and tries again the next time the app starts.
 
-Photos that earlier iOS builds picked from the Photos library were stored as paths in
-`Library/Caches/photo-library-renderable`, which iOS can empty at any time and does not restore from a
-backup. The migration passes any reference it could not rewrite to a `MediaRescuer`; on iOS,
-`IosCachedPhotoRescuer` copies such a photo into the library while the cached file still exists and the note
-then stores the library reference. A photo iOS has already purged from the cache is gone from the device, so
-its note keeps the old reference. New picks are copied into the library when they are chosen.
+Earlier iOS builds also stored media outside every collection:
+
+- Photos picked from the Photos library were stored as paths in `Library/Caches/photo-library-renderable`, which iOS
+  can empty at any time and does not restore from a backup.
+- Camera captures and journal cover images were stored in `Documents/imports`, which no reference names.
+
+The migration passes any reference it could not rewrite to a `MediaRescuer`. On iOS, `IosOutOfLibraryMediaRescuer`
+moves such a file into the library while it still exists, and a second reference to a file it already moved gets the
+same library reference. A photo iOS has already purged from the cache is gone from the device, so its note keeps the
+old reference. New picks are copied into the library when they are chosen.
+
+Two kinds of stored string are deliberately left as they were written, because they work through the readers' fallback
+for files from an earlier install:
+
+- **Drafts.** A draft is short-lived, and the editor compares the recorder's live file path literally to recognise an
+  unfinished recording, so rewriting a draft's paths could break recovery. Media a draft still names is opened through
+  `filePath`, and discarding a draft compares references in their canonical spelling.
+- **The sync upload cache** (`MediaSyncRef.localUri`). Sync compares it with a note's reference through
+  `StoredMediaReferences`, so either spelling counts as the same file.
