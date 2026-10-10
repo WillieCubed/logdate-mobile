@@ -87,9 +87,9 @@ private fun JournalListPreview() {
     JournalList(journals, onOpenJournal = {}, onCreateJournal = {})
 }
 
-/** Right-click and long-press actions for a journal cover. */
+/** Right-click and long-press actions for a journal cover, wherever covers are shown. */
 @Composable
-private fun journalContextMenuItems(
+internal fun journalContextMenuItems(
     journal: Journal,
     onOpenJournal: JournalClickCallback,
 ): List<ContextMenuItem> {

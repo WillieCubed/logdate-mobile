@@ -101,7 +101,8 @@ fun MediaThumbnailItem(
         label = "ThumbnailHoverScale",
     )
 
-    ContextMenuArea(items = contextMenuItems) {
+    // Long-press drags the media to another app, so the menu opens on right-click only.
+    ContextMenuArea(items = contextMenuItems, openOnLongPress = false) {
         Box(
             modifier =
                 modifier

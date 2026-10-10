@@ -15,10 +15,13 @@ data class ContextMenuItem(
 )
 
 /**
- * Wraps [content] with a context menu that appears on long-press (all platforms) or
- * right-click (Android with a mouse or trackpad, and desktop). On iOS the menu is
- * presented through a native `UIContextMenuInteraction`, so users get the system long-press
- * preview with rich actions; on Android and desktop the menu renders as a Material dropdown.
+ * Wraps [content] with a context menu that appears on long-press, or on right-click with a mouse or
+ * trackpad. The menu renders as a Material dropdown on every platform today; on iOS a native
+ * `UIContextMenuInteraction` bridge is a planned follow-up.
+ *
+ * [content] may be clickable: a long-press opens the menu without also counting as a tap. Pass
+ * `openOnLongPress = false` when the content uses long-press for something else, such as starting a
+ * drag; right-click still opens the menu. With no [items], every press is left to the content.
  *
  * Usage:
  * ```
@@ -36,6 +39,7 @@ data class ContextMenuItem(
 expect fun ContextMenuArea(
     items: List<ContextMenuItem>,
     modifier: Modifier = Modifier,
+    openOnLongPress: Boolean = true,
     content: @Composable () -> Unit,
 )
 

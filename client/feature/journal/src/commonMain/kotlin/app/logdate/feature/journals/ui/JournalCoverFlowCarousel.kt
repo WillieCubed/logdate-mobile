@@ -124,6 +124,7 @@ fun JournalCoverFlowCarousel(
                             JournalCover(
                                 journal = item.data,
                                 onClick = { onOpenJournal(item.data.id) },
+                                contextMenuItems = journalContextMenuItems(item.data, onOpenJournal),
                                 modifier =
                                     Modifier
                                         .width(carouselCardWidth)

@@ -134,7 +134,7 @@ A row reaches `[done]` only when its Evidence column lists:
 | Status | Requirement | Evidence |
 | --- | --- | --- |
 | `[partial]` | One keyboard shortcut catalog drives Compose handlers, the Meta+/ helper, and desktop menus | `AppKeyboardShortcut` drives the Compose handlers (Ctrl+N, Ctrl+Shift+R, Ctrl+F, Ctrl+Comma, Ctrl+1 to 5, editor Ctrl+S and Esc) and the Meta+/ groups; `AppKeyboardShortcutsTest`. Missing: desktop menu bar and the Meta+/ capture. |
-| `[partial]` | Right-click opens context menus at the pointer; icon-only actions have tooltips | Secondary click opens `ContextMenuArea` at the pointer (`ContextMenuPlacementTest`); `IconTooltip` on the account action and the recorder bubble. Missing: Lane 1 menu and tooltip references. |
+| `[partial]` | Right-click opens context menus at the pointer; icon-only actions have tooltips | Secondary click opens `ContextMenuArea` at the pointer (`ContextMenuPlacementTest`), on desktop as well as Android; long-press opens it over clickable cards without also clicking (`ContextMenuAreaTest`). `IconTooltip` on the account action and the recorder bubble. Missing: Lane 1 menu and tooltip references. |
 | `[partial]` | Text, photos, videos, and audio can be dropped or pasted into the editor | `entryDropTarget` with `routeDroppedItems` (`EntryDropTest`); media is copied into the private store before the drag permission ends. Missing: paste through `contentReceiver` and a cross-app drag capture. |
 | `[partial]` | Photos and videos drag out as readable content URIs | `mediaDragSource` sends FileProvider URIs with global read flags from Library thumbnails. Missing: cross-app drag capture. |
 | `[todo]` | Stylus handwriting works in the editor | |

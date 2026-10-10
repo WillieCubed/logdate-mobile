@@ -43,7 +43,8 @@ LogDate.
 ### Pointer
 
 - Right-clicking a journal cover, a media thumbnail, or a postcard opens its menu at the pointer.
-  Long-press still works.
+- Long-pressing a journal cover or a postcard opens the same menu without also opening the item.
+  Long-pressing a media thumbnail starts a drag instead (see below), so its menu is on right-click.
 - Hovering an icon-only button shows a tooltip naming its action.
 
 ### Drag and drop
@@ -83,10 +84,21 @@ The editor's shortcuts are scoped to the editor, so they never fight with text e
 
 ### Right-click
 
-`ContextMenuArea` is an expect/actual in `client/ui`. Its Android version opens on long-press and on
-a secondary click. A right-click menu opens at the pointer: `contextMenuOffset` converts the click
-position into the dropdown's offset from the item's bottom-left corner. Journal covers offer "Open
-journal", plus "New entry in a new window" where the device supports more than one window.
+`ContextMenuArea` is an expect/actual in `client/ui`. Android, desktop, and (until its native bridge
+lands) iOS all use `MaterialContextMenuArea`, which opens on long-press and on a secondary click. A
+right-click menu opens at the pointer: `contextMenuOffset` converts the click position into the
+dropdown's offset from the item's bottom-left corner.
+
+Long-press needs care because the content inside is usually clickable. Compose delivers pointer
+events to the innermost element first in the normal (Main) pass, and a `clickable` card consumes the
+press there, so a long-press detector on the wrapper in that pass never fires. The wrapper instead
+watches the Initial pass, which runs outermost first, and consumes nothing until the press has lasted
+the long-press timeout. Then it opens the menu and consumes the finger lifting, so the card does not
+also count the press as a tap. If the finger moves past the touch slop after the menu opens, the menu
+closes so a drag can take over. Content that uses long-press itself passes `openOnLongPress = false`.
+
+Journal covers offer "Open journal", plus "New entry in a new window" where the device supports more
+than one window, in both the journal list and the tablet carousel.
 
 `IconTooltip` (client/ui) names icon-only controls on hover and long-press. The workspace account
 button uses it.
@@ -122,7 +134,9 @@ Dragging out shares only the file the person dragged, with read-only access gran
 
 - **Unit tests:** the catalog has no duplicate chords per scope, and key events map to the right
   actions.
-- **Compose UI tests:** right-click opens the menu, and long-press still does.
+- **Compose UI tests:** `ContextMenuAreaTest` (client/ui desktopTest) checks that long-press over a
+  clickable card opens the menu without clicking, a tap still clicks, right-click opens the menu, and
+  content without items or with `openOnLongPress = false` keeps the press.
 - **Import tests:** MIME routing, partial-failure rollback, and a specific error for unreadable URIs.
 - **Manual check:** on an API 37 tablet emulator with a hardware keyboard and mouse, press Meta+/ and
   drag between LogDate and Files in split screen.
