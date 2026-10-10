@@ -63,7 +63,8 @@ class WearDeadLetterMigrationTest {
     @Test
     fun `a record of an unknown kind stays where it can be seen`() =
         runTest {
-            coEvery { deadLetterStore.list() } returns listOf(record(id = "MOMENT_$noteId", entityType = "MOMENT", entityId = noteId))
+            coEvery { deadLetterStore.list() } returns
+                listOf(record(id = "SOMETHING_NEWER_$noteId", entityType = "SOMETHING_NEWER", entityId = noteId))
 
             assertEquals(0, migration.migrate())
 

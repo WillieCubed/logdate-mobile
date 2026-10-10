@@ -43,6 +43,7 @@ import app.logdate.client.database.dao.journals.JournalMergeDao
 import app.logdate.client.database.dao.maintenance.IntegrityDao
 import app.logdate.client.database.dao.media.IndexedMediaDao
 import app.logdate.client.database.dao.media.MediaExifDao
+import app.logdate.client.database.dao.moments.MarkedMomentDao
 import app.logdate.client.database.dao.people.InferredPersonClusterDao
 import app.logdate.client.database.dao.people.InferredPersonEvidenceDao
 import app.logdate.client.database.dao.people.PersonDao
@@ -52,6 +53,7 @@ import app.logdate.client.database.dao.rewind.CachedRewindDao
 import app.logdate.client.database.dao.rewind.ReflectionPromptResponseDao
 import app.logdate.client.database.dao.rewind.RewindGenerationRequestDao
 import app.logdate.client.database.dao.sync.DownloadInboxDao
+import app.logdate.client.database.dao.sync.PeerDeliveryDao
 import app.logdate.client.database.dao.sync.SyncMetadataDao
 import app.logdate.client.database.entities.AudioNoteEntity
 import app.logdate.client.database.entities.AudioTagEntity
@@ -83,6 +85,7 @@ import app.logdate.client.database.entities.media.IndexedImageEntity
 import app.logdate.client.database.entities.media.IndexedVideoEntity
 import app.logdate.client.database.entities.media.MediaExifMetadataEntity
 import app.logdate.client.database.entities.media.MediaImageEntity
+import app.logdate.client.database.entities.moments.MarkedMomentEntity
 import app.logdate.client.database.entities.people.InferredPersonClusterEntity
 import app.logdate.client.database.entities.people.InferredPersonEvidenceEntity
 import app.logdate.client.database.entities.people.PersonEntity
@@ -96,6 +99,7 @@ import app.logdate.client.database.entities.rewind.RewindTextContentEntity
 import app.logdate.client.database.entities.rewind.RewindVideoContentEntity
 import app.logdate.client.database.entities.sync.DownloadCheckpointEntity
 import app.logdate.client.database.entities.sync.DownloadInboxEntity
+import app.logdate.client.database.entities.sync.PeerDeliveryEntity
 import app.logdate.client.database.entities.sync.PendingUploadEntity
 import app.logdate.client.database.entities.sync.SyncCursorEntity
 import app.logdate.client.database.migrations.MIGRATION_10_11
@@ -144,6 +148,7 @@ import app.logdate.client.database.migrations.MIGRATION_49_50
 import app.logdate.client.database.migrations.MIGRATION_4_5
 import app.logdate.client.database.migrations.MIGRATION_50_51
 import app.logdate.client.database.migrations.MIGRATION_51_52
+import app.logdate.client.database.migrations.MIGRATION_52_53
 import app.logdate.client.database.migrations.MIGRATION_5_6
 import app.logdate.client.database.migrations.MIGRATION_6_7
 import app.logdate.client.database.migrations.MIGRATION_7_8
@@ -191,6 +196,7 @@ import kotlinx.coroutines.CoroutineDispatcher
         PendingUploadEntity::class,
         DownloadInboxEntity::class,
         DownloadCheckpointEntity::class,
+        PeerDeliveryEntity::class,
         // Others
         TranscriptionEntity::class,
         TranscriptionSegmentEntity::class,
@@ -216,8 +222,10 @@ import kotlinx.coroutines.CoroutineDispatcher
         InferredPersonEvidenceEntity::class,
         PersonLinkEntity::class,
         PersonResolutionDecisionEntity::class,
+        // Moments marked on the watch
+        MarkedMomentEntity::class,
     ],
-    version = 52,
+    version = 53,
     exportSchema = true,
 )
 @TypeConverters(
@@ -273,6 +281,10 @@ abstract class LogDateDatabase : RoomDatabase() {
     abstract fun downloadInboxDao(): DownloadInboxDao
 
     abstract fun syncMetadataDao(): SyncMetadataDao
+
+    abstract fun peerDeliveryDao(): PeerDeliveryDao
+
+    abstract fun markedMomentDao(): MarkedMomentDao
 
     abstract fun integrityDao(): IntegrityDao
 
@@ -425,4 +437,5 @@ private fun databaseMigrations() =
         MIGRATION_49_50,
         MIGRATION_50_51,
         MIGRATION_51_52,
+        MIGRATION_52_53,
     )

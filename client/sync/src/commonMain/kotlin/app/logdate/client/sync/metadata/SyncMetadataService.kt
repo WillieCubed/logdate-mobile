@@ -175,6 +175,8 @@ interface Syncable {
 
 /**
  * Types of entities that can be synced.
+ *
+ * [MOMENT] is a moment marked on the watch, stored apart from notes; nothing uploads it yet.
  */
 enum class EntityType {
     JOURNAL,
@@ -184,4 +186,5 @@ enum class EntityType {
     MEDIA,
     HEALTH,
     DRAFT,
+    MOMENT,
 }

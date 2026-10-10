@@ -247,4 +247,63 @@ interface SyncMetadataDao {
         serverOrigin: String,
         entityType: String,
     )
+
+    // --- Moving to a new owner ---
+
+    @Query("SELECT * FROM pending_uploads WHERE ownerId = :ownerId AND serverOrigin = :serverOrigin ORDER BY createdAt ASC")
+    suspend fun getPendingForOrigin(
+        ownerId: String,
+        serverOrigin: String,
+    ): List<PendingUploadEntity>
+
+    @Query("SELECT * FROM sync_cursors WHERE ownerId = :ownerId AND serverOrigin = :serverOrigin")
+    suspend fun getCursorsForOrigin(
+        ownerId: String,
+        serverOrigin: String,
+    ): List<SyncCursorEntity>
+
+    /**
+     * Moves every queued upload of one owner and server to another, keeping each operation's id and
+     * retry count. A row whose entity the new scope already queues stays where it is, never merged or
+     * dropped, and is counted in the result so the caller can decide about it.
+     */
+    @Transaction
+    suspend fun reassignPending(
+        oldOwner: String,
+        oldOrigin: String,
+        newOwner: String,
+        newOrigin: String,
+    ): Int {
+        if (oldOwner == newOwner && oldOrigin == newOrigin) return 0
+        var leftBehind = 0
+        for (row in getPendingForOrigin(oldOwner, oldOrigin)) {
+            if (getPending(newOwner, newOrigin, row.entityType, row.entityId) != null) {
+                leftBehind++
+                continue
+            }
+            insertPending(row.copy(ownerId = newOwner, serverOrigin = newOrigin))
+            deletePending(oldOwner, oldOrigin, row.entityType, row.entityId)
+        }
+        return leftBehind
+    }
+
+    /**
+     * Moves download cursors from one owner and server to another. Where the new scope already has a
+     * cursor for the same entity type, the earlier of the two wins, so nothing is skipped.
+     */
+    @Transaction
+    suspend fun reassignCursors(
+        oldOwner: String,
+        oldOrigin: String,
+        newOwner: String,
+        newOrigin: String,
+    ) {
+        if (oldOwner == newOwner && oldOrigin == newOrigin) return
+        for (cursor in getCursorsForOrigin(oldOwner, oldOrigin)) {
+            val existing = getCursor(newOwner, newOrigin, cursor.entityType)
+            val timestamp = existing?.let { minOf(it.lastSyncTimestamp, cursor.lastSyncTimestamp) } ?: cursor.lastSyncTimestamp
+            upsertCursor(SyncCursorEntity(newOwner, newOrigin, cursor.entityType, timestamp))
+        }
+        deleteCursorsForOrigin(oldOwner, oldOrigin)
+    }
 }

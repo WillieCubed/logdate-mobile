@@ -215,6 +215,16 @@ class DatabaseSyncMetadataServiceTest {
             )
         }
 
+    @Test
+    fun `a marked moment can wait in the outbox`() =
+        runTest {
+            val metadata = service(InMemorySyncMetadataDao(), "owner", "https://first.example")
+
+            metadata.enqueuePending("moment", EntityType.MOMENT, PendingOperation.CREATE)
+
+            assertEquals(PendingOperation.CREATE, metadata.getPendingUploads(EntityType.MOMENT).single().operation)
+        }
+
     private fun service(
         dao: SyncMetadataDao,
         ownerId: String,
@@ -298,6 +308,16 @@ class DatabaseSyncMetadataServiceTest {
             }
 
         override suspend fun getAllPending(): List<PendingUploadEntity> = pendingRows.toList()
+
+        override suspend fun getPendingForOrigin(
+            ownerId: String,
+            serverOrigin: String,
+        ): List<PendingUploadEntity> = pendingRows.filter { it.ownerId == ownerId && it.serverOrigin == serverOrigin }
+
+        override suspend fun getCursorsForOrigin(
+            ownerId: String,
+            serverOrigin: String,
+        ): List<SyncCursorEntity> = cursors.filter { it.ownerId == ownerId && it.serverOrigin == serverOrigin }
 
         override suspend fun insertRepairIfAbsent(
             ownerId: String,
