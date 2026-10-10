@@ -1,5 +1,6 @@
 package app.logdate.client.sync
 
+import app.logdate.client.database.entities.sync.DownloadInboxEntity
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.RemoteRecordFailure
 import app.logdate.client.sync.conflict.ConflictResolution
@@ -69,6 +70,10 @@ internal class DownloadStrategy<T : Any>(
     val sameUploadedFields: suspend (local: T, remote: T) -> Boolean = { _, _ -> false },
     val sameCreateBaseFields: suspend (local: T, remote: T) -> Boolean = { _, _ -> false },
     val acknowledgeUpload: suspend (local: T, remote: T) -> Boolean = { _, _ -> false },
+    /** Whether a record only the server has is stored here; a record already here is always updated. */
+    val appliesRemoteCreate: (T) -> Boolean = { true },
+    /** Whether an applied record's media is queued for download; off where media is fetched on demand. */
+    val enqueuesMediaRecovery: Boolean = true,
 )
 
 /**
@@ -207,6 +212,7 @@ internal class SyncDownloadEngine(
                     }
                 val appliedIds = mutableSetOf<String>()
                 val skippedIds = mutableSetOf<String>()
+                val outsideWindowIds = mutableSetOf<String>()
                 val failedIds = mutableSetOf<String>()
 
                 if (downloadScope != null) check(downloadScope == downloadInbox.currentScope()) { "Download scope changed" }
@@ -221,16 +227,7 @@ internal class SyncDownloadEngine(
                             val diagnosticRow = rows[recordId.toString()]
                             val attemptId = if (diagnosticRow != null) Uuid.random().toString() else null
                             if (diagnosticRow != null) {
-                                report(
-                                    SyncDiagnosticEvent(
-                                        DiagnosticPhase.APPLY,
-                                        DiagnosticOutcome.STARTED,
-                                        operationId = diagnosticRow.operationId,
-                                        attemptId = attemptId,
-                                        attemptCount = diagnosticRow.attempts + 1,
-                                    ),
-                                    source,
-                                )
+                                report(applyEvent(diagnosticRow, attemptId, DiagnosticOutcome.STARTED), source)
                             }
                             val previous = localById[recordId]
                             val downloadedBefore = downloadedCount
@@ -259,6 +256,10 @@ internal class SyncDownloadEngine(
 
                                         if (existing == null && pendingLocal) {
                                             skippedIds += id.toString()
+                                            return@record
+                                        }
+                                        if (existing == null && !strategy.appliesRemoteCreate(item)) {
+                                            outsideWindowIds += id.toString()
                                             return@record
                                         }
                                         if (existing != null &&
@@ -362,45 +363,16 @@ internal class SyncDownloadEngine(
                                             row.version,
                                             requireNotNull(downloadScope),
                                             enqueueMedia =
-                                                row.entityId !in skippedIds,
+                                                strategy.enqueuesMediaRecovery &&
+                                                    row.entityId !in skippedIds &&
+                                                    row.entityId !in outsideWindowIds,
                                         )
                                     }
                                     ensureScope(downloadScope)
                                 }
                                 appliedIds += recordId.toString()
                                 if (diagnosticRow != null) {
-                                    report(
-                                        SyncDiagnosticEvent(
-                                            DiagnosticPhase.APPLY,
-                                            if (recordId.toString() in
-                                                skippedIds
-                                            ) {
-                                                DiagnosticOutcome.CONFLICT
-                                            } else {
-                                                DiagnosticOutcome.SUCCEEDED
-                                            },
-                                            reason =
-                                                if (recordId.toString() in
-                                                    skippedIds
-                                                ) {
-                                                    DiagnosticReason.CONFLICT
-                                                } else {
-                                                    DiagnosticReason.NONE
-                                                },
-                                            action =
-                                                if (recordId.toString() in
-                                                    skippedIds
-                                                ) {
-                                                    DiagnosticAction.REVIEW_CONFLICT
-                                                } else {
-                                                    DiagnosticAction.NONE
-                                                },
-                                            operationId = diagnosticRow.operationId,
-                                            attemptId = attemptId,
-                                            attemptCount = diagnosticRow.attempts + 1,
-                                        ),
-                                        source,
-                                    )
+                                    report(appliedEvent(diagnosticRow, attemptId, conflicted = recordId.toString() in skippedIds), source)
                                 }
                             } catch (e: Exception) {
                                 if (previous == null) localById.remove(recordId) else localById[recordId] = previous
@@ -408,33 +380,21 @@ internal class SyncDownloadEngine(
                                 conflictsResolved = conflictsBefore
                                 if (e is CancellationException) {
                                     if (diagnosticRow != null) {
-                                        report(
-                                            SyncDiagnosticEvent(
-                                                DiagnosticPhase.APPLY,
-                                                DiagnosticOutcome.INTERRUPTED,
-                                                operationId = diagnosticRow.operationId,
-                                                attemptId = attemptId,
-                                                attemptCount = diagnosticRow.attempts + 1,
-                                            ),
-                                            source,
-                                        )
+                                        report(applyEvent(diagnosticRow, attemptId, DiagnosticOutcome.INTERRUPTED), source)
                                     }
                                     throw e
                                 }
                                 if (diagnosticRow != null) {
-                                    report(
-                                        SyncDiagnosticEvent(
-                                            DiagnosticPhase.APPLY,
+                                    val failure =
+                                        applyEvent(
+                                            diagnosticRow,
+                                            attemptId,
                                             DiagnosticOutcome.FAILED,
-                                            reason = DiagnosticReason.LOCAL_STORAGE,
-                                            action = DiagnosticAction.RETRY,
-                                            operationId = diagnosticRow.operationId,
-                                            attemptId = attemptId,
-                                            attemptCount = diagnosticRow.attempts + 1,
+                                            DiagnosticReason.LOCAL_STORAGE,
+                                            DiagnosticAction.RETRY,
                                             retryable = true,
-                                        ),
-                                        source,
-                                    )
+                                        )
+                                    report(failure, source)
                                 }
                                 failedIds += recordId.toString()
                                 batchErrors.add(
@@ -451,16 +411,7 @@ internal class SyncDownloadEngine(
                             val diagnosticRow = rows[id.toString()]
                             val attemptId = if (diagnosticRow != null) Uuid.random().toString() else null
                             if (diagnosticRow != null) {
-                                report(
-                                    SyncDiagnosticEvent(
-                                        DiagnosticPhase.APPLY,
-                                        DiagnosticOutcome.STARTED,
-                                        operationId = diagnosticRow.operationId,
-                                        attemptId = attemptId,
-                                        attemptCount = diagnosticRow.attempts + 1,
-                                    ),
-                                    source,
-                                )
+                                report(applyEvent(diagnosticRow, attemptId, DiagnosticOutcome.STARTED), source)
                             }
                             val previous = localById[id]
                             val downloadedBefore = downloadedCount
@@ -517,25 +468,7 @@ internal class SyncDownloadEngine(
                                 }
                                 appliedIds += id.toString()
                                 if (diagnosticRow != null) {
-                                    report(
-                                        SyncDiagnosticEvent(
-                                            DiagnosticPhase.APPLY,
-                                            if (id.toString() in skippedIds) DiagnosticOutcome.CONFLICT else DiagnosticOutcome.SUCCEEDED,
-                                            reason = if (id.toString() in skippedIds) DiagnosticReason.CONFLICT else DiagnosticReason.NONE,
-                                            action =
-                                                if (id.toString() in
-                                                    skippedIds
-                                                ) {
-                                                    DiagnosticAction.REVIEW_CONFLICT
-                                                } else {
-                                                    DiagnosticAction.NONE
-                                                },
-                                            operationId = diagnosticRow.operationId,
-                                            attemptId = attemptId,
-                                            attemptCount = diagnosticRow.attempts + 1,
-                                        ),
-                                        source,
-                                    )
+                                    report(appliedEvent(diagnosticRow, attemptId, conflicted = id.toString() in skippedIds), source)
                                 }
                             } catch (e: Exception) {
                                 if (previous == null) localById.remove(id) else localById[id] = previous
@@ -543,33 +476,21 @@ internal class SyncDownloadEngine(
                                 conflictsResolved = conflictsBefore
                                 if (e is CancellationException) {
                                     if (diagnosticRow != null) {
-                                        report(
-                                            SyncDiagnosticEvent(
-                                                DiagnosticPhase.APPLY,
-                                                DiagnosticOutcome.INTERRUPTED,
-                                                operationId = diagnosticRow.operationId,
-                                                attemptId = attemptId,
-                                                attemptCount = diagnosticRow.attempts + 1,
-                                            ),
-                                            source,
-                                        )
+                                        report(applyEvent(diagnosticRow, attemptId, DiagnosticOutcome.INTERRUPTED), source)
                                     }
                                     throw e
                                 }
                                 if (diagnosticRow != null) {
-                                    report(
-                                        SyncDiagnosticEvent(
-                                            DiagnosticPhase.APPLY,
+                                    val failure =
+                                        applyEvent(
+                                            diagnosticRow,
+                                            attemptId,
                                             DiagnosticOutcome.FAILED,
-                                            reason = DiagnosticReason.LOCAL_STORAGE,
-                                            action = DiagnosticAction.RETRY,
-                                            operationId = diagnosticRow.operationId,
-                                            attemptId = attemptId,
-                                            attemptCount = diagnosticRow.attempts + 1,
+                                            DiagnosticReason.LOCAL_STORAGE,
+                                            DiagnosticAction.RETRY,
                                             retryable = true,
-                                        ),
-                                        source,
-                                    )
+                                        )
+                                    report(failure, source)
                                 }
                                 failedIds += id.toString()
                                 batchErrors.add(
@@ -717,6 +638,36 @@ internal class SyncDownloadEngine(
         )
     }
 }
+
+/** One step of applying a downloaded record, as the diagnostics see it; creates and deletions report the same steps. */
+private fun applyEvent(
+    row: DownloadInboxEntity,
+    attemptId: String?,
+    outcome: DiagnosticOutcome,
+    reason: DiagnosticReason = DiagnosticReason.NONE,
+    action: DiagnosticAction = DiagnosticAction.NONE,
+    retryable: Boolean = false,
+) = SyncDiagnosticEvent(
+    DiagnosticPhase.APPLY,
+    outcome,
+    reason = reason,
+    action = action,
+    operationId = row.operationId,
+    attemptId = attemptId,
+    attemptCount = row.attempts + 1,
+    retryable = retryable,
+)
+
+private fun appliedEvent(
+    row: DownloadInboxEntity,
+    attemptId: String?,
+    conflicted: Boolean,
+): SyncDiagnosticEvent =
+    if (conflicted) {
+        applyEvent(row, attemptId, DiagnosticOutcome.CONFLICT, DiagnosticReason.CONFLICT, DiagnosticAction.REVIEW_CONFLICT)
+    } else {
+        applyEvent(row, attemptId, DiagnosticOutcome.SUCCEEDED)
+    }
 
 private fun conflictTimestamps(
     localSyncVersion: Long,

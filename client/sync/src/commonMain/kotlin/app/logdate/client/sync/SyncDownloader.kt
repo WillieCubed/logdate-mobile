@@ -53,6 +53,8 @@ internal class SyncDownloader(
     mapCloudApiError: (CloudApiException) -> SyncResult,
     mapException: (Exception, String) -> SyncResult,
     private val downloadInbox: app.logdate.client.sync.recovery.DownloadInbox? = null,
+    private val downloadsMedia: Boolean = true,
+    private val remoteApplyFilter: RemoteApplyFilter = RemoteApplyFilter.ALL,
 ) {
     private val draftDownloader =
         DraftDownloader(
@@ -226,6 +228,8 @@ internal class SyncDownloader(
                         if (syncableRepository != null) syncableRepository.deleteFromSync(id) else journalNotesRepository.removeById(id)
                     },
                     afterDelete = { id -> mediaSyncRefStore.delete(id) },
+                    appliesRemoteCreate = remoteApplyFilter::appliesNote,
+                    enqueuesMediaRecovery = downloadsMedia,
                 ),
             accessToken = accessToken,
             since = since,
@@ -239,7 +243,7 @@ internal class SyncDownloader(
         // Pending work must compare the original remote fields without replacing its media mapping.
         if (syncMetadataService.hasPending(EntityType.NOTE, note.uid.toString())) return note
         val accepted = preserveTranscript(note)
-        return if (downloadInbox == null) mediaTransfer.downloadIfNeeded(accessToken, accepted) else accepted
+        return if (downloadInbox == null && downloadsMedia) mediaTransfer.downloadIfNeeded(accessToken, accepted) else accepted
     }
 
     private suspend fun preserveTranscript(replacement: JournalNote): JournalNote {
