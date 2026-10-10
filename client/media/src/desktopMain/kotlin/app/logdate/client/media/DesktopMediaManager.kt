@@ -1,9 +1,11 @@
 package app.logdate.client.media
 
+import app.logdate.client.media.storage.DesktopMediaDirectories
+import app.logdate.client.media.storage.MediaCollection
+import app.logdate.client.media.storage.MediaFileResolver
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.io.asSource
-import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.BasicFileAttributes
@@ -19,9 +21,12 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class DesktopMediaManager(
-    /** Where LogDate keeps its own copies. Injectable so a test never touches a real home directory. */
-    private val mediaRoot: Path = defaultMediaRoot,
+    /** Resolves stored media references. Injectable so a test never touches a real home directory. */
+    private val mediaFiles: MediaFileResolver = MediaFileResolver(DesktopMediaDirectories()),
 ) : MediaManager {
+    /** Where LogDate keeps its own copies. */
+    private val mediaRoot: Path = Path.of(mediaFiles.directory(MediaCollection.Library))
+
     override suspend fun getMedia(uri: String): MediaObject {
         val path = resolvePath(uri)
         return toMediaObject(path) ?: error("Unsupported or missing media at $uri")
@@ -46,7 +51,7 @@ class DesktopMediaManager(
         return Files.deleteIfExists(resolved)
     }
 
-    override suspend fun exists(mediaId: String): Boolean = Files.exists(resolvePath(mediaId))
+    override suspend fun exists(mediaId: String): Boolean = mediaFiles.filePath(mediaId)?.let { Files.exists(Path.of(it)) } ?: false
 
     override suspend fun getRecentMedia(limit: Int): Flow<List<MediaObject>> {
         val media =
@@ -137,12 +142,7 @@ class DesktopMediaManager(
         return destPath.toUri().toString()
     }
 
-    private fun resolvePath(uri: String): Path =
-        if (uri.startsWith("file://")) {
-            Path.of(URI(uri))
-        } else {
-            Path.of(uri)
-        }
+    private fun resolvePath(uri: String): Path = Path.of(mediaFiles.filePath(uri) ?: error("Not a local media file: $uri"))
 
     private fun ensureMediaDir(): Path {
         val directory = mediaRoot
@@ -237,8 +237,6 @@ class DesktopMediaManager(
         private val picturesRoot: Path = Path.of(System.getProperty("user.home"), "Pictures")
     }
 }
-
-private val defaultMediaRoot: Path = Path.of(System.getProperty("user.home"), ".logdate", "media")
 
 private fun Path.hasIgnoredLibrarySegment(root: Path): Boolean {
     val relativePath = root.relativize(this)

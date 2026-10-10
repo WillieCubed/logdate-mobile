@@ -49,6 +49,7 @@ import androidx.compose.ui.awt.SwingPanel
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.ui.common.AspectRatios
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.delay
@@ -59,6 +60,7 @@ import logdate.client.feature.editor.generated.resources.choose_from_gallery
 import logdate.client.feature.editor.generated.resources.pause_video
 import logdate.client.feature.editor.generated.resources.play_video
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import uk.co.caprica.vlcj.player.component.CallbackMediaPlayerComponent
 import java.awt.Desktop
 import java.awt.FileDialog
@@ -93,10 +95,11 @@ actual fun VideoPlayerContent(
     var durationMs by remember(uri) { mutableLongStateOf(0L) }
     var controlsVisible by remember(uri) { mutableStateOf(true) }
     var lastInteractionTick by remember(uri) { mutableLongStateOf(0L) }
+    val mediaFiles = koinInject<MediaFileResolver>()
 
     // Load + parse the media so duration is available before play.
     LaunchedEffect(uri) {
-        val resolvedPath = uriToPlayableMrl(uri)
+        val resolvedPath = uriToPlayableMrl(uri, mediaFiles)
         if (resolvedPath != null) {
             mediaPlayer.media().prepare(resolvedPath)
         } else {
@@ -281,16 +284,13 @@ private fun formatTimestamp(ms: Long): String {
 }
 
 /**
- * Convert a Kotlin URI string into a path libVLC will accept. libVLC handles
- * file:// URIs natively, but the picker may hand us a raw absolute path.
+ * Convert a stored media string into an MRL libVLC will accept: an encoded file URL for local
+ * media (including `logdate-media://` references), or the string itself for anything else.
  */
-private fun uriToPlayableMrl(uri: String): String? {
-    if (uri.startsWith("file:")) return uri
-    return runCatching {
-        val file = File(uri)
-        if (file.exists()) file.absolutePath else uri
-    }.getOrNull()
-}
+private fun uriToPlayableMrl(
+    uri: String,
+    mediaFiles: MediaFileResolver,
+): String? = mediaFiles.filePath(uri)?.let { File(it).toURI().toString() } ?: uri
 
 @Suppress("ktlint:standard:function-naming")
 @Composable

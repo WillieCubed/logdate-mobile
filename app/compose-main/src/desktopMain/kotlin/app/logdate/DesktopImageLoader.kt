@@ -1,5 +1,7 @@
 package app.logdate
 
+import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.ui.media.LocalMediaImageMapper
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.disk.DiskCache
@@ -17,10 +19,14 @@ import java.util.Locale
  * OS-specific user cache directory so the app integrates with the host's
  * "purgeable data" conventions.
  */
-fun buildLogDateImageLoader(context: PlatformContext): ImageLoader =
+fun buildLogDateImageLoader(
+    context: PlatformContext,
+    mediaFiles: MediaFileResolver,
+): ImageLoader =
     ImageLoader
         .Builder(context)
         .crossfade(IMAGE_CROSSFADE_MS)
+        .components { add(LocalMediaImageMapper(mediaFiles)) }
         .memoryCache {
             MemoryCache
                 .Builder()

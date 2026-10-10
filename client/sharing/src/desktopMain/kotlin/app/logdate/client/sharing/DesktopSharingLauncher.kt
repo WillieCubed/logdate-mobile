@@ -1,5 +1,7 @@
 package app.logdate.client.sharing
 
+import app.logdate.client.media.storage.DesktopMediaDirectories
+import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.repository.journals.JournalRepository
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
@@ -8,6 +10,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import java.awt.Desktop
+import java.io.File
 import java.net.URI
 import kotlin.uuid.Uuid
 
@@ -22,6 +25,7 @@ import kotlin.uuid.Uuid
 class DesktopSharingLauncher(
     private val journalRepository: JournalRepository,
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main),
+    private val mediaFiles: MediaFileResolver = MediaFileResolver(DesktopMediaDirectories()),
 ) : SharingLauncher {
     override fun shareContent(
         text: String?,
@@ -116,10 +120,9 @@ class DesktopSharingLauncher(
         throw UnsupportedOperationException("Sharing videos to Instagram is not supported on desktop")
 
     /**
-     * Gets a URI for a media file by its ID.
+     * Gets a file URL for stored media, or [uid] unchanged when it names no local file.
      *
-     * @param uid The ID of the media file
-     * @return A string path to the media file
+     * @param uid A stored media reference
      */
-    override fun getUriFromMedia(uid: String): String = "file:///media/$uid"
+    override fun getUriFromMedia(uid: String): String = mediaFiles.filePath(uid)?.let { File(it).toURI().toString() } ?: uid
 }

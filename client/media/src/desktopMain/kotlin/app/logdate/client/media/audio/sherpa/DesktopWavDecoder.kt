@@ -1,5 +1,7 @@
 package app.logdate.client.media.audio.sherpa
 
+import app.logdate.client.media.storage.DesktopMediaDirectories
+import app.logdate.client.media.storage.MediaFileResolver
 import io.github.aakira.napier.Napier
 import java.io.File
 import javax.sound.sampled.AudioFormat
@@ -17,7 +19,9 @@ import javax.sound.sampled.AudioSystem
  * MediaCodec / MediaExtractor required — Java Sound has WAV reading and
  * resampling built in.
  */
-internal class DesktopWavDecoder {
+internal class DesktopWavDecoder(
+    private val mediaFiles: MediaFileResolver = MediaFileResolver(DesktopMediaDirectories()),
+) {
     fun decodeToMono16kHz(uri: String): FloatArray? {
         val file = uriToFile(uri) ?: return null
         if (!file.exists()) {
@@ -86,12 +90,7 @@ internal class DesktopWavDecoder {
         return out
     }
 
-    private fun uriToFile(uri: String): File? =
-        when {
-            uri.startsWith("file://") -> File(java.net.URI(uri))
-            uri.contains(":/") -> null // Unsupported scheme; only local files for now
-            else -> File(uri)
-        }
+    private fun uriToFile(uri: String): File? = mediaFiles.filePath(uri)?.let(::File)
 
     companion object {
         // Speech models expect mono 16 kHz signed 16-bit PCM. Java Sound's

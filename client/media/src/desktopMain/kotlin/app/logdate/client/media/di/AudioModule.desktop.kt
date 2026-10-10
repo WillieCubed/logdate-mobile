@@ -25,8 +25,8 @@ actual val audioModule: Module =
         single<AudioStorage> { DesktopAudioStorage() }
         // Provide the Desktop implementation of AudioRecordingManager as a singleton
         single<AudioRecordingManager> { DesktopAudioRecordingManager(get()) }
-        single<AudioPlaybackManager> { DesktopAudioPlaybackManager() }
-        single<AudioDurationResolver> { DesktopAudioDurationResolver() }
+        single<AudioPlaybackManager> { DesktopAudioPlaybackManager(get()) }
+        single<AudioDurationResolver> { DesktopAudioDurationResolver(get()) }
         single<AudioRouteRepository> { SystemControlledAudioRouteRepository() }
 
         // Real on-device Whisper transcription via Sherpa-ONNX JVM. The

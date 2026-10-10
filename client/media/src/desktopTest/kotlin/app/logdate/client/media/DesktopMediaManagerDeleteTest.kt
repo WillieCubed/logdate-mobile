@@ -1,5 +1,7 @@
 package app.logdate.client.media
 
+import app.logdate.client.media.storage.DesktopMediaDirectories
+import app.logdate.client.media.storage.MediaFileResolver
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
 import java.nio.file.Path
@@ -19,7 +21,7 @@ import kotlin.test.assertTrue
 class DesktopMediaManagerDeleteTest {
     private val tempRoot: Path = Files.createTempDirectory("logdate-media-test")
     private val mediaRoot: Path = tempRoot.resolve("media").also { it.createDirectories() }
-    private val manager = DesktopMediaManager(mediaRoot = mediaRoot)
+    private val manager = DesktopMediaManager(MediaFileResolver(DesktopMediaDirectories(tempRoot.toFile())))
 
     @AfterTest
     fun cleanUp() {

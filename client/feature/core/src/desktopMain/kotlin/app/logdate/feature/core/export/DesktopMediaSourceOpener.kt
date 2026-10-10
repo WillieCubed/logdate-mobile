@@ -1,6 +1,8 @@
 package app.logdate.feature.core.export
 
 import app.logdate.client.domain.export.archive.MediaSourceOpener
+import app.logdate.client.media.storage.DesktopMediaDirectories
+import app.logdate.client.media.storage.MediaFileResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okio.Source
@@ -10,14 +12,17 @@ import java.net.URI
 import java.net.URISyntaxException
 
 /**
- * Opens the media references the desktop app stores: absolute paths, Windows drive paths and `file:`
- * URLs. Anything else, including a network address, is treated as missing, since an export never
- * fetches from the network.
+ * Opens the media references the desktop app stores: `logdate-media://` references, absolute
+ * paths, Windows drive paths and `file:` URLs. Anything else, including a network address, is
+ * treated as missing, since an export never fetches from the network.
  */
-class DesktopMediaSourceOpener : MediaSourceOpener {
+class DesktopMediaSourceOpener(
+    private val mediaFiles: MediaFileResolver = MediaFileResolver(DesktopMediaDirectories()),
+) : MediaSourceOpener {
     override suspend fun open(reference: String): Source? =
         withContext(Dispatchers.IO) {
-            localFileCandidates(reference).firstOrNull { it.isFile }?.source()
+            val resolved = mediaFiles.filePath(reference)?.let(::File)
+            (listOfNotNull(resolved) + localFileCandidates(reference)).firstOrNull { it.isFile }?.source()
         }
 }
 

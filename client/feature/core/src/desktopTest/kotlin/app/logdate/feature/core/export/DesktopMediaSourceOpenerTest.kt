@@ -1,5 +1,7 @@
 package app.logdate.feature.core.export
 
+import app.logdate.client.media.storage.DesktopMediaDirectories
+import app.logdate.client.media.storage.MediaFileResolver
 import kotlinx.coroutines.test.runTest
 import okio.buffer
 import java.io.File
@@ -19,6 +21,17 @@ class DesktopMediaSourceOpenerTest {
     }
 
     private fun fileNamed(name: String) = File(folder, name).apply { writeText("bytes") }
+
+    @Test
+    fun `a media reference is opened from the library`() =
+        runTest {
+            val dataRoot = File(folder, ".logdate")
+            File(dataRoot, "media").mkdirs()
+            File(dataRoot, "media/Beach Day.jpg").writeText("library bytes")
+            val libraryOpener = DesktopMediaSourceOpener(MediaFileResolver(DesktopMediaDirectories(dataRoot)))
+
+            assertEquals("library bytes", libraryOpener.open("logdate-media://library/Beach%20Day.jpg")?.buffer()?.readUtf8())
+        }
 
     @Test
     fun `a file url the app wrote with an unencoded space is opened`() =

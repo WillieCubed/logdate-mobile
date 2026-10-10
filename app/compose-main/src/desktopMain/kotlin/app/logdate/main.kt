@@ -3,6 +3,8 @@
 package app.logdate
 
 import androidx.compose.ui.window.application
+import app.logdate.client.media.storage.DesktopMediaDirectories
+import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.desktop.LogDateApplication
 import app.logdate.desktop.rememberApplicationState
 import app.logdate.di.appModule
@@ -17,7 +19,9 @@ import org.koin.dsl.koinConfiguration
  */
 fun main() =
     application {
-        SingletonImageLoader.setSafe { context -> buildLogDateImageLoader(context) }
+        SingletonImageLoader.setSafe { context ->
+            buildLogDateImageLoader(context, MediaFileResolver(DesktopMediaDirectories()))
+        }
         KoinApplication(koinConfiguration { modules(appModule) }) {
             val console = DebugAntilog()
             Napier.base(

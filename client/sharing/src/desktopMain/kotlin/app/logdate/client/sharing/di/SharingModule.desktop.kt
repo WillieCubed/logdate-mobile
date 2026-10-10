@@ -21,6 +21,7 @@ actual val sharingModule: Module =
         single<SharingLauncher> {
             DesktopSharingLauncher(
                 journalRepository = get(),
+                mediaFiles = get(),
             )
         }
         single<RewindQuoteCardRenderer> { NoOpRewindQuoteCardRenderer }

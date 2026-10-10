@@ -1,5 +1,6 @@
 package app.logdate.ui.audio.extraction
 
+import app.logdate.client.media.storage.MediaFileResolver
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -12,7 +13,9 @@ import kotlin.math.sqrt
 /**
  * Desktop/JVM implementation of AmplitudeExtractor.
  */
-class DesktopAmplitudeExtractor : AmplitudeExtractor {
+class DesktopAmplitudeExtractor(
+    private val mediaFiles: MediaFileResolver,
+) : AmplitudeExtractor {
     override suspend fun extractAmplitudes(
         uri: String,
         targetSampleCount: Int,
@@ -49,12 +52,7 @@ class DesktopAmplitudeExtractor : AmplitudeExtractor {
         }
     }
 
-    private fun resolveFile(uri: String): File? =
-        if (uri.startsWith("file://")) {
-            runCatching { File(java.net.URI(uri)) }.getOrNull()
-        } else {
-            File(uri)
-        }
+    private fun resolveFile(uri: String): File? = mediaFiles.filePath(uri)?.let(::File)
 
     private fun ensurePcmSigned(format: AudioFormat): AudioFormat =
         if (format.encoding == AudioFormat.Encoding.PCM_SIGNED) {

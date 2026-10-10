@@ -15,6 +15,6 @@ actual val audioUiModule: Module =
             val cacheDir = File(System.getProperty("user.home"), ".logdate/cache").apply { mkdirs() }
             DesktopWaveformStorage(cacheDir)
         }
-        single<AmplitudeExtractor> { DesktopAmplitudeExtractor() }
+        single<AmplitudeExtractor> { DesktopAmplitudeExtractor(get()) }
         factory { AudioContextProcessor(get(), get()) }
     }
