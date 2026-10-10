@@ -87,7 +87,7 @@ A row reaches `[done]` only when its Evidence column lists:
 | `[done]` | OS integration flags exist with debug-only toggles | Six flags in `FeatureFlag.kt` (`FeatureFlagStoreTest`); toggles in Developer tools > Feature previews. Lane 1: `Flow20_02_FeaturePreviewsScreenshots.kt` and the desktop `feature-previews` scene. |
 | `[done]` | `PlatformComponentToggler` enables and disables flagged manifest components | `PlatformComponentToggler` with `PlatformComponentTogglerTest`. Tiles, the bubble activity, and its receiver are declared disabled; the API 37 captures show them appearing once their flags are on. |
 | `[done]` | Manifest declares the touchscreen as optional, `configChanges`, editor `<layout>` minimums, and multi-instance support | `touchscreen` optional, `configChanges` on both activities, editor `<layout>` minimums, and `PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI`. Resizing into an App Bubble keeps state (`app-bubble--phone-api37.png`). |
-| `[todo]` | `ShareReceiver` declares no SEND filters it cannot receive | |
+| `[done]` | `ShareReceiver` declares no SEND filters it cannot receive | The receiver is not exported and handles only LogDate's explicit copy-link, QR code, and chooser callbacks; the filters and empty branches are gone. `ShareReceiverE2ETest` covers the two actions. |
 | `[partial]` | Editor windows are titled in Recents, the taskbar, and desktop captions | `editorWindowTitle` (`EditorWindowTitleTest`) sets the task title from the entry. Missing: Recents and taskbar capture. |
 | `[partial]` | The compat splash screen on API 30 matches Android 12+ | `Theme.LogDate.Starting` with the launcher brown and foreground. Missing: API 30 and API 37 cold-start captures. |
 

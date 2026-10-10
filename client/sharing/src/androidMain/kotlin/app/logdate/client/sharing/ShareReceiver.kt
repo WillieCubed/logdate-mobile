@@ -12,7 +12,8 @@ import android.widget.Toast
 import io.github.aakira.napier.Napier
 
 /**
- * A receiver that acts as a callback for the system share sheet.
+ * Handles LogDate's own share sheet callbacks: copying a link, sharing a QR code, and logging which
+ * app the person chose. Content shared into LogDate from other apps goes to MainActivity instead.
  */
 class ShareReceiver : BroadcastReceiver() {
     override fun onReceive(
@@ -20,45 +21,10 @@ class ShareReceiver : BroadcastReceiver() {
         intent: Intent,
     ) {
         when (intent.action) {
-            CustomIntents.ACTION_COPY_LINK -> {
-                copyLinkToClipboard(context, intent.getStringExtra(CustomIntents.EXTRA_SHARE_TEXT))
-                return
-            }
-            CustomIntents.ACTION_CHOOSER_RESULT -> {
-                logChosenComponent(intent)
-                return
-            }
-            CustomIntents.ACTION_SHARE_QR_CODE -> {
-                shareQrCode(context, intent)
-                return
-            }
+            CustomIntents.ACTION_COPY_LINK -> copyLinkToClipboard(context, intent.getStringExtra(CustomIntents.EXTRA_SHARE_TEXT))
+            CustomIntents.ACTION_SHARE_QR_CODE -> shareQrCode(context, intent)
+            else -> logChosenComponent(intent)
         }
-
-        val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
-        val sharedImage =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
-            } else {
-                @Suppress("DEPRECATION")
-                intent.getParcelableExtra(Intent.EXTRA_STREAM)
-            }
-        val sharedImages =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
-            } else {
-                @Suppress("DEPRECATION")
-                intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM)
-            }
-        if (sharedText != null) {
-            // Handle text
-        } else if (sharedImage != null) {
-            // Handle single image
-        } else if (sharedImages != null) {
-            val totalImages = sharedImages.size
-            Napier.d("Share sheet returned $totalImages image(s)")
-        }
-
-        logChosenComponent(intent)
     }
 
     private fun logChosenComponent(intent: Intent) {

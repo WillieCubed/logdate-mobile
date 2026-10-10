@@ -5,16 +5,12 @@
             android:name="com.facebook.sdk.ApplicationId"
             android:value="@string/facebook_app_id" />
 
+        <!--
+            Receives only LogDate's own explicit share callbacks: copy link, share a QR code, and
+            the chooser result. Content shared into LogDate arrives at MainActivity instead.
+        -->
         <receiver
             android:name=".sharing.ShareReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <action android:name="android.intent.action.SEND_MULTIPLE" />
-
-                <data android:mimeType="text/*" />
-                <data android:mimeType="image/*" />
-            </intent-filter>
-        </receiver>
+            android:exported="false" />
     </application>
 </manifest>
