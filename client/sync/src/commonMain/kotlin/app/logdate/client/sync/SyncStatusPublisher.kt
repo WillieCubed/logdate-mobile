@@ -260,7 +260,10 @@ internal class SyncStatusPublisher(
             .onFailure { Napier.w("Failed to refresh quota") }
     }
 
-    /** Helper to handle sync exceptions consistently. */
+    /**
+     * Helper to handle sync exceptions consistently. The error keeps the exception's own message,
+     * so the person and the logs see why [operation] failed rather than only that it did.
+     */
     fun handleSyncException(
         e: Exception,
         operation: String,
@@ -268,10 +271,11 @@ internal class SyncStatusPublisher(
         val error =
             SyncError(
                 type = SyncErrorType.UNKNOWN_ERROR,
-                message = "Synchronization failed",
+                message = "Synchronization failed: ${e.message ?: e::class.simpleName}",
+                cause = e,
             )
         lastErrorFlow.value = error
-        Napier.e("Synchronization failed")
+        Napier.e("Synchronization failed ($operation)", e)
         return SyncResult(success = false, errors = listOf(error))
     }
 

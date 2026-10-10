@@ -1,5 +1,6 @@
 package app.logdate.client.e2e.osintegration
 
+import android.app.HandoffActivityDataRequestInfo
 import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.Rect
@@ -485,6 +486,51 @@ class OsSurfaceScreenshotsTest {
     }
 
     /**
+     * Editor Handoff on one device, both ends: the editor offers its draft to other devices, then
+     * opens that draft the way a second device does when Handoff launches it, and explains a draft
+     * that has not arrived. Two devices on one account cannot run on a managed emulator, so the
+     * receiving launch uses the same intent extras Android passes on.
+     */
+    @Test fun editorHandoff() {
+        if (Build.VERSION.SDK_INT < 37) return
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.clearDrafts()
+        OsSurfaceCapture.enableFlags(FeatureFlag.EDITOR_HANDOFF)
+        OsSurfaceCapture.shell("am start -n ${OsSurfaceCapture.packageName}/$EDITOR_ACTIVITY -f 0x10000000")
+        OsSurfaceCapture.waitForText("Write something").click()
+        OsSurfaceCapture.waitForText("What's on your mind?")
+        OsSurfaceCapture.device.findObject(By.clazz("android.widget.EditText")).text = HANDOFF_ENTRY
+        val draftId = OsSurfaceCapture.awaitDraftContaining(HANDOFF_ENTRY)
+
+        val offered =
+            OsSurfaceCapture.onResumedActivity { activity ->
+                check(activity.isHandoffEnabled) { "The editor did not offer itself for Handoff with the flag on" }
+                activity.onHandoffActivityDataRequested(HandoffActivityDataRequestInfo(false))
+            }
+        val offeredDraft = offered?.extras?.getString(EXTRA_HANDOFF_DRAFT_ID)
+        check(offeredDraft == draftId.toString()) { "Handoff offered draft $offeredDraft instead of $draftId" }
+        OsSurfaceCapture.writeEvidence(
+            surface = "large-screens-and-desktop-windowing",
+            state = "editor-handoff-data",
+            text = "component=${offered?.componentName?.flattenToShortString()}\n$EXTRA_HANDOFF_DRAFT_ID=$offeredDraft\n",
+        )
+        OsSurfaceCapture.onResumedActivity { it.finish() }
+
+        OsSurfaceCapture.shell("am start -n ${OsSurfaceCapture.packageName}/$EDITOR_ACTIVITY -f 0x10000000 --es $EXTRA_HANDOFF_DRAFT_ID $draftId")
+        OsSurfaceCapture.waitForText(HANDOFF_ENTRY)
+        Thread.sleep(1_000L)
+        OsSurfaceCapture.capture(surface = "large-screens-and-desktop-windowing", state = "editor-handoff-arrived")
+        OsSurfaceCapture.onResumedActivity { it.finish() }
+
+        // Backup is off on the managed device, so a draft that is not here can never arrive.
+        OsSurfaceCapture.shell("am start -n ${OsSurfaceCapture.packageName}/$EDITOR_ACTIVITY -f 0x10000000 --es $EXTRA_HANDOFF_DRAFT_ID ${Uuid.random()}")
+        OsSurfaceCapture.waitForText("Your entry hasn’t arrived")
+        Thread.sleep(500L)
+        OsSurfaceCapture.capture(surface = "large-screens-and-desktop-windowing", state = "editor-handoff-missing")
+        OsSurfaceCapture.onResumedActivity { it.finish() }
+    }
+
+    /**
      * "hello" written with a pen in a new entry: once while the pen is still down, with the ink on
      * screen, and once after the keyboard's handwriting recognition has typed it into the entry.
      */
@@ -754,6 +800,9 @@ class OsSurfaceScreenshotsTest {
         const val WINDOWING_MODE_FREEFORM = 5
 
         /** The Files app, opened at Downloads, for the cross-app drag. */
+        const val EDITOR_ACTIVITY = "app.logdate.client.EditorActivity"
+        const val EXTRA_HANDOFF_DRAFT_ID = "app.logdate.extra.HANDOFF_DRAFT_ID"
+        const val HANDOFF_ENTRY = "Halfway up the ridge trail and the fog is finally lifting. Finishing this at home."
         const val GBOARD_PACKAGE = "com.google.android.inputmethod.latin"
         const val KEYBOARD_SUGGESTION_TIMEOUT_MS = 15_000L
         const val GIF_PANEL_TIMEOUT_MS = 30_000L

@@ -230,10 +230,13 @@ class DefaultSyncManager(
             upload = uploader::uploadDrafts,
             updatesGlobalSyncState = false,
             onException = { e ->
-                Napier.e("Draft sync failed")
+                Napier.e("Draft sync failed", e)
                 SyncResult(
                     success = false,
-                    errors = listOf(SyncError(SyncErrorType.UNKNOWN_ERROR, "Draft sync failed")),
+                    errors =
+                        listOf(
+                            SyncError(SyncErrorType.UNKNOWN_ERROR, "Draft sync failed: ${e.message ?: e::class.simpleName}", cause = e),
+                        ),
                 )
             },
         )

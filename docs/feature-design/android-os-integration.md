@@ -110,6 +110,7 @@ Each row links to its guide. Status is tracked in the checklist.
 | Keyboard, pointer, drag and drop | Keyboard shortcuts, right-click menus, tooltips, and dragging text and media in and out | none | [keyboard-pointer-drag-and-drop](../reference/android/os-integration/keyboard-pointer-drag-and-drop.md) |
 | Large screens and desktop windowing | Titled editor windows, side-by-side windows, and an app bar that sits in the desktop caption bar | none | [large-screens-and-desktop-windowing](../reference/android/os-integration/large-screens-and-desktop-windowing.md) |
 | AppFunctions | Ask an assistant to add an entry or start a voice note, and, with consent, to search the journal | `APP_FUNCTIONS` | [app-functions](../reference/android/os-integration/app-functions.md) |
+| Editor Handoff | Pick up an unfinished entry on another Android device; it opens once backup delivers its draft | `EDITOR_HANDOFF` | [app-functions](../reference/android/os-integration/app-functions.md#cross-device-handoff) |
 
 ## Privacy rules
 
@@ -140,6 +141,7 @@ New surfaces are invisible until their flag is on. Flags live in
 | `LOCK_SCREEN_CAPTURE_WIDGET` | off | The keyguard widget receiver |
 | `RECORDING_BUBBLE` | off | The Float action and the recording bubble activity |
 | `APP_FUNCTIONS` | off | Registration of LogDate's AppFunctions |
+| `EDITOR_HANDOFF` | off | Offering editor windows to other devices. An editor launched by a handoff still opens its draft. |
 
 Some surfaces are declared in the manifest (tiles, widget receivers, the bubble activity), so a
 runtime check alone cannot hide them. These components are declared `android:enabled="false"`.

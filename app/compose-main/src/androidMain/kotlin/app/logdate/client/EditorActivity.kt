@@ -1,6 +1,8 @@
 package app.logdate.client
 
 import android.app.ActivityManager
+import android.app.HandoffActivityData
+import android.app.HandoffActivityDataRequestInfo
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -10,14 +12,21 @@ import android.view.Menu
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.Composable
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.window.layout.WindowMetricsCalculator
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.editor.editorWindowTitle
 import app.logdate.client.location.tracking.LocationTrackingManager
+import app.logdate.feature.editor.handoff.DraftRefreshResult
+import app.logdate.feature.editor.handoff.DraftRefresher
+import app.logdate.feature.editor.handoff.HandoffDraftGate
+import app.logdate.feature.editor.handoff.HandoffDraftReceiver
 import app.logdate.feature.editor.ui.NoteEditorScreen
+import app.logdate.feature.editor.ui.editor.EditorState
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.ui.keyboard.AppShortcutScope
@@ -50,6 +59,9 @@ import kotlin.uuid.Uuid
 class EditorActivity : FragmentActivity() {
     private val viewModel by viewModel<EntryEditorViewModel>()
     private val locationTrackingManager: LocationTrackingManager by inject()
+    private val featureFlags: FeatureFlagStore by inject()
+    private val draftRefresher: DraftRefresher by inject()
+    private val handoffDraftReceiver: HandoffDraftReceiver by inject()
 
     // We'll implement EditorInstanceId handling later
     private var instanceId: String? = null
@@ -78,6 +90,9 @@ class EditorActivity : FragmentActivity() {
                 ?.mapNotNull { runCatching { Uuid.parse(it) }.getOrNull() }
                 ?: emptyList()
 
+        // Android Handoff opens the editor on another device with the draft it was writing.
+        val handoffDraftId = handoffDraftId(intent.getStringExtra(EXTRA_HANDOFF_DRAFT_ID))
+
         // Configure window features
         enableEdgeToEdge()
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
@@ -85,22 +100,58 @@ class EditorActivity : FragmentActivity() {
         // Set up lifecycle-aware operations
         setupLifecycleHandling()
         followWindowTitle(isExistingEntry = entryId != null)
+        followEditorHandoffFlag(featureFlags)
 
         setContent {
             LogDateTheme {
-                NoteEditorScreen(
-                    onNavigateBack = { finish() },
-                    onEntrySaved = {
-                        setResult(RESULT_OK)
-                        finish()
-                    },
-                    entryId = entryId,
-                    journalId = journalId,
-                    journalIds = initialJournalIds,
-                    initialTextContent = initialText,
-                    attachments = attachmentUris,
-                    viewModel = viewModel,
-                )
+                val editor: @Composable (Uuid?) -> Unit = { draftId ->
+                    NoteEditorScreen(
+                        onNavigateBack = { finish() },
+                        onEntrySaved = {
+                            setResult(RESULT_OK)
+                            finish()
+                        },
+                        entryId = entryId,
+                        draftId = draftId,
+                        journalId = journalId,
+                        journalIds = initialJournalIds,
+                        initialTextContent = initialText,
+                        attachments = attachmentUris,
+                        viewModel = viewModel,
+                    )
+                }
+                if (handoffDraftId != null) {
+                    HandoffDraftGate(draftId = handoffDraftId, receiver = handoffDraftReceiver, editor = editor)
+                } else {
+                    editor(null)
+                }
+            }
+        }
+    }
+
+    /**
+     * Hands this editor to another of the person's devices. When the person picks it there
+     * ([HandoffActivityDataRequestInfo.isActiveRequest]), the latest text is saved and uploaded at
+     * once instead of on backup's schedule, so the other device can fetch it while it waits.
+     */
+    override fun onHandoffActivityDataRequested(info: HandoffActivityDataRequestInfo): HandoffActivityData? {
+        val state = viewModel.editorState.value
+        if (info.isActiveRequest) uploadDraftForHandoff(state)
+        val handoff = editorHandoffFor(state)
+        if (handoff == null) {
+            Napier.w("Handoff was requested before the entry was saved as a draft; it can be handed off once autosave runs")
+            return null
+        }
+        return editorHandoffData(handoff)
+    }
+
+    private fun uploadDraftForHandoff(state: EditorState) {
+        lifecycleScope.launch {
+            if (state.isDirty) viewModel.persistDraft(state)
+            when (val result = draftRefresher.refresh()) {
+                DraftRefreshResult.Refreshed -> Napier.d("Uploaded the draft for handoff")
+                DraftRefreshResult.Unavailable -> Napier.w("The draft was not uploaded for handoff: backup is off or needs attention")
+                is DraftRefreshResult.Failed -> Napier.w("The draft was not uploaded for handoff: ${result.message}")
             }
         }
     }

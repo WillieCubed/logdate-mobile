@@ -87,6 +87,9 @@ enum class FeatureFlag(
 
     /** Write and Record actions on capture nudges, so an entry can be written from the notification. */
     NOTIFICATION_QUICK_REPLY(key = "notification_quick_reply_enabled", defaultEnabled = false),
+
+    /** Android Handoff for the editor, so an unfinished entry continues on another Android device. */
+    EDITOR_HANDOFF(key = "editor_handoff_enabled", defaultEnabled = false),
     ;
 
     companion object {

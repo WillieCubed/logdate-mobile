@@ -92,6 +92,7 @@ class FeatureFlagStoreTest {
                     FeatureFlag.APP_FUNCTIONS,
                     FeatureFlag.LOCK_SCREEN_CAPTURE_WIDGET,
                     FeatureFlag.NOTIFICATION_QUICK_REPLY,
+                    FeatureFlag.EDITOR_HANDOFF,
                 )
             surfaces.forEach { flag -> assertFalse(store.isEnabled(flag), "$flag should default off") }
 

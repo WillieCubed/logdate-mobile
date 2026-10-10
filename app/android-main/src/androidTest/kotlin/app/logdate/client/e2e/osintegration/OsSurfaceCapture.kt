@@ -1,5 +1,6 @@
 package app.logdate.client.e2e.osintegration
 
+import android.app.Activity
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.ClipData
@@ -47,6 +48,9 @@ import app.logdate.client.media.AndroidManagedMediaDiscarder
 import app.logdate.client.repository.journals.EntryDraftRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
+import kotlin.uuid.Uuid
 import kotlinx.datetime.TimeZone
 import org.koin.core.context.GlobalContext
 import java.io.File
@@ -486,6 +490,38 @@ object OsSurfaceCapture {
                 .getSystemService(ClipboardManager::class.java)
                 .setPrimaryClip(ClipData.newUri(context.contentResolver, "Photo", uri))
         }
+    }
+
+    /** Waits for autosave to keep a draft whose text includes [text], and returns its id. */
+    fun awaitDraftContaining(
+        text: String,
+        timeoutMs: Long = TIMEOUT_MS,
+    ): Uuid {
+        val drafts = GlobalContext.get().get<EntryDraftRepository>()
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            val draft =
+                runBlocking { drafts.getDrafts().first() }.firstOrNull { draft ->
+                    draft.notes.any { note -> (note as? JournalNote.Text)?.content?.contains(text) == true }
+                }
+            if (draft != null) return draft.id
+            Thread.sleep(250L)
+        }
+        error("No draft containing \"$text\" was saved")
+    }
+
+    /** Runs [block] on the main thread with the activity in front, and returns its result. */
+    fun <T> onResumedActivity(block: (Activity) -> T): T {
+        var result: Result<T>? = null
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val activity =
+                ActivityLifecycleMonitorRegistry
+                    .getInstance()
+                    .getActivitiesInStage(Stage.RESUMED)
+                    .single()
+            result = runCatching { block(activity) }
+        }
+        return checkNotNull(result).getOrThrow()
     }
 
     /** Empties the clipboard, so the keyboard shows its tools instead of suggesting a copied item. */

@@ -202,6 +202,8 @@
     <string name="feature_preview_lock_screen_widget_description">Start an entry from the lock screen. The widget never shows journal content.</string>
     <string name="feature_preview_app_functions_title">Assistant actions</string>
     <string name="feature_preview_app_functions_description">Let assistants add entries. Searching needs system search on and LogDate unlocked.</string>
+    <string name="feature_preview_editor_handoff_title">Continue on another device</string>
+    <string name="feature_preview_editor_handoff_description">Pick up an unfinished entry on your other Android devices. Needs Backup on both.</string>
     <string name="developer_location">Location overrides</string>
     <string name="app_updates_description">Get the latest LogDate improvements.</string>
 </resources>

@@ -28,6 +28,7 @@ import app.logdate.client.events.EventInferenceScheduler
 import app.logdate.client.events.EventInferenceWorker
 import app.logdate.client.feature.widgets.di.widgetModule
 import app.logdate.client.feature.widgets.shortcuts.DynamicShortcutPublisher
+import app.logdate.client.handoff.SyncDraftRefresher
 import app.logdate.client.health.di.androidHealthModule
 import app.logdate.client.health.di.healthModule
 import app.logdate.client.intelligence.di.intelligenceModule
@@ -40,6 +41,7 @@ import app.logdate.client.notifications.RecordingBubbleSwitch
 import app.logdate.client.platform.FeatureFlagState
 import app.logdate.client.platform.PackageManagerComponentSwitch
 import app.logdate.client.platform.PlatformComponentToggler
+import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.rewind.MilestoneRewindCoordinator
 import app.logdate.client.rewind.RewindGenerationWorker
 import app.logdate.client.rewind.RewindNotificationCoordinator
@@ -83,11 +85,14 @@ import app.logdate.feature.core.export.CloudBackupWorker
 import app.logdate.feature.core.restore.CloudRestoreScheduler
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
 import app.logdate.feature.core.settings.updates.AppUpdateController
+import app.logdate.feature.editor.handoff.DraftRefresher
+import app.logdate.feature.editor.handoff.HandoffDraftReceiver
 import app.logdate.feature.editor.ui.editor.CaptureUsageReporter
 import app.logdate.ui.common.HomeScreenPins
 import coil3.SingletonImageLoader
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.androidx.workmanager.dsl.workerOf
@@ -186,6 +191,11 @@ actual val appModule: Module =
         single<RecordingBubbleSwitch> { FlagRecordingBubbleSwitch(get(), get()) }
         single { RecordingBubbleNotifier(androidContext(), get()) }
         single<CaptureUsageReporter> { AndroidCaptureUsageReporter(androidContext()) }
+        single<DraftRefresher> { SyncDraftRefresher(get()) }
+        factory {
+            val drafts = get<EntryDraftRepository>()
+            HandoffDraftReceiver(hasDraft = { id -> drafts.getDraft(id).first().isSuccess }, refresher = get())
+        }
         single<HomeScreenPins> {
             AndroidHomeScreenPins(
                 context = androidContext(),

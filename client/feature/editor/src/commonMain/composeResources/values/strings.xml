@@ -119,6 +119,14 @@
     <string name="use_video">Use Video</string>
     <string name="undo">Undo</string>
     <string name="paste_as_attachment">Paste as attachment</string>
+    <string name="handoff_waiting_title">Opening your entry from another device</string>
+    <string name="handoff_waiting_body">It opens here as soon as it downloads from backup.</string>
+    <string name="handoff_missing_title">Your entry hasn’t arrived</string>
+    <string name="handoff_backup_unavailable">Backup is off or needs attention on this device. Entries move between devices through backup, so check Backup in Settings.</string>
+    <string name="handoff_fetch_failed">Downloading entries from backup failed: %1$s</string>
+    <string name="handoff_not_uploaded">Your other device hasn’t uploaded it yet. Check that it’s online with backup on, then try again.</string>
+    <string name="handoff_try_again">Try again</string>
+    <string name="handoff_start_new_entry">Start a new entry</string>
     <string name="unsaved_changes">Unsaved Changes</string>
     <string name="video">Video</string>
     <string name="video_not_available_on_desktop">Video not available on Desktop</string>

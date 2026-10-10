@@ -73,6 +73,17 @@ app-functions|system|docs/screenshots/android-os-integration/app-functions/assis
 app-functions|system|docs/screenshots/android-os-integration/app-functions/entry-from-assistant--phone-api37.png
 app-functions|system|docs/screenshots/android-os-integration/app-functions/assistant-actions--tablet-api37.txt
 
+# Editor Handoff: the offered extras, an entry opened from them, and one that has not arrived.
+editor-handoff|android|app/logdate/screenshots/flows/flow20_os_integration/Flow20_04_EditorHandoffScreenshots.kt#S01_EditorHandoffWaiting
+editor-handoff|android|app/logdate/screenshots/flows/flow20_os_integration/Flow20_04_EditorHandoffScreenshots.kt#S02_EditorHandoffBackupUnavailable
+editor-handoff|android|app/logdate/screenshots/flows/flow20_os_integration/Flow20_04_EditorHandoffScreenshots.kt#S03_EditorHandoffNotUploaded
+editor-handoff|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/editor-handoff-data--phone-api37.txt
+editor-handoff|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/editor-handoff-arrived--phone-api37.png
+editor-handoff|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/editor-handoff-missing--phone-api37.png
+editor-handoff|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/editor-handoff-data--tablet-api37.txt
+editor-handoff|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/editor-handoff-arrived--tablet-api37.png
+editor-handoff|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/editor-handoff-missing--tablet-api37.png
+
 # Notification quick reply: Write's reply field on the capture reminder, and the saved confirmation.
 notification-quick-reply|system|docs/screenshots/android-os-integration/notification-quick-reply/reply-field--phone-api37.png
 notification-quick-reply|system|docs/screenshots/android-os-integration/notification-quick-reply/saved--phone-api37.png

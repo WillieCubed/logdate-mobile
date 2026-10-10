@@ -34,6 +34,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -197,6 +198,28 @@ class DraftSyncIntegrationTest {
             manager.syncDrafts()
 
             assertEquals(null, repository.getDraft(draftId))
+        }
+
+    @Test
+    fun `a failed draft download reports what went wrong`() =
+        runTest {
+            val apiClient =
+                fakeCloudApiClient {
+                    getDraftChangesResponse = Result.failure(IllegalStateException("The server could not be reached"))
+                }
+            val syncManager =
+                testDefaultSyncManager(
+                    cloudDraftDataSource = DefaultCloudDraftDataSource(apiClient, cipher(), supportsRichDrafts = { true }),
+                    supportsRichDrafts = { true },
+                )
+
+            val result = syncManager.syncDrafts()
+
+            assertFalse(result.success)
+            assertTrue(
+                result.errors.any { "The server could not be reached" in it.message },
+                "Expected the download error in ${result.errors}",
+            )
         }
 
     @Test

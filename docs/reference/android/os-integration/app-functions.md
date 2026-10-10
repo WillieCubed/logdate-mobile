@@ -105,17 +105,47 @@ through Android's own registry.
 
 ## Cross-device: Handoff
 
-Android 17 Handoff lets an activity continue on another of the person's Android devices. `MainActivity`
-already opts in (`MainActivity+Handoff.kt`); the web fallback stays off until logdate.app can rebuild
-app state from a URL.
+Android 17 Handoff lets an activity continue on another of the person's Android devices. While an
+activity is open, Android shows its app icon on the person's other nearby devices; picking it there
+opens the same activity on that device. `MainActivity` opts in (`MainActivity+Handoff.kt`); the web
+fallback stays off until logdate.app can rebuild app state from a URL.
 
-Extending Handoff to `EditorActivity`, so an unfinished entry continues on another device, is not
-built yet. Drafts do sync between devices (`DraftUploader` and `DraftDownloader` in `client/sync`),
-but on the sync schedule, not the moment the person moves. A handoff that arrives before its draft
-would open an empty editor. Editor Handoff needs two more pieces first:
+### Editor Handoff
 
-- uploading the open draft when Android asks for handoff data, in `onHandoffActivityDataRequested`;
-- on the receiving device, opening the editor with the draft id and waiting for that draft to download,
-  with a visible "waiting for your draft" state and a specific error if it never arrives.
+With `EDITOR_HANDOFF` on, an editor window can move too: start an entry on the phone, pick LogDate on
+the tablet, and the tablet opens the same unfinished entry.
 
-It also needs two devices signed in to the same account to verify, which one emulator cannot show.
+The hard part is that Handoff carries only a small bundle of extras, never the entry itself. The entry
+travels as a **draft** through backup's draft sync (`DraftUploader` and `DraftDownloader` in
+`client/sync`), which normally runs on backup's schedule. So the two devices each do one extra thing:
+
+- **The sending device** (`EditorActivity.onHandoffActivityDataRequested`) puts the draft's id in the
+  extras (`editorHandoffFor` decides what to hand off). When the request is active, meaning the
+  person just picked LogDate on the other device, it also saves the latest text and runs draft sync
+  at once, instead of waiting for backup's schedule. An empty editor hands off as a new entry. Text
+  typed in the last couple of seconds, before autosave made its first draft, cannot be handed off
+  yet; Android shows that Handoff failed, and trying again a moment later works.
+- **The receiving device** opens `EditorActivity` with that id (`EXTRA_HANDOFF_DRAFT_ID`).
+  `HandoffDraftGate` opens the draft at once when it is already on the device. Otherwise
+  `HandoffDraftReceiver` runs draft sync every few seconds for up to a minute, through the
+  `DraftRefresher` interface that `SyncDraftRefresher` implements, while the editor shows that the
+  entry is on its way. If it never comes, the editor says why, with a different message for backup
+  being off, a sync error (with its message), and a draft the other device has not uploaded. Try
+  again starts the wait over, and Start a new entry stops waiting.
+
+| Opened from another device | When the draft has not arrived |
+| --- | --- |
+| ![The editor showing the handed-off entry about the ridge trail](../../../screenshots/android-os-integration/large-screens-and-desktop-windowing/editor-handoff-arrived--tablet-api37.png) | ![The editor explaining that the entry has not arrived because backup is off on this device, with Start a new entry and Try again](../../../screenshots/android-os-integration/large-screens-and-desktop-windowing/editor-handoff-missing--phone-api37.png) |
+
+The flag only controls whether an editor offers itself to other devices. An editor that a handoff
+launches always opens its draft, so a device with the flag off can still receive one.
+
+**Testing.** `HandoffDraftReceiverTest` and `HandoffDraftGateTest` (editor module) cover waiting,
+arrival, each missing reason, Try again, and Start a new entry. `EditorHandoffTest` and
+`SyncDraftRefresherTest` (compose-main) cover what is handed off and how a draft sync result maps to
+a reason. `OsSurfaceScreenshotsTest#editorHandoff` runs both ends on one Android 17 managed device: it
+types an entry, checks that the editor offers Handoff and that the offered extras name its draft
+(saved as `editor-handoff-data--<device>-api37.txt`), then launches the editor with those extras the
+way Android does on a second device. A real two-device handoff needs two devices signed in to the
+same Google account and LogDate account, which managed emulators cannot provide; that check is the
+flag's remaining step before it turns on.
