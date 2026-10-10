@@ -109,6 +109,13 @@ Android 17 Handoff lets an activity continue on another of the person's Android 
 already opts in (`MainActivity+Handoff.kt`); the web fallback stays off until logdate.app can rebuild
 app state from a URL.
 
-Extending Handoff to `EditorActivity`, so an unfinished entry continues on another device, requires
-drafts to sync between devices. Whether they do is checked against `client/sync` before this ships,
-and the result is recorded here.
+Extending Handoff to `EditorActivity`, so an unfinished entry continues on another device, is not
+built yet. Drafts do sync between devices (`DraftUploader` and `DraftDownloader` in `client/sync`),
+but on the sync schedule, not the moment the person moves. A handoff that arrives before its draft
+would open an empty editor. Editor Handoff needs two more pieces first:
+
+- uploading the open draft when Android asks for handoff data, in `onHandoffActivityDataRequested`;
+- on the receiving device, opening the editor with the draft id and waiting for that draft to download,
+  with a visible "waiting for your draft" state and a specific error if it never arrives.
+
+It also needs two devices signed in to the same account to verify, which one emulator cannot show.
