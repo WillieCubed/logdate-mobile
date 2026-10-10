@@ -8,6 +8,14 @@
         android:name="android.software.companion_device_setup"
         android:required="false" />
 
+    <!--
+        Chromebooks and desktops without a touchscreen can install LogDate; it works with a
+        keyboard, mouse, or trackpad. See large-screens-and-desktop-windowing.md.
+    -->
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false" />
+
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_COMPANION_PROFILE_WATCH" />
 
@@ -41,11 +49,12 @@
         <activity
             android:name="app.logdate.client.MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.LogDate"
+            android:theme="@style/Theme.LogDate.Starting"
             android:enableOnBackInvokedCallback="true"
             android:documentLaunchMode="intoExisting"
             android:supportsPictureInPicture="true"
             android:resizeableActivity="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|density|keyboard|keyboardHidden|navigation"
             android:windowSoftInputMode="adjustResize">
             <meta-data
                 android:name="android.app.shortcuts"
@@ -146,7 +155,6 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
-            <!-- TODO: Support sharing images -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <action android:name="android.intent.action.SEND_MULTIPLE" />
@@ -178,10 +186,19 @@
             android:documentLaunchMode="always"
             android:windowSoftInputMode="adjustResize"
             android:resizeableActivity="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|density|keyboard|keyboardHidden|navigation"
             android:taskAffinity=".editor">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
             </intent-filter>
+            <!-- Launchers and the taskbar offer "New window" for the editor. -->
+            <property
+                android:name="android.window.PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI"
+                android:value="true" />
+            <!-- Keeps a floating or freeform editor window large enough to write in. -->
+            <layout
+                android:minWidth="280dp"
+                android:minHeight="320dp" />
         </activity>
 
         <!--

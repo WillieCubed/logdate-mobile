@@ -2,10 +2,11 @@
 
 Status: partial.
 
-- **Ships today:** Ctrl/Cmd+F opens Search from anywhere, and the postcard canvas and media viewer
-  have local keys. Text drag sources exist in the timeline and search results.
-- **Planned:** the shared shortcut catalog, right-click menus, tooltips, media drag in and out, and
-  stylus verification.
+- **Built:** the shared shortcut catalog (Compose handlers and Android's Meta+/ helper), right-click
+  menus at the pointer, tooltips on the workspace account button, dropping text and media from other
+  apps into the editor, and dragging photos and videos out as real files.
+- **Planned:** desktop menu bar entries from the catalog, a new-window shortcut, and stylus
+  verification.
 
 ## What it is
 
@@ -27,14 +28,14 @@ those devices people expect the same input conventions as any desktop app:
 | Shortcut | Action | Where |
 | --- | --- | --- |
 | Ctrl+N | New entry | Anywhere |
-| Ctrl+Shift+N | New editor window | Anywhere |
 | Ctrl+Shift+R | Record a voice entry | Anywhere |
-| Ctrl+F | Search | Anywhere (ships today) |
+| Ctrl+F | Search | Anywhere |
 | Ctrl+, | Settings | Anywhere |
-| Ctrl+1 to Ctrl+5 | Timeline, Places, Journals, Library, Rewind | Home |
-| Ctrl+S | Save | Editor |
-| Ctrl+Enter | Save and close | Editor |
-| Esc | Close | Editor |
+| Ctrl+S | Save entry | Editor |
+| Esc | Close the editor | Editor |
+| Ctrl+1 to Ctrl+5 | Open the first to fifth Home tab, in the order the navigation shows them | Home |
+
+Planned: Ctrl+Shift+N for a new editor window.
 
 On macOS desktop builds, Cmd replaces Ctrl. Pressing Meta+/ on Android lists all of these under
 LogDate.
@@ -59,37 +60,49 @@ tooltip states, drop states, and a cross-app drag on a tablet.
 
 ### One shortcut catalog
 
-`AppKeyboardShortcuts` (commonMain) lists each action with its key chord, label, and group. Three
-places read it, so a shortcut is defined once:
+`AppKeyboardShortcut` in `client/ui/src/commonMain/kotlin/app/logdate/ui/keyboard/AppKeyboardShortcuts.kt`
+lists each action with its key chord, label, and scope (`App` or `Editor`). A chord's "primary"
+modifier matches either Ctrl or Command, so one catalog works on every platform. Three places read
+it, so a shortcut is defined once:
 
 1. **The Compose key handler.** It replaces the single Ctrl+F handler in
    `app/compose-main/src/commonMain/kotlin/app/logdate/navigation/LogDateNavDisplay.kt` with a lookup
    in the catalog.
 2. **`onProvideKeyboardShortcuts`** in `MainActivity` and `EditorActivity`. Android calls it when the
-   person opens the shortcut helper, and it returns `KeyboardShortcutGroup`s built from the catalog.
-3. **The desktop `MenuBar`** in `app/compose-main/src/desktopMain/.../MainWindow.kt` and
-   `EditorWindow.kt`.
+   person opens the shortcut helper, and `appKeyboardShortcutGroups` (client/ui androidMain) turns
+   the catalog into `KeyboardShortcutGroup`s named "LogDate" and "Entry editor".
+3. **The editor**, whose `EntryEditorContent` handles the `Editor` scope: Ctrl+S saves when the
+   Save button would, and Esc behaves like the back button.
+4. **Home**, whose `HomeScreen` handles the `Home` scope. Each tab shortcut carries a `homeTabIndex`,
+   counted in the visible tabs, so Ctrl+4 still opens the fourth tab shown when Library is hidden.
+
+Desktop builds get the `App` shortcuts through the same Compose handler. Listing them in the desktop
+`MenuBar` is planned.
 
 The editor's shortcuts are scoped to the editor, so they never fight with text editing keys.
 
 ### Right-click
 
-`ContextMenuArea` is an expect/actual in `client/ui`. Its Android version opens only on long-press
-today. It also opens on secondary click, using the same pointer handling as
-`UniversalSearchResultItem.kt`, which already checks `event.buttons.isSecondaryPressed`.
+`ContextMenuArea` is an expect/actual in `client/ui`. Its Android version opens on long-press and on
+a secondary click. A right-click menu opens at the pointer: `contextMenuOffset` converts the click
+position into the dropdown's offset from the item's bottom-left corner. Journal covers offer "Open
+journal", plus "New entry in a new window" where the device supports more than one window.
+
+`IconTooltip` (client/ui) names icon-only controls on hover and long-press. The workspace account
+button uses it.
 
 ### Drag and drop
 
-- **Into the editor.** The editor gets a `Modifier.dragAndDropTarget` that accepts `text/*`,
-  `image/*`, `video/*`, and `audio/*`. Content URIs from other apps need
-  `requestDragAndDropPermissions` before they can be read. Then they go through the same
-  `ManagedMediaImporter` path as shared files in `IncomingShare.kt`, which includes rollback if an
-  import fails partway. The text field also gets `Modifier.contentReceiver` for paste and keyboard
-  media.
-- **Out of LogDate.** `DragAndDrop.android.kt` in `client/ui` sends a `ClipData` with a content URI
-  from the app's FileProvider (`${applicationId}.provider`). It sets the drag flags
-  `DRAG_FLAG_GLOBAL | DRAG_FLAG_GLOBAL_URI_READ`, so the receiving app may read it. Today media drags
-  send the URI as plain text, which other apps cannot open.
+- **Into the editor.** `entryDropTarget` (editor module) accepts `text/*`, `image/*`, `video/*`, and
+  `audio/*`; `routeDroppedItems` splits a drop into media and text and ignores anything else. Content
+  URIs from other apps need `requestDragAndDropPermissions`, and that permission ends when released,
+  so each file is copied into LogDate's private store through `ManagedMediaImporter` (the same path
+  shared files use) before the permission is released. While an acceptable drag hovers, the editor
+  draws a primary-color outline. Paste and keyboard media through `contentReceiver` are planned.
+- **Out of LogDate.** `mediaDragSource` in `client/ui` sends a `ClipData` with a content URI from the
+  app's FileProvider (`${applicationId}.provider`, which covers the private media store) and the
+  file's MIME type. It sets `DRAG_FLAG_GLOBAL | DRAG_FLAG_GLOBAL_URI_READ`, so the receiving app may
+  read that one file. Library thumbnails use it.
 
 ### Stylus
 

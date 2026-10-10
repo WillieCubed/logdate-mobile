@@ -100,6 +100,8 @@ kotlin {
             implementation(libs.google.maps.compose)
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.window)
+            // FileProvider, for dragging media out to other apps.
+            implementation(libs.androidx.core.ktx)
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)

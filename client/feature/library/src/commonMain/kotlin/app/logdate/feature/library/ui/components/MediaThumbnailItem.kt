@@ -37,7 +37,7 @@ import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.common.ContextMenuArea
 import app.logdate.ui.common.ContextMenuItem
 import app.logdate.ui.common.focusableWithRing
-import app.logdate.ui.common.noteDragSource
+import app.logdate.ui.common.mediaDragSource
 import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.util.formatDateLocalized
@@ -116,7 +116,7 @@ fun MediaThumbnailItem(
                             Modifier
                         },
                     ).hoverable(interactionSource)
-                    .noteDragSource(item.uri)
+                    .mediaDragSource(item.uri)
                     .focusableWithRing()
                     .clickable { onItemClick(item.uid) },
         ) {

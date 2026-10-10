@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Keyboard shortcut labels, shown in Android's shortcut helper (Meta+/) and desktop menus. -->
+    <string name="keyboard_shortcuts_app_group">LogDate</string>
+    <string name="keyboard_shortcuts_editor_group">Entry editor</string>
+    <string name="keyboard_shortcuts_home_group">Home</string>
+    <string name="keyboard_shortcut_new_entry">New entry</string>
+    <string name="keyboard_shortcut_record_voice">Record a voice entry</string>
+    <string name="keyboard_shortcut_search">Search</string>
+    <string name="keyboard_shortcut_settings">Settings</string>
+    <string name="keyboard_shortcut_save_entry">Save entry</string>
+    <string name="keyboard_shortcut_close_editor">Close the editor</string>
+    <string name="keyboard_shortcut_home_tab_1">Open the first Home tab</string>
+    <string name="keyboard_shortcut_home_tab_2">Open the second Home tab</string>
+    <string name="keyboard_shortcut_home_tab_3">Open the third Home tab</string>
+    <string name="keyboard_shortcut_home_tab_4">Open the fourth Home tab</string>
+    <string name="keyboard_shortcut_home_tab_5">Open the fifth Home tab</string>
+</resources>

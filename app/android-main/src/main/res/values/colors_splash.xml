@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The launcher icon's background brown, so the splash and the icon read as one object. -->
+    <color name="logdate_splash_background">#3B2929</color>
+</resources>

@@ -2,14 +2,23 @@ package app.logdate.ui.common
 
 import android.content.ClipData
 import android.content.ClipDescription
+import android.content.Context
+import android.net.Uri
+import android.view.View
+import android.webkit.MimeTypeMap
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.DragAndDropTarget
 import androidx.compose.ui.draganddrop.DragAndDropTransferData
 import androidx.compose.ui.draganddrop.toAndroidDragEvent
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import io.github.aakira.napier.Napier
+import java.io.File
 
 @OptIn(ExperimentalFoundationApi::class)
 actual fun Modifier.noteDragSource(text: String): Modifier =
@@ -55,4 +64,42 @@ actual fun Modifier.noteDropTarget(onDrop: (String) -> Unit): Modifier {
         },
         target = target,
     )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+actual fun Modifier.mediaDragSource(uri: String): Modifier {
+    val context = LocalContext.current
+    return this.dragAndDropSource { _ ->
+        val shareable = context.shareableMediaUri(uri)
+        if (shareable == null) {
+            DragAndDropTransferData(clipData = ClipData.newPlainText("media", uri))
+        } else {
+            val mimeType =
+                context.contentResolver.getType(shareable)
+                    ?: MimeTypeMap.getSingleton().getMimeTypeFromExtension(MimeTypeMap.getFileExtensionFromUrl(uri))
+                    ?: "application/octet-stream"
+            DragAndDropTransferData(
+                clipData = ClipData(ClipDescription("LogDate media", arrayOf(mimeType)), ClipData.Item(shareable)),
+                flags = View.DRAG_FLAG_GLOBAL or View.DRAG_FLAG_GLOBAL_URI_READ,
+            )
+        }
+    }
+}
+
+/**
+ * A content URI another app may read for [uri]. App-private files are exposed through the app's
+ * FileProvider; content URIs pass through; anything else returns null.
+ */
+private fun Context.shareableMediaUri(uri: String): Uri? {
+    val parsed = Uri.parse(uri)
+    return when (parsed.scheme) {
+        "content" -> parsed
+        "file", null ->
+            runCatching {
+                FileProvider.getUriForFile(this, "$packageName.provider", File(requireNotNull(parsed.path)))
+            }.onFailure { error -> Napier.w("Media at $uri is outside the shareable folders", error) }
+                .getOrNull()
+        else -> null
+    }
 }

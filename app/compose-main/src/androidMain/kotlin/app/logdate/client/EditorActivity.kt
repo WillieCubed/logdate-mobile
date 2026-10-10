@@ -1,8 +1,12 @@
 package app.logdate.client
 
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import android.view.KeyboardShortcutGroup
+import android.view.Menu
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -11,15 +15,22 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.window.layout.WindowMetricsCalculator
+import app.logdate.client.editor.editorWindowTitle
 import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.feature.editor.ui.NoteEditorScreen
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
+import app.logdate.feature.editor.ui.editor.TextBlockUiState
+import app.logdate.ui.keyboard.AppShortcutScope
+import app.logdate.ui.keyboard.appKeyboardShortcutGroups
 import app.logdate.ui.theme.LogDateTheme
 import io.github.aakira.napier.Napier
 import io.github.vinceglb.filekit.core.FileKit
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
+import studio.hypertext.logdate.R
 import kotlin.uuid.Uuid
 
 /**
@@ -73,6 +84,7 @@ class EditorActivity : FragmentActivity() {
 
         // Set up lifecycle-aware operations
         setupLifecycleHandling()
+        followWindowTitle(isExistingEntry = entryId != null)
 
         setContent {
             LogDateTheme {
@@ -91,6 +103,41 @@ class EditorActivity : FragmentActivity() {
                 )
             }
         }
+    }
+
+    /**
+     * Names this window after the first line of the entry, so several editor windows can be told
+     * apart in Recents, the taskbar, and desktop caption bars.
+     */
+    private fun followWindowTitle(isExistingEntry: Boolean) {
+        val fallback = getString(if (isExistingEntry) R.string.editor_window_existing_entry else R.string.editor_window_new_entry)
+        lifecycleScope.launch {
+            viewModel.editorState
+                .map { state ->
+                    editorWindowTitle(
+                        state.blocks
+                            .filterIsInstance<TextBlockUiState>()
+                            .firstOrNull()
+                            ?.content,
+                    ) ?: fallback
+                }.distinctUntilChanged()
+                .collect { title -> setTaskTitle(title) }
+        }
+    }
+
+    private fun setTaskTitle(title: String) {
+        val description =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ActivityManager.TaskDescription
+                    .Builder()
+                    .setLabel(title)
+                    .build()
+            } else {
+                @Suppress("DEPRECATION")
+                ActivityManager.TaskDescription(title)
+            }
+        setTaskDescription(description)
+        this.title = title
     }
 
     /**
@@ -199,5 +246,15 @@ class EditorActivity : FragmentActivity() {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT)
                 addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
             }
+    }
+
+    /** Lists LogDate's keyboard shortcuts in Android's shortcut helper (Meta+/). */
+    override fun onProvideKeyboardShortcuts(
+        data: MutableList<KeyboardShortcutGroup>,
+        menu: Menu?,
+        deviceId: Int,
+    ) {
+        super.onProvideKeyboardShortcuts(data, menu, deviceId)
+        data += appKeyboardShortcutGroups(listOf(AppShortcutScope.Editor, AppShortcutScope.App))
     }
 }

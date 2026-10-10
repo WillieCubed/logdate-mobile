@@ -2,6 +2,7 @@ package app.logdate.client.editor
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import androidx.window.layout.WindowInfoTracker
 import androidx.window.layout.WindowLayoutInfo
@@ -21,10 +22,17 @@ class EditorManager(
 ) {
     fun supportsMultiWindow(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
 
+    /**
+     * Opens a new entry in its own window.
+     *
+     * @param adjacent Ask Android to place the window beside the current one, for split screen and
+     *   wide windows. Android ignores the request where there is no room.
+     */
     fun openNewEditorWindow(
         initialText: String? = null,
         attachments: List<String>? = null,
         journalIds: List<Uuid> = emptyList(),
+        adjacent: Boolean = false,
     ) {
         try {
             val intent =
@@ -34,6 +42,7 @@ class EditorManager(
                     attachments = attachments,
                     journalIds = journalIds,
                 )
+            if (adjacent) intent.addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT)
             context.startActivity(intent)
             Napier.d("Launched new editor window")
         } catch (e: Exception) {

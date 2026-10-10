@@ -86,10 +86,10 @@ A row reaches `[done]` only when its Evidence column lists:
 | `[done]` | `app.logdate.action.CAPTURE` and `logdate://capture` resolve to the editor; legacy widget and ambient extras keep resolving | `CaptureLaunch.kt` and `DeepLinkResolver`; `CaptureLaunchTest`, `MainActivityNavIntentResolverTest`. Used by the launcher shortcuts and tiles in the system UI captures. |
 | `[done]` | OS integration flags exist with debug-only toggles | Six flags in `FeatureFlag.kt` (`FeatureFlagStoreTest`); toggles in Developer tools > Feature previews. Lane 1: `Flow20_02_FeaturePreviewsScreenshots.kt` and the desktop `feature-previews` scene. |
 | `[done]` | `PlatformComponentToggler` enables and disables flagged manifest components | `PlatformComponentToggler` with `PlatformComponentTogglerTest`. Tiles, the bubble activity, and its receiver are declared disabled; the API 37 captures show them appearing once their flags are on. |
-| `[todo]` | Manifest declares the touchscreen as optional, `configChanges`, editor `<layout>` minimums, and multi-instance support | |
+| `[done]` | Manifest declares the touchscreen as optional, `configChanges`, editor `<layout>` minimums, and multi-instance support | `touchscreen` optional, `configChanges` on both activities, editor `<layout>` minimums, and `PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI`. |
 | `[todo]` | `ShareReceiver` declares no SEND filters it cannot receive | |
-| `[todo]` | Editor windows are titled in Recents, the taskbar, and desktop captions | |
-| `[todo]` | The compat splash screen on API 30 matches Android 12+ | |
+| `[partial]` | Editor windows are titled in Recents, the taskbar, and desktop captions | `editorWindowTitle` (`EditorWindowTitleTest`) sets the task title from the entry. Missing: Recents and taskbar capture. |
+| `[partial]` | The compat splash screen on API 30 matches Android 12+ | `Theme.LogDate.Starting` with the launcher brown and foreground. Missing: API 30 and API 37 cold-start captures. |
 
 ## Launcher Shortcuts and Direct Share
 
@@ -133,17 +133,17 @@ A row reaches `[done]` only when its Evidence column lists:
 
 | Status | Requirement | Evidence |
 | --- | --- | --- |
-| `[partial]` | One keyboard shortcut catalog drives Compose handlers, the Meta+/ helper, and desktop menus | Ctrl/Cmd+F opens Search today (`LogDateNavDisplay.kt`). No `KeyboardShortcutGroup` exists. |
-| `[todo]` | Right-click opens context menus at the pointer; icon-only actions have tooltips | |
-| `[todo]` | Text, photos, videos, and audio can be dropped or pasted into the editor | |
-| `[todo]` | Photos and videos drag out as readable content URIs | |
+| `[partial]` | One keyboard shortcut catalog drives Compose handlers, the Meta+/ helper, and desktop menus | `AppKeyboardShortcut` drives the Compose handlers (Ctrl+N, Ctrl+Shift+R, Ctrl+F, Ctrl+Comma, Ctrl+1 to 5, editor Ctrl+S and Esc) and the Meta+/ groups; `AppKeyboardShortcutsTest`. Missing: desktop menu bar and the Meta+/ capture. |
+| `[partial]` | Right-click opens context menus at the pointer; icon-only actions have tooltips | Secondary click opens `ContextMenuArea` at the pointer (`ContextMenuPlacementTest`); `IconTooltip` on the account action and the recorder bubble. Missing: Lane 1 menu and tooltip references. |
+| `[partial]` | Text, photos, videos, and audio can be dropped or pasted into the editor | `entryDropTarget` with `routeDroppedItems` (`EntryDropTest`); media is copied into the private store before the drag permission ends. Missing: paste through `contentReceiver` and a cross-app drag capture. |
+| `[partial]` | Photos and videos drag out as readable content URIs | `mediaDragSource` sends FileProvider URIs with global read flags from Library thumbnails. Missing: cross-app drag capture. |
 | `[todo]` | Stylus handwriting works in the editor | |
 
 ## Large Screens and Desktop Windowing
 
 | Status | Requirement | Evidence |
 | --- | --- | --- |
-| `[partial]` | Entries and journals open in a new window, beside the current one when there is room | `EditorActivity` and `EditorManager` ship today, covered by `MultiWindowEditorE2ETest`. The "Open in new window" action is missing. |
+| `[partial]` | Entries and journals open in a new window, beside the current one when there is room | Journal menus offer "New entry in a new window", opened adjacent with `FLAG_ACTIVITY_LAUNCH_ADJACENT`. Missing: side-by-side capture. |
 | `[todo]` | The workspace app bar sits in the desktop caption bar | |
 
 ## AppFunctions and Cross-Device

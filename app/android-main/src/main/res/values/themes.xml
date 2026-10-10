@@ -2,4 +2,15 @@
 <resources>
 
     <style name="Theme.LogDate" parent="Theme.Material3.DayNight.NoActionBar" />
+
+    <!--
+        Cold-start theme for MainActivity. Extending Theme.SplashScreen gives Android 11 the same
+        branded splash (launcher icon on the brand brown) that Android 12 and later draw natively;
+        installSplashScreen() then switches to postSplashScreenTheme.
+    -->
+    <style name="Theme.LogDate.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/logdate_splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground_shadowed</item>
+        <item name="postSplashScreenTheme">@style/Theme.LogDate</item>
+    </style>
 </resources>

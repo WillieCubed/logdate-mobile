@@ -14,13 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.isMetaPressed
-import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.navigation3.runtime.NavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -58,6 +52,7 @@ import app.logdate.feature.core.settings.navigation.WatchTroubleshootingRoute
 import app.logdate.feature.core.settings.navigation.settingsEntries
 import app.logdate.feature.core.settings.navigation.watchEntries
 import app.logdate.feature.core.sync.navigation.syncIssuesEntry
+import app.logdate.feature.editor.navigation.EditorLaunchMode
 import app.logdate.feature.editor.navigation.EntryEditorRoute
 import app.logdate.feature.editor.navigation.editorEntry
 import app.logdate.feature.events.navigation.EventDetailRoute
@@ -91,6 +86,8 @@ import app.logdate.navigation.scenes.HomeSceneStrategy
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.audio.AudioPlaybackProvider
+import app.logdate.ui.keyboard.AppKeyboardShortcut
+import app.logdate.ui.keyboard.AppShortcutScope
 import app.logdate.ui.navigation.taggedEntry
 import app.logdate.ui.platform.DefaultLogDateHaptics
 import app.logdate.ui.platform.LocalLogDateHaptics
@@ -214,15 +211,19 @@ fun LogDateNavDisplay(
                                         enabled = backStack.size > 1,
                                         onBack = { backStack.removeLastOrNull() },
                                     ).onPreviewKeyEvent { event ->
-                                        if (event.type == KeyEventType.KeyDown &&
-                                            (event.isMetaPressed || event.isCtrlPressed) &&
-                                            event.key == Key.F &&
-                                            backStack.lastOrNull() != SearchRoute()
-                                        ) {
-                                            backStack.add(SearchRoute())
-                                            true
-                                        } else {
+                                        val target =
+                                            when (AppKeyboardShortcut.match(event, AppShortcutScope.App)) {
+                                                AppKeyboardShortcut.NewEntry -> EntryEditorRoute()
+                                                AppKeyboardShortcut.RecordVoice -> EntryEditorRoute(launchMode = EditorLaunchMode.Voice)
+                                                AppKeyboardShortcut.Search -> SearchRoute()
+                                                AppKeyboardShortcut.Settings -> SettingsRoute()
+                                                else -> null
+                                            }
+                                        if (target == null || appUiState.requiresUnlock || !appUiState.isOnboarded) {
                                             false
+                                        } else {
+                                            if (backStack.lastOrNull() != target) backStack.add(target)
+                                            true
                                         }
                                     },
                             entryDecorators =

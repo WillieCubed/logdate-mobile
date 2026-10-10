@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Editor window titles in Recents, the taskbar, and desktop caption bars. -->
+    <string name="editor_window_new_entry">New entry</string>
+    <string name="editor_window_existing_entry">Entry</string>
+</resources>

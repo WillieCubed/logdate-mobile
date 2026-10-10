@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.IconTooltip
 import app.logdate.ui.theme.WorkspaceSurface
 import app.logdate.ui.theme.workspaceContainer
 import logdate.client.ui.generated.resources.Res
@@ -47,39 +48,41 @@ fun WorkspaceAccountAction(
     var expanded by rememberSaveable { mutableStateOf(false) }
     val label = stringResource(Res.string.workspace_account_label)
     Box(modifier) {
-        IconButton(
-            onClick = { expanded = true },
-            modifier =
-                Modifier.testTag("workspace_account").semantics {
-                    contentDescription = label
-                    statusDescription?.let { stateDescription = it }
-                },
-        ) {
-            Box(Modifier.size(32.dp)) {
-                Icon(Icons.Default.AccountCircle, null, Modifier.matchParentSize())
-                if (indicator != WorkspaceAccountIndicator.None) {
-                    Icon(
-                        when (indicator) {
-                            WorkspaceAccountIndicator.Working -> Icons.Default.Sync
-                            WorkspaceAccountIndicator.Waiting -> Icons.Default.CloudUpload
-                            else -> Icons.Default.ErrorOutline
-                        },
-                        contentDescription = null,
-                        tint =
-                            if (indicator ==
-                                WorkspaceAccountIndicator.Attention
-                            ) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
+        IconTooltip(label = label) {
+            IconButton(
+                onClick = { expanded = true },
+                modifier =
+                    Modifier.testTag("workspace_account").semantics {
+                        contentDescription = label
+                        statusDescription?.let { stateDescription = it }
+                    },
+            ) {
+                Box(Modifier.size(32.dp)) {
+                    Icon(Icons.Default.AccountCircle, null, Modifier.matchParentSize())
+                    if (indicator != WorkspaceAccountIndicator.None) {
+                        Icon(
+                            when (indicator) {
+                                WorkspaceAccountIndicator.Working -> Icons.Default.Sync
+                                WorkspaceAccountIndicator.Waiting -> Icons.Default.CloudUpload
+                                else -> Icons.Default.ErrorOutline
                             },
-                        modifier =
-                            Modifier
-                                .align(Alignment.BottomEnd)
-                                .size(16.dp)
-                                .background(MaterialTheme.colorScheme.workspaceContainer(WorkspaceSurface.Canvas), CircleShape)
-                                .padding(2.dp),
-                    )
+                            contentDescription = null,
+                            tint =
+                                if (indicator ==
+                                    WorkspaceAccountIndicator.Attention
+                                ) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(16.dp)
+                                    .background(MaterialTheme.colorScheme.workspaceContainer(WorkspaceSurface.Canvas), CircleShape)
+                                    .padding(2.dp),
+                        )
+                    }
                 }
             }
         }

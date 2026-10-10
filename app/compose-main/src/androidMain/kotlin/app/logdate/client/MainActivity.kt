@@ -8,13 +8,15 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.os.Bundle
+import android.view.KeyboardShortcutGroup
 import android.view.Menu
-import android.view.MenuItem
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
@@ -58,6 +60,9 @@ import app.logdate.feature.core.restore.AndroidRestoreLauncher
 import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
 import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
 import app.logdate.navigation.LogDateNavDisplay
+import app.logdate.ui.common.LocalEditorWindows
+import app.logdate.ui.keyboard.AppShortcutScope
+import app.logdate.ui.keyboard.appKeyboardShortcutGroups
 import io.github.aakira.napier.Napier
 import io.github.vinceglb.filekit.core.FileKit
 import kotlinx.coroutines.delay
@@ -172,18 +177,20 @@ class MainActivity : FragmentActivity() {
         setContent {
             val state = appUiState as? GlobalAppUiLoadedState
             if (state != null) {
-                MainActivityContent(
-                    state = state,
-                    pendingNavKey = pendingNavKey,
-                    onPendingNavKeyConsumed = { pendingNavKey = null },
-                    onCurrentNavKeyChanged = { currentNavKey = it },
-                    onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
-                    onCloudSignIn = viewModel::requestCloudRestoreAfterSignIn,
-                    onShareSearchResult = ::shareSearchResult,
-                    updateController = playInAppUpdateController,
-                    onLaunchUpdate = { checkForUpdates(AppUpdateCheckTrigger.Manual) },
-                    onCompleteUpdate = { lifecycleScope.launch { playInAppUpdateController.completeUpdate() } },
-                )
+                CompositionLocalProvider(LocalEditorWindows provides remember { editorWindows() }) {
+                    MainActivityContent(
+                        state = state,
+                        pendingNavKey = pendingNavKey,
+                        onPendingNavKeyConsumed = { pendingNavKey = null },
+                        onCurrentNavKeyChanged = { currentNavKey = it },
+                        onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
+                        onCloudSignIn = viewModel::requestCloudRestoreAfterSignIn,
+                        onShareSearchResult = ::shareSearchResult,
+                        updateController = playInAppUpdateController,
+                        onLaunchUpdate = { checkForUpdates(AppUpdateCheckTrigger.Manual) },
+                        onCompleteUpdate = { lifecycleScope.launch { playInAppUpdateController.completeUpdate() } },
+                    )
+                }
             }
         }
         markLaunchStage(LaunchStage.ComposeAttached)
@@ -283,18 +290,6 @@ class MainActivity : FragmentActivity() {
         resolveMainActivityNavKey(intent)?.let { pendingNavKey = it }
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        createMultiWindowMenuOptions(menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (handleMultiWindowMenuSelection(item)) {
-            return true
-        }
-        return super.onOptionsItemSelected(item)
-    }
-
     @SuppressLint("NewApi")
     override fun onHandoffActivityDataRequested(info: HandoffActivityDataRequestInfo): HandoffActivityData? {
         val url = currentNavKey?.toWebUrl() ?: return null
@@ -372,6 +367,16 @@ class MainActivity : FragmentActivity() {
     private fun markLaunchStage(stage: LaunchStage) {
         if (!launchTracker.mark(stage)) return
         Napier.i("MainActivity launch stage: ${stage.analyticsName}", tag = APP_LAUNCH_TAG)
+    }
+
+    /** Lists LogDate's keyboard shortcuts in Android's shortcut helper (Meta+/). */
+    override fun onProvideKeyboardShortcuts(
+        data: MutableList<KeyboardShortcutGroup>,
+        menu: Menu?,
+        deviceId: Int,
+    ) {
+        super.onProvideKeyboardShortcuts(data, menu, deviceId)
+        data += appKeyboardShortcutGroups(listOf(AppShortcutScope.App, AppShortcutScope.Home, AppShortcutScope.Editor))
     }
 }
 

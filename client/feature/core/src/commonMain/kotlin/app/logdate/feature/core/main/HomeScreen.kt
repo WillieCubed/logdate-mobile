@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
@@ -54,6 +55,8 @@ import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.audio.TranscriptionProvider
 import app.logdate.ui.common.applyScreenStyles
 import app.logdate.ui.common.transitions.TransitionKeys
+import app.logdate.ui.keyboard.AppKeyboardShortcut
+import app.logdate.ui.keyboard.AppShortcutScope
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.platform.currentPlatform
 import app.logdate.ui.streak.CampfireChip
@@ -117,6 +120,14 @@ fun HomeScreen(
             currentDestination = HomeRouteDestination.Timeline
         }
     }
+    // Ctrl+1 to Ctrl+5 open the Home tabs in the order the navigation shows them.
+    val homeKeys =
+        modifier.onPreviewKeyEvent { event ->
+            val index = AppKeyboardShortcut.match(event, AppShortcutScope.Home)?.homeTabIndex
+            val destination = index?.let(visibleDestinations::getOrNull) ?: return@onPreviewKeyEvent false
+            currentDestination = destination
+            true
+        }
     val snackbarHostState = remember { SnackbarHostState() }
     val onSyncAction: (SyncAction) -> Unit = { action ->
         when (action) {
@@ -174,7 +185,7 @@ fun HomeScreen(
                     hasMergeRecovery = mergeIssues.value.isNotEmpty(),
                 )
             },
-            modifier = modifier,
+            modifier = homeKeys,
         ) {
             val destinationContent: @Composable () -> Unit = {
                 sourceState.SaveableStateProvider(currentDestination.name) {
@@ -258,7 +269,7 @@ fun HomeScreen(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = modifier,
+        modifier = homeKeys,
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding)) {
             NavigationSuiteScaffold(

@@ -3,46 +3,21 @@
 package app.logdate.client
 
 import android.content.Intent
-import android.view.Menu
-import android.view.MenuItem
 import androidx.lifecycle.lifecycleScope
 import app.logdate.client.editor.EditorManager
 import app.logdate.client.media.MediaManager
 import app.logdate.client.shortcuts.parseLauncherShortcutTargetJournalId
+import app.logdate.ui.common.EditorWindows
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
+import kotlin.uuid.Uuid
 
 /** Initializes the multi-window feature gate without starting any background observers. */
 fun MainActivity.setupMultiWindowSupport() {
     val editorManager: EditorManager by inject()
     if (!editorManager.supportsMultiWindow()) {
         return
-    }
-}
-
-fun MainActivity.createMultiWindowMenuOptions(menu: Menu): Boolean {
-    val editorManager: EditorManager by inject()
-
-    if (editorManager.supportsMultiWindow()) {
-        menu
-            .add(Menu.NONE, MENU_ID_NEW_EDITOR, Menu.NONE, "New Editor Window")
-            .setIcon(android.R.drawable.ic_menu_add)
-            .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
-    }
-
-    return true
-}
-
-fun MainActivity.handleMultiWindowMenuSelection(item: MenuItem): Boolean {
-    val editorManager: EditorManager by inject()
-
-    return when (item.itemId) {
-        MENU_ID_NEW_EDITOR -> {
-            editorManager.openNewEditorWindow()
-            true
-        }
-        else -> false
     }
 }
 
@@ -81,4 +56,20 @@ fun MainActivity.handleMultiWindowIntent(intent: Intent): Boolean {
     }
 }
 
-private const val MENU_ID_NEW_EDITOR = 1001
+/**
+ * Lets screens open entries in their own windows, or null where this device cannot show another
+ * LogDate window. New windows open beside this one in split screen or when the window is wide.
+ */
+internal fun MainActivity.editorWindows(): EditorWindows? {
+    val editorManager: EditorManager by inject()
+    if (!editorManager.supportsMultiWindow()) return null
+    return object : EditorWindows {
+        override fun openNewEntry(journalId: String?) {
+            val journalIds = listOfNotNull(journalId?.let { runCatching { Uuid.parse(it) }.getOrNull() })
+            val adjacent = isInMultiWindowMode || resources.configuration.screenWidthDp >= EXPANDED_WIDTH_DP
+            editorManager.openNewEditorWindow(journalIds = journalIds, adjacent = adjacent)
+        }
+    }
+}
+
+private const val EXPANDED_WIDTH_DP = 840

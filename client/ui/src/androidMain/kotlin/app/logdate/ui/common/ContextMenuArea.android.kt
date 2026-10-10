@@ -13,8 +13,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.DpOffset
 
+/**
+ * Opens the menu on long-press, and on a secondary (right) click from a mouse or trackpad. A
+ * right-click menu opens at the pointer, the way desktop context menus do.
+ */
 @Composable
 actual fun ContextMenuArea(
     items: List<ContextMenuItem>,
@@ -22,20 +29,38 @@ actual fun ContextMenuArea(
     content: @Composable () -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    var menuOffset by remember { mutableStateOf(DpOffset.Zero) }
 
     Box(
         modifier =
-            modifier.pointerInput(Unit) {
-                detectTapGestures(
-                    onLongPress = { showMenu = true },
-                )
-            },
+            modifier
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onLongPress = {
+                            menuOffset = DpOffset.Zero
+                            showMenu = true
+                        },
+                    )
+                }.pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
+                                val offset = contextMenuOffset(event.changes.first().position, size.height)
+                                menuOffset = DpOffset(offset.x.toDp(), offset.y.toDp())
+                                showMenu = true
+                                event.changes.forEach { it.consume() }
+                            }
+                        }
+                    }
+                },
     ) {
         content()
 
         DropdownMenu(
             expanded = showMenu,
             onDismissRequest = { showMenu = false },
+            offset = menuOffset,
         ) {
             items.forEach { item ->
                 DropdownMenuItem(

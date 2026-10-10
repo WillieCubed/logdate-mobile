@@ -15,9 +15,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.logdate.shared.model.Journal
+import app.logdate.ui.common.ContextMenuItem
+import app.logdate.ui.common.LocalEditorWindows
 import app.logdate.ui.common.centeredGridPadding
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
+import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.journal_menu_new_entry_window
+import logdate.client.feature.journal.generated.resources.journal_menu_open
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -46,7 +52,11 @@ fun JournalList(
             items(journals) { item ->
                 when (item) {
                     is JournalListItemUiState.ExistingJournal -> {
-                        JournalCover(item.data, onClick = onOpenJournal)
+                        JournalCover(
+                            item.data,
+                            onClick = onOpenJournal,
+                            contextMenuItems = journalContextMenuItems(item.data, onOpenJournal),
+                        )
                     }
 
                     is JournalListItemUiState.CreateJournalPlaceholder -> {
@@ -75,4 +85,19 @@ private fun JournalListPreview() {
             )
         }.map { JournalListItemUiState.ExistingJournal(it) }
     JournalList(journals, onOpenJournal = {}, onCreateJournal = {})
+}
+
+/** Right-click and long-press actions for a journal cover. */
+@Composable
+private fun journalContextMenuItems(
+    journal: Journal,
+    onOpenJournal: JournalClickCallback,
+): List<ContextMenuItem> {
+    val windows = LocalEditorWindows.current
+    val open = stringResource(Res.string.journal_menu_open)
+    val newWindow = stringResource(Res.string.journal_menu_new_entry_window)
+    return buildList {
+        add(ContextMenuItem(open) { onOpenJournal(journal.id) })
+        if (windows != null) add(ContextMenuItem(newWindow) { windows.openNewEntry(journal.id.toString()) })
+    }
 }
