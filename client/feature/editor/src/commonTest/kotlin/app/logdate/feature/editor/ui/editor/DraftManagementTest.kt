@@ -184,6 +184,28 @@ class DraftManagementTest {
         }
 
     @Test
+    fun `text not yet saved is handed off under the id its first draft is then saved with`() =
+        testScope.runTest {
+            val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
+            advanceUntilIdle()
+            viewModel.updateBlock(block.copy(content = "Halfway up the ridge trail"))
+
+            val handedOff = viewModel.draftIdForHandoff()
+            advanceUntilIdle()
+
+            val stored = entryDraftRepository.getDrafts().first().single()
+            assertEquals(handedOff, stored.id)
+            assertEquals(DraftState.Active(stored.id), viewModel.editorState.value.draftState)
+        }
+
+    @Test
+    fun `an empty new entry hands off no draft`() =
+        testScope.runTest {
+            advanceUntilIdle()
+            assertEquals(null, viewModel.draftIdForHandoff())
+        }
+
+    @Test
     fun `draft id survives combine reemission`() =
         testScope.runTest {
             // Create a text block with content

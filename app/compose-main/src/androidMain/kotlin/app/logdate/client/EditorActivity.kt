@@ -130,19 +130,15 @@ class EditorActivity : FragmentActivity() {
     }
 
     /**
-     * Hands this editor to another of the person's devices. When the person picks it there
-     * ([HandoffActivityDataRequestInfo.isActiveRequest]), the latest text is saved and uploaded at
-     * once instead of on backup's schedule, so the other device can fetch it while it waits.
+     * Hands this editor to another of the person's devices. Text not saved as a draft yet is handed
+     * off under the id its first draft is about to be saved with. When the person picks LogDate there
+     * ([HandoffActivityDataRequestInfo.isActiveRequest]), the latest text is also saved and uploaded
+     * at once instead of on backup's schedule, so the other device can fetch it while it waits.
      */
-    override fun onHandoffActivityDataRequested(info: HandoffActivityDataRequestInfo): HandoffActivityData? {
-        val state = viewModel.editorState.value
-        if (info.isActiveRequest) uploadDraftForHandoff(state)
-        val handoff = editorHandoffFor(state)
-        if (handoff == null) {
-            Napier.w("Handoff was requested before the entry was saved as a draft; it can be handed off once autosave runs")
-            return null
-        }
-        return editorHandoffData(handoff)
+    override fun onHandoffActivityDataRequested(info: HandoffActivityDataRequestInfo): HandoffActivityData {
+        val draftId = viewModel.draftIdForHandoff()
+        if (info.isActiveRequest) uploadDraftForHandoff(viewModel.editorState.value)
+        return editorHandoffData(draftId)
     }
 
     private fun uploadDraftForHandoff(state: EditorState) {

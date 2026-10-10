@@ -526,6 +526,20 @@ class EntryEditorViewModel(
     fun autoSaveLatestEntry() = autoSaveEntry(currentDraftPersistenceState(editorState.value))
 
     /**
+     * The id of the draft Handoff names when it offers this entry to another device, or null for an
+     * empty new entry. Text that has no draft yet gets the id its first draft will be saved under,
+     * and that save starts now, so the id can be handed off at once rather than after autosave.
+     */
+    fun draftIdForHandoff(): Uuid? {
+        val state = mutableEditorState.value
+        (state.draftState as? DraftState.Active)?.let { return it.id }
+        if (!state.hasContent()) return null
+        val draftId = draftManager.reserveDraftId()
+        autoSaveLatestEntry()
+        return draftId
+    }
+
+    /**
      * Suspends until the local draft repository finishes persisting [state].
      */
     suspend fun persistDraft(state: EditorState): Uuid? =

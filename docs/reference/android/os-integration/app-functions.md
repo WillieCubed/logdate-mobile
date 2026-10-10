@@ -126,11 +126,13 @@ travels as a **draft** through backup's draft sync (`DraftUploader` and `DraftDo
 `client/sync`), which normally runs on backup's schedule. So the two devices each do one extra thing:
 
 - **The sending device** (`EditorActivity.onHandoffActivityDataRequested`) puts the draft's id in the
-  extras (`editorHandoffFor` decides what to hand off). When the request is active, meaning the
-  person just picked LogDate on the other device, it also saves the latest text and runs draft sync
-  at once, instead of waiting for backup's schedule. An empty editor hands off as a new entry. Text
-  typed in the last couple of seconds, before autosave made its first draft, cannot be handed off
-  yet; Android shows that Handoff failed, and trying again a moment later works.
+  extras (`EntryEditorViewModel.draftIdForHandoff`). Text that autosave has not saved yet is handed
+  off under the id its first draft is about to be saved with (`DraftManager.reserveDraftId`), and
+  that save starts at once. Android also asks while the window is closing, for a copy it keeps, and
+  this way that copy names the draft even if autosave is still running. When the request is active,
+  meaning the person just picked LogDate on the other device, it also saves the latest text and runs
+  draft sync at once, instead of waiting for backup's schedule. An empty editor hands off as a new
+  entry.
 - **The receiving device** opens `EditorActivity` with that id (`EXTRA_HANDOFF_DRAFT_ID`).
   `HandoffDraftGate` opens the draft at once when it is already on the device. Otherwise
   `HandoffDraftReceiver` runs draft sync every few seconds for up to a minute, through the
@@ -148,8 +150,9 @@ launches always opens its draft, so a device with the flag off can still receive
 
 **Testing.** `HandoffDraftReceiverTest` and `HandoffDraftGateTest` (editor module) cover waiting,
 arrival, each missing reason, Try again, and Start a new entry. `EditorHandoffTest` and
-`SyncDraftRefresherTest` (compose-main) cover what is handed off and how a draft sync result maps to
-a reason. `OsSurfaceScreenshotsTest#editorHandoff` runs both ends on one Android 17 managed device: it
+`SyncDraftRefresherTest` (compose-main) cover the handed-off id and how a draft sync result maps to
+a reason, and `DraftManagementTest` checks that unsaved text is handed off under the id its draft is
+then saved with. `OsSurfaceScreenshotsTest#editorHandoff` runs both ends on one Android 17 managed device: it
 types an entry, checks that the editor offers Handoff and that the offered extras name its draft
 (saved as `editor-handoff-data--<device>-api37.txt`), then launches the editor with those extras the
 way Android does on a second device. A real two-device handoff needs two devices signed in to the

@@ -11,35 +11,12 @@ import androidx.annotation.RequiresApi
 import androidx.lifecycle.lifecycleScope
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
-import app.logdate.feature.editor.ui.editor.DraftState
-import app.logdate.feature.editor.ui.editor.EditorState
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.uuid.Uuid
 
 /** The launch extra naming the draft that an editor handed off from another device continues. */
 internal const val EXTRA_HANDOFF_DRAFT_ID = "app.logdate.extra.HANDOFF_DRAFT_ID"
-
-/** What handing an editor window to another device opens there. */
-internal sealed interface EditorHandoff {
-    /** Nothing is written yet, so the other device opens an empty editor. */
-    data object NewEntry : EditorHandoff
-
-    /** The other device opens draft [id] once backup has brought it there. */
-    data class Draft(
-        val id: Uuid,
-    ) : EditorHandoff
-}
-
-/**
- * What handing off an editor in [state] continues on the other device, or null while written text
- * has no draft yet. Drafts carry an entry between devices, and autosave creates the first one a
- * couple of seconds after typing starts.
- */
-internal fun editorHandoffFor(state: EditorState): EditorHandoff? {
-    (state.draftState as? DraftState.Active)?.let { return EditorHandoff.Draft(it.id) }
-    return if (state.hasContent()) null else EditorHandoff.NewEntry
-}
 
 /** The draft id an editor was launched to continue, when Android Handoff started it. */
 internal fun handoffDraftId(extra: String?): Uuid? = extra?.let { runCatching { Uuid.parse(it) }.getOrNull() }
@@ -59,11 +36,14 @@ internal fun EditorActivity.followEditorHandoffFlag(flags: FeatureFlagStore) {
     }
 }
 
-/** The data Android passes to the other device to open [handoff] in LogDate's editor there. */
+/**
+ * The data Android passes to the other device to open LogDate's editor there: on [draftId], or on a
+ * new entry when nothing is written yet.
+ */
 @RequiresApi(37)
-internal fun EditorActivity.editorHandoffData(handoff: EditorHandoff): HandoffActivityData {
+internal fun EditorActivity.editorHandoffData(draftId: Uuid?): HandoffActivityData {
     val extras = PersistableBundle()
-    if (handoff is EditorHandoff.Draft) extras.putString(EXTRA_HANDOFF_DRAFT_ID, handoff.id.toString())
+    if (draftId != null) extras.putString(EXTRA_HANDOFF_DRAFT_ID, draftId.toString())
     return HandoffActivityData
         .Builder(ComponentName(this, EditorActivity::class.java))
         .setExtras(extras)

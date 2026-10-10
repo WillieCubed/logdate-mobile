@@ -157,6 +157,12 @@ class DraftManager(
             Result.failure(e)
         }
 
+    /**
+     * The id the next new draft will be saved under, chosen now if no save has chosen one yet, so it
+     * can be shared before the save finishes.
+     */
+    fun reserveDraftId(): Uuid = pendingDraftId ?: Uuid.random().also { pendingDraftId = it }
+
     /** Returns the durable draft that must be removed after a successful publish or discard. */
     fun draftIdForCleanup(activeDraftId: Uuid?): Uuid? = activeDraftId ?: pendingDraftId
 
