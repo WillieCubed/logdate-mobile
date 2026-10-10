@@ -488,6 +488,14 @@ object OsSurfaceCapture {
         }
     }
 
+    /** Empties the clipboard, so the keyboard shows its tools instead of suggesting a copied item. */
+    fun clearClipboard() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            context.getSystemService(ClipboardManager::class.java).clearPrimaryClip()
+        }
+    }
+
     /**
      * Saves the debug build's sample photo to Downloads as [name], replacing a copy an earlier run
      * left, so the Files app lists it once.

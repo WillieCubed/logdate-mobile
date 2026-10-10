@@ -118,6 +118,7 @@
     <string name="use_photo">Use Photo</string>
     <string name="use_video">Use Video</string>
     <string name="undo">Undo</string>
+    <string name="paste_as_attachment">Paste as attachment</string>
     <string name="unsaved_changes">Unsaved Changes</string>
     <string name="video">Video</string>
     <string name="video_not_available_on_desktop">Video not available on Desktop</string>

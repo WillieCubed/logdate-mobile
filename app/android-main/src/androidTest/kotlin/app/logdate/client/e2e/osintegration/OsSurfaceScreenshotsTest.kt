@@ -410,6 +410,81 @@ class OsSurfaceScreenshotsTest {
     }
 
     /**
+     * A photo copied in another app, pasted into a new entry from the text menu that holding a finger
+     * on the field opens: once with the menu showing Paste, and once with the photo attached.
+     */
+    @Test fun pastePhotoFromTextMenu() {
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.copyPhotoToClipboard()
+        OsSurfaceCapture.openCapture("text")
+        OsSurfaceCapture.waitForText("Write something").click()
+        val hint = OsSurfaceCapture.waitForText("What's on your mind?")
+        // A press while the keyboard is still opening moves the field under it and drops the menu.
+        OsSurfaceCapture.device.wait(Until.hasObject(By.pkg(GBOARD_PACKAGE)), KEYBOARD_SUGGESTION_TIMEOUT_MS)
+        Thread.sleep(1_000L)
+        OsSurfaceCapture.longPress(hint)
+        val paste = OsSurfaceCapture.waitForText("Paste")
+        Thread.sleep(500L)
+        OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "paste-menu")
+        paste.click()
+        Thread.sleep(4_000L)
+        OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "paste-menu-photo")
+    }
+
+    /**
+     * A copied photo sent into a new entry by the on-screen keyboard. Gboard suggests a copied image
+     * only to a field that accepts images, and sends it as a file, the way it sends GIFs and stickers.
+     */
+    @Test fun keyboardInsertsImage() {
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.copyPhotoToClipboard()
+        OsSurfaceCapture.openCapture("text")
+        OsSurfaceCapture.waitForText("Write something").click()
+        OsSurfaceCapture.waitForText("What's on your mind?")
+        val suggestion =
+            checkNotNull(
+                OsSurfaceCapture.device.wait(Until.findObject(By.pkg(GBOARD_PACKAGE).text("Image")), KEYBOARD_SUGGESTION_TIMEOUT_MS),
+            ) { "The keyboard did not suggest the copied image" }
+        Thread.sleep(500L)
+        OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "keyboard-image-suggestion")
+        suggestion.click()
+        Thread.sleep(4_000L)
+        check(OsSurfaceCapture.device.hasObject(By.text("Add a caption..."))) { "The keyboard's image was not added to the entry" }
+        OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "keyboard-image-inserted")
+    }
+
+    /** A GIF picked from the on-screen keyboard's GIF panel and sent into a new entry. */
+    @Test fun keyboardGif() {
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.clearClipboard()
+        OsSurfaceCapture.openCapture("text")
+        OsSurfaceCapture.waitForText("Write something").click()
+        OsSurfaceCapture.waitForText("What's on your mind?")
+        val gifTab =
+            checkNotNull(
+                OsSurfaceCapture.device.wait(Until.findObject(By.pkg(GBOARD_PACKAGE).desc("GIF Keyboard")), KEYBOARD_SUGGESTION_TIMEOUT_MS),
+            ) {
+                OsSurfaceCapture.dumpHierarchy("keyboard-gif-tab")
+                "The keyboard has no GIF button"
+            }
+        gifTab.click()
+        // Gboard describes each GIF in a sentence; its tabs and categories have short names.
+        val firstGif =
+            checkNotNull(
+                OsSurfaceCapture.device.wait(Until.findObject(By.pkg(GBOARD_PACKAGE).desc(GIF_DESCRIPTION)), GIF_PANEL_TIMEOUT_MS),
+            ) {
+                OsSurfaceCapture.dumpHierarchy("keyboard-gif-panel")
+                "The keyboard's GIF panel did not load any GIFs"
+            }
+        Thread.sleep(3_000L)
+        OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "keyboard-gif-panel")
+        firstGif.click()
+        OsSurfaceCapture.waitForText("Add a caption...", timeoutMs = GIF_PANEL_TIMEOUT_MS)
+        Thread.sleep(2_000L)
+        OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "keyboard-gif-inserted")
+    }
+
+    /**
      * "hello" written with a pen in a new entry: once while the pen is still down, with the ink on
      * screen, and once after the keyboard's handwriting recognition has typed it into the entry.
      */
@@ -679,6 +754,10 @@ class OsSurfaceScreenshotsTest {
         const val WINDOWING_MODE_FREEFORM = 5
 
         /** The Files app, opened at Downloads, for the cross-app drag. */
+        const val GBOARD_PACKAGE = "com.google.android.inputmethod.latin"
+        const val KEYBOARD_SUGGESTION_TIMEOUT_MS = 15_000L
+        const val GIF_PANEL_TIMEOUT_MS = 30_000L
+        val GIF_DESCRIPTION: Pattern = Pattern.compile(".{24,}")
         const val FILES_PACKAGE = "com.google.android.documentsui"
         const val FILES_ACTIVITY = "$FILES_PACKAGE/com.android.documentsui.files.FilesActivity"
         const val DOWNLOADS_ROOT = "content://com.android.providers.downloads.documents/root/downloads"

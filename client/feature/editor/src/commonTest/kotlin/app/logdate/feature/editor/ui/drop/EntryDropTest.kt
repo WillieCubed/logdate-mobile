@@ -35,4 +35,32 @@ class EntryDropTest {
             routeDroppedItems(items),
         )
     }
+
+    @Test
+    fun `the text menu offers no media paste when the clipboard holds only text`() {
+        assertEquals(null, mediaPasteItem(listOf("text/plain")))
+        assertEquals(null, mediaPasteItem(emptyList()))
+    }
+
+    @Test
+    fun `the text menu offers Paste for a copied photo, video, or recording`() {
+        listOf("image/jpeg", "video/mp4", "audio/mpeg").forEach { mime ->
+            assertEquals(MediaPasteItem.Paste, mediaPasteItem(listOf(mime)), "$mime should paste as media")
+        }
+    }
+
+    @Test
+    fun `media copied with text is offered as an attachment beside the text Paste`() {
+        assertEquals(MediaPasteItem.PasteAsAttachment, mediaPasteItem(listOf("text/plain", "image/png")))
+    }
+
+    @Test
+    fun `keyboards may insert GIFs, stickers, and other images`() {
+        listOf("image/gif", "image/png", "image/webp", "video/mp4").forEach { mime ->
+            assertTrue(acceptsKeyboardContent(mime), "$mime should be accepted")
+        }
+        assertFalse(acceptsKeyboardContent("application/pdf"))
+        assertFalse(acceptsKeyboardContent("text/plain"))
+        assertEquals(listOf("image/*", "video/*", "audio/*"), keyboardContentMimeTypes)
+    }
 }

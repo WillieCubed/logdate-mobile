@@ -74,11 +74,33 @@ And on an entry in a day, opened beside the timeline:
 
 - Dropping text, photos, videos, or audio onto the editor adds them to the entry. A highlighted drop
   area shows while dragging over it.
-- Pasting with a keyboard (Ctrl+V) adds a copied photo, video, or audio file to the entry on
-  Android; any copied text is pasted into the text as usual. Pasting an image from the
-  touch text menu, and GIFs from on-screen keyboards, do not work yet (see How it works).
+- Pasting adds a copied photo, video, or audio file to the entry on Android, whether with a
+  keyboard (Ctrl+V) or from the text menu that holding a finger on the text opens. Any copied text
+  is pasted into the text as usual. When the clipboard holds media, the text menu shows Paste, or
+  Paste as attachment when it also holds text that the menu's own Paste inserts.
+- GIFs, stickers, and other images sent from the on-screen keyboard are added to the entry as
+  files, the same as a pasted photo, rather than as links.
 
-A photo copied in another app and pasted with Ctrl+V on a tablet with a USB keyboard:
+A photo copied in another app and pasted from the text menu on a phone:
+
+| The text menu | Once pasted |
+| --- | --- |
+| ![A new entry with the text menu open over its empty text field, showing Paste](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/paste-menu--phone-api37.png) | ![The entry with the pasted photo of a dog wrapped in a blanket](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/paste-menu-photo--phone-api37.png) |
+
+Gboard suggests a copied image only to a field that accepts images. Tapping its suggestion sends
+the photo the same way it sends a GIF or sticker:
+
+| The keyboard's suggestion | Once sent |
+| --- | --- |
+| ![A new entry with the keyboard open, suggesting the copied image above its keys](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/keyboard-image-suggestion--phone-api37.png) | ![The entry with the photo the keyboard sent](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/keyboard-image-inserted--phone-api37.png) |
+
+A GIF picked from Gboard's GIF panel arrives the same way, as a file in the entry:
+
+| The keyboard's GIF panel | Once sent |
+| --- | --- |
+| ![A new entry with Gboard's GIF panel open below it](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/keyboard-gif-panel--phone-api37.png) | ![The entry with the GIF the keyboard sent, above the still-open GIF panel](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/keyboard-gif-inserted--phone-api37.png) |
+
+The same photo pasted with Ctrl+V on a tablet with a USB keyboard:
 
 ![A new entry in the editor with the pasted photo of a dog wrapped in a blanket](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/paste-photo--tablet-api37.png)
 
@@ -189,15 +211,27 @@ bubble use it. Wrap any new icon-only button in it, with the same label as its c
   so each file is copied into LogDate's private store through `ManagedMediaImporter` (the same path
   shared files use) before the permission is released. While an acceptable drag hovers, the editor
   draws a primary-color outline.
-- **Pasting media.** `entryPasteTarget` (editor module) watches for the paste keys. When the
-  clipboard holds media, it routes the clip through the same `routeDroppedItems` and import as a
-  drop (`importIntoEntry`), and attaches the copies. It does not consume the keys, so the text field
-  still pastes any text. Compose's `Modifier.contentReceiver`, which would also handle the touch
-  paste menu and GIFs from on-screen keyboards, works only with the state-based `BasicTextField`
-  (`TextFieldState`). The editor's text block stays on the value-based field because its inline
-  Markdown styling is a `VisualTransformation`. The state-based field's `OutputTransformation` can
-  change the displayed text but cannot add styles (Compose foundation 1.11), so moving the editor
-  would drop its Markdown styling.
+- **Pasting media.** `entryPasteTarget` (editor module) handles both ways of pasting. For the
+  paste keys, it watches key events; it does not consume them, so the text field still pastes any
+  text. For the text menu, it adds an item with `appendTextContextMenuComponents`, which every text
+  field inside the modifier includes in its long-press toolbar and right-click menu. The item is
+  chosen when the menu opens, from the clipboard's description alone: reading the description,
+  unlike reading the clip, does not show Android's "pasted from your clipboard" notice.
+  `mediaPasteItem` decides between no item, Paste, and Paste as attachment (when there is also text
+  for the field's own Paste). Either way, the clip goes through the same `routeDroppedItems` and
+  import as a drop (`importIntoEntry`), and the copies are attached.
+- **Keyboard GIFs and stickers.** A keyboard sends a file only to a field whose `EditorInfo` lists
+  that content type, through `InputConnection.commitContent`. Compose's `Modifier.contentReceiver`
+  does this, but only for the state-based `BasicTextField` (`TextFieldState`); the editor's text
+  block stays on the value-based field because its inline Markdown styling is a
+  `VisualTransformation`, which the state-based field cannot apply (its `OutputTransformation`
+  changes text, not styles, as of Compose foundation 1.11). Instead, `EntryKeyboardContentReceiver`
+  wraps the editor in `InterceptPlatformTextInput`. When any text field inside starts a keyboard
+  session, the interceptor adds `keyboardContentMimeTypes` to the `EditorInfo` with
+  `EditorInfoCompat.setContentMimeTypes` and wraps the `InputConnection` with
+  `InputConnectionCompat.createWrapper`. A committed file is accepted only if
+  `acceptsKeyboardContent` matches its type; the keyboard's read grant is requested, the file is
+  copied with `importIntoEntry`, and the grant is released once the copy finishes.
 - **Out of LogDate.** `mediaDragSource` in `client/ui` sends a `ClipData` with a content URI from the
   app's FileProvider (`${applicationId}.provider`, which covers the private media store) and the
   file's MIME type. Stored media is named by `logdate-media://` references, so it first resolves the
@@ -252,6 +286,13 @@ Dragging out shares only the file the person dragged, with read-only access gran
 - **Stylus:** `OsSurfaceScreenshotsTest#stylusHandwriting` writes "hello" with pen events and fails
   if the keyboard does not type it into the entry, and `stylusWritingOnControls` does the same on the
   "Write something" card and the search pill (see Updating screenshots).
+- **Paste and keyboard content:** `EntryDropTest` covers which Paste item the text menu offers and
+  which types keyboards may send. `OsSurfaceScreenshotsTest#pastePhotoFromTextMenu` long-presses a
+  new entry's text, taps Paste, and captures both steps; `#keyboardInsertsImage` taps Gboard's
+  suggestion for the copied photo and fails if the photo is not added to the entry;
+  `#keyboardGif` opens Gboard's GIF panel, picks the first GIF, and waits for it in the entry (it
+  needs the emulator's network, which Gboard uses to load GIFs); `#pastePhotoIntoEntry` pastes with
+  Ctrl+V from a virtual USB keyboard.
 - **Cross-app drag:** `OsSurfaceScreenshotsTest#crossAppDrag` drags a photo from Files into a new
   entry on the Android desktop and waits for it in the entry, and `#dragPhotoBetweenWindows` drags
   a Library photo into an entry in a second window.

@@ -39,6 +39,7 @@ import app.logdate.feature.editor.ui.common.PlatformBackHandler
 import app.logdate.feature.editor.ui.content.EditorBottomContent
 import app.logdate.feature.editor.ui.dialog.DraftsBottomSheet
 import app.logdate.feature.editor.ui.dialog.alert.ConfirmEntryExitDialog
+import app.logdate.feature.editor.ui.drop.EntryKeyboardContentReceiver
 import app.logdate.feature.editor.ui.drop.entryDropTarget
 import app.logdate.feature.editor.ui.drop.entryPasteTarget
 import app.logdate.feature.editor.ui.editor.EditorBackgroundSaveEffect
@@ -252,106 +253,122 @@ fun EntryEditorContent(
     var dropActive by remember { mutableStateOf(false) }
     val canSave =
         focus !is EditorFocus.Recording && !editorState.isEditingLocked && !editorState.isSaving && !editorState.shouldExit
-    ImmersiveEditorLayout(
-        modifier =
-            modifier
-                .entryDropTarget(
-                    onText = { viewModel.appendTextBlock(it) },
-                    onMediaImported = { viewModel.setInitialAttachments(it) },
-                    onActiveChanged = { dropActive = it },
-                ).entryPasteTarget(onMediaImported = { viewModel.setInitialAttachments(it) })
-                .then(
-                    if (dropActive) {
-                        Modifier.border(3.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.large)
-                    } else {
-                        Modifier
+    EntryKeyboardContentReceiver(onMediaImported = { viewModel.setInitialAttachments(it) }) {
+        ImmersiveEditorLayout(
+            modifier =
+                modifier
+                    .entryDropTarget(
+                        onText = { viewModel.appendTextBlock(it) },
+                        onMediaImported = { viewModel.setInitialAttachments(it) },
+                        onActiveChanged = { dropActive = it },
+                    ).entryPasteTarget(onMediaImported = { viewModel.setInitialAttachments(it) })
+                    .then(
+                        if (dropActive) {
+                            Modifier.border(3.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.large)
+                        } else {
+                            Modifier
+                        },
+                    ).onPreviewKeyEvent { event ->
+                        when (AppKeyboardShortcut.match(event, AppShortcutScope.Editor)) {
+                            AppKeyboardShortcut.SaveEntry ->
+                                canSave.also { save ->
+                                    if (save) {
+                                        haptics.saveSucceeded()
+                                        viewModel.saveEntry(editorState)
+                                    }
+                                }
+                            AppKeyboardShortcut.CloseEditor -> {
+                                handleEditorBack()
+                                true
+                            }
+                            else -> false
+                        }
                     },
-                ).onPreviewKeyEvent { event ->
-                    when (AppKeyboardShortcut.match(event, AppShortcutScope.Editor)) {
-                        AppKeyboardShortcut.SaveEntry ->
-                            canSave.also { save ->
-                                if (save) {
-                                    haptics.saveSucceeded()
-                                    viewModel.saveEntry(editorState)
+            isImmersiveBlockActive = isImmersiveBlockActive,
+            isAudioRecordingActive = editorState.isRecordingAudio,
+            focusState = focus,
+            hasJournalSelection = uiState.availableJournals.any { it.id in uiState.selectedJournalIds },
+            entryLocked = editorState.isSaving || editorState.shouldExit || editorState.isEditingLocked,
+            immersiveExitProgress = chromeProgress.value,
+            topBarContent = {
+                NoteEditorToolbar(
+                    onBack = handleEditorBack,
+                    onSave = {
+                        haptics.saveSucceeded()
+                        viewModel.saveEntry(editorState)
+                    },
+                    onShowDrafts = { showDraftsDialog = true },
+                    draftCount = editorState.availableDrafts.size,
+                    autoSaveStatus = autoSaveState.status,
+                    actionsVisible = !isImmersiveBlockActive,
+                    optionsVisible = focus !is EditorFocus.Recording,
+                    saveEnabled = focus !is EditorFocus.Recording && !editorState.isEditingLocked,
+                    actionsEnabled = !editorState.isSaving && !editorState.shouldExit,
+                )
+            },
+            editorContent = {
+                Column(Modifier.fillMaxSize()) {
+                    if (!isImmersiveBlockActive) {
+                        editorState.visitContext?.let { VisitMemoryContextBanner(it) }
+                    }
+                    MainEditorContent(
+                        modifier = Modifier.weight(1f),
+                        uiState = uiState,
+                        focusState = focus,
+                        shouldReturnToPickerOnBack = shouldReturnToPickerOnBack,
+                        onDismissExpanded = {
+                            viewModel.dismissExpandedBlockOrClearSingleEmpty()
+                        },
+                        onBackProgress = { p ->
+                            if (isImmersiveBlockActive) scope.launch { chromeProgress.snapTo(p) }
+                        },
+                        onBackCommit = {
+                            if (isImmersiveBlockActive) {
+                                scope.launch {
+                                    chromeProgress.animateTo(
+                                        1f,
+                                        tween(300, easing = FastOutSlowInEasing),
+                                    )
                                 }
                             }
-                        AppKeyboardShortcut.CloseEditor -> {
-                            handleEditorBack()
-                            true
-                        }
-                        else -> false
-                    }
-                },
-        isImmersiveBlockActive = isImmersiveBlockActive,
-        isAudioRecordingActive = editorState.isRecordingAudio,
-        focusState = focus,
-        hasJournalSelection = uiState.availableJournals.any { it.id in uiState.selectedJournalIds },
-        entryLocked = editorState.isSaving || editorState.shouldExit || editorState.isEditingLocked,
-        immersiveExitProgress = chromeProgress.value,
-        topBarContent = {
-            NoteEditorToolbar(
-                onBack = handleEditorBack,
-                onSave = {
-                    haptics.saveSucceeded()
-                    viewModel.saveEntry(editorState)
-                },
-                onShowDrafts = { showDraftsDialog = true },
-                draftCount = editorState.availableDrafts.size,
-                autoSaveStatus = autoSaveState.status,
-                actionsVisible = !isImmersiveBlockActive,
-                optionsVisible = focus !is EditorFocus.Recording,
-                saveEnabled = focus !is EditorFocus.Recording && !editorState.isEditingLocked,
-                actionsEnabled = !editorState.isSaving && !editorState.shouldExit,
-            )
-        },
-        editorContent = {
-            Column(Modifier.fillMaxSize()) {
-                if (!isImmersiveBlockActive) {
-                    editorState.visitContext?.let { VisitMemoryContextBanner(it) }
+                        },
+                        onBackCancel = {
+                            if (isImmersiveBlockActive) {
+                                scope.launch {
+                                    chromeProgress.animateTo(
+                                        0f,
+                                        tween(300, easing = FastOutSlowInEasing),
+                                    )
+                                }
+                            }
+                        },
+                        onAudioResolverReady = { blockId, resolver ->
+                            viewModel.bindAudioBlockFinalizer(blockId, DefaultAudioBlockFinalizer(resolver))
+                        },
+                    )
                 }
-                MainEditorContent(
-                    modifier = Modifier.weight(1f),
-                    uiState = uiState,
-                    focusState = focus,
-                    shouldReturnToPickerOnBack = shouldReturnToPickerOnBack,
-                    onDismissExpanded = {
-                        viewModel.dismissExpandedBlockOrClearSingleEmpty()
-                    },
-                    onBackProgress = { p ->
-                        if (isImmersiveBlockActive) scope.launch { chromeProgress.snapTo(p) }
-                    },
-                    onBackCommit = {
-                        if (isImmersiveBlockActive) scope.launch { chromeProgress.animateTo(1f, tween(300, easing = FastOutSlowInEasing)) }
-                    },
-                    onBackCancel = {
-                        if (isImmersiveBlockActive) scope.launch { chromeProgress.animateTo(0f, tween(300, easing = FastOutSlowInEasing)) }
-                    },
-                    onAudioResolverReady = { blockId, resolver ->
-                        viewModel.bindAudioBlockFinalizer(blockId, DefaultAudioBlockFinalizer(resolver))
+            },
+            bottomContent = {
+                EditorBottomContent(
+                    availableJournals = uiState.availableJournals,
+                    selectedJournalIds = uiState.selectedJournalIds,
+                    onJournalSelectionChanged = { if (focus !is EditorFocus.Recording) uiState.onJournalSelectionChanged(it) },
+                    enabled =
+                        focus !is EditorFocus.Recording && !editorState.isSaving && !editorState.shouldExit && !editorState.isEditingLocked,
+                    journalSelectorExpanded = journalSelectorExpanded,
+                    onJournalSelectorExpandedChange = { expanded ->
+                        if (focus !is EditorFocus.Recording &&
+                            !editorState.isSaving &&
+                            !editorState.shouldExit &&
+                            !editorState.isEditingLocked
+                        ) {
+                            journalSelectorExpanded = expanded
+                        }
                     },
                 )
-            }
-        },
-        bottomContent = {
-            EditorBottomContent(
-                availableJournals = uiState.availableJournals,
-                selectedJournalIds = uiState.selectedJournalIds,
-                onJournalSelectionChanged = { if (focus !is EditorFocus.Recording) uiState.onJournalSelectionChanged(it) },
-                enabled =
-                    focus !is EditorFocus.Recording && !editorState.isSaving && !editorState.shouldExit && !editorState.isEditingLocked,
-                journalSelectorExpanded = journalSelectorExpanded,
-                onJournalSelectorExpandedChange = { expanded ->
-                    if (focus !is EditorFocus.Recording &&
-                        !editorState.isSaving &&
-                        !editorState.shouldExit &&
-                        !editorState.isEditingLocked
-                    ) {
-                        journalSelectorExpanded = expanded
-                    }
-                },
-            )
-        },
-    )
+            },
+        )
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         SnackbarHost(

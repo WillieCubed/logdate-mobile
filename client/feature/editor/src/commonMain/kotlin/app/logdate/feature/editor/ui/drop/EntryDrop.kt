@@ -24,3 +24,27 @@ fun routeDroppedItems(items: List<DroppedItem>): EntryDrop =
         mediaUris = items.filter { item -> mediaPrefixes.any(item.mimeType::startsWith) }.mapNotNull { it.uri },
         texts = items.filter { it.mimeType.startsWith("text/") }.mapNotNull { it.text?.takeIf(String::isNotBlank) },
     )
+
+/** The Paste item the text menu adds for media on the clipboard. */
+enum class MediaPasteItem {
+    /** The clipboard holds only media, so the text field's own Paste would do nothing. */
+    Paste,
+
+    /** The clipboard also holds text, which the text field's own Paste inserts. */
+    PasteAsAttachment,
+}
+
+/**
+ * Which media Paste item the text menu shows for a clipboard holding [clipMimeTypes], or null when
+ * there is no photo, video, or audio to attach.
+ */
+fun mediaPasteItem(clipMimeTypes: List<String>): MediaPasteItem? {
+    if (clipMimeTypes.none { mime -> mediaPrefixes.any(mime::startsWith) }) return null
+    return if (clipMimeTypes.any { it.startsWith("text/") }) MediaPasteItem.PasteAsAttachment else MediaPasteItem.Paste
+}
+
+/** The content types the editor tells keyboards it accepts, so GIF and sticker keys insert files, not links. */
+val keyboardContentMimeTypes: List<String> = mediaPrefixes.map { "$it*" }
+
+/** Whether a keyboard's inserted file of [mimeType] can become part of an entry. */
+fun acceptsKeyboardContent(mimeType: String): Boolean = mediaPrefixes.any(mimeType::startsWith)

@@ -80,6 +80,11 @@ Editor Feature
 - **CameraX Integration**: Advanced camera features
 - **File Picker**: System file selection
 - **Keyboard Handling**: IME integration
+- **Drop and Paste**: Text, photos, videos, and audio dropped from other apps or pasted with Ctrl+V
+  or the text menu are added to the entry (`ui/drop/`)
+- **Keyboard GIFs and Stickers**: Images the on-screen keyboard sends are attached as files
+  (`EntryKeyboardContentReceiver`); see
+  [Keyboard, Pointer, Drag and Drop](../../../docs/reference/android/os-integration/keyboard-pointer-drag-and-drop.md)
 - **Material Design**: Platform-native styling
 
 ### iOS

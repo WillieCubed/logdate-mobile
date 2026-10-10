@@ -126,6 +126,20 @@ widget-renders|system|docs/screenshots/android-os-integration/widgets/pinned-mem
 
 # Keyboard paste: a copied photo pasted into a new entry with Ctrl+V.
 keyboard-paste|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/paste-photo--tablet-api37.png
+# Touch paste: a copied photo pasted into a new entry from the text menu a long press opens.
+touch-paste|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/paste-menu--phone-api37.png
+touch-paste|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/paste-menu-photo--phone-api37.png
+touch-paste|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/paste-menu--tablet-api37.png
+touch-paste|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/paste-menu-photo--tablet-api37.png
+# Keyboard content: the on-screen keyboard sends a copied photo or a GIF into a new entry as a file.
+keyboard-content|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/keyboard-image-suggestion--phone-api37.png
+keyboard-content|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/keyboard-image-inserted--phone-api37.png
+keyboard-content|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/keyboard-image-suggestion--tablet-api37.png
+keyboard-content|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/keyboard-image-inserted--tablet-api37.png
+keyboard-content|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/keyboard-gif-panel--phone-api37.png
+keyboard-content|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/keyboard-gif-inserted--phone-api37.png
+keyboard-content|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/keyboard-gif-panel--tablet-api37.png
+keyboard-content|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/keyboard-gif-inserted--tablet-api37.png
 cross-app-drag|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/cross-app-drag--tablet-api37.png
 cross-app-drag|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/cross-app-drop--tablet-api37.png
 drag-out|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/drag-out--tablet-api37.png
