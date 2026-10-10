@@ -85,6 +85,7 @@ editor-windows|system|docs/screenshots/android-os-integration/large-screens-and-
 # Context menus: a long-press on a journal cover opens its menu instead of the journal.
 context-menus|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/journal-context-menu--tablet-api37.png
 context-menus|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/entry-context-menu--tablet-api37.png
+tooltips|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/account-tooltip--tablet-api37.png
 
 # Keyboard shortcuts: Android's Meta+/ helper listing LogDate's group with a USB keyboard attached.
 keyboard-shortcuts|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/shortcut-helper--tablet-api37.png

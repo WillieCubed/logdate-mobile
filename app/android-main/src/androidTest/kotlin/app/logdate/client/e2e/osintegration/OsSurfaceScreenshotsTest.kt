@@ -229,6 +229,12 @@ class OsSurfaceScreenshotsTest {
         Thread.sleep(2_000L)
         // Search and the account button in the window's caption bar, between Android's controls.
         OsSurfaceCapture.capture(surface = "large-screens-and-desktop-windowing", state = "caption-bar")
+        // A mouse resting on the account button names it in a tooltip.
+        val account = OsSurfaceCapture.device.findObject(By.desc(ACCOUNT_LABEL)).visibleCenter
+        OsSurfaceCapture.hover(account)
+        checkNotNull(OsSurfaceCapture.device.wait(Until.findObject(By.text(ACCOUNT_LABEL)), 5_000L)) { "No tooltip on the account button" }
+        OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "account-tooltip")
+        OsSurfaceCapture.hover(Point(account.x, OsSurfaceCapture.device.displayHeight - account.y))
         OsSurfaceCapture.longPress(OsSurfaceCapture.waitForText("Summer in Lisbon"))
         OsSurfaceCapture.waitForText("New entry in a new window").click()
         Thread.sleep(4_000L)
@@ -606,6 +612,9 @@ class OsSurfaceScreenshotsTest {
         const val FILES_ACTIVITY = "$FILES_PACKAGE/com.android.documentsui.files.FilesActivity"
         const val DOWNLOADS_ROOT = "content://com.android.providers.downloads.documents/root/downloads"
         const val DRAGGED_PHOTO = "milo-after-the-rain.jpg"
+
+        /** The account button's name, which its tooltip shows. */
+        const val ACCOUNT_LABEL = "Account, backup and settings"
 
         /** About a second of holding still: `UiDevice.swipe` takes 5 ms a step. */
         const val LONG_PRESS_STEPS = 200

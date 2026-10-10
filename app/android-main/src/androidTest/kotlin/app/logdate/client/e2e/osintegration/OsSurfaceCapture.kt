@@ -15,6 +15,8 @@ import android.os.Environment
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.provider.MediaStore
+import android.view.InputDevice
+import android.view.MotionEvent
 import android.view.WindowManager
 import androidx.core.content.FileProvider
 import androidx.test.platform.app.InstrumentationRegistry
@@ -65,6 +67,9 @@ object OsSurfaceCapture {
     private const val DEMO_MODE_ATTEMPTS = 10
     private const val RETURN_HOME_STEPS = 6
     private const val DRAG_CAPTURE_LEAD_MS = 1_200L
+    private const val HOVER_STEPS = 10
+    private const val HOVER_STEP_PX = 8
+    private const val HOVER_FRAME_MS = 16L
     private const val SPLASH_WAIT_MS = 5_000L
 
     /** `FLAG_ACTIVITY_NEW_TASK` with `FLAG_ACTIVITY_CLEAR_TASK`, so the activity starts over. */
@@ -480,6 +485,47 @@ object OsSurfaceCapture {
                 ?: error("$packageName has no window")
         shell("am task resize $task ${bounds.left} ${bounds.top} ${bounds.right} ${bounds.bottom}")
         Thread.sleep(1_500L)
+    }
+
+    /**
+     * Rests a mouse pointer on [point], so hover feedback such as a tooltip shows. The pointer moves
+     * in from a little to the left, as a hand on a mouse would bring it.
+     */
+    fun hover(point: Point) {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val downTime = SystemClock.uptimeMillis()
+        for (step in HOVER_STEPS downTo 0) {
+            val properties =
+                MotionEvent.PointerProperties().apply {
+                    id = 0
+                    toolType = MotionEvent.TOOL_TYPE_MOUSE
+                }
+            val coords =
+                MotionEvent.PointerCoords().apply {
+                    x = (point.x - step * HOVER_STEP_PX).toFloat()
+                    y = point.y.toFloat()
+                }
+            val event =
+                MotionEvent.obtain(
+                    downTime,
+                    SystemClock.uptimeMillis(),
+                    MotionEvent.ACTION_HOVER_MOVE,
+                    1,
+                    arrayOf(properties),
+                    arrayOf(coords),
+                    0,
+                    0,
+                    1f,
+                    1f,
+                    0,
+                    0,
+                    InputDevice.SOURCE_MOUSE,
+                    0,
+                )
+            automation.injectInputEvent(event, true)
+            event.recycle()
+            Thread.sleep(HOVER_FRAME_MS)
+        }
     }
 
     /**

@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.AutoSaveStatus
+import app.logdate.ui.common.IconTooltip
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import kotlinx.coroutines.delay
@@ -83,14 +84,16 @@ fun NoteEditorToolbar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Left-aligned back button — always visible
-        FilledTonalIconButton(
-            onClick = { onBack() },
-            enabled = actionsEnabled,
-        ) {
-            Icon(
-                painter = PlatformIcons.back(),
-                contentDescription = stringResource(UiRes.string.common_back),
-            )
+        IconTooltip(label = stringResource(UiRes.string.common_back)) {
+            FilledTonalIconButton(
+                onClick = { onBack() },
+                enabled = actionsEnabled,
+            ) {
+                Icon(
+                    painter = PlatformIcons.back(),
+                    contentDescription = stringResource(UiRes.string.common_back),
+                )
+            }
         }
 
         AnimatedVisibility(
@@ -114,57 +117,63 @@ fun NoteEditorToolbar(
                 }
 
                 if (optionsVisible && draftCount > 0) {
-                    FilledTonalIconButton(
-                        onClick = { onShowDrafts() },
-                        enabled = actionsEnabled,
-                        modifier = Modifier.testTag(LOGDATE_EDITOR_DRAFTS_BUTTON_TAG),
-                    ) {
-                        BadgedBox(
-                            badge = {
-                                Badge { Text(draftCount.toString()) }
-                            },
+                    IconTooltip(label = stringResource(Res.string.load_drafts)) {
+                        FilledTonalIconButton(
+                            onClick = { onShowDrafts() },
+                            enabled = actionsEnabled,
+                            modifier = Modifier.testTag(LOGDATE_EDITOR_DRAFTS_BUTTON_TAG),
                         ) {
-                            Icon(
-                                painter = PlatformIcons.drafts(),
-                                contentDescription = stringResource(Res.string.load_drafts),
-                            )
+                            BadgedBox(
+                                badge = {
+                                    Badge { Text(draftCount.toString()) }
+                                },
+                            ) {
+                                Icon(
+                                    painter = PlatformIcons.drafts(),
+                                    contentDescription = stringResource(Res.string.load_drafts),
+                                )
+                            }
                         }
                     }
                 }
 
-                FilledTonalIconButton(
-                    onClick = { onSave() },
-                    enabled = actionsEnabled && saveEnabled,
-                    modifier = Modifier.testTag(LOGDATE_EDITOR_SAVE_BUTTON_TAG),
-                ) {
-                    Icon(
-                        painter = PlatformIcons.save(),
-                        contentDescription = stringResource(Res.string.save_entry),
-                    )
+                IconTooltip(label = stringResource(Res.string.save_entry)) {
+                    FilledTonalIconButton(
+                        onClick = { onSave() },
+                        enabled = actionsEnabled && saveEnabled,
+                        modifier = Modifier.testTag(LOGDATE_EDITOR_SAVE_BUTTON_TAG),
+                    ) {
+                        Icon(
+                            painter = PlatformIcons.save(),
+                            contentDescription = stringResource(Res.string.save_entry),
+                        )
+                    }
                 }
 
                 if (optionsVisible) {
-                    FilledTonalIconButton(
-                        onClick = { showMenu = true },
-                        enabled = actionsEnabled,
-                    ) {
-                        Icon(
-                            painter = PlatformIcons.more(),
-                            contentDescription = stringResource(Res.string.more_options),
-                        )
-
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false },
+                    IconTooltip(label = stringResource(Res.string.more_options)) {
+                        FilledTonalIconButton(
+                            onClick = { showMenu = true },
+                            enabled = actionsEnabled,
                         ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(Res.string.manage_drafts)) },
-                                enabled = actionsEnabled,
-                                onClick = {
-                                    showMenu = false
-                                    onShowDrafts()
-                                },
+                            Icon(
+                                painter = PlatformIcons.more(),
+                                contentDescription = stringResource(Res.string.more_options),
                             )
+
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(Res.string.manage_drafts)) },
+                                    enabled = actionsEnabled,
+                                    onClick = {
+                                        showMenu = false
+                                        onShowDrafts()
+                                    },
+                                )
+                            }
                         }
                     }
                 }

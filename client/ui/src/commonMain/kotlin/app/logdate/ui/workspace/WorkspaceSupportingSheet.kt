@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.IconTooltip
 import app.logdate.ui.common.PlatformBackHandler
 import app.logdate.ui.foldable.rememberFoldableLayoutInfo
 import app.logdate.ui.foldable.rememberWindowOrigin
@@ -189,38 +190,43 @@ fun WorkspaceSupportingSheet(
                                                 SupportingExtent.Browsing -> "Expand"
                                                 else -> "Collapse"
                                             }
-                                        IconButton(onClick = {
-                                            extent =
-                                                when (extent) {
-                                                    SupportingExtent.Peek ->
-                                                        if (anchors.canOverlay) SupportingExtent.Browsing else SupportingExtent.Focused
-                                                    SupportingExtent.Browsing -> SupportingExtent.Expanded
-                                                    else -> SupportingExtent.Peek
-                                                }
-                                        }) {
-                                            Icon(
-                                                PlatformIcons.expandMore(),
-                                                expandLabel,
-                                                Modifier.then(
-                                                    if ((extent == SupportingExtent.Peek || extent == SupportingExtent.Browsing)) {
-                                                        Modifier.graphicsLayer {
-                                                            rotationZ =
-                                                                180f
-                                                        }
-                                                    } else {
-                                                        Modifier
-                                                    },
-                                                ),
-                                            )
+                                        IconTooltip(label = expandLabel) {
+                                            IconButton(onClick = {
+                                                extent =
+                                                    when (extent) {
+                                                        SupportingExtent.Peek ->
+                                                            if (anchors.canOverlay) SupportingExtent.Browsing else SupportingExtent.Focused
+                                                        SupportingExtent.Browsing -> SupportingExtent.Expanded
+                                                        else -> SupportingExtent.Peek
+                                                    }
+                                            }) {
+                                                Icon(
+                                                    PlatformIcons.expandMore(),
+                                                    expandLabel,
+                                                    Modifier.then(
+                                                        if ((extent == SupportingExtent.Peek || extent == SupportingExtent.Browsing)) {
+                                                            Modifier.graphicsLayer {
+                                                                rotationZ =
+                                                                    180f
+                                                            }
+                                                        } else {
+                                                            Modifier
+                                                        },
+                                                    ),
+                                                )
+                                            }
                                         }
-                                        IconButton(onClick = {
-                                            extent =
-                                                if (focused) {
-                                                    if (anchors.canOverlay) SupportingExtent.Browsing else SupportingExtent.Peek
-                                                } else {
-                                                    SupportingExtent.Focused
-                                                }
-                                        }) { Icon(PlatformIcons.openInNew(), if (focused) "Show map" else "Full view") }
+                                        val fullViewLabel = if (focused) "Show map" else "Full view"
+                                        IconTooltip(label = fullViewLabel) {
+                                            IconButton(onClick = {
+                                                extent =
+                                                    if (focused) {
+                                                        if (anchors.canOverlay) SupportingExtent.Browsing else SupportingExtent.Peek
+                                                    } else {
+                                                        SupportingExtent.Focused
+                                                    }
+                                            }) { Icon(PlatformIcons.openInNew(), fullViewLabel) }
+                                        }
                                     }
                                     headerActions()
                                 }

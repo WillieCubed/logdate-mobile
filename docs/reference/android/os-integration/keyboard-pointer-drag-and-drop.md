@@ -54,7 +54,13 @@ Multitasking. It lists an app's shortcuts only for keys that the attached keyboa
   on right-click.
 - An entry's only action is "Open in new window", so it has no menu on devices that cannot open
   another LogDate window.
-- Hovering an icon-only button shows a tooltip naming its action.
+- Hovering an icon-only button shows a tooltip naming its action: the account button, the editor's
+  Back, Drafts, Save, and More options buttons, and the Places sheet's expand and full-view buttons.
+  A long press shows the same tooltip on touch. Screen readers read the same names.
+
+A mouse resting on the account button in a desktop window's title bar:
+
+![A LogDate window on the Android desktop with a tooltip reading Account, backup and settings under the account button in the title bar](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/account-tooltip--tablet-api37.png)
 
 A long-press on a journal in the tablet's Journals carousel, on Android 17:
 
@@ -112,7 +118,8 @@ A person can also start writing on two controls that open a text field rather th
 | ![Writing "hello" where the Write something card was: the card opened a text entry as soon as the pen touched it, and the ink stays over the entry](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/stylus-write-card--tablet-api37.png) | ![A new text entry with "hello" typed in it](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/stylus-write-card-typed--tablet-api37.png) |
 | ![Search, opened as the pen touched Home's search bar, with "hello" handwritten over its field](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/stylus-search--tablet-api37.png) | ![Search with "hello" typed as the query and the entry it finds](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/stylus-search-typed--tablet-api37.png) |
 
-Still to be added: the context menu and tooltip states as app screenshots.
+Menus and tooltips draw in popup windows, which preview screenshots cannot render, so their
+screenshots are real captures from Android.
 
 ## How it works
 
@@ -163,7 +170,8 @@ Journal covers offer "Open journal", plus "New entry in a new window" where the 
 than one window, in both the journal list and the tablet carousel.
 
 `IconTooltip` (client/ui) names icon-only controls on hover and long-press. The workspace account
-button uses it.
+button, the editor toolbar (`NoteEditorToolbar`), the Places supporting sheet, and the recorder
+bubble use it. Wrap any new icon-only button in it, with the same label as its content description.
 
 ### Drag and drop
 
@@ -225,7 +233,9 @@ Dragging out shares only the file the person dragged, with read-only access gran
   actions.
 - **Compose UI tests:** `ContextMenuAreaTest` (client/ui desktopTest) checks that long-press over a
   clickable card opens the menu without clicking, a tap still clicks, right-click opens the menu, and
-  content without items or with `openOnLongPress = false` keeps the press.
+  content without items or with `openOnLongPress = false` keeps the press. `NoteEditorToolbarTest`
+  (editor desktopTest) checks that hovering Save shows its tooltip and that screen readers hear the
+  toolbar buttons by name.
 - **Import tests:** MIME routing, partial-failure rollback, and a specific error for unreadable URIs.
 - **Stylus:** `OsSurfaceScreenshotsTest#stylusHandwriting` writes "hello" with pen events and fails
   if the keyboard does not type it into the entry, and `stylusWritingOnControls` does the same on the
@@ -238,8 +248,9 @@ Dragging out shares only the file the person dragged, with read-only access gran
 
 - Desktop menus, menus, tooltips, and drop states are Lane 1 references.
 - The shortcut helper and stylus input are Lane 2 captures, recorded with `./run screenshots:os`. The
-  cross-app drag is recorded with `./run screenshots:desktop`, on the desktop windowing emulator,
-  where Files and LogDate sit in windows side by side. They land in
+  cross-app drag and the account tooltip are recorded with `./run screenshots:desktop`, on the
+  desktop windowing emulator, where windows sit side by side and a mouse pointer can hover; the
+  tooltip capture rests the pointer with injected mouse hover events. They land in
   `docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/`.
 - The cross-app drag test saves the sample photo to Downloads, opens Files there, places the two
   windows with `am task resize`, selects the photo with a long press, and drags it with

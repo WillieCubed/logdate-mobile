@@ -3,13 +3,25 @@ package app.logdate.feature.editor.ui.common
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.v2.runSkikoComposeUiTest
 import app.logdate.ui.theme.LogDateTheme
 import kotlin.test.Test
 
 @OptIn(ExperimentalTestApi::class)
 class NoteEditorToolbarTest {
+    @Test
+    fun `hovering an icon button names it in a tooltip`() =
+        runSkikoComposeUiTest(size = Size(390f, 780f)) {
+            setContent {
+                LogDateTheme(dynamicColor = false) { NoteEditorToolbar({}, {}, {}, draftCount = 1) }
+            }
+            onNodeWithTag(LOGDATE_EDITOR_SAVE_BUTTON_TAG).performMouseInput { moveTo(center) }
+            waitUntil(timeoutMillis = TOOLTIP_TIMEOUT_MS) { onAllNodesWithText("Save entry").fetchSemanticsNodes().isNotEmpty() }
+        }
+
     @Test
     fun `screen readers hear the save and drafts buttons by name`() =
         runSkikoComposeUiTest(size = Size(390f, 780f)) {
@@ -21,6 +33,7 @@ class NoteEditorToolbarTest {
         }
 
     private companion object {
+        const val TOOLTIP_TIMEOUT_MS = 3_000L
         const val LOAD_DRAFTS = "Load drafts"
     }
 }
