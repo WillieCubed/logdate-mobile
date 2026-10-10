@@ -11,6 +11,11 @@ import app.logdate.wear.v2.flow.FlowViewModel
 import app.logdate.wear.v2.haptics.HapticsPreferenceStore
 import app.logdate.wear.v2.haptics.SharedPreferencesHapticsPreferenceStore
 import app.logdate.wear.v2.haptics.watchHaptics
+import app.logdate.wear.v2.permissions.AndroidPermissionChecker
+import app.logdate.wear.v2.permissions.PermissionChecker
+import app.logdate.wear.v2.permissions.PermissionPromptStore
+import app.logdate.wear.v2.permissions.PermissionPrompts
+import app.logdate.wear.v2.permissions.SharedPreferencesPermissionPromptStore
 import app.logdate.wear.v2.phone.PhoneHandoff
 import app.logdate.wear.v2.phone.PhoneLinkRepository
 import app.logdate.wear.v2.recorder.RecorderViewModel
@@ -40,6 +45,14 @@ val wearV2Module =
                 systemHapticsOff = { isSystemHapticFeedbackOff(context) },
             )
         }
+
+        single<PermissionChecker> { AndroidPermissionChecker(get()) }
+        single<PermissionPromptStore> {
+            SharedPreferencesPermissionPromptStore(
+                get<Context>().getSharedPreferences(SharedPreferencesPermissionPromptStore.PREFERENCES_NAME, Context.MODE_PRIVATE),
+            )
+        }
+        single { PermissionPrompts(checker = get(), store = get()) }
 
         single { DayClock(timeChanges = timeChangeSignals(get())) }
         // The phone shares its day-start hour through the state document (Track A, C2); until then there is none.
