@@ -1,7 +1,7 @@
 package app.logdate.client.sharing
 
-import app.logdate.client.media.storage.DesktopMediaDirectories
 import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.desktopMediaFileResolver
 import app.logdate.client.repository.journals.JournalRepository
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
@@ -25,7 +25,7 @@ import kotlin.uuid.Uuid
 class DesktopSharingLauncher(
     private val journalRepository: JournalRepository,
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main),
-    private val mediaFiles: MediaFileResolver = MediaFileResolver(DesktopMediaDirectories()),
+    private val mediaFiles: MediaFileResolver = desktopMediaFileResolver(),
 ) : SharingLauncher {
     override fun shareContent(
         text: String?,

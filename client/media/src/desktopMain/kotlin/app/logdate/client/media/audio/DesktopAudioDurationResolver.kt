@@ -1,7 +1,7 @@
 package app.logdate.client.media.audio
 
-import app.logdate.client.media.storage.DesktopMediaDirectories
 import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.desktopMediaFileResolver
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -10,7 +10,7 @@ import javax.sound.sampled.AudioSystem
 import kotlin.math.roundToLong
 
 class DesktopAudioDurationResolver(
-    private val mediaFiles: MediaFileResolver = MediaFileResolver(DesktopMediaDirectories()),
+    private val mediaFiles: MediaFileResolver = desktopMediaFileResolver(),
 ) : AudioDurationResolver {
     override suspend fun resolveDurationMs(uri: String): Long? =
         withContext(Dispatchers.IO) {

@@ -182,9 +182,28 @@ class StoredMediaReferencePersistenceTest {
             val migration =
                 StoredMediaReferenceMigration(database.imageNoteDao(), database.audioNoteDao(), database.videoNoteDao(), references)
 
-            StoredMediaReferenceMigrationLauncher(migration, scope = this).start().join()
+            StoredMediaReferenceMigrationLauncher(scope = this) { migration }.start().join()
 
             assertEquals("logdate-media://library/old.jpg", contentUriOf(legacy.uid))
+        }
+
+    @Test
+    fun `the launcher builds the migration only when started, and only once`() =
+        runTest {
+            var built = 0
+            val migration =
+                StoredMediaReferenceMigration(database.imageNoteDao(), database.audioNoteDao(), database.videoNoteDao(), references)
+            val launcher =
+                StoredMediaReferenceMigrationLauncher(scope = this) {
+                    built++
+                    migration
+                }
+            assertEquals(0, built)
+
+            launcher.start().join()
+            launcher.start().join()
+
+            assertEquals(1, built)
         }
 
     private suspend fun contentUriOf(uid: Uuid): String? = repository.getNoteById(uid)?.mediaRefOrNull()

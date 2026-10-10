@@ -1,8 +1,8 @@
 package app.logdate.client.media
 
-import app.logdate.client.media.storage.DesktopMediaDirectories
 import app.logdate.client.media.storage.MediaCollection
 import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.desktopMediaFileResolver
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.io.asSource
@@ -22,7 +22,7 @@ import kotlin.uuid.Uuid
 
 class DesktopMediaManager(
     /** Resolves stored media references. Injectable so a test never touches a real home directory. */
-    private val mediaFiles: MediaFileResolver = MediaFileResolver(DesktopMediaDirectories()),
+    private val mediaFiles: MediaFileResolver = desktopMediaFileResolver(),
 ) : MediaManager {
     /** Where LogDate keeps its own copies. */
     private val mediaRoot: Path = Path.of(mediaFiles.directory(MediaCollection.Library))

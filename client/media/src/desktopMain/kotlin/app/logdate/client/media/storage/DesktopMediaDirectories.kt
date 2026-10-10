@@ -41,4 +41,9 @@ class DesktopMediaDirectories(
     }
 }
 
+private val sharedResolver by lazy { MediaFileResolver(DesktopMediaDirectories()) }
+
+/** The one [MediaFileResolver] for this user's LogDate folder, shared by dependency injection and default arguments. */
+fun desktopMediaFileResolver(): MediaFileResolver = sharedResolver
+
 private fun canonical(path: String): String = File(path).canonicalPath.replace('\\', '/')

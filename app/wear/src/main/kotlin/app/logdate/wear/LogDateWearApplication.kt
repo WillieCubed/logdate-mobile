@@ -1,6 +1,7 @@
 package app.logdate.wear
 
 import android.app.Application
+import app.logdate.client.data.notes.StoredMediaReferenceMigrationLauncher
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.notifications.LogDateNotificationChannelKey
 import app.logdate.client.notifications.LogDateNotificationRegistrar
@@ -81,9 +82,9 @@ class LogDateWearApplication : Application() {
     private fun warmUpDatabase() {
         thread(name = "db-warmup", isDaemon = true) {
             try {
-                org.koin.java.KoinJavaComponent
-                    .getKoin()
-                    .get<LogDateDatabase>()
+                val koin = org.koin.java.KoinJavaComponent.getKoin()
+                koin.get<LogDateDatabase>()
+                koin.get<StoredMediaReferenceMigrationLauncher>().start()
             } catch (e: Exception) {
                 Napier.w("Background database warmup failed", e)
             }

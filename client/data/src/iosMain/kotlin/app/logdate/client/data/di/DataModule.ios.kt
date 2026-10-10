@@ -173,7 +173,7 @@ actual val dataModule: Module =
             )
         }
         single { StoredMediaReferenceMigration(get(), get(), get(), get()) }
-        single(createdAtStart = true) { StoredMediaReferenceMigrationLauncher(get()).also { it.start() } }
+        single { StoredMediaReferenceMigrationLauncher { get() } }
         single<NotePlaceResolver> { DatabaseNotePlaceResolver(get()) }
         single<JournalContentRepository> {
             OfflineFirstJournalContentRepository(

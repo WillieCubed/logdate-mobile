@@ -9,10 +9,9 @@ import app.logdate.client.media.audio.transcription.AndroidTranscriptionManager
 import app.logdate.client.media.audio.transcription.TranscriptionManager
 import app.logdate.client.media.display.OnDemandRemoteDisplayManager
 import app.logdate.client.media.display.RemoteDisplayManager
-import app.logdate.client.media.storage.AndroidMediaDirectories
-import app.logdate.client.media.storage.MediaDirectories
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.media.storage.StoredMediaReferences
+import app.logdate.client.media.storage.androidMediaFileResolver
 import app.logdate.client.media.video.ExoPlayerPool
 import app.logdate.client.media.video.MediaCache
 import org.koin.android.ext.koin.androidContext
@@ -28,8 +27,7 @@ actual val mediaModule: Module =
     module {
         // Media manager dependencies
         single<ContentResolver> { androidContext().contentResolver }
-        single<MediaDirectories> { AndroidMediaDirectories(androidContext().filesDir) }
-        single { MediaFileResolver(get()) }
+        single { androidMediaFileResolver(androidContext()) }
         single<StoredMediaReferences> { get<MediaFileResolver>() }
         single<MediaManager> { AndroidMediaManager(get(), get(), mediaFiles = get()) }
         single<MediaCleaner> { AndroidMediaCleaner(get()) }

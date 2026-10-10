@@ -58,6 +58,11 @@ class IosMediaDirectories internal constructor(
     }
 }
 
+private val sharedResolver by lazy { MediaFileResolver(IosMediaDirectories()) }
+
+/** The one [MediaFileResolver] for this app's iOS container, shared by dependency injection and default arguments. */
+fun iosMediaFileResolver(): MediaFileResolver = sharedResolver
+
 /** `/private/var/…` and `/var/…` are the same directory on iOS; LogDate spells it without `/private`. */
 private fun canonical(path: String): String = (if (path.startsWith("/private/var/")) path.removePrefix("/private") else path).trimEnd('/')
 

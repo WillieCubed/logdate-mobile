@@ -1,7 +1,7 @@
 package app.logdate
 
 import app.logdate.client.media.storage.MediaFileResolver
-import app.logdate.ui.media.LocalMediaImageMapper
+import app.logdate.ui.media.addLocalMedia
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.disk.DiskCache
@@ -26,7 +26,7 @@ fun buildLogDateImageLoader(
     ImageLoader
         .Builder(context)
         .crossfade(IMAGE_CROSSFADE_MS)
-        .components { add(LocalMediaImageMapper(mediaFiles)) }
+        .components { addLocalMedia(mediaFiles) }
         .memoryCache {
             MemoryCache
                 .Builder()

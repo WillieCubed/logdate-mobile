@@ -1,7 +1,7 @@
 package app.logdate.client.media.audio.sherpa
 
-import app.logdate.client.media.storage.DesktopMediaDirectories
 import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.desktopMediaFileResolver
 import io.github.aakira.napier.Napier
 import java.io.File
 import javax.sound.sampled.AudioFormat
@@ -20,7 +20,7 @@ import javax.sound.sampled.AudioSystem
  * resampling built in.
  */
 internal class DesktopWavDecoder(
-    private val mediaFiles: MediaFileResolver = MediaFileResolver(DesktopMediaDirectories()),
+    private val mediaFiles: MediaFileResolver = desktopMediaFileResolver(),
 ) {
     fun decodeToMono16kHz(uri: String): FloatArray? {
         val file = uriToFile(uri) ?: return null

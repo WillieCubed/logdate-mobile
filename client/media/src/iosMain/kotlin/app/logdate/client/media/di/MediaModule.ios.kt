@@ -8,10 +8,9 @@ import app.logdate.client.media.audio.transcription.IosTranscriptionManager
 import app.logdate.client.media.audio.transcription.TranscriptionManager
 import app.logdate.client.media.display.RemoteDisplayManager
 import app.logdate.client.media.display.UnavailableRemoteDisplayManager
-import app.logdate.client.media.storage.IosMediaDirectories
-import app.logdate.client.media.storage.MediaDirectories
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.media.storage.StoredMediaReferences
+import app.logdate.client.media.storage.iosMediaFileResolver
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -23,8 +22,7 @@ actual val mediaModule: Module =
         // Include the audio module only
         includes(audioModule)
 
-        single<MediaDirectories> { IosMediaDirectories() }
-        single { MediaFileResolver(get()) }
+        single { iosMediaFileResolver() }
         single<StoredMediaReferences> { get<MediaFileResolver>() }
         single<MediaManager> { IosMediaManager(get()) }
         single<MediaCleaner> { IosMediaCleaner(get()) }

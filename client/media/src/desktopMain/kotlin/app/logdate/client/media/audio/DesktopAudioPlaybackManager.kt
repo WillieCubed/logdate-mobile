@@ -1,7 +1,7 @@
 package app.logdate.client.media.audio
 
-import app.logdate.client.media.storage.DesktopMediaDirectories
 import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.desktopMediaFileResolver
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,7 +20,7 @@ import javax.sound.sampled.LineEvent
  * Desktop implementation of AudioPlaybackManager using Java Sound API.
  */
 class DesktopAudioPlaybackManager(
-    private val mediaFiles: MediaFileResolver = MediaFileResolver(DesktopMediaDirectories()),
+    private val mediaFiles: MediaFileResolver = desktopMediaFileResolver(),
 ) : AudioPlaybackManager {
     private var clip: Clip? = null
     private var audioInputStream: AudioInputStream? = null

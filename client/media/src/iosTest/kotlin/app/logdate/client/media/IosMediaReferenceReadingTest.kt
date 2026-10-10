@@ -14,6 +14,7 @@ import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.readByteArray
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSHomeDirectory
+import platform.Foundation.NSTemporaryDirectory
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -106,6 +107,39 @@ class IosMediaReferenceReadingTest {
         assertEquals("https://cloud.logdate.app/media/abc", mediaFiles.playableUrl("https://cloud.logdate.app/media/abc")?.absoluteString)
         assertNull(mediaFiles.fileUrl("ph://ABC/L0/001"))
     }
+
+    @Test
+    fun `an exported photo is imported into the media library`() =
+        runTest {
+            val source = "${NSTemporaryDirectory().trimEnd('/')}/photos-export-test.jpg"
+            SystemFileSystem.sink(Path(source)).buffered().use { it.write(byteArrayOf(9, 9)) }
+            created += source
+
+            val imported = requireNotNull(IosMediaManager(mediaFiles).importIntoLibrary(source, "ABC-IMG 0007.jpg"))
+            val importedPath = requireNotNull(mediaFiles.filePath(imported))
+            created += importedPath
+
+            assertEquals("$library/ABC-IMG 0007.jpg", importedPath)
+            assertEquals("logdate-media://library/ABC-IMG%200007.jpg", mediaFiles.storedReference(imported))
+            assertContentEquals(byteArrayOf(9, 9), IosMediaManager(mediaFiles).readMedia(imported).data)
+        }
+
+    @Test
+    fun `importing the same photo again keeps the first copy`() =
+        runTest {
+            val source = "${NSTemporaryDirectory().trimEnd('/')}/photos-export-twice.jpg"
+            SystemFileSystem.sink(Path(source)).buffered().use { it.write(byteArrayOf(1)) }
+            created += source
+            val manager = IosMediaManager(mediaFiles)
+            val first = requireNotNull(manager.importIntoLibrary(source, "DEF-IMG 0008.jpg"))
+            created += requireNotNull(mediaFiles.filePath(first))
+            SystemFileSystem.sink(Path(source)).buffered().use { it.write(byteArrayOf(2)) }
+
+            val second = requireNotNull(manager.importIntoLibrary(source, "DEF-IMG 0008.jpg"))
+
+            assertEquals(first, second)
+            assertContentEquals(byteArrayOf(1), manager.readMedia(second).data)
+        }
 
     private fun createLibraryFile(name: String): String {
         fileManager.createDirectoryAtPath(library, withIntermediateDirectories = true, attributes = null, error = null)

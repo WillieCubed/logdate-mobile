@@ -5,9 +5,9 @@
 
 package app.logdate.client.media
 
-import app.logdate.client.media.storage.IosMediaDirectories
 import app.logdate.client.media.storage.MediaCollection
 import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.iosMediaFileResolver
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
@@ -64,7 +64,7 @@ import kotlin.uuid.Uuid
  * can pass selected images through save/sync flows before they are copied into app storage.
  */
 class IosMediaManager(
-    private val mediaFiles: MediaFileResolver = MediaFileResolver(IosMediaDirectories()),
+    private val mediaFiles: MediaFileResolver = iosMediaFileResolver(),
 ) : MediaManager {
     private val fileManager = NSFileManager.defaultManager
     private val mediaRootPath = mediaFiles.directory(MediaCollection.Library)
@@ -232,20 +232,49 @@ class IosMediaManager(
             return@withContext NSURL.fileURLWithPath(destPath).absoluteString ?: "file://$destPath"
         }
 
+    /**
+     * A file URL for a photo the user picked, copied into the media library so the entry that
+     * stores it keeps it. The renderable cache is purgeable and not restored from a backup.
+     */
     suspend fun resolvePhotoLibraryImageUri(localIdentifier: String): String? {
         val asset = fetchPhotoLibraryAsset(localIdentifier) ?: return null
         if (asset.mediaType != PHAssetMediaTypeImage) {
             return null
         }
-        return resolveRenderableUri(asset)
+        return importAssetIntoLibrary(asset)
     }
 
+    /** Like [resolvePhotoLibraryImageUri] for a video, or the `ph://` URI when it cannot be copied. */
     suspend fun resolvePhotoLibraryVideoUri(localIdentifier: String): String? {
         val asset = fetchPhotoLibraryAsset(localIdentifier) ?: return null
         if (asset.mediaType != PHAssetMediaTypeVideo) {
             return null
         }
-        return resolveRenderableUri(asset) ?: photoLibraryUri(localIdentifier)
+        return importAssetIntoLibrary(asset) ?: photoLibraryUri(localIdentifier)
+    }
+
+    private suspend fun importAssetIntoLibrary(asset: PHAsset): String? {
+        val resource = preferredAssetResource(asset) ?: return null
+        val exported = exportResourceToCacheFile(asset, resource)?.path ?: return null
+        val fileName = "${asset.localIdentifier.sanitizeForPath()}-${resource.originalFilename.sanitizeForPath()}"
+        return importIntoLibrary(exported, fileName)
+    }
+
+    /**
+     * Copies the file at [sourcePath] into the media library as [fileName] unless that name is
+     * already there, and returns the stored file's URL, or `null` when it could not be copied.
+     */
+    internal fun importIntoLibrary(
+        sourcePath: String,
+        fileName: String,
+    ): String? {
+        ensureMediaDir()
+        val destination = buildMediaPath(fileName)
+        if (!fileManager.fileExistsAtPath(destination) && !fileManager.copyItemAtPath(sourcePath, destination, error = null)) {
+            Napier.e("Failed to copy $sourcePath into the media library")
+            return null
+        }
+        return NSURL.fileURLWithPath(destination).absoluteString
     }
 
     private suspend fun listPhotoLibraryMedia(fetchLimit: Int? = null): List<MediaObject> {

@@ -48,5 +48,14 @@ class AndroidMediaDirectories(
     }
 }
 
-/** The [MediaFileResolver] for this app's Android storage, for entry points that cannot inject one. */
-fun androidMediaFileResolver(context: Context): MediaFileResolver = MediaFileResolver(AndroidMediaDirectories(context.filesDir))
+private val resolvers = mutableMapOf<String, MediaFileResolver>()
+
+/**
+ * The one [MediaFileResolver] for the app storage of [context], shared by dependency injection and
+ * by entry points that cannot inject one (widgets, services), so every reader sees the same
+ * directory mapping.
+ */
+fun androidMediaFileResolver(context: Context): MediaFileResolver =
+    synchronized(resolvers) {
+        resolvers.getOrPut(context.filesDir.path) { MediaFileResolver(AndroidMediaDirectories(context.filesDir)) }
+    }

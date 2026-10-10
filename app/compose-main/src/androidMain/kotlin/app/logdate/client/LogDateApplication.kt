@@ -9,6 +9,7 @@ import android.os.StrictMode
 import app.logdate.client.ambient.AmbientPromptScheduler
 import app.logdate.client.ambient.AmbientPromptSchedulingObserver
 import app.logdate.client.calendar.CalendarImportScheduler
+import app.logdate.client.data.notes.StoredMediaReferenceMigrationLauncher
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.domain.recommendation.AmbientPromptTriggerContext
 import app.logdate.client.events.EventInferenceScheduler
@@ -21,7 +22,7 @@ import app.logdate.client.rewind.RewindGenerationScheduler
 import app.logdate.client.shortcuts.DynamicShortcutRefreshObserver
 import app.logdate.client.shortcuts.DynamicShortcutScheduler
 import app.logdate.di.initializeKoin
-import app.logdate.ui.media.LocalMediaImageMapper
+import app.logdate.ui.media.addLocalMedia
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.disk.DiskCache
@@ -56,7 +57,7 @@ class LogdateApplication :
             .components {
                 // Stored media strings name files by LogDate reference or by a path that may come
                 // from another install; resolve them before Coil's own file handling sees them.
-                add(LocalMediaImageMapper(get()))
+                addLocalMedia(get())
                 add(VideoFrameDecoder.Factory())
                 add(DataSaverImageInterceptor(get<DataUsagePolicy>()))
             }.memoryCache {
@@ -95,6 +96,11 @@ class LogdateApplication :
             LogDateNotificationRegistrar(this).registerAllPhoneChannels()
         }.onFailure { error ->
             Napier.w("Failed to register notification channels on app startup", error)
+        }
+        runCatching {
+            get<StoredMediaReferenceMigrationLauncher>().start()
+        }.onFailure { error ->
+            Napier.w("Failed to start the media reference migration", error)
         }
         runCatching {
             get<AmbientPromptSchedulingObserver>().start()

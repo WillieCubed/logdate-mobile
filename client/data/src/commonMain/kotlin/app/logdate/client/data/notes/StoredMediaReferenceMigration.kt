@@ -55,23 +55,32 @@ class StoredMediaReferenceMigration(
 }
 
 /**
- * Runs [StoredMediaReferenceMigration] once per app launch, off the main thread.
+ * Runs [StoredMediaReferenceMigration] once per app process, off the calling thread.
  *
- * A failure is logged and the migration is retried at the next launch: it only touches rows
- * that still hold a local path, so a partial run loses nothing.
+ * The platform's app entry point calls [start] when the app is actually in use (the app launch on
+ * Android, the first screen on iOS and desktop), not while the dependency graph is built: building
+ * the migration opens the database, which can be locked or slow during a background launch. The
+ * migration is created inside the coroutine for the same reason.
+ *
+ * A failure is logged and the migration is tried again the next time the app starts: it only
+ * touches rows that still hold a local path, so a partial run loses nothing.
  */
 class StoredMediaReferenceMigrationLauncher(
-    private val migration: StoredMediaReferenceMigration,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    private val migration: () -> StoredMediaReferenceMigration,
 ) {
+    private var job: Job? = null
+
+    /** Starts the migration the first time it is called and returns that run on every later call. */
     fun start(): Job =
-        scope.launch {
-            try {
-                migration.run()
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (error: Exception) {
-                Napier.e("Could not store media references; will retry at the next launch", error)
-            }
-        }
+        job ?: scope
+            .launch {
+                try {
+                    migration().run()
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (error: Exception) {
+                    Napier.e("Could not store media references; will retry the next time the app starts", error)
+                }
+            }.also { job = it }
 }

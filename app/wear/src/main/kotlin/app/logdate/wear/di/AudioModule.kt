@@ -18,10 +18,9 @@ import app.logdate.client.media.audio.RecordingServiceController
 import app.logdate.client.media.audio.RecordingSessionOptions
 import app.logdate.client.media.device.AndroidAudioRouteRepository
 import app.logdate.client.media.device.AudioRouteRepository
-import app.logdate.client.media.storage.AndroidMediaDirectories
-import app.logdate.client.media.storage.MediaDirectories
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.media.storage.StoredMediaReferences
+import app.logdate.client.media.storage.androidMediaFileResolver
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.rewind.RewindRepository
 import app.logdate.client.sync.SyncManager
@@ -117,8 +116,7 @@ val wearAudioModule =
         // Audio playback — reuses the phone's AndroidAudioPlaybackManager + AudioPlaybackService
         single { WearAudioOutputMonitor(get()) }
         single<WearAudioOutputs> { get<WearAudioOutputMonitor>() }
-        single<MediaDirectories> { AndroidMediaDirectories(get<Context>().filesDir) }
-        single { MediaFileResolver(get()) }
+        single { androidMediaFileResolver(get<Context>()) }
         single<StoredMediaReferences> { get<MediaFileResolver>() }
         single { AndroidAudioPlaybackManager(get(), get(), mediaFiles = get()) }
         single<AudioPlaybackManager> { get<AndroidAudioPlaybackManager>() }

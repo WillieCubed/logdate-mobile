@@ -154,7 +154,7 @@ val wearDataModule =
             )
         }
         single { StoredMediaReferenceMigration(get(), get(), get(), get()) }
-        single(createdAtStart = true) { StoredMediaReferenceMigrationLauncher(get()).also { it.start() } }
+        single { StoredMediaReferenceMigrationLauncher { get() } }
     }
 
 /**

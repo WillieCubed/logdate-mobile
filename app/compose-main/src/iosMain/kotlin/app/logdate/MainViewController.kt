@@ -1,9 +1,11 @@
 package app.logdate
 
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.window.ComposeUIViewController
+import app.logdate.client.data.notes.StoredMediaReferenceMigrationLauncher
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.GlobalAppUiLoadedState
@@ -21,6 +23,8 @@ fun MainViewController() =
         startCrashReportingUserBridge()
         val mediaFiles = koinInject<MediaFileResolver>()
         SingletonImageLoader.setSafe { context -> buildLogDateImageLoader(context, mediaFiles) }
+        val mediaReferenceMigration = koinInject<StoredMediaReferenceMigrationLauncher>()
+        LaunchedEffect(mediaReferenceMigration) { mediaReferenceMigration.start() }
         val viewModel: AppViewModel = koinViewModel()
         DisposableEffect(viewModel) {
             val observer =

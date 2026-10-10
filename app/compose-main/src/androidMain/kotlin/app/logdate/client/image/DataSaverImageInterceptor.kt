@@ -61,7 +61,7 @@ class DataSaverImageInterceptor(
 
 private val LOCAL_PROVIDER_SCHEMES = listOf("content://", "android.resource://")
 
-private fun Any?.isLocalMediaSource(): Boolean {
+internal fun Any?.isLocalMediaSource(): Boolean {
     val uriString = this?.toString() ?: return false
     return MediaReference.parse(uriString) !is MediaReference.External || LOCAL_PROVIDER_SCHEMES.any { uriString.startsWith(it) }
 }

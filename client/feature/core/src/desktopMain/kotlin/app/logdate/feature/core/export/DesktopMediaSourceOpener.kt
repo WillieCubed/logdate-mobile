@@ -1,8 +1,8 @@
 package app.logdate.feature.core.export
 
 import app.logdate.client.domain.export.archive.MediaSourceOpener
-import app.logdate.client.media.storage.DesktopMediaDirectories
 import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.desktopMediaFileResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okio.Source
@@ -17,7 +17,7 @@ import java.net.URISyntaxException
  * treated as missing, since an export never fetches from the network.
  */
 class DesktopMediaSourceOpener(
-    private val mediaFiles: MediaFileResolver = MediaFileResolver(DesktopMediaDirectories()),
+    private val mediaFiles: MediaFileResolver = desktopMediaFileResolver(),
 ) : MediaSourceOpener {
     override suspend fun open(reference: String): Source? =
         withContext(Dispatchers.IO) {
