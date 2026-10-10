@@ -64,15 +64,14 @@ internal class CaptionRequests<W : Any> {
 
 /**
  * Lets a screen's own [background] show through the window's caption bar in Android desktop
- * windowing, instead of the system's tinted bar, for screens that keep their controls below the
- * caption, such as the editor. The workspace does the same while it places its app bar inside the
- * caption. Has no effect outside desktop windowing or before Android 15.
+ * windowing, instead of the system's tinted bar, and draws the caption's controls to read on it. For
+ * screens that keep their controls below the caption, such as the editor; the workspace uses it too,
+ * through [rememberPlatformCaptionBar], while it places its app bar inside the caption. Has no effect
+ * outside desktop windowing or before Android 15.
  */
 @Suppress("ktlint:standard:function-naming")
 @Composable
-fun BlendedCaptionBar(background: Color) {
-    rememberPlatformCaptionBar(background)
-}
+expect fun BlendedCaptionBar(background: Color)
 
 /**
  * The widths, in pixels, that the system's caption controls take at the left and right edges of a
