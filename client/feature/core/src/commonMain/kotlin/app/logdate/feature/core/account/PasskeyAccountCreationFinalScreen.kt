@@ -29,12 +29,13 @@ import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -224,20 +225,16 @@ private fun AccountIdentityCard(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.CenterHorizontally),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                AssistChip(
-                    onClick = onEditName,
-                    enabled = editEnabled,
-                    label = { Text(stringResource(Res.string.account_edit_name)) },
-                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                )
-                AssistChip(
-                    onClick = onEditUsername,
-                    enabled = editEnabled,
-                    label = { Text(stringResource(Res.string.account_edit_username)) },
-                    leadingIcon = {
-                        Icon(Icons.Default.AlternateEmail, contentDescription = null, modifier = Modifier.size(18.dp))
-                    },
-                )
+                OutlinedButton(onClick = onEditName, enabled = editEnabled) {
+                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text(stringResource(Res.string.account_edit_name))
+                }
+                OutlinedButton(onClick = onEditUsername, enabled = editEnabled) {
+                    Icon(Icons.Default.AlternateEmail, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text(stringResource(Res.string.account_edit_username))
+                }
             }
         }
     }
