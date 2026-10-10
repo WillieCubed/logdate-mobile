@@ -65,8 +65,13 @@ class AndroidDynamicShortcutApplier(
         // survives the refresh; dropping it would orphan that surface.
         val liveShortcuts =
             ShortcutManagerCompat.getDynamicShortcuts(context).filter { it.id in LIVE_SURFACE_SHORTCUT_IDS }
-        val systemLimit = ShortcutManagerCompat.getMaxShortcutCountPerActivity(context) - liveShortcuts.size
-        val launcherSlots = launcherDescriptors.take(systemLimit.coerceAtLeast(0))
+        val systemLimit =
+            dynamicShortcutSlots(
+                maxPerActivity = ShortcutManagerCompat.getMaxShortcutCountPerActivity(context),
+                manifestShortcuts = ShortcutManagerCompat.getShortcuts(context, ShortcutManagerCompat.FLAG_MATCH_MANIFEST).size,
+                liveShortcuts = liveShortcuts.size,
+            )
+        val launcherSlots = launcherDescriptors.take(systemLimit)
         val remainingSlots = (systemLimit - launcherSlots.size).coerceAtLeast(0)
         val sharingSlots =
             sharingDescriptors

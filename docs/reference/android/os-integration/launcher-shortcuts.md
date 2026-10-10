@@ -79,6 +79,11 @@ label when it has one, and "Share to Summer in Lisbon" did not fit its two short
 Launchers show four shortcuts. The publisher's cap is that number minus the three static
 shortcuts, so it decides which dynamic shortcut appears instead of the launcher trimming silently.
 
+Android also limits the total for the activity (`getMaxShortcutCountPerActivity`, often 15), and that
+total includes the static shortcuts in `shortcuts.xml` and any live ones. `dynamicShortcutSlots`
+subtracts both before the applier fills the launcher and share-target slots; publishing past the
+limit throws, which would leave every dynamic and Direct Share shortcut stale.
+
 A shortcut that a running surface depends on survives each refresh. The floating recorder's
 "Voice recorder" conversation shortcut is the one case today: the applier republishes it alongside
 the new set, so a refresh during a recording never orphans the bubble.
