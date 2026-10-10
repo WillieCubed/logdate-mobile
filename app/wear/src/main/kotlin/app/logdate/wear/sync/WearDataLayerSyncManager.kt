@@ -1,6 +1,7 @@
 package app.logdate.wear.sync
 
 import app.logdate.client.database.dao.HealthSnapshotDao
+import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
@@ -60,6 +61,7 @@ class WearDataLayerSyncManager(
     private val journalDataMapper: JournalDataMapper,
     private val associationDataMapper: AssociationDataMapper,
     private val healthSnapshotDataMapper: HealthSnapshotDataMapper,
+    private val mediaFiles: MediaFileResolver,
     private val clock: Clock = Clock.System,
 ) : SyncManager,
     WearNoteAckHandler,
@@ -394,7 +396,7 @@ class WearDataLayerSyncManager(
 
         if (note !is JournalNote.Audio) return UploadOutcome.SUCCESS
 
-        if (!dataLayerClient.sendFile("$path/audio", note.mediaRef)) {
+        if (!dataLayerClient.sendFile("$path/audio", mediaFiles.filePath(note.mediaRef) ?: note.mediaRef)) {
             Napier.w("Audio file transfer failed for note $noteId")
             return UploadOutcome.FAILED
         }

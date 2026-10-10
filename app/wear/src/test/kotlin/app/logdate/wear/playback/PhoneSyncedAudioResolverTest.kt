@@ -3,12 +3,15 @@ package app.logdate.wear.playback
 import android.content.Context
 import app.logdate.client.media.audio.AudioRecordingTarget
 import app.logdate.client.media.audio.AudioStorage
+import app.logdate.client.media.storage.AndroidMediaDirectories
+import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.wear.sync.WearDataLayerClient
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import java.nio.file.Files
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -33,6 +36,7 @@ class PhoneSyncedAudioResolverTest {
     private val audioStorage = mockk<AudioStorage>()
     private val dataLayerClient = mockk<WearDataLayerClient>(relaxed = true)
     private val notesRepository = mockk<SyncableJournalNotesRepository>(relaxed = true)
+    private val filesDir = Files.createTempDirectory("wear-files").toFile()
 
     @Before
     fun setUp() {
@@ -48,7 +52,23 @@ class PhoneSyncedAudioResolverTest {
             dataLayerClient = dataLayerClient,
             notesRepository = notesRepository,
             ioDispatcher = dispatcher,
+            mediaFiles = MediaFileResolver(AndroidMediaDirectories(filesDir)),
         )
+
+    @Test
+    fun `plays a media reference whose recording is on the watch without download`() =
+        runTest {
+            val noteId = Uuid.random()
+            File(filesDir, "audio_notes").mkdirs()
+            File(filesDir, "audio_notes/recording $noteId.m4a").writeText("audio")
+            val reference = "logdate-media://recordings/recording%20$noteId.m4a"
+
+            val result = buildResolver().resolvePlayableUri(audioNote(noteId = noteId, mediaRef = reference))
+
+            assertEquals(reference, result.getOrNull())
+            coVerify(exactly = 0) { dataLayerClient.downloadAudioFromPhone(any(), any()) }
+            filesDir.deleteRecursively()
+        }
 
     @Test
     fun `returns existing local media ref without download`() =

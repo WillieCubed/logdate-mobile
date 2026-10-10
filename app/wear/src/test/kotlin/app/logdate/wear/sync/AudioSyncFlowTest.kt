@@ -1,6 +1,8 @@
 package app.logdate.wear.sync
 
 import app.logdate.client.database.dao.HealthSnapshotDao
+import app.logdate.client.media.storage.AndroidMediaDirectories
+import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
@@ -19,6 +21,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import kotlin.io.path.createTempDirectory
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -83,6 +86,7 @@ class AudioSyncFlowTest {
                 journalDataMapper = JournalDataMapper(),
                 associationDataMapper = AssociationDataMapper(),
                 healthSnapshotDataMapper = HealthSnapshotDataMapper(),
+                mediaFiles = MediaFileResolver(AndroidMediaDirectories(createTempDirectory().toFile())),
             )
     }
 

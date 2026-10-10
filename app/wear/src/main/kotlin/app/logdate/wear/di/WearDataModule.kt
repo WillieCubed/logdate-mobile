@@ -7,6 +7,8 @@ import app.logdate.client.data.location.OfflineFirstLocationHistoryRepository
 import app.logdate.client.data.notes.EmptyNotePlaceResolver
 import app.logdate.client.data.notes.NotePlaceResolver
 import app.logdate.client.data.notes.OfflineFirstJournalNotesRepository
+import app.logdate.client.data.notes.StoredMediaReferenceMigration
+import app.logdate.client.data.notes.StoredMediaReferenceMigrationLauncher
 import app.logdate.client.data.rewind.OfflineFirstRewindRepository
 import app.logdate.client.database.databaseModule
 import app.logdate.client.device.di.deviceInstanceModule
@@ -94,6 +96,7 @@ val wearDataModule =
                 journalDataMapper = get(),
                 associationDataMapper = get(),
                 healthSnapshotDataMapper = get(),
+                mediaFiles = get(),
             )
         } binds arrayOf(SyncManager::class, WearNoteAckHandler::class, WearNoteRemovalNotifier::class)
         single { WearPhoneMessageHandler(ackHandler = get(), syncManager = get()) }
@@ -147,8 +150,11 @@ val wearDataModule =
                 notePlaceResolver = get(),
                 syncManagerProvider = { get() },
                 syncMetadataService = get(),
+                mediaReferences = get(),
             )
         }
+        single { StoredMediaReferenceMigration(get(), get(), get(), get()) }
+        single(createdAtStart = true) { StoredMediaReferenceMigrationLauncher(get()).also { it.start() } }
     }
 
 /**

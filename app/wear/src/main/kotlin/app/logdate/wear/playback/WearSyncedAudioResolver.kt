@@ -3,6 +3,7 @@ package app.logdate.wear.playback
 import android.content.Context
 import android.net.Uri
 import app.logdate.client.media.audio.AudioStorage
+import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
@@ -22,6 +23,7 @@ class PhoneSyncedAudioResolver(
     private val dataLayerClient: WearDataLayerClient,
     private val notesRepository: JournalNotesRepository,
     private val ioDispatcher: CoroutineDispatcher,
+    private val mediaFiles: MediaFileResolver,
 ) : WearSyncedAudioResolver {
     override suspend fun resolvePlayableUri(note: JournalNote.Audio): Result<String> {
         val result =
@@ -59,14 +61,7 @@ class PhoneSyncedAudioResolver(
             }.getOrDefault(false)
         }
 
-        val filePath =
-            when {
-                mediaRef.startsWith("file://") -> Uri.parse(mediaRef).path
-                mediaRef.startsWith("/") -> mediaRef
-                else -> null
-            }
-
-        return filePath?.let { File(it).exists() } ?: false
+        return mediaFiles.filePath(mediaRef)?.let { File(it).exists() } ?: false
     }
 
     private fun inferExtension(mediaRef: String): String {

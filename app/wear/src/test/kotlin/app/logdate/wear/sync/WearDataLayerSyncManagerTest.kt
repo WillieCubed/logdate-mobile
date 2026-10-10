@@ -1,6 +1,8 @@
 package app.logdate.wear.sync
 
 import app.logdate.client.database.dao.HealthSnapshotDao
+import app.logdate.client.media.storage.AndroidMediaDirectories
+import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
@@ -21,6 +23,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlin.io.path.createTempDirectory
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -133,6 +136,7 @@ class WearDataLayerSyncManagerTest {
                 journalDataMapper = journalDataMapper,
                 associationDataMapper = associationDataMapper,
                 healthSnapshotDataMapper = healthSnapshotDataMapper,
+                mediaFiles = MediaFileResolver(AndroidMediaDirectories(createTempDirectory().toFile())),
             )
     }
 
@@ -149,6 +153,7 @@ class WearDataLayerSyncManagerTest {
             journalDataMapper = journalDataMapper,
             associationDataMapper = associationDataMapper,
             healthSnapshotDataMapper = healthSnapshotDataMapper,
+            mediaFiles = MediaFileResolver(AndroidMediaDirectories(createTempDirectory().toFile())),
             clock =
                 object : Clock {
                     override fun now(): Instant = fixedTime
