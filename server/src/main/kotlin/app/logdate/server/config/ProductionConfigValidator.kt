@@ -13,7 +13,7 @@ import java.util.Base64
  */
 object ProductionConfigValidator {
     private const val MIN_JWT_SECRET_LENGTH = 32
-    private const val MIN_SIGNING_KEY_KEK_LENGTH = 32
+    private const val MIN_DEDICATED_SECRET_LENGTH = 32
 
     private const val ANDROID_ORIGIN_PREFIX = "android:apk-key-hash:"
 
@@ -51,7 +51,19 @@ object ProductionConfigValidator {
         val failures = mutableListOf<String>()
 
         validateJwtSecret(readEnv, failures)
-        validateAtprotoSigningKeyKek(readEnv, failures)
+        validateDedicatedSecret(
+            AtprotoSigningKeyKek,
+            "It encrypts hosted AT Protocol signing keys; a deployment that already stores keys must keep the exact " +
+                "value that encrypted them (see server/docs/environment-variables.md).",
+            readEnv,
+            failures,
+        )
+        validateDedicatedSecret(
+            AtprotoSessionSecret,
+            "It signs hosted AT Protocol session tokens (see server/docs/environment-variables.md).",
+            readEnv,
+            failures,
+        )
         validateDatabase(readEnv, failures)
         validateBlobStorage(readEnv, failures)
         val publicOrigin = validatePublicOrigin(readEnv, failures)
@@ -92,21 +104,19 @@ object ProductionConfigValidator {
         }
     }
 
-    private fun validateAtprotoSigningKeyKek(
+    private fun validateDedicatedSecret(
+        secret: DedicatedSecret,
+        purpose: String,
         readEnv: (String) -> String?,
         failures: MutableList<String>,
     ) {
-        val name = AtprotoSigningKeyKek.ENV_VAR
-        val kek = readEnv(name)?.trim().orEmpty()
+        val name = secret.envVar
+        val value = readEnv(name)?.trim().orEmpty()
         when {
-            kek.isEmpty() ->
-                failures +=
-                    "$name is required in production. It encrypts hosted AT Protocol signing keys; a deployment " +
-                    "that already stores keys must keep the exact value that encrypted them (see server/docs/environment-variables.md)."
-            kek.length < MIN_SIGNING_KEY_KEK_LENGTH ->
-                failures += "$name must be at least $MIN_SIGNING_KEY_KEK_LENGTH characters (got ${kek.length})."
-            kek.lowercase() in INSECURE_JWT_SECRETS ->
-                failures += "$name is set to a known placeholder value."
+            value.isEmpty() -> failures += "$name is required in production. $purpose"
+            value.length < MIN_DEDICATED_SECRET_LENGTH ->
+                failures += "$name must be at least $MIN_DEDICATED_SECRET_LENGTH characters (got ${value.length})."
+            value.lowercase() in INSECURE_JWT_SECRETS -> failures += "$name is set to a known placeholder value."
         }
     }
 

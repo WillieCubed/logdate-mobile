@@ -362,6 +362,7 @@ DATABASE_USER=logdate-db-user:1
 DATABASE_PASSWORD=logdate-db-password:1
 JWT_SECRET=logdate-jwt-secret:latest
 ATPROTO_SIGNING_KEY_KEK=logdate-atproto-signing-key-kek:latest
+ATPROTO_SESSION_SECRET=logdate-atproto-session-secret:latest
 SERVER_ENCRYPTION_KEY=logdate-server-encryption-key:latest
 SERVER_ENCRYPTION_KEY_ID=logdate-server-encryption-key-id:latest
 SECRETEOF
@@ -605,6 +606,7 @@ assert_contains '"DATABASE_PASSWORD": { "secret_id": "logdate-db-password", "ver
 assert_contains 'serviceusage.googleapis.com' "$(cat "$LOG_DIR/gcloud.log")"
 assert_contains 'secrets versions add logdate-jwt-secret' "$(cat "$LOG_DIR/gcloud.log")"
 assert_contains 'secrets versions add logdate-atproto-signing-key-kek' "$(cat "$LOG_DIR/gcloud.log")"
+assert_contains 'secrets versions add logdate-atproto-session-secret' "$(cat "$LOG_DIR/gcloud.log")"
 assert_contains '--config' "$(cat "$LOG_DIR/curl.log")"
 assert_contains 'POST' "$(cat "$LOG_DIR/cloud-sql-methods")"
 assert_not_contains '/sql/v1beta4/' "$(cat "$LOG_DIR/curl.log")"

@@ -212,7 +212,7 @@ These development/test-only variables provide the local PostgreSQL fallback when
   - Must be at least 32 characters.
   - Known placeholder values (e.g. `your-secret-key-change-in-production`) are rejected at startup.
   - Store in a secret manager; never commit.
-  - Rotate periodically. Hosted AT Protocol signing keys are encrypted with `ATPROTO_SIGNING_KEY_KEK`, not with this secret, so rotating it does not affect them.
+  - Rotate periodically. Hosted AT Protocol signing keys are encrypted with `ATPROTO_SIGNING_KEY_KEK`, and AT Protocol session tokens are signed with `ATPROTO_SESSION_SECRET`, so rotating this secret affects neither.
 
 ### `ATPROTO_SIGNING_KEY_KEK`
 - **Description**: The secret that encrypts each account's hosted AT Protocol signing key at rest (a *key-encryption key*). The server derives an AES-256 key from it to wrap the private keys stored in the database, and unwraps them whenever it signs a repository commit, a PLC operation or a key export.
@@ -224,6 +224,17 @@ These development/test-only variables provide the local PostgreSQL fallback when
   - A different value leaves every stored signing key unreadable: commits, PLC operations and key exports fail. Never change it in place. Moving to a new value means re-encrypting every stored key first.
   - Before this variable existed, deployed servers encrypted signing keys with `JWT_SECRET`. An existing deployment must therefore start this secret from the **exact bytes** of the `JWT_SECRET` version it has been running with. Copy the version byte for byte, then compare SHA-256 digests of the two versions before deploying.
   - A new deployment with no stored keys uses a fresh random value, independent of `JWT_SECRET`.
+  - Store in a secret manager; never commit.
+
+### `ATPROTO_SESSION_SECRET`
+- **Description**: The secret that signs the access and refresh tokens the server issues to AT Protocol clients through `com.atproto.server.createSession` and `refreshSession`. The LogDate apps sign in with their own tokens and do not use these.
+- **Type**: String (minimum 32 characters in production).
+- **Default**: None in production. Development and test fall back to a fixed value published in the source code.
+- **Example**: `ATPROTO_SESSION_SECRET=$(openssl rand -base64 48)`
+- **Required**: **Yes, in production.** `LOGDATE_ENV=production` refuses to start without it. The server never falls back to `JWT_SECRET`.
+- **Security**:
+  - Anyone holding this value can mint AT Protocol session tokens for any account, which is why a published fallback is never acceptable outside a developer's machine.
+  - Before this variable existed, deployed servers signed these tokens with `JWT_SECRET`. A new value signs out every AT Protocol client session, and their users sign in again; nothing is lost. Copying the `JWT_SECRET` version byte for byte keeps those sessions working instead, at the cost of keeping the two secrets identical.
   - Store in a secret manager; never commit.
 
 ### `GOOGLE_OIDC_CLIENT_IDS`
@@ -493,6 +504,7 @@ AUTO_MIGRATE=false
 # Auth
 JWT_SECRET=${JWT_SECRET_FROM_SECRET_MANAGER}
 ATPROTO_SIGNING_KEY_KEK=${ATPROTO_SIGNING_KEY_KEK_FROM_SECRET_MANAGER}
+ATPROTO_SESSION_SECRET=${ATPROTO_SESSION_SECRET_FROM_SECRET_MANAGER}
 
 # Public identity, release, and internal health
 LOGDATE_PUBLIC_ORIGIN=https://cloud.logdate.app
@@ -549,12 +561,14 @@ ALLOW_PASSTHROUGH_CLIENT_CIPHERTEXT=true
 2. **Rotate secrets periodically**
    - `JWT_SECRET`: Rotate quarterly
    - `ATPROTO_SIGNING_KEY_KEK`: Never change in place; stored signing keys must be re-encrypted under the new value first
+   - `ATPROTO_SESSION_SECRET`: Rotate as needed; rotating signs out every AT Protocol client session
    - `SERVER_ENCRYPTION_KEY`: Support multiple keys via key rotation (increment `SERVER_ENCRYPTION_KEY_ID`)
    - Database passwords: Rotate annually or after security incidents
 
 3. **Use strong values**
    - `JWT_SECRET`: Minimum 32 characters, random
    - `ATPROTO_SIGNING_KEY_KEK`: Minimum 32 characters, random, and independent of `JWT_SECRET` for new deployments
+   - `ATPROTO_SESSION_SECRET`: Minimum 32 characters, random, independent of every other secret
    - `SERVER_ENCRYPTION_KEY`: Use `openssl rand -base64 32` for AES-256
    - Database passwords: 16+ characters, random
 

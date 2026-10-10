@@ -659,6 +659,7 @@ cloud_run_secret_env = {
   DATABASE_PASSWORD        = { secret_id = "logdate-db-password", version = "1" }
   JWT_SECRET               = { secret_id = "logdate-jwt-secret", version = "1" }
   ATPROTO_SIGNING_KEY_KEK  = { secret_id = "logdate-atproto-signing-key-kek", version = "1" }
+  ATPROTO_SESSION_SECRET   = { secret_id = "logdate-atproto-session-secret", version = "1" }
   SERVER_ENCRYPTION_KEY    = { secret_id = "logdate-server-encryption-key", version = "1" }
   SERVER_ENCRYPTION_KEY_ID = { secret_id = "logdate-server-encryption-key-id", version = "1" }
   HEALTH_INTERNAL_TOKEN    = { secret_id = "logdate-health-internal-token", version = "1" }
@@ -1035,6 +1036,14 @@ phase_4_secrets() {
     else
         log_info "Generating AT Protocol signing-key secret via openssl rand -base64 48"
         put_secret_value logdate-atproto-signing-key-kek "$(openssl rand -base64 48 | tr -d '\n')"
+    fi
+
+    # A new session secret only signs out AT Protocol client sessions, so it is always generated fresh.
+    if secret_has_version logdate-atproto-session-secret; then
+        log_info "logdate-atproto-session-secret already has a version — skipping"
+    else
+        log_info "Generating AT Protocol session secret via openssl rand -base64 48"
+        put_secret_value logdate-atproto-session-secret "$(openssl rand -base64 48 | tr -d '\n')"
     fi
 
     resolve_and_put_secret logdate-db-url      DATABASE_URL      ""         "DATABASE_URL (jdbc:postgresql://host/db?user=X&password=Y&sslmode=require)"

@@ -741,6 +741,7 @@ bootstrap_runtime_secrets() {
         exit 1
     fi
     ensure_secret_file "logdate-atproto-signing-key-kek" generate_base64_secret "$SENSITIVE_WORKDIR/atproto-signing-key-kek"
+    ensure_secret_file "logdate-atproto-session-secret" generate_base64_secret "$SENSITIVE_WORKDIR/atproto-session-secret"
     ensure_secret_file "logdate-server-encryption-key" generate_base64_secret "$SENSITIVE_WORKDIR/encryption-key"
     ensure_literal_secret_file "logdate-server-encryption-key-id" "${SERVICE_NAME}-v1" "$SENSITIVE_WORKDIR/encryption-key-id"
     ensure_secret_file "logdate-health-internal-token" generate_health_token "$SENSITIVE_WORKDIR/health-token"
@@ -832,6 +833,7 @@ ${github_repo_line}  "artifact_registry_repo": "${ARTIFACT_REGISTRY_REPO}",
     "DATABASE_PASSWORD": { "secret_id": "logdate-db-password"${database_password_version_json} },
     "JWT_SECRET": { "secret_id": "logdate-jwt-secret" },
     "ATPROTO_SIGNING_KEY_KEK": { "secret_id": "logdate-atproto-signing-key-kek" },
+    "ATPROTO_SESSION_SECRET": { "secret_id": "logdate-atproto-session-secret" },
     "SERVER_ENCRYPTION_KEY": { "secret_id": "logdate-server-encryption-key" },
     "SERVER_ENCRYPTION_KEY_ID": { "secret_id": "logdate-server-encryption-key-id" },
     "HEALTH_INTERNAL_TOKEN": { "secret_id": "logdate-health-internal-token" }

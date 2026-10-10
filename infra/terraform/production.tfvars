@@ -92,6 +92,9 @@ cloud_run_secret_env = {
   # logdate-jwt-secret version 1, which encrypted every key stored before this secret existed
   # (server/docs/environment-variables.md#atproto_signing_key_kek).
   ATPROTO_SIGNING_KEY_KEK = { secret_id = "logdate-atproto-signing-key-kek", version = "1" }
+  # Signs hosted AT Protocol session tokens. A new value signs out every AT Protocol client
+  # session; the LogDate apps are unaffected.
+  ATPROTO_SESSION_SECRET = { secret_id = "logdate-atproto-session-secret", version = "1" }
   # Required by the first-party contract. Create a version for each of these in the production
   # project's Secret Manager before deploying; Cloud Run rejects an empty mounted secret.
   SERVER_ENCRYPTION_KEY    = { secret_id = "logdate-server-encryption-key", version = "1" }

@@ -31,6 +31,7 @@ import app.logdate.server.auth.PendingEmailVerificationRepository
 import app.logdate.server.auth.RefreshTokenRevocationRepository
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.TokenService
+import app.logdate.server.config.AtprotoSessionSecret
 import app.logdate.server.config.AtprotoSigningKeyKek
 import app.logdate.server.config.RuntimeProfile
 import app.logdate.server.config.profileAwareBoolEnv
@@ -329,7 +330,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             )
         }
         single { AtprotoPasswordService(repository = get()) }
-        single { AtprotoSessionTokenService(sessionRepository = get()) }
+        single { AtprotoSessionTokenService(sessionRepository = get(), secret = AtprotoSessionSecret.resolve()) }
         single<PdsSessionService> {
             AtprotoPdsSessionService(
                 accountRepository = get(),

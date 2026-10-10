@@ -67,6 +67,7 @@ for secret_id in \
     logdate-db-password \
     logdate-jwt-secret \
     logdate-atproto-signing-key-kek \
+    logdate-atproto-session-secret \
     logdate-server-encryption-key \
     logdate-server-encryption-key-id \
     logdate-health-internal-token; do

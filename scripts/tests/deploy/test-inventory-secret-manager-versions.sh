@@ -57,6 +57,9 @@ case "$*" in
     "secrets versions list logdate-atproto-signing-key-kek --project $project"*)
         printf 'projects/%s/secrets/logdate-atproto-signing-key-kek/versions/1\n' "${GCLOUD_VERSION_PROJECT:-$project}"
         ;;
+    "secrets versions list logdate-atproto-session-secret --project $project"*)
+        printf 'projects/%s/secrets/logdate-atproto-session-secret/versions/1\n' "${GCLOUD_VERSION_PROJECT:-$project}"
+        ;;
     "secrets versions list logdate-server-encryption-key --project $project"*)
         printf 'projects/%s/secrets/logdate-server-encryption-key/versions/5\n' "${GCLOUD_VERSION_PROJECT:-$project}"
         ;;
@@ -93,6 +96,7 @@ assert_contains 'secret_id=logdate-db-user' "$staging_output"
 assert_contains 'secret_id=logdate-db-password' "$staging_output"
 assert_contains 'secret_id=logdate-jwt-secret' "$staging_output"
 assert_contains 'secret_id=logdate-atproto-signing-key-kek' "$staging_output"
+assert_contains 'secret_id=logdate-atproto-session-secret' "$staging_output"
 assert_contains 'secret_id=logdate-server-encryption-key' "$staging_output"
 assert_contains 'secret_id=logdate-server-encryption-key-id' "$staging_output"
 assert_contains 'secret_id=logdate-health-internal-token' "$staging_output"

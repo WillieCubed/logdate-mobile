@@ -179,7 +179,7 @@ public class AtprotoPasswordService(
 @OptIn(ExperimentalUuidApi::class)
 public class AtprotoSessionTokenService(
     private val sessionRepository: AtprotoSessionRepository,
-    private val secret: String = System.getenv("ATPROTO_SESSION_SECRET") ?: System.getenv("JWT_SECRET") ?: "logdate-atproto-session-dev",
+    private val secret: String,
     private val issuer: String = "logdate.app",
     private val audience: String = "atproto-pds",
     private val clock: Clock = Clock.System,

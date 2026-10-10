@@ -28,6 +28,9 @@ cloud_run_secret_env = {
   # Encrypts hosted AT Protocol signing keys. A new deployment uses a fresh random value; an
   # existing one keeps the exact value that encrypted its stored keys.
   ATPROTO_SIGNING_KEY_KEK  = { secret_id = "logdate-atproto-signing-key-kek", version = "1" }
+  # Signs hosted AT Protocol session tokens. A new value signs out every AT Protocol client
+  # session; the LogDate apps are unaffected.
+  ATPROTO_SESSION_SECRET   = { secret_id = "logdate-atproto-session-secret", version = "1" }
   GOOGLE_OIDC_CLIENT_IDS   = { secret_id = "logdate-google-oidc-client-ids", version = "1" }
   REDIS_URL                = { secret_id = "logdate-redis-url", version = "1" }
   SERVER_ENCRYPTION_KEY    = { secret_id = "logdate-server-encryption-key", version = "1" }

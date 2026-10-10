@@ -69,6 +69,7 @@ services:
       # Matches JWT_SECRET because local signing keys created before this variable existed were
       # encrypted with it.
       ATPROTO_SIGNING_KEY_KEK: "dev-secret-change-in-production-very-long-key-for-security"
+      ATPROTO_SESSION_SECRET: "dev-atproto-session-secret-change-in-production-long-key"
       
       # WebAuthn Configuration (development)
       WEBAUTHN_RP_ID: "localhost"
