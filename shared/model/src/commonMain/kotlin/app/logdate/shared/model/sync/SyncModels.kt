@@ -73,6 +73,11 @@ data class ContentUploadRequest(
     val location: String? = null,
     /** Encrypted structured audio transcript. Omission preserves it while the source media is unchanged. */
     val transcript: String? = null,
+    /**
+     * The device the entry was captured on, encrypted by the apps, or null when it was not recorded.
+     * The server stores and returns it without reading it; an update that omits it leaves it as it is.
+     */
+    val capturedOn: String? = null,
 )
 
 @Serializable
@@ -110,6 +115,11 @@ data class ContentUpdateRequest(
     val location: String? = null,
     /** Encrypted structured audio transcript. Omission preserves it while the source media is unchanged. */
     val transcript: String? = null,
+    /**
+     * The device the entry was captured on, encrypted by the apps, or null when it was not recorded.
+     * The server stores and returns it without reading it; an update that omits it leaves it as it is.
+     */
+    val capturedOn: String? = null,
 )
 
 @Serializable
@@ -145,6 +155,11 @@ data class ContentChange(
     val location: String? = null,
     /** Encrypted structured audio transcript. Omission preserves an existing transcript. */
     val transcript: String? = null,
+    /**
+     * The device the entry was captured on, encrypted by the apps, or null when it was not recorded.
+     * The server stores and returns it without reading it; an update that omits it leaves it as it is.
+     */
+    val capturedOn: String? = null,
 )
 
 @Serializable

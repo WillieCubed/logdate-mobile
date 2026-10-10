@@ -88,6 +88,7 @@ private fun Route.contentRoutes(
                         photoPresentation = req.photoPresentation,
                         location = req.location,
                         transcript = req.transcript,
+                        capturedOn = req.capturedOn,
                     )
                 val strictCreate = call.isStrictCreate()
                 if (strictCreate || call.isCreateOnly()) {
@@ -198,6 +199,7 @@ private fun Route.contentRoutes(
                                 photoPresentation = req.photoPresentation ?: existing?.photoPresentation,
                                 location = req.location ?: existing?.location,
                                 transcript = req.transcript,
+                                capturedOn = req.capturedOn ?: existing?.capturedOn,
                             ),
                     )
                 call.respond(ContentUpdateResponse(contentId, updated.version, updated.lastUpdated))

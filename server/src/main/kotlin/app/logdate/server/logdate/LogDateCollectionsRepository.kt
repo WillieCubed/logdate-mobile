@@ -28,6 +28,8 @@ data class LogDateEntry(
     val location: String? = null,
     /** Opaque encrypted structured audio transcript. */
     val transcript: String? = null,
+    /** Opaque encrypted capture device; the server stores and returns it without reading it. */
+    val capturedOn: String? = null,
 )
 
 data class LogDateJournal(
