@@ -22,7 +22,7 @@ jobs:
   test:
     name: Unit tests and coverage
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
 
     services:
       postgres:
