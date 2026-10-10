@@ -40,6 +40,13 @@ internal interface LogDateCollectionsMetadataStore {
         recordKey: String,
     ): LogDateCollectionMetadata?
 
+    /** The deleted row for [recordKey], or null when the record is live, unknown, or its tombstone was purged. */
+    suspend fun tombstone(
+        userId: UUID,
+        collection: LogDateCollectionKind,
+        recordKey: String,
+    ): LogDateCollectionMetadata?
+
     suspend fun changes(
         userId: UUID,
         collection: LogDateCollectionKind,
@@ -135,6 +142,15 @@ internal class InMemoryLogDateCollectionsMetadataStore : LogDateCollectionsMetad
     ): LogDateCollectionMetadata? =
         metadataForUser(userId)[LogDateCollectionKey(collection = collection, recordKey = recordKey)]
             ?.takeUnless(LogDateCollectionRow::deleted)
+            ?.toMetadata()
+
+    override suspend fun tombstone(
+        userId: UUID,
+        collection: LogDateCollectionKind,
+        recordKey: String,
+    ): LogDateCollectionMetadata? =
+        metadataForUser(userId)[LogDateCollectionKey(collection = collection, recordKey = recordKey)]
+            ?.takeIf(LogDateCollectionRow::deleted)
             ?.toMetadata()
 
     override suspend fun changes(

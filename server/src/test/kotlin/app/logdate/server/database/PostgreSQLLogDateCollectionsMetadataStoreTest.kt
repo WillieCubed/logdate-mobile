@@ -3,6 +3,7 @@ package app.logdate.server.database
 import app.logdate.server.database.support.withH2Database
 import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
 import app.logdate.server.logdate.LogDateCollectionKind
+import app.logdate.server.logdate.LogDateCollectionMetadata
 import app.logdate.server.logdate.LogDateCollectionsMetadataStore
 import kotlinx.coroutines.runBlocking
 import studio.hypertext.atproto.identity.AtprotoDid
@@ -99,5 +100,31 @@ class PostgreSQLLogDateCollectionsMetadataStoreTest {
                 assertEquals(0, purged.journalPurged)
             }
         }
+    }
+
+    @Test
+    fun `tombstones are read only for deleted rows`() {
+        withH2Database(LogDateCollectionStatesTable, LogDateCollectionRecordsTable) {
+            runBlocking {
+                assertTombstones(PostgreSQLLogDateCollectionsMetadataStore())
+                assertTombstones(InMemoryLogDateCollectionsMetadataStore())
+            }
+        }
+    }
+
+    private suspend fun assertTombstones(store: LogDateCollectionsMetadataStore) {
+        val userId = UUID.randomUUID()
+        val repoDid = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
+        store.upsert(userId, repoDid, LogDateCollectionKind.ENTRY, "live")
+        store.upsert(userId, repoDid, LogDateCollectionKind.ENTRY, "gone")
+        val deleted = assertNotNull(store.delete(userId, repoDid, LogDateCollectionKind.ENTRY, "gone", 1_234L))
+
+        assertNull(store.tombstone(userId, LogDateCollectionKind.ENTRY, "live"))
+        assertNull(store.tombstone(userId, LogDateCollectionKind.ENTRY, "never"))
+        assertNull(store.tombstone(userId, LogDateCollectionKind.JOURNAL, "gone"))
+        assertEquals(
+            LogDateCollectionMetadata("gone", deleted.version, 1_234L),
+            store.tombstone(userId, LogDateCollectionKind.ENTRY, "gone"),
+        )
     }
 }

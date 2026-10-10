@@ -91,6 +91,25 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
             }
         }
 
+    override suspend fun tombstone(
+        userId: UUID,
+        collection: LogDateCollectionKind,
+        recordKey: String,
+    ): LogDateCollectionMetadata? =
+        withContext(Dispatchers.IO) {
+            transaction {
+                LogDateCollectionRecordsTable
+                    .selectAll()
+                    .where {
+                        (LogDateCollectionRecordsTable.userId eq userId) and
+                            (LogDateCollectionRecordsTable.collection eq collection.storageName) and
+                            (LogDateCollectionRecordsTable.recordKey eq recordKey) and
+                            (LogDateCollectionRecordsTable.deleted eq true)
+                    }.singleOrNull()
+                    ?.toCollectionMetadata()
+            }
+        }
+
     override suspend fun changes(
         userId: UUID,
         collection: LogDateCollectionKind,

@@ -240,6 +240,75 @@ interface LogDateCollectionsRepository {
         limit: Int,
     ): LogDateChangeSet<LogDateAssociation, LogDateAssociationDeletion>
 
+    /**
+     * Whether entry [id] is live, deleted, or unknown. This fallback reads the record and then scans the
+     * whole change feed for a tombstone; stores with an index of tombstones override it.
+     */
+    suspend fun entryState(
+        userId: UUID,
+        id: String,
+    ): LogDateRecordState {
+        getEntry(userId, id)?.let { return LogDateRecordState.Live(it.version) }
+        val tombstone =
+            entryChanges(userId, since = 0L, limit = Int.MAX_VALUE).deletions.lastOrNull { it.id == id }
+                ?: return LogDateRecordState.Absent
+        return LogDateRecordState.Deleted(tombstone.deletedAt, tombstone.serverVersion)
+    }
+
+    /** Whether journal [id] is live, deleted, or unknown. See [entryState]. */
+    suspend fun journalState(
+        userId: UUID,
+        id: String,
+    ): LogDateRecordState {
+        getJournal(userId, id)?.let { return LogDateRecordState.Live(it.version) }
+        val tombstone =
+            journalChanges(userId, since = 0L, limit = Int.MAX_VALUE).deletions.lastOrNull { it.id == id }
+                ?: return LogDateRecordState.Absent
+        return LogDateRecordState.Deleted(tombstone.deletedAt, tombstone.serverVersion)
+    }
+
+    /**
+     * Writes [entry] only if no live entry holds its ID. A deleted ID answers [ConditionalCreate.Deleted]
+     * when [respectTombstones] is set and is recreated otherwise. This fallback reads, then writes; stores
+     * that can create atomically override it.
+     */
+    suspend fun createEntryIfAbsent(
+        userId: UUID,
+        entry: LogDateEntry,
+        respectTombstones: Boolean,
+    ): ConditionalCreate<LogDateEntry> = entryState(userId, entry.id).createUnlessTaken(respectTombstones) { upsertEntry(userId, entry) }
+
+    /** Writes [journal] only if no live journal holds its ID. See [createEntryIfAbsent]. */
+    suspend fun createJournalIfAbsent(
+        userId: UUID,
+        journal: LogDateJournal,
+        respectTombstones: Boolean,
+    ): ConditionalCreate<LogDateJournal> =
+        journalState(userId, journal.id).createUnlessTaken(respectTombstones) { upsertJournal(userId, journal) }
+
+    /** Writes only the links that were never written; live and deleted links are reported and left alone. */
+    suspend fun createAssociationsIfAbsent(
+        userId: UUID,
+        associations: List<LogDateAssociation>,
+    ): AssociationCreateResults {
+        val live = listAssociations(userId).mapTo(mutableSetOf()) { LogDateAssociationRef(it.journalId, it.entryId) }
+        val tombstones = associationChanges(userId, since = 0L, limit = Int.MAX_VALUE).deletions.associateBy { it.association }
+        val existing = mutableListOf<LogDateAssociationRef>()
+        val deleted = mutableListOf<LogDateAssociationDeletion>()
+        val fresh = mutableListOf<LogDateAssociation>()
+        associations.forEach { association ->
+            val ref = LogDateAssociationRef(association.journalId, association.entryId)
+            val tombstone = tombstones[ref]
+            when {
+                ref in live -> existing += ref
+                tombstone != null -> deleted += tombstone
+                else -> fresh += association
+            }
+        }
+        val created = if (fresh.isEmpty()) emptyList() else upsertAssociations(userId, fresh)
+        return AssociationCreateResults(created, existing, deleted)
+    }
+
     suspend fun upsertDraft(
         userId: UUID,
         draft: LogDateDraft,

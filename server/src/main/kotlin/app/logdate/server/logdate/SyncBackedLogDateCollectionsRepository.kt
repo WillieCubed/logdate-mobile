@@ -53,6 +53,15 @@ class SyncBackedLogDateCollectionsRepository(
             if (getEntry(userId, entry.id) != null) null else writeEntry(userId, entry)
         }
 
+    override suspend fun createEntryIfAbsent(
+        userId: UUID,
+        entry: LogDateEntry,
+        respectTombstones: Boolean,
+    ): ConditionalCreate<LogDateEntry> =
+        creationMutex.withLock {
+            entryState(userId, entry.id).createUnlessTaken(respectTombstones) { writeEntry(userId, entry) }
+        }
+
     private fun writeEntry(
         userId: UUID,
         entry: LogDateEntry,
@@ -111,6 +120,15 @@ class SyncBackedLogDateCollectionsRepository(
     ): LogDateJournal? =
         creationMutex.withLock {
             if (getJournal(userId, journal.id) != null) null else writeJournal(userId, journal)
+        }
+
+    override suspend fun createJournalIfAbsent(
+        userId: UUID,
+        journal: LogDateJournal,
+        respectTombstones: Boolean,
+    ): ConditionalCreate<LogDateJournal> =
+        creationMutex.withLock {
+            journalState(userId, journal.id).createUnlessTaken(respectTombstones) { writeJournal(userId, journal) }
         }
 
     private fun writeJournal(

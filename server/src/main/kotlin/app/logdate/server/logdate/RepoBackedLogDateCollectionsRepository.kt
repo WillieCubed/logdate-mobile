@@ -32,6 +32,7 @@ internal class RepoBackedLogDateCollectionsRepository(
     internal val metadataStore: LogDateCollectionsMetadataStore,
 ) : LogDateCollectionsRepository {
     internal val repoEngine = DefaultRepoEngine(blockStore, signer = HostedRepoCommitSigner(accountRepository, signingKeyService))
+    private val conditionalWriter = RepoConditionalWriter(repoEngine, metadataStore)
 
     override suspend fun status(userId: UUID): LogDateCollectionsStatus = metadataStore.status(userId)
 
@@ -107,6 +108,78 @@ internal class RepoBackedLogDateCollectionsRepository(
         userId: UUID,
         id: String,
     ): Boolean = metadataStore.metadata(userId, LogDateCollectionKind.JOURNAL, id) != null
+
+    override suspend fun entryState(
+        userId: UUID,
+        id: String,
+    ): LogDateRecordState = conditionalWriter.state(userId, LogDateCollectionKind.ENTRY, id)
+
+    override suspend fun journalState(
+        userId: UUID,
+        id: String,
+    ): LogDateRecordState = conditionalWriter.state(userId, LogDateCollectionKind.JOURNAL, id)
+
+    override suspend fun createEntryIfAbsent(
+        userId: UUID,
+        entry: LogDateEntry,
+        respectTombstones: Boolean,
+    ): ConditionalCreate<LogDateEntry> {
+        val repoDid = canonicalRepoDid(userId)
+        return conditionalWriter
+            .createIfAbsent(
+                userId = userId,
+                repoDid = repoDid,
+                collection = LogDateCollectionKind.ENTRY,
+                recordId = entryRecordId(repoDid, entry.id),
+                value = entry.toRepoJson(),
+                respectTombstones = respectTombstones,
+            ).mapCreated { version -> entry.copy(version = version, lastUpdated = System.currentTimeMillis()) }
+    }
+
+    override suspend fun createJournalIfAbsent(
+        userId: UUID,
+        journal: LogDateJournal,
+        respectTombstones: Boolean,
+    ): ConditionalCreate<LogDateJournal> {
+        val repoDid = canonicalRepoDid(userId)
+        return conditionalWriter
+            .createIfAbsent(
+                userId = userId,
+                repoDid = repoDid,
+                collection = LogDateCollectionKind.JOURNAL,
+                recordId = journalRecordId(repoDid, journal.id),
+                value = journal.toRepoJson(),
+                respectTombstones = respectTombstones,
+            ).mapCreated { version -> journal.copy(version = version, lastUpdated = System.currentTimeMillis()) }
+    }
+
+    override suspend fun createAssociationsIfAbsent(
+        userId: UUID,
+        associations: List<LogDateAssociation>,
+    ): AssociationCreateResults {
+        val repoDid = canonicalRepoDid(userId)
+        val created = mutableListOf<LogDateAssociation>()
+        val existing = mutableListOf<LogDateAssociationRef>()
+        val deleted = mutableListOf<LogDateAssociationDeletion>()
+        associations.forEach { association ->
+            val ref = LogDateAssociationRef(association.journalId, association.entryId)
+            val outcome =
+                conditionalWriter.createIfAbsent(
+                    userId = userId,
+                    repoDid = repoDid,
+                    collection = LogDateCollectionKind.ASSOCIATION,
+                    recordId = associationRecordId(repoDid, association.journalId, association.entryId),
+                    value = association.toRepoJson(),
+                    respectTombstones = true,
+                )
+            when (outcome) {
+                is ConditionalCreate.Created -> created += association.copy(version = outcome.record)
+                is ConditionalCreate.Exists -> existing += ref
+                is ConditionalCreate.Deleted -> deleted += LogDateAssociationDeletion(ref, outcome.deletedAt, outcome.serverVersion)
+            }
+        }
+        return AssociationCreateResults(created, existing, deleted)
+    }
 
     private suspend fun indexExistingRecordIfNeeded(
         userId: UUID,
