@@ -88,7 +88,12 @@ The code lives in `client/feature/android-widgets/src/androidMain/kotlin/app/log
   `capture_widget_info.xml`, declares `home_screen|keyguard`, so Android offers it on the lock
   screen and the hub as well as the home screen; `capture_widget_preview.xml` is its picker preview.
   Each button sends the public capture action (`app.logdate.action.CAPTURE` with a mode), the same
-  one launcher shortcuts and tiles send. The widget module cannot depend on the app, so the action
+  one launcher shortcuts and tiles send. `captureWidgetIntent` also names LogDate's main window as the
+  intent's component. Glance gives every clickable intent a `glance-action:` data URI so their
+  PendingIntents stay distinct, and an intent Android resolves by its action alone must then match a
+  filter that declares that data; the capture filter declares none, so without the component Android
+  finds no activity and the tap does nothing. Naming the component skips filter matching, as the
+  other widgets' launch intents (`getLaunchIntentForPackage`) already do. The widget module cannot depend on the app, so the action
   and extra names are repeated in `CAPTURE_WIDGET_ACTION` and `CAPTURE_WIDGET_EXTRA_MODE`, and
   `CaptureWidgetContractTest` (app/compose-main) fails if they drift. `CaptureWidgetReceiver` is
   declared disabled and enabled by `PlatformComponentToggler` while `LOCK_SCREEN_CAPTURE_WIDGET` is
@@ -114,6 +119,8 @@ Home-screen widgets have no flag. The lock-screen capture widget is behind `LOCK
   `OnThisDayWidgetStateSerializationTest`, and `WidgetContentModelsTest`.
 - `OnThisDayWidgetPreviewTest` and `WidgetSetupScreenshotsTest` render widgets and setup screens on
   managed devices.
+- `CaptureWidgetIntentTest` (app/compose-main `androidHostTest`) checks that each Capture button is
+  addressed to the main window and still resolves after Glance adds its data URI.
 
 ## Updating screenshots
 

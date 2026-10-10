@@ -68,15 +68,25 @@ private val CaptureWidgetButton.circle: Int
             CaptureWidgetButton.Photo -> R.drawable.widget_action_camera
         }
 
-/** The intent a capture widget button sends, scoped to LogDate's own package. */
+/**
+ * The intent a capture widget button sends: the capture action, addressed to LogDate's main window.
+ *
+ * Glance gives each clickable intent a `glance-action:` data URI so their PendingIntents stay
+ * distinct. An intent resolved by its action alone would then have to match an intent filter that
+ * declares that data, and the capture filter declares none, so Android would find no activity. Naming
+ * the main window directly skips filter matching, as the other widgets' launches already do.
+ */
 fun captureWidgetIntent(
     context: Context,
     button: CaptureWidgetButton,
-): Intent =
-    Intent(CAPTURE_WIDGET_ACTION)
+): Intent {
+    val mainWindow = context.packageManager.getLaunchIntentForPackage(context.packageName)?.component
+    return Intent(CAPTURE_WIDGET_ACTION)
         .setPackage(context.packageName)
+        .setComponent(mainWindow)
         .putExtra(CAPTURE_WIDGET_EXTRA_MODE, button.mode)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+}
 
 /**
  * Starts an entry from the home screen, the lock screen, or the hub: Write, Record, or Photo.
