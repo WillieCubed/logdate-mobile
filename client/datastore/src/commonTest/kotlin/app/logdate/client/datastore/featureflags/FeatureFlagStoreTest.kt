@@ -39,6 +39,16 @@ class FeatureFlagStoreTest {
         }
 
     @Test
+    fun `journal merge is enabled unless explicitly disabled`() =
+        runTest {
+            assertTrue(store.isEnabled(FeatureFlag.JOURNAL_MERGE))
+
+            store.setEnabled(FeatureFlag.JOURNAL_MERGE, enabled = false)
+
+            assertFalse(store.isEnabled(FeatureFlag.JOURNAL_MERGE))
+        }
+
+    @Test
     fun `setting a flag persists it and overrides the default`() =
         runTest {
             store.setEnabled(FeatureFlag.LIBRARY, enabled = false)
