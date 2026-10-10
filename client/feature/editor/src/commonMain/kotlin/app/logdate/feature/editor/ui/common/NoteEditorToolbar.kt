@@ -30,8 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.editor.ui.editor.AutoSaveStatus
 import app.logdate.ui.platform.PlatformIcons
@@ -119,12 +117,7 @@ fun NoteEditorToolbar(
                     FilledTonalIconButton(
                         onClick = { onShowDrafts() },
                         enabled = actionsEnabled,
-                        modifier =
-                            Modifier
-                                .testTag(LOGDATE_EDITOR_DRAFTS_BUTTON_TAG)
-                                .semantics {
-                                    contentDescription = LOGDATE_EDITOR_DRAFTS_BUTTON_TAG
-                                },
+                        modifier = Modifier.testTag(LOGDATE_EDITOR_DRAFTS_BUTTON_TAG),
                     ) {
                         BadgedBox(
                             badge = {
@@ -142,12 +135,7 @@ fun NoteEditorToolbar(
                 FilledTonalIconButton(
                     onClick = { onSave() },
                     enabled = actionsEnabled && saveEnabled,
-                    modifier =
-                        Modifier
-                            .testTag(LOGDATE_EDITOR_SAVE_BUTTON_TAG)
-                            .semantics {
-                                contentDescription = LOGDATE_EDITOR_SAVE_BUTTON_TAG
-                            },
+                    modifier = Modifier.testTag(LOGDATE_EDITOR_SAVE_BUTTON_TAG),
                 ) {
                     Icon(
                         painter = PlatformIcons.save(),
