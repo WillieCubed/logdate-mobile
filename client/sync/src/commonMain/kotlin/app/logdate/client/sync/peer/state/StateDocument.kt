@@ -1,0 +1,119 @@
+package app.logdate.client.sync.peer.state
+
+import app.logdate.client.sync.datalayer.v2.CloudPresence
+import app.logdate.client.sync.datalayer.v2.Decoded
+import app.logdate.client.sync.datalayer.v2.WearJson
+import app.logdate.client.sync.datalayer.v2.WearProtocol
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+
+@Serializable
+enum class PeerRole {
+    PHONE,
+    WATCH,
+}
+
+/** A shared preference value with the time, by the writer's clock, it was written. */
+@Serializable
+data class Stamped(
+    val value: JsonElement,
+    val at: Long,
+)
+
+/** The campfire as the phone computed it; the watch's window is too short to compute a long run. */
+@Serializable
+data class CampfireSnapshot(
+    val phase: String,
+    val runDays: Int,
+    val litToday: Boolean,
+    val computedAt: Long,
+)
+
+/**
+ * Fields only the phone writes.
+ *
+ * @property flags Feature flag values by [app.logdate.client.datastore.featureflags.FeatureFlag.key].
+ * @property features The version 2 features this phone supports, from [app.logdate.client.sync.datalayer.v2.WearFeatures].
+ */
+@Serializable
+data class PhoneState(
+    val flags: Map<String, Boolean> = emptyMap(),
+    val cloud: CloudPresence = CloudPresence.UNKNOWN,
+    val campfire: CampfireSnapshot? = null,
+    val dayStartHour: Int = 0,
+    val zone: String? = null,
+    val openMarks: Int = 0,
+    val features: Set<String> = emptySet(),
+)
+
+@Serializable
+enum class PeerLinkState {
+    UNLINKED,
+    PAIRED,
+    LINKED,
+    NEEDS_RELINK,
+}
+
+@Serializable
+enum class PresenceState {
+    ON_WRIST,
+    OFF_WRIST,
+    UNKNOWN,
+}
+
+@Serializable
+data class Presence(
+    val state: PresenceState = PresenceState.UNKNOWN,
+    val observedAt: Long = 0,
+)
+
+/** Fields only the watch writes. */
+@Serializable
+data class WatchState(
+    val outboxCount: Int = 0,
+    val deadLetterCount: Int = 0,
+    val freeBytes: Long? = null,
+    val link: PeerLinkState = PeerLinkState.UNLINKED,
+    val presence: Presence = Presence(),
+    val features: Set<String> = emptySet(),
+)
+
+/**
+ * One device's state, written as a data item at [app.logdate.client.sync.datalayer.v2.WearPaths.STATE].
+ *
+ * Every field has one owner: a phone document's [watch] and a watch document's [phone] are ignored by
+ * [StateMerger]. [shared] entries are written by both and merged last-writer-wins.
+ */
+@Serializable
+data class StateDocument(
+    val schema: Int = WearProtocol.STATE_SCHEMA,
+    val role: PeerRole,
+    val writtenAt: Long,
+    val phone: PhoneState? = null,
+    val watch: WatchState? = null,
+    val shared: Map<String, Stamped> = emptyMap(),
+    val lastReminderAt: Long? = null,
+)
+
+/** Reads and writes [StateDocument]s, enforcing their size limit. */
+object StateDocumentCodec {
+    /** The data item key the document's JSON is stored under. */
+    const val KEY = "doc"
+
+    /** Throws [IllegalArgumentException] for a document over [WearProtocol.MAX_STATE_BYTES]. */
+    fun encode(document: StateDocument): String {
+        val text = WearJson.encode(StateDocument.serializer(), document)
+        val size = text.encodeToByteArray().size
+        require(size <= WearProtocol.MAX_STATE_BYTES) { "A state document is $size bytes; the limit is ${WearProtocol.MAX_STATE_BYTES}" }
+        return text
+    }
+
+    fun decode(text: String): Decoded<StateDocument> = WearJson.decode(text, WearProtocol.STATE_SCHEMA, StateDocument.serializer())
+
+    fun toDataMap(document: StateDocument): Map<String, String> = mapOf(KEY to encode(document))
+
+    fun fromDataMap(data: Map<String, String>): Decoded<StateDocument> {
+        val text = data[KEY] ?: return Decoded.Malformed("The data item has no state document")
+        return decode(text)
+    }
+}
