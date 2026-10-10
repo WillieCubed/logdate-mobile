@@ -41,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.client.domain.journals.MergeJournalsUseCase
 import app.logdate.client.domain.timeline.Timeline
 import app.logdate.feature.core.streak.CampfireViewModel
 import app.logdate.feature.core.sync.SyncAction
@@ -138,6 +139,8 @@ fun HomeScreen(
         }
     }
     val flags: FeatureFlagStore = koinInject()
+    val mergeJournals: MergeJournalsUseCase = koinInject()
+    val mergeIssues = remember(mergeJournals) { mergeJournals.observeIssues() }.collectAsStateWithLifecycle(initialValue = emptyList())
     val workspaceEnabled by remember(flags) { flags.observe(FeatureFlag.HOME_WORKSPACE_V2) }
         .collectAsStateWithLifecycle(initialValue = FeatureFlag.HOME_WORKSPACE_V2.defaultEnabled)
     if (workspaceEnabled) {
@@ -168,6 +171,7 @@ fun HomeScreen(
                     onOpenStreak,
                     onSyncAction,
                     accountSyncStatus.value,
+                    hasMergeRecovery = mergeIssues.value.isNotEmpty(),
                 )
             },
             modifier = modifier,

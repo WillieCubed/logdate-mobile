@@ -41,6 +41,7 @@ import app.logdate.server.database.PostgreSQLAtprotoSessionRepository
 import app.logdate.server.database.PostgreSQLDeviceEnrollmentRepository
 import app.logdate.server.database.PostgreSQLDiagnosticReportStore
 import app.logdate.server.database.PostgreSQLHostedPlcOperationRepository
+import app.logdate.server.database.PostgreSQLJournalMergeStore
 import app.logdate.server.database.PostgreSQLLogDateAtprotoBlobRepository
 import app.logdate.server.database.PostgreSQLLogDateBackupRepository
 import app.logdate.server.database.PostgreSQLLogDateCollectionsMetadataStore
@@ -68,18 +69,22 @@ import app.logdate.server.identity.SigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.logdate.CompositeLogDateMediaBlobRepository
 import app.logdate.server.logdate.FilesystemLogDateBlobStorage
+import app.logdate.server.logdate.InMemoryJournalMergeStore
 import app.logdate.server.logdate.InMemoryLogDateAtprotoBlobRepository
 import app.logdate.server.logdate.InMemoryLogDateBackupRepository
 import app.logdate.server.logdate.InMemoryLogDateBlobStorage
 import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
 import app.logdate.server.logdate.InMemoryLogDateMediaRepository
 import app.logdate.server.logdate.InMemoryResourceRouteRepository
+import app.logdate.server.logdate.JournalMergeStore
 import app.logdate.server.logdate.LogDateAtprotoBlobRepository
 import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateCollectionsMetadataStore
+import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.logdate.LogDateMediaBlobRepository
 import app.logdate.server.logdate.LogDateMediaRepository
+import app.logdate.server.logdate.MergeAwareLogDateCollectionsRepository
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
 import app.logdate.server.logdate.ResourceRouteRepository
 import app.logdate.server.oauth.InMemoryOAuthRuntimeStateRepository
@@ -385,9 +390,15 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 metadataStore = get(),
             )
         }
+        single<JournalMergeStore> {
+            if (isDatabaseAvailable) PostgreSQLJournalMergeStore() else InMemoryJournalMergeStore()
+        }
+        single<LogDateCollectionsRepository> {
+            MergeAwareLogDateCollectionsRepository(get<RepoBackedLogDateCollectionsRepository>(), get())
+        }
         single {
             LogDateRepoStore(
-                collectionsRepository = get<RepoBackedLogDateCollectionsRepository>(),
+                collectionsRepository = get<LogDateCollectionsRepository>(),
                 identityService = get(),
                 signingKeyService = get(),
                 accountRepository = get(),

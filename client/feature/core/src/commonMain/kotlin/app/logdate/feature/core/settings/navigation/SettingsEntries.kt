@@ -46,6 +46,7 @@ import app.logdate.feature.events.ui.calendarsync.CalendarSyncActivityScreen
 import app.logdate.feature.events.ui.calendarsync.CalendarSyncCalendarsScreen
 import app.logdate.feature.events.ui.calendarsync.CalendarSyncSettingsScreen
 import app.logdate.feature.events.ui.settings.EventsSettingsScreen
+import app.logdate.feature.journals.navigation.JournalMergeRoute
 import app.logdate.feature.rewind.ui.settings.RewindSettingsScreen
 import app.logdate.ui.navigation.ViewModelsPerVisit
 import app.logdate.ui.navigation.taggedEntry
@@ -206,6 +207,9 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
             onNavigateToSignIn = onNavigateToSignIn,
             onNavigateToRecoveryPhrase = { onNavigateTo(RecoveryPhraseRoute) },
+            onRecoverJournalMerge = { operation ->
+                onNavigateTo(JournalMergeRoute(operation.sourceId.toString(), operation.operationId.toString()))
+            },
         )
     }
     taggedEntry<RecoveryPhraseEntrySettingsRoute> {

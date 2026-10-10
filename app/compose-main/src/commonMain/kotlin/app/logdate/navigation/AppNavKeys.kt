@@ -57,6 +57,7 @@ import app.logdate.feature.events.navigation.EventDetailRoute
 import app.logdate.feature.journals.navigation.JournalContentPickerRoute
 import app.logdate.feature.journals.navigation.JournalCreationRoute
 import app.logdate.feature.journals.navigation.JournalDetailsRoute
+import app.logdate.feature.journals.navigation.JournalMergeRoute
 import app.logdate.feature.journals.navigation.JournalSettingsRoute
 import app.logdate.feature.journals.navigation.JournalsOverviewRoute
 import app.logdate.feature.journals.navigation.NoteDetailRoute
@@ -184,6 +185,7 @@ val appNavSavedStateConfiguration: SavedStateConfiguration =
                     // Journals
                     subclass(JournalsOverviewRoute::class, JournalsOverviewRoute.serializer())
                     subclass(JournalDetailsRoute::class, JournalDetailsRoute.serializer())
+                    subclass(JournalMergeRoute::class, JournalMergeRoute.serializer())
                     subclass(JournalContentPickerRoute::class, JournalContentPickerRoute.serializer())
                     subclass(JournalSettingsRoute::class, JournalSettingsRoute.serializer())
                     subclass(JournalCreationRoute::class, JournalCreationRoute.serializer())

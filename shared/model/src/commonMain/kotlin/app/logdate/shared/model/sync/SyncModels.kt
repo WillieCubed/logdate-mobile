@@ -213,6 +213,7 @@ data class JournalDeletion(
     val id: String,
     val deletedAt: Long,
     val serverVersion: Long = deletedAt,
+    val mergedIntoJournalId: String? = null,
 )
 
 @Serializable

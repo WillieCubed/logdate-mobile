@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlin.uuid.Uuid
 
@@ -35,6 +36,11 @@ class OfflineFirstJournalContentRepository(
     private val dispatcher: CoroutineDispatcher = platformIODispatcher,
 ) : JournalContentRepository,
     SyncableJournalContentRepository {
+    override fun observeJournalItemCounts(): Flow<Map<Uuid, Int>> =
+        journalContentDao.observeAllLinks().map { links ->
+            links.groupingBy { it.journalId }.eachCount()
+        }
+
     override fun observeContentForJournal(journalId: Uuid): Flow<List<JournalNote>> {
         // Use the JournalContentDao to get content IDs associated with this journal
         return journalContentDao
@@ -76,17 +82,18 @@ class OfflineFirstJournalContentRepository(
             if (uniqueContentIds.isEmpty()) return@withContext 0
 
             transactionManager.withTransaction {
+                val destination = journalRepository.resolveJournalId(journalId)
                 val newContentIds =
                     uniqueContentIds.filterNot { contentId ->
-                        journalContentDao.isContentInJournal(journalId, contentId)
+                        journalContentDao.isContentInJournal(destination, contentId)
                     }
 
                 newContentIds.forEach { contentId ->
-                    journalContentDao.addContentToJournal(JournalContentEntityLink(journalId, contentId))
+                    journalContentDao.addContentToJournal(JournalContentEntityLink(destination, contentId))
                 }
                 newContentIds.forEach { contentId ->
                     syncMetadataService.enqueuePending(
-                        entityId = AssociationPendingKey(journalId, contentId).toPendingId(),
+                        entityId = AssociationPendingKey(destination, contentId).toPendingId(),
                         entityType = EntityType.ASSOCIATION,
                         operation = PendingOperation.CREATE,
                     )
@@ -99,7 +106,7 @@ class OfflineFirstJournalContentRepository(
         contentId: Uuid,
         journalId: Uuid,
     ) = withContext(dispatcher) {
-        // Remove from the journal content links table using string IDs
+        if (journalRepository.resolveJournalId(journalId) != journalId) return@withContext
         journalContentDao.removeContentFromJournal(journalId, contentId)
 
         syncMetadataService.enqueuePending(
@@ -154,15 +161,25 @@ class OfflineFirstJournalContentRepository(
         contentId: Uuid,
         journalId: Uuid,
     ) = withContext(dispatcher) {
-        val link = JournalContentEntityLink(journalId, contentId)
-        journalContentDao.addContentToJournal(link)
+        transactionManager.withTransaction {
+            val destination = journalRepository.resolveJournalId(journalId)
+            journalContentDao.addContentToJournal(JournalContentEntityLink(destination, contentId))
+            if (destination != journalId) {
+                syncMetadataService.enqueueCreateIfAbsent(
+                    AssociationPendingKey(destination, contentId).toPendingId(),
+                    EntityType.ASSOCIATION,
+                )
+            }
+        }
     }
 
     override suspend fun removeContentFromJournalFromSync(
         contentId: Uuid,
         journalId: Uuid,
     ) = withContext(dispatcher) {
-        journalContentDao.removeContentFromJournal(journalId, contentId)
+        if (journalRepository.resolveJournalId(journalId) == journalId) {
+            journalContentDao.removeContentFromJournal(journalId, contentId)
+        }
     }
 }
 

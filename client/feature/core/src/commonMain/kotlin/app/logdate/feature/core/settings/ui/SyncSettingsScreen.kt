@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.CloudDone
@@ -34,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.logdate.client.domain.journals.MergeJournalsUseCase
+import app.logdate.client.repository.journals.JournalMergeOperation
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
@@ -52,6 +55,7 @@ import logdate.client.feature.core.generated.resources.sync_feedback_succeeded
 import logdate.client.feature.core.generated.resources.sync_feedback_up_to_date
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -66,8 +70,11 @@ fun SyncSettingsScreen(
     onNavigateToCloudAccountCreation: () -> Unit = {},
     onNavigateToSignIn: () -> Unit = {},
     onNavigateToRecoveryPhrase: () -> Unit = {},
+    onRecoverJournalMerge: (JournalMergeOperation) -> Unit = {},
     viewModel: DataSettingsViewModel = koinViewModel(),
+    mergeJournals: MergeJournalsUseCase = koinInject(),
 ) {
+    val mergeIssues by remember(mergeJournals) { mergeJournals.observeIssues() }.collectAsState(emptyList())
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -128,6 +135,8 @@ fun SyncSettingsScreen(
 
     SyncSettingsContent(
         onBack = onBack,
+        mergeIssues = mergeIssues,
+        onRecoverJournalMerge = onRecoverJournalMerge,
         syncStatus = uiState.syncStatus,
         cloudArchiveStatus = uiState.cloudArchiveStatus,
         isAuthenticated = isAuthenticated,
@@ -159,6 +168,8 @@ fun SyncSettingsContent(
     isQuotaAvailable: Boolean,
     snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier,
+    mergeIssues: List<JournalMergeOperation> = emptyList(),
+    onRecoverJournalMerge: (JournalMergeOperation) -> Unit = {},
 ) {
     SettingsScaffold(
         title = stringResource(Res.string.sync_and_backup),
@@ -180,6 +191,11 @@ fun SyncSettingsContent(
                     onSyncUsingMobileData = onSyncUsingMobileData,
                     modifier = Modifier.padding(horizontal = Spacing.lg),
                 )
+            }
+        }
+        if (isAuthenticated) {
+            items(mergeIssues, key = { it.operationId }) { operation ->
+                JournalMergeRecoveryItem(operation) { onRecoverJournalMerge(operation) }
             }
         }
     }

@@ -348,9 +348,10 @@ class OfflineFirstJournalNotesRepository(
                 note = note,
                 pendingMediaIndex = pendingMediaIndex,
             )
-            journalContentDao.addContentToJournal(JournalContentEntityLink(journalId, note.uid))
+            val destination = journalRepository.resolveJournalId(journalId)
+            journalContentDao.addContentToJournal(JournalContentEntityLink(destination, note.uid))
             syncMetadataService.enqueuePending(
-                entityId = AssociationPendingKey(journalId, note.uid).toPendingId(),
+                entityId = AssociationPendingKey(destination, note.uid).toPendingId(),
                 entityType = EntityType.ASSOCIATION,
                 operation = PendingOperation.CREATE,
             )
@@ -364,6 +365,7 @@ class OfflineFirstJournalNotesRepository(
         noteId: Uuid,
         journalId: Uuid,
     ) {
+        if (journalRepository.resolveJournalId(journalId) != journalId) return
         journalContentDao.removeContentFromJournal(journalId, noteId)
 
         syncMetadataService.enqueuePending(

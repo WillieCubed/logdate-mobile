@@ -20,6 +20,7 @@ fun <T : Any> rememberWorkspaceRouteDecorator(): NavEntryDecorator<T> =
                         app.logdate.feature.journals.navigation.JournalsOverviewRoute::class,
                         app.logdate.feature.journals.navigation.JournalDetailsRoute::class,
                         app.logdate.feature.journals.navigation.JournalContentPickerRoute::class,
+                        app.logdate.feature.journals.navigation.JournalMergeRoute::class,
                         app.logdate.feature.journals.navigation.NoteDetailRoute::class,
                         app.logdate.feature.library.navigation.LibraryOverviewRoute::class,
                         app.logdate.feature.library.navigation.MediaDetailRoute::class,
@@ -28,7 +29,14 @@ fun <T : Any> rememberWorkspaceRouteDecorator(): NavEntryDecorator<T> =
                     )
             if (workspaceRoute && !isAlwaysFullscreen(route)) {
                 app.logdate.ui.workspace
-                    .WorkspaceRouteFrame { entry.Content() }
+                    .WorkspaceRouteFrame(
+                        focusConstraints =
+                            if (route == app.logdate.feature.journals.navigation.JournalMergeRoute::class) {
+                                app.logdate.ui.workspace.PanelConstraints.ReadingCollection
+                            } else {
+                                app.logdate.ui.workspace.PanelConstraints.Reading
+                            },
+                    ) { entry.Content() }
             } else {
                 entry.Content()
             }

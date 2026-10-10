@@ -24,7 +24,7 @@ import app.logdate.server.identity.SigningKeyService
 import app.logdate.server.logdate.CompositeLogDateMediaBlobRepository
 import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateBlobStorage
-import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
+import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.logdate.ResourceRouteRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
@@ -171,7 +171,7 @@ internal fun Application.contentApiRoutes() {
     val diagnosticReportAvailability by inject<app.logdate.server.diagnostics.DiagnosticReportAvailability>()
     val diagnosticReportStore by inject<app.logdate.server.diagnostics.DiagnosticReportStore>()
     val blobStorage by inject<LogDateBlobStorage>()
-    val logDateCollectionsRepository by inject<RepoBackedLogDateCollectionsRepository>()
+    val logDateCollectionsRepository by inject<LogDateCollectionsRepository>()
     val logDateMediaBlobRepository by inject<CompositeLogDateMediaBlobRepository>()
     val logDateBackupRepository by inject<LogDateBackupRepository>()
     val resourceRouteRepository by inject<ResourceRouteRepository>()

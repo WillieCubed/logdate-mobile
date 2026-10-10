@@ -39,6 +39,7 @@ import app.logdate.client.database.dao.UserMediaDao
 import app.logdate.client.database.dao.UserPlaceDao
 import app.logdate.client.database.dao.VideoNoteDao
 import app.logdate.client.database.dao.journals.JournalContentDao
+import app.logdate.client.database.dao.journals.JournalMergeDao
 import app.logdate.client.database.dao.maintenance.IntegrityDao
 import app.logdate.client.database.dao.media.IndexedMediaDao
 import app.logdate.client.database.dao.media.MediaExifDao
@@ -77,6 +78,7 @@ import app.logdate.client.database.entities.UserDeviceEntity
 import app.logdate.client.database.entities.UserPlaceEntity
 import app.logdate.client.database.entities.VideoNoteEntity
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
+import app.logdate.client.database.entities.journals.JournalMergeEntity
 import app.logdate.client.database.entities.media.IndexedImageEntity
 import app.logdate.client.database.entities.media.IndexedVideoEntity
 import app.logdate.client.database.entities.media.MediaExifMetadataEntity
@@ -141,6 +143,7 @@ import app.logdate.client.database.migrations.MIGRATION_48_49
 import app.logdate.client.database.migrations.MIGRATION_49_50
 import app.logdate.client.database.migrations.MIGRATION_4_5
 import app.logdate.client.database.migrations.MIGRATION_50_51
+import app.logdate.client.database.migrations.MIGRATION_51_52
 import app.logdate.client.database.migrations.MIGRATION_5_6
 import app.logdate.client.database.migrations.MIGRATION_6_7
 import app.logdate.client.database.migrations.MIGRATION_7_8
@@ -173,6 +176,7 @@ import kotlinx.coroutines.CoroutineDispatcher
         UserDeviceEntity::class,
         MediaImageEntity::class,
         JournalContentEntityLink::class,
+        JournalMergeEntity::class,
         // Rewind entities
         RewindEntity::class,
         RewindTextContentEntity::class,
@@ -213,7 +217,7 @@ import kotlinx.coroutines.CoroutineDispatcher
         PersonLinkEntity::class,
         PersonResolutionDecisionEntity::class,
     ],
-    version = 51,
+    version = 52,
     exportSchema = true,
 )
 @TypeConverters(
@@ -237,6 +241,8 @@ abstract class LogDateDatabase : RoomDatabase() {
     abstract fun journalDao(): JournalDao
 
     abstract fun journalNotesDao(): JournalNotesDao
+
+    abstract fun journalMergeDao(): JournalMergeDao
 
     abstract fun journalContentDao(): JournalContentDao
 
@@ -418,4 +424,5 @@ private fun databaseMigrations() =
         MIGRATION_48_49,
         MIGRATION_49_50,
         MIGRATION_50_51,
+        MIGRATION_51_52,
     )

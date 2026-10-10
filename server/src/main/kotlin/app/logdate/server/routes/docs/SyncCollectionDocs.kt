@@ -284,6 +284,14 @@ internal object SyncCollectionDocs {
                     "Journal already exists",
                 ),
             )
+            syncError(
+                HttpStatusCode.Conflict,
+                ErrorCase(
+                    "JOURNAL_MERGED",
+                    "The source journal was merged. details.destinationId identifies its survivor.",
+                    "Journal has been merged",
+                ),
+            )
             syncUnauthorized()
             syncServerError()
         }
@@ -371,7 +379,15 @@ internal object SyncCollectionDocs {
                 ),
             )
             syncUnauthorized()
-            syncError(HttpStatusCode.Conflict, SyncExamples.conflict)
+            syncError(
+                HttpStatusCode.Conflict,
+                SyncExamples.conflict,
+                ErrorCase(
+                    "JOURNAL_MERGED",
+                    "The source journal was merged. details.destinationId identifies its survivor.",
+                    "Journal has been merged",
+                ),
+            )
             syncServerError()
         }
     }

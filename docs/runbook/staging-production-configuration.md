@@ -18,7 +18,7 @@ resolved.
 | Public host | `cloud-staging.logdate.app` | `cloud.logdate.app` |
 | WebAuthn RP ID | `cloud-staging.logdate.app` | `logdate.app` |
 | WebAuthn origin | `https://cloud-staging.logdate.app` | `https://cloud.logdate.app` |
-| Auto migrations | `AUTO_MIGRATE=true` | `AUTO_MIGRATE=false` |
+| Auto migrations | `AUTO_MIGRATE=false` | `AUTO_MIGRATE=false` |
 | Allowed origins | `https://cloud-staging.logdate.app` | `https://cloud.logdate.app` |
 | Secret storage | Staging project's Secret Manager | Production project's Secret Manager |
 | Media bucket | `logdate-media-staging` | `logdate-media-logdate` |
@@ -27,6 +27,11 @@ Production deploys are deliberately tag-gated and staging-verified. The
 production workflow checks for a successful staging deploy for the same SHA,
 then runs the passkey smoke test against `https://cloud-staging.logdate.app`
 before invoking the reusable Cloud Run deploy workflow.
+
+Both environments run explicit Flyway migrations before deploying the
+no-traffic candidate. Migrations and the candidate use the same rendered
+deployment contract and pinned database secret versions; application startup
+does not run migrations.
 
 `LOGDATE_DEPLOY_SOURCE` controls where deploy workflows read Terraform-style
 configuration:

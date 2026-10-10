@@ -2,6 +2,7 @@
 
 package app.logdate.server.sync
 
+import app.logdate.shared.model.sync.DeviceId
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
@@ -256,11 +257,26 @@ class DbSyncRepository : SyncRepository {
                     .singleOrNull()
                     ?.get(JournalSyncTable.serverVersion)
             val newVersion = nextVersion(existingVersion)
-            JournalSyncTable.update({ (JournalSyncTable.id eq id) and (JournalSyncTable.userId eq userId) }) {
-                it[deleted] = true
-                it[JournalSyncTable.deletedAt] = deletedAt
-                it[lastUpdated] = deletedAt
-                it[JournalSyncTable.serverVersion] = newVersion
+            if (existingVersion == null) {
+                JournalSyncTable.insert {
+                    it[JournalSyncTable.id] = id
+                    it[JournalSyncTable.userId] = userId
+                    it[title] = ""
+                    it[description] = ""
+                    it[createdAt] = deletedAt
+                    it[lastUpdated] = deletedAt
+                    it[serverVersion] = newVersion
+                    it[deviceId] = DeviceId.UNKNOWN.value
+                    it[deleted] = true
+                    it[JournalSyncTable.deletedAt] = deletedAt
+                }
+            } else {
+                JournalSyncTable.update({ (JournalSyncTable.id eq id) and (JournalSyncTable.userId eq userId) }) {
+                    it[deleted] = true
+                    it[JournalSyncTable.deletedAt] = deletedAt
+                    it[lastUpdated] = deletedAt
+                    it[JournalSyncTable.serverVersion] = newVersion
+                }
             }
         }
     }

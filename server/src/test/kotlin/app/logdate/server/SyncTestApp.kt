@@ -6,9 +6,11 @@ import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.InMemorySigningKeyRepository
 import app.logdate.server.identity.SigningKeyService
+import app.logdate.server.logdate.InMemoryJournalMergeStore
 import app.logdate.server.logdate.InMemoryLogDateBackupRepository
 import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
 import app.logdate.server.logdate.InMemoryLogDateMediaRepository
+import app.logdate.server.logdate.MergeAwareLogDateCollectionsRepository
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
 import app.logdate.server.logdate.asLogDateMediaBlobRepository
 import app.logdate.server.routes.syncRoutes
@@ -85,7 +87,7 @@ fun TestApplicationBuilder.configureSyncTestApp(
                     mediaStorage = mediaStorage,
                     metrics = metrics,
                     mediaAccessPolicy = mediaAccessPolicy,
-                    collectionsRepository = collectionsRepository,
+                    collectionsRepository = MergeAwareLogDateCollectionsRepository(collectionsRepository, InMemoryJournalMergeStore()),
                     mediaBlobRepository = mediaRepository.asLogDateMediaBlobRepository(),
                     backupRepository = backupRepository,
                 )

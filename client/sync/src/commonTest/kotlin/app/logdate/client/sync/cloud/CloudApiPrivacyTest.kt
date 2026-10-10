@@ -24,6 +24,14 @@ class CloudApiPrivacyTest {
     }
 
     @Test
+    fun `documented merge failures remain actionable without trusting arbitrary server strings`() {
+        for (code in listOf("JOURNAL_MERGED", "MERGE_CONFLICT", "MERGE_DESTINATION_MISSING")) {
+            assertEquals(code, safeCloudErrorCode(code))
+        }
+        assertEquals("UNKNOWN_ERROR", safeCloudErrorCode("MERGE_private-title"))
+    }
+
+    @Test
     fun `error bodies token prefixes and exception causes cannot escape through logs or API errors`() =
         runTest {
             val captured = mutableListOf<String>()

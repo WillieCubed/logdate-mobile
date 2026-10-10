@@ -62,6 +62,22 @@ abstract class HistoryOwnerAdoptionDao {
         device: String,
     ): Int
 
+    @Query("UPDATE journal_merges SET ownerId = :newOwner WHERE ownerId = :oldOwner AND serverOrigin = :origin")
+    abstract suspend fun moveJournalMerges(
+        oldOwner: String,
+        newOwner: String,
+        origin: String,
+    )
+
+    @Query(
+        "UPDATE pending_uploads SET ownerId = :newOwner WHERE ownerId = :oldOwner AND serverOrigin = :origin AND entityType = 'JOURNAL_MERGE'",
+    )
+    abstract suspend fun moveJournalMergeUploads(
+        oldOwner: String,
+        newOwner: String,
+        origin: String,
+    )
+
     @Transaction
     open suspend fun adopt(
         oldOwner: String,
@@ -82,6 +98,8 @@ abstract class HistoryOwnerAdoptionDao {
                 removeHistory(oldOwner, origin, source.id)
             }
         }
+        moveJournalMerges(oldOwner, newOwner, origin)
+        moveJournalMergeUploads(oldOwner, newOwner, origin)
         moveLocations(oldOwner, newOwner, device)
         moveActivities(oldOwner, newOwner, device)
         removeCursor(oldOwner, origin)

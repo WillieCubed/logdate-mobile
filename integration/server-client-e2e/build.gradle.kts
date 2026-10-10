@@ -20,6 +20,7 @@ dependencies {
     testImplementation(projects.client.data)
     testImplementation(projects.client.database)
     testImplementation(projects.client.device)
+    testImplementation(projects.client.media)
     testImplementation(projects.client.repository)
     testImplementation(projects.client.logdateDatastore)
     testImplementation(libs.sqlite.bundled)

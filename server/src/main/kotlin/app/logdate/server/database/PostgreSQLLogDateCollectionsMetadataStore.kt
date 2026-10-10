@@ -205,6 +205,7 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
         collection: LogDateCollectionKind,
         recordKey: String,
         deletedAt: Long,
+        allowMissing: Boolean,
     ): LogDateCollectionMetadata? =
         withContext(Dispatchers.IO) {
             transaction {
@@ -215,18 +216,30 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
                             (LogDateCollectionRecordsTable.userId eq userId) and
                                 (LogDateCollectionRecordsTable.collection eq collection.storageName) and
                                 (LogDateCollectionRecordsTable.recordKey eq recordKey)
-                        }.singleOrNull() ?: return@transaction null
+                        }.singleOrNull()
+                if (existing == null && !allowMissing) return@transaction null
                 val state = nextState(userId, repoDid)
-                LogDateCollectionRecordsTable.update({
-                    (LogDateCollectionRecordsTable.userId eq userId) and
-                        (LogDateCollectionRecordsTable.collection eq collection.storageName) and
-                        (LogDateCollectionRecordsTable.recordKey eq recordKey)
-                }) {
-                    it[serverVersion] = state.lastVersion
-                    it[LogDateCollectionRecordsTable.deleted] = true
-                    it[LogDateCollectionRecordsTable.deletedAt] = deletedAt
+                if (existing == null) {
+                    LogDateCollectionRecordsTable.insert {
+                        it[LogDateCollectionRecordsTable.userId] = userId
+                        it[LogDateCollectionRecordsTable.collection] = collection.storageName
+                        it[LogDateCollectionRecordsTable.recordKey] = recordKey
+                        it[serverVersion] = state.lastVersion
+                        it[deleted] = true
+                        it[LogDateCollectionRecordsTable.deletedAt] = deletedAt
+                    }
+                } else {
+                    LogDateCollectionRecordsTable.update({
+                        (LogDateCollectionRecordsTable.userId eq userId) and
+                            (LogDateCollectionRecordsTable.collection eq collection.storageName) and
+                            (LogDateCollectionRecordsTable.recordKey eq recordKey)
+                    }) {
+                        it[serverVersion] = state.lastVersion
+                        it[LogDateCollectionRecordsTable.deleted] = true
+                        it[LogDateCollectionRecordsTable.deletedAt] = deletedAt
+                    }
                 }
-                existing.toCollectionMetadata().copy(version = state.lastVersion, deletedAt = deletedAt)
+                LogDateCollectionMetadata(recordKey, state.lastVersion, deletedAt)
             }
         }
 

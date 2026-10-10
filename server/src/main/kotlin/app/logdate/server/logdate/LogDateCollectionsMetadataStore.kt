@@ -83,6 +83,7 @@ internal interface LogDateCollectionsMetadataStore {
         collection: LogDateCollectionKind,
         recordKey: String,
         deletedAt: Long,
+        allowMissing: Boolean = false,
     ): LogDateCollectionMetadata?
 
     suspend fun purgeTombstones(
@@ -221,9 +222,10 @@ internal class InMemoryLogDateCollectionsMetadataStore : LogDateCollectionsMetad
         collection: LogDateCollectionKind,
         recordKey: String,
         deletedAt: Long,
+        allowMissing: Boolean,
     ): LogDateCollectionMetadata? {
         val key = LogDateCollectionKey(collection = collection, recordKey = recordKey)
-        if (metadataForUser(userId)[key] == null) {
+        if (!allowMissing && metadataForUser(userId)[key] == null) {
             return null
         }
         val version = nextVersion(userId = userId, repoDid = repoDid)

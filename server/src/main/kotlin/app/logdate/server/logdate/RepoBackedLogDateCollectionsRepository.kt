@@ -256,6 +256,24 @@ internal class RepoBackedLogDateCollectionsRepository(
         )
     }
 
+    override suspend fun recordJournalMergeDeletion(
+        userId: UUID,
+        id: String,
+        deletedAt: Long,
+    ): Long {
+        val repoDid = canonicalRepoDid(userId)
+        return checkNotNull(
+            metadataStore.delete(
+                userId = userId,
+                repoDid = repoDid,
+                collection = LogDateCollectionKind.JOURNAL,
+                recordKey = id,
+                deletedAt = deletedAt,
+                allowMissing = true,
+            ),
+        ).version
+    }
+
     override suspend fun journalChanges(
         userId: UUID,
         since: Long,

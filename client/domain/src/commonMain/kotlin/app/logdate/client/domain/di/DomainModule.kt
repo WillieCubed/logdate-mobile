@@ -36,6 +36,7 @@ import app.logdate.client.domain.journals.DeleteJournalUseCase
 import app.logdate.client.domain.journals.GetCurrentUserJournalsUseCase
 import app.logdate.client.domain.journals.GetDefaultSelectedJournalsUseCase
 import app.logdate.client.domain.journals.GetJournalByIdUseCase
+import app.logdate.client.domain.journals.MergeJournalsUseCase
 import app.logdate.client.domain.journals.SuggestJournalsUseCase
 import app.logdate.client.domain.journals.UpdateJournalUseCase
 import app.logdate.client.domain.location.ObserveLocationStopsUseCase
@@ -115,6 +116,7 @@ import org.koin.dsl.module
  */
 val domainModule: Module =
     module {
+        factory { MergeJournalsUseCase(get(), get(), get()) }
         // Domain module dependencies
 
         // Entities

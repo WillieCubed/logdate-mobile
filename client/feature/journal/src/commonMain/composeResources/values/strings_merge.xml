@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="journal_merge_action">Merge into…</string>
+    <string name="journal_merge_picker_title">Merge ‘%1$s’ into…</string>
+    <string name="journal_merge_picker_subtitle">Choose the journal you want to keep.</string>
+    <string name="journal_merge_review_title">Review journal merge</string>
+    <string name="journal_merge_search">Search journals</string>
+    <string name="journal_merge_from">From</string>
+    <string name="journal_merge_keep">Keep</string>
+    <plurals name="journal_merge_combined">
+        <item quantity="one">%1$d item after merging</item>
+        <item quantity="other">%1$d items after merging</item>
+    </plurals>
+    <plurals name="journal_merge_overlap">
+        <item quantity="one">%1$d item already in both journals</item>
+        <item quantity="other">%1$d items already in both journals</item>
+    </plurals>
+    <plurals name="journal_merge_item_count">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
+    <string name="journal_merge_updated">Updated %1$s</string>
+    <string name="journal_merge_explanation">Everything in ‘%1$s’ will be added to ‘%2$s’. ‘%2$s’ keeps its name, description, and cover. ‘%1$s’ will be removed. Your notes and media won’t be deleted. This can’t be undone.</string>
+    <string name="journal_merge_change_destination">Change destination</string>
+    <string name="journal_merge_cancel">Cancel</string>
+    <string name="journal_merge_confirm">Merge journals</string>
+    <string name="journal_merge_merging">Merging…</string>
+    <string name="journal_merge_empty">There’s no other journal to merge into.</string>
+    <string name="journal_merge_no_matches">No matching journals.</string>
+    <string name="journal_merge_clear_search">Clear search</string>
+    <string name="journal_merge_failed">Couldn’t merge these journals. Nothing was changed.</string>
+    <string name="journal_merge_changed">These journals changed. Review the updated details and confirm again.</string>
+    <string name="journal_merge_unavailable">This journal is no longer available. Choose another destination.</string>
+    <string name="journal_merge_recovery">The original destination is no longer available. Choose another journal to keep your merged items.</string>
+    <string name="journal_merge_recovery_explanation">The items from ‘%1$s’ will be added to ‘%2$s’. ‘%2$s’ keeps its name, description, and cover. Your notes and media won’t be deleted. This can’t be undone.</string>
+    <string name="journal_merge_success">Merged ‘%1$s’ into ‘%2$s’.</string>
+    <string name="journal_merge_back">Back</string>
+    <string name="journal_merge_loading">Loading journals…</string>
+</resources>

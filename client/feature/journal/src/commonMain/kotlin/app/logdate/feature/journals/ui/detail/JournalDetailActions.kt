@@ -17,6 +17,7 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Merge
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Warning
@@ -43,6 +44,7 @@ import logdate.client.feature.journal.generated.resources.action_remove
 import logdate.client.feature.journal.generated.resources.delete_journal_description
 import logdate.client.feature.journal.generated.resources.delete_journal_title
 import logdate.client.feature.journal.generated.resources.journal_delete_label
+import logdate.client.feature.journal.generated.resources.journal_merge_action
 import logdate.client.feature.journal.generated.resources.journal_settings_label
 import logdate.client.feature.journal.generated.resources.journal_share_label
 import logdate.client.feature.journal.generated.resources.remove_from_journal_description
@@ -88,6 +90,8 @@ internal fun JournalDetailBookSummaryPane(
     onNavigateToShare: (journalId: Uuid) -> Unit,
     onNavigateToSettings: (journalId: Uuid) -> Unit,
     onRequestDelete: () -> Unit,
+    mergeEnabled: Boolean,
+    onNavigateToMerge: (Uuid) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -139,6 +143,13 @@ internal fun JournalDetailBookSummaryPane(
                 label = stringResource(Res.string.journal_settings_label),
                 onClick = { onNavigateToSettings(uiState.journalId) },
             )
+            if (mergeEnabled) {
+                JournalDetailPaneAction(
+                    icon = Icons.Rounded.Merge,
+                    label = stringResource(Res.string.journal_merge_action),
+                    onClick = { onNavigateToMerge(uiState.journalId) },
+                )
+            }
             JournalDetailPaneAction(
                 icon = Icons.Rounded.DeleteOutline,
                 label = stringResource(Res.string.journal_delete_label),

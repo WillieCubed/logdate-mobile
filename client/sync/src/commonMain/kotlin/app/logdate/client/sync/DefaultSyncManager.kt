@@ -413,6 +413,18 @@ class DefaultSyncManager(
             downloadInbox = downloadInbox,
         )
 
+    internal val mergeUploader =
+        cloudApiClient?.let { api ->
+            JournalMergeUploader(
+                journalRepository,
+                api,
+                syncMetadataService,
+                tokenRefresher,
+                retryCoordinator,
+                statusPublisher::recordProgress,
+            )
+        }
+
     internal val uploader =
         SyncUploader(
             journalRepository = journalRepository,

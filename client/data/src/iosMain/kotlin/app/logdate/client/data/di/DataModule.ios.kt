@@ -88,6 +88,7 @@ import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.client.repository.user.devices.UserDeviceRepository
 import app.logdate.shared.config.configModule
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import org.koin.core.module.Module
@@ -133,6 +134,19 @@ actual val dataModule: Module =
                 get(),
                 syncManagerProvider = { get() },
                 syncMetadataService = get(),
+                database = get(),
+                mergeTransactionManager = get(),
+                mergeScopeChanges =
+                    combine(
+                        get<app.logdate.shared.config.LogDateConfigRepository>().backendUrl,
+                        get<app.logdate.client.datastore.SessionStorage>().getSessionFlow(),
+                    ) { _, _ -> Unit },
+                currentScope = {
+                    app.logdate.client.repository.journals.JournalMergeScope(
+                        get<app.logdate.client.device.identity.CanonicalOwnerProvider>().getCanonicalOwnerId(),
+                        get<app.logdate.shared.config.LogDateConfigRepository>().getCurrentBackendUrl().trimEnd('/'),
+                    )
+                },
             )
         }
 
@@ -166,7 +180,7 @@ actual val dataModule: Module =
             )
         }
 
-        single<EntryDraftRepository> { OfflineFirstEntryDraftRepository(get(), get()) }
+        single<EntryDraftRepository> { OfflineFirstEntryDraftRepository(get(), get(), get()) }
         factory<LocalEntryDraftStore> { IosLocalEntryDraftStore() }
 
         // Rewind

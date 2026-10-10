@@ -10,8 +10,15 @@ import app.logdate.shared.model.CompleteAccountCreationResponse
 import app.logdate.shared.model.LogDateAccount
 import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.first
 import kotlinx.io.files.Path
@@ -217,6 +224,33 @@ class LogDateCloudApiClient(
         backupId: String,
     ): Result<Unit> = requestDeleteBackup(accessToken, backupId)
 
+    override suspend fun mergeJournals(
+        accessToken: String,
+        sourceId: String,
+        request: app.logdate.shared.model.sync.JournalMergeRequest,
+    ): Result<app.logdate.shared.model.sync.JournalMergeResponse> =
+        try {
+            val baseUrl = getBaseUrl(accessToken)
+            val response =
+                transport.post("$baseUrl/journals/$sourceId/merge") {
+                    headers.append(HttpHeaders.Authorization, "Bearer $accessToken")
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+            if (response.status == HttpStatusCode.OK) Result.success(response.body()) else handleApiError(response)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Napier.e("Failed to sync journal merge", error)
+            Result.failure(CloudApiException("NETWORK_ERROR", "Failed to sync journal merge"))
+        }
+
+    /**
+     * Handles API error responses.
+     *
+     * @param response The HTTP response containing the error.
+     * @return A Result.failure with appropriate error information.
+     */
     internal suspend fun <T> handleApiError(response: HttpResponse): Result<T> {
         val statusCode = response.status.value
         val errorPayload =

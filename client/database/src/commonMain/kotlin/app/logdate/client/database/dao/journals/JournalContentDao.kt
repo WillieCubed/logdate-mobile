@@ -58,6 +58,9 @@ interface JournalContentDao {
     @Query("SELECT * FROM journal_content_links")
     suspend fun getAllLinks(): List<JournalContentEntityLink>
 
+    @Query("SELECT * FROM journal_content_links")
+    fun observeAllLinks(): Flow<List<JournalContentEntityLink>>
+
     /**
      * Checks if a piece of content is associated with a journal.
      */

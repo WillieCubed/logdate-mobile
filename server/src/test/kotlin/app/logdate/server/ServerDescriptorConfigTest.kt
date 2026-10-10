@@ -12,6 +12,14 @@ import kotlin.test.assertTrue
 
 class ServerDescriptorConfigTest {
     @Test
+    fun `journal merge protocol is advertised for first party and self hosted deployments`() {
+        for (kind in DeploymentKind.entries) {
+            val descriptor = ServerDescriptorConfig(deploymentKind = kind).toDescriptor(AtprotoIdentityConfig(), "logdate.app", "LogDate")
+            assertTrue(descriptor.hasProtocolFeature("journalMergeV1"))
+        }
+    }
+
+    @Test
     fun `diagnostic reports use an additive protocol flag without changing known capabilities`() {
         val identity = AtprotoIdentityConfig()
         val config = ServerDescriptorConfig(deploymentKind = DeploymentKind.FIRST_PARTY)

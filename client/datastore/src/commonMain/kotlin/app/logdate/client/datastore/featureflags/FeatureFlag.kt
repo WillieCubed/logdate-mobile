@@ -50,6 +50,9 @@ enum class FeatureFlag(
      */
     CAMPFIRE_STREAKS(key = "campfire_streaks_enabled", defaultEnabled = true),
 
+    /** Combine journal membership while retaining notes and media. */
+    JOURNAL_MERGE(key = "journal_merge_enabled", defaultEnabled = false),
+
     /** Shared adaptive Home presentation; retain the preference as a presentation rollback switch. */
     HOME_WORKSPACE_V2(key = "home_workspace_v2_enabled", defaultEnabled = true),
 

@@ -13,6 +13,13 @@ import app.logdate.shared.model.LogDateAccount
  * account management, authentication, and data synchronization.
  */
 interface CloudApiClient {
+    suspend fun mergeJournals(
+        accessToken: String,
+        sourceId: String,
+        request: app.logdate.shared.model.sync.JournalMergeRequest,
+    ): Result<app.logdate.shared.model.sync.JournalMergeResponse> =
+        Result.failure(UnsupportedOperationException("Journal merge is not supported"))
+
     suspend fun uploadBackupFile(
         accessToken: String,
         backup: BackupUploadFileRequest,

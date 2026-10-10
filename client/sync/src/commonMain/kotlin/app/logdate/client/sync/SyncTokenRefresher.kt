@@ -27,6 +27,8 @@ internal class SyncTokenRefresher(
 ) {
     fun currentUploadScope(): UploadScope? = sessionStorage.getOriginBoundSession()?.let { UploadScope(it.session.accountId, it.origin) }
 
+    fun currentRequestScope(): UploadScope? = if (cloudAccountRepository is CloudRequestLocationProvider) currentUploadScope() else null
+
     suspend fun <T> withFreshToken(
         operation: suspend (accessToken: String) -> Result<T>,
         operationName: String,

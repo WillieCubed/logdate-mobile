@@ -100,6 +100,8 @@ class ForegroundSyncManager(
 
     override suspend fun uploadPendingChanges(): SyncResult = defaultSyncManager.uploadPendingChanges()
 
+    override suspend fun <T> whilePaused(block: suspend () -> T): T = defaultSyncManager.whilePaused(block)
+
     override suspend fun downloadRemoteChanges(): SyncResult = defaultSyncManager.downloadRemoteChanges()
 
     override suspend fun syncContent(): SyncResult = defaultSyncManager.syncContent()

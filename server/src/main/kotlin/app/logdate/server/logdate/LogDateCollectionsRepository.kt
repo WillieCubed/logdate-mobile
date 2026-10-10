@@ -1,6 +1,8 @@
 package app.logdate.server.logdate
 
 import app.logdate.shared.model.sync.DeviceId
+import app.logdate.shared.model.sync.JournalMergeRequest
+import app.logdate.shared.model.sync.JournalMergeResponse
 import java.util.UUID
 
 /**
@@ -77,6 +79,7 @@ data class LogDateJournalDeletion(
     val id: String,
     val deletedAt: Long,
     val serverVersion: Long = deletedAt,
+    val mergedIntoJournalId: String? = null,
 )
 
 data class LogDateAssociationRef(
@@ -118,6 +121,27 @@ class DraftFormatUpgradeRequiredException : IllegalStateException("Draft was upg
  * internal persistence language.
  */
 interface LogDateCollectionsRepository {
+    suspend fun merge(
+        userId: UUID,
+        sourceId: String,
+        request: JournalMergeRequest,
+    ): JournalMergeResponse = throw UnsupportedOperationException("Journal merge is unavailable")
+
+    /** Allocates a change-feed deletion even when the source existed only offline. */
+    suspend fun recordJournalMergeDeletion(
+        userId: UUID,
+        id: String,
+        deletedAt: Long,
+    ): Long {
+        deleteJournal(userId, id, deletedAt)
+        return journalChanges(userId, 0L, Int.MAX_VALUE).deletions.first { it.id == id }.serverVersion
+    }
+
+    suspend fun journalMergeDestination(
+        userId: UUID,
+        id: String,
+    ): String? = null
+
     suspend fun status(userId: UUID): LogDateCollectionsStatus
 
     suspend fun listEntries(userId: UUID): List<LogDateEntry>

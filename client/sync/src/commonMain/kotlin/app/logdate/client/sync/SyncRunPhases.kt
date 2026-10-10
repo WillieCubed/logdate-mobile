@@ -75,12 +75,19 @@ internal suspend fun DefaultSyncManager.runPendingUploads(): SyncResult =
         // (they contend on one repo) and cost entries.
         val journalResult = uploader.uploadJournals(accessToken)
         val contentResult = uploader.uploadContent(accessToken)
+        val mergeResult =
+            if (journalResult.success && contentResult.success) {
+                mergeUploader?.uploadPending() ?: SyncResult(success = true)
+            } else {
+                SyncResult(success = false)
+            }
         val associationResult = uploader.uploadAssociations(accessToken)
         val draftResult = uploader.uploadDrafts(accessToken)
         val historyResult = locationHistorySyncEngine?.upload(accessToken) ?: SyncResult(success = true)
         val totalUploaded =
             journalResult.uploadedItems +
                 contentResult.uploadedItems +
+                mergeResult.uploadedItems +
                 associationResult.uploadedItems +
                 draftResult.uploadedItems +
                 historyResult.uploadedItems
@@ -88,6 +95,7 @@ internal suspend fun DefaultSyncManager.runPendingUploads(): SyncResult =
         val errors =
             journalResult.errors +
                 contentResult.errors +
+                mergeResult.errors +
                 associationResult.errors +
                 draftResult.errors +
                 historyResult.errors

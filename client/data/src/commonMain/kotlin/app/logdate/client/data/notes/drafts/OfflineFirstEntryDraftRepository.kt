@@ -3,6 +3,7 @@ package app.logdate.client.data.notes.drafts
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.PendingMediaRecord
 import app.logdate.shared.model.location.VisitMemoryContext
 import kotlinx.coroutines.CompletableDeferred
@@ -28,6 +29,7 @@ import kotlin.uuid.Uuid
 class OfflineFirstEntryDraftRepository(
     private val draftStore: LocalEntryDraftStore,
     coroutineScope: CoroutineScope,
+    private val journalRepository: JournalRepository? = null,
 ) : EntryDraftRepository {
     // StateFlow to store and emit drafts
     private val draftsFlow = MutableStateFlow<Map<Uuid, EntryDraft>>(emptyMap())
@@ -63,7 +65,7 @@ class OfflineFirstEntryDraftRepository(
     override fun getDrafts(): Flow<List<EntryDraft>> =
         flow {
             initializationComplete.await()
-            emitAll(draftsFlow.map { it.values.toList() })
+            emitAll(draftsFlow.map { it.values.map { draft -> resolveDraft(draft) } })
         }
 
     override fun getDraft(uid: Uuid): Flow<Result<EntryDraft>> =
@@ -71,7 +73,7 @@ class OfflineFirstEntryDraftRepository(
             initializationComplete.await()
             emitAll(
                 draftsFlow.map { drafts ->
-                    drafts[uid]?.let { Result.success(it) }
+                    drafts[uid]?.let { Result.success(resolveDraft(it)) }
                         ?: Result.failure(NoSuchElementException("Draft with ID $uid not found"))
                 },
             )
@@ -109,7 +111,7 @@ class OfflineFirstEntryDraftRepository(
                     createdAt = existing?.createdAt ?: now,
                     updatedAt = now,
                     pendingMedia = pendingMedia,
-                    selectedJournalIds = selectedJournalIds,
+                    selectedJournalIds = resolveSelection(selectedJournalIds),
                     visitContext = visitContext,
                 )
 
@@ -144,7 +146,7 @@ class OfflineFirstEntryDraftRepository(
                 existingDraft = requireDraft(uid),
                 notes = notes,
                 pendingMedia = pendingMedia,
-                selectedJournalIds = selectedJournalIds,
+                selectedJournalIds = resolveSelection(selectedJournalIds),
             )
         }
 
@@ -182,7 +184,7 @@ class OfflineFirstEntryDraftRepository(
             existingDraft = existingDraft,
             notes = existingDraft.notes,
             pendingMedia = existingDraft.pendingMedia,
-            selectedJournalIds = selectedJournalIds,
+            selectedJournalIds = resolveSelection(selectedJournalIds),
         )
         Unit
     }
@@ -217,6 +219,11 @@ class OfflineFirstEntryDraftRepository(
             expiredIds.size
         }
 
+    private suspend fun resolveSelection(ids: List<Uuid>): List<Uuid> = ids.map { journalRepository?.resolveJournalId(it) ?: it }.distinct()
+
+    private suspend fun resolveDraft(draft: EntryDraft): EntryDraft =
+        draft.copy(selectedJournalIds = resolveSelection(draft.selectedJournalIds))
+
     private suspend fun findDraft(uid: Uuid): EntryDraft? =
         draftsFlow.value[uid]
             ?: draftStore.getDraft(uid)
@@ -236,7 +243,7 @@ class OfflineFirstEntryDraftRepository(
             existingDraft.copy(
                 notes = notes,
                 pendingMedia = pendingMedia,
-                selectedJournalIds = selectedJournalIds,
+                selectedJournalIds = resolveSelection(selectedJournalIds),
                 updatedAt = Clock.System.now(),
                 visitContext = visitContext,
             )

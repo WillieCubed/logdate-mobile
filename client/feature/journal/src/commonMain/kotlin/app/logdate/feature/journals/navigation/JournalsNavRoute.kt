@@ -3,6 +3,7 @@ package app.logdate.feature.journals.navigation
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
+import app.logdate.client.repository.journals.JournalMergeOperation
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
 import app.logdate.ui.navigation.taggedEntry
 import kotlinx.serialization.Serializable
@@ -46,6 +47,9 @@ fun EntryProviderScope<NavKey>.journalEntries(
     onOpenContentPickerForJournal: (Uuid) -> Unit,
     onOpenJournalSettings: (Uuid) -> Unit,
     onShareJournal: (Uuid) -> Unit,
+    onMergeJournal: (Uuid) -> Unit = {},
+    onJournalMerged: (JournalMergeOperation) -> Unit = {},
+    onJournalRedirected: (sourceId: Uuid, destinationId: Uuid) -> Unit = { _, _ -> },
 ) {
     journalsOverviewEntry(
         onOpenJournal = onOpenJournal,
@@ -59,6 +63,8 @@ fun EntryProviderScope<NavKey>.journalEntries(
         onOpenContentPicker = onOpenContentPickerForJournal,
         onOpenSettings = onOpenJournalSettings,
         onShareJournal = onShareJournal,
+        onMergeJournal = onMergeJournal,
+        onJournalRedirected = onJournalRedirected,
     )
     journalCreationEntry(
         onBack = onBack,
@@ -69,6 +75,7 @@ fun EntryProviderScope<NavKey>.journalEntries(
         onJournalDeleted = onJournalDeleted,
     )
     journalContentPickerEntry(onBack = onBack)
+    journalMergeEntry(onBack = onBack, onJournalMerged = onJournalMerged)
     shareJournalEntry(onBack = onBack)
     noteDetailEntry(onBack = onBack)
 }

@@ -178,6 +178,7 @@ interface Syncable {
  */
 enum class EntityType {
     JOURNAL,
+    JOURNAL_MERGE,
     NOTE,
     ASSOCIATION,
     MEDIA,

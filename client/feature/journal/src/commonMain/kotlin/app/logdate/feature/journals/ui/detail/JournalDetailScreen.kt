@@ -1,4 +1,4 @@
-@file:Suppress("ktlint:standard:function-naming", "ktlint:standard:no-wildcard-imports")
+@file:Suppress("ktlint:standard:function-naming")
 @file:OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 
 package app.logdate.feature.journals.ui.detail
@@ -17,6 +17,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Merge
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Share
@@ -28,6 +29,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -42,6 +45,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.feature.journals.ui.merge.journalMergeAvailability
+import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.adaptive.FoldableBookLayout
@@ -50,17 +56,19 @@ import app.logdate.ui.theme.Spacing
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.ui.workspace.PanelHeader
 import app.logdate.ui.workspace.WorkspacePanel
-import logdate.client.feature.journal.generated.resources.*
 import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.journal_delete_label
+import logdate.client.feature.journal.generated.resources.journal_merge_action
+import logdate.client.feature.journal.generated.resources.journal_merge_success
+import logdate.client.feature.journal.generated.resources.journal_settings_label
+import logdate.client.feature.journal.generated.resources.journal_share_label
 import logdate.client.ui.generated.resources.common_back
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 import logdate.client.ui.generated.resources.Res as UiRes
 
-/**
- * The main screen to view a journal's contents.
- */
 @Composable
 fun JournalDetailScreen(
     journalId: Uuid,
@@ -71,7 +79,11 @@ fun JournalDetailScreen(
     onOpenContentPicker: (Uuid) -> Unit = {},
     onNavigateToSettings: (journalId: Uuid) -> Unit = {},
     onNavigateToShare: (journalId: Uuid) -> Unit = {},
+    onNavigateToMerge: (Uuid) -> Unit = {},
+    mergedSourceTitle: String? = null,
     modifier: Modifier = Modifier,
+    flags: FeatureFlagStore = koinInject(),
+    config: LogDateConfigRepository = koinInject(),
     viewModel: JournalDetailViewModel = koinViewModel(),
 ) {
     LaunchedEffect(journalId) {
@@ -79,10 +91,24 @@ fun JournalDetailScreen(
     }
 
     val state by viewModel.uiState.collectAsState()
+    val mergeEnabled by remember(flags, config) { journalMergeAvailability(flags, config) }.collectAsState(false)
+    val snackbarHostState = remember { SnackbarHostState() }
+    val destinationTitle = (state as? JournalDetailUiState.Success)?.title
+    val mergedMessage = destinationTitle?.let { stringResource(Res.string.journal_merge_success, mergedSourceTitle.orEmpty(), it) }
+    var mergeNoticeShown by rememberSaveable(mergedSourceTitle) { mutableStateOf(false) }
+    LaunchedEffect(mergedSourceTitle, mergedMessage) {
+        if (!mergeNoticeShown && mergedSourceTitle != null && mergedMessage != null) {
+            mergeNoticeShown = true
+            snackbarHostState.showSnackbar(mergedMessage)
+        }
+    }
     var openDeleteConfirmation by rememberSaveable { mutableStateOf(false) }
     var noteToRemove by rememberSaveable { mutableStateOf<String?>(null) }
     JournalDetailScreenContent(
         uiState = state,
+        mergeEnabled = mergeEnabled,
+        onNavigateToMerge = onNavigateToMerge,
+        snackbarHostState = snackbarHostState,
         onGoBack = onGoBack,
         onNavigateToNoteDetail = onNavigateToNoteDetail,
         onOpenEditor = { onOpenEditor(journalId) },
@@ -126,6 +152,9 @@ fun JournalDetailScreenContent(
     showRemoveNoteConfirmation: Boolean = false,
     onDismissRemoveNoteConfirmation: () -> Unit = {},
     onConfirmRemoveNote: () -> Unit = {},
+    mergeEnabled: Boolean = false,
+    onNavigateToMerge: (Uuid) -> Unit = {},
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     modifier: Modifier = Modifier,
 ) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
@@ -187,6 +216,12 @@ fun JournalDetailScreenContent(
                                         showOverflowMenu = false
                                         onNavigateToSettings(uiState.journalId)
                                     })
+                                    if (mergeEnabled) {
+                                        DropdownMenuItem(text = { Text(stringResource(Res.string.journal_merge_action)) }, onClick = {
+                                            showOverflowMenu = false
+                                            onNavigateToMerge(uiState.journalId)
+                                        })
+                                    }
                                     DropdownMenuItem(text = { Text("Delete journal") }, onClick = {
                                         showOverflowMenu = false
                                         onRequestDelete()
@@ -205,6 +240,7 @@ fun JournalDetailScreenContent(
                             true,
                             Modifier.weight(1f).fillMaxWidth(),
                         )
+                        SnackbarHost(snackbarHostState)
                     }
                 }
             } else {
@@ -227,6 +263,7 @@ fun JournalDetailScreenContent(
                                 }
                             },
                     contentWindowInsets = WindowInsets.navigationBars,
+                    snackbarHost = { SnackbarHost(snackbarHostState) },
                     floatingActionButton = {
                         Box {
                             FloatingActionButton(onClick = { showAddMenu = true }) {
@@ -305,6 +342,16 @@ fun JournalDetailScreenContent(
                                                 Icon(Icons.Rounded.Settings, contentDescription = null)
                                             },
                                         )
+                                        if (mergeEnabled) {
+                                            DropdownMenuItem(
+                                                text = { Text(stringResource(Res.string.journal_merge_action)) },
+                                                onClick = {
+                                                    showOverflowMenu = false
+                                                    onNavigateToMerge(uiState.journalId)
+                                                },
+                                                leadingIcon = { Icon(Icons.Rounded.Merge, contentDescription = null) },
+                                            )
+                                        }
                                         DropdownMenuItem(
                                             text = { Text(stringResource(Res.string.journal_delete_label)) },
                                             onClick = {
@@ -333,6 +380,8 @@ fun JournalDetailScreenContent(
                                 onNavigateToShare = onNavigateToShare,
                                 onNavigateToSettings = onNavigateToSettings,
                                 onRequestDelete = onRequestDelete,
+                                mergeEnabled = mergeEnabled,
+                                onNavigateToMerge = onNavigateToMerge,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         },

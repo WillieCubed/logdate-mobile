@@ -1,7 +1,6 @@
 package app.logdate.server
 
 import app.logdate.server.logdate.LogDateCollectionsRepository
-import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.server.sync.SyncRepository
 import io.github.aakira.napier.Napier
@@ -24,7 +23,7 @@ import java.time.Duration
  * purge and the in-memory repositories don't accumulate tombstones across restarts.
  */
 internal fun Application.installSyncMaintenance(isDatabaseAvailable: Boolean) {
-    val collectionsRepository by inject<RepoBackedLogDateCollectionsRepository>()
+    val collectionsRepository by inject<LogDateCollectionsRepository>()
     val syncMetrics by inject<SyncMetricsRegistry>()
 
     val maintenanceReadEnv: (String) -> String? =

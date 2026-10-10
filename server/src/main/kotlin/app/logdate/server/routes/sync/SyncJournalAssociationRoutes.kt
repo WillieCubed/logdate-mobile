@@ -1,6 +1,9 @@
 package app.logdate.server.routes.sync
 
 import app.logdate.server.auth.TokenService
+import app.logdate.server.logdate.JournalMergeConflictException
+import app.logdate.server.logdate.JournalMergeDestinationMissingException
+import app.logdate.server.logdate.JournalMergedException
 import app.logdate.server.logdate.LogDateAssociation
 import app.logdate.server.logdate.LogDateAssociationRef
 import app.logdate.server.logdate.LogDateCollectionsRepository
@@ -8,6 +11,7 @@ import app.logdate.server.logdate.LogDateJournal
 import app.logdate.server.responses.error
 import app.logdate.server.routes.docs.SyncAssociationDocs
 import app.logdate.server.routes.docs.SyncCollectionDocs
+import app.logdate.server.routes.docs.SyncJournalMergeDocs
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.shared.model.sync.AssociationChangesResponse
 import app.logdate.shared.model.sync.AssociationDeleteRequest
@@ -16,6 +20,7 @@ import app.logdate.shared.model.sync.AssociationUploadRequest
 import app.logdate.shared.model.sync.AssociationUploadResponse
 import app.logdate.shared.model.sync.JournalChangesResponse
 import app.logdate.shared.model.sync.JournalDeletion
+import app.logdate.shared.model.sync.JournalMergeRequest
 import app.logdate.shared.model.sync.JournalUpdateRequest
 import app.logdate.shared.model.sync.JournalUpdateResponse
 import app.logdate.shared.model.sync.JournalUploadRequest
@@ -41,6 +46,21 @@ internal fun Route.journalRoutes(
     collectionsRepository: LogDateCollectionsRepository,
 ) {
     route("/journals") {
+        post("/{journalId}/merge", SyncJournalMergeDocs.merge) {
+            val userId = extractUserId(call, tokenService) ?: return@post
+            val journalId = call.requiredPathParam("journalId")
+            val request = call.receive<JournalMergeRequest>()
+            try {
+                call.respond(collectionsRepository.merge(userId, journalId, request))
+            } catch (_: JournalMergeDestinationMissingException) {
+                call.respond(HttpStatusCode.NotFound, error("MERGE_DESTINATION_MISSING", "Merge destination is unavailable"))
+            } catch (conflict: JournalMergeConflictException) {
+                call.respond(HttpStatusCode.Conflict, error("MERGE_CONFLICT", conflict.message.orEmpty()))
+            } catch (invalid: IllegalArgumentException) {
+                call.respond(HttpStatusCode.BadRequest, error("VALIDATION_ERROR", invalid.message.orEmpty()))
+            }
+        }
+
         put("/{journalId}", SyncCollectionDocs.upsertJournal) {
             val start = System.currentTimeMillis()
             var success = false
@@ -54,6 +74,7 @@ internal fun Route.journalRoutes(
                         error("VALIDATION_ERROR", "Request body id must match path journalId"),
                     )
                 }
+                collectionsRepository.journalMergeDestination(userId, journalId)?.let { throw JournalMergedException(it) }
                 val wasCreated = !collectionsRepository.journalExists(userId, journalId)
                 if (call.request.header(HttpHeaders.IfNoneMatch) == "*" && !wasCreated) {
                     return@put call.respond(
@@ -87,6 +108,18 @@ internal fun Route.journalRoutes(
                     call.respond(HttpStatusCode.OK, response)
                 }
                 success = true
+            } catch (merged: JournalMergedException) {
+                metrics.recordConflict()
+                call.respond(
+                    HttpStatusCode.Conflict,
+                    error(
+                        "JOURNAL_MERGED",
+                        "Journal has been merged",
+                        mapOf(
+                            "destinationId" to merged.destinationId,
+                        ),
+                    ),
+                )
             } finally {
                 metrics.recordOperation(METRIC_JOURNAL_UPLOAD, System.currentTimeMillis() - start, success)
             }
@@ -107,6 +140,7 @@ internal fun Route.journalRoutes(
                             id = it.id,
                             deletedAt = it.deletedAt,
                             serverVersion = it.serverVersion,
+                            mergedIntoJournalId = it.mergedIntoJournalId,
                         )
                     }
                 call.respond(JournalChangesResponse(changes, deletions, changeSet.lastTimestamp, changeSet.hasMore))
@@ -139,6 +173,7 @@ internal fun Route.journalRoutes(
                 val userId = extractUserId(call, tokenService) ?: return@patch
                 val journalId = call.requiredPathParam("journalId")
                 val req = call.receive<JournalUpdateRequest>()
+                collectionsRepository.journalMergeDestination(userId, journalId)?.let { throw JournalMergedException(it) }
                 val existing = collectionsRepository.getJournal(userId, journalId)
                 if (req.isOutdated(existing?.version)) {
                     metrics.recordConflict()
@@ -164,6 +199,18 @@ internal fun Route.journalRoutes(
                     )
                 call.respond(JournalUpdateResponse(journalId, stored.version, stored.lastUpdated))
                 success = true
+            } catch (merged: JournalMergedException) {
+                metrics.recordConflict()
+                call.respond(
+                    HttpStatusCode.Conflict,
+                    error(
+                        "JOURNAL_MERGED",
+                        "Journal has been merged",
+                        mapOf(
+                            "destinationId" to merged.destinationId,
+                        ),
+                    ),
+                )
             } finally {
                 metrics.recordOperation(METRIC_JOURNAL_UPDATE, System.currentTimeMillis() - start, success)
             }

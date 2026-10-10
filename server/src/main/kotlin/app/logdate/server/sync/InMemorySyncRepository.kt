@@ -25,8 +25,7 @@ class InMemorySyncRepository : SyncRepository {
 
     private fun now(): Long {
         val ts = System.currentTimeMillis()
-        lastTimestamp.set(ts)
-        return ts
+        return lastTimestamp.updateAndGet { previous -> maxOf(previous, ts) }
     }
 
     private fun nextVersion(): Long = lastTimestamp.incrementAndGet()
@@ -74,7 +73,7 @@ class InMemorySyncRepository : SyncRepository {
     ) {
         content.forUser(userId).remove(id)
         contentDeletions.forUser(userId)[id] = deletedAt
-        lastTimestamp.set(deletedAt)
+        lastTimestamp.updateAndGet { previous -> maxOf(previous, deletedAt) }
     }
 
     override fun contentChanges(
@@ -130,7 +129,7 @@ class InMemorySyncRepository : SyncRepository {
     ) {
         journals.forUser(userId).remove(id)
         journalDeletions.forUser(userId)[id] = deletedAt
-        lastTimestamp.set(deletedAt)
+        lastTimestamp.updateAndGet { previous -> maxOf(previous, deletedAt) }
     }
 
     override fun journalChanges(
@@ -184,7 +183,7 @@ class InMemorySyncRepository : SyncRepository {
             associations.forUser(userId).remove(key)
             associationDeletions.forUser(userId)[key] = deletedAt
         }
-        lastTimestamp.set(deletedAt)
+        lastTimestamp.updateAndGet { previous -> maxOf(previous, deletedAt) }
     }
 
     override fun associationChanges(
@@ -244,7 +243,7 @@ class InMemorySyncRepository : SyncRepository {
     ) {
         media.forUser(userId).remove(mediaId)
         mediaDeletions.forUser(userId)[mediaId] = deletedAt
-        lastTimestamp.set(deletedAt)
+        lastTimestamp.updateAndGet { previous -> maxOf(previous, deletedAt) }
     }
 
     override fun listAllMediaForUser(userId: UUID): List<MediaRecord> = media.forUser(userId).values.toList()

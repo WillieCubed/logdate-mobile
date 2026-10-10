@@ -10,6 +10,9 @@ import kotlin.uuid.Uuid
  * This allows notes to be associated with multiple journals.
  */
 interface JournalContentRepository {
+    /** Raw membership counts include content that has not downloaded yet. */
+    fun observeJournalItemCounts(): Flow<Map<Uuid, Int>> = kotlinx.coroutines.flow.flowOf(emptyMap())
+
     /**
      * Observes all content associated with a journal.
      */

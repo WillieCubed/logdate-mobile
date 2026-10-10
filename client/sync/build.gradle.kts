@@ -79,6 +79,7 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.androidx.datastore.preferences)
             implementation(libs.ktor.client.mock)
             implementation(projects.client.logdateDatastore)
             implementation(projects.client.util)

@@ -49,6 +49,7 @@ class ExportCoverageTest {
             "media_captions" to exported(),
             "journals" to exported(),
             "journal_content_links" to exported(),
+            "journal_merges" to bookkeeping("Scoped merge redirects and upload intents; canonical content and memberships are exported."),
             "location_logs" to exported(),
             "location_activity" to planned("Movement evidence; encrypted history sync implemented, archive export pending."),
             "history_records" to planned("Places, corrections, and history evidence; encrypted sync implemented, archive export pending."),

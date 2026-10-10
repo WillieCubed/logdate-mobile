@@ -63,6 +63,7 @@ internal class SyncUploader(
     private val associationUploader =
         AssociationUploader(
             cloudAssociationDataSource = cloudAssociationDataSource,
+            journalRepository = journalRepository,
             syncMetadataService = syncMetadataService,
             tokenRefresher = tokenRefresher,
             retryCoordinator = retryCoordinator,
@@ -123,6 +124,11 @@ internal class SyncUploader(
                 val journalId = runCatching { Uuid.parse(pending.entityId) }.getOrNull()
                 if (journalId == null) {
                     errors.add(retryCoordinator.recordUnparsableOutboxEntry(EntityType.JOURNAL, pending, "journal ID"))
+                    continue
+                }
+
+                if (journalRepository.resolveJournalId(journalId) != journalId) {
+                    retryCoordinator.markUploadSettled(EntityType.JOURNAL, pending, Clock.System.now(), 0L)
                     continue
                 }
 

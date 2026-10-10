@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="journal_merge_recovery_title">Finish journal merge</string>
+    <string name="journal_merge_recovery_message">The items from ‘%1$s’ are saved on this device. Their destination ‘%2$s’ is no longer available. Choose another journal to finish backing up these items.</string>
+    <string name="journal_merge_recovery_status">A journal merge needs a new destination.</string>
+    <string name="journal_merge_recovery_choose">Choose destination</string>
+</resources>

@@ -60,6 +60,8 @@ data class JournalSyncResult(
     val unreadable: List<Uuid> = emptyList(),
     val failures: List<RemoteRecordFailure> = emptyList(),
     val unreadableVersions: Map<Uuid, Long> = emptyMap(),
+    val mergeRedirects: Map<Uuid, Uuid> = emptyMap(),
+    val mergeRedirectVersions: Map<Uuid, Long> = emptyMap(),
 )
 
 /**
@@ -145,10 +147,23 @@ class DefaultCloudJournalDataSource(
 
     private suspend fun JournalChangesResponse.toJournalSyncResult(): JournalSyncResult {
         val records = changes.readEach(idOf = { it.id }, versionOf = { it.serverVersion }) { it.toJournal() }
-        val removed = deletions.readEach(idOf = { it.id }, versionOf = { it.serverVersion }) { Uuid.parse(it.id) }
+        val removed =
+            deletions.readEach(idOf = { it.id }, versionOf = { it.serverVersion }) {
+                Uuid.parse(it.id) to it.mergedIntoJournalId?.let(Uuid::parse)
+            }
         return JournalSyncResult(
             changes = records.readable,
-            deletions = removed.readable,
+            deletions = removed.readable.filter { it.second == null }.map { it.first },
+            mergeRedirects = removed.readable.mapNotNull { (source, destination) -> destination?.let { source to it } }.toMap(),
+            mergeRedirectVersions =
+                deletions
+                    .filter { it.mergedIntoJournalId != null }
+                    .mapNotNull { deletion ->
+                        removed.readable.firstOrNull { it.first.toString() == deletion.id && it.second != null }?.let {
+                            it.first to
+                                deletion.serverVersion
+                        }
+                    }.toMap(),
             lastSyncTimestamp = Instant.fromEpochMilliseconds(lastTimestamp),
             hasMore = hasMore,
             unreadable = records.unreadable,

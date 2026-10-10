@@ -1,6 +1,7 @@
 package app.logdate.client.sync
 
 import app.logdate.client.repository.journals.JournalContentRepository
+import app.logdate.client.repository.journals.JournalMergeScope
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
@@ -16,6 +17,8 @@ import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.MediaSyncRefStore
 import app.logdate.client.sync.metadata.SyncMetadataService
+import app.logdate.client.sync.metadata.UploadScope
+import app.logdate.client.sync.recovery.DownloadScope
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.flow.first
 import kotlin.time.Instant
@@ -42,7 +45,7 @@ internal class SyncDownloader(
     private val journalConflictResolver: ConflictResolver<Journal>,
     private val noteConflictResolver: ConflictResolver<JournalNote>,
     private val syncMetadataService: SyncMetadataService,
-    transactionManager: SyncTransactionManager,
+    private val transactionManager: SyncTransactionManager,
     private val mediaSyncRefStore: MediaSyncRefStore,
     private val downloadEngine: SyncDownloadEngine,
     private val mediaTransfer: SyncMediaTransfer,
@@ -82,61 +85,91 @@ internal class SyncDownloader(
         since: Instant,
     ): SyncResult {
         val syncableRepository = journalRepository as? SyncableJournalRepository
-        return downloadEngine.download(
-            strategy =
-                DownloadStrategy(
-                    entityType = EntityType.JOURNAL,
-                    logLabel = "journal",
-                    fetchChanges = { token, cursor ->
-                        tokenRefresher
-                            .withFreshToken(
-                                { t -> cloudJournalDataSource.getJournalChanges(t, cursor, SYNC_PAGE_SIZE) },
-                                "getJournalChanges",
-                            ).map {
-                                ChangesPage(
-                                    it.changes,
-                                    it.deletions,
-                                    it.lastSyncTimestamp,
-                                    it.hasMore,
-                                    it.unreadable,
-                                    it.failures,
-                                    it.unreadableVersions,
-                                )
+        val downloadScope = downloadInbox?.currentScope()
+        val requestScope = tokenRefresher.currentRequestScope()
+        val mergeScope = requestScope?.let { JournalMergeScope(it.ownerId, it.serverOrigin) }
+        val result =
+            downloadEngine.download(
+                strategy =
+                    DownloadStrategy(
+                        entityType = EntityType.JOURNAL,
+                        logLabel = "journal",
+                        fetchChanges = { _, cursor -> fetchJournalChanges(cursor, requestScope, downloadScope) },
+                        localItems = { journalRepository.allJournalsObserved.first().associateBy { it.id } },
+                        localItem = journalRepository::getJournalById,
+                        idOf = { it.id },
+                        syncVersionOf = { it.syncVersion },
+                        lastUpdatedOf = { it.lastUpdated },
+                        conflictResolver = journalConflictResolver,
+                        sameUploadedFields = ::sameJournalFields,
+                        acknowledgeUpload = { local, remote ->
+                            if (syncableRepository != null) {
+                                syncableRepository.updateSyncMetadata(local.id, remote.syncVersion, remote.lastUpdated)
+                                true
+                            } else {
+                                false
                             }
-                    },
-                    localItems = { journalRepository.allJournalsObserved.first().associateBy { it.id } },
-                    localItem = journalRepository::getJournalById,
-                    idOf = { it.id },
-                    syncVersionOf = { it.syncVersion },
-                    lastUpdatedOf = { it.lastUpdated },
-                    conflictResolver = journalConflictResolver,
-                    sameUploadedFields = ::sameJournalFields,
-                    acknowledgeUpload = { local, remote ->
-                        if (syncableRepository != null) {
-                            syncableRepository.updateSyncMetadata(local.id, remote.syncVersion, remote.lastUpdated)
-                            true
-                        } else {
-                            false
-                        }
-                    },
-                    applyCreate = { journal ->
-                        if (syncableRepository != null) syncableRepository.createFromSync(journal) else journalRepository.create(journal)
-                    },
-                    applyReplace = { _, replacement ->
-                        if (syncableRepository != null) {
-                            syncableRepository.updateFromSync(replacement)
-                        } else {
-                            journalRepository.update(replacement)
-                        }
-                    },
-                    applyDelete = { id ->
-                        if (syncableRepository != null) syncableRepository.deleteFromSync(id) else journalRepository.delete(id)
-                    },
-                ),
-            accessToken = accessToken,
-            since = since,
-        )
+                        },
+                        applyCreate = { journal ->
+                            if (syncableRepository !=
+                                null
+                            ) {
+                                syncableRepository.createFromSync(journal)
+                            } else {
+                                journalRepository.create(journal)
+                            }
+                        },
+                        applyReplace = { _, replacement ->
+                            if (syncableRepository != null) {
+                                syncableRepository.updateFromSync(replacement)
+                            } else {
+                                journalRepository.update(replacement)
+                            }
+                        },
+                        applyDelete = { id ->
+                            if (syncableRepository != null) syncableRepository.deleteFromSync(id) else journalRepository.delete(id)
+                        },
+                    ),
+                accessToken = accessToken,
+                since = since,
+            )
+        journalRepository.reconcileJournalRedirects(mergeScope)
+        return result
     }
+
+    private suspend fun fetchJournalChanges(
+        cursor: Instant,
+        requestScope: UploadScope?,
+        downloadScope: DownloadScope?,
+    ): Result<ChangesPage<Journal>> =
+        tokenRefresher
+            .withFreshToken(
+                { token -> cloudJournalDataSource.getJournalChanges(token, cursor, SYNC_PAGE_SIZE) },
+                "getJournalChanges",
+                requestScope,
+            ).map { page ->
+                val mergeScope = requestScope?.let { JournalMergeScope(it.ownerId, it.serverOrigin) }
+                transactionManager.withTransaction {
+                    check(downloadScope == downloadInbox?.currentScope()) { "Download scope changed" }
+                    page.mergeRedirects.forEach { (source, destination) ->
+                        journalRepository.applyJournalRedirect(source, destination, mergeScope)
+                        val version = page.mergeRedirectVersions[source]
+                        if (version != null && downloadScope != null) {
+                            downloadInbox?.applied("JOURNAL", source.toString(), version, downloadScope)
+                        }
+                    }
+                    check(downloadScope == downloadInbox?.currentScope()) { "Download scope changed" }
+                }
+                ChangesPage(
+                    page.changes,
+                    page.deletions,
+                    page.lastSyncTimestamp,
+                    page.hasMore,
+                    page.unreadable,
+                    page.failures,
+                    page.unreadableVersions,
+                )
+            }
 
     suspend fun downloadContent(
         accessToken: String,

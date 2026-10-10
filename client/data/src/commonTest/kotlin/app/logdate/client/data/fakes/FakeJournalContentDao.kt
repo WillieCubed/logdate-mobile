@@ -67,6 +67,15 @@ class FakeJournalContentDao : JournalContentDao {
             }
         }
 
+    override fun observeAllLinks(): Flow<List<JournalContentEntityLink>> =
+        state.map { entries ->
+            entries.flatMap { (journalId, contentIds) ->
+                contentIds.map {
+                    JournalContentEntityLink(journalId, it)
+                }
+            }
+        }
+
     override suspend fun getAllLinks(): List<JournalContentEntityLink> =
         journalContent.flatMap { (journalId, contentIds) ->
             contentIds.map { contentId ->

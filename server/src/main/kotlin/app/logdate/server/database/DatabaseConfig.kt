@@ -9,6 +9,9 @@ import org.jetbrains.exposed.v1.jdbc.Database
 import javax.sql.DataSource
 
 object DatabaseConfig {
+    internal var initializedDataSource: DataSource? = null
+        private set
+
     /**
      * Requests Cloud Run sends to one instance at a time.
      *
@@ -115,7 +118,7 @@ object DatabaseConfig {
         } else {
             Napier.i("Database migrations skipped because AUTO_MIGRATE=false")
         }
-        return connect(dataSource)
+        return connect(dataSource).also { initializedDataSource = dataSource }
     }
 
     private fun runMigrations(dataSource: DataSource) {

@@ -171,6 +171,26 @@ internal object SyncSchemaDocs {
                     ),
                 ),
             // ---- Journals -------------------------------------------------------------------------
+            "JournalMergeRequest" to
+                SchemaDoc(
+                    "A durable request to retire the source journal into a surviving destination while retaining every membership.",
+                    mapOf(
+                        "operationId" to "A stable operation ID. Retries must preserve this ID and the exact submitted request.",
+                        "destinationId" to
+                            "The surviving journal's ID. Its metadata stays unchanged; merged destinations resolve to their survivor.",
+                        "contentIds" to
+                            "Source membership IDs known to this device, including entries it has not downloaded. Combined with remote memberships.",
+                    ),
+                ),
+            "JournalMergeResponse" to
+                SchemaDoc(
+                    "Confirmation that a journal merge completed, including the destination after following later merges.",
+                    mapOf(
+                        "operationId" to "The stable operation ID from the request.",
+                        "sourceId" to "The retired source journal's ID.",
+                        "destinationId" to "The surviving destination after resolving durable journal redirects.",
+                    ),
+                ),
             "JournalUploadRequest" to
                 SchemaDoc(
                     "A whole journal, as sent to **Create or replace a journal**.",
@@ -244,6 +264,7 @@ internal object SyncSchemaDocs {
                         "id" to "The deleted journal's ID.",
                         "deletedAt" to "When it was deleted. $EPOCH_MS",
                         "serverVersion" to DELETION_VERSION,
+                        "mergedIntoJournalId" to "The surviving journal's ID for a merge tombstone, or `null` for an ordinary deletion.",
                     ),
                 ),
             // ---- Associations ---------------------------------------------------------------------

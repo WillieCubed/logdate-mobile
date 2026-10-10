@@ -1,5 +1,6 @@
 package app.logdate.client.sync
 
+import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.sync.cloud.CloudAssociationDataSource
 import app.logdate.client.sync.cloud.JournalContentAssociation
 import app.logdate.client.sync.metadata.AssociationPendingKey
@@ -24,6 +25,7 @@ internal class AssociationUploader(
     private val tokenRefresher: SyncTokenRefresher,
     private val retryCoordinator: SyncRetryCoordinator,
     private val recordProgress: (Int) -> Unit,
+    private val journalRepository: JournalRepository? = null,
 ) {
     private class Batch {
         val associations = mutableListOf<JournalContentAssociation>()
@@ -68,6 +70,13 @@ internal class AssociationUploader(
         deletes: Batch,
         errors: MutableList<SyncError>,
     ) {
+        val blockedDestinations =
+            journalRepository
+                ?.pendingJournalMerges()
+                ?.map {
+                    journalRepository.resolveJournalId(it.sourceId)
+                }?.toSet()
+                .orEmpty()
         pendingUploads.forEach { pending ->
             if (!retryCoordinator.shouldAttempt(EntityType.ASSOCIATION, pending)) {
                 return@forEach
@@ -77,11 +86,17 @@ internal class AssociationUploader(
                 errors.add(retryCoordinator.recordUnparsableOutboxEntry(EntityType.ASSOCIATION, pending, "association key"))
                 return@forEach
             }
+            val destination = journalRepository?.resolveJournalId(key.journalId) ?: key.journalId
+            if (destination != key.journalId && pending.operation == PendingOperation.DELETE) {
+                retryCoordinator.markUploadSettled(EntityType.ASSOCIATION, pending, Clock.System.now(), 0L)
+                return@forEach
+            }
+            if (destination in blockedDestinations) return@forEach
             if (!retryCoordinator.beginAttempt(EntityType.ASSOCIATION, pending, errors)) return@forEach
 
             val association =
                 JournalContentAssociation(
-                    journalId = key.journalId,
+                    journalId = destination,
                     contentId = key.contentId,
                     createdAt = Clock.System.now(),
                 )

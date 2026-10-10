@@ -65,11 +65,14 @@ import app.logdate.feature.events.navigation.eventDetailEntry
 import app.logdate.feature.journals.navigation.JournalContentPickerRoute
 import app.logdate.feature.journals.navigation.JournalCreationRoute
 import app.logdate.feature.journals.navigation.JournalDetailsRoute
+import app.logdate.feature.journals.navigation.JournalMergeRoute
 import app.logdate.feature.journals.navigation.JournalSettingsRoute
 import app.logdate.feature.journals.navigation.JournalsOverviewRoute
 import app.logdate.feature.journals.navigation.NoteDetailRoute
 import app.logdate.feature.journals.navigation.ShareJournalRoute
+import app.logdate.feature.journals.navigation.completeJournalMerge
 import app.logdate.feature.journals.navigation.journalEntries
+import app.logdate.feature.journals.navigation.redirectJournalDetail
 import app.logdate.feature.library.navigation.MediaDetailRoute
 import app.logdate.feature.library.navigation.libraryEntries
 import app.logdate.feature.library.ui.LibraryScreen
@@ -294,6 +297,11 @@ fun LogDateNavDisplay(
                                         },
                                         onOpenJournalSettings = { backStack.add(JournalSettingsRoute(it)) },
                                         onShareJournal = { backStack.add(ShareJournalRoute(it)) },
+                                        onMergeJournal = { backStack.add(JournalMergeRoute(it.toString())) },
+                                        onJournalMerged = { backStack.completeJournalMerge(it) },
+                                        onJournalRedirected = { sourceId, destinationId ->
+                                            backStack.redirectJournalDetail(sourceId, destinationId)
+                                        },
                                     )
                                     libraryEntries(
                                         onOpenMediaDetail = { backStack.add(MediaDetailRoute(it)) },

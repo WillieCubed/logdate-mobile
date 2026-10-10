@@ -234,7 +234,6 @@ private fun DaySectionHeader(
 }
 
 // region Entry type composables
-
 @Composable
 private fun JournalEntryItem(
     entry: EntryDisplayData,

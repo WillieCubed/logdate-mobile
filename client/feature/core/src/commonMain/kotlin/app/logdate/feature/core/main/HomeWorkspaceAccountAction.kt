@@ -23,6 +23,8 @@ import app.logdate.ui.streak.CampfirePresentation
 import app.logdate.ui.workspace.WorkspaceAccountAction
 import app.logdate.ui.workspace.WorkspaceAccountIndicator
 import logdate.client.feature.core.generated.resources.Res
+import logdate.client.feature.core.generated.resources.journal_merge_recovery_status
+import logdate.client.feature.core.generated.resources.journal_merge_recovery_title
 import logdate.client.feature.core.generated.resources.settings
 import logdate.client.feature.core.generated.resources.sync_account_mobile_data
 import logdate.client.feature.core.generated.resources.sync_banner_enter_recovery_phrase
@@ -41,9 +43,16 @@ fun HomeWorkspaceAccountAction(
     onOpenStreak: () -> Unit,
     onSyncAction: (SyncAction) -> Unit,
     accountStatus: AccountSyncStatus? = null,
+    hasMergeRecovery: Boolean = false,
 ) {
-    val summary = accountStatus?.let { stringResource(it.messageResource()) } ?: sync.accountSummaryResource()?.let { stringResource(it) }
-    WorkspaceAccountAction(accountStatus?.indicator() ?: sync.accountIndicator(), summary) { dismiss ->
+    val summary =
+        if (hasMergeRecovery) {
+            stringResource(Res.string.journal_merge_recovery_status)
+        } else {
+            accountStatus?.let { stringResource(it.messageResource()) } ?: sync.accountSummaryResource()?.let { stringResource(it) }
+        }
+    val indicator = if (hasMergeRecovery) WorkspaceAccountIndicator.Attention else accountStatus?.indicator() ?: sync.accountIndicator()
+    WorkspaceAccountAction(indicator, summary) { dismiss ->
         summary?.let {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
@@ -63,6 +72,15 @@ fun HomeWorkspaceAccountAction(
                 dismiss()
                 onSyncAction(action)
             })
+        }
+        if (hasMergeRecovery) {
+            DropdownMenuItem(
+                text = { Text(stringResource(Res.string.journal_merge_recovery_title)) },
+                onClick = {
+                    dismiss()
+                    onSyncAction(SyncAction.OpenStatus)
+                },
+            )
         }
         HorizontalDivider()
         if (campfire != null) {

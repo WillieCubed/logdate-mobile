@@ -52,6 +52,7 @@ kotlin {
         commonMain.dependencies {
             // Project dependencies
             implementation(projects.shared.model)
+            implementation(projects.shared.config)
             implementation(projects.client.ui)
             implementation(projects.client.repository)
             implementation(projects.client.logdateDatastore)
@@ -87,6 +88,7 @@ kotlin {
         }
 
         commonTest.dependencies {
+            implementation(projects.client.sync)
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.androidx.datastore.preferences)
