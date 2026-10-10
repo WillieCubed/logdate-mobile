@@ -47,12 +47,10 @@ import app.logdate.server.database.PostgreSQLLogDateBackupRepository
 import app.logdate.server.database.PostgreSQLLogDateCollectionsMetadataStore
 import app.logdate.server.database.PostgreSQLLogDateMediaRepository
 import app.logdate.server.database.PostgreSQLOAuthRuntimeStateRepository
-import app.logdate.server.database.PostgreSQLPasskeyRepository
 import app.logdate.server.database.PostgreSQLPendingEmailVerificationRepository
 import app.logdate.server.database.PostgreSQLRefreshTokenRevocationRepository
 import app.logdate.server.database.PostgreSQLRepoBlockStore
 import app.logdate.server.database.PostgreSQLResourceRouteRepository
-import app.logdate.server.database.PostgreSQLRestoreCredentialRepository
 import app.logdate.server.database.PostgreSQLSessionManager
 import app.logdate.server.database.PostgreSQLSigningKeyRepository
 import app.logdate.server.diagnostics.DiagnosticReportAvailability
@@ -93,14 +91,6 @@ import app.logdate.server.oauth.OAuthDpopVerifier
 import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthNonceService
 import app.logdate.server.oauth.OAuthRuntimeStateRepository
-import app.logdate.server.passkeys.InMemoryPasskeyRepository
-import app.logdate.server.passkeys.InMemoryRestoreCredentialRepository
-import app.logdate.server.passkeys.PasskeyRepository
-import app.logdate.server.passkeys.RestoreCredentialRepository
-import app.logdate.server.passkeys.RestoreCredentialService
-import app.logdate.server.passkeys.WebAuthnConfig
-import app.logdate.server.passkeys.WebAuthnPasskeyService
-import app.logdate.server.routes.AssetLinksConfig
 import app.logdate.server.sync.DbLocationHistoryRepository
 import app.logdate.server.sync.DbSyncRepository
 import app.logdate.server.sync.GcsMediaStorage
@@ -235,14 +225,6 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             }
         }
 
-        single<PasskeyRepository> {
-            if (isDatabaseAvailable) PostgreSQLPasskeyRepository() else InMemoryPasskeyRepository()
-        }
-
-        single<RestoreCredentialRepository> {
-            if (isDatabaseAvailable) PostgreSQLRestoreCredentialRepository() else InMemoryRestoreCredentialRepository()
-        }
-
         single<SigningKeyRepository> {
             if (isDatabaseAvailable) PostgreSQLSigningKeyRepository() else InMemorySigningKeyRepository()
         }
@@ -255,26 +237,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             if (isDatabaseAvailable) PostgreSQLRefreshTokenRevocationRepository() else InMemoryRefreshTokenRevocationRepository()
         }
 
-        single { WebAuthnConfig.fromEnvironment(serverOrigin = get<AtprotoIdentityConfig>().pdsServiceEndpoint) }
-        single { AssetLinksConfig.fromEnvironment() }
-        single {
-            val webAuthnConfig: WebAuthnConfig = get()
-            WebAuthnPasskeyService(
-                passkeyRepository = get(),
-                relyingPartyId = webAuthnConfig.relyingPartyId,
-                relyingPartyName = webAuthnConfig.relyingPartyName,
-                origins = webAuthnConfig.origins,
-            )
-        }
-        single {
-            val webAuthnConfig: WebAuthnConfig = get()
-            RestoreCredentialService(
-                restoreCredentialRepository = get(),
-                relyingPartyId = webAuthnConfig.relyingPartyId,
-                relyingPartyName = webAuthnConfig.relyingPartyName,
-                origins = webAuthnConfig.origins,
-            )
-        }
+        passkeyServices(isDatabaseAvailable)
 
         single<PendingEmailVerificationRepository> {
             if (isDatabaseAvailable) PostgreSQLPendingEmailVerificationRepository() else InMemoryPendingEmailVerificationRepository()
