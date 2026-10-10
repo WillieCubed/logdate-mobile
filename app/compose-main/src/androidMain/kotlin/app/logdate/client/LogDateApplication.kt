@@ -8,6 +8,7 @@ import android.content.pm.ApplicationInfo
 import android.os.StrictMode
 import app.logdate.client.ambient.AmbientPromptScheduler
 import app.logdate.client.ambient.AmbientPromptSchedulingObserver
+import app.logdate.client.bubble.RecordingBubbleNotifier
 import app.logdate.client.calendar.CalendarImportScheduler
 import app.logdate.client.data.notes.StoredMediaReferenceMigrationLauncher
 import app.logdate.client.datastore.featureflags.FeatureFlag
@@ -19,6 +20,7 @@ import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.notifications.LiveUpdatesSwitch
 import app.logdate.client.notifications.LogDateNotificationRegistrar
+import app.logdate.client.notifications.RecordingBubbleSwitch
 import app.logdate.client.platform.PlatformComponentToggler
 import app.logdate.client.rewind.RewindGenerationScheduler
 import app.logdate.client.shortcuts.DynamicShortcutRefreshObserver
@@ -155,9 +157,11 @@ class LogdateApplication :
         runCatching {
             get<PlatformComponentToggler>().start(get<CoroutineScope>())
             get<RecordVoiceTileUpdater>().start(get<CoroutineScope>())
-            // Notification builders read this switch synchronously. Creating it now starts its
-            // flag read, so the first recording after launch already sees the flag.
+            get<RecordingBubbleNotifier>().start(get<CoroutineScope>())
+            // Notification builders read these switches synchronously. Creating them now starts
+            // their flag reads, so the first recording after launch already sees the flags.
             get<LiveUpdatesSwitch>()
+            get<RecordingBubbleSwitch>()
         }.onFailure { error ->
             Napier.w("Failed to start syncing flag-gated components", error)
         }

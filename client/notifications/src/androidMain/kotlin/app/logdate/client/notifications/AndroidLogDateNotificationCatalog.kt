@@ -22,6 +22,7 @@ data class AndroidLogDateNotificationChannelSpec(
     val vibrationEnabled: Boolean = false,
     val soundEnabled: Boolean = false,
     val lockscreenVisibility: Int = Notification.VISIBILITY_PRIVATE,
+    val allowBubbles: Boolean = false,
 )
 
 object AndroidLogDateNotificationCatalog {
@@ -60,6 +61,17 @@ object AndroidLogDateNotificationCatalog {
                 vibrationEnabled = false,
                 soundEnabled = false,
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC,
+            ),
+            AndroidLogDateNotificationChannelSpec(
+                key = LogDateNotificationChannelKey.FLOATING_RECORDER,
+                nameResId = R.string.notification_channel_floating_recorder_name,
+                descriptionResId = R.string.notification_channel_floating_recorder_description,
+                importance = NotificationManager.IMPORTANCE_DEFAULT,
+                showBadge = false,
+                vibrationEnabled = false,
+                soundEnabled = false,
+                lockscreenVisibility = Notification.VISIBILITY_PRIVATE,
+                allowBubbles = true,
             ),
             AndroidLogDateNotificationChannelSpec(
                 key = LogDateNotificationChannelKey.AUDIO_PLAYBACK,
@@ -213,6 +225,9 @@ class LogDateNotificationRegistrar(
             lockscreenVisibility = spec.lockscreenVisibility
             if (!spec.soundEnabled) {
                 setSound(null, null)
+            }
+            if (spec.allowBubbles) {
+                setAllowBubbles(true)
             }
         }
 }

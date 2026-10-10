@@ -74,6 +74,7 @@ import kotlin.uuid.Uuid
 @Preview(name = "Tablet portrait", device = ScreenshotTestData.TABLET_PORTRAIT, showBackground = true)
 @Preview(name = "Wide RTL", device = ScreenshotTestData.TABLET, locale = "ar", showBackground = true)
 @Preview(name = "RTL", device = ScreenshotTestData.PHONE, locale = "ar", showBackground = true)
+@Preview(name = "Bubble", device = ScreenshotTestData.BUBBLE, showBackground = true)
 annotation class WorkspacePreviewMatrix
 
 internal val workspaceDestinations =

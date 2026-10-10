@@ -65,6 +65,13 @@ the share sheet row, and the pin dialogs.
 Launchers show four shortcuts. The publisher's cap is that number minus the three static
 shortcuts, so it decides which dynamic shortcut appears instead of the launcher trimming silently.
 
+A shortcut that a running surface depends on survives each refresh. The floating recorder's
+"Voice recorder" conversation shortcut is the one case today: the applier republishes it alongside
+the new set, so a refresh during a recording never orphans the bubble.
+
+Share targets carry a `LocusId` equal to their shortcut id, which Android uses to connect the share
+target with the journal it opens.
+
 Drafts stay in the atomic `setDynamicShortcuts` call rather than moving to `pushDynamicShortcut`.
 Shortcut ids are stable across refreshes, so usage history is not lost, and one atomic call cannot
 leave launcher and share shortcuts half-updated.

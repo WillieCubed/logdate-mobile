@@ -347,6 +347,23 @@
         </service>
 
         <!--
+            Floating recorder bubble. Both components are declared disabled and enabled by
+            PlatformComponentToggler while the RECORDING_BUBBLE flag is on. A bubble's activity must
+            be embeddable, resizable, and open a new document each time.
+            See docs/reference/android/os-integration/bubbles.md.
+        -->
+        <activity
+            android:name="app.logdate.client.bubble.RecordingBubbleActivity"
+            android:allowEmbedded="true"
+            android:documentLaunchMode="always"
+            android:enabled="false"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:label="@string/recorder_bubble_title"
+            android:resizeableActivity="true"
+            android:theme="@style/Theme.LogDate" />
+
+        <!--
             Saves a capture reminder's quick reply as an entry. Reminders only offer the Write action
             while NOTIFICATION_QUICK_REPLY is on.
             See docs/reference/android/os-integration/notification-quick-reply.md.
@@ -356,6 +373,15 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="app.logdate.action.QUICK_REPLY" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="app.logdate.client.bubble.FloatRecorderReceiver"
+            android:enabled="false"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="app.logdate.action.FLOAT_RECORDER" />
             </intent-filter>
         </receiver>
 

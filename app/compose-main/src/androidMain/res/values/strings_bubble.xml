@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Name of the floating recorder bubble and of the conversation Android files it under. -->
+    <string name="recorder_bubble_title">Voice recorder</string>
+    <!-- Text of the bubble's notification, shown where the bubble cannot float. -->
+    <string name="recorder_bubble_message">Recording a voice entry</string>
+</resources>

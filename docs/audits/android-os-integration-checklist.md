@@ -98,7 +98,7 @@ A row reaches `[done]` only when its Evidence column lists:
 | `[done]` | Static shortcuts for New entry, Record voice, and Take photo, with themed icons | Three static shortcuts on the capture action, with adaptive icons and monochrome layers. Lane 2: `launcher-shortcuts/long-press--{phone-api36,phone-api37,tablet-api37}.png`. |
 | `[done]` | Dynamic shortcuts for Continue draft, Today, and Last week | Ship today (`DynamicShortcutPublisherTest`). Their icons were bare white glyphs that launchers drew white on white; they now use the same adaptive icons as the static shortcuts (visible in the launcher captures). |
 | `[done]` | The dynamic shortcut cap leaves room for static shortcuts | `DynamicShortcutPublisher` caps dynamic shortcuts at four visible minus three static; `DynamicShortcutPublisherTest`. |
-| `[todo]` | Drafts are pushed with `pushDynamicShortcut`; share targets carry a `LocusId` | |
+| `[done]` | Drafts are pushed with `pushDynamicShortcut`; share targets carry a `LocusId` | Share targets carry a `LocusId`. Drafts stay in the atomic `setDynamicShortcuts` call by decision (stable ids keep usage history); recorded in `launcher-shortcuts.md`. The recorder bubble's shortcut survives refreshes. |
 | `[partial]` | Direct Share targets for each journal | Ship today. `SharingShortcutParsersTest`, `IncomingShareE2ETest`. Missing: Lane 2 share sheet capture. |
 | `[done]` | `reportShortcutUsed` is called on save for each mode and shared journal | `CaptureUsageReporter` (editor) and `AndroidCaptureUsageReporter`; ids from `captureShortcutId`, tested in `CaptureLaunchTest`. |
 | `[todo]` | Journals and widgets can be pinned from inside the app | |
@@ -125,9 +125,9 @@ A row reaches `[done]` only when its Evidence column lists:
 
 | Status | Requirement | Evidence |
 | --- | --- | --- |
-| `[todo]` | Home, the editor, and the recorder work at App Bubble sizes without being recreated on resize | |
-| `[todo]` | Recording bubble spike decided | |
-| `[todo]` | The voice recorder floats as a bubble with pause, stop, and save | |
+| `[partial]` | Home, the editor, and the recorder work at App Bubble sizes without being recreated on resize | `configChanges` on both activities. Lane 1 bubble window: every Home workspace scene, `Flow03_01` editor S01 and S02, and the recorder. Missing: Lane 2 capture of LogDate as an App Bubble. |
+| `[partial]` | Recording bubble spike decided | The bubble is a conversation notification tied to a long-lived "Voice recorder" shortcut, separate from the Live Update. Missing: emulator verification on API 36 and 37. |
+| `[partial]` | The voice recorder floats as a bubble with pause, stop, and save | Behind `RECORDING_BUBBLE`. Lane 1: `Flow20_03_RecorderBubbleScreenshots.kt` (matrix plus bubble window). Tests: `RecorderBubbleStatesTest`. Missing: Lane 2 captures of the floating recorder. |
 
 ## Keyboard, Pointer, Drag and Drop
 

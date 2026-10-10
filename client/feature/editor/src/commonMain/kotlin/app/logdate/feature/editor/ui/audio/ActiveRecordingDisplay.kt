@@ -546,10 +546,8 @@ private fun LiveTranscriptText(
     }
 }
 
-/**
- * Helper function to format the duration as MM:SS
- */
-private fun formatDuration(duration: Duration): String {
+/** Formats [duration] as MM:SS, the elapsed-time format every recording surface uses. */
+internal fun formatDuration(duration: Duration): String {
     val totalSeconds = duration.inWholeSeconds
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60

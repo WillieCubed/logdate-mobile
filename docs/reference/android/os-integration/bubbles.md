@@ -1,7 +1,8 @@
 # Bubbles
 
-Status: planned. App Bubble readiness has no flag; the recording bubble is behind `RECORDING_BUBBLE`
-and waits on a spike.
+Status: the recording bubble is built, behind `RECORDING_BUBBLE` (Settings > Advanced > Developer
+tools > Feature previews); its emulator spike is pending. App Bubble readiness is planned and has no
+flag.
 
 ## What it is
 
@@ -20,16 +21,21 @@ LogDate uses both kinds:
 
 - **App Bubble readiness.** Because people can bubble any app, Home and the editor must work in a
   bubble-sized window, and resizing must not restart them.
-- **The recording bubble.** A floating recorder keeps a voice entry recording, with pause, stop, and
-  save, while the person uses another app.
+- **The recording bubble.** A floating recorder shows a voice entry as it records, with Pause or
+  Resume and Finish, while the person uses another app.
 
 ## What the person sees
 
 - **Bubbling LogDate:** the timeline and the editor fit in the bubble. Nothing important is clipped,
   and controls stay reachable.
-- **Floating a recording:** while recording, a "Float" action appears on the recording notification
-  and in the editor's voice block. Tapping it collapses the recorder into a bubble, which expands into
-  a compact recorder showing the waveform, elapsed time, Pause or Resume, Stop, and Save.
+- **Floating a recording:** while recording, a **Float** action appears on the recording
+  notification. Tapping it floats the recorder as a bubble. Expanded, the bubble shows:
+  - "Recording" or "Paused", with a button that opens LogDate;
+  - the live transcript, when the bubble is tall enough (320dp or more);
+  - the waveform and the elapsed time;
+  - Pause or Resume, and Finish, which saves the recording to its entry.
+
+  A Float action in the editor's voice block is planned.
 
 Screenshots are added here as each part ships: bubble-size Home and editor scenes, LogDate bubbled
 from the launcher, the tablet Bubble Bar, and the recorder bubble collapsed and expanded.
@@ -50,8 +56,8 @@ A notification bubble must belong to a **conversation**: a notification with `Me
 to a long-lived sharing shortcut with a `Person`. LogDate's recorder is not a conversation, so the
 design has to work within that rule:
 
-1. **A long-lived shortcut.** LogDate publishes a long-lived "Voice recorder" shortcut whose `Person`
-   is the user.
+1. **A long-lived shortcut.** LogDate publishes a long-lived "Voice recorder" shortcut, with a
+   `Person` of the same name, when the person taps Float. It is removed when the recording ends.
 2. **A separate bubble notification.** "Float" posts a second notification with:
    - `MessagingStyle`, linked to that shortcut;
    - `BubbleMetadata` pointing at `RecordingBubbleActivity`;
@@ -59,14 +65,27 @@ design has to work within that rule:
    - `setSuppressNotification(true)`, so no duplicate shade entry appears.
 3. **The recorder activity.** `RecordingBubbleActivity` is declared with
    `android:allowEmbedded="true"`, `android:resizeableActivity="true"`, and
-   `android:documentLaunchMode="always"`, which bubbles require. It shows a compact recorder bound to
-   the same `RecordingServiceController` the editor uses.
+   `android:documentLaunchMode="always"`, which bubbles require. It draws `RecorderBubbleContent`
+   (editor module) from the recorder's live streams, combined by `recorderBubbleStates`. Pause,
+   Resume, and Finish send the recording service the same actions as the notification's buttons, so
+   the bubble and the notification can never disagree.
 
 The recording keeps its own foreground-service notification. That notification is a
 [Live Update](live-updates.md), and a Live Update cannot use `MessagingStyle`, which is why the bubble
 needs a notification of its own.
 
-Stopping or saving dismisses the bubble. Closing the bubble never stops or discards a recording.
+`RecordingBubbleNotifier` (app/compose-main androidMain, `client/bubble/`) posts and removes the
+bubble. It watches the recorder and dismisses the bubble whenever a recording ends, however it ended.
+Closing the bubble never stops or discards a recording.
+
+The Float action lives in the media module, which cannot depend on the app. It reads
+`RecordingBubbleSwitch` (client/notifications) to decide whether to show the action, and sends a
+broadcast to `FloatRecorderReceiver` by class name. The app binds `FlagRecordingBubbleSwitch`, which
+follows the flag.
+
+Where the person has not allowed bubbles, Android shows the same notification in the shade as a
+conversation, with the system's bubble button. The bubble's notification uses its own channel,
+"Floating recorder", which allows bubbles.
 
 ### Spike result
 
@@ -77,21 +96,26 @@ recording bubble in favor of App Bubbles.
 ## Flag and rollout
 
 - App Bubble readiness: no flag.
-- Recording bubble: `RECORDING_BUBBLE`, off by default. `RecordingBubbleActivity` is declared disabled
-  and enabled by `PlatformComponentToggler`.
+- Recording bubble: `RECORDING_BUBBLE`, off by default. `RecordingBubbleActivity` and
+  `FloatRecorderReceiver` are declared disabled and enabled by `PlatformComponentToggler`. With the
+  flag off, the recording notification has no Float action.
 
 ## Privacy
 
-The bubble shows recording time and the waveform, never transcripts or entry text.
+The bubble shows the live transcript of the recording in progress, the same text the editor shows
+while recording. It never shows other entries. A collapsed bubble shows only the recorder icon, and
+bubbles do not appear on the lock screen.
 
 ## How to test
 
-- Tests cover building the bubble notification, mapping the recorder state, and cleanup on stop,
-  save, and process death.
+- `RecorderBubbleStatesTest` (editor, common) covers mapping the recorder's streams: neutral
+  starting values, the waveform window, and following pause and transcript changes.
+- `PlatformComponentTogglerTest` covers enabling the bubble components with the flag.
 - On an API 37 emulator, long-press the LogDate icon and choose Bubble.
 
 ## Updating screenshots
 
-- The recorder UI and bubble-size scenes are Lane 1 references.
+- The recorder UI is a Lane 1 reference: `Flow20_03_RecorderBubbleScreenshots.kt`, recording and
+  paused, in every `@OsIntegrationPreviewMatrix` configuration plus the 360×480dp bubble window.
 - The real bubbles and the Bubble Bar are Lane 2 captures, recorded with `./run screenshots:os`.
   They land in `docs/screenshots/android-os-integration/bubbles/`.

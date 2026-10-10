@@ -18,6 +18,10 @@
 privacy-system-search|android|app/logdate/screenshots/flows/flow20_os_integration/Flow20_01_SystemSearchVisibilityScreenshots.kt#S01_PrivacySystemSearchVisibility
 privacy-system-search|desktop|privacy-settings
 
+# Recording bubble: the compact recorder inside the floating bubble, recording and paused.
+recording-bubble|android|app/logdate/screenshots/flows/flow20_os_integration/Flow20_03_RecorderBubbleScreenshots.kt#S01_RecorderBubbleRecording
+recording-bubble|android|app/logdate/screenshots/flows/flow20_os_integration/Flow20_03_RecorderBubbleScreenshots.kt#S02_RecorderBubblePaused
+
 # Feature previews: Developer tools toggles for every flag-gated OS integration surface.
 feature-previews|android|app/logdate/screenshots/flows/flow20_os_integration/Flow20_02_FeaturePreviewsScreenshots.kt#S01_FeaturePreviews
 feature-previews|desktop|feature-previews

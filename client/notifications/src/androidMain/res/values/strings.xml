@@ -7,7 +7,9 @@
     <string name="notification_group_import_export">Import &amp; export</string>
 
     <string name="notification_channel_audio_recording_name">Audio recording</string>
-    <string name="notification_channel_audio_recording_description">Keeps recording controls available while you capture audio.</string>
+    <string name="notification_channel_audio_recording_description">Shows recording controls while you capture audio.</string>
+    <string name="notification_channel_floating_recorder_name">Floating recorder</string>
+    <string name="notification_channel_floating_recorder_description">Shows a running voice recording as a bubble over other apps.</string>
     <string name="notification_channel_audio_playback_name">Audio playback</string>
     <string name="notification_channel_audio_playback_description">Shows playback controls while you listen to saved audio notes.</string>
     <string name="notification_channel_location_history_name">Location history</string>

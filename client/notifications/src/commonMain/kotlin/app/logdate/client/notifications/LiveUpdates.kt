@@ -49,6 +49,24 @@ fun recordingLiveUpdate(
     }
 
 /**
+ * Whether a running recording may float as a bubble. The app binds an implementation backed by the
+ * RECORDING_BUBBLE flag; anywhere none is bound, the recording notification offers no Float action.
+ */
+interface RecordingBubbleSwitch {
+    val enabled: Boolean
+
+    object Off : RecordingBubbleSwitch {
+        override val enabled: Boolean = false
+    }
+}
+
+/** The broadcast the recording notification's Float action sends to the app. */
+const val ACTION_FLOAT_RECORDER = "app.logdate.action.FLOAT_RECORDER"
+
+/** The app's receiver for [ACTION_FLOAT_RECORDER], named so notification code needs no app dependency. */
+const val FLOAT_RECORDER_RECEIVER_CLASS = "app.logdate.client.bubble.FloatRecorderReceiver"
+
+/**
  * How long-running data work (export, restore, sync) presents itself as a Live Update.
  *
  * @property promoted Whether to request promotion to a Live Update.

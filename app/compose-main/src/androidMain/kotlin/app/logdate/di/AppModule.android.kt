@@ -5,6 +5,8 @@ import app.logdate.client.ambient.AmbientPromptNotificationCoordinator
 import app.logdate.client.ambient.AmbientPromptScheduler
 import app.logdate.client.ambient.AmbientPromptSchedulingObserver
 import app.logdate.client.ambient.AmbientPromptWorker
+import app.logdate.client.bubble.FlagRecordingBubbleSwitch
+import app.logdate.client.bubble.RecordingBubbleNotifier
 import app.logdate.client.calendar.AndroidCalendarImportLauncher
 import app.logdate.client.calendar.CalendarImportScheduler
 import app.logdate.client.calendar.CalendarImportWorker
@@ -34,6 +36,7 @@ import app.logdate.client.media.di.audioModule
 import app.logdate.client.networking.di.networkingModule
 import app.logdate.client.notifications.FlagLiveUpdatesSwitch
 import app.logdate.client.notifications.LiveUpdatesSwitch
+import app.logdate.client.notifications.RecordingBubbleSwitch
 import app.logdate.client.platform.FeatureFlagState
 import app.logdate.client.platform.PackageManagerComponentSwitch
 import app.logdate.client.platform.PlatformComponentToggler
@@ -177,6 +180,8 @@ actual val appModule: Module =
         workerOf(::DynamicShortcutRefreshWorker)
         single { RecordVoiceTileUpdater(androidContext(), get()) }
         single<LiveUpdatesSwitch> { FlagLiveUpdatesSwitch(get(), get()) }
+        single<RecordingBubbleSwitch> { FlagRecordingBubbleSwitch(get(), get()) }
+        single { RecordingBubbleNotifier(androidContext(), get()) }
         single<CaptureUsageReporter> { AndroidCaptureUsageReporter(androidContext()) }
         single {
             PlatformComponentToggler(

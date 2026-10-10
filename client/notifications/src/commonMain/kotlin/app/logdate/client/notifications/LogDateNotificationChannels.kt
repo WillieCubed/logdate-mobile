@@ -30,6 +30,11 @@ enum class LogDateNotificationChannelKey(
         groupKey = LogDateNotificationGroupKey.CAPTURE_PLAYBACK,
         notificationId = 1001,
     ),
+    FLOATING_RECORDER(
+        id = "floating_recorder_channel",
+        groupKey = LogDateNotificationGroupKey.CAPTURE_PLAYBACK,
+        notificationId = 1005,
+    ),
     AUDIO_PLAYBACK(
         id = "audio_playback_channel",
         groupKey = LogDateNotificationGroupKey.CAPTURE_PLAYBACK,
@@ -86,6 +91,7 @@ object LogDateNotificationChannels {
     val phoneChannels: List<LogDateNotificationChannelKey> =
         listOf(
             LogDateNotificationChannelKey.AUDIO_RECORDING,
+            LogDateNotificationChannelKey.FLOATING_RECORDER,
             LogDateNotificationChannelKey.AUDIO_PLAYBACK,
             LogDateNotificationChannelKey.LOCATION_HISTORY,
             LogDateNotificationChannelKey.CAPTURE_NUDGES,

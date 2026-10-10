@@ -48,6 +48,12 @@
     <string name="generating_transcription">Generating transcription...</string>
     <string name="grant_permission">Grant Permission</string>
     <string name="listening">Listening\u2026</string>
+    <string name="recorder_bubble_recording">Recording</string>
+    <string name="recorder_bubble_paused">Paused</string>
+    <string name="recorder_bubble_open_app">Open LogDate</string>
+    <string name="recorder_bubble_no_transcript">Nothing transcribed yet</string>
+    <string name="recorder_bubble_pause">Pause</string>
+    <string name="recorder_bubble_resume">Resume</string>
     <string name="load_drafts">Load drafts</string>
     <string name="loading_camera">Loading camera...</string>
     <string name="loading_drafts">Loading drafts...</string>

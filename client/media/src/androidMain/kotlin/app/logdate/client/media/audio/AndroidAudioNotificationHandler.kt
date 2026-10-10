@@ -7,9 +7,12 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import app.logdate.client.media.R
+import app.logdate.client.notifications.ACTION_FLOAT_RECORDER
+import app.logdate.client.notifications.FLOAT_RECORDER_RECEIVER_CLASS
 import app.logdate.client.notifications.LiveUpdateChip
 import app.logdate.client.notifications.LiveUpdatesSwitch
 import app.logdate.client.notifications.LogDateNotificationChannelKey
+import app.logdate.client.notifications.RecordingBubbleSwitch
 import app.logdate.client.notifications.recordingLiveUpdate
 import io.github.aakira.napier.Napier
 import org.koin.mp.KoinPlatform
@@ -24,6 +27,8 @@ class AndroidAudioNotificationHandler(
     private val context: Context,
     private val liveUpdates: LiveUpdatesSwitch =
         KoinPlatform.getKoinOrNull()?.getOrNull<LiveUpdatesSwitch>() ?: LiveUpdatesSwitch.Off,
+    private val recordingBubble: RecordingBubbleSwitch =
+        KoinPlatform.getKoinOrNull()?.getOrNull<RecordingBubbleSwitch>() ?: RecordingBubbleSwitch.Off,
 ) {
     companion object {
         val CHANNEL_ID = LogDateNotificationChannelKey.AUDIO_RECORDING.id
@@ -136,6 +141,21 @@ class AndroidAudioNotificationHandler(
                 android.R.drawable.ic_media_play,
                 context.getString(R.string.audio_recording_action_resume),
                 createActionIntent(ACTION_RESUME),
+            )
+        }
+
+        if (recordingBubble.enabled) {
+            val float =
+                Intent(ACTION_FLOAT_RECORDER).setClassName(context, FLOAT_RECORDER_RECEIVER_CLASS)
+            builder.addAction(
+                R.drawable.ic_notification_recording,
+                context.getString(R.string.audio_recording_action_float),
+                PendingIntent.getBroadcast(
+                    context,
+                    ACTION_FLOAT_RECORDER.hashCode(),
+                    float,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                ),
             )
         }
 

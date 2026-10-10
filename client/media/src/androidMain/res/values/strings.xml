@@ -6,6 +6,8 @@
     <string name="audio_recording_notification_title_paused">Recording paused</string>
     <!-- Status-bar chip text while a recording is paused; the chip shows elapsed time otherwise. -->
     <string name="audio_recording_chip_paused">Paused</string>
+    <!-- Notification action that keeps the recorder floating over other apps as a bubble. -->
+    <string name="audio_recording_action_float">Float</string>
     <string name="audio_recording_notification_text_paused">Tap to resume or return to your entry</string>
     <string name="audio_recording_action_pause">Pause</string>
     <string name="audio_recording_action_resume">Resume</string>

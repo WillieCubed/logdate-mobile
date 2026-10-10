@@ -19,6 +19,7 @@ import app.logdate.feature.editor.ui.editor.VideoBlockUiState
 import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
 import app.logdate.feature.editor.ui.state.BlocksUiState
 import app.logdate.ui.audio.expansion.SpatialExpandedAudioBlock
+import app.logdate.screenshots.common.BubbleWindowPreview
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTheme
@@ -74,6 +75,7 @@ private val sampleDrafts =
 
 @PreviewTest
 @ScreenshotPreviewMatrix
+@BubbleWindowPreview
 @Composable
 fun S01_EntryEditorEmpty() {
     EditorRouteFrame {
@@ -89,6 +91,7 @@ fun S01_EntryEditorEmpty() {
 
 @PreviewTest
 @ScreenshotPreviewMatrix
+@BubbleWindowPreview
 @Composable
 fun S02_EntryEditorListMixedContent() {
     EditorRouteFrame {

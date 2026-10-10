@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.client.notifications.FLOAT_RECORDER_RECEIVER_CLASS
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -78,6 +79,11 @@ class PlatformComponentToggler(
                     listOf(
                         "app.logdate.client.tiles.NewEntryTileService",
                         "app.logdate.client.tiles.RecordVoiceTileService",
+                    ),
+                FeatureFlag.RECORDING_BUBBLE to
+                    listOf(
+                        "app.logdate.client.bubble.RecordingBubbleActivity",
+                        FLOAT_RECORDER_RECEIVER_CLASS,
                     ),
             )
     }

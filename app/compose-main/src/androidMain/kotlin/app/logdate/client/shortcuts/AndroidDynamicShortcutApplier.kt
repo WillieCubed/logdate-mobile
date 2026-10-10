@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.app.Person
+import androidx.core.content.LocusIdCompat
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
@@ -17,6 +18,7 @@ import app.logdate.client.ambient.AMBIENT_PROMPT_TARGET_MEMORY_RECALL
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_DRAFT_ID
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_RECALL_DATE
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_TARGET
+import app.logdate.client.bubble.RecordingBubbleNotifier
 import app.logdate.client.feature.widgets.R
 import app.logdate.client.feature.widgets.shortcuts.DynamicShortcutDescriptor
 import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_ID
@@ -69,8 +71,12 @@ class AndroidDynamicShortcutApplier(
         val (sharingDescriptors, launcherDescriptors) =
             descriptors.partition { it is DynamicShortcutDescriptor.ShareToJournal }
 
-        val systemLimit = ShortcutManagerCompat.getMaxShortcutCountPerActivity(context)
-        val launcherSlots = launcherDescriptors.take(systemLimit)
+        // A shortcut a live surface depends on, such as the floating recorder's conversation,
+        // survives the refresh; dropping it would orphan that surface.
+        val liveShortcuts =
+            ShortcutManagerCompat.getDynamicShortcuts(context).filter { it.id in LIVE_SURFACE_SHORTCUT_IDS }
+        val systemLimit = ShortcutManagerCompat.getMaxShortcutCountPerActivity(context) - liveShortcuts.size
+        val launcherSlots = launcherDescriptors.take(systemLimit.coerceAtLeast(0))
         val remainingSlots = (systemLimit - launcherSlots.size).coerceAtLeast(0)
         val sharingSlots =
             sharingDescriptors
@@ -91,7 +97,7 @@ class AndroidDynamicShortcutApplier(
             }
 
         val publishSucceeded =
-            ShortcutManagerCompat.setDynamicShortcuts(context, launcherShortcuts + sharingShortcuts)
+            ShortcutManagerCompat.setDynamicShortcuts(context, launcherShortcuts + sharingShortcuts + liveShortcuts)
         if (!publishSucceeded) {
             Napier.w("Dynamic shortcut publish was rate-limited by ShortcutManagerCompat")
         }
@@ -201,6 +207,7 @@ class AndroidDynamicShortcutApplier(
             .setIntent(intent)
             .setRank(rank)
             .setLongLived(true)
+            .setLocusId(LocusIdCompat(descriptor.id))
             .setCategories(setOf(SHORTCUT_CATEGORY_CONVERSATION))
             .setPerson(person)
             .build()
@@ -277,6 +284,9 @@ class AndroidDynamicShortcutApplier(
          * rank — this only affects launcher long-press visibility.
          */
         const val SHARING_RANK_BASE = 100
+
+        /** Dynamic shortcuts owned by a running surface rather than by this refresh. */
+        private val LIVE_SURFACE_SHORTCUT_IDS = setOf(RecordingBubbleNotifier.SHORTCUT_ID)
 
         /**
          * Conversation category required for the system to surface a dynamic shortcut as a
