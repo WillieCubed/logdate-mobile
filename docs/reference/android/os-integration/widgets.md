@@ -1,7 +1,8 @@
 # Widgets
 
-Status: partial. Three home-screen widgets ship today. The capture-only lock-screen and hub widget,
-in-app pinning, and committed widget screenshots are planned.
+Status: partial. Three home-screen widgets ship today, and pinning them from Settings works. The
+capture-only lock-screen and hub widget is built, behind `LOCK_SCREEN_CAPTURE_WIDGET`. Committed
+Glance screenshot references are planned.
 
 ## What it is
 
@@ -29,10 +30,14 @@ screen while charging or docked.
 | New entry | Home screen | Write, Record, and Camera actions, optionally over a chosen photo | Opens the editor in that mode |
 | On This Day | Home screen | A memory from this date in past years | Opens that day |
 | Pinned memory | Home screen | One memory the person chose | Opens that memory |
-| Capture (planned) | Lock screen and hub | Write, Record, and Photo actions only | Opens the editor in that mode |
+| Capture | Home screen, lock screen, and hub | Write, Record, and Photo actions only | Opens the editor in that mode |
 
-Screenshots are added here once the widget screenshot lane exists: each widget in light, dark,
-right-to-left, and 200% text, plus the lock-screen placement.
+The Capture widget in the Android 17 widget picker, below New Entry, whose buttons it shares:
+
+![The widget picker listing Capture, 3 × 1, with Write, Record, and Photo buttons and the note that it shows nothing from the journal](../../../screenshots/android-os-integration/widgets/capture-widget-picker--phone-api37.png)
+
+Glance references for each widget in light, dark, right-to-left, and 200% text are added once the
+widget screenshot lane exists, with a lock-screen placement capture.
 
 ## How it works
 
@@ -51,12 +56,19 @@ The code lives in `client/feature/android-widgets/src/androidMain/kotlin/app/log
   `setWidgetPreviews`, so the picker shows the real widget.
 - **Refresh.** `WidgetRefreshScheduler` and `OnThisDayWidgetRefreshWorker` refresh content. The
   provider XMLs set `updatePeriodMillis="0"`, so nothing refreshes on a fixed timer.
-- **Planned: lock-screen capture widget.** A capture-only variant of `NewEntryWidget` with a new
-  provider XML that declares `keyguard`. Its receiver is declared disabled and enabled by
-  `PlatformComponentToggler` when `LOCK_SCREEN_CAPTURE_WIDGET` is on.
-- **Planned: pinning.** Widget settings get "Add widget", which calls
-  `GlanceAppWidgetManager.requestPinGlanceAppWidget`. It is shown only when the launcher supports
-  pinning.
+- **The capture widget.** `CaptureWidget` (`CaptureWidget.kt`) draws three buttons with the New
+  entry widget's icons and colored circles, and nothing else. Its provider XML,
+  `capture_widget_info.xml`, declares `home_screen|keyguard`, so Android offers it on the lock
+  screen and the hub as well as the home screen; `capture_widget_preview.xml` is its picker preview.
+  Each button sends the public capture action (`app.logdate.action.CAPTURE` with a mode), the same
+  one launcher shortcuts and tiles send. The widget module cannot depend on the app, so the action
+  and extra names are repeated in `CAPTURE_WIDGET_ACTION` and `CAPTURE_WIDGET_EXTRA_MODE`, and
+  `CaptureWidgetContractTest` (app/compose-main) fails if they drift. `CaptureWidgetReceiver` is
+  declared disabled and enabled by `PlatformComponentToggler` while `LOCK_SCREEN_CAPTURE_WIDGET` is
+  on.
+- **Pinning.** Settings > Widgets offers each widget through
+  `GlanceAppWidgetManager.requestPinGlanceAppWidget` (`AndroidMemoriesWidgetInstallController`),
+  only where the launcher supports pinning.
 
 ## Flag and rollout
 

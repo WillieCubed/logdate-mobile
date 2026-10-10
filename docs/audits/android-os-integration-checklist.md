@@ -112,7 +112,7 @@ A row reaches `[done]` only when its Evidence column lists:
 | `[done]` | The recording notification is a Live Update with a status bar chip | Behind `LIVE_UPDATES`. Tests: `LiveUpdatesTest`. Lane 2: `live-updates/recording-status-chip--phone-api37.png` and `recording-notification`; `recording-promotion--phone-api37.txt` records `promotedOngoing=true`. |
 | `[partial]` | Export, restore, and sync progress are Live Updates, with semantic colors on API 37 | Built behind `LIVE_UPDATES`: `applyTransferLiveUpdate` with percent chip and `ProgressStyle`; restore phases become segments. Tests: `LiveUpdatesTest`. Missing: API 37 semantic colors and Lane 2 captures. |
 | `[partial]` | Capture nudges offer Write (direct reply) and Record | Built behind `NOTIFICATION_QUICK_REPLY`: `QuickReplyReceiver`, confirmation without the entry text, failure with Retry. Tests: `QuickReplyTest`. Lane 2 reply captures pending. |
-| `[todo]` | A capture-only lock-screen and hub widget, showing no journal content | |
+| `[partial]` | A capture-only lock-screen and hub widget, showing no journal content | `CaptureWidget` behind `LOCK_SCREEN_CAPTURE_WIDGET`, declared for `home_screen\|keyguard`, with Write, Record, and Photo only. Tests: `CaptureWidgetContractTest`, `PlatformComponentTogglerTest`. Lane 2: `widgets/capture-widget-picker--phone-api37.png`. Missing: a capture placed on the lock screen or hub. |
 
 ## Widgets
 

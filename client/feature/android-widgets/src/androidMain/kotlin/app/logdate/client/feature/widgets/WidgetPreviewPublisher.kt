@@ -17,6 +17,7 @@ suspend fun publishWidgetPreviews(context: Context) {
         OnThisDayWidgetReceiver::class,
         FixedMemoryWidgetReceiver::class,
         NewEntryWidgetReceiver::class,
+        CaptureWidgetReceiver::class,
     )) {
         val key = "${receiver.java.name}:$appVersion:safe-samples-v4"
         if (now - preferences.getLong(key, 0L) < 6 * 60 * 60 * 1000L) continue

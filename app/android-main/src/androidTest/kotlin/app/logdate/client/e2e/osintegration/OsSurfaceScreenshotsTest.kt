@@ -38,6 +38,18 @@ class OsSurfaceScreenshotsTest {
         OsSurfaceCapture.dumpHierarchy("launcher-long-press")
     }
 
+    @Test fun captureWidgetInPicker() {
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.enableFlags(FeatureFlag.LOCK_SCREEN_CAPTURE_WIDGET)
+        OsSurfaceCapture.awaitComponentEnabled("app.logdate.client.feature.widgets.CaptureWidgetReceiver")
+        OsSurfaceCapture.openLauncherShortcuts()
+        OsSurfaceCapture.waitForText("Widgets").click()
+        OsSurfaceCapture.waitForText("Memories")
+        OsSurfaceCapture.scrollUntilText("Capture")
+        Thread.sleep(2_000L)
+        OsSurfaceCapture.capture(surface = "widgets", state = "capture-widget-picker")
+    }
+
     @Test fun pinJournal() {
         OsSurfaceCapture.prepareOnboardedApp()
         OsSurfaceCapture.openJournal(OsSurfaceCapture.createJournal("Summer in Lisbon"))

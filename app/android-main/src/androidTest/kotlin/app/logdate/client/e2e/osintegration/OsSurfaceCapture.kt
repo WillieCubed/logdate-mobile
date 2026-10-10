@@ -2,6 +2,8 @@ package app.logdate.client.e2e.osintegration
 
 import android.app.Notification
 import android.app.NotificationManager
+import android.content.ComponentName
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import androidx.test.platform.app.InstrumentationRegistry
@@ -94,6 +96,22 @@ object OsSurfaceCapture {
         file.parentFile?.mkdirs()
         check(device.takeScreenshot(file)) { "Screenshot failed for $surface/$state" }
         return file
+    }
+
+    /** Swipes up through a list until [text] is fully on screen, then centers it a little. */
+    fun scrollUntilText(
+        text: String,
+        maxSwipes: Int = 8,
+    ) {
+        val width = device.displayWidth
+        val height = device.displayHeight
+        repeat(maxSwipes) {
+            val found = device.findObject(By.text(text))
+            if (found != null && found.visibleBounds.bottom < height * 3 / 4) return
+            device.swipe(width / 2, height * 3 / 4, width / 2, height / 3, 20)
+            device.waitForIdle()
+        }
+        waitForText(text)
     }
 
     /** Saves the current view hierarchy under `failures/` for debugging; it is never published. */
@@ -208,6 +226,25 @@ object OsSurfaceCapture {
         }
         device.waitForIdle()
         Thread.sleep(1_000L)
+    }
+
+    /**
+     * Waits until the flag-gated component [className] is enabled, then gives the launcher a moment
+     * to notice the package change. Components switch asynchronously after a flag turns on.
+     */
+    fun awaitComponentEnabled(className: String) {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val component = ComponentName(context, className)
+        val deadline = System.currentTimeMillis() + TIMEOUT_MS
+        while (System.currentTimeMillis() < deadline) {
+            val state = context.packageManager.getComponentEnabledSetting(component)
+            if (state == PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
+                Thread.sleep(3_000L)
+                return
+            }
+            Thread.sleep(250L)
+        }
+        error("$className was not enabled")
     }
 
     /** Adds the tile served by [serviceClass] to Quick Settings, as if the person placed it. */

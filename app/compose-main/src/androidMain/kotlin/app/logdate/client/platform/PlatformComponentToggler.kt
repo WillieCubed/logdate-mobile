@@ -80,6 +80,8 @@ class PlatformComponentToggler(
                         "app.logdate.client.tiles.NewEntryTileService",
                         "app.logdate.client.tiles.RecordVoiceTileService",
                     ),
+                FeatureFlag.LOCK_SCREEN_CAPTURE_WIDGET to
+                    listOf("app.logdate.client.feature.widgets.CaptureWidgetReceiver"),
                 FeatureFlag.RECORDING_BUBBLE to
                     listOf(
                         "app.logdate.client.bubble.RecordingBubbleActivity",

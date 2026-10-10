@@ -18,6 +18,9 @@
     <string name="widget_description_fixed_memory">Keep one journal entry on your home screen</string>
     <string name="widget_name_new_entry">New Entry</string>
     <string name="widget_description_new_entry">Start writing with an optional recent photo prompt</string>
+    <string name="widget_name_capture">Capture</string>
+    <!-- Shown in the widget picker. The widget is offered on the lock screen, so it says it shows nothing private. -->
+    <string name="widget_description_capture">Write, record, or take a photo for a new entry. Shows nothing from your journal.</string>
 
     <!-- Configuration activity -->
     <string name="widget_config_title">Set up Memories</string>

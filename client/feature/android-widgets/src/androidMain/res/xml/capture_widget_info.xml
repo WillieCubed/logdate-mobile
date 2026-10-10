@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The capture widget. It shows only Write, Record, and Photo, never journal content, so it is
+    offered for the lock screen and hub (keyguard) as well as the home screen.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_description_capture"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:previewLayout="@layout/capture_widget_preview"
+    android:minWidth="180dp"
+    android:minHeight="60dp"
+    android:minResizeWidth="120dp"
+    android:minResizeHeight="60dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="1"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen|keyguard" />
