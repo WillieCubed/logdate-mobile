@@ -40,9 +40,9 @@ Every piece of data gets three labels.
 - **Device only**: not a record at all. It stays on one device (or in the server's own tables) and
   never becomes a lexicon.
 
-Derived data is still a record when it is expensive or impossible to recompute (a transcript,
-a Rewind) or when the person has acted on it (confirming an inferred person). Otherwise it stays
-device-only and is recomputed.
+Derived data is a record when it is expensive or impossible to recompute (a transcript, a Rewind),
+when the person has acted on it (confirming an inferred person), or when every device needs to
+agree on it (inferred people). Otherwise it stays device-only and is recomputed.
 
 ## Client data
 
@@ -60,7 +60,7 @@ Classified from the latest Room schema. When the schema changes,
 | `journal_merges` | Not a record | — | Bookkeeping | Device only |
 | `user_places` | `app.logdate.place.place` | Private only | Authored | Personal space |
 | `history_records` | `app.logdate.place.visit`, `app.logdate.place.journey`, plus corrections | Private only | Derived from sensors, with authored corrections | Personal space |
-| `location_logs` | `app.logdate.place.sample` | Private only | Derived from sensors | Personal space |
+| `location_logs` | `app.logdate.place.sample`, one record per day | Private only | Derived from sensors | Personal space |
 | `location_activity` | Part of the visit or journey it explains | Private only | Derived | Personal space |
 | `history_cursors` | Not a record | — | Bookkeeping | Device only |
 | `places` | Not a record. Nothing writes it; drop it with the migration. | — | — | — |
@@ -69,7 +69,7 @@ Classified from the latest Room schema. When the schema changes,
 | `people` | `app.logdate.people.person` | Private only | Authored or confirmed | Personal space |
 | `person_links` | `app.logdate.people.mention` | Private only | Authored or confirmed | Personal space |
 | `person_resolution_decisions` | Part of `app.logdate.people.person` | Private only | Authored | Personal space |
-| `inferred_person_clusters`, `inferred_person_evidence` | Not records until confirmed | Private only | Derived | Device only |
+| `inferred_person_clusters`, `inferred_person_evidence` | `app.logdate.people.inference`, with its evidence | Private only | Derived | Personal space |
 | `rewinds`, `rewind_text_content`, `rewind_image_content`, `rewind_video_content` | `app.logdate.rewind.rewind`, with its panels | Publishable | Derived, costly | Personal space |
 | `rewind_prompt_responses` | `app.logdate.rewind.promptResponse` | Shareable | Authored | Personal space |
 | `rewind_generation_requests` | Not a record | — | Bookkeeping | Device only |
@@ -123,7 +123,7 @@ All new schemas use the `app.logdate.*` namespace. Each group below is its own a
 |---|---|
 | `app.logdate.journal` | `entry`, `transcript`, `journal`, `membership`, `draft` |
 | `app.logdate.place` | `place`, `visit`, `journey`, `sample` |
-| `app.logdate.people` | `person`, `mention` |
+| `app.logdate.people` | `person`, `mention`, `inference` |
 | `app.logdate.event` | `annotation` |
 | `app.logdate.rewind` | `rewind`, `promptResponse` |
 | `app.logdate.craft` | `postcard`, `sticker` |
@@ -178,9 +178,10 @@ yet.
 | `place.place` | `Place`, with `name`, `latitude`, `longitude`, `radius` and `units` |
 | `place.visit` | `Arrive`, with the `Place` as `location` and the visit's start as `published`; the end time uses a LogDate term |
 | `place.journey` | `Travel`, with `origin` and `target` places |
-| `place.sample` | None; raw location samples use the lexicon form (and GeoJSON in exports) |
+| `place.sample` | None; daily location records use the lexicon form (and GeoJSON in exports) |
 | `people.person` | `Person` as an object, not an actor: `name`, `summary`, `icon`. It describes someone; it doesn't make them an account. |
 | `people.mention` | A `Mention` in the entry's `tag` |
+| `people.inference` | None; an unconfirmed guess is not something to show outside LogDate |
 | Reused `calendar.event` and `event.annotation` | `Event`, with `name`, `startTime`, `endTime` and `location`; linked entries in `context` |
 | `rewind.rewind` | `OrderedCollection` of its panels; an `Article` when published |
 | `rewind.promptResponse` | `Note` with `inReplyTo` pointing at the prompt |
@@ -202,14 +203,11 @@ yet.
 When the schema files are drafted, each one carries its Activity Streams mapping, and the
 toolchain checks that no record type is left without one (or without an explicit "none").
 
-## Open decisions
+## Decisions
 
-- **One entry type.** The `entry` schema follows the planned multi-block journal entry, not
-  today's one-table-per-note-type layout. The sync migration converts existing notes into entries.
-- **Sealed envelope.** Whether every private record shares one `sealed` collection (hiding even
-  which kinds of records someone has) or each type gets its own sealed collection. The storage
-  spike decides.
-- **Location history volume.** Raw location samples are numerous. They may need batching into
-  daily records rather than one record per sample.
-- **Inferred people.** Whether unconfirmed inferences should sync between a person's devices as
-  records or stay recomputed on each device.
+| Date | Decision |
+|---|---|
+| 2026-10-10 | **One entry type.** `entry` holds ordered blocks (text, photo, video, audio), following the planned multi-block journal entry. The sync migration converts today's separate note tables into entries. |
+| 2026-10-10 | **One sealed collection.** Every private record is stored inside a single `app.logdate.crypto.sealed` collection, so the server can't tell which kinds of records someone has. |
+| 2026-10-10 | **Daily location records.** Raw location samples are batched into one `place.sample` record per day instead of one record per sample. |
+| 2026-10-10 | **Inferred people sync as regular records.** Unconfirmed inferences are `people.inference` records in the personal space, synced like any other content, so every device shows the same suggestions and works from the same underlying data. They stay private and never become shareable until confirmed. |

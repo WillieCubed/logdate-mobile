@@ -279,3 +279,4 @@ Every user-visible project ships behind a feature flag until its acceptance crit
 | 2026-10-09 | Circles ship on LogDate-native end-to-end encrypted sync first and adopt Atproto Spaces once it stabilizes |
 | 2026-10-09 | New lexicons use the `app.logdate.*` namespace |
 | 2026-10-10 | Every LogDate record has a defined Activity Streams 2.0 shape. ActivityPub, if added, publishes only deliberately published records, generated from the same lexicon records |
+| 2026-10-10 | Published stories are not followable on either protocol: they are links people hand out, and LogDate rejects follow and subscription requests |
