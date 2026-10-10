@@ -48,8 +48,8 @@ test|test:verify|Verify coverage meets threshold|./gradlew koverVerify
 test|test:bench:phone|Run managed phone macrobenchmarks|./gradlew managedPhoneBenchmark
 test|test:bench:wear|Run managed Wear OS macrobenchmarks|./gradlew managedWearBenchmark
 test|test:bench:micro|Run Android microbenchmarks|./gradlew managedMicroBenchmark
-test|test:screenshots|Validate screenshot tests|./gradlew :app:android-main:validateDebugScreenshotTest
-test|test:screenshots:update|Regenerate golden screenshots|./gradlew :app:android-main:updateDebugScreenshotTest
+test|test:screenshots|Validate screenshot references in every lane: Android, desktop, and Wear|./gradlew --continue :app:android-main:validateDebugScreenshotTest :app:compose-main:validateDesktopScreenshotTest :app:wear:validateDebugScreenshotTest
+test|test:screenshots:update|Regenerate screenshot references in every lane: Android, desktop, and Wear|./gradlew :app:android-main:updateDebugScreenshotTest :app:compose-main:updateDesktopScreenshotTest :app:wear:updateDebugScreenshotTest
 test|screenshots:check|Check OS integration screenshot coverage and find stale references|./gradlew checkOsIntegrationScreenshotCoverage
 test|screenshots:sheet|Build labeled comparison sheets for OS integration screenshots (add -Pfeature=<name> for one)|./gradlew buildScreenshotComparisonSheet
 test|screenshots:os|Capture real system UI (launcher, shade, bubbles) on managed devices into docs/screenshots|./scripts/os-surface-screenshots.sh

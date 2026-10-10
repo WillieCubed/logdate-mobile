@@ -287,7 +287,11 @@ adb -s emulator-5554 devices
 
 ### Generate Baseline Images
 
-Create or update reference images for the first time or after intentional changes:
+Create or update reference images for the first time or after intentional changes. `./run
+test:screenshots:update` updates every lane at once. Updating rewrites every reference in a lane,
+including ones your change did not touch, so prefer updating only your own tests with `--tests`
+(for example `--tests '*HomeWorkspaceScreenshotsKt.Workspace*InDesktopWindow*'`) and review what
+changed before committing:
 
 ```bash
 # Update baselines — phone app
@@ -308,7 +312,8 @@ Desktop baselines: `app/compose-main/src/desktopTest/reference/`
 
 ### Validate Against Baselines
 
-Check if current screenshots match baselines:
+Check if current screenshots match baselines. `./run test:screenshots` validates every lane, and
+keeps going past a failing lane so each one reports:
 
 ```bash
 # Validate — phone app
