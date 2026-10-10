@@ -43,6 +43,8 @@ import app.logdate.client.testing.onboarding.DEBUG_SKIP_ONBOARDING_EXTRA
 import app.logdate.client.testing.onboarding.ONBOARDING_TEST_FIXTURE_EXTRA
 import app.logdate.client.testing.onboarding.OnboardingTestFixtureApplier
 import app.logdate.client.testing.onboarding.readOnboardingTestFixture
+import app.logdate.client.tiles.EXTRA_SHOW_RECORDING
+import app.logdate.client.tiles.RecordingWindowTracker
 import app.logdate.client.updates.ActivityResultAppUpdateFlowLauncher
 import app.logdate.client.updates.PlayInAppUpdateController
 import app.logdate.client.watch.WatchCompanionAssociationManager
@@ -90,6 +92,7 @@ class MainActivity : FragmentActivity() {
     private val androidRestoreLauncher: AndroidRestoreLauncher by inject()
     private val databaseStartupMonitor: DatabaseStartupMonitor by inject()
     private val homeScreenPins: HomeScreenPins by inject()
+    private val recordingWindows: RecordingWindowTracker by inject()
     private val databaseRecoveryController: DatabaseRecoveryController by inject()
     private val postRestoreDetector: PostRestoreDetector by inject()
     private val playInAppUpdateController: PlayInAppUpdateController by inject()
@@ -205,6 +208,7 @@ class MainActivity : FragmentActivity() {
         if (savedInstanceState == null && intent?.let { handleMultiWindowIntent(it) } == true) {
             return
         }
+        if (savedInstanceState == null) showRecordingWindowIfAsked(intent)
     }
 
     private fun attachPlatformLaunchers() {
@@ -293,7 +297,17 @@ class MainActivity : FragmentActivity() {
         if (handleMultiWindowIntent(intent)) {
             return
         }
+        if (showRecordingWindowIfAsked(intent)) return
         resolveMainActivityNavKey(intent)?.let { pendingNavKey = it }
+    }
+
+    /**
+     * Brings forward the window a voice recording runs in, when the Record voice tile asked for it.
+     * A recording in this window needs nothing more, since this window is already in front.
+     */
+    private fun showRecordingWindowIfAsked(intent: Intent?): Boolean {
+        if (intent?.getBooleanExtra(EXTRA_SHOW_RECORDING, false) != true) return false
+        return recordingWindows.bringRecordingWindowForward(this)
     }
 
     @SuppressLint("NewApi")

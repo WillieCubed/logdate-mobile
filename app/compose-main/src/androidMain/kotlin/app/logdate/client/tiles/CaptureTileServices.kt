@@ -45,7 +45,8 @@ class NewEntryTileService : TileService() {
 
 /**
  * The Record voice Quick Settings tile. Tapping it opens the editor in voice mode, which starts
- * recording; while a recording runs the tile is highlighted, and tapping it brings that entry back.
+ * recording; while a recording runs the tile is highlighted, and tapping it brings that entry back,
+ * in whichever LogDate window it is recording ([RecordingWindowTracker]).
  *
  * It is an active tile: [RecordVoiceTileUpdater] asks Android to refresh it when recording starts or
  * stops, so it is correct even while the shade was closed.
@@ -75,7 +76,7 @@ class RecordVoiceTileService :
     override fun onClick() {
         when (voiceTileAction(recorder.isRecording)) {
             VoiceTileAction.StartRecording -> openCapture(mode = "voice")
-            VoiceTileAction.ShowRecording -> openApp()
+            VoiceTileAction.ShowRecording -> openRecording()
         }
     }
 }
@@ -114,24 +115,33 @@ private fun TileService.openCapture(mode: String) {
             .setClass(this, MainActivity::class.java)
             .putExtra(EXTRA_CAPTURE_MODE, mode)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+        requestKey = "tile-capture-$mode",
     )
 }
 
-private fun TileService.openApp() {
+private fun TileService.openRecording() {
     launchFromTile(
         Intent(this, MainActivity::class.java)
+            .putExtra(EXTRA_SHOW_RECORDING, true)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+        requestKey = "tile-show-recording",
     )
 }
 
-/** Starts [intent] and closes the shade, using the PendingIntent form Android 14 requires. */
+/**
+ * Starts [intent] and closes the shade, using the PendingIntent form Android 14 requires. Each
+ * [requestKey] names one PendingIntent, so repeated taps reuse it rather than registering a new one.
+ */
 @SuppressLint("StartActivityAndCollapseDeprecated")
-private fun TileService.launchFromTile(intent: Intent) {
+private fun TileService.launchFromTile(
+    intent: Intent,
+    requestKey: String,
+) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
         val pendingIntent =
             PendingIntent.getActivity(
                 this,
-                intent.hashCode(),
+                requestKey.hashCode(),
                 intent,
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )

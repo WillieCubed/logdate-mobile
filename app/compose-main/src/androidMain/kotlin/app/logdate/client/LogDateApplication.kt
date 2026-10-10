@@ -26,6 +26,7 @@ import app.logdate.client.rewind.RewindGenerationScheduler
 import app.logdate.client.shortcuts.DynamicShortcutRefreshObserver
 import app.logdate.client.shortcuts.DynamicShortcutScheduler
 import app.logdate.client.tiles.RecordVoiceTileUpdater
+import app.logdate.client.tiles.RecordingWindowTracker
 import app.logdate.di.initializeKoin
 import app.logdate.ui.media.addLocalMedia
 import coil3.ImageLoader
@@ -157,6 +158,7 @@ class LogdateApplication :
         runCatching {
             get<PlatformComponentToggler>().start(get<CoroutineScope>())
             get<RecordVoiceTileUpdater>().start(get<CoroutineScope>())
+            get<RecordingWindowTracker>().start(this, get<CoroutineScope>())
             get<RecordingBubbleNotifier>().start(get<CoroutineScope>())
             // Notification builders read these switches synchronously. Creating them now starts
             // their flag reads, so the first recording after launch already sees the flags.

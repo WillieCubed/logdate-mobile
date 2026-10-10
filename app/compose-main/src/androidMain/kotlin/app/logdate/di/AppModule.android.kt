@@ -70,6 +70,7 @@ import app.logdate.client.sync.WatchNoteNotifier
 import app.logdate.client.sync.WearSyncNotificationHelper
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.tiles.RecordVoiceTileUpdater
+import app.logdate.client.tiles.RecordingWindowTracker
 import app.logdate.client.updates.PlayInAppUpdateController
 import app.logdate.client.watch.AndroidCompanionDeviceClient
 import app.logdate.client.watch.AndroidWatchConnectionManager
@@ -187,6 +188,7 @@ actual val appModule: Module =
         }
         workerOf(::DynamicShortcutRefreshWorker)
         single { RecordVoiceTileUpdater(androidContext(), get()) }
+        single { RecordingWindowTracker(get()) }
         single<LiveUpdatesSwitch> { FlagLiveUpdatesSwitch(get(), get()) }
         single<RecordingBubbleSwitch> { FlagRecordingBubbleSwitch(get(), get()) }
         single { RecordingBubbleNotifier(androidContext(), get()) }

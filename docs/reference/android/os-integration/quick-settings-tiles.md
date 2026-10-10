@@ -45,6 +45,10 @@ Android 17 shows small tiles as icons only; the tile's label stays its accessibi
   shows it: inactive when idle, active with "Recording" or "Paused" while a recording runs. The
   mapping lives in `CaptureTileState.kt` so it is unit-tested without Android.
 - **Tapping during a recording** brings that recording's entry back instead of starting a second one.
+  The recording may be in a separate editor window, so `RecordingWindowTracker` remembers the window
+  in front when recording started. The tile opens the main window with `EXTRA_SHOW_RECORDING`, and
+  the main window, now allowed to move windows because it is in front, brings the recording's window
+  forward with `ActivityManager.AppTask.moveToFront`.
 
 ### Starting the microphone
 
