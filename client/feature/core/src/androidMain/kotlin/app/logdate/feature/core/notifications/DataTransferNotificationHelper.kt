@@ -10,6 +10,10 @@ import androidx.core.app.NotificationCompat
 import androidx.work.ForegroundInfo
 import androidx.work.WorkManager
 import app.logdate.client.feature.core.R
+import app.logdate.client.notifications.LiveUpdatesSwitch
+import app.logdate.client.notifications.applyTransferLiveUpdate
+import app.logdate.client.notifications.currentLiveUpdatesSwitch
+import app.logdate.client.notifications.transferLiveUpdate
 import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid
 
@@ -18,11 +22,13 @@ import kotlin.uuid.toJavaUuid
  *
  * Captures the superset behavior: progress bar, immediate foreground
  * service display, silent notifications across all states, and a cancel
- * action during progress.
+ * action during progress. With Live Updates on, progress is also promoted
+ * to the status bar, with the percent in the chip.
  */
 abstract class DataTransferNotificationHelper(
     protected val context: Context,
     protected val workId: Uuid,
+    private val liveUpdates: LiveUpdatesSwitch = currentLiveUpdatesSwitch(),
 ) {
     protected abstract val channelId: String
     protected abstract val notificationId: Int
@@ -35,6 +41,9 @@ abstract class DataTransferNotificationHelper(
 
     @get:StringRes
     protected abstract val failedTitleResId: Int
+
+    /** Where each phase of the work begins on the 0-100 bar, so a Live Update can show the phases. */
+    protected open val phaseStarts: List<Int> = emptyList()
 
     protected val notificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -69,6 +78,10 @@ abstract class DataTransferNotificationHelper(
                     android.R.drawable.ic_delete,
                     context.getString(R.string.notification_action_cancel),
                     cancelIntent,
+                ).applyTransferLiveUpdate(
+                    update = transferLiveUpdate(liveUpdates.enabled, progress.takeIf { it > 0 }),
+                    percent = progress.takeIf { it > 0 },
+                    phaseStarts = phaseStarts,
                 ).build()
 
         return ForegroundInfo(

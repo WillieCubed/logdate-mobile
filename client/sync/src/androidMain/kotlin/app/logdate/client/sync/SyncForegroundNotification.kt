@@ -6,6 +6,9 @@ import android.content.pm.ServiceInfo
 import androidx.core.app.NotificationCompat
 import androidx.work.ForegroundInfo
 import app.logdate.client.notifications.LogDateNotificationChannelKey
+import app.logdate.client.notifications.applyTransferLiveUpdate
+import app.logdate.client.notifications.currentLiveUpdatesSwitch
+import app.logdate.client.notifications.transferLiveUpdate
 
 /**
  * The notification that keeps a backup alive while the app is not on screen.
@@ -36,11 +39,15 @@ internal object SyncForegroundNotification {
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setVisibility(Notification.VISIBILITY_PRIVATE)
 
-        if (total != null && total > 0 && completed != null) {
-            builder.setProgress(total, completed, false)
-        } else {
-            builder.setProgress(0, 0, true)
-        }
+        val percent =
+            if (total != null && total > 0 && completed != null) {
+                builder.setProgress(total, completed, false)
+                (completed * 100 / total).coerceIn(0, 100)
+            } else {
+                builder.setProgress(0, 0, true)
+                null
+            }
+        builder.applyTransferLiveUpdate(transferLiveUpdate(currentLiveUpdatesSwitch().enabled, percent), percent)
 
         return ForegroundInfo(
             notificationId,

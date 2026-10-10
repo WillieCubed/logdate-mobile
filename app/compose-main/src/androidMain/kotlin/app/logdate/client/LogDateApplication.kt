@@ -17,6 +17,7 @@ import app.logdate.client.feature.widgets.publishWidgetPreviews
 import app.logdate.client.image.DataSaverImageInterceptor
 import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.client.networking.DataUsagePolicy
+import app.logdate.client.notifications.LiveUpdatesSwitch
 import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.client.platform.PlatformComponentToggler
 import app.logdate.client.rewind.RewindGenerationScheduler
@@ -154,6 +155,9 @@ class LogdateApplication :
         runCatching {
             get<PlatformComponentToggler>().start(get<CoroutineScope>())
             get<RecordVoiceTileUpdater>().start(get<CoroutineScope>())
+            // Notification builders read this switch synchronously. Creating it now starts its
+            // flag read, so the first recording after launch already sees the flag.
+            get<LiveUpdatesSwitch>()
         }.onFailure { error ->
             Napier.w("Failed to start syncing flag-gated components", error)
         }

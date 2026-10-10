@@ -7,8 +7,12 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import app.logdate.client.media.R
+import app.logdate.client.notifications.LiveUpdateChip
+import app.logdate.client.notifications.LiveUpdatesSwitch
 import app.logdate.client.notifications.LogDateNotificationChannelKey
+import app.logdate.client.notifications.recordingLiveUpdate
 import io.github.aakira.napier.Napier
+import org.koin.mp.KoinPlatform
 import kotlin.time.Clock
 
 /**
@@ -18,6 +22,8 @@ import kotlin.time.Clock
  */
 class AndroidAudioNotificationHandler(
     private val context: Context,
+    private val liveUpdates: LiveUpdatesSwitch =
+        KoinPlatform.getKoinOrNull()?.getOrNull<LiveUpdatesSwitch>() ?: LiveUpdatesSwitch.Off,
 ) {
     companion object {
         val CHANNEL_ID = LogDateNotificationChannelKey.AUDIO_RECORDING.id
@@ -103,6 +109,18 @@ class AndroidAudioNotificationHandler(
                 .setContentIntent(createMainActivityIntent())
                 .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
                 .setSilent(true)
+
+        val liveUpdate = recordingLiveUpdate(enabled = liveUpdates.enabled, isRecording = isRecording)
+        if (liveUpdate.promoted) {
+            builder.setRequestPromotedOngoing(true)
+            liveUpdate.chipText?.let { chip ->
+                builder.setShortCriticalText(
+                    when (chip) {
+                        LiveUpdateChip.Paused -> context.getString(R.string.audio_recording_chip_paused)
+                    },
+                )
+            }
+        }
 
         // Add action buttons based on current state
         if (isRecording) {

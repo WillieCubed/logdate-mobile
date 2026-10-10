@@ -31,6 +31,8 @@ import app.logdate.client.intelligence.di.intelligenceModule
 import app.logdate.client.location.di.locationModule
 import app.logdate.client.media.di.audioModule
 import app.logdate.client.networking.di.networkingModule
+import app.logdate.client.notifications.FlagLiveUpdatesSwitch
+import app.logdate.client.notifications.LiveUpdatesSwitch
 import app.logdate.client.platform.PackageManagerComponentSwitch
 import app.logdate.client.platform.PlatformComponentToggler
 import app.logdate.client.rewind.MilestoneRewindCoordinator
@@ -169,6 +171,7 @@ actual val appModule: Module =
         }
         workerOf(::DynamicShortcutRefreshWorker)
         single { RecordVoiceTileUpdater(androidContext(), get()) }
+        single<LiveUpdatesSwitch> { FlagLiveUpdatesSwitch(get(), get()) }
         single<CaptureUsageReporter> { AndroidCaptureUsageReporter(androidContext()) }
         single {
             PlatformComponentToggler(

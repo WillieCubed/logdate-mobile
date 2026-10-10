@@ -71,6 +71,8 @@ kotlin {
         }
         androidMain.dependencies {
             implementation(libs.koin.android)
+            // Live Update builder methods (setRequestPromotedOngoing) need core 1.17 or later.
+            implementation(libs.androidx.core.ktx)
             implementation(projects.client.networking)
             implementation(projects.client.notifications)
             implementation(libs.androidx.work.runtime)

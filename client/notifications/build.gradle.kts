@@ -47,6 +47,11 @@ kotlin {
             implementation(libs.koin.core)
         }
 
+        androidMain.dependencies {
+            // Live Update builder methods and ProgressStyle need core 1.17 or later.
+            implementation(libs.androidx.core.ktx)
+        }
+
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }

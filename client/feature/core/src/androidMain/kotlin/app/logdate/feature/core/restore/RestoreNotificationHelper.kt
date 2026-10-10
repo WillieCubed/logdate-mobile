@@ -21,6 +21,7 @@ class RestoreNotificationHelper(
     override val progressTitleResId = R.string.restore_title_progress
     override val completeTitleResId = R.string.restore_title_complete
     override val failedTitleResId = R.string.restore_title_failed
+    override val phaseStarts = RestoreStage.entries.map { it.defaultProgressPercent }
 
     fun createForegroundInfo(stage: RestoreStage): ForegroundInfo =
         createForegroundInfo(

@@ -109,8 +109,8 @@ A row reaches `[done]` only when its Evidence column lists:
 | --- | --- | --- |
 | `[done]` | Tile microphone start spike decided | Decided without starting the microphone from the tile: Record voice opens the editor in voice mode through the capture action, which starts recording in the foreground. Recorded in `quick-settings-tiles.md`. |
 | `[partial]` | New entry and Record voice Quick Settings tiles, with an active recording state | Behind `QUICK_SETTINGS_TILES`; components toggled by `PlatformComponentToggler`. Tests: `CaptureTileStateTest`, `PlatformComponentTogglerTest`. Missing: Lane 2 captures of the tiles in the shade. |
-| `[todo]` | The recording notification is a Live Update with a status bar chip | |
-| `[todo]` | Export, restore, and sync progress are Live Updates, with semantic colors on API 37 | |
+| `[partial]` | The recording notification is a Live Update with a status bar chip | Behind `LIVE_UPDATES`: promotion request and "Paused" chip text. Tests: `LiveUpdatesTest`. Missing: Lane 2 captures of the chip and the promoted notification. |
+| `[partial]` | Export, restore, and sync progress are Live Updates, with semantic colors on API 37 | Built behind `LIVE_UPDATES`: `applyTransferLiveUpdate` with percent chip and `ProgressStyle`; restore phases become segments. Tests: `LiveUpdatesTest`. Missing: API 37 semantic colors and Lane 2 captures. |
 | `[todo]` | Capture nudges offer Write (direct reply) and Record | |
 | `[todo]` | A capture-only lock-screen and hub widget, showing no journal content | |
 

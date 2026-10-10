@@ -1,6 +1,7 @@
 # Live Updates
 
-Status: planned, behind `LIVE_UPDATES`.
+Status: recording, export, restore, and sync progress are built, behind `LIVE_UPDATES` (Settings >
+Advanced > Developer tools > Feature previews). Semantic colors on Android 17 are planned.
 
 ## What it is
 
@@ -27,9 +28,9 @@ The person can turn promotion off per app in system settings. The notification t
 | Work | Status bar chip | Expanded notification |
 | --- | --- | --- |
 | Voice recording | A microphone icon and the elapsed time | Elapsed time, with Pause and Stop |
-| Export | Percent complete | Segmented progress through the export phases |
-| Restore | Percent complete | Segmented progress, then completion or a specific failure |
-| Sync | Shown only while a long sync runs | Progress, then completion or a specific failure |
+| Export | Percent complete, once known | Progress, then completion or a specific failure |
+| Restore | Percent complete, once known | Progress split into the restore's phases, then completion or a specific failure |
+| Sync | Percent of entries backed up, once known | Progress, then completion or a specific failure |
 
 On Android 17, failures use the system's semantic red and completion uses semantic green, so they
 read the same as other apps' Live Updates.
@@ -41,16 +42,25 @@ screen, on API 36 and API 37.
 
 - **Recording.** `AndroidAudioNotificationHandler`
   (`client/media/src/androidMain/kotlin/app/logdate/client/media/audio/`) builds the recording
-  notification. With the flag on it adds:
-  - `setRequestPromotedOngoing(true)`;
-  - `setUsesChronometer(true)` with the recording start time;
-  - `setShortCriticalText(...)`, the short text in the status bar chip.
-- **Progress.** The export, restore, and cloud-sync notifications use
-  `NotificationCompat.ProgressStyle`. Each phase becomes a segment, so the bar shows where the work
-  is, not just how much is done.
-- **Semantic colors (API 37).** `Notification.createSemanticStyleAnnotation` marks failure (red) and
-  completion (green). Earlier versions get the plain style.
-- **Library.** `androidx.core` 1.18 (already in the version catalog) provides the compat builders.
+  notification, which already counts up with `setUsesChronometer`. With the flag on it also calls
+  `setRequestPromotedOngoing(true)`. While recording, the status bar chip shows the chronometer's
+  elapsed time; while paused, `setShortCriticalText` makes the chip say "Paused". The decision is
+  `recordingLiveUpdate` in `client/notifications`, a pure function with tests.
+- **The switch.** Notification code reads `LiveUpdatesSwitch` (client/notifications) instead of the
+  flag store. The app binds `FlagLiveUpdatesSwitch`, which follows the `LIVE_UPDATES` flag; anywhere
+  no switch is bound, Live Updates stay off.
+- **Progress.** The export and restore notifications (`DataTransferNotificationHelper`,
+  client/feature/core androidMain) and the cloud-sync notification (`SyncForegroundNotification`,
+  client/sync androidMain) call `applyTransferLiveUpdate` (client/notifications androidMain). With the
+  flag on, it requests promotion, puts the percent in the chip with `setShortCriticalText`, and
+  switches to `NotificationCompat.ProgressStyle`. Restore passes the progress value where each of its
+  phases begins, and `progressSegmentLengths` turns those into segments, so the bar shows which phase
+  the restore is in, not just how much is done. The decision, `transferLiveUpdate`, is a pure function
+  with tests. Work is promoted as soon as it starts; the chip shows a percent once progress is known.
+- **Semantic colors (API 37, planned).** `Notification.createSemanticStyleAnnotation` will mark
+  failure (red) and completion (green). Earlier versions get the plain style.
+- **Library.** `androidx.core` 1.18 provides the compat builders and `ProgressStyle`; the media and
+  notifications modules depend on it directly, because transitive versions predate these methods.
 
 The notification channels are defined in `client/notifications/.../LogDateNotificationChannels.kt`.
 
