@@ -31,6 +31,8 @@ import app.logdate.client.intelligence.di.intelligenceModule
 import app.logdate.client.location.di.locationModule
 import app.logdate.client.media.di.audioModule
 import app.logdate.client.networking.di.networkingModule
+import app.logdate.client.platform.PackageManagerComponentSwitch
+import app.logdate.client.platform.PlatformComponentToggler
 import app.logdate.client.rewind.MilestoneRewindCoordinator
 import app.logdate.client.rewind.RewindGenerationWorker
 import app.logdate.client.rewind.RewindNotificationCoordinator
@@ -56,6 +58,7 @@ import app.logdate.client.sync.WatchNoteIngestor
 import app.logdate.client.sync.WatchNoteNotifier
 import app.logdate.client.sync.WearSyncNotificationHelper
 import app.logdate.client.sync.datalayer.NoteDataMapper
+import app.logdate.client.tiles.RecordVoiceTileUpdater
 import app.logdate.client.updates.PlayInAppUpdateController
 import app.logdate.client.watch.AndroidCompanionDeviceClient
 import app.logdate.client.watch.AndroidWatchConnectionManager
@@ -165,7 +168,15 @@ actual val appModule: Module =
             )
         }
         workerOf(::DynamicShortcutRefreshWorker)
+        single { RecordVoiceTileUpdater(androidContext(), get()) }
         single<CaptureUsageReporter> { AndroidCaptureUsageReporter(androidContext()) }
+        single {
+            PlatformComponentToggler(
+                flags = get(),
+                components = PlatformComponentToggler.osIntegrationComponents,
+                switch = PackageManagerComponentSwitch(androidContext()),
+            )
+        }
 
         single { NoteDataMapper() }
         single { WearSyncNotificationHelper(androidContext()) }

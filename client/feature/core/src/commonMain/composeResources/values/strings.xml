@@ -189,6 +189,19 @@
     <string name="about_logdate_description">Version and app updates</string>
     <string name="developer_tools">Developer Tools</string>
     <string name="developer_tools_description">Diagnostics and technical overrides</string>
+    <string name="feature_previews">Feature previews</string>
+    <string name="feature_preview_quick_settings_tiles_title">Quick Settings tiles</string>
+    <string name="feature_preview_quick_settings_tiles_description">Add New entry and Record voice tiles to Quick Settings.</string>
+    <string name="feature_preview_live_updates_title">Live Updates</string>
+    <string name="feature_preview_live_updates_description">Show recording, export, and sync progress in the status bar and on the lock screen.</string>
+    <string name="feature_preview_quick_reply_title">Reply to capture nudges</string>
+    <string name="feature_preview_quick_reply_description">Write or record an entry straight from a nudge notification.</string>
+    <string name="feature_preview_recording_bubble_title">Recording bubble</string>
+    <string name="feature_preview_recording_bubble_description">Show a running voice recording in a floating bubble over other apps.</string>
+    <string name="feature_preview_lock_screen_widget_title">Lock screen capture widget</string>
+    <string name="feature_preview_lock_screen_widget_description">Start an entry from the lock screen. The widget never shows journal content.</string>
+    <string name="feature_preview_app_functions_title">Assistant actions</string>
+    <string name="feature_preview_app_functions_description">Let assistants add entries. Searching needs system search on and LogDate unlocked.</string>
     <string name="developer_location">Location overrides</string>
     <string name="app_updates_description">Get the latest LogDate improvements.</string>
 </resources>

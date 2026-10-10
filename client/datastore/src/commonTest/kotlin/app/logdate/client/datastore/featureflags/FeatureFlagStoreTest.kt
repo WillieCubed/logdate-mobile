@@ -82,6 +82,31 @@ class FeatureFlagStoreTest {
         }
 
     @Test
+    fun `OS integration surfaces stay off until they are turned on`() =
+        runTest {
+            val surfaces =
+                listOf(
+                    FeatureFlag.QUICK_SETTINGS_TILES,
+                    FeatureFlag.LIVE_UPDATES,
+                    FeatureFlag.RECORDING_BUBBLE,
+                    FeatureFlag.APP_FUNCTIONS,
+                    FeatureFlag.LOCK_SCREEN_CAPTURE_WIDGET,
+                    FeatureFlag.NOTIFICATION_QUICK_REPLY,
+                )
+            surfaces.forEach { flag -> assertFalse(store.isEnabled(flag), "$flag should default off") }
+
+            surfaces.forEach { flag -> store.setEnabled(flag, enabled = true) }
+
+            surfaces.forEach { flag -> assertTrue(store.isEnabled(flag), "$flag should turn on") }
+        }
+
+    @Test
+    fun `every flag has its own storage key`() {
+        val keys = FeatureFlag.entries.map { it.key }
+        assertEquals(keys.size, keys.toSet().size)
+    }
+
+    @Test
     fun `a flag is stored under its declared key`() =
         runTest {
             store.setEnabled(FeatureFlag.LIBRARY, enabled = true)

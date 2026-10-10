@@ -108,6 +108,13 @@ steps:
 2. Register it with `PlatformComponentToggler`, which watches the flag and calls
    `PackageManager.setComponentEnabledSetting(..., DONT_KILL_APP)` when the flag changes.
 
+The mapping from flag to components is `PlatformComponentToggler.osIntegrationComponents` in
+`app/compose-main/src/androidMain/kotlin/app/logdate/client/platform/PlatformComponentToggler.kt`.
+The app starts the toggler at launch, and it follows each flag from then on.
+
+While a surface is being verified, its flag can be turned on in **Settings > Advanced > Developer
+tools > Feature previews**. That works in every build, including release builds used for dogfooding.
+
 When a surface ships to everyone, delete its flag. Then remove `android:enabled="false"` and the
 toggler entry in the same commit.
 

@@ -1,7 +1,8 @@
 # Quick Settings Tiles
 
-Status: planned, behind `QUICK_SETTINGS_TILES`. The Wear app already has its own tiles; this guide
-covers phone and tablet Quick Settings.
+Status: built, behind `QUICK_SETTINGS_TILES` (off by default; turn it on in Settings > Advanced >
+Developer tools > Feature previews). The Wear app has its own tiles; this guide covers phone and tablet
+Quick Settings.
 
 ## What it is
 
@@ -18,7 +19,7 @@ when the tile is added, shown, hidden, or clicked.
 | Tile | Inactive | Active | On click |
 | --- | --- | --- | --- |
 | New entry | "New entry" | n/a | The shade closes and the editor opens in text mode |
-| Record voice | "Record voice" | "Recording · 0:42" | Starts a voice entry, or returns to the running recording |
+| Record voice | "Record voice" | Highlighted, with "Recording" or "Paused" | Starts a voice entry, or returns to the running recording |
 
 Screenshots are added here when the tiles ship: both tiles in the shade, the active voice tile, and
 light and dark themes on phone and tablet.
@@ -26,33 +27,35 @@ light and dark themes on phone and tablet.
 ## How it works
 
 - **Services.** `NewEntryTileService` and `RecordVoiceTileService` live in
-  `app/compose-main/src/androidMain/`. Each is declared in the manifest with the
-  `android.service.quicksettings.action.QS_TILE` intent filter and the
-  `BIND_QUICK_SETTINGS_TILE` permission.
-- **Opening the app.** Since Android 14 a tile must open activities with
-  `startActivityAndCollapse(PendingIntent)`. Both tiles send the
-  [capture launch contract](capture-launch-contract.md) intent.
-- **Active state.** The voice tile declares `TileService.META_DATA_ACTIVE_TILE`, so the app can update
-  it while the shade is closed. When recording starts or stops, `RecordingServiceController` calls
-  `TileService.requestListeningState`. The tile then reads the current state and shows "Recording"
-  with the elapsed time.
-- **Starting the microphone.** The voice tile's click behavior depends on a spike. Android limits
-  starting a microphone foreground service from the background. If a tile click counts as a valid
-  start, the tile starts recording directly. Otherwise it opens the editor in voice mode, and the
-  editor starts recording. The spike result is recorded in the "Spike result" section below.
-- **Asking to add the tile.** `StatusBarManager.requestAddTileService` can show a system prompt that
-  asks the person to add a tile. If LogDate uses it, the prompt appears only from a settings action
-  the person chose, never on its own.
+  `app/compose-main/src/androidMain/kotlin/app/logdate/client/tiles/CaptureTileServices.kt`. Each is
+  declared in `app/android-main/src/main/AndroidManifest.xml` with the
+  `android.service.quicksettings.action.QS_TILE` intent filter and the `BIND_QUICK_SETTINGS_TILE`
+  permission. Tile icons are single-color vectors (`ic_tile_new_entry`, `ic_tile_record_voice`),
+  because the shade tints them.
+- **Opening the app.** Tapping a tile closes the shade and opens the editor through the
+  [capture launch contract](capture-launch-contract.md): `mode=text` for New entry, `mode=voice` for
+  Record voice. On Android 14 and later this uses `startActivityAndCollapse(PendingIntent)`, which the
+  platform requires; earlier versions use the older `Intent` form.
+- **Active state.** The voice tile declares `TileService.META_DATA_ACTIVE_TILE`, so Android only binds
+  it when asked. `RecordVoiceTileUpdater` watches the recorder's recording and paused flows and calls
+  `TileService.requestListeningState` when either changes. The tile then reads the current state and
+  shows it: inactive when idle, active with "Recording" or "Paused" while a recording runs. The
+  mapping lives in `CaptureTileState.kt` so it is unit-tested without Android.
+- **Tapping during a recording** brings that recording's entry back instead of starting a second one.
 
-### Spike result
+### Starting the microphone
 
-Pending.
+The voice tile opens the editor in voice mode, and the editor starts recording. It does not start the
+recording service from the tile itself. Android 14 and later restrict starting a microphone foreground
+service from the background, and the editor path works the same on every supported version, so this
+was chosen over a direct start. A direct start from the tile was not prototyped.
 
 ## Flag and rollout
 
 `QUICK_SETTINGS_TILES`, off by default. The services are declared `android:enabled="false"`, and
-`PlatformComponentToggler` enables them when the flag turns on. While the flag is off, the tiles do
-not appear in the tile picker at all.
+`PlatformComponentToggler` enables them when the flag turns on (see the hub guide's section on flags
+and manifest components). While the flag is off, the tiles do not appear in the tile picker at all.
+For now the flag is turned on from Settings > Advanced > Developer tools > Feature previews.
 
 ## Privacy
 
@@ -61,7 +64,9 @@ passes the app lock before the rest of the journal is reachable.
 
 ## How to test
 
-- Host tests cover the tile state mapping (idle, recording, paused) and the click intents.
+- `CaptureTileStateTest` (compose-main `androidHostTest`) covers the tile appearance for idle,
+  recording, and paused, and what a tap does in each.
+- `PlatformComponentTogglerTest` covers enabling and disabling the services with the flag.
 - On an emulator with the flag on, add the tile from the shade's edit screen.
 
 ## Updating screenshots

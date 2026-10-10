@@ -18,9 +18,11 @@ import app.logdate.client.image.DataSaverImageInterceptor
 import app.logdate.client.location.tracking.LocationTrackingManager
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.notifications.LogDateNotificationRegistrar
+import app.logdate.client.platform.PlatformComponentToggler
 import app.logdate.client.rewind.RewindGenerationScheduler
 import app.logdate.client.shortcuts.DynamicShortcutRefreshObserver
 import app.logdate.client.shortcuts.DynamicShortcutScheduler
+import app.logdate.client.tiles.RecordVoiceTileUpdater
 import app.logdate.di.initializeKoin
 import app.logdate.ui.media.addLocalMedia
 import coil3.ImageLoader
@@ -148,6 +150,12 @@ class LogdateApplication :
             get<DynamicShortcutRefreshObserver>().start()
         }.onFailure { error ->
             Napier.w("Failed to initialize dynamic shortcut scheduling", error)
+        }
+        runCatching {
+            get<PlatformComponentToggler>().start(get<CoroutineScope>())
+            get<RecordVoiceTileUpdater>().start(get<CoroutineScope>())
+        }.onFailure { error ->
+            Napier.w("Failed to start syncing flag-gated components", error)
         }
     }
 

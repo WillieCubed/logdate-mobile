@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.domain.dayboundary.HealthConnectGateKind
 import app.logdate.client.domain.dayboundary.HealthConnectGateState
 import app.logdate.client.domain.dayboundary.HealthConnectMissingRequirement
@@ -60,6 +61,8 @@ import app.logdate.feature.core.settings.ui.DataSettingsContent
 import app.logdate.feature.core.settings.ui.DayBoundarySettingsContent
 import app.logdate.feature.core.settings.ui.DeveloperLocationSection
 import app.logdate.feature.core.settings.ui.DeveloperToolsContent
+import app.logdate.feature.core.settings.ui.FeaturePreview
+import app.logdate.feature.core.settings.ui.FeaturePreviewsSection
 import app.logdate.feature.core.settings.ui.IntegrityState
 import app.logdate.feature.core.settings.ui.LibrarySettingsContent
 import app.logdate.feature.core.settings.ui.LocalDiagnosticsState
@@ -83,6 +86,7 @@ import app.logdate.feature.core.settings.ui.VoiceNotesSettingsViewModel
 import app.logdate.feature.core.settings.ui.devices.DeviceInfoUiState
 import app.logdate.feature.core.settings.ui.devices.DevicesScreenContent
 import app.logdate.feature.core.settings.ui.devices.DevicesUiState
+import app.logdate.feature.core.settings.ui.osIntegrationPreviewFlags
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionState
 import app.logdate.feature.core.settings.ui.watch.WatchNotificationSettingsContent
 import app.logdate.feature.core.settings.ui.watch.WatchSettingsContent
@@ -192,6 +196,7 @@ enum class SharedScreenshotSceneId(
     LocationTrackingOptions("location-tracking-options"),
     LocationInterval("location-interval"),
     DeveloperTools("developer-tools"),
+    FeaturePreviews("feature-previews"),
     DevicesSettings("devices-settings"),
     StreakSettings("streak-settings"),
     CampfireStates("campfire-states"),
@@ -1004,6 +1009,29 @@ object SharedScreenshotCatalog {
                             settings = sampleLocationSettings(),
                             onToggleServerAssist = {},
                             onSetDefaultLocation = {},
+                        )
+                    },
+                )
+            },
+            sharedScene(SharedScreenshotSceneId.FeaturePreviews, ScreenshotSceneGroup.SETTINGS, osIntegrationVariants) {
+                DeveloperToolsContent(
+                    onBack = {},
+                    state = LocalDiagnosticsState(eventCount = 3),
+                    onPreview = {},
+                    onExport = {},
+                    onClear = {},
+                    onSetVerboseEnabled = {},
+                    featurePreviewsContent = {
+                        FeaturePreviewsSection(
+                            previews =
+                                osIntegrationPreviewFlags.map { flag ->
+                                    FeaturePreview(
+                                        flag,
+                                        enabled =
+                                            flag == FeatureFlag.QUICK_SETTINGS_TILES || flag == FeatureFlag.LIVE_UPDATES,
+                                    )
+                                },
+                            onToggle = { _, _ -> },
                         )
                     },
                 )

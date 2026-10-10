@@ -297,6 +297,38 @@
                 android:resource="@xml/authenticator" />
         </service>
 
+        <!--
+            Quick Settings tiles. Declared disabled so they stay out of the tile picker until the
+            QUICK_SETTINGS_TILES flag is on; PlatformComponentToggler enables them.
+            See docs/reference/android/os-integration/quick-settings-tiles.md.
+        -->
+        <service
+            android:name="app.logdate.client.tiles.NewEntryTileService"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_new_entry"
+            android:label="@string/tile_new_entry"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name="app.logdate.client.tiles.RecordVoiceTileService"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_record_voice"
+            android:label="@string/tile_record_voice"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="true" />
+        </service>
+
     </application>
 
 </manifest>

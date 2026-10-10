@@ -58,6 +58,35 @@ enum class FeatureFlag(
 
     /** Human history browsing and encrypted sync; complete-day recording still requires explicit opt-in. */
     HUMAN_LOCATION_HISTORY(key = "human_location_history_enabled", defaultEnabled = true),
+
+    /**
+     * New entry and Record voice tiles in Quick Settings.
+     *
+     * Off until the tiles are verified on managed devices. While off, the tile services stay disabled
+     * in the manifest, so the tiles do not appear in the tile picker at all.
+     */
+    QUICK_SETTINGS_TILES(key = "quick_settings_tiles_enabled", defaultEnabled = false),
+
+    /**
+     * Recording, export, restore, and sync shown as promoted Live Updates in the status bar and on the
+     * lock screen. Off keeps the existing ongoing notifications.
+     */
+    LIVE_UPDATES(key = "live_updates_enabled", defaultEnabled = false),
+
+    /** A floating recorder bubble that keeps a voice entry recording while another app is open. */
+    RECORDING_BUBBLE(key = "recording_bubble_enabled", defaultEnabled = false),
+
+    /**
+     * LogDate's AppFunctions for on-device assistants: capture always, reading only with consent and
+     * while unlocked.
+     */
+    APP_FUNCTIONS(key = "app_functions_enabled", defaultEnabled = false),
+
+    /** A capture-only widget for the lock screen and hub that never shows journal content. */
+    LOCK_SCREEN_CAPTURE_WIDGET(key = "lock_screen_capture_widget_enabled", defaultEnabled = false),
+
+    /** Write and Record actions on capture nudges, so an entry can be written from the notification. */
+    NOTIFICATION_QUICK_REPLY(key = "notification_quick_reply_enabled", defaultEnabled = false),
     ;
 
     companion object {

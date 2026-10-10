@@ -84,8 +84,8 @@ A row reaches `[done]` only when its Evidence column lists:
 | --- | --- | --- |
 | `[done]` | The editor opens in Text, Voice, Camera, Video, or PhotoPrompt mode from one `EditorLaunchMode` | `EditorLaunchMode` on `EntryEditorRoute`; voice launches start recording once the microphone is allowed and the window has focus. `TextEditingTest` launch tests; verified on API 36 and 37 managed devices from the Record voice tile. |
 | `[done]` | `app.logdate.action.CAPTURE` and `logdate://capture` resolve to the editor; legacy widget and ambient extras keep resolving | `CaptureLaunch.kt` and `DeepLinkResolver`; `CaptureLaunchTest`, `MainActivityNavIntentResolverTest`. Used by the launcher shortcuts and tiles in the system UI captures. |
-| `[todo]` | OS integration flags exist with debug-only toggles | |
-| `[todo]` | `PlatformComponentToggler` enables and disables flagged manifest components | |
+| `[done]` | OS integration flags exist with debug-only toggles | Six flags in `FeatureFlag.kt` (`FeatureFlagStoreTest`); toggles in Developer tools > Feature previews. Lane 1: `Flow20_02_FeaturePreviewsScreenshots.kt` and the desktop `feature-previews` scene. |
+| `[done]` | `PlatformComponentToggler` enables and disables flagged manifest components | `PlatformComponentToggler` with `PlatformComponentTogglerTest`. Tiles, the bubble activity, and its receiver are declared disabled; the API 37 captures show them appearing once their flags are on. |
 | `[todo]` | Manifest declares the touchscreen as optional, `configChanges`, editor `<layout>` minimums, and multi-instance support | |
 | `[todo]` | `ShareReceiver` declares no SEND filters it cannot receive | |
 | `[todo]` | Editor windows are titled in Recents, the taskbar, and desktop captions | |
@@ -107,8 +107,8 @@ A row reaches `[done]` only when its Evidence column lists:
 
 | Status | Requirement | Evidence |
 | --- | --- | --- |
-| `[todo]` | Tile microphone start spike decided | |
-| `[todo]` | New entry and Record voice Quick Settings tiles, with an active recording state | |
+| `[done]` | Tile microphone start spike decided | Decided without starting the microphone from the tile: Record voice opens the editor in voice mode through the capture action, which starts recording in the foreground. Recorded in `quick-settings-tiles.md`. |
+| `[partial]` | New entry and Record voice Quick Settings tiles, with an active recording state | Behind `QUICK_SETTINGS_TILES`; components toggled by `PlatformComponentToggler`. Tests: `CaptureTileStateTest`, `PlatformComponentTogglerTest`. Missing: Lane 2 captures of the tiles in the shade. |
 | `[todo]` | The recording notification is a Live Update with a status bar chip | |
 | `[todo]` | Export, restore, and sync progress are Live Updates, with semantic colors on API 37 | |
 | `[todo]` | Capture nudges offer Write (direct reply) and Record | |

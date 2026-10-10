@@ -9,6 +9,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.sync.diagnostics.DiagnosticReportingController
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.theme.Spacing
@@ -24,6 +25,7 @@ fun DeveloperToolsScreen(
     diagnostics: LocalDiagnosticsViewModel = koinViewModel(),
     reporting: DiagnosticReportingController = koinInject(),
     location: LocationSettingsViewModel = koinViewModel(),
+    featureFlags: FeatureFlagStore = koinInject(),
 ) {
     val diagnosticsState by diagnostics.state.collectAsState()
     val locationState by location.uiState.collectAsState()
@@ -43,6 +45,7 @@ fun DeveloperToolsScreen(
                 onSetDefaultLocation = location::setDefaultLocation,
             )
         },
+        featurePreviewsContent = { FeaturePreviewsSection(store = featureFlags) },
     )
 }
 
@@ -56,8 +59,14 @@ fun DeveloperToolsContent(
     onSetVerboseEnabled: (Boolean) -> Unit,
     reportingContent: @Composable () -> Unit = {},
     locationContent: @Composable () -> Unit = {},
+    featurePreviewsContent: (@Composable () -> Unit)? = null,
 ) {
     SettingsScaffold(title = stringResource(Res.string.developer_tools), onBack = onBack) {
+        if (featurePreviewsContent != null) {
+            item {
+                Box(Modifier.padding(horizontal = Spacing.lg)) { featurePreviewsContent() }
+            }
+        }
         item {
             LocalDiagnosticsSettingsSection(
                 state = state,
