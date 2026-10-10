@@ -17,6 +17,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class PasskeyChallengePostgresTest {
@@ -57,9 +58,10 @@ class PasskeyChallengePostgresTest {
                 val restore = challenge.copy(challenge = Uuid.random().toString(), type = "restore-authentication")
                 PostgreSQLPasskeyChallengeRepository().save("restore", restore)
                 assertNotNull(PostgreSQLPasskeyChallengeRepository().consume("restore", restore.challenge, restore.type, null, now))
-                val expired = challenge.copy(challenge = Uuid.random().toString(), expiresAt = now.toString())
+                val expiry = Instant.fromEpochSeconds(now.epochSeconds + 60, 123_456_789)
+                val expired = challenge.copy(challenge = Uuid.random().toString(), expiresAt = expiry.toString())
                 PostgreSQLPasskeyChallengeRepository().save("passkey", expired)
-                assertNull(PostgreSQLPasskeyChallengeRepository().consume("passkey", expired.challenge, expired.type, null, now))
+                assertNull(PostgreSQLPasskeyChallengeRepository().consume("passkey", expired.challenge, expired.type, null, expiry))
             }
         } finally {
             TransactionManager.defaultDatabase = previous

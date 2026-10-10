@@ -24,12 +24,12 @@ class PostgreSQLPasskeyChallengeRepository : PasskeyChallengeRepository {
     ) {
         val ceremony = requireNotNull(storedType(scope, challenge.type))
         transaction {
-            WebAuthnChallengesTable.deleteWhere { expiresAt lessEq Clock.System.now() }
+            WebAuthnChallengesTable.deleteWhere { expiresAt lessEq Clock.System.now().databasePrecision() }
             WebAuthnChallengesTable.insert {
                 it[WebAuthnChallengesTable.challenge] = "$scope:${challenge.challenge}"
                 it[userId] = challenge.userId.toJavaUUID()
                 it[type] = ceremony
-                it[expiresAt] = Instant.parse(challenge.expiresAt)
+                it[expiresAt] = Instant.parse(challenge.expiresAt).databasePrecision()
                 it[isUsed] = challenge.isUsed
             }
         }
@@ -49,7 +49,7 @@ class PostgreSQLPasskeyChallengeRepository : PasskeyChallengeRepository {
                 (WebAuthnChallengesTable.challenge eq key) and
                     (WebAuthnChallengesTable.type eq ceremony) and
                     (WebAuthnChallengesTable.isUsed eq false) and
-                    (WebAuthnChallengesTable.expiresAt greater now)
+                    (WebAuthnChallengesTable.expiresAt greater now.databasePrecision())
             if (expectedUserId != null) {
                 predicate = predicate and (WebAuthnChallengesTable.userId eq expectedUserId.toJavaUUID())
             }
@@ -77,4 +77,6 @@ class PostgreSQLPasskeyChallengeRepository : PasskeyChallengeRepository {
                 it in setOf("registration", "authentication")
         }
     }
+
+    private fun Instant.databasePrecision(): Instant = Instant.fromEpochSeconds(epochSeconds, nanosecondsOfSecond / 1_000 * 1_000)
 }

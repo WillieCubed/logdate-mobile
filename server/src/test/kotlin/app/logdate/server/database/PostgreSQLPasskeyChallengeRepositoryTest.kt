@@ -14,6 +14,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class PostgreSQLPasskeyChallengeRepositoryTest {
@@ -38,7 +39,7 @@ class PostgreSQLPasskeyChallengeRepositoryTest {
         withH2Database(WebAuthnChallengesTable) {
             runBlocking {
                 val repository = PostgreSQLPasskeyChallengeRepository()
-                val now = Clock.System.now()
+                val now = Instant.fromEpochSeconds(Clock.System.now().epochSeconds + 60, 123_456_789)
                 val challenge = challenge().copy(expiresAt = now.toString())
                 repository.save("passkey", challenge)
                 assertNull(repository.consume("passkey", challenge.challenge, "registration", challenge.userId, now))
