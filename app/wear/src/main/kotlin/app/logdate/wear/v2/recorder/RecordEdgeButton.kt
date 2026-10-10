@@ -23,8 +23,9 @@ import app.logdate.wear.v2.today.TodayTags
 
 /**
  * Record as Today's edge button. While armed, a touch goes through [recordGesture]; otherwise a
- * click does what the button shows. Its shape follows the recorder from the record circle to the
- * Stop square.
+ * click does what the button shows. While a hold slides toward the lock its shape follows the
+ * finger from the record circle to a square; once locked, Today takes the button away and Stop
+ * comes in the list.
  */
 @Composable
 internal fun RecordEdgeButton(recorder: TodayRecorder) {
@@ -57,7 +58,6 @@ private fun recordButtonClick(
 ): () -> Unit =
     when (action) {
         RecordButtonAction.START -> recorder.gesture::startLocked
-        RecordButtonAction.STOP -> recorder.actions::stop
         RecordButtonAction.RETRY_SAVE -> recorder.actions::retry
         RecordButtonAction.NONE -> NoClick
     }

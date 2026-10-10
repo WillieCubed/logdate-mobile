@@ -64,6 +64,7 @@ import app.logdate.wear.v2.recorder.RecordingRing
 import app.logdate.wear.v2.recorder.TodayRecorder
 import app.logdate.wear.v2.recorder.recorderItems
 import app.logdate.wear.v2.recorder.replacesSummary
+import app.logdate.wear.v2.recorder.showsRecordButton
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toJavaLocalDate
@@ -95,8 +96,8 @@ data class TodayControls(
  * Home's first page: the date in the time text, the campfire, the day's summary line, the latest
  * moment and, when the paired Android phone lacks LogDate, a card that opens its Play listing.
  * Record sits at the end as the edge button, with Mark and + above it. While the recorder has
- * something to show, it takes the summary's place: the live recording with Pause and Discard,
- * then the saved recording with Undo and the five feelings, or what went wrong.
+ * something to show, it takes the summary's place: the live recording with Pause, Stop and
+ * Discard, then the saved recording with Undo and the five feelings, or what went wrong.
  */
 @Composable
 fun TodayPage(
@@ -163,7 +164,8 @@ private fun TodayScaffold(
         ScreenScaffold(scrollState = listState, timeText = timeText, content = content)
         return
     }
-    ScreenScaffold(scrollState = listState, edgeButton = { RecordEdgeButton(recorder) }, timeText = timeText, content = content)
+    val edgeButton: @Composable BoxScope.() -> Unit = { if (recorder.state.showsRecordButton) RecordEdgeButton(recorder) }
+    ScreenScaffold(scrollState = listState, edgeButton = edgeButton, timeText = timeText, content = content)
 }
 
 @Composable

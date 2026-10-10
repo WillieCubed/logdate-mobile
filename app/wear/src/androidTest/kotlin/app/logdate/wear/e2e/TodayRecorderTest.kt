@@ -1,17 +1,23 @@
 package app.logdate.wear.e2e
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.wear.compose.material3.AppScaffold
@@ -79,10 +85,26 @@ class TodayRecorderTest {
         recorder.state = RecorderState.Live(LiveMode.LOCKED, lockProgress = 1f)
         show()
 
-        composeRule.onNodeWithTag(TodayTags.RECORD).performClick()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.wear_today_recorder_stop)).performClick()
         composeRule.waitForIdle()
 
         assertEquals(1, recorder.stops)
+    }
+
+    @Test
+    fun a_locked_recording_shows_a_Stop_that_can_be_tapped() {
+        recorder.state = RecorderState.Live(LiveMode.LOCKED, lockProgress = 1f, elapsed = 42.seconds)
+        show()
+
+        assertStopCanBeTapped()
+    }
+
+    @Test
+    fun a_locked_recording_shows_a_Stop_that_can_be_tapped_at_the_largest_font_scale() {
+        recorder.state = RecorderState.Live(LiveMode.LOCKED, lockProgress = 1f, elapsed = 42.seconds)
+        show(fontScale = 1.24f)
+
+        assertStopCanBeTapped()
     }
 
     @Test
@@ -118,17 +140,30 @@ class TodayRecorderTest {
         composeRule.onNodeWithTag(TodayTags.RECORD).assertIsNotEnabled()
     }
 
-    private fun show() {
+    /** Stop is the only one, shows at least [MIN_STOP_HEIGHT] of itself without scrolling, and Pause, Discard and the time stay in view. */
+    private fun assertStopCanBeTapped() {
+        val stop = composeRule.onNodeWithContentDescription(context.getString(R.string.wear_today_recorder_stop))
+        stop.assertIsDisplayed()
+        val shown = stop.getBoundsInRoot().height
+        assertTrue(shown >= MIN_STOP_HEIGHT, "Stop shows ${shown.value} dp of its height; at least ${MIN_STOP_HEIGHT.value} dp is needed")
+        composeRule.onNodeWithTag(RecorderTags.PAUSE).assertIsDisplayed()
+        composeRule.onNodeWithTag(RecorderTags.DISCARD).assertIsDisplayed()
+        composeRule.onNodeWithTag(RecorderTags.ELAPSED).assertIsDisplayed()
+    }
+
+    private fun show(fontScale: Float = 1f) {
         composeRule.setContent {
-            LogDateWearTheme(dynamicColor = false) {
-                AppScaffold {
-                    TodayPage(
-                        state = today,
-                        handoff = HandoffState.IDLE,
-                        onGetPhoneApp = {},
-                        onHandoffDismissed = {},
-                        controls = TodayControls(recorder = TodayRecorder(recorder.state, recorder, recorder)),
-                    )
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
+                LogDateWearTheme(dynamicColor = false) {
+                    AppScaffold {
+                        TodayPage(
+                            state = today,
+                            handoff = HandoffState.IDLE,
+                            onGetPhoneApp = {},
+                            onHandoffDismissed = {},
+                            controls = TodayControls(recorder = TodayRecorder(recorder.state, recorder, recorder)),
+                        )
+                    }
                 }
             }
         }
@@ -195,6 +230,7 @@ class TodayRecorderTest {
     }
 
     private companion object {
+        val MIN_STOP_HEIGHT = 40.dp
         val today =
             TodayUiState.Ready(
                 date = LocalDate(2026, 10, 10),

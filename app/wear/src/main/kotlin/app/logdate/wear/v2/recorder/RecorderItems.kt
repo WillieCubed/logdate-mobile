@@ -31,6 +31,7 @@ import androidx.wear.compose.material3.FilledIconButton
 import androidx.wear.compose.material3.FilledTonalIconButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.IconButton
+import androidx.wear.compose.material3.IconButtonDefaults
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import app.logdate.ui.glyphs.LogDateGlyph
@@ -47,6 +48,7 @@ object RecorderTags {
     const val MESSAGE = "recorder_message"
     const val LOCK_HINT = "recorder_lock_hint"
     const val PAUSE = "recorder_pause"
+    const val STOP = "recorder_stop"
     const val DISCARD = "recorder_discard"
     const val UNDO = "recorder_undo"
     const val FEELINGS = "recorder_feelings"
@@ -222,7 +224,10 @@ private fun LockHint(progress: Float) {
     }
 }
 
-/** Pause and Discard beside Stop, once the recording is locked. */
+/**
+ * Pause, Stop and Discard in one row, once the recording is locked. Stop sits between the other two
+ * and is the filled one, and a Discard waiting for its second tap turns red so the two never look alike.
+ */
 @Composable
 private fun LockedControls(
     live: RecorderState.Live,
@@ -230,14 +235,26 @@ private fun LockedControls(
 ) {
     val pauseLabel = stringResource(if (live.paused) R.string.wear_today_recorder_resume else R.string.wear_today_recorder_pause)
     val pauseIcon = if (live.paused) R.drawable.ic_recorder_resume else R.drawable.ic_recorder_pause
+    val stopLabel = stringResource(R.string.wear_today_recorder_stop)
     val discardLabel =
         stringResource(if (live.confirmingDiscard) R.string.wear_today_recorder_discard_confirm else R.string.wear_today_recorder_discard)
     ButtonGroup(modifier = Modifier.fillMaxWidth()) {
         FilledTonalIconButton(onClick = actions::togglePause, modifier = Modifier.weight(1f).testTag(RecorderTags.PAUSE)) {
             Icon(painter = painterResource(pauseIcon), contentDescription = pauseLabel)
         }
+        FilledIconButton(onClick = actions::stop, modifier = Modifier.weight(1f).testTag(RecorderTags.STOP)) {
+            Icon(painter = painterResource(R.drawable.ic_recorder_stop), contentDescription = stopLabel)
+        }
         if (live.confirmingDiscard) {
-            FilledIconButton(onClick = actions::discard, modifier = Modifier.weight(1f).testTag(RecorderTags.DISCARD)) {
+            FilledIconButton(
+                onClick = actions::discard,
+                modifier = Modifier.weight(1f).testTag(RecorderTags.DISCARD),
+                colors =
+                    IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                    ),
+            ) {
                 Icon(painter = painterResource(R.drawable.ic_recorder_discard), contentDescription = discardLabel)
             }
         } else {

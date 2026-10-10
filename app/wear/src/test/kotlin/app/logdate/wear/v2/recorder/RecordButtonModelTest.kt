@@ -29,12 +29,23 @@ class RecordButtonModelTest {
     }
 
     @Test
-    fun `a locked recording makes Record its Stop button`() {
-        val model = RecorderState.Live(LiveMode.LOCKED, lockProgress = 1f).recordButton()
+    fun `a locked recording has no Record button because Stop is in Today's list`() {
+        assertFalse(RecorderState.Live(LiveMode.LOCKED, lockProgress = 1f).showsRecordButton)
+    }
 
-        assertEquals(RecordButtonAction.STOP, model.action)
-        assertEquals(1f, model.morph)
-        assertEquals(R.string.wear_today_recorder_stop, model.descriptionRes)
+    @Test
+    fun `Record shows in every other state including while a finger still holds it`() {
+        val states =
+            listOf(
+                RecorderState.Ready,
+                RecorderState.Arming,
+                RecorderState.Live(LiveMode.HOLDING, lockProgress = 0.9f),
+                RecorderState.Saving,
+                RecorderState.Saved(Uuid.random(), 4.seconds, feelingsOffered = true),
+                RecorderState.TooShort,
+            ) + RecorderFailure.entries.map { RecorderState.Failed(it) }
+
+        states.forEach { state -> assertTrue(state.showsRecordButton, "$state") }
     }
 
     @Test
