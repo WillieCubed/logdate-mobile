@@ -194,3 +194,10 @@ the rows in place without queueing a sync upload, because the media itself has n
 missing, or lives outside every collection (such as camera captures that earlier iOS builds kept in
 `Documents/imports`), keep their original string and are still opened through relocation. If the migration
 fails, it logs the error and tries again at the next launch.
+
+Photos that earlier iOS builds picked from the Photos library were stored as paths in
+`Library/Caches/photo-library-renderable`, which iOS can empty at any time and does not restore from a
+backup. The migration passes any reference it could not rewrite to a `MediaRescuer`; on iOS,
+`IosCachedPhotoRescuer` copies such a photo into the library while the cached file still exists and the note
+then stores the library reference. A photo iOS has already purged from the cache is gone from the device, so
+its note keeps the old reference. New picks are copied into the library when they are chosen.

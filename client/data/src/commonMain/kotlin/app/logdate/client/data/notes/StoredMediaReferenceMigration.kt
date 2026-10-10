@@ -4,6 +4,7 @@ import app.logdate.client.database.dao.AudioNoteDao
 import app.logdate.client.database.dao.ImageNoteDao
 import app.logdate.client.database.dao.VideoNoteDao
 import app.logdate.client.database.entities.NoteContentUri
+import app.logdate.client.media.storage.MediaRescuer
 import app.logdate.client.media.storage.StoredMediaReferences
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
@@ -19,8 +20,9 @@ import kotlin.uuid.Uuid
  *
  * Builds from before media references existed stored absolute paths, which stop working when the
  * operating system moves the app's storage. Only rows whose file is in one of this install's media
- * collections change ([StoredMediaReferences] leaves every other reference as written), so a
- * missing file keeps its original reference. Rows are updated in place without queueing a sync
+ * collections change ([StoredMediaReferences] leaves every other reference as written), and
+ * media a note stores outside them, such as in a purgeable cache, is moved in by the
+ * [MediaRescuer] while it still exists. A missing file keeps its original reference. Rows are updated in place without queueing a sync
  * upload: the media itself has not changed. A row is rewritten only while it still holds the value
  * that was read, so a reference changed in the meantime is never overwritten.
  *
@@ -32,6 +34,7 @@ class StoredMediaReferenceMigration(
     private val audioNoteDao: AudioNoteDao,
     private val videoNoteDao: VideoNoteDao,
     private val mediaReferences: StoredMediaReferences,
+    private val rescuer: MediaRescuer = MediaRescuer.None,
 ) {
     /** Rewrites what it can and returns how many notes changed. */
     suspend fun run(): Int {
@@ -48,9 +51,11 @@ class StoredMediaReferenceMigration(
         update: suspend (Uuid, String, String) -> Unit,
     ): Int =
         rows.count { row ->
-            val stored = mediaReferences.storedReference(row.contentUri)
-            if (stored != row.contentUri) update(row.uid, row.contentUri, stored)
-            stored != row.contentUri
+            val stored =
+                mediaReferences.storedReference(row.contentUri).takeIf { it != row.contentUri }
+                    ?: rescuer.rescue(row.contentUri)
+            if (stored != null) update(row.uid, row.contentUri, stored)
+            stored != null
         }
 }
 

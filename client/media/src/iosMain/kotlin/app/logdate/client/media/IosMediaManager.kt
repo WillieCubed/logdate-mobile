@@ -7,6 +7,7 @@ package app.logdate.client.media
 
 import app.logdate.client.media.storage.MediaCollection
 import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.importFileIntoLibrary
 import app.logdate.client.media.storage.iosMediaFileResolver
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.addressOf
@@ -267,15 +268,10 @@ class IosMediaManager(
     internal fun importIntoLibrary(
         sourcePath: String,
         fileName: String,
-    ): String? {
-        ensureMediaDir()
-        val destination = buildMediaPath(fileName)
-        if (!fileManager.fileExistsAtPath(destination) && !fileManager.copyItemAtPath(sourcePath, destination, error = null)) {
-            Napier.e("Failed to copy $sourcePath into the media library")
-            return null
+    ): String? =
+        importFileIntoLibrary(mediaFiles, sourcePath, fileName).also { imported ->
+            if (imported == null) Napier.e("Failed to copy $sourcePath into the media library")
         }
-        return NSURL.fileURLWithPath(destination).absoluteString
-    }
 
     private suspend fun listPhotoLibraryMedia(fetchLimit: Int? = null): List<MediaObject> {
         if (!hasPhotoLibraryReadAccess()) {

@@ -6,6 +6,7 @@ import app.logdate.client.data.fakes.FakeSyncMetadataService
 import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.database.getRoomDatabase
 import app.logdate.client.media.InMemoryMediaManager
+import app.logdate.client.media.storage.MediaRescuer
 import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.mediaRefOrNull
@@ -172,6 +173,26 @@ class StoredMediaReferencePersistenceTest {
             assertEquals("logdate-media://library/new.jpg", contentUriOf(current.uid))
             assertEquals(0, metadata.getPendingCount(), "Rewriting a local reference must not queue an upload")
             assertEquals(0, StoredMediaReferenceMigration(dao, database.audioNoteDao(), database.videoNoteDao(), references).run())
+        }
+
+    @Test
+    fun `migration moves media stored in a purgeable cache into the library`() =
+        runTest {
+            val dao = database.imageNoteDao()
+            val cached = image("file:///var/caches/photo-1.jpg")
+            val gone = image("file:///var/caches/photo-2.jpg")
+            listOf(cached, gone).forEach { dao.addNote(it.toEntity()) }
+            val rescuer =
+                MediaRescuer { reference ->
+                    "logdate-media://library/photo-1.jpg".takeIf { reference == "file:///var/caches/photo-1.jpg" }
+                }
+
+            val rewritten =
+                StoredMediaReferenceMigration(dao, database.audioNoteDao(), database.videoNoteDao(), references, rescuer).run()
+
+            assertEquals(1, rewritten)
+            assertEquals("logdate-media://library/photo-1.jpg", contentUriOf(cached.uid))
+            assertEquals("file:///var/caches/photo-2.jpg", contentUriOf(gone.uid))
         }
 
     @Test

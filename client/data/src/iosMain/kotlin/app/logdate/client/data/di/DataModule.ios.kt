@@ -172,7 +172,7 @@ actual val dataModule: Module =
                 mediaReferences = get(),
             )
         }
-        single { StoredMediaReferenceMigration(get(), get(), get(), get()) }
+        single { StoredMediaReferenceMigration(get(), get(), get(), get(), get()) }
         single { StoredMediaReferenceMigrationLauncher { get() } }
         single<NotePlaceResolver> { DatabaseNotePlaceResolver(get()) }
         single<JournalContentRepository> {

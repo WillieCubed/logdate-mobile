@@ -2,6 +2,7 @@
 
 package app.logdate.client.media
 
+import app.logdate.client.media.storage.IosCachedPhotoRescuer
 import app.logdate.client.media.storage.IosMediaDirectories
 import app.logdate.client.media.storage.MediaCollection
 import app.logdate.client.media.storage.MediaFileResolver
@@ -122,6 +123,37 @@ class IosMediaReferenceReadingTest {
             assertEquals("$library/ABC-IMG 0007.jpg", importedPath)
             assertEquals("logdate-media://library/ABC-IMG%200007.jpg", mediaFiles.storedReference(imported))
             assertContentEquals(byteArrayOf(9, 9), IosMediaManager(mediaFiles).readMedia(imported).data)
+        }
+
+    @Test
+    fun `a photo an earlier build stored in the cache is moved into the library`() =
+        runTest {
+            val cache = "${directories.canonicalPath(NSHomeDirectory())}/Library/Caches/photo-library-renderable"
+            fileManager.createDirectoryAtPath(cache, withIntermediateDirectories = true, attributes = null, error = null)
+            val cached = "$cache/ABC-IMG 0009.jpg"
+            SystemFileSystem.sink(Path(cached)).buffered().use { it.write(byteArrayOf(5)) }
+            created += cached
+
+            val rescued = requireNotNull(IosCachedPhotoRescuer(mediaFiles).rescue("file://$cached"))
+            created += "$library/ABC-IMG 0009.jpg"
+
+            assertEquals("logdate-media://library/ABC-IMG%200009.jpg", rescued)
+            assertContentEquals(byteArrayOf(5), IosMediaManager(mediaFiles).readMedia(rescued).data)
+        }
+
+    @Test
+    fun `only cached photos that still exist are rescued`() =
+        runTest {
+            val rescuer = IosCachedPhotoRescuer(mediaFiles)
+            val libraryFile = "$library/${createLibraryFile("not-cache.jpg")}"
+
+            assertNull(rescuer.rescue("file://$libraryFile"))
+            assertNull(
+                rescuer.rescue(
+                    "file://${directories.canonicalPath(NSHomeDirectory())}/Library/Caches/photo-library-renderable/missing.jpg",
+                ),
+            )
+            assertNull(rescuer.rescue("ph://ABC/L0/001"))
         }
 
     @Test
