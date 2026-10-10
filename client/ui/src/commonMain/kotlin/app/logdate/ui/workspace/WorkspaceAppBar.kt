@@ -7,9 +7,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.absolutePadding
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -21,10 +24,12 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.handwritingDelegator
 import app.logdate.ui.platform.PlatformIcons
@@ -60,10 +65,43 @@ fun WorkspaceAppBar(
     }
 }
 
+/**
+ * The workspace app bar in a desktop window's caption bar: Search and [actions] between the system's
+ * own controls, at the caption's height. Presses on them go to LogDate; the rest of the bar still
+ * drags the window.
+ */
+@Composable
+internal fun WorkspaceCaptionAppBar(
+    title: String,
+    captionBar: WorkspaceCaptionBar,
+    onSearch: () -> Unit,
+    actions: @Composable RowScope.() -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(captionBar.height)
+            .absolutePadding(left = captionBar.left + Spacing.sm, right = captionBar.right + Spacing.sm)
+            .semantics { paneTitle = title },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            WorkspaceSearchBar(onSearch, Modifier.captionBarControl(), height = captionBar.height - Spacing.sm)
+        }
+        Row(Modifier.captionBarControl(), verticalAlignment = Alignment.CenterVertically, content = actions)
+    }
+}
+
+/**
+ * The workspace search pill. [height] is its height; the default is the standard search bar's, and
+ * the caption bar passes a shorter one.
+ */
 @Composable
 fun WorkspaceSearchBar(
     onSearch: () -> Unit,
     modifier: Modifier = Modifier,
+    height: Dp = SEARCH_BAR_HEIGHT,
 ) {
     val binding = LocalWorkspaceSearchController.current?.binding
     if (binding != null) {
@@ -72,6 +110,7 @@ fun WorkspaceSearchBar(
             hint = binding.hint,
             onQueryChange = binding.onQuery,
             modifier = modifier,
+            height = height,
         )
         return
     }
@@ -83,7 +122,7 @@ fun WorkspaceSearchBar(
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Row(
-            Modifier.heightIn(min = 56.dp).padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+            Modifier.heightIn(min = height).padding(horizontal = Spacing.lg),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
@@ -99,14 +138,22 @@ fun WorkspaceSearchBar(
     }
 }
 
-/** Shared editable form of the workspace search surface for bounded collection searches. */
+/**
+ * Shared editable form of the workspace search surface for bounded collection searches. Below the
+ * standard [height] the field is drawn compactly, since a Material text field cannot be shorter.
+ */
 @Composable
 fun WorkspaceSearchField(
     query: String,
     hint: String,
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
+    height: Dp = SEARCH_BAR_HEIGHT,
 ) {
+    if (height < SEARCH_BAR_HEIGHT) {
+        CompactSearchField(query, hint, onQueryChange, height, modifier)
+        return
+    }
     TextField(
         value = query,
         onValueChange = onQueryChange,
@@ -124,3 +171,51 @@ fun WorkspaceSearchField(
             ),
     )
 }
+
+@Composable
+private fun CompactSearchField(
+    query: String,
+    hint: String,
+    onQueryChange: (String) -> Unit,
+    height: Dp,
+    modifier: Modifier,
+) {
+    BasicTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        modifier = modifier.searchBarMaxWidth().testTag("workspace_search"),
+        decorationBox = { field ->
+            Surface(
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.workspaceContainer(WorkspaceSurface.Raised),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ) {
+                Row(
+                    Modifier.heightIn(min = height).padding(horizontal = Spacing.lg),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
+                    Icon(PlatformIcons.search(), contentDescription = null)
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        if (query.isEmpty()) {
+                            Text(
+                                hint,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        field()
+                    }
+                }
+            }
+        },
+    )
+}
+
+/** The standard Material search bar height. */
+private val SEARCH_BAR_HEIGHT = 56.dp

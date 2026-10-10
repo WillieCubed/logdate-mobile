@@ -146,7 +146,7 @@ A row reaches `[done]` only when its Evidence column lists:
 | --- | --- | --- |
 | `[done]` | Entries and journals open in a new window, beside the current one when there is room | Journal menus (overflow, long-press, right-click) offer "New entry in a new window", started from the activity with `FLAG_ACTIVITY_LAUNCH_ADJACENT`. Lane 2: `large-screens-and-desktop-windowing/side-by-side--tablet-api37.png`. Entries in a day offer "Open in new window" (`NoteContextMenuTest`); Lane 2: `entry-side-by-side--tablet-api37.png`, `keyboard-pointer-drag-and-drop/entry-context-menu--tablet-api37.png`. |
 | `[done]` | LogDate runs in Android desktop windowing, with entries in windows of their own | Lane 2: `large-screens-and-desktop-windowing/desktop-windows--tablet-api37.png` (Android 17 tablet emulator with desktop windowing on, via `./run screenshots:desktop`). |
-| `[todo]` | The workspace app bar sits in the desktop caption bar | |
+| `[done]` | The workspace app bar sits in the desktop caption bar | `rememberPlatformCaptionBar` makes the caption transparent while Home shows and reports Android's control rectangles; `WorkspaceCaptionAppBar` places search and the account action between them, with presses excluded from window dragging (`WorkspaceCaptionBarTest`). Lane 1: `HomeWorkspaceScreenshots.kt#WorkspaceTimelineInDesktopWindow` and `#WorkspaceLocationsInDesktopWindow` (light, dark, RTL, narrow window, and 200% text, where the app bar stays below the bar). Lane 2: `large-screens-and-desktop-windowing/caption-bar--tablet-api37.png` and `desktop-windows--tablet-api37.png`, via `./run screenshots:desktop`. |
 
 ## AppFunctions and Cross-Device
 

@@ -32,6 +32,7 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.Journal
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.TimeZone
 import org.koin.core.context.GlobalContext
@@ -448,9 +449,18 @@ object OsSurfaceCapture {
         }
     }
 
-    /** Creates a journal named [title] and returns its id. */
+    /**
+     * Returns the id of the one journal named [title], creating it if needed. The desktop windowing
+     * emulator keeps its data between runs, so copies earlier runs left are removed; a capture shows
+     * the journal once.
+     */
     fun createJournal(title: String): String =
-        runBlocking { GlobalContext.get().get<JournalRepository>().create(Journal(title = title)).toString() }
+        runBlocking {
+            val journals = GlobalContext.get().get<JournalRepository>()
+            val existing = journals.allJournalsObserved.first().filter { it.title == title }
+            existing.drop(1).forEach { journals.delete(it.id) }
+            (existing.firstOrNull()?.id ?: journals.create(Journal(title = title))).toString()
+        }
 
     /** Opens the journal [journalId] through its deep link. */
     fun openJournal(journalId: String) {

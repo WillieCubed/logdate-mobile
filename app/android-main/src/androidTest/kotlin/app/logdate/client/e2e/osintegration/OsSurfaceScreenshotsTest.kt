@@ -222,6 +222,10 @@ class OsSurfaceScreenshotsTest {
             "am start --windowingMode $WINDOWING_MODE_FREEFORM -n ${OsSurfaceCapture.packageName}/app.logdate.client.MainActivity",
         )
         OsSurfaceCapture.waitForText("Journals").click()
+        OsSurfaceCapture.waitForText("Summer in Lisbon")
+        Thread.sleep(2_000L)
+        // Search and the account button in the window's caption bar, between Android's controls.
+        OsSurfaceCapture.capture(surface = "large-screens-and-desktop-windowing", state = "caption-bar")
         OsSurfaceCapture.longPress(OsSurfaceCapture.waitForText("Summer in Lisbon"))
         OsSurfaceCapture.waitForText("New entry in a new window").click()
         Thread.sleep(4_000L)

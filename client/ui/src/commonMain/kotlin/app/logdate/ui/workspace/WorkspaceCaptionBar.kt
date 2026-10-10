@@ -1,0 +1,44 @@
+package app.logdate.ui.workspace
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
+
+/**
+ * The window's caption bar: the title bar Android desktop windowing draws above each window, with
+ * the app's name and the minimize, maximize, and close buttons. An app may draw its own controls in
+ * the rest of the bar.
+ *
+ * [left] and [right] are the widths the system's own controls take at each edge of the window. They
+ * are absolute sides, not reading-direction ones, because the system places its controls by side.
+ */
+@Immutable
+data class WorkspaceCaptionBar(
+    val height: Dp,
+    val left: Dp,
+    val right: Dp,
+)
+
+/**
+ * Overrides the caption bar the workspace reads from the platform, for previews and tests that show
+ * the workspace in a desktop window.
+ */
+val LocalWorkspaceCaptionBar = staticCompositionLocalOf<WorkspaceCaptionBar?> { null }
+
+/**
+ * The window's caption bar, or null when it has none (phones, tablets outside desktop windowing,
+ * desktop and iOS builds). While this is composed, the platform draws the caption with a transparent
+ * background, so the workspace [canvas] reaches the top of the window, and draws its own controls in
+ * a color that reads on [canvas].
+ */
+@Composable
+internal expect fun rememberPlatformCaptionBar(canvas: Color): WorkspaceCaptionBar?
+
+/**
+ * Lets a control in the caption bar receive presses. Without it the platform treats a press in the
+ * caption bar as the start of dragging the window.
+ */
+internal expect fun Modifier.captionBarControl(): Modifier

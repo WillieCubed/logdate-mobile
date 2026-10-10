@@ -93,6 +93,9 @@ keyboard-shortcuts|system|docs/screenshots/android-os-integration/keyboard-point
 desktop-windowing|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/desktop-windows--tablet-api37.png
 desktop-windowing|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/desktop-window-labels--tablet-api37.txt
 
+# Caption bar: Home's search and account button in a desktop window's caption bar.
+caption-bar|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/caption-bar--tablet-api37.png
+
 # Splash screen: the Android 11 compat splash and the Android 17 system splash look the same.
 splash|system|docs/screenshots/android-os-integration/splash/launch--phone-api30.png
 splash|system|docs/screenshots/android-os-integration/splash/launch--phone-api37.png

@@ -4,8 +4,8 @@ Status: partial.
 
 - **Ships today:** the adaptive Home workspace, foldable postures, separate editor windows, video
   picture-in-picture, manifest hygiene, window titles, and "New entry in a new window".
-- **Verified:** separate LogDate windows in Android 17 desktop windowing.
-- **Planned:** the workspace app bar in the caption bar.
+- **Verified:** separate LogDate windows in Android 17 desktop windowing, with Home's search and
+  account button in the window's caption bar.
 
 ## What it is
 
@@ -35,8 +35,10 @@ covers the window and system side.
   offers "New entry in a new window", and an entry in a day offers "Open in new window" on a
   long-press or right-click. Either opens the editor beside LogDate in split screen when there is
   room. Launchers and the taskbar offer "New window" for the editor.
-- **The caption bar.** In desktop windowing, Search and the account button sit in the caption bar,
-  between the system controls.
+- **The caption bar.** In desktop windowing, Home's search and account button sit in the window's
+  caption bar, between Android's app menu and its window buttons, and the window's background runs
+  up behind them. Dragging any other part of the bar still moves the window. With text at 150% or
+  larger, they stay in their usual row below the bar, where they fit.
 
 "New entry in a new window" on a Pixel Tablet running Android 17, started from full screen. LogDate
 keeps the left half, and the editor opens on the right, already filed to the journal:
@@ -47,7 +49,20 @@ An existing entry opened from its menu in a day, beside that day:
 
 ![The day on the left and the entry in the editor on the right, split down the middle](../../../screenshots/android-os-integration/large-screens-and-desktop-windowing/entry-side-by-side--tablet-api37.png)
 
-The caption bar is added when it ships.
+Home in a desktop window, recorded as Lane 1 references with stand-ins for Android's own caption
+controls, in light, dark, right-to-left (where Android swaps the controls' sides), and a narrow
+window:
+
+| Light | Dark |
+| --- | --- |
+| ![Home's timeline in a desktop window, with the search pill and account button in the caption bar between the LogDate app menu and the window buttons](../../../../app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/audit/workspace/HomeWorkspaceScreenshotsKt/WorkspaceTimelineInDesktopWindow_Desktop%20window_750cb730_0.png) | ![The same window in dark mode](../../../../app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/audit/workspace/HomeWorkspaceScreenshotsKt/WorkspaceTimelineInDesktopWindow_Desktop%20window%20dark_778ae88f_0.png) |
+| **Right-to-left** | **Narrow window, Places** |
+| ![The same window in Arabic, with the window buttons at the left and the app menu at the right](../../../../app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/audit/workspace/HomeWorkspaceScreenshotsKt/WorkspaceTimelineInDesktopWindow_Desktop%20window%20RTL_68d44ea7_0.png) | ![Places in a narrow desktop window with the navigation rail and the caption bar search](../../../../app/android-main/src/screenshotTestDebug/reference/app/logdate/screenshots/audit/workspace/HomeWorkspaceScreenshotsKt/WorkspaceLocationsInDesktopWindow_Narrow%20desktop%20window_2ae90ce6_0.png) |
+
+And on an Android 17 tablet emulator with desktop windowing on, where Android draws its app menu
+(LogDate's icon) and window buttons itself:
+
+![A LogDate window on the Android desktop showing Journals, with the Search your log bar and the account button in the window's title bar between LogDate's icon and the minimize, maximize, and close buttons](../../../screenshots/android-os-integration/large-screens-and-desktop-windowing/caption-bar--tablet-api37.png)
 
 ## How it works
 
@@ -83,16 +98,33 @@ still reloads correctly.
 
 ### The caption bar
 
-In freeform and desktop windowing:
+Android 15 lets an app draw in its caption bar. The Home workspace shell does, in
+`client/ui/.../workspace`:
 
-1. LogDate requests a transparent caption background with
-   `WindowInsetsController.setSystemBarsAppearance(APPEARANCE_TRANSPARENT_CAPTION_BAR_BACKGROUND, ...)`.
-2. The system still draws its controls, and reports where they are through `WindowInsets.captionBar`
-   and its bounding rectangles.
-3. `WorkspaceAppBar` pads around those rectangles, so Search and the account action sit in the bar
-   without overlapping the system controls.
+1. `rememberPlatformCaptionBar` (androidMain) sets `APPEARANCE_TRANSPARENT_CAPTION_BAR_BACKGROUND`
+   with `WindowInsetsController.setSystemBarsAppearance` while Home is on screen, and clears it when
+   Home leaves, so other screens keep the standard bar. It also sets
+   `APPEARANCE_LIGHT_CAPTION_BARS` when the workspace canvas is light, so Android draws its controls
+   dark enough to read.
+2. It reads the bar's height from `WindowInsets.captionBar`, and where Android's controls are from
+   `WindowInsetsCompat.getBoundingRects(Type.captionBar())`: one rectangle for the app menu at one
+   edge and one for the window buttons at the other. These are screen sides, not reading-direction
+   ones, so `WorkspaceCaptionBar` keeps them as `left` and `right`.
+3. `WorkspaceScaffold` stops padding its content for the caption bar and puts
+   `WorkspaceCaptionAppBar` in it: search, at the bar's height less 8dp, and the account action,
+   padded clear of both rectangles.
+4. A press in the caption bar normally starts dragging the window. The search pill and the account
+   action use `Modifier.systemGestureExclusion()` (`captionBarControl`), which tells Android to send
+   presses there to LogDate; the rest of the bar still drags.
 
-These changes are covered by the Home workspace contract (`checkHomeWorkspaceContract`).
+If the bar is shorter than 40dp, or the text is at 150% or more, the app bar stays below the bar, so
+search and the account action never shrink below a readable size. Desktop and iOS builds have no
+caption bar to share and keep the standard layout.
+
+These changes are covered by the Home workspace contract (`checkHomeWorkspaceContract`) and
+`WorkspaceCaptionBarTest` (client/ui desktopTest), which checks that search and the account action
+fit inside the bar and clear both sides' controls, that content starts below it, and that large text
+and windows without a caption bar keep the usual app bar.
 
 ### Desktop windowing evidence
 
@@ -109,7 +141,7 @@ when the script passes `logdate.desktopWindowing=true`.
 
 The main window, and a new entry opened from a journal's menu as a second window:
 
-![Two LogDate windows on the Android desktop, each with a LogDate caption bar and minimize, maximize, and close buttons, the editor in front of the Journals window, with LogDate in the taskbar](../../../screenshots/android-os-integration/large-screens-and-desktop-windowing/desktop-windows--tablet-api37.png)
+![Two LogDate windows on the Android desktop, the editor in front of the Journals window, whose title bar holds Home's search and account button, with LogDate in the taskbar](../../../screenshots/android-os-integration/large-screens-and-desktop-windowing/desktop-windows--tablet-api37.png)
 
 ## Flag and rollout
 
@@ -129,7 +161,9 @@ bar or Recents, but a launcher that lists task labels would, as it would for any
 
 ## Updating screenshots
 
-- Caption-aware app bar scenes are Lane 1 references.
+- The caption bar scenes are Lane 1 references in `HomeWorkspaceScreenshots.kt`
+  (`WorkspaceTimelineInDesktopWindow`, `WorkspaceLocationsInDesktopWindow`), recorded with
+  `./gradlew :app:android-main:updateDebugScreenshotTest --tests "*HomeWorkspaceScreenshotsKt.Workspace*InDesktopWindow*"`.
 - Side-by-side windows are Lane 2 captures, recorded with `./run screenshots:os`. Desktop windowing
   is recorded with `./run screenshots:desktop`, because it needs its own emulator (see above). Both
   land in `docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/`.

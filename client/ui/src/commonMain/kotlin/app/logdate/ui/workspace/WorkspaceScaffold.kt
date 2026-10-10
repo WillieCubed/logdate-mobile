@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.captionBar
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -77,9 +79,14 @@ fun WorkspaceScaffold(
         val rail = navigation != WorkspaceNavigationMode.Bottom
         val largeText = LocalDensity.current.fontScale >= 1.5f
         val canvas = MaterialTheme.colorScheme.workspaceContainer(WorkspaceSurface.Canvas)
+        // In a desktop window the app bar moves into the window's caption bar, between the system's
+        // own controls, unless the text is too large to fit its height.
+        val captionBar = if (onSearch != null) LocalWorkspaceCaptionBar.current ?: rememberPlatformCaptionBar(canvas) else null
+        val appBarInCaption = captionBar?.takeIf { it.height >= MIN_CAPTION_APP_BAR_HEIGHT && !largeText }
         Scaffold(
             containerColor = canvas,
-            contentWindowInsets = WindowInsets.safeDrawing,
+            contentWindowInsets =
+                if (appBarInCaption != null) WindowInsets.safeDrawing.exclude(WindowInsets.captionBar) else WindowInsets.safeDrawing,
             bottomBar = {
                 if (!rail) {
                     NavigationBar(containerColor = canvas) {
@@ -103,60 +110,70 @@ fun WorkspaceScaffold(
                 if (!rail && onCreate != null) WorkspaceCreateAction(onCreate, createLabel, createEntryTransition)
             },
         ) { insets ->
-            Row(Modifier.fillMaxSize().padding(insets)) {
-                if (navigation == WorkspaceNavigationMode.Sidebar) {
-                    Column(
-                        Modifier
-                            .width(240.dp)
-                            .fillMaxHeight()
-                            .verticalScroll(rememberScrollState())
-                            .padding(Spacing.lg),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    ) {
-                        Text("LogDate", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(Spacing.lg))
-                        onCreate?.let { WorkspaceCreateAction(it, createLabel, createEntryTransition) }
-                        destinations.forEach { destination ->
-                            NavigationDrawerItem(
-                                label = { Text(destination.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                selected = selected.key == destination.key,
-                                onClick = { onSelect(destination.key) },
-                                icon = { Icon(destination.icon, null) },
-                            )
-                        }
+            WorkspaceSearchHost {
+                Column(Modifier.fillMaxSize().padding(insets)) {
+                    if (appBarInCaption != null && onSearch != null) {
+                        WorkspaceCaptionAppBar(selected.title, appBarInCaption, onSearch, actions)
                     }
-                } else if (rail) {
-                    NavigationRail(
-                        containerColor = canvas,
-                        windowInsets = WindowInsets(0, 0, 0, 0),
-                        header = { onCreate?.let { WorkspaceCreateAction(it, createLabel, createEntryTransition) } },
-                        modifier = Modifier.fillMaxHeight(),
-                    ) {
-                        destinations.forEach { destination ->
-                            NavigationRailItem(
-                                selected.key == destination.key,
-                                { onSelect(destination.key) },
-                                icon = { Icon(destination.icon, destination.title) },
-                                label =
-                                    if (largeText) {
-                                        null
-                                    } else {
-                                        { Text(destination.title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                                    },
-                            )
+                    Row(Modifier.fillMaxWidth().weight(1f)) {
+                        if (navigation == WorkspaceNavigationMode.Sidebar) {
+                            Column(
+                                Modifier
+                                    .width(240.dp)
+                                    .fillMaxHeight()
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(Spacing.lg),
+                                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                            ) {
+                                // A desktop window's caption bar already names the app.
+                                if (appBarInCaption == null) {
+                                    Text("LogDate", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(Spacing.lg))
+                                }
+                                onCreate?.let { WorkspaceCreateAction(it, createLabel, createEntryTransition) }
+                                destinations.forEach { destination ->
+                                    NavigationDrawerItem(
+                                        label = { Text(destination.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                        selected = selected.key == destination.key,
+                                        onClick = { onSelect(destination.key) },
+                                        icon = { Icon(destination.icon, null) },
+                                    )
+                                }
+                            }
+                        } else if (rail) {
+                            NavigationRail(
+                                containerColor = canvas,
+                                windowInsets = WindowInsets(0, 0, 0, 0),
+                                header = { onCreate?.let { WorkspaceCreateAction(it, createLabel, createEntryTransition) } },
+                                modifier = Modifier.fillMaxHeight(),
+                            ) {
+                                destinations.forEach { destination ->
+                                    NavigationRailItem(
+                                        selected.key == destination.key,
+                                        { onSelect(destination.key) },
+                                        icon = { Icon(destination.icon, destination.title) },
+                                        label =
+                                            if (largeText) {
+                                                null
+                                            } else {
+                                                { Text(destination.title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                                            },
+                                    )
+                                }
+                            }
                         }
-                    }
-                }
-                WorkspaceSearchHost {
-                    Column(Modifier.weight(1f).fillMaxHeight()) {
-                        if (onSearch != null) {
-                            WorkspaceAppBar(selected.title, onSearch, actions = actions)
-                        } else {
-                            PanelHeader(selected.title, role = PanelHeaderRole.Destination, actions = actions)
-                        }
-                        status()
-                        Box(Modifier.fillMaxWidth().weight(1f)) {
-                            CompositionLocalProvider(LocalWorkspaceEnabled provides true, LocalWorkspaceHosted provides true) {
-                                holder.SaveableStateProvider(selected.key) { content() }
+                        Column(Modifier.weight(1f).fillMaxHeight()) {
+                            if (appBarInCaption == null) {
+                                if (onSearch != null) {
+                                    WorkspaceAppBar(selected.title, onSearch, actions = actions)
+                                } else {
+                                    PanelHeader(selected.title, role = PanelHeaderRole.Destination, actions = actions)
+                                }
+                            }
+                            status()
+                            Box(Modifier.fillMaxWidth().weight(1f)) {
+                                CompositionLocalProvider(LocalWorkspaceEnabled provides true, LocalWorkspaceHosted provides true) {
+                                    holder.SaveableStateProvider(selected.key) { content() }
+                                }
                             }
                         }
                     }
@@ -165,6 +182,9 @@ fun WorkspaceScaffold(
         }
     }
 }
+
+/** A caption bar shorter than this cannot hold the search field and account button. */
+private val MIN_CAPTION_APP_BAR_HEIGHT = 40.dp
 
 @Composable
 private fun WorkspaceCreateAction(

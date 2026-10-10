@@ -59,6 +59,29 @@ import coil3.compose.AsyncImagePreviewHandler
 import coil3.compose.LocalAsyncImagePreviewHandler
 import com.android.tools.screenshot.PreviewTest
 import kotlin.uuid.Uuid
+import app.logdate.ui.workspace.WorkspaceCaptionBar
+import app.logdate.ui.workspace.LocalWorkspaceCaptionBar
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.CropSquare
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.Column
 
 @Preview(name = "Phone", device = ScreenshotTestData.PHONE, showBackground = true)
 @Preview(name = "Compact", device = ScreenshotTestData.COMPACT_PHONE, showBackground = true)
@@ -95,48 +118,62 @@ private fun PlacesOptionsFixture() {
 private fun WorkspaceScene(
     key: String,
     detail: (@Composable () -> Unit)? = null,
+    inDesktopWindow: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     ScreenshotTheme {
-        val context = LocalContext.current
-        val image =
-            remember(
-                context,
-            ) { BitmapFactory.decodeResource(context.resources, app.logdate.client.R.drawable.workspace_sample_photo).asImage() }
-        val handler = remember(image) { AsyncImagePreviewHandler { image } }
-        CompositionLocalProvider(LocalAsyncImagePreviewHandler provides handler) {
-            WorkspaceScaffold(workspaceDestinations, key, {}, onCreate = {}.takeIf { key != "locations" }, onSearch = {}, actions = {
-                app.logdate.feature.core.main.HomeWorkspaceAccountAction(
-                    app.logdate.feature.core.sync.SyncPresentation
-                        .Pending(2),
-                    app.logdate.ui.streak
-                        .CampfirePresentation(app.logdate.ui.streak.CampfirePhase.BURNING, runDays = 4),
-                    {},
-                    {},
-                    {},
+        if (inDesktopWindow) {
+            DesktopWindow { WorkspaceSceneContent(key, detail, content) }
+        } else {
+            WorkspaceSceneContent(key, detail, content)
+        }
+    }
+}
+
+@Composable
+private fun WorkspaceSceneContent(
+    key: String,
+    detail: (@Composable () -> Unit)?,
+    content: @Composable () -> Unit,
+) {
+    val context = LocalContext.current
+    val image =
+        remember(
+            context,
+        ) { BitmapFactory.decodeResource(context.resources, app.logdate.client.R.drawable.workspace_sample_photo).asImage() }
+    val handler = remember(image) { AsyncImagePreviewHandler { image } }
+    CompositionLocalProvider(LocalAsyncImagePreviewHandler provides handler) {
+        WorkspaceScaffold(workspaceDestinations, key, {}, onCreate = {}.takeIf { key != "locations" }, onSearch = {}, actions = {
+            app.logdate.feature.core.main.HomeWorkspaceAccountAction(
+                app.logdate.feature.core.sync.SyncPresentation
+                    .Pending(2),
+                app.logdate.ui.streak
+                    .CampfirePresentation(app.logdate.ui.streak.CampfirePhase.BURNING, runDays = 4),
+                {},
+                {},
+                {},
+            )
+        }) {
+            if (key == "locations" && detail == null) {
+                content()
+            } else {
+                AdaptiveWorkspaceLayout(
+                    Modifier.fillMaxSize(),
+                    browseOnStart = true,
+                    focusConstraints =
+                        if (key == "timeline" && detail == null) {
+                            app.logdate.ui.workspace.PanelConstraints.ReadingCollection
+                        } else if (key ==
+                            "library"
+                        ) {
+                            app.logdate.ui.workspace.PanelConstraints.Visual
+                        } else {
+                            app.logdate.ui.workspace.PanelConstraints.Reading
+                        },
+                    browse = content.takeIf { detail != null },
+                    focus =
+                        detail ?: content,
                 )
-            }) {
-                if (key == "locations" && detail == null) {
-                    content()
-                } else {
-                    AdaptiveWorkspaceLayout(
-                        Modifier.fillMaxSize(),
-                        browseOnStart = true,
-                        focusConstraints =
-                            if (key == "timeline" && detail == null) {
-                                app.logdate.ui.workspace.PanelConstraints.ReadingCollection
-                            } else if (key ==
-                                "library"
-                            ) {
-                                app.logdate.ui.workspace.PanelConstraints.Visual
-                            } else {
-                                app.logdate.ui.workspace.PanelConstraints.Reading
-                            },
-                        browse = content.takeIf { detail != null },
-                        focus =
-                            detail ?: content,
-                    )
-                }
             }
         }
     }
@@ -401,4 +438,81 @@ fun WorkspaceSyncRecovery() =
                 },
             )
         }
+    }
+
+@Preview(name = "Desktop window", device = ScreenshotTestData.TABLET, showBackground = true)
+@Preview(
+    name = "Desktop window dark",
+    device = ScreenshotTestData.TABLET,
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES,
+    showBackground = true,
+)
+@Preview(name = "Narrow desktop window", device = "spec:width=720dp,height=600dp", showBackground = true)
+@Preview(name = "Desktop window RTL", device = ScreenshotTestData.TABLET, locale = "ar", showBackground = true)
+@Preview(name = "Desktop window large text", device = ScreenshotTestData.TABLET, fontScale = 2f, showBackground = true)
+annotation class DesktopWindowPreviewMatrix
+
+/**
+ * Home in an Android desktop window, with the app bar in the window's caption bar. Android draws the
+ * caption's app menu and window buttons itself; [SystemCaptionControls] stands in for them so the
+ * references show what the app bar avoids. In right-to-left the system swaps their sides.
+ */
+@Composable
+private fun DesktopWindow(content: @Composable () -> Unit) {
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val appMenu = 160.dp
+    val windowButtons = 144.dp
+    val captionBar =
+        if (rtl) {
+            WorkspaceCaptionBar(height = 48.dp, left = windowButtons, right = appMenu)
+        } else {
+            WorkspaceCaptionBar(height = 48.dp, left = appMenu, right = windowButtons)
+        }
+    CompositionLocalProvider(LocalWorkspaceCaptionBar provides captionBar) {
+        if (LocalDensity.current.fontScale >= 1.5f) {
+            // Large text keeps the app bar out of the caption bar. On a device the window's caption
+            // inset then places the workspace below the bar; previews have no insets, so the
+            // stand-in bar is laid out above it.
+            Column(Modifier.fillMaxSize()) {
+                SystemCaptionControls(captionBar.height, appMenu, windowButtons)
+                Box(Modifier.weight(1f)) { content() }
+            }
+        } else {
+            Box(Modifier.fillMaxSize()) {
+                content()
+                SystemCaptionControls(captionBar.height, appMenu, windowButtons)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SystemCaptionControls(
+    height: androidx.compose.ui.unit.Dp,
+    appMenuWidth: androidx.compose.ui.unit.Dp,
+    windowButtonsWidth: androidx.compose.ui.unit.Dp,
+) {
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(Modifier.fillMaxWidth().height(height), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.width(appMenuWidth).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(24.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
+            Text("LogDate", color = color, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 8.dp))
+            Icon(Icons.Default.ExpandMore, null, tint = color)
+        }
+        Spacer(Modifier.weight(1f))
+        Row(Modifier.width(windowButtonsWidth), horizontalArrangement = Arrangement.SpaceEvenly) {
+            listOf(Icons.Default.Remove, Icons.Default.CropSquare, Icons.Default.Close).forEach { Icon(it, null, tint = color) }
+        }
+    }
+}
+
+@PreviewTest @DesktopWindowPreviewMatrix @Composable
+fun WorkspaceTimelineInDesktopWindow() = WorkspaceScene("timeline", inDesktopWindow = true) { TimelineFixture() }
+
+@PreviewTest @DesktopWindowPreviewMatrix @Composable
+fun WorkspaceLocationsInDesktopWindow() =
+    WorkspaceScene("locations", inDesktopWindow = true) {
+        HumanLocationHistoryContent(historyDay, HumanLocationHistoryActions(), showTitle = false, toolbarActions = {
+            PlacesOptionsFixture()
+        }, mapContent = { HistoryMapFixture(it) })
     }
