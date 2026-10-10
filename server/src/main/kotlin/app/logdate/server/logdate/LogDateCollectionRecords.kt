@@ -40,6 +40,10 @@ internal enum class LogDateCollectionKind(
         storageName = "draft",
         nsid = Nsid.require("studio.hypertext.logdate.draft"),
     ),
+    MOMENT(
+        storageName = "moment",
+        nsid = Nsid.require("studio.hypertext.logdate.moment"),
+    ),
     ;
 
     companion object {
@@ -86,6 +90,41 @@ internal fun draftRecordId(
         repo = repo,
         collection = LogDateCollectionKind.DRAFT.nsid,
         recordKey = RecordKey.require(id),
+    )
+
+internal fun momentRecordId(
+    repo: AtprotoDid,
+    id: String,
+): RepoRecordId =
+    RepoRecordId(
+        repo = repo,
+        collection = LogDateCollectionKind.MOMENT.nsid,
+        recordKey = RecordKey.require(id),
+    )
+
+internal fun LogDateMoment.toRepoJson(): JsonObject =
+    buildJsonObject {
+        put(TYPE_FIELD_NAME, LogDateCollectionKind.MOMENT.nsid.toString())
+        put("id", id)
+        put("capturedAt", capturedAt)
+        put("lastUpdated", lastUpdated)
+        put("deviceId", deviceId.value)
+        put("payload", payload)
+        put("schema", schema)
+    }
+
+internal fun JsonObject.toLogDateMoment(
+    recordKey: RecordKey,
+    version: Long,
+): LogDateMoment =
+    LogDateMoment(
+        id = stringValue("id") ?: recordKey.toString(),
+        capturedAt = longValue("capturedAt") ?: 0L,
+        lastUpdated = longValue("lastUpdated") ?: 0L,
+        version = version,
+        deviceId = deviceIdOrDefault(),
+        payload = stringValue("payload").orEmpty(),
+        schema = this["schema"]?.jsonPrimitive?.intOrNull ?: 1,
     )
 
 internal fun associationRecordKey(
