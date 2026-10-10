@@ -4,6 +4,7 @@ import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
@@ -108,6 +109,7 @@ class DefaultSyncManager(
     private val supportsRichDrafts: () -> Boolean = { false },
     internal val diagnostics: app.logdate.client.sync.diagnostics.SyncDiagnosticRecorder? = null,
     internal val diagnosticSource: () -> app.logdate.client.sync.diagnostics.DiagnosticSource? = { null },
+    private val mediaReferences: StoredMediaReferences = StoredMediaReferences.Unchanged,
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     internal val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -378,6 +380,7 @@ class DefaultSyncManager(
             mediaManager = mediaManager,
             mediaSyncRefStore = mediaSyncRefStore,
             cloudMediaDataSource = cloudMediaDataSource,
+            mediaReferences = mediaReferences,
         )
 
     private val retryCoordinator =

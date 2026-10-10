@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import app.logdate.client.database.entities.ImageNoteEntity
+import app.logdate.client.database.entities.NoteContentUri
 import kotlinx.coroutines.flow.Flow
 import kotlin.uuid.Uuid
 
@@ -119,6 +120,13 @@ interface ImageNoteDao {
         syncVersion: Long,
         lastSynced: kotlin.time.Instant,
     )
+
+    /**
+     * Notes whose media reference is still a local file path or `file:` URI rather than a
+     * `logdate-media://` reference, so a migration can rewrite them.
+     */
+    @Query("SELECT uid, contentUri FROM image_notes WHERE contentUri LIKE 'file:%' OR contentUri LIKE '/%' OR contentUri LIKE '_:%'")
+    suspend fun localFileContentUris(): List<NoteContentUri>
 
     @Query("UPDATE image_notes SET contentUri = :contentUri WHERE uid = :noteId")
     suspend fun updateContentUri(

@@ -10,6 +10,7 @@ import app.logdate.client.database.entities.MediaCaptionEntity
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
+import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.repository.journals.ExportableJournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -53,6 +54,7 @@ class OfflineFirstJournalNotesRepository(
     private val syncMetadataService: SyncMetadataService,
     private val syncScope: CoroutineScope = CoroutineScope(Dispatchers.Default),
     private val transcriptionRepository: TranscriptionRepository? = null,
+    private val mediaReferences: StoredMediaReferences = StoredMediaReferences.Unchanged,
 ) : JournalNotesRepository,
     ExportableJournalContentRepository,
     SyncableJournalNotesRepository {
@@ -105,18 +107,39 @@ class OfflineFirstJournalNotesRepository(
 
     override suspend fun hasNotesBefore(beforeExclusive: Instant): Boolean = queries.hasNotesBefore(beforeExclusive)
 
-    override suspend fun notesReferencingMediaPaths(paths: Set<String>): Set<String> = queries.notesReferencingMediaPaths(paths)
+    /**
+     * Returns the [paths] a note still references, recognising a file under any spelling: a
+     * note may store a `logdate-media://` reference for a file a draft names by its path.
+     */
+    override suspend fun notesReferencingMediaPaths(paths: Set<String>): Set<String> {
+        if (paths.isEmpty()) return emptySet()
+        val spellings = paths.associateWith(::spellingsOf)
+        val referenced = queries.notesReferencingMediaPaths(spellings.values.flatten().toSet())
+        return paths.filterTo(mutableSetOf()) { path -> spellings.getValue(path).any(referenced::contains) }
+    }
+
+    /** [reference] as written and as LogDate stores it, which differ for a legacy file path. */
+    private fun spellingsOf(reference: String): Set<String> = setOf(reference, mediaReferences.storedReference(reference))
+
+    private fun JournalNote.withStoredMediaRef(): JournalNote =
+        when (this) {
+            is JournalNote.Image -> copy(mediaRef = mediaReferences.storedReference(mediaRef))
+            is JournalNote.Audio -> copy(mediaRef = mediaReferences.storedReference(mediaRef))
+            is JournalNote.Video -> copy(mediaRef = mediaReferences.storedReference(mediaRef))
+            else -> this
+        }
 
     override suspend fun getNoteById(noteId: Uuid): JournalNote? = queries.getNoteById(noteId)
 
     override suspend fun create(note: JournalNote): Uuid {
-        val pendingMediaIndex = buildPendingMediaIndex(note)
+        val storedNote = note.withStoredMediaRef()
+        val pendingMediaIndex = buildPendingMediaIndex(storedNote)
         val noteId =
             transactionManager.withTransaction {
                 // Keep note persistence, optional index creation, and sync metadata aligned so a
                 // local write failure cannot leave orphaned indexed media behind.
                 createNoteRecord(
-                    note = note,
+                    note = storedNote,
                     pendingMediaIndex = pendingMediaIndex,
                 )
             }
@@ -233,7 +256,8 @@ class OfflineFirstJournalNotesRepository(
      *
      * Media is stored content-addressed, so two entries holding identical bytes share one file --
      * deleting one entry must not take the other's photo with it. This runs after the note rows
-     * are gone, so the count it reads is the number of *remaining* references.
+     * are gone, so the count it reads is the number of *remaining* references, under both the
+     * spelling the deleted note used and the one LogDate stores.
      *
      * [MediaManager.deleteOwnedMedia] refuses anything LogDate did not store itself, so a note
      * that referenced a photo from the user's own library leaves that photo alone.
@@ -243,9 +267,11 @@ class OfflineFirstJournalNotesRepository(
         val manager = mediaManager ?: return
 
         val remainingReferences =
-            imageNoteDao.countByContentUri(contentUri) +
-                videoNoteDao.countByContentUri(contentUri) +
-                audioNoteDao.countByContentUri(contentUri)
+            spellingsOf(contentUri).sumOf { spelling ->
+                imageNoteDao.countByContentUri(spelling) +
+                    videoNoteDao.countByContentUri(spelling) +
+                    audioNoteDao.countByContentUri(spelling)
+            }
         if (remainingReferences > 0) return
 
         runCatching { manager.deleteOwnedMedia(contentUri) }
@@ -342,10 +368,11 @@ class OfflineFirstJournalNotesRepository(
         note: JournalNote,
         journalId: Uuid,
     ) {
-        val pendingMediaIndex = buildPendingMediaIndex(note)
+        val storedNote = note.withStoredMediaRef()
+        val pendingMediaIndex = buildPendingMediaIndex(storedNote)
         transactionManager.withTransaction {
             createNoteRecord(
-                note = note,
+                note = storedNote,
                 pendingMediaIndex = pendingMediaIndex,
             )
             val destination = journalRepository.resolveJournalId(journalId)
@@ -378,23 +405,23 @@ class OfflineFirstJournalNotesRepository(
     }
 
     override suspend fun createFromSync(note: JournalNote) {
-        when (note) {
-            is JournalNote.Text -> textNoteDao.addNote(note.toEntity())
+        when (val storedNote = note.withStoredMediaRef()) {
+            is JournalNote.Text -> textNoteDao.addNote(storedNote.toEntity())
             is JournalNote.Image -> {
-                imageNoteDao.addNote(note.toEntity())
-                if (note.caption.isNotEmpty()) {
-                    mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
+                imageNoteDao.addNote(storedNote.toEntity())
+                if (storedNote.caption.isNotEmpty()) {
+                    mediaCaptionDao.upsertCaption(MediaCaptionEntity(storedNote.uid, storedNote.caption))
                 }
             }
             is JournalNote.Audio -> {
-                audioNoteDao.addNote(note.toEntity())
-                mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
-                note.persistTranscript(transcriptionRepository)
+                audioNoteDao.addNote(storedNote.toEntity())
+                mediaCaptionDao.upsertCaption(MediaCaptionEntity(storedNote.uid, storedNote.caption))
+                storedNote.persistTranscript(transcriptionRepository)
             }
             is JournalNote.Video -> {
-                videoNoteDao.addNote(note.toEntity())
-                if (note.caption.isNotEmpty()) {
-                    mediaCaptionDao.upsertCaption(MediaCaptionEntity(note.uid, note.caption))
+                videoNoteDao.addNote(storedNote.toEntity())
+                if (storedNote.caption.isNotEmpty()) {
+                    mediaCaptionDao.upsertCaption(MediaCaptionEntity(storedNote.uid, storedNote.caption))
                 }
             }
         }
@@ -426,12 +453,13 @@ class OfflineFirstJournalNotesRepository(
         noteId: Uuid,
         mediaRef: String,
     ) {
+        val storedRef = mediaReferences.storedReference(mediaRef)
         transactionManager.withTransaction {
             val previous = (getNoteById(noteId) as? JournalNote.Audio)?.mediaRef
-            if (previous != null) transcriptionRepository?.rebindMediaReference(noteId, previous, mediaRef)
-            imageNoteDao.updateContentUri(noteId, mediaRef)
-            audioNoteDao.updateContentUri(noteId, mediaRef)
-            videoNoteDao.updateContentUri(noteId, mediaRef)
+            if (previous != null) transcriptionRepository?.rebindMediaReference(noteId, previous, storedRef)
+            imageNoteDao.updateContentUri(noteId, storedRef)
+            audioNoteDao.updateContentUri(noteId, storedRef)
+            videoNoteDao.updateContentUri(noteId, storedRef)
         }
     }
 

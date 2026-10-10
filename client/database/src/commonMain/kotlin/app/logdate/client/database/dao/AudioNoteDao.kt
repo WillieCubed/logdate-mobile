@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import app.logdate.client.database.entities.AudioNoteEntity
+import app.logdate.client.database.entities.NoteContentUri
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -111,6 +112,13 @@ interface AudioNoteDao {
         syncVersion: Long,
         lastSynced: Instant,
     )
+
+    /**
+     * Notes whose media reference is still a local file path or `file:` URI rather than a
+     * `logdate-media://` reference, so a migration can rewrite them.
+     */
+    @Query("SELECT uid, contentUri FROM audio_notes WHERE contentUri LIKE 'file:%' OR contentUri LIKE '/%' OR contentUri LIKE '_:%'")
+    suspend fun localFileContentUris(): List<NoteContentUri>
 
     @Query("UPDATE audio_notes SET contentUri = :contentUri WHERE uid = :noteId")
     suspend fun updateContentUri(

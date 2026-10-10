@@ -24,6 +24,8 @@ import app.logdate.client.data.media.OfflineIndexedMediaRepository
 import app.logdate.client.data.notes.DatabaseNotePlaceResolver
 import app.logdate.client.data.notes.NotePlaceResolver
 import app.logdate.client.data.notes.OfflineFirstJournalNotesRepository
+import app.logdate.client.data.notes.StoredMediaReferenceMigration
+import app.logdate.client.data.notes.StoredMediaReferenceMigrationLauncher
 import app.logdate.client.data.notes.drafts.IosLocalEntryDraftStore
 import app.logdate.client.data.notes.drafts.LocalEntryDraftStore
 import app.logdate.client.data.notes.drafts.OfflineFirstEntryDraftRepository
@@ -167,8 +169,11 @@ actual val dataModule: Module =
                 syncManagerProvider = { get() },
                 syncMetadataService = get(),
                 transcriptionRepository = get(),
+                mediaReferences = get(),
             )
         }
+        single { StoredMediaReferenceMigration(get(), get(), get(), get()) }
+        single(createdAtStart = true) { StoredMediaReferenceMigrationLauncher(get()).also { it.start() } }
         single<NotePlaceResolver> { DatabaseNotePlaceResolver(get()) }
         single<JournalContentRepository> {
             OfflineFirstJournalContentRepository(

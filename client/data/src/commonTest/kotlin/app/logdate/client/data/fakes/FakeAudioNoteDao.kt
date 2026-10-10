@@ -2,6 +2,7 @@ package app.logdate.client.data.fakes
 
 import app.logdate.client.database.dao.AudioNoteDao
 import app.logdate.client.database.entities.AudioNoteEntity
+import app.logdate.client.database.entities.NoteContentUri
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -64,6 +65,11 @@ class FakeAudioNoteDao : AudioNoteDao {
     }
 
     override suspend fun countByContentUri(contentUri: String): Int = notes.values.count { it.contentUri == contentUri }
+
+    override suspend fun localFileContentUris(): List<NoteContentUri> =
+        notes.values
+            .filter { it.contentUri.startsWith("file:") || it.contentUri.startsWith("/") || it.contentUri.getOrNull(1) == ':' }
+            .map { NoteContentUri(it.uid, it.contentUri) }
 
     override suspend fun findReferencedContentUris(contentUris: List<String>): List<String> {
         val candidates = contentUris.toSet()

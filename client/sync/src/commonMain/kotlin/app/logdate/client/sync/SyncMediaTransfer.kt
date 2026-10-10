@@ -4,6 +4,7 @@ import app.logdate.client.device.crypto.IdentityKeyNotFoundException
 import app.logdate.client.media.MediaFileSource
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaPayload
+import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.mediaRefOrNull
 import app.logdate.client.sync.cloud.CloudApiException
@@ -26,7 +27,14 @@ internal class SyncMediaTransfer(
     private val mediaManager: MediaManager,
     private val mediaSyncRefStore: MediaSyncRefStore,
     private val cloudMediaDataSource: CloudMediaDataSource,
+    private val mediaReferences: StoredMediaReferences = StoredMediaReferences.Unchanged,
 ) {
+    /** Whether two stored references name the same local file, however each is spelled. */
+    private fun sameLocalFile(
+        first: String,
+        second: String,
+    ): Boolean = first == second || mediaReferences.storedReference(first) == mediaReferences.storedReference(second)
+
     fun isRemoteRef(mediaRef: String): Boolean = mediaRef.startsWith("http://") || mediaRef.startsWith("https://")
 
     /** Resolve every local attachment before the draft record can reference it remotely. */
@@ -71,7 +79,7 @@ internal class SyncMediaTransfer(
     ): String? {
         if (uri == null || isRemoteRef(uri)) return uri
         val cached = mediaSyncRefStore.getDraftAsset(draftId, blockId, kind)
-        if (cached?.localUri == uri && cached.remoteUrl.isNotBlank()) return cached.remoteUrl
+        if (cached != null && sameLocalFile(cached.localUri, uri) && cached.remoteUrl.isNotBlank()) return cached.remoteUrl
         val media = mediaManager.openMedia(uri)
         val named = MediaFileSource("draft-$kind-${media.fileName}", media.mimeType, media.sizeBytes) { media.open() }
         val uploaded = cloudMediaDataSource.uploadMedia(accessToken, blockId, named).getOrThrow()
@@ -203,7 +211,7 @@ internal class SyncMediaTransfer(
             return Result.success(note)
         }
         val cached = mediaSyncRefStore.get(note.uid)
-        if (cached != null && cached.localUri == mediaRef && cached.remoteUrl.isNotBlank()) {
+        if (cached != null && sameLocalFile(cached.localUri, mediaRef) && cached.remoteUrl.isNotBlank()) {
             return Result.success(note.withMediaRef(cached.remoteUrl))
         }
 

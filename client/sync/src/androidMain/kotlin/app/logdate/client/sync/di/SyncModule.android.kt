@@ -63,6 +63,7 @@ actual val syncModule: Module =
                 sessionStorage = get(),
                 mediaManager = get(),
                 mediaSyncRefStore = get(),
+                mediaReferences = get(),
                 journalRepository = get(),
                 journalNotesRepository = get(),
                 journalContentRepository = get(),
