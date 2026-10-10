@@ -1,0 +1,69 @@
+# list-app-functions (LogDate)
+  "studio.hypertext.logdate.debug": [
+      "AppFunctionStaticMetadata-studio.hypertext.logdate.debug": {
+          "app.logdate.client.appfunctions.LogDateAppFunctions#searchEntries"
+          "android$apps-db\/apps#studio.hypertext.logdate.debug"
+          "studio.hypertext.logdate.debug"
+      "AppFunctionRuntimeMetadata-studio.hypertext.logdate.debug": {
+        "AppFunctionRuntimeMetadata-studio.hypertext.logdate.debug": {
+            "android$apps-db\/app_functions#studio.hypertext.logdate.debug\/app.logdate.client.appfunctions.LogDateAppFunctions\\#searchEntries"
+            "app.logdate.client.appfunctions.LogDateAppFunctions#searchEntries"
+            "studio.hypertext.logdate.debug"
+      "AppFunctionComponentMetadataDocument-studio.hypertext.logdate.debug": {
+          "android$apps-db\/apps#studio.hypertext.logdate.debug"
+          "studio.hypertext.logdate.debug"
+      "AppFunctionStaticMetadata-studio.hypertext.logdate.debug": {
+          "app.logdate.client.appfunctions.LogDateAppFunctions#listJournals"
+          "android$apps-db\/apps#studio.hypertext.logdate.debug"
+          "studio.hypertext.logdate.debug"
+      "AppFunctionRuntimeMetadata-studio.hypertext.logdate.debug": {
+        "AppFunctionRuntimeMetadata-studio.hypertext.logdate.debug": {
+            "android$apps-db\/app_functions#studio.hypertext.logdate.debug\/app.logdate.client.appfunctions.LogDateAppFunctions\\#listJournals"
+            "app.logdate.client.appfunctions.LogDateAppFunctions#listJournals"
+            "studio.hypertext.logdate.debug"
+      "AppFunctionStaticMetadata-studio.hypertext.logdate.debug": {
+          "app.logdate.client.appfunctions.LogDateAppFunctions#createTextEntry"
+          "android$apps-db\/apps#studio.hypertext.logdate.debug"
+          "studio.hypertext.logdate.debug"
+      "AppFunctionRuntimeMetadata-studio.hypertext.logdate.debug": {
+        "AppFunctionRuntimeMetadata-studio.hypertext.logdate.debug": {
+            "android$apps-db\/app_functions#studio.hypertext.logdate.debug\/app.logdate.client.appfunctions.LogDateAppFunctions\\#createTextEntry"
+            "app.logdate.client.appfunctions.LogDateAppFunctions#createTextEntry"
+            "studio.hypertext.logdate.debug"
+
+# createTextEntry
+{
+  "androidAppfunctionsReturnValue": [
+    {
+      "id": [
+        "a1584660-e3d3-4a23-87f5-158625447690"
+      ],
+      "text": [
+        "Walked the long way home along the river."
+      ],
+      "createdAt": [
+        "2026-10-10T07:32:50.147323Z"
+      ]
+    }
+  ]
+}
+
+# searchEntries with system search visibility off
+Error executing app function: android.app.appfunctions.AppFunctionException: LogDate only lets assistants read entries when the person turns on system search visibility in LogDate Settings > Privacy. (code 1000). See logcat for more details.
+
+# searchEntries with system search visibility on
+{
+  "androidAppfunctionsReturnValue": [
+    {
+      "id": [
+        "a1584660-e3d3-4a23-87f5-158625447690"
+      ],
+      "text": [
+        "Walked the long way home along the river."
+      ],
+      "createdAt": [
+        "2026-10-10T07:32:50.147Z"
+      ]
+    }
+  ]
+}

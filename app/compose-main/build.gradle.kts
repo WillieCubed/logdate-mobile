@@ -13,6 +13,7 @@ plugins {
     alias(libs.plugins.dokka)
     alias(libs.plugins.buildConfig)
     alias(libs.plugins.kotlinx.serialization)
+    alias(libs.plugins.ksp)
 }
 
 kotlin {
@@ -122,6 +123,8 @@ kotlin {
             implementation(projects.client.screenshotScenes)
         }
         androidMain.dependencies {
+            // Assistant actions (Android 16+). The compiler generates the service and its schema.
+            implementation(libs.androidx.appfunctions)
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.health.connect)
@@ -242,6 +245,22 @@ buildConfig {
 }
 
 val desktopScreenshotReferenceDir = layout.projectDirectory.dir("src/desktopTest/reference")
+dependencies {
+    add("kspAndroid", libs.androidx.appfunctions.compiler)
+}
+
+// The AppFunctions compiler writes the assistant actions' schema (logdate_app_functions.xml) as an
+// asset. The multiplatform Android library does not package KSP assets by itself, so add them.
+val appFunctionAssets = layout.buildDirectory.dir("generated/ksp/android/androidMain/resources/assets")
+extensions.getByType(com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension::class.java).let { components ->
+    components.onVariants(components.selector().all()) { variant ->
+        variant.sources.assets?.addStaticSourceDirectory(appFunctionAssets.get().asFile.absolutePath)
+    }
+}
+tasks
+    .matching { it.name == "generateAndroidMainAssets" || it.name == "mergeAndroidMainAssets" }
+    .configureEach { dependsOn("kspAndroidMain") }
+
 val desktopScreenshotActualDir = layout.buildDirectory.dir("reports/desktopScreenshotTest/actual")
 val desktopScreenshotDiffDir = layout.buildDirectory.dir("reports/desktopScreenshotTest/diff")
 val desktopScreenshotSceneFilter = providers.systemProperty("logdate.desktopScreenshots.sceneFilter").orNull

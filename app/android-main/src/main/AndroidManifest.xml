@@ -364,6 +364,29 @@
             android:theme="@style/Theme.LogDate" />
 
         <!--
+            Assistant actions (Android 16+). The AppFunctions compiler generates this service and its
+            schema asset; it is declared disabled and enabled while APP_FUNCTIONS is on.
+            See docs/reference/android/os-integration/app-functions.md.
+        -->
+        <service
+            android:name="app.logdate.client.appfunctions.LogDateAppFunctionService"
+            android:enabled="false"
+            android:exported="true"
+            android:permission="android.permission.BIND_APP_FUNCTION_SERVICE"
+            tools:targetApi="36">
+            <property
+                android:name="android.app.appfunctions.v2"
+                android:value="logdate_app_functions.xml" />
+            <intent-filter>
+                <action android:name="android.app.appfunctions.AppFunctionService" />
+            </intent-filter>
+        </service>
+
+        <property
+            android:name="android.app.appfunctions.app_metadata"
+            android:resource="@xml/app_functions_app_metadata" />
+
+        <!--
             Saves a capture reminder's quick reply as an entry. Reminders only offer the Write action
             while NOTIFICATION_QUICK_REPLY is on.
             See docs/reference/android/os-integration/notification-quick-reply.md.

@@ -39,6 +39,7 @@ androidx-test-uiautomator = "2.3.0"
 
 # Common (Multiplatform) Dependencies
 ksp = "2.3.7"
+androidxAppFunctions = "1.0.0-alpha10"
 junit = "4.13.2"
 kotlinx-coroutines = "1.11.0"
 kotlinx-serialization = "1.11.0"
@@ -242,6 +243,8 @@ koin-androidx-startup = { group = "io.insert-koin", name = "koin-androidx-startu
 koin-androidx-workmanager = { group = "io.insert-koin", name = "koin-androidx-workmanager", version.ref = "koin" }
 koin-annotations-bom = { group = "io.insert-koin", name = "koin-annotations-bom", version.ref = "koin-annotations-bom" }
 koin-annotations = { group = "io.insert-koin", name = "koin-annotations", version.ref = "koin-annotations-bom" }
+androidx-appfunctions = { group = "androidx.appfunctions", name = "appfunctions", version.ref = "androidxAppFunctions" }
+androidx-appfunctions-compiler = { group = "androidx.appfunctions", name = "appfunctions-compiler", version.ref = "androidxAppFunctions" }
 koin-ksp-compiler = { group = "io.insert-koin", name = "koin-ksp-compiler", version.ref = "koin-annotations-bom" }
 
 # Room

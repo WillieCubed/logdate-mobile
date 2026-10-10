@@ -38,6 +38,63 @@ class OsSurfaceScreenshotsTest {
         OsSurfaceCapture.dumpHierarchy("launcher-long-press")
     }
 
+    /**
+     * Assistant actions, driven the way an assistant would through `cmd app_function`. Android 16
+     * added the command; the output is saved as text evidence next to the screenshots.
+     */
+    @Test fun assistantActions() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) return
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.setSystemSearchVisibility(false)
+        OsSurfaceCapture.enableFlags(FeatureFlag.APP_FUNCTIONS)
+        OsSurfaceCapture.awaitComponentEnabled("app.logdate.client.appfunctions.LogDateAppFunctionService")
+        Thread.sleep(5_000L)
+
+        val pkg = OsSurfaceCapture.packageName
+        val functions = "app.logdate.client.appfunctions.LogDateAppFunctions"
+        fun execute(
+            function: String,
+            parameters: String,
+        ) = OsSurfaceCapture.shellScript(
+            "cmd app_function execute-app-function --package $pkg --function '$functions#$function' --parameters '$parameters'",
+        )
+
+        val listing =
+            OsSurfaceCapture
+                .shellScript("cmd app_function list-app-functions")
+                .lines()
+                .filter { it.contains(functions) || it.contains(pkg) }
+                .joinToString("\n")
+        val created = execute("createTextEntry", """{"text":["Walked the long way home along the river."]}""")
+        val refused = execute("searchEntries", """{"query":["river"]}""")
+        OsSurfaceCapture.setSystemSearchVisibility(true)
+        Thread.sleep(1_000L)
+        val found = execute("searchEntries", """{"query":["river"]}""")
+        OsSurfaceCapture.writeEvidence(
+            surface = "app-functions",
+            state = "assistant-actions",
+            text =
+                buildString {
+                    appendLine("# list-app-functions (LogDate)")
+                    appendLine(listing)
+                    appendLine()
+                    appendLine("# createTextEntry")
+                    appendLine(created.trim())
+                    appendLine()
+                    appendLine("# searchEntries with system search visibility off")
+                    appendLine(refused.trim())
+                    appendLine()
+                    appendLine("# searchEntries with system search visibility on")
+                    appendLine(found.trim())
+                },
+        )
+
+        OsSurfaceCapture.shell("am start -n $pkg/app.logdate.client.MainActivity -f 0x10000000")
+        OsSurfaceCapture.device.wait(Until.findObject(By.textContains("Walked the long way home")), 10_000L)
+            ?: OsSurfaceCapture.waitForText("Walked the long way home along the river.")
+        OsSurfaceCapture.capture(surface = "app-functions", state = "entry-from-assistant")
+    }
+
     @Test fun captureWidgetInPicker() {
         OsSurfaceCapture.prepareOnboardedApp()
         OsSurfaceCapture.enableFlags(FeatureFlag.LOCK_SCREEN_CAPTURE_WIDGET)

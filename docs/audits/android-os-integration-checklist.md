@@ -150,6 +150,6 @@ A row reaches `[done]` only when its Evidence column lists:
 
 | Status | Requirement | Evidence |
 | --- | --- | --- |
-| `[todo]` | Capture AppFunctions: `createTextEntry`, `startVoiceEntry`, and `listJournals` | |
-| `[todo]` | Read AppFunctions refuse without consent or while locked | |
+| `[done]` | Capture AppFunctions: `createTextEntry`, `startVoiceEntry`, and `listJournals` | `createTextEntry` and `listJournals` behind `APP_FUNCTIONS`; `startVoiceEntry` left out by decision (background calls cannot open activities reliably). Evidence: `app-functions/assistant-actions--phone-api37.txt` (registered and called on Android 17), `entry-from-assistant--phone-api37.png`. |
+| `[done]` | Read AppFunctions refuse without consent or while locked | `searchEntries` throws `AppFunctionDeniedException` from `assistantReadRefusal` (`AssistantAccessTest`). The Android 17 evidence shows the refusal with consent off and results with it on. `summarizeDay` left out by decision. |
 | `[partial]` | Handoff continues an in-progress entry on another device | `MainActivity` opts into Handoff on API 37 (`MainActivity+Handoff.kt`). Editor Handoff depends on draft sync. |

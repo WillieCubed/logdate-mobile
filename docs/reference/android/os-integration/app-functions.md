@@ -1,6 +1,8 @@
 # AppFunctions
 
-Status: planned, behind `APP_FUNCTIONS`. Requires Android 16 (API 36) or later.
+Status: built, behind `APP_FUNCTIONS` (Settings > Advanced > Developer tools > Feature previews), and
+verified on an Android 17 emulator. Requires Android 16 (API 36) or later. Library:
+`androidx.appfunctions` 1.0.0-alpha10.
 
 ## What it is
 
@@ -16,68 +18,90 @@ removed because they pointed at a class that no longer exists.
 
 | Function | What it does | Needs consent? |
 | --- | --- | --- |
-| `createTextEntry(text, journalName?)` | Saves a text entry, optionally into a named journal | No |
-| `startVoiceEntry()` | Opens the editor already recording | No |
-| `listJournals()` | Returns journal names, so an agent can pick one | No |
-| `searchEntries(query, dateRange?)` | Returns matching entries | Yes |
-| `summarizeDay(date)` | Returns that day's entries for the agent to summarize | Yes |
+| `createTextEntry(text)` | Saves a text entry, dated now, and returns it | No |
+| `listJournals()` | Returns each journal's id and title, so an agent can name one | No |
+| `searchEntries(query)` | Returns up to 10 matching entries, best match first, each shortened to one line | Yes |
+
+The entry an assistant saves appears in the timeline like any other:
+
+![The timeline's Today section showing "Walked the long way home along the river.", saved by an assistant](../../../screenshots/android-os-integration/app-functions/entry-from-assistant--phone-api37.png)
+
+Two functions from the original plan were left out on purpose:
+
+- **`startVoiceEntry`.** An assistant calls a function from the background, and Android does not let a
+  background call open an activity reliably. Voice entries start from the Record voice shortcut,
+  tile, and widget instead.
+- **`summarizeDay`.** It would hand over a whole day of writing at once. `searchEntries` returns only
+  what matches, under the same consent.
 
 ## Consent and the app lock
 
-Reading someone's journal is far more sensitive than adding to it. Every read function checks two
-things on every call:
+Reading someone's journal is far more sensitive than adding to it. `searchEntries` checks two things
+on every call:
 
 1. **System search visibility.** The person controls this in Privacy settings. It is the same setting
-   that lets LogDate entries appear in system search, read through
-   `LogdatePreferencesDataSource.observeSystemSearchVisibilityEnabled()`. The Privacy settings copy
-   says that this setting also covers assistants.
-2. **The app lock.** If `AndroidBiometricGatekeeper` reports that the app is locked, read functions
-   refuse.
+   that lets LogDate entries appear in Android search, read through
+   `LogdatePreferencesDataSource.getSystemSearchVisibilityEnabled()`.
+2. **The app lock.** If `BiometricGatekeeper` reports that LogDate still needs unlocking in this
+   session, the call is refused.
 
-A refusal returns a specific error that names which check failed and where to change it. It never
-returns partial data.
+A refusal throws `AppFunctionDeniedException` with a message that says which check failed and what the
+person can do; it never returns partial data. The decision is `assistantReadRefusal`
+(app/compose-main commonMain, `client/appfunctions/AssistantAccess.kt`), a pure function with tests.
 
 ## How it works
 
-- The functions live in `app/compose-main/src/androidMain/kotlin/app/logdate/client/appfunctions/`.
-- They call the existing domain use cases, the same ones the editor and search use, so behavior
-  matches the app.
-- The `androidx.appfunctions` KSP compiler generates the function metadata Android registers.
-- Registration is guarded to `SDK_INT >= 36` and to the `APP_FUNCTIONS` flag.
-- `startVoiceEntry` sends the [capture launch contract](capture-launch-contract.md) intent.
-
-The library version is pinned in `gradle/libs.versions.toml`, and the pinned version is recorded here
-when the functions ship.
+- `LogDateAppFunctions` (app/compose-main androidMain, `client/appfunctions/`) is an abstract
+  `AppFunctionService` annotated `@AppFunctionServiceEntryPoint`. Each function's KDoc is its
+  description for agents (`isDescribedByKDoc = true`).
+- The AppFunctions KSP compiler, applied to the module's Android target as `kspAndroid`, generates the
+  concrete `LogDateAppFunctionService` and the schema asset `logdate_app_functions.xml`. The
+  multiplatform Android library does not package KSP assets on its own, so `app/compose-main`'s build
+  adds that folder to its assets; check that the APK contains `assets/logdate_app_functions.xml`.
+- The app manifest declares the generated service with the `android.app.appfunctions.v2` property
+  naming that asset, and an application-level `app_metadata` property pointing at
+  `res/xml/app_functions_app_metadata.xml`, which tells agents what LogDate is and when to use each
+  function.
+- The functions call the same use cases the app uses: `AddNoteUseCase`, the current user's journals,
+  and the search repository.
 
 ## Flag and rollout
 
-`APP_FUNCTIONS`, off by default. As of mid-2026, Gemini calls AppFunctions only for apps in a private
-preview, so functions are verified through Android's own registry rather than through Gemini.
+`APP_FUNCTIONS`, off by default. The generated service is declared disabled and enabled by
+`PlatformComponentToggler` while the flag is on, so Android only indexes the functions then. As of
+mid-2026, Gemini calls AppFunctions only for apps in a private preview, so functions are verified
+through Android's own registry.
 
 ## Privacy
 
-- Capture functions only create; they never return journal content.
-- Read functions follow the consent and lock rules above on every call.
+- `createTextEntry` and `listJournals` return nothing from the person's entries.
+- `searchEntries` follows the consent and lock rules above on every call, and returns short
+  excerpts rather than whole entries.
 
 ## How to test
 
-- Unit tests with fake use cases cover every function, an unknown journal name, visibility off,
-  locked, and empty results.
-- On an API 36 or 37 emulator, list and call the functions:
+- `AssistantAccessTest` covers the consent and lock decision and the excerpts.
+- `OsSurfaceScreenshotsTest#assistantActions` drives the functions on an Android 16+ managed device
+  the way an agent would and saves the output as
+  `docs/screenshots/android-os-integration/app-functions/assistant-actions--phone-api37.txt`: the
+  registered functions, a saved entry, a refused search with consent off, and a successful search
+  with consent on.
+- By hand, on an emulator with the flag on:
 
   ```bash
   adb -s emulator-5554 shell cmd app_function list-app-functions
   ```
 
-  The exact subcommands vary by platform build. Run `adb -s emulator-5554 shell cmd app_function help`
-  for the current list.
+  ```bash
+  adb -s emulator-5554 shell "cmd app_function execute-app-function --package studio.hypertext.logdate.debug --function 'app.logdate.client.appfunctions.LogDateAppFunctions#createTextEntry' --parameters '{\"text\":[\"A note from adb\"]}'"
+  ```
+
+  Each parameter is a one-element JSON array.
 
 ## Updating screenshots
 
-- Privacy settings copy is a Lane 1 reference.
-- The editor opened by `startVoiceEntry` is a Lane 2 capture.
-- `cmd app_function` output is saved as text evidence in
-  `docs/screenshots/android-os-integration/app-functions/`.
+`./run screenshots:os` records the text evidence and the timeline capture under
+`docs/screenshots/android-os-integration/app-functions/`.
 
 ## Cross-device: Handoff
 

@@ -11,6 +11,7 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
+import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.media.audio.AudioRecordingManager
@@ -64,6 +65,16 @@ object OsSurfaceCapture {
     fun shell(command: String): String {
         val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
         return ParcelFileDescriptor.AutoCloseInputStream(descriptor).bufferedReader().use { it.readText() }
+    }
+
+    /**
+     * Runs [script] in a device shell, passed on standard input, so arguments with spaces or JSON
+     * survive intact. [shell] splits its command on whitespace and cannot do that.
+     */
+    fun shellScript(script: String): String {
+        val (output, input) = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommandRw("sh")
+        ParcelFileDescriptor.AutoCloseOutputStream(input).bufferedWriter().use { it.write(script + "\n") }
+        return ParcelFileDescriptor.AutoCloseInputStream(output).bufferedReader().use { it.readText() }
     }
 
     /** Pins the status bar to 9:41, full battery, and full signal, with no notification icons. */
@@ -200,7 +211,7 @@ object OsSurfaceCapture {
         error("'$text' did not appear")
     }
 
-    private val packageName: String
+    val packageName: String
         get() = InstrumentationRegistry.getInstrumentation().targetContext.packageName
 
     /**
@@ -264,6 +275,11 @@ object OsSurfaceCapture {
         device.openNotification()
         device.waitForIdle()
         Thread.sleep(800L)
+    }
+
+    /** Turns LogDate's system search visibility, the consent assistants need to read entries, on or off. */
+    fun setSystemSearchVisibility(enabled: Boolean) {
+        runBlocking { GlobalContext.get().get<LogdatePreferencesDataSource>().setSystemSearchVisibilityEnabled(enabled) }
     }
 
     /** Creates a journal named [title] and returns its id. */
