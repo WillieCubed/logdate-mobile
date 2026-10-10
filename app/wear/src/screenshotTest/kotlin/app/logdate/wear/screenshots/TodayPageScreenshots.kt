@@ -10,6 +10,8 @@ import app.logdate.ui.streak.CampfirePhase
 import app.logdate.ui.streak.CampfirePresentation
 import app.logdate.ui.streak.CampfireSize
 import app.logdate.wear.capture.Feeling
+import app.logdate.wear.v2.recorder.RecorderState
+import app.logdate.wear.v2.recorder.TodayRecorder
 import app.logdate.wear.v2.theme.LogDateWearTheme
 import app.logdate.wear.v2.today.HandoffState
 import app.logdate.wear.v2.today.PhoneCard
@@ -109,7 +111,8 @@ private const val LAST_ITEM_INDEX = 3
 private val zone = TimeZone.currentSystemDefault()
 private val saturday = LocalDate(2026, 10, 3)
 private val burning = CampfirePresentation(phase = CampfirePhase.BURNING, loggedToday = true, runDays = 4, size = CampfireSize.SMALL)
-private val allControls = TodayControls(onRecord = {}, onMark = {}, onAdd = {})
+private val allControls =
+    TodayControls(recorder = TodayRecorder(RecorderState.Ready, PreviewRecorder, PreviewRecorder), onMark = {}, onAdd = {})
 
 private fun at(
     hour: Int,

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The recorder on Today, in the new watch app -->
+    <string name="wear_today_recorder_start">Start recording</string>
+    <string name="wear_today_recorder_stop">Stop recording</string>
+    <string name="wear_today_recorder_save_again">Save the recording again</string>
+    <string name="wear_today_recorder_recording">Recording</string>
+    <string name="wear_today_recorder_saving">Saving…</string>
+    <string name="wear_today_recorder_release_to_save">Release to save</string>
+    <string name="wear_today_recorder_slide_to_lock">Slide up to lock</string>
+    <string name="wear_today_recorder_paused">Paused</string>
+    <string name="wear_today_recorder_paused_by_app">Paused by another app</string>
+    <string name="wear_today_recorder_pause">Pause</string>
+    <string name="wear_today_recorder_resume">Resume</string>
+    <string name="wear_today_recorder_discard">Discard</string>
+    <string name="wear_today_recorder_discard_confirm">Tap again to discard</string>
+    <string name="wear_today_recorder_saved">Saved&#160;· %1$s</string>
+    <string name="wear_today_recorder_undo">Undo</string>
+    <!-- The feeling chosen after a recording: its emoji, then its name. -->
+    <string name="wear_today_recorder_feeling_chosen">%1$s %2$s</string>
+    <string name="wear_today_recorder_too_short">Too short to save</string>
+    <string name="wear_today_recorder_failed_microphone">LogDate needs the microphone to record</string>
+    <string name="wear_today_recorder_failed_microphone_off">The microphone is off for LogDate</string>
+    <string name="wear_today_recorder_failed_storage">The watch is out of storage</string>
+    <string name="wear_today_recorder_failed_start">Couldn’t start recording</string>
+    <string name="wear_today_recorder_failed_save">Couldn’t save the recording</string>
+    <string name="wear_today_recorder_failed_lost">The recording had no audio</string>
+    <string name="wear_today_recorder_allow">Allow</string>
+    <string name="wear_today_recorder_open_settings">Open Settings</string>
+    <string name="wear_today_recorder_open_storage">Storage</string>
+    <string name="wear_today_recorder_try_again">Try again</string>
+    <string name="wear_today_recorder_ok">OK</string>
+</resources>

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -28,8 +29,6 @@ import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.ButtonGroup
-import androidx.wear.compose.material3.EdgeButton
-import androidx.wear.compose.material3.EdgeButtonSize
 import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
@@ -59,6 +58,12 @@ import app.logdate.wear.capture.Feeling
 import app.logdate.wear.v2.moments.formatClockDuration
 import app.logdate.wear.v2.moments.momentClockTime
 import app.logdate.wear.v2.moments.momentLabel
+import app.logdate.wear.v2.recorder.RecordEdgeButton
+import app.logdate.wear.v2.recorder.RecorderState
+import app.logdate.wear.v2.recorder.RecordingRing
+import app.logdate.wear.v2.recorder.TodayRecorder
+import app.logdate.wear.v2.recorder.recorderItems
+import app.logdate.wear.v2.recorder.replacesSummary
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toJavaLocalDate
@@ -77,12 +82,11 @@ object TodayTags {
 }
 
 /**
- * The controls Today shows. Each appears only when its handler is set, and the change that makes a
- * control work is the change that sets its handler, so Today never shows a control that does
- * nothing.
+ * The controls Today shows. Each appears only when it is set, and the change that makes a control
+ * work is the change that sets it, so Today never shows a control that does nothing.
  */
 data class TodayControls(
-    val onRecord: (() -> Unit)? = null,
+    val recorder: TodayRecorder? = null,
     val onMark: (() -> Unit)? = null,
     val onAdd: (() -> Unit)? = null,
 )
@@ -90,7 +94,9 @@ data class TodayControls(
 /**
  * Home's first page: the date in the time text, the campfire, the day's summary line, the latest
  * moment and, when the paired Android phone lacks LogDate, a card that opens its Play listing.
- * Record sits at the end as the edge button, with Mark and + above it.
+ * Record sits at the end as the edge button, with Mark and + above it. While the recorder has
+ * something to show, it takes the summary's place: the live recording with Pause and Discard,
+ * then the saved recording with Undo and the five feelings, or what went wrong.
  */
 @Composable
 fun TodayPage(
@@ -103,8 +109,10 @@ fun TodayPage(
     listState: TransformingLazyColumnState = rememberTransformingLazyColumnState(),
     timeSource: TimeSource = TimeTextDefaults.rememberTimeSource(TimeTextDefaults.timeFormat()),
 ) {
+    val recorderState = controls.recorder?.state
     val timeText: @Composable () -> Unit = { TodayTimeText(state = state, timeSource = timeSource) }
-    TodayScaffold(listState = listState, timeText = timeText, onRecord = controls.onRecord) { contentPadding ->
+    TodayScaffold(listState = listState, timeText = timeText, recorder = controls.recorder) { contentPadding ->
+        if (recorderState is RecorderState.Live) RecordingRing(levels = recorderState.levels, modifier = Modifier.fillMaxSize())
         TodayList(
             state = state,
             handoff = handoff,
@@ -148,14 +156,14 @@ fun TodayTimeText(
 private fun TodayScaffold(
     listState: TransformingLazyColumnState,
     timeText: @Composable () -> Unit,
-    onRecord: (() -> Unit)?,
+    recorder: TodayRecorder?,
     content: @Composable BoxScope.(PaddingValues) -> Unit,
 ) {
-    if (onRecord == null) {
+    if (recorder == null) {
         ScreenScaffold(scrollState = listState, timeText = timeText, content = content)
         return
     }
-    ScreenScaffold(scrollState = listState, edgeButton = { RecordButton(onRecord) }, timeText = timeText, content = content)
+    ScreenScaffold(scrollState = listState, edgeButton = { RecordEdgeButton(recorder) }, timeText = timeText, content = content)
 }
 
 @Composable
@@ -169,8 +177,13 @@ private fun TodayList(
     modifier: Modifier,
 ) {
     val spec = rememberTransformationSpec()
-    val padding = if (startsWithCampfire(state)) contentPadding else contentPadding.belowTimeText()
+    val recorder = controls.recorder?.takeIf { it.state.replacesSummary }
+    val padding = if (recorder == null && startsWithCampfire(state)) contentPadding else contentPadding.belowTimeText()
     TransformingLazyColumn(state = listState, contentPadding = padding, modifier = modifier.testTag(TodayTags.PAGE)) {
+        if (recorder != null) {
+            recorderItems(recorder)
+            return@TransformingLazyColumn
+        }
         when (state) {
             TodayUiState.Loading -> Unit
             TodayUiState.Failed -> item { CenteredText(stringResource(R.string.wear_today_failed)) }
@@ -299,13 +312,6 @@ private fun TodayButtonGroup(controls: TodayControls) {
 @Composable
 private fun RowScope.CenteredContent(content: @Composable () -> Unit) {
     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) { content() }
-}
-
-@Composable
-private fun RecordButton(onRecord: () -> Unit) {
-    EdgeButton(onClick = onRecord, buttonSize = EdgeButtonSize.Medium, modifier = Modifier.testTag(TodayTags.RECORD)) {
-        Icon(imageVector = LogDateGlyph.RECORD.vector(), contentDescription = stringResource(R.string.wear_today_record))
-    }
 }
 
 @Composable

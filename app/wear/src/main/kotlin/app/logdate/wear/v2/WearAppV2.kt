@@ -5,6 +5,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
@@ -24,9 +25,12 @@ import app.logdate.wear.v2.flow.FlowViewModel
 import app.logdate.wear.v2.home.HomeScreen
 import app.logdate.wear.v2.navigation.WearRoute
 import app.logdate.wear.v2.navigation.toV2BackStack
+import app.logdate.wear.v2.permissions.rememberPermissionRequester
 import app.logdate.wear.v2.recorder.RecorderViewModel
+import app.logdate.wear.v2.recorder.TodayRecorder
 import app.logdate.wear.v2.recorder.locksPaging
 import app.logdate.wear.v2.theme.LogDateWearTheme
+import app.logdate.wear.v2.today.TodayControls
 import app.logdate.wear.v2.today.TodayPage
 import app.logdate.wear.v2.today.TodayViewModel
 import kotlinx.coroutines.flow.Flow
@@ -43,7 +47,8 @@ object WearAppV2Tags {
  * [initialRequest] picks the first back stack; a recreated activity restores the one it saved
  * instead. Each item of [newRequests] replaces the back stack, as a cold launch from a tile does.
  * Swiping right dismisses the top screen. Each screen's view models live as long as its entry; the
- * recorder is resolved here, outside every entry, so it belongs to the activity.
+ * recorder is resolved here, outside every entry, so it belongs to the activity, and the
+ * permissions it asks for are requested here.
  */
 @Composable
 fun WearAppV2(
@@ -58,6 +63,7 @@ fun WearAppV2(
             backStack.addAll(request.toV2BackStack())
         }
     }
+    RecorderPermissionPrompts(recorder)
     LogDateWearTheme {
         CompositionLocalProvider(LocalLogDateHaptics provides koinInject<LogDateHaptics>()) {
             AppScaffold(modifier = Modifier.testTag(WearAppV2Tags.SHELL)) {
@@ -80,18 +86,34 @@ fun WearAppV2(
     }
 }
 
+/** Asks for the permissions the recorder needs at the moment it needs them, and gives it the answers. */
+@Composable
+private fun RecorderPermissionPrompts(recorder: RecorderViewModel) {
+    val requester = rememberPermissionRequester(onResult = recorder::onPermissionResult)
+    LaunchedEffect(recorder, requester) {
+        recorder.permissionRequests.collect { permission -> requester.request(permission) }
+    }
+}
+
 @Composable
 private fun HomeEntry(recorder: RecorderViewModel) {
     val recorderState by recorder.state.collectAsState()
+    val controls =
+        remember(recorderState, recorder) {
+            TodayControls(recorder = TodayRecorder(recorderState, gesture = recorder, actions = recorder))
+        }
     HomeScreen(
         pagingLocked = recorderState.locksPaging,
-        today = { listState -> TodayEntry(listState) },
+        today = { listState -> TodayEntry(listState, controls) },
         flow = { listState -> FlowEntry(listState) },
     )
 }
 
 @Composable
-private fun TodayEntry(listState: TransformingLazyColumnState) {
+private fun TodayEntry(
+    listState: TransformingLazyColumnState,
+    controls: TodayControls,
+) {
     val viewModel = koinViewModel<TodayViewModel>()
     val state by viewModel.uiState.collectAsState()
     val handoff by viewModel.handoff.collectAsState()
@@ -100,6 +122,7 @@ private fun TodayEntry(listState: TransformingLazyColumnState) {
         handoff = handoff,
         onGetPhoneApp = viewModel::getPhoneApp,
         onHandoffDismissed = viewModel::dismissHandoff,
+        controls = controls,
         listState = listState,
     )
 }
