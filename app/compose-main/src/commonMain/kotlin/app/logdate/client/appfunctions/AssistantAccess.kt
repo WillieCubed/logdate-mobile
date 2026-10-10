@@ -1,5 +1,7 @@
 package app.logdate.client.appfunctions
 
+import app.logdate.client.text.oneLineExcerpt
+
 /** How many entries one assistant search returns at most. */
 const val ASSISTANT_SEARCH_LIMIT = 10
 
@@ -44,7 +46,4 @@ fun assistantReadRefusal(
 fun assistantExcerpt(
     content: String,
     maxLength: Int = ASSISTANT_EXCERPT_LENGTH,
-): String {
-    val oneLine = content.lines().joinToString(" ") { it.trim() }.trim()
-    return if (oneLine.length <= maxLength) oneLine else oneLine.take(maxLength - 1).trimEnd() + "…"
-}
+): String = oneLineExcerpt(content, maxLength)

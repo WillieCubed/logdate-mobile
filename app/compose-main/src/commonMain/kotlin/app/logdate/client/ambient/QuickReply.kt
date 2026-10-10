@@ -1,6 +1,7 @@
 package app.logdate.client.ambient
 
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.text.oneLineExcerpt
 import kotlin.time.Instant
 
 /** The longest quick reply shown back in the saved confirmation before it is shortened. */
@@ -26,7 +27,4 @@ fun quickReplyNote(
 }
 
 /** The reply as the confirmation shows it: on one line, shortened with an ellipsis when long. */
-fun quickReplyPreview(content: String): String {
-    val oneLine = content.lines().joinToString(" ") { it.trim() }.trim()
-    return if (oneLine.length <= CONFIRMATION_PREVIEW_LENGTH) oneLine else oneLine.take(CONFIRMATION_PREVIEW_LENGTH - 1).trimEnd() + "…"
-}
+fun quickReplyPreview(content: String): String = oneLineExcerpt(content, CONFIRMATION_PREVIEW_LENGTH)
