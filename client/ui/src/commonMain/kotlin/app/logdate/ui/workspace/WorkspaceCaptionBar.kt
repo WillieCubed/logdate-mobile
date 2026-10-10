@@ -6,6 +6,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntRect
 
 /**
  * The window's caption bar: the title bar Android desktop windowing draws above each window, with
@@ -36,6 +37,23 @@ val LocalWorkspaceCaptionBar = staticCompositionLocalOf<WorkspaceCaptionBar?> { 
  */
 @Composable
 internal expect fun rememberPlatformCaptionBar(canvas: Color): WorkspaceCaptionBar?
+
+/**
+ * The widths, in pixels, that the system's caption controls take at the left and right edges of a
+ * window [windowWidth] wide, from their bounding rectangles in window coordinates. A rectangle counts
+ * toward the edge nearer its center. Each width stays between zero and half the window: while a
+ * window is being resized, its rectangles can briefly describe the old size.
+ */
+internal fun captionControlInsets(
+    controls: List<IntRect>,
+    windowWidth: Int,
+): Pair<Int, Int> {
+    if (windowWidth <= 0) return 0 to 0
+    val half = windowWidth / 2
+    val left = controls.filter { it.center.x < half }.maxOfOrNull { it.right } ?: 0
+    val right = controls.filter { it.center.x >= half }.minOfOrNull { windowWidth - it.left } ?: 0
+    return left.coerceIn(0, half) to right.coerceIn(0, half)
+}
 
 /**
  * Lets a control in the caption bar receive presses. Without it the platform treats a press in the

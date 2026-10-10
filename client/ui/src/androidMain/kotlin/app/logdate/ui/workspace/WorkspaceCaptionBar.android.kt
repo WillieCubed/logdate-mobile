@@ -1,19 +1,25 @@
 package app.logdate.ui.workspace
 
 import android.os.Build
+import android.view.View
 import android.view.WindowInsetsController
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.captionBar
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntRect
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 
@@ -31,20 +37,35 @@ internal actual fun rememberPlatformCaptionBar(canvas: Color): WorkspaceCaptionB
         onDispose { controller?.setSystemBarsAppearance(0, transparent or lightControls) }
     }
     val density = LocalDensity.current
-    val height = WindowInsets.captionBar.getTop(density)
-    val windowWidth = LocalWindowInfo.current.containerSize.width
-    return remember(view, height, windowWidth) {
-        if (height == 0) return@remember null
-        // The system's controls: the app menu at one edge and the window buttons at the other.
-        val controls =
-            ViewCompat
-                .getRootWindowInsets(view)
-                ?.getBoundingRects(WindowInsetsCompat.Type.captionBar())
-                .orEmpty()
-        val left = controls.filter { it.centerX() < windowWidth / 2 }.maxOfOrNull { it.right } ?: 0
-        val right = controls.filter { it.centerX() >= windowWidth / 2 }.minOfOrNull { windowWidth - it.left } ?: 0
-        with(density) { WorkspaceCaptionBar(height.toDp(), left.toDp(), right.toDp()) }
+    // Read after every layout of the window: resizing changes the window's width and the controls'
+    // rectangles in separate passes, and neither alone is reliable.
+    var captionBar by remember(view) { mutableStateOf(readCaptionBar(view, density)) }
+    DisposableEffect(view, density) {
+        val update = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> captionBar = readCaptionBar(view, density) }
+        view.addOnLayoutChangeListener(update)
+        captionBar = readCaptionBar(view, density)
+        onDispose { view.removeOnLayoutChangeListener(update) }
     }
+    // The caption bar appearing or going away changes the window's insets.
+    val captionHeight = WindowInsets.captionBar.getTop(density)
+    LaunchedEffect(captionHeight) { captionBar = readCaptionBar(view, density) }
+    return captionBar
+}
+
+private fun readCaptionBar(
+    view: View,
+    density: Density,
+): WorkspaceCaptionBar? {
+    val insets = ViewCompat.getRootWindowInsets(view) ?: return null
+    val height = insets.getInsets(WindowInsetsCompat.Type.captionBar()).top
+    if (height == 0) return null
+    // The system's controls: the app menu at one edge and the window buttons at the other.
+    val controls =
+        insets
+            .getBoundingRects(WindowInsetsCompat.Type.captionBar())
+            .map { IntRect(it.left, it.top, it.right, it.bottom) }
+    val (left, right) = captionControlInsets(controls, view.width)
+    return with(density) { WorkspaceCaptionBar(height.toDp(), left.toDp(), right.toDp()) }
 }
 
 internal actual fun Modifier.captionBarControl(): Modifier = systemGestureExclusion()
