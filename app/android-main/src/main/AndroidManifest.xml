@@ -329,6 +329,19 @@
                 android:value="true" />
         </service>
 
+        <!--
+            Saves a capture reminder's quick reply as an entry. Reminders only offer the Write action
+            while NOTIFICATION_QUICK_REPLY is on.
+            See docs/reference/android/os-integration/notification-quick-reply.md.
+        -->
+        <receiver
+            android:name="app.logdate.client.ambient.QuickReplyReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="app.logdate.action.QUICK_REPLY" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

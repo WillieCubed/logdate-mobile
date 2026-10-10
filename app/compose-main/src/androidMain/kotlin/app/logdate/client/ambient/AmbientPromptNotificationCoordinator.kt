@@ -5,7 +5,10 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
+import androidx.core.app.RemoteInput
 import app.logdate.client.MainActivity
+import app.logdate.client.capture.ACTION_CAPTURE
+import app.logdate.client.capture.EXTRA_CAPTURE_MODE
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.domain.recommendation.AmbientCaptureNudgeStyle
 import app.logdate.client.domain.recommendation.AmbientPromptCandidate
@@ -15,10 +18,12 @@ import app.logdate.client.notifications.LogDateNotificationChannelKey
 import app.logdate.util.toReadableDateAllDay
 import app.logdate.util.toReadableDateTimeShort
 import io.github.aakira.napier.Napier
+import studio.hypertext.logdate.R
 import app.logdate.client.notifications.R as NotificationResources
 
 class AmbientPromptNotificationCoordinator(
     private val context: Context,
+    private val quickReplyEnabled: () -> Boolean = { false },
 ) {
     private val notificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -27,11 +32,12 @@ class AmbientPromptNotificationCoordinator(
         if (candidate.family == AmbientPromptFamily.EVENT_NUDGE && !FeatureFlag.EVENTS.availableForLaunch) return false
         return runCatching {
             val channelKey = candidate.channelKey()
+            val notificationId = channelKey.notificationId ?: candidate.dedupeKey.hashCode()
             val content = notificationContent(candidate)
-            val notification =
+            val builder =
                 NotificationCompat
                     .Builder(context, channelKey.id)
-                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setSmallIcon(NotificationResources.drawable.ic_notification_capture)
                     .setContentTitle(content.title)
                     .setContentText(content.body)
                     .setStyle(NotificationCompat.BigTextStyle().bigText(content.body))
@@ -39,12 +45,57 @@ class AmbientPromptNotificationCoordinator(
                     .setContentIntent(buildPendingIntent(candidate))
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     .setCategory(content.category)
-                    .build()
+            if (candidate.payload is AmbientPromptPayload.CaptureNudge && quickReplyEnabled()) {
+                builder.addAction(writeAction(notificationId)).addAction(recordAction())
+            }
 
-            notificationManager.notify(channelKey.notificationId ?: candidate.dedupeKey.hashCode(), notification)
+            notificationManager.notify(notificationId, builder.build())
         }.onFailure { error ->
             Napier.w("Failed to post ambient prompt notification", error)
         }.isSuccess
+    }
+
+    /** Write: a reply field in the notification whose text is saved as an entry by [QuickReplyReceiver]. */
+    private fun writeAction(notificationId: Int): NotificationCompat.Action {
+        val reply =
+            PendingIntent.getBroadcast(
+                context,
+                notificationId,
+                Intent(ACTION_QUICK_REPLY)
+                    .setClass(context, QuickReplyReceiver::class.java)
+                    .putExtra(EXTRA_QUICK_REPLY_NOTIFICATION_ID, notificationId),
+                // RemoteInput fills in the reply, so this intent must stay mutable.
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+            )
+        val input =
+            RemoteInput
+                .Builder(QUICK_REPLY_RESULT_KEY)
+                .setLabel(context.getString(R.string.quick_reply_hint))
+                .build()
+        return NotificationCompat.Action
+            .Builder(NotificationResources.drawable.ic_notification_capture, context.getString(R.string.quick_reply_write), reply)
+            .addRemoteInput(input)
+            .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
+            .setAllowGeneratedReplies(false)
+            .setShowsUserInterface(false)
+            .build()
+    }
+
+    /** Record: opens the editor through the capture action and starts a voice entry. */
+    private fun recordAction(): NotificationCompat.Action {
+        val record =
+            PendingIntent.getActivity(
+                context,
+                ACTION_CAPTURE.hashCode(),
+                Intent(ACTION_CAPTURE)
+                    .setClass(context, MainActivity::class.java)
+                    .putExtra(EXTRA_CAPTURE_MODE, "voice")
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        return NotificationCompat.Action
+            .Builder(NotificationResources.drawable.ic_notification_capture, context.getString(R.string.quick_reply_record), record)
+            .build()
     }
 
     private fun buildPendingIntent(candidate: AmbientPromptCandidate): PendingIntent {

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Capture reminder action that opens a reply field in the notification. -->
+    <string name="quick_reply_write">Write</string>
+    <!-- Hint in the notification's reply field. -->
+    <string name="quick_reply_hint">Write an entry</string>
+    <!-- Capture reminder action that opens the editor and starts recording. -->
+    <string name="quick_reply_record">Record</string>
+    <!-- Title after a quick reply is saved. Never repeats the entry: it can show on the lock screen. -->
+    <string name="quick_reply_saved_title">Entry saved</string>
+    <string name="quick_reply_saved_body">Added to today’s timeline.</string>
+    <!-- Action on a failed quick reply that tries the save again. -->
+    <string name="quick_reply_retry">Retry</string>
+    <!-- Title when a quick reply could not be saved. -->
+    <string name="quick_reply_failed_title">Entry not saved</string>
+    <!-- Body when a quick reply could not be saved; %1$s is the reply, so it is not lost. -->
+    <string name="quick_reply_failed_body">Retry, or tap to add it in LogDate: “%1$s”</string>
+</resources>

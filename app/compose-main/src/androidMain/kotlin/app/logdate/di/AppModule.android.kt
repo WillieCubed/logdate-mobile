@@ -10,6 +10,7 @@ import app.logdate.client.calendar.CalendarImportScheduler
 import app.logdate.client.calendar.CalendarImportWorker
 import app.logdate.client.calendar.di.calendarSyncModule
 import app.logdate.client.data.di.appDataModule
+import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.device.di.deviceModule
 import app.logdate.client.domain.di.accountDomainModule
 import app.logdate.client.domain.di.domainModule
@@ -33,6 +34,7 @@ import app.logdate.client.media.di.audioModule
 import app.logdate.client.networking.di.networkingModule
 import app.logdate.client.notifications.FlagLiveUpdatesSwitch
 import app.logdate.client.notifications.LiveUpdatesSwitch
+import app.logdate.client.platform.FeatureFlagState
 import app.logdate.client.platform.PackageManagerComponentSwitch
 import app.logdate.client.platform.PlatformComponentToggler
 import app.logdate.client.rewind.MilestoneRewindCoordinator
@@ -116,7 +118,10 @@ actual val appModule: Module =
         includes(windowingModule)
         includes(widgetModule)
 
-        single { AmbientPromptNotificationCoordinator(androidContext()) }
+        single {
+            val quickReply = FeatureFlagState(get(), FeatureFlag.NOTIFICATION_QUICK_REPLY, get())
+            AmbientPromptNotificationCoordinator(androidContext(), quickReplyEnabled = quickReply::enabled)
+        }
         single { AmbientPromptScheduler(androidContext(), get()) }
         single { AmbientPromptSchedulingObserver(get(), get(), get()) }
         workerOf(::AmbientPromptWorker)
