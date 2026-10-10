@@ -21,12 +21,8 @@ import com.webauthn4j.data.client.challenge.DefaultChallenge
 import com.webauthn4j.server.ServerProperty
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.runBlocking
-import java.security.SecureRandom
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.time.Clock
-import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -36,7 +32,7 @@ private const val CHALLENGE_TYPE_AUTHENTICATION = "restore-authentication"
 /**
  * Standalone WebAuthn service for the restore credential flow.
  *
- * Manages its own challenge map, WebAuthn4J instances, and repository — completely isolated
+ * Uses separately scoped challenges, WebAuthn4J instances, and a repository isolated
  * from [WebAuthnPasskeyService]. Restore credentials are not user-visible passkeys and have
  * a different lifecycle: one per user, rotated on re-registration, consumed on authentication.
  */
@@ -52,9 +48,10 @@ class RestoreCredentialService(
             productionDefault = true,
             devDefault = false,
         ),
+    private val challengeRepository: PasskeyChallengeRepository? = null,
 ) {
-    private val secureRandom = SecureRandom()
     private val challenges = ConcurrentHashMap<String, PasskeyChallenge>()
+    private val challengeStore = PasskeyChallenges("restore", challenges, challengeRepository)
     private val objectConverter = ObjectConverter()
     private val webAuthnManager = WebAuthnManager.createNonStrictWebAuthnManager(objectConverter)
     private val attestedCredentialDataConverter = AttestedCredentialDataConverter(objectConverter)
@@ -81,15 +78,7 @@ class RestoreCredentialService(
         username: String,
         displayName: String,
     ): PasskeyRegistrationOptions {
-        val challenge = generateChallenge()
-        challenges[challenge] =
-            PasskeyChallenge(
-                challenge = challenge,
-                userId = userId,
-                type = CHALLENGE_TYPE_REGISTRATION,
-                expiresAt = (Clock.System.now() + 5.minutes).toString(),
-                isUsed = false,
-            )
+        val challenge = challengeStore.issue(userId, CHALLENGE_TYPE_REGISTRATION)
 
         val excludeCredentials = runBlocking { restoreCredentialRepository.getCredentialIdsForUser(userId) }
 
@@ -127,15 +116,7 @@ class RestoreCredentialService(
         }
 
     fun generateAuthOptions(): PasskeyAuthenticationOptions {
-        val challenge = generateChallenge()
-        challenges[challenge] =
-            PasskeyChallenge(
-                challenge = challenge,
-                userId = Uuid.random(),
-                type = CHALLENGE_TYPE_AUTHENTICATION,
-                expiresAt = (Clock.System.now() + 5.minutes).toString(),
-                isUsed = false,
-            )
+        val challenge = challengeStore.issue(Uuid.random(), CHALLENGE_TYPE_AUTHENTICATION)
 
         return PasskeyAuthenticationOptions(
             challenge = challenge,
@@ -161,10 +142,8 @@ class RestoreCredentialService(
         registrationResponse: PasskeyRegistrationResponse,
     ): RegistrationResult =
         try {
-            val challengeData =
-                validateChallenge(challenge, CHALLENGE_TYPE_REGISTRATION, userId)
-                    ?: return RegistrationResult(success = false, error = "Invalid or expired challenge")
-            challenges[challenge] = challengeData.copy(isUsed = true)
+            challengeStore.consume(challenge, CHALLENGE_TYPE_REGISTRATION, userId)
+                ?: return RegistrationResult(success = false, error = "Invalid or expired challenge")
 
             val credentialId = normalizeCredentialId(registrationResponse.id) ?: registrationResponse.id
 
@@ -190,10 +169,8 @@ class RestoreCredentialService(
         registrationResponse: PasskeyRegistrationResponse,
     ): RegistrationResult =
         try {
-            val challengeData =
-                validateChallenge(challenge, CHALLENGE_TYPE_REGISTRATION, userId)
-                    ?: return RegistrationResult(success = false, error = "Invalid or expired challenge")
-            challenges[challenge] = challengeData.copy(isUsed = true)
+            challengeStore.consume(challenge, CHALLENGE_TYPE_REGISTRATION, userId)
+                ?: return RegistrationResult(success = false, error = "Invalid or expired challenge")
 
             val challengeBytes =
                 decodeBase64Url(challenge)
@@ -250,10 +227,8 @@ class RestoreCredentialService(
         authenticationResponse: PasskeyAuthenticationResponse,
     ): AuthenticationResult =
         try {
-            val challengeData =
-                validateChallenge(challenge, CHALLENGE_TYPE_AUTHENTICATION, null)
-                    ?: return AuthenticationResult(success = false, error = "Invalid or expired challenge")
-            challenges[challenge] = challengeData.copy(isUsed = true)
+            challengeStore.consume(challenge, CHALLENGE_TYPE_AUTHENTICATION, null)
+                ?: return AuthenticationResult(success = false, error = "Invalid or expired challenge")
 
             val stored =
                 runBlocking {
@@ -276,10 +251,8 @@ class RestoreCredentialService(
         authenticationResponse: PasskeyAuthenticationResponse,
     ): AuthenticationResult =
         try {
-            val challengeData =
-                validateChallenge(challenge, CHALLENGE_TYPE_AUTHENTICATION, null)
-                    ?: return AuthenticationResult(success = false, error = "Invalid or expired challenge")
-            challenges[challenge] = challengeData.copy(isUsed = true)
+            challengeStore.consume(challenge, CHALLENGE_TYPE_AUTHENTICATION, null)
+                ?: return AuthenticationResult(success = false, error = "Invalid or expired challenge")
 
             val credentialIdBytes =
                 decodeBase64Url(authenticationResponse.id)
@@ -343,26 +316,6 @@ class RestoreCredentialService(
             Napier.e("Restore authentication strict verification failed", e)
             AuthenticationResult(success = false, error = "Authentication verification failed: ${e.message}")
         }
-
-    private fun validateChallenge(
-        challenge: String,
-        expectedType: String,
-        expectedUserId: Uuid?,
-    ): PasskeyChallenge? {
-        val data = challenges[challenge] ?: return null
-        if (data.isUsed) return null
-        if (data.type != expectedType) return null
-        if (expectedUserId != null && data.userId != expectedUserId) return null
-        val expiresAt = runCatching { Instant.parse(data.expiresAt) }.getOrNull() ?: return null
-        if (Clock.System.now() > expiresAt) return null
-        return data
-    }
-
-    private fun generateChallenge(): String {
-        val bytes = ByteArray(32)
-        secureRandom.nextBytes(bytes)
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-    }
 
     private fun decodeBase64Url(value: String): ByteArray? = runCatching { Base64.getUrlDecoder().decode(value) }.getOrNull()
 

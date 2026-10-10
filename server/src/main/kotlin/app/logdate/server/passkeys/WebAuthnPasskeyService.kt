@@ -22,12 +22,9 @@ import com.webauthn4j.data.client.challenge.DefaultChallenge
 import com.webauthn4j.server.ServerProperty
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.runBlocking
-import java.security.SecureRandom
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -53,13 +50,12 @@ class WebAuthnPasskeyService(
             productionDefault = true,
             devDefault = false,
         ),
+    private val challengeRepository: PasskeyChallengeRepository? = null,
 ) {
-    private val secureRandom = SecureRandom()
     private val challenges = ConcurrentHashMap<String, PasskeyChallenge>()
+    private val challengeStore = PasskeyChallenges("passkey", challenges, challengeRepository)
 
     init {
-        // Which verification path a ceremony takes, and what it will be checked against, decides
-        // every passkey failure below — and neither was visible anywhere before.
         Napier.i(
             "WebAuthnPasskeyService strict=$strictVerificationEnabled rpId=$relyingPartyId origins=$origins",
         )
@@ -120,17 +116,7 @@ class WebAuthnPasskeyService(
         displayName: String,
         excludeCredentials: List<String> = emptyList(),
     ): PasskeyRegistrationOptions {
-        val challenge = generateChallenge()
-        val expiresAt = Clock.System.now() + 5.minutes
-
-        challenges[challenge] =
-            PasskeyChallenge(
-                challenge = challenge,
-                userId = userId,
-                type = "registration",
-                expiresAt = expiresAt.toString(),
-                isUsed = false,
-            )
+        val challenge = challengeStore.issue(userId, "registration")
 
         return PasskeyRegistrationOptions(
             challenge = challenge,
@@ -158,18 +144,7 @@ class WebAuthnPasskeyService(
         userId: Uuid? = null,
         allowedCredentials: List<String> = emptyList(),
     ): PasskeyAuthenticationOptions {
-        val challenge = generateChallenge()
-        val challengeUserId = userId ?: Uuid.random()
-        val expiresAt = Clock.System.now() + 5.minutes
-
-        challenges[challenge] =
-            PasskeyChallenge(
-                challenge = challenge,
-                userId = challengeUserId,
-                type = "authentication",
-                expiresAt = expiresAt.toString(),
-                isUsed = false,
-            )
+        val challenge = challengeStore.issue(userId ?: Uuid.random(), "authentication")
 
         val allowCredentials =
             when {
@@ -293,13 +268,11 @@ class WebAuthnPasskeyService(
         registrationResponse: PasskeyRegistrationResponse,
     ): VerificationOutcome {
         return try {
-            val challengeData =
-                validateChallenge(
-                    challenge = challenge,
-                    expectedType = "registration",
-                    expectedUserId = userId,
-                ) ?: return VerificationOutcome.Failure("Invalid challenge")
-            challenges[challenge] = challengeData.copy(isUsed = true)
+            challengeStore.consume(
+                challenge = challenge,
+                expectedType = "registration",
+                expectedUserId = userId,
+            ) ?: return VerificationOutcome.Failure("Invalid challenge")
 
             val credentialId = normalizeCredentialId(registrationResponse.id) ?: registrationResponse.id
             VerificationOutcome.Success(
@@ -330,13 +303,11 @@ class WebAuthnPasskeyService(
         registrationResponse: PasskeyRegistrationResponse,
     ): VerificationOutcome {
         return try {
-            val challengeData =
-                validateChallenge(
-                    challenge = challenge,
-                    expectedType = "registration",
-                    expectedUserId = userId,
-                ) ?: return VerificationOutcome.Failure("Invalid challenge")
-            challenges[challenge] = challengeData.copy(isUsed = true)
+            challengeStore.consume(
+                challenge = challenge,
+                expectedType = "registration",
+                expectedUserId = userId,
+            ) ?: return VerificationOutcome.Failure("Invalid challenge")
 
             val challengeBytes =
                 decodeBase64Url(challenge)
@@ -407,13 +378,11 @@ class WebAuthnPasskeyService(
         authenticationResponse: PasskeyAuthenticationResponse,
     ): AuthenticationResult {
         return try {
-            val challengeData =
-                validateChallenge(
-                    challenge = challenge,
-                    expectedType = "authentication",
-                    expectedUserId = null,
-                ) ?: return AuthenticationResult(success = false, error = "Invalid challenge")
-            challenges[challenge] = challengeData.copy(isUsed = true)
+            challengeStore.consume(
+                challenge = challenge,
+                expectedType = "authentication",
+                expectedUserId = null,
+            ) ?: return AuthenticationResult(success = false, error = "Invalid challenge")
 
             val (userId, storedData) =
                 findStoredPasskey(authenticationResponse.id)
@@ -434,13 +403,11 @@ class WebAuthnPasskeyService(
         authenticationResponse: PasskeyAuthenticationResponse,
     ): AuthenticationResult {
         return try {
-            val challengeData =
-                validateChallenge(
-                    challenge = challenge,
-                    expectedType = "authentication",
-                    expectedUserId = null,
-                ) ?: return AuthenticationResult(success = false, error = "Invalid challenge")
-            challenges[challenge] = challengeData.copy(isUsed = true)
+            challengeStore.consume(
+                challenge = challenge,
+                expectedType = "authentication",
+                expectedUserId = null,
+            ) ?: return AuthenticationResult(success = false, error = "Invalid challenge")
 
             val credentialIdBytes =
                 decodeBase64Url(authenticationResponse.id)
@@ -516,40 +483,12 @@ class WebAuthnPasskeyService(
         }
     }
 
-    private fun validateChallenge(
-        challenge: String,
-        expectedType: String,
-        expectedUserId: Uuid?,
-    ): PasskeyChallenge? {
-        val challengeData = challenges[challenge] ?: return null
-        if (challengeData.isUsed) {
-            return null
-        }
-        if (challengeData.type != expectedType) {
-            return null
-        }
-        if (expectedUserId != null && challengeData.userId != expectedUserId) {
-            return null
-        }
-        val expiresAt = runCatching { Instant.parse(challengeData.expiresAt) }.getOrNull()
-        if (expiresAt == null || Clock.System.now() > expiresAt) {
-            return null
-        }
-        return challengeData
-    }
-
     private fun findStoredPasskey(credentialId: String): Pair<Uuid, StoredPasskeyData>? {
         val normalized = normalizeCredentialId(credentialId)
         return runBlocking {
             passkeyRepository.getPasskeyByCredentialId(credentialId)
                 ?: (normalized?.takeIf { it != credentialId }?.let { passkeyRepository.getPasskeyByCredentialId(it) })
         }
-    }
-
-    private fun generateChallenge(): String {
-        val challengeBytes = ByteArray(32)
-        secureRandom.nextBytes(challengeBytes)
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(challengeBytes)
     }
 
     private fun decodeBase64Url(value: String): ByteArray? = runCatching { Base64.getUrlDecoder().decode(value) }.getOrNull()

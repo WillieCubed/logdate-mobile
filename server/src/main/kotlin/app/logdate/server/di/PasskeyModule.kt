@@ -1,10 +1,12 @@
 package app.logdate.server.di
 
+import app.logdate.server.database.PostgreSQLPasskeyChallengeRepository
 import app.logdate.server.database.PostgreSQLPasskeyRepository
 import app.logdate.server.database.PostgreSQLRestoreCredentialRepository
 import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.passkeys.InMemoryPasskeyRepository
 import app.logdate.server.passkeys.InMemoryRestoreCredentialRepository
+import app.logdate.server.passkeys.PasskeyChallengeRepository
 import app.logdate.server.passkeys.PasskeyRepository
 import app.logdate.server.passkeys.RestoreCredentialRepository
 import app.logdate.server.passkeys.RestoreCredentialService
@@ -14,6 +16,9 @@ import app.logdate.server.routes.AssetLinksConfig
 import org.koin.core.module.Module
 
 internal fun Module.passkeyServices(isDatabaseAvailable: Boolean) {
+    if (isDatabaseAvailable) {
+        single<PasskeyChallengeRepository> { PostgreSQLPasskeyChallengeRepository() }
+    }
     single<PasskeyRepository> {
         if (isDatabaseAvailable) PostgreSQLPasskeyRepository() else InMemoryPasskeyRepository()
     }
@@ -31,6 +36,7 @@ internal fun Module.passkeyServices(isDatabaseAvailable: Boolean) {
             relyingPartyId = webAuthnConfig.relyingPartyId,
             relyingPartyName = webAuthnConfig.relyingPartyName,
             origins = webAuthnConfig.origins,
+            challengeRepository = if (isDatabaseAvailable) get<PasskeyChallengeRepository>() else null,
         )
     }
     single {
@@ -40,6 +46,7 @@ internal fun Module.passkeyServices(isDatabaseAvailable: Boolean) {
             relyingPartyId = webAuthnConfig.relyingPartyId,
             relyingPartyName = webAuthnConfig.relyingPartyName,
             origins = webAuthnConfig.origins,
+            challengeRepository = if (isDatabaseAvailable) get<PasskeyChallengeRepository>() else null,
         )
     }
 }
