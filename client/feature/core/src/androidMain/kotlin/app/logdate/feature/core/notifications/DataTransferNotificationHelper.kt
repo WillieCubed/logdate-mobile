@@ -11,12 +11,9 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkManager
 import app.logdate.client.feature.core.R
 import app.logdate.client.notifications.LiveUpdatesSwitch
-import app.logdate.client.notifications.TransferOutcome
 import app.logdate.client.notifications.applyTransferLiveUpdate
 import app.logdate.client.notifications.currentLiveUpdatesSwitch
-import app.logdate.client.notifications.semanticStyledText
 import app.logdate.client.notifications.transferLiveUpdate
-import app.logdate.client.notifications.transferSemanticStyle
 import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid
 
@@ -103,12 +100,8 @@ abstract class DataTransferNotificationHelper(
         val notification =
             NotificationCompat
                 .Builder(context, channelId)
-                .setContentTitle(
-                    semanticStyledText(
-                        context.getString(completeTitleResId),
-                        transferSemanticStyle(liveUpdates.enabled, TransferOutcome.Completed),
-                    ),
-                ).setContentText(contentText)
+                .setContentTitle(context.getString(completeTitleResId))
+                .setContentText(contentText)
                 .setContentIntent(createContentIntent())
                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
                 .setAutoCancel(true)
@@ -129,12 +122,8 @@ abstract class DataTransferNotificationHelper(
         val notification =
             NotificationCompat
                 .Builder(context, channelId)
-                .setContentTitle(
-                    semanticStyledText(
-                        context.getString(failedTitleResId),
-                        transferSemanticStyle(liveUpdates.enabled, TransferOutcome.Failed),
-                    ),
-                ).setContentText(context.getString(R.string.error_with_message, errorMessage))
+                .setContentTitle(context.getString(failedTitleResId))
+                .setContentText(context.getString(R.string.error_with_message, errorMessage))
                 .setContentIntent(createContentIntent())
                 .setSmallIcon(android.R.drawable.stat_notify_error)
                 .setAutoCancel(true)

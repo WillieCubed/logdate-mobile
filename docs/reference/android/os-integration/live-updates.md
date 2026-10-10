@@ -1,8 +1,7 @@
 # Live Updates
 
-Status: recording, export, restore, and sync progress, and Android 17's semantic colors for finished
-transfers, are built, behind `LIVE_UPDATES` (Settings > Advanced > Developer tools > Feature
-previews).
+Status: recording, export, restore, and sync progress are built, behind `LIVE_UPDATES` (Settings >
+Advanced > Developer tools > Feature previews).
 
 ## What it is
 
@@ -33,8 +32,8 @@ The person can turn promotion off per app in system settings. The notification t
 | Restore | Percent complete, once known | Progress split into the restore's phases, then completion or a specific failure |
 | Sync | Percent of entries backed up, once known | Progress, then completion or a specific failure |
 
-On Android 17, failures use the system's semantic red and completion uses semantic green, so they
-read the same as other apps' Live Updates.
+When the work finishes or fails, the notification stops being a Live Update: the chip goes away and
+the notification drops into the shade's normal list, where the person can tap it or swipe it away.
 
 | The status bar chip | The promoted notification |
 | --- | --- |
@@ -65,11 +64,12 @@ predates the chip, so its captures show the notification only.
   phases begins, and `progressSegmentLengths` turns those into segments, so the bar shows which phase
   the restore is in, not just how much is done. The decision, `transferLiveUpdate`, is a pure function
   with tests. Work is promoted as soon as it starts; the chip shows a percent once progress is known.
-- **Semantic colors (Android 17).** When an export or restore finishes or fails, its title carries
-  `Notification.createSemanticStyleAnnotation` with `SEMANTIC_STYLE_SAFE` or `SEMANTIC_STYLE_DANGER`,
-  so Android colors it green or red. `transferSemanticStyle` (client/notifications, tested) decides
-  the style and `semanticStyledText` applies it; earlier versions, and Live Updates off, get plain
-  text.
+- **No semantic colors.** Android 17 adds `Notification.createSemanticStyleAnnotation`, which marks
+  text as safe (green), danger (red), and so on. Android applies it only to promoted notifications
+  (the SDK's documentation says so, and an Android 17 emulator confirmed it). A finished or failed
+  transfer is no longer promoted, so coloring its title would do nothing; LogDate leaves it plain.
+  If a transfer ever reports a problem while it is still running, that text could carry the danger
+  style, since the notification is still a Live Update then.
 - **Library.** `androidx.core` 1.18 provides the compat builders and `ProgressStyle`; the media and
   notifications modules depend on it directly, because transitive versions predate these methods.
 
