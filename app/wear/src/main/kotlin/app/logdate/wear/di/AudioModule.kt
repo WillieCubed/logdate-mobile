@@ -156,6 +156,7 @@ val wearAudioModule =
                 hintStore = get(),
                 removalNotifier = get(),
                 applicationScope = get(),
+                mediaFiles = get(),
             )
         }
         viewModel {

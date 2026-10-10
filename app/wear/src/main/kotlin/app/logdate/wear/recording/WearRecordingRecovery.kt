@@ -6,7 +6,6 @@ import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SystemCaptureTimeZone
-import app.logdate.wear.presentation.recording.WearRecordingViewModel
 import io.github.aakira.napier.Napier
 import java.io.File
 import kotlin.time.Clock
@@ -93,7 +92,7 @@ class WearRecordingRecovery(
             Napier.e("Could not read the length of ${file.name}; it stays for the next launch")
             return false
         }
-        if (durationMs < WearRecordingViewModel.MIN_DURATION_MS) {
+        if (durationMs < AudioMomentSaver.MIN_DURATION_MS) {
             file.delete()
             return false
         }
