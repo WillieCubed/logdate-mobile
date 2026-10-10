@@ -6,8 +6,9 @@
 # restart, and a Gradle Managed Device cannot restart in the middle of a run, so this script runs its
 # own emulator instead. It creates the emulator the first time, boots it without a window, turns
 # desktop windowing on and restarts it if needed, installs the debug app and its tests, and runs
-# OsSurfaceScreenshotsTest#desktopWindows and #crossAppDrag. It only ever talks to that emulator's
-# serial, never to a physical device, and shuts the emulator down again if it started it.
+# OsSurfaceScreenshotsTest#desktopWindows, #crossAppDrag, and #dragPhotoBetweenWindows. It only ever
+# talks to that emulator's serial, never to a physical device, and shuts the emulator down again if
+# it started it.
 #
 # Usage:
 #   scripts/desktop-windowing-screenshots.sh
@@ -23,7 +24,7 @@ IMAGE="system-images;android-37.0;google_apis_ps16k;arm64-v8a"
 PORT=5580
 SERIAL="emulator-$PORT"
 APP_ID="studio.hypertext.logdate.debug"
-TESTS=(desktopWindows crossAppDrag)
+TESTS=(desktopWindows crossAppDrag dragPhotoBetweenWindows)
 TEST_CLASS="$(printf 'app.logdate.client.e2e.osintegration.OsSurfaceScreenshotsTest#%s,' "${TESTS[@]}")"
 TEST_CLASS="${TEST_CLASS%,}"
 DEVICE_OUTPUT="/sdcard/Android/media/$APP_ID/additional_test_output"

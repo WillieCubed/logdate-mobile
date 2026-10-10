@@ -39,6 +39,12 @@ import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.Journal
+import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.media.MediaManager
+import app.logdate.client.media.ManagedMediaImporter
+import app.logdate.client.media.AndroidManagedMediaImportSource
+import app.logdate.client.media.AndroidManagedMediaDiscarder
+import app.logdate.client.repository.journals.EntryDraftRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.TimeZone
@@ -66,7 +72,9 @@ object OsSurfaceCapture {
     private const val RECORDING_NOTIFICATION_ID = 1001
     private const val DEMO_MODE_ATTEMPTS = 10
     private const val RETURN_HOME_STEPS = 6
-    private const val DRAG_CAPTURE_LEAD_MS = 1_200L
+    private const val LONG_PRESS_HOLD_MS = 1_000L
+    private const val TOUCH_FRAME_MS = 16L
+    private const val DROP_SETTLE_MS = 600L
     private const val HOVER_STEPS = 10
     private const val HOVER_STEP_PX = 8
     private const val HOVER_FRAME_MS = 16L
@@ -431,6 +439,40 @@ object OsSurfaceCapture {
     }
 
     /**
+     * Saves an entry with the debug build's sample photo and [caption], importing the photo into
+     * LogDate's media store as the editor does, unless an earlier run already saved it, so the
+     * Library shows the photo once.
+     */
+    fun createPhotoEntry(caption: String) {
+        val notes = GlobalContext.get().get<JournalNotesRepository>()
+        val existing = runBlocking { notes.allNotesObserved.first() }
+        if (existing.any { it is JournalNote.Image && it.caption == caption }) return
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val photo = File(context.cacheDir, "library-photo.jpg")
+        context.assets.open("sample_note_photo.jpg").use { input -> photo.outputStream().use(input::copyTo) }
+        val uri = FileProvider.getUriForFile(context, "$packageName.provider", photo)
+        val media = GlobalContext.get().get<MediaManager>()
+        val importer =
+            ManagedMediaImporter(
+                mediaManager = media,
+                source = AndroidManagedMediaImportSource(context),
+                discardManagedMedia = AndroidManagedMediaDiscarder(context, media)::discard,
+            )
+        val now = Clock.System.now()
+        runBlocking {
+            val note =
+                JournalNote.Image(
+                    creationTimestamp = now,
+                    lastUpdated = now,
+                    mediaRef = importer.import(uri.toString()),
+                    caption = caption,
+                    timeZoneId = TimeZone.currentSystemDefault().id,
+                )
+            GlobalContext.get().get<AddNoteUseCase>()(notes = listOf(note), captureCurrentLocation = false)
+        }
+    }
+
+    /**
      * Puts a photo on the clipboard, the way copying an image in another app does: a content URI
      * from LogDate's file provider for a copy of the debug build's sample photo.
      */
@@ -529,23 +571,72 @@ object OsSurfaceCapture {
     }
 
     /**
-     * Drags with a finger from [from] to [to] over [durationMs], the way Android's `input
-     * draganddrop` does: a long press, then a steady move. [whileDragging] runs partway through, while
-     * the item is over [to].
+     * Drags with a finger from [from] to [to]: a press held still past the long-press timeout, which
+     * picks the item up, then a steady move over [durationMs]. [overTarget] runs while the item is
+     * held over [to], before the finger lifts and drops it.
      */
     fun drag(
         from: Point,
         to: Point,
         durationMs: Long,
-        whileDragging: () -> Unit,
+        overTarget: () -> Unit,
     ) {
-        val command = "input touchscreen draganddrop ${from.x} ${from.y} ${to.x} ${to.y} $durationMs"
-        val output = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
-        Thread.sleep(durationMs - DRAG_CAPTURE_LEAD_MS)
-        whileDragging()
-        // Reading to the end waits for the drag to finish.
-        ParcelFileDescriptor.AutoCloseInputStream(output).use { it.readBytes() }
+        val downTime = SystemClock.uptimeMillis()
+        touch(MotionEvent.ACTION_DOWN, from, downTime)
+        Thread.sleep(LONG_PRESS_HOLD_MS)
+        val steps = (durationMs / TOUCH_FRAME_MS).toInt().coerceAtLeast(1)
+        for (step in 1..steps) {
+            val fraction = step.toFloat() / steps
+            val point = Point(from.x + ((to.x - from.x) * fraction).toInt(), from.y + ((to.y - from.y) * fraction).toInt())
+            touch(MotionEvent.ACTION_MOVE, point, downTime)
+            Thread.sleep(TOUCH_FRAME_MS)
+        }
+        Thread.sleep(DROP_SETTLE_MS)
+        overTarget()
+        touch(MotionEvent.ACTION_UP, to, downTime)
         device.waitForIdle()
+    }
+
+    private fun touch(
+        action: Int,
+        point: Point,
+        downTime: Long,
+    ) {
+        val touchscreen =
+            InputDevice.getDeviceIds().firstOrNull { id ->
+                InputDevice.getDevice(id)?.supportsSource(InputDevice.SOURCE_TOUCHSCREEN) == true
+            } ?: 0
+        val properties =
+            MotionEvent.PointerProperties().apply {
+                id = 0
+                toolType = MotionEvent.TOOL_TYPE_FINGER
+            }
+        val coords =
+            MotionEvent.PointerCoords().apply {
+                x = point.x.toFloat()
+                y = point.y.toFloat()
+                pressure = 1f
+                size = 1f
+            }
+        val event =
+            MotionEvent.obtain(
+                downTime,
+                SystemClock.uptimeMillis(),
+                action,
+                1,
+                arrayOf(properties),
+                arrayOf(coords),
+                0,
+                0,
+                1f,
+                1f,
+                touchscreen,
+                0,
+                InputDevice.SOURCE_TOUCHSCREEN,
+                0,
+            )
+        InstrumentationRegistry.getInstrumentation().uiAutomation.injectInputEvent(event, true)
+        event.recycle()
     }
 
     /**
@@ -561,6 +652,14 @@ object OsSurfaceCapture {
         } finally {
             keyboards.forEach { shell("ime enable $it") }
         }
+    }
+
+    /**
+     * Deletes every unfinished entry. The desktop windowing emulator keeps its data between runs, and
+     * each run's editors would otherwise pile up as drafts, counted on the editor's drafts button.
+     */
+    fun clearDrafts() {
+        runBlocking { GlobalContext.get().get<EntryDraftRepository>().deleteAllDrafts() }
     }
 
     /**

@@ -136,11 +136,11 @@ middle of a run, and starting LogDate with `am start --windowingMode 5` there op
 `./run screenshots:desktop` (`scripts/desktop-windowing-screenshots.sh`) captures it on a regular
 emulator instead. It creates an Android 17 Pixel Tablet emulator the first time, turns desktop
 windowing on and restarts it, installs the debug app and its tests, and runs
-`OsSurfaceScreenshotsTest#desktopWindows` and `#crossAppDrag` (a photo dragged from Files into an
-entry, documented in the keyboard, pointer, and drag and drop guide). Both skip everywhere else,
-because they run only when the script passes `logdate.desktopWindowing=true`. The emulator keeps its
-data between runs, so the tests reuse one journal and one Downloads photo, and close the Files window
-before capturing.
+`OsSurfaceScreenshotsTest#desktopWindows`, `#crossAppDrag`, and `#dragPhotoBetweenWindows` (photos
+dragged into and out of LogDate, documented in the keyboard, pointer, and drag and drop guide). They
+skip everywhere else, because they run only when the script passes `logdate.desktopWindowing=true`.
+The emulator keeps its data between runs, so the tests reuse one journal, one Downloads photo, and
+one Library photo, clear leftover drafts, and close the Files window before capturing.
 
 The main window, and a new entry opened from a journal's menu as a second window:
 

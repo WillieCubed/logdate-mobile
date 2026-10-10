@@ -117,9 +117,11 @@ fun MediaThumbnailItem(
                             Modifier
                         },
                     ).hoverable(interactionSource)
-                    .mediaDragSource(item.uri)
                     .focusableWithRing()
-                    .clickable { onItemClick(item.uid) },
+                    .clickable { onItemClick(item.uid) }
+                    // Inside clickable, so the drag sees the press before the click takes it and a
+                    // long press can pick the media up.
+                    .mediaDragSource(item.uri),
         ) {
             val capturedAt =
                 remember(item.timestamp) {

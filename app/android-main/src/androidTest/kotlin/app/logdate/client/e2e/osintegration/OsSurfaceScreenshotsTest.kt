@@ -218,6 +218,7 @@ class OsSurfaceScreenshotsTest {
     @Test fun desktopWindows() {
         assumeTrue(InstrumentationRegistry.getArguments().getString("logdate.desktopWindowing") == "true")
         OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.clearDrafts()
         OsSurfaceCapture.createJournal("Summer in Lisbon")
         // Closes the Files window crossAppDrag leaves open on this reused emulator.
         OsSurfaceCapture.shell("am force-stop $FILES_PACKAGE")
@@ -252,6 +253,7 @@ class OsSurfaceScreenshotsTest {
     @Test fun crossAppDrag() {
         assumeTrue(InstrumentationRegistry.getArguments().getString("logdate.desktopWindowing") == "true")
         OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.clearDrafts()
         OsSurfaceCapture.createJournal("Summer in Lisbon")
         OsSurfaceCapture.putPhotoInDownloads(DRAGGED_PHOTO)
         // Starts from Home, discarding an entry an earlier run left open.
@@ -279,12 +281,49 @@ class OsSurfaceScreenshotsTest {
         // A long press selects the file in Files; dragging the selected file starts the drag.
         OsSurfaceCapture.device.swipe(from.x, from.y, from.x, from.y, LONG_PRESS_STEPS)
         Thread.sleep(1_000L)
-        OsSurfaceCapture.drag(from, editor, durationMs = 5_000L) {
+        OsSurfaceCapture.drag(from, editor, durationMs = 2_000L) {
             OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "cross-app-drag")
         }
         OsSurfaceCapture.waitForText("Add a caption...")
         Thread.sleep(1_500L)
         OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "cross-app-drop")
+    }
+
+    /**
+     * A photo dragged out of LogDate's Library into a new entry in another window, side by side on
+     * the Android desktop: once while it is over the entry, and once it is dropped. The drag carries
+     * the file itself, as a content URI the receiving window may read, the same as a drag into
+     * another app. Runs from `scripts/desktop-windowing-screenshots.sh`.
+     */
+    @Test fun dragPhotoBetweenWindows() {
+        assumeTrue(InstrumentationRegistry.getArguments().getString("logdate.desktopWindowing") == "true")
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.clearDrafts()
+        OsSurfaceCapture.createPhotoEntry(LIBRARY_PHOTO_CAPTION)
+        OsSurfaceCapture.shell("am force-stop $FILES_PACKAGE")
+        OsSurfaceCapture.shell(
+            "am start --windowingMode $WINDOWING_MODE_FREEFORM -n ${OsSurfaceCapture.packageName}/app.logdate.client.MainActivity",
+        )
+        OsSurfaceCapture.returnHome()
+        OsSurfaceCapture.waitForText("Library").click()
+        OsSurfaceCapture.shell(
+            "am start --windowingMode $WINDOWING_MODE_FREEFORM -f 0x18080000 " +
+                "-n ${OsSurfaceCapture.packageName}/app.logdate.client.EditorActivity",
+        )
+        val screen = Rect(0, 0, OsSurfaceCapture.device.displayWidth, OsSurfaceCapture.device.displayHeight)
+        val top = screen.height() / 16
+        val bottom = screen.height() * 15 / 16
+        OsSurfaceCapture.placeWindow(OsSurfaceCapture.packageName, Rect(top, top, screen.centerX() - top / 4, bottom))
+        OsSurfaceCapture.placeWindow(EDITOR_TASK_AFFINITY, Rect(screen.centerX() + top / 4, top, screen.width() - top, bottom))
+
+        val photo = OsSurfaceCapture.waitForText("Photo from", partial = true).visibleCenter
+        val entry = OsSurfaceCapture.waitForText("Write something").visibleCenter
+        OsSurfaceCapture.drag(photo, entry, durationMs = 2_000L) {
+            OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "drag-out")
+        }
+        OsSurfaceCapture.waitForText("Add a caption...")
+        Thread.sleep(1_500L)
+        OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "drag-out-dropped")
     }
 
     /**
@@ -612,6 +651,10 @@ class OsSurfaceScreenshotsTest {
         const val FILES_ACTIVITY = "$FILES_PACKAGE/com.android.documentsui.files.FilesActivity"
         const val DOWNLOADS_ROOT = "content://com.android.providers.downloads.documents/root/downloads"
         const val DRAGGED_PHOTO = "milo-after-the-rain.jpg"
+
+        /** The Library photo dragged into another window, and how editor windows show in Recents. */
+        const val LIBRARY_PHOTO_CAPTION = "Milo after the rain"
+        const val EDITOR_TASK_AFFINITY = ":.editor"
 
         /** The account button's name, which its tooltip shows. */
         const val ACCOUNT_LABEL = "Account, backup and settings"

@@ -17,6 +17,7 @@ import androidx.compose.ui.draganddrop.DragAndDropTransferData
 import androidx.compose.ui.draganddrop.toAndroidDragEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.FileProvider
+import app.logdate.client.media.storage.androidMediaFileResolver
 import io.github.aakira.napier.Napier
 import java.io.File
 
@@ -88,18 +89,16 @@ actual fun Modifier.mediaDragSource(uri: String): Modifier {
 }
 
 /**
- * A content URI another app may read for [uri]. App-private files are exposed through the app's
- * FileProvider; content URIs pass through; anything else returns null.
+ * A content URI another app may read for [uri]. Content URIs pass through. App-private files, named
+ * by path or by a `logdate-media://` reference, are exposed through the app's FileProvider. Anything
+ * else returns null.
  */
 private fun Context.shareableMediaUri(uri: String): Uri? {
     val parsed = Uri.parse(uri)
-    return when (parsed.scheme) {
-        "content" -> parsed
-        "file", null ->
-            runCatching {
-                FileProvider.getUriForFile(this, "$packageName.provider", File(requireNotNull(parsed.path)))
-            }.onFailure { error -> Napier.w("Media at $uri is outside the shareable folders", error) }
-                .getOrNull()
-        else -> null
-    }
+    if (parsed.scheme == "content") return parsed
+    val path = androidMediaFileResolver(this).filePath(uri) ?: return null
+    return runCatching {
+        FileProvider.getUriForFile(this, "$packageName.provider", File(path))
+    }.onFailure { error -> Napier.w("Media at $uri is outside the shareable folders", error) }
+        .getOrNull()
 }

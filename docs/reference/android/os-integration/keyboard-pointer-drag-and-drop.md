@@ -82,7 +82,15 @@ A photo copied in another app and pasted with Ctrl+V on a tablet with a USB keyb
 
 ![A new entry in the editor with the pasted photo of a dog wrapped in a blanket](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/paste-photo--tablet-api37.png)
 
-- Dragging a photo or video out of LogDate into another app sends the actual file, not a path string.
+- Dragging a photo or video out of LogDate's Library sends the actual file, not a path string, to
+  another app or to another LogDate window. A long press picks it up.
+
+A photo dragged from the Library into a new entry in a second LogDate window on the Android 17
+desktop:
+
+| While dragging | Once dropped |
+| --- | --- |
+| ![The Library on the left with its photo being dragged over a new entry in an editor window on the right, which is outlined as a drop target](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/drag-out--tablet-api37.png) | ![The editor window with the photo dropped into the new entry](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/drag-out-dropped--tablet-api37.png) |
 
 A photo dragged from the Files app into a new entry, with the two side by side on the Android 17
 desktop. While it is over the editor, the editor is outlined in the theme's primary color:
@@ -192,8 +200,12 @@ bubble use it. Wrap any new icon-only button in it, with the same label as its c
   would drop its Markdown styling.
 - **Out of LogDate.** `mediaDragSource` in `client/ui` sends a `ClipData` with a content URI from the
   app's FileProvider (`${applicationId}.provider`, which covers the private media store) and the
-  file's MIME type. It sets `DRAG_FLAG_GLOBAL | DRAG_FLAG_GLOBAL_URI_READ`, so the receiving app may
-  read that one file. Library thumbnails use it.
+  file's MIME type. Stored media is named by `logdate-media://` references, so it first resolves the
+  reference to its file with `MediaFileResolver`. It sets
+  `DRAG_FLAG_GLOBAL | DRAG_FLAG_GLOBAL_URI_READ`, so the receiving app may read that one file.
+  Library thumbnails use it. Compose starts the drag on a long press, so the modifier sits inside
+  the thumbnail's `clickable`: outside it, the click takes the press first and the drag never
+  starts.
 
 ### Stylus
 
@@ -241,7 +253,8 @@ Dragging out shares only the file the person dragged, with read-only access gran
   if the keyboard does not type it into the entry, and `stylusWritingOnControls` does the same on the
   "Write something" card and the search pill (see Updating screenshots).
 - **Cross-app drag:** `OsSurfaceScreenshotsTest#crossAppDrag` drags a photo from Files into a new
-  entry on the Android desktop and waits for it in the entry.
+  entry on the Android desktop and waits for it in the entry, and `#dragPhotoBetweenWindows` drags
+  a Library photo into an entry in a second window.
 - **Manual check:** on an API 37 tablet emulator with a hardware keyboard and mouse, press Meta+/.
 
 ## Updating screenshots
@@ -252,10 +265,13 @@ Dragging out shares only the file the person dragged, with read-only access gran
   desktop windowing emulator, where windows sit side by side and a mouse pointer can hover; the
   tooltip capture rests the pointer with injected mouse hover events. They land in
   `docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/`.
-- The cross-app drag test saves the sample photo to Downloads, opens Files there, places the two
-  windows with `am task resize`, selects the photo with a long press, and drags it with
-  `input touchscreen draganddrop`. In Files a first long press only selects a file; a drag starts
-  from a file that is already selected.
+- The drag tests place the two windows with `am task resize` and drag with injected touch events
+  (`OsSurfaceCapture.drag`): a press held past the long-press timeout, a steady move, and a pause
+  over the target for the capture. `input draganddrop` does not hold long enough for Compose's
+  drag source. In Files a first long press only selects a file; a drag starts from a file that is
+  already selected. The Files app on the emulator does not accept files dropped from other apps,
+  so the drag out of LogDate is shown into a second LogDate window, which receives the same shared
+  file URI another app would.
 - The shortcut helper capture plugs in a USB keyboard through Android's `uinput` shell tool
   (`HardwareKeyboard` in the instrumented tests). Key presses that UiAutomator injects come from
   Android's virtual keyboard, which has no physical keys, and Android 17's helper then drops every app
