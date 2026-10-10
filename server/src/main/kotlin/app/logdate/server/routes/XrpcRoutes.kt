@@ -17,6 +17,7 @@ import io.github.smiley4.ktoropenapi.post
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.plugins.origin
 import io.ktor.server.request.contentType
@@ -73,6 +74,27 @@ fun Route.xrpcRoutes(
     oauthDpopVerifier: OAuthDpopVerifier? = null,
     oauthNonceService: OAuthNonceService? = null,
 ) {
+    // Every repo holds its owner's private journal, so reads are owner-only. Anyone else gets
+    // `respondAsMissing`, the answer for a repo that does not exist, before anything is looked up.
+    suspend fun ApplicationCall.requireRepoOwner(
+        repo: String,
+        respondAsMissing: suspend ApplicationCall.() -> Unit,
+    ): Boolean {
+        val account =
+            requireAuthenticatedAccount(
+                identityService = identityService,
+                accountRepository = accountRepository,
+                tokenService = tokenService,
+                atprotoSessionTokenService = atprotoSessionTokenService,
+                oauthAccessTokenService = oauthAccessTokenService,
+                oauthDpopVerifier = oauthDpopVerifier,
+                oauthNonceService = oauthNonceService,
+            ) ?: return false
+        if (ownsRepo(account, repo)) return true
+        respondAsMissing()
+        return false
+    }
+
     route("/xrpc") {
         get("/com.atproto.identity.resolveHandle", XrpcDocs.resolveHandle) {
             val handleValue =
@@ -242,6 +264,7 @@ fun Route.xrpcRoutes(
                 call.respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", "Invalid did or since"))
                 return@get
             }
+            if (!call.requireRepoOwner(didValue) { respondRepoNotFound(didValue) }) return@get
             val result = syncApi.getRepo(GetRepoRequest(did = did, since = since))
             val export = result.getOrNull()
             if (export == null) {
@@ -270,6 +293,7 @@ fun Route.xrpcRoutes(
                 call.respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", "did is required"))
                 return@get
             }
+            if (!call.requireRepoOwner(didValue) { respondRepoNotFound(didValue) }) return@get
             val result = syncApi.getLatestCommit(GetLatestCommitRequest(did))
             val latestCommit = result.getOrNull()
             if (latestCommit == null) {
@@ -294,6 +318,7 @@ fun Route.xrpcRoutes(
                 call.respond(HttpStatusCode.BadRequest, PdsErrorResponse("InvalidRequest", "did is required"))
                 return@get
             }
+            if (!call.requireRepoOwner(didValue) { respondRepoNotFound(didValue) }) return@get
             val result = syncApi.getRepoStatus(GetRepoStatusRequest(did))
             val repoStatus = result.getOrNull()
             if (repoStatus == null) {
@@ -329,12 +354,16 @@ fun Route.xrpcRoutes(
                 return@get
             }
 
+            val respondInvalidRecordId: suspend ApplicationCall.() -> Unit = {
+                respond(
+                    HttpStatusCode.BadRequest,
+                    PdsErrorResponse("InvalidRequest", "Invalid repo, collection, or record key"),
+                )
+            }
+            if (!call.requireRepoOwner(repoValue, respondInvalidRecordId)) return@get
             val recordId =
                 parseRecordId(identityService, repoValue, collectionValue, recordKeyValue)
-                    ?: return@get call.respond(
-                        HttpStatusCode.BadRequest,
-                        PdsErrorResponse("InvalidRequest", "Invalid repo, collection, or record key"),
-                    )
+                    ?: return@get call.respondInvalidRecordId()
 
             val recordResult =
                 repoApi.getRecord(
@@ -386,13 +415,17 @@ fun Route.xrpcRoutes(
                 return@get
             }
 
-            val repo = resolveRepoDid(identityService, repoValue)
-            val collection = Nsid.parse(collectionValue).getOrNull()
-            if (repo == null || collection == null) {
-                call.respond(
+            val respondInvalidRepoOrCollection: suspend ApplicationCall.() -> Unit = {
+                respond(
                     HttpStatusCode.BadRequest,
                     PdsErrorResponse("InvalidRequest", "Invalid repo or collection"),
                 )
+            }
+            if (!call.requireRepoOwner(repoValue, respondInvalidRepoOrCollection)) return@get
+            val repo = resolveRepoDid(identityService, repoValue)
+            val collection = Nsid.parse(collectionValue).getOrNull()
+            if (repo == null || collection == null) {
+                call.respondInvalidRepoOrCollection()
                 return@get
             }
 
@@ -640,6 +673,7 @@ fun Route.xrpcRoutes(
                 return@get
             }
 
+            if (!call.requireRepoOwner(didValue) { respondBlobNotFound() }) return@get
             val result =
                 pdsBlobService.getBlob(
                     GetBlobRequest(
@@ -661,10 +695,7 @@ fun Route.xrpcRoutes(
                 return@get
             }
             if (result.isSuccess) {
-                call.respond(
-                    HttpStatusCode.NotFound,
-                    PdsErrorResponse("BlobNotFound", "Blob not found"),
-                )
+                call.respondBlobNotFound()
                 return@get
             }
 
@@ -903,6 +934,14 @@ private suspend fun io.ktor.server.application.ApplicationCall.respondForRepoErr
                 PdsErrorResponse("InvalidRequest", error?.message ?: "Invalid XRPC request"),
             )
     }
+}
+
+private suspend fun ApplicationCall.respondRepoNotFound(did: String) {
+    respond(HttpStatusCode.NotFound, PdsErrorResponse("RepoNotFound", "Unknown repo: $did"))
+}
+
+private suspend fun ApplicationCall.respondBlobNotFound() {
+    respond(HttpStatusCode.NotFound, PdsErrorResponse("BlobNotFound", "Blob not found"))
 }
 
 private suspend fun io.ktor.server.application.ApplicationCall.respondForBlobError(error: Throwable?) {

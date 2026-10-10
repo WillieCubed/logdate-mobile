@@ -174,7 +174,7 @@ There are four ways to obtain an access token:
 3. **Restore credential** (`/auth/restore/*`): a special passkey the app registers so a person who has lost every device can still regain access. Register it while signed in; use it later without a username.
 4. **Refresh** (`/auth/token/refresh`): exchanges a refresh token for a new access token. This is the only auth call a client makes routinely.
 
-Send the access token as `Authorization: Bearer <accessToken>` on every endpoint marked with a lock icon (the XRPC write methods also accept the OAuth form described next). Logging out (`/auth/logout`) revokes the refresh token; a revoked token answers `401 REFRESH_TOKEN_REVOKED` forever after.
+Send the access token as `Authorization: Bearer <accessToken>` on every endpoint marked with a lock icon (the XRPC repository methods also accept the OAuth form described next). Logging out (`/auth/logout`) revokes the refresh token; a revoked token answers `401 REFRESH_TOKEN_REVOKED` forever after.
 
 Third-party AT Protocol clients use the **OAuth** section instead, and send DPoP-bound tokens as `Authorization: DPoP <token>` together with a `DPoP` proof header.
 

@@ -39,7 +39,8 @@ internal val unsupported =
 internal val invalidRequest =
     ErrorCase(
         "InvalidRequest",
-        "A required parameter is missing or malformed. The `message` names it.",
+        "A required parameter is missing or malformed, or the repository is not yours or does not exist. " +
+            "The `message` names the parameter.",
         "repo, collection, and rkey are required",
     )
 internal val repoMismatch =
@@ -54,12 +55,17 @@ internal val invalidSwap =
         "`swapRecord` or `swapCommit` did not match the current state: someone wrote in between. Re-read and try again.",
         "swapRecord did not match",
     )
-internal val repoNotFound = ErrorCase("RepoNotFound", "No repository with that DID is hosted here.", "Unknown repo: did:plc:…")
+internal val repoNotFound =
+    ErrorCase(
+        "RepoNotFound",
+        "No repository with that DID is hosted here, or it is not yours. The two cases answer identically.",
+        "Unknown repo: did:plc:…",
+    )
 internal val accountTakedown = ErrorCase("AccountTakedown", "The account has been deactivated by the operator.", "Account is not active")
 
 internal fun ResponsesConfig.notConfigured() = pdsError(HttpStatusCode.NotImplemented, unsupported)
 
-/** Write operations answer every credential problem with `AuthRequired`; only the session methods use `InvalidToken`. */
+/** Repository operations answer every credential problem with `AuthRequired`; only the session methods use `InvalidToken`. */
 internal fun ResponsesConfig.authRequired() =
     pdsError(
         HttpStatusCode.Unauthorized,

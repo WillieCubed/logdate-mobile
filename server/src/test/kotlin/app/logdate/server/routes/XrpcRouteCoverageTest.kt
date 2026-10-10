@@ -279,6 +279,22 @@ class XrpcRouteCoverageTest {
                 }
             assertEquals(HttpStatusCode.OK, created.status)
 
+            val listed =
+                client.get("/xrpc/com.atproto.repo.listRecords?repo=$repoDid&collection=studio.hypertext.logdate.content") {
+                    header(HttpHeaders.Authorization, "DPoP $accessToken")
+                    header(
+                        "DPoP",
+                        createDpopProof(
+                            keyPair = clientKey,
+                            method = "GET",
+                            htu = "http://localhost/xrpc/com.atproto.repo.listRecords",
+                            nonce = env.oauthNonceService.currentNonce(),
+                            ath = env.oauthDpopVerifier.accessTokenHash(accessToken),
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.OK, listed.status)
+
             val missingProof =
                 client.post("/xrpc/com.atproto.repo.createRecord") {
                     contentType(ContentType.Application.Json)
@@ -472,6 +488,7 @@ class XrpcRouteCoverageTest {
                     )
                 }
             val ensuredAccount = runBlocking { env.identityService.ensureIdentity(account) }
+            val accessToken = env.tokenService.generateAccessToken(ensuredAccount.id.toString())
 
             val missingDescribeRepo = client.get("/xrpc/com.atproto.repo.describeRepo")
             val unknownDescribeRepo = client.get("/xrpc/com.atproto.repo.describeRepo?repo=missing.logdate.app")
@@ -479,16 +496,22 @@ class XrpcRouteCoverageTest {
             val getRecordInvalid =
                 client.get(
                     "/xrpc/com.atproto.repo.getRecord?repo=alice.logdate.app&collection=bad collection&rkey=entry-1",
-                )
+                ) {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
             val getRecordMissingValue =
                 client.get(
                     "/xrpc/com.atproto.repo.getRecord?repo=alice.logdate.app&collection=studio.hypertext.logdate.content&rkey=entry-1",
-                )
+                ) {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
             store.getRecordResult = Result.failure(UnsupportedCollectionException("studio.hypertext.logdate.other"))
             val getRecordFailure =
                 client.get(
                     "/xrpc/com.atproto.repo.getRecord?repo=alice.logdate.app&collection=studio.hypertext.logdate.content&rkey=entry-1",
-                )
+                ) {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
             store.getRecordResult =
                 Result.success(
                     RepoRecord(
@@ -500,14 +523,21 @@ class XrpcRouteCoverageTest {
             val getRecordCidMismatch =
                 client.get(
                     "/xrpc/com.atproto.repo.getRecord?repo=alice.logdate.app&collection=studio.hypertext.logdate.content&rkey=entry-1&cid=bafy-other",
-                )
+                ) {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
             val listRecordsMissing = client.get("/xrpc/com.atproto.repo.listRecords")
-            val listRecordsInvalid = client.get("/xrpc/com.atproto.repo.listRecords?repo=alice.logdate.app&collection=bad collection")
+            val listRecordsInvalid =
+                client.get("/xrpc/com.atproto.repo.listRecords?repo=alice.logdate.app&collection=bad collection") {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
             store.listRecordsResult = Result.success(RepoListPage(records = emptyList(), cursor = "next"))
             val listRecordsSuccess =
                 client.get(
                     "/xrpc/com.atproto.repo.listRecords?repo=alice.logdate.app&collection=studio.hypertext.logdate.content&limit=999&cursor=%20cursor-1%20&reverse=true",
-                )
+                ) {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
 
             assertEquals(HttpStatusCode.BadRequest, missingDescribeRepo.status)
             assertEquals(HttpStatusCode.BadRequest, unknownDescribeRepo.status)
@@ -1049,23 +1079,45 @@ class XrpcRouteCoverageTest {
     fun `xrpc routes proxy standard sync export endpoints`() =
         testApplication {
             val syncService = StubSyncService()
-            configureXrpcApp(
-                repoRecordStore = StubRepoRecordStore(),
-                syncService = syncService,
-            )
+            val env =
+                configureXrpcApp(
+                    repoRecordStore = StubRepoRecordStore(),
+                    syncService = syncService,
+                )
+            val account =
+                runBlocking {
+                    env.accountRepository.save(
+                        Account(
+                            id = Uuid.random(),
+                            username = "alice",
+                            displayName = "Alice",
+                            createdAt = Clock.System.now(),
+                        ),
+                    )
+                }
+            val did = requireNotNull(runBlocking { env.identityService.ensureIdentity(account) }.did)
+            val accessToken = env.tokenService.generateAccessToken(account.id.toString())
 
             val repoResponse =
-                client.get("/xrpc/com.atproto.sync.getRepo?did=did:web:alice.logdate.app&since=${Tid.fromLong(5L)}")
-            val latestCommit = client.get("/xrpc/com.atproto.sync.getLatestCommit?did=did:web:alice.logdate.app")
-            val repoStatus = client.get("/xrpc/com.atproto.sync.getRepoStatus?did=did:web:alice.logdate.app")
+                client.get("/xrpc/com.atproto.sync.getRepo?did=$did&since=${Tid.fromLong(5L)}") {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
+            val latestCommit =
+                client.get("/xrpc/com.atproto.sync.getLatestCommit?did=$did") {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
+            val repoStatus =
+                client.get("/xrpc/com.atproto.sync.getRepoStatus?did=$did") {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
 
             assertEquals(HttpStatusCode.OK, repoResponse.status)
             assertEquals("application/vnd.ipld.car", repoResponse.contentType().toString())
             assertEquals("car-bytes", repoResponse.bodyAsText())
-            assertEquals("did:web:alice.logdate.app", syncService.lastGetRepoRequest?.did.toString())
+            assertEquals(did, syncService.lastGetRepoRequest?.did.toString())
             assertEquals(5L, syncService.lastGetRepoRequest?.since?.toLong())
-            assertEquals("did:web:alice.logdate.app", syncService.lastGetLatestCommitRequest?.did.toString())
-            assertEquals("did:web:alice.logdate.app", syncService.lastGetRepoStatusRequest?.did.toString())
+            assertEquals(did, syncService.lastGetLatestCommitRequest?.did.toString())
+            assertEquals(did, syncService.lastGetRepoStatusRequest?.did.toString())
             assertEquals(
                 "bafyreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
                 json

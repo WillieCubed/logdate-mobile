@@ -19,6 +19,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
@@ -79,7 +81,10 @@ class XrpcRepoRoutesTest {
             val createdCid = createdPayload["cid"]?.jsonPrimitive?.content
             assertTrue(createdCid?.startsWith("b") == true)
 
-            val list = client.get("/xrpc/com.atproto.repo.listRecords?repo=alice.logdate.app&collection=studio.hypertext.logdate.content")
+            val list =
+                client.get("/xrpc/com.atproto.repo.listRecords?repo=alice.logdate.app&collection=studio.hypertext.logdate.content") {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
             assertEquals(HttpStatusCode.OK, list.status)
             val listPayload = json.parseToJsonElement(list.bodyAsText()).jsonObject
             val listedRecord = listPayload["records"]?.jsonArray?.single()?.jsonObject
@@ -93,7 +98,9 @@ class XrpcRepoRoutesTest {
                 client.get(
                     "/xrpc/com.atproto.repo.getRecord" +
                         "?repo=alice.logdate.app&collection=studio.hypertext.logdate.content&rkey=entry-1&cid=$createdCid",
-                )
+                ) {
+                    header(HttpHeaders.Authorization, "Bearer $accessToken")
+                }
             assertEquals(HttpStatusCode.OK, getRecord.status)
             val getPayload = json.parseToJsonElement(getRecord.bodyAsText()).jsonObject
             assertEquals(
@@ -227,7 +234,9 @@ class XrpcRepoRoutesTest {
                 client.get(
                     "/xrpc/com.atproto.repo.listRecords" +
                         "?repo=brie.logdate.app&collection=studio.hypertext.logdate.content&cursor=not-a-number",
-                )
+                ) {
+                    header(HttpHeaders.Authorization, "Bearer $firstToken")
+                }
             assertEquals(HttpStatusCode.OK, listWithCursor.status)
             val cursorPayload = json.parseToJsonElement(listWithCursor.bodyAsText()).jsonObject
             assertTrue(cursorPayload.containsKey("records"))
@@ -249,4 +258,89 @@ class XrpcRepoRoutesTest {
                 }
             assertEquals(HttpStatusCode.OK, deleteWithSwap.status)
         }
+
+    @Test
+    fun `repo reads answer only the signed-in owner and never confirm another repo`() =
+        testApplication {
+            val env = configureAuthV1TestApp()
+            val owner =
+                runBlocking {
+                    env.accountRepository.save(
+                        Account(id = Uuid.random(), username = "dana", displayName = "Dana", createdAt = Clock.System.now()),
+                    )
+                }
+            val other =
+                runBlocking {
+                    env.accountRepository.save(
+                        Account(id = Uuid.random(), username = "eli", displayName = "Eli", createdAt = Clock.System.now()),
+                    )
+                }
+            val ownerToken = env.tokenService.generateAccessToken(owner.id.toString())
+            val otherToken = env.tokenService.generateAccessToken(other.id.toString())
+            val created =
+                client.post("/xrpc/com.atproto.repo.createRecord") {
+                    contentType(ContentType.Application.Json)
+                    header(HttpHeaders.Authorization, "Bearer $ownerToken")
+                    setBody(
+                        """
+                        {
+                          "repo": "dana.logdate.app",
+                          "collection": "studio.hypertext.logdate.content",
+                          "rkey": "entry-1",
+                          "record": { "type": "TEXT", "content": "private words" }
+                        }
+                        """.trimIndent(),
+                    )
+                }
+            assertEquals(HttpStatusCode.OK, created.status)
+            val ownerDid = runBlocking { requireNotNull(env.atprotoIdentityService.findByHandle("dana.logdate.app")?.did) }
+
+            fun readsOf(
+                handle: String,
+                did: String,
+            ) = listOf(
+                "/xrpc/com.atproto.repo.getRecord?repo=$handle&collection=studio.hypertext.logdate.content&rkey=entry-1",
+                "/xrpc/com.atproto.repo.listRecords?repo=$handle&collection=studio.hypertext.logdate.content",
+                "/xrpc/com.atproto.sync.getRepo?did=$did",
+                "/xrpc/com.atproto.sync.getLatestCommit?did=$did",
+                "/xrpc/com.atproto.sync.getRepoStatus?did=$did",
+            )
+
+            readsOf("dana.logdate.app", ownerDid)
+                .zip(readsOf("nobody.logdate.app", MISSING_DID))
+                .forEach { (ownerRead, missingRead) ->
+                    val anonymous = client.get(ownerRead)
+                    val anonymousMissing = client.get(missingRead)
+                    assertEquals(HttpStatusCode.Unauthorized, anonymous.status, ownerRead)
+                    assertTrue(anonymous.bodyAsText().contains("AuthRequired"), ownerRead)
+                    assertEquals(anonymousMissing.status, anonymous.status, ownerRead)
+                    assertEquals(anonymousMissing.bodyAsText(), anonymous.bodyAsText(), ownerRead)
+
+                    val otherReading = client.get(ownerRead) { header(HttpHeaders.Authorization, "Bearer $otherToken") }
+                    val otherMissing = client.get(missingRead) { header(HttpHeaders.Authorization, "Bearer $otherToken") }
+                    assertNotEquals(HttpStatusCode.OK, otherReading.status, ownerRead)
+                    assertEquals(otherMissing.status, otherReading.status, ownerRead)
+                    // A missing repo's answer may name the identifier that was asked for, and nothing else.
+                    assertEquals(otherMissing.bodyAsText().replace(MISSING_DID, ownerDid), otherReading.bodyAsText(), ownerRead)
+                    assertFalse(otherReading.bodyAsText().contains("private words"), ownerRead)
+
+                    val ownerReading = client.get(ownerRead) { header(HttpHeaders.Authorization, "Bearer $ownerToken") }
+                    assertEquals(HttpStatusCode.OK, ownerReading.status, ownerRead)
+                }
+
+            val ownerRecord =
+                client.get(readsOf("dana.logdate.app", ownerDid).first()) {
+                    header(HttpHeaders.Authorization, "Bearer $ownerToken")
+                }
+            assertTrue(ownerRecord.bodyAsText().contains("private words"))
+            val ownerExport =
+                client.get("/xrpc/com.atproto.sync.getRepo?did=$ownerDid") {
+                    header(HttpHeaders.Authorization, "Bearer $ownerToken")
+                }
+            assertEquals("application/vnd.ipld.car", ownerExport.contentType().toString())
+        }
+
+    private companion object {
+        const val MISSING_DID = "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa"
+    }
 }

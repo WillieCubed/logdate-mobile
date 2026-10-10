@@ -345,12 +345,6 @@ class OpenApiContractTest {
                 "describeRepo",
                 "createAtprotoAccount",
                 "createAtprotoSession",
-                "getRepo",
-                "getLatestCommit",
-                "getRepoStatus",
-                "getRecord",
-                "listRecords",
-                "getBlob",
                 "claimDeviceEnrollment",
             )
 

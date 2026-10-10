@@ -10,7 +10,6 @@ import app.logdate.server.routes.binarySchema
 import app.logdate.server.routes.jsonBody
 import app.logdate.server.routes.ok
 import app.logdate.server.routes.pdsError
-import app.logdate.server.routes.publicOperation
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -37,14 +36,15 @@ internal object XrpcRepoDocs {
     // ---- Repository sync -----------------------------------------------------------------------
 
     val getRepo: RouteConfig.() -> Unit = {
-        publicOperation(
+        bearerOrDpopOperation(
             "getRepo",
             ApiTags.XRPC,
             "Export a repository",
             """
             `com.atproto.sync.getRepo`. Streams the whole repository as a CAR file (a content-addressed
             archive of all its blocks), which is how AT Protocol servers copy and verify each other's data.
-            Pass `since` (a revision) to get only the blocks written after it.
+            Pass `since` (a revision) to get only the blocks written after it. Only the repository's owner can read it: send their access token. Asking for any other
+            repository answers exactly as if it did not exist.
             """,
         )
         request {
@@ -64,44 +64,51 @@ internal object XrpcRepoDocs {
                 HttpStatusCode.BadRequest,
                 ErrorCase("InvalidRequest", "`did` is missing, or `did` or `since` is malformed.", "Invalid did or since"),
             )
+            authRequired()
             pdsError(HttpStatusCode.NotFound, repoNotFound)
             notConfigured()
         }
     }
 
     val getLatestCommit: RouteConfig.() -> Unit = {
-        publicOperation(
+        bearerOrDpopOperation(
             "getLatestCommit",
             ApiTags.XRPC,
             "Get the latest commit",
             """
             `com.atproto.sync.getLatestCommit`. Returns the CID and revision of the repository's newest commit.
             Compare it with what you last saw to learn whether anything changed before exporting.
+            Only the repository's owner can read it: send their access token. Asking for any other
+            repository answers exactly as if it did not exist.
             """,
         )
         request { didParameter() }
         response {
             ok("The head of the repository.", GetLatestCommitResponse(cid = Cid.require(COMMIT_CID), rev = Tid.require(REV)))
             pdsError(HttpStatusCode.BadRequest, ErrorCase("InvalidRequest", "`did` is missing or malformed.", "did is required"))
+            authRequired()
             pdsError(HttpStatusCode.NotFound, repoNotFound)
             notConfigured()
         }
     }
 
     val getRepoStatus: RouteConfig.() -> Unit = {
-        publicOperation(
+        bearerOrDpopOperation(
             "getRepoStatus",
             ApiTags.XRPC,
             "Get repository status",
             """
             `com.atproto.sync.getRepoStatus`. Says whether a repository is active on this server and, if so,
             its current revision. Deactivated or migrated repositories answer `active: false` with a `status`.
+            Only the repository's owner can read it: send their access token. Asking for any other
+            repository answers exactly as if it did not exist.
             """,
         )
         request { didParameter() }
         response {
             ok("The repository's status.", GetRepoStatusResponse(did = did, active = true, rev = Tid.require(REV)))
             pdsError(HttpStatusCode.BadRequest, ErrorCase("InvalidRequest", "`did` is missing or malformed.", "did is required"))
+            authRequired()
             pdsError(HttpStatusCode.NotFound, repoNotFound)
             notConfigured()
         }
@@ -110,7 +117,7 @@ internal object XrpcRepoDocs {
     // ---- Records --------------------------------------------------------------------------------
 
     val getRecord: RouteConfig.() -> Unit = {
-        publicOperation(
+        bearerOrDpopOperation(
             "getRecord",
             ApiTags.XRPC,
             "Get a record",
@@ -118,7 +125,8 @@ internal object XrpcRepoDocs {
             `com.atproto.repo.getRecord`. Fetches one record by repository, collection and record key. A
             *collection* is a lexicon ID such as `studio.hypertext.logdate.content`; the *record key* is the
             record's ID within it. Records are returned as the JSON the writer stored, plus the `at://` URI and
-            the CID (content hash) of this version.
+            the CID (content hash) of this version. Only the repository's owner can read it: send their access token. Asking for any other
+            repository answers exactly as if it did not exist.
             """,
         )
         request {
@@ -150,19 +158,21 @@ internal object XrpcRepoDocs {
                     "Record not found",
                 ),
             )
+            authRequired()
             notConfigured()
         }
     }
 
     val listRecords: RouteConfig.() -> Unit = {
-        publicOperation(
+        bearerOrDpopOperation(
             "listRecords",
             ApiTags.XRPC,
             "List records",
             """
             `com.atproto.repo.listRecords`. Pages through the records in one collection of one repository.
             Pass the `cursor` from each response to get the next page; an absent cursor means you have reached
-            the end.
+            the end. Only the repository's owner can read it: send their access token. Asking for any other
+            repository answers exactly as if it did not exist.
             """,
         )
         request {
@@ -197,10 +207,12 @@ internal object XrpcRepoDocs {
                 HttpStatusCode.BadRequest,
                 ErrorCase(
                     "InvalidRequest",
-                    "`repo` or `collection` is missing or malformed, the collection is not one this server stores, or the cursor is invalid.",
+                    "`repo` or `collection` is missing or malformed, the repository is not yours or does not exist, " +
+                        "the collection is not one this server stores, or the cursor is invalid.",
                     "Invalid repo or collection",
                 ),
             )
+            authRequired()
             notConfigured()
         }
     }
@@ -357,13 +369,14 @@ internal object XrpcRepoDocs {
     }
 
     val getBlob: RouteConfig.() -> Unit = {
-        publicOperation(
+        bearerOrDpopOperation(
             "getBlob",
             ApiTags.XRPC,
             "Download a blob",
             """
             `com.atproto.sync.getBlob`. Streams a blob's bytes by repository DID and CID, with the
-            `Content-Type` it was uploaded with. Public, like the records that reference it.
+            `Content-Type` it was uploaded with. Only the repository's owner can read it: send their access token. Asking for any other
+            repository answers exactly as if it did not exist.
             """,
         )
         request {
@@ -383,9 +396,14 @@ internal object XrpcRepoDocs {
                 HttpStatusCode.BadRequest,
                 ErrorCase("InvalidRequest", "`did` or `cid` is missing or malformed.", "did and cid are required"),
             )
+            authRequired()
             pdsError(
                 HttpStatusCode.NotFound,
-                ErrorCase("BlobNotFound", "No blob with that CID exists in the repository.", "Blob not found"),
+                ErrorCase(
+                    "BlobNotFound",
+                    "No blob with that CID exists in the repository, or the repository is not yours.",
+                    "Blob not found",
+                ),
             )
             notConfigured()
         }
