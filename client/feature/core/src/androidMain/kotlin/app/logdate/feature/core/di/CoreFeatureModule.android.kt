@@ -107,7 +107,7 @@ actual val coreFeatureModule: Module =
         // Single instance exposed as both concrete type and interface
         single<DeviceTransferSealer> { AndroidDeviceTransferSealer() }
         single<CodeScannerAvailability> { PlayServicesCodeScannerAvailability }
-        single<MediaSourceOpener> { AndroidMediaSourceOpener(androidContext()) }
+        single<MediaSourceOpener> { AndroidMediaSourceOpener(androidContext(), get()) }
         single {
             val identity = get<IdentityKeyManager>()
             val derivation = get<KeyDerivation>()

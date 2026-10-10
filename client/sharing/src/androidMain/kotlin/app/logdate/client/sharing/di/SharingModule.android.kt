@@ -30,6 +30,6 @@ actual val sharingModule: Module =
         factory<RewindStatsSummaryRenderer> {
             AndroidRewindStatsSummaryRenderer(androidContext(), get(named("io-dispatcher")))
         }
-        factory<SharingLauncher> { AndroidSharingLauncher(get(), get(), get(), get()) }
+        factory<SharingLauncher> { AndroidSharingLauncher(get(), get(), get(), get(), mediaFiles = get()) }
         factory<JournalLinkSharingAvailability> { ServerJournalLinkSharingAvailability(get()) }
     }

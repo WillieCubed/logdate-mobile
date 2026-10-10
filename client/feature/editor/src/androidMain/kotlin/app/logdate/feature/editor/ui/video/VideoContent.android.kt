@@ -83,6 +83,8 @@ import app.logdate.client.media.MediaManager
 import app.logdate.client.media.device.AudioRouteRepository
 import app.logdate.client.media.device.MediaDeviceKind
 import app.logdate.client.media.device.systemControlledSelection
+import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.playableUri
 import app.logdate.client.media.video.ExoPlayerPool
 import app.logdate.feature.editor.ui.media.ManagedMediaSelectionController
 import app.logdate.feature.editor.ui.media.ManagedMediaSelectionState
@@ -145,6 +147,7 @@ actual fun VideoPlayerContent(
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val exoPlayerPool: ExoPlayerPool = koinInject()
+    val mediaFiles: MediaFileResolver = koinInject()
     val audioRouteRepository: AudioRouteRepository = koinInject()
     val outputSelection by audioRouteRepository.outputDevices.collectAsState()
 
@@ -162,7 +165,7 @@ actual fun VideoPlayerContent(
     val exoPlayer =
         remember(uri) {
             exoPlayerPool.acquire().apply {
-                setMediaItem(MediaItem.fromUri(uri))
+                setMediaItem(MediaItem.fromUri(mediaFiles.playableUri(uri)))
                 prepare()
                 playWhenReady = false
                 addListener(
@@ -500,6 +503,7 @@ actual fun VideoPickerContent(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val mediaManager: MediaManager = koinInject()
+    val mediaFiles: MediaFileResolver = koinInject()
     val currentOnVideoSelected by rememberUpdatedState(onVideoSelected)
     val managedMediaDiscarder =
         remember(context, mediaManager) { AndroidManagedMediaDiscarder(context.applicationContext, mediaManager) }
@@ -527,7 +531,7 @@ actual fun VideoPickerContent(
                 prepareManagedMedia = { managedUri ->
                     ManagedVideoSelection(
                         uri = managedUri,
-                        durationMs = getVideoDuration(context, Uri.parse(managedUri)),
+                        durationMs = getVideoDuration(context, Uri.parse(mediaFiles.playableUri(managedUri))),
                     )
                 },
                 transferOwnership = { selection ->
@@ -566,7 +570,7 @@ actual fun VideoPickerContent(
                     prepareManagedMedia = { managedUri ->
                         ManagedVideoSelection(
                             uri = managedUri,
-                            durationMs = getVideoDuration(context, Uri.parse(managedUri)),
+                            durationMs = getVideoDuration(context, Uri.parse(mediaFiles.playableUri(managedUri))),
                         )
                     },
                     transferOwnership = { selection ->

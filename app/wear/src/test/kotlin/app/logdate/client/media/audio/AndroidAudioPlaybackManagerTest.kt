@@ -6,6 +6,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
+import app.logdate.client.media.storage.AndroidMediaDirectories
+import app.logdate.client.media.storage.MediaFileResolver
 import com.google.common.util.concurrent.Futures
 import io.mockk.every
 import io.mockk.just
@@ -15,6 +17,8 @@ import io.mockk.runs
 import io.mockk.slot
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import java.io.File
+import java.nio.file.Files
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -43,6 +47,8 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalCoroutinesApi::class)
 class AndroidAudioPlaybackManagerTest {
     private val context = mockk<Context>()
+    private val filesDir = Files.createTempDirectory("logdate-files").toFile()
+    private val mediaFiles = MediaFileResolver(AndroidMediaDirectories(filesDir))
     private val controller = mockk<MediaController>()
     private val controllerListener = slot<Player.Listener>()
     private val directExecutor = Executor { runnable -> runnable.run() }
@@ -59,7 +65,28 @@ class AndroidAudioPlaybackManagerTest {
     @AfterTest
     fun unmockSystemClock() {
         unmockkStatic(SystemClock::class)
+        filesDir.deleteRecursively()
     }
+
+    @Test
+    fun `startPlayback plays a media reference from its recording file`() =
+        runTest {
+            val itemFactory = RecordingAudioPlaybackItemFactory()
+            val manager = createManager(this, currentPosition = PlaybackStateHolder(0L), itemFactory = itemFactory)
+            every { controller.isPlaying } returns true
+
+            manager.startPlayback(
+                uri = "logdate-media://recordings/voice%20note.m4a",
+                metadata = null,
+                onProgressUpdated = {},
+                onPlaybackCompleted = {},
+            )
+
+            assertEquals("logdate-media://recordings/voice%20note.m4a", manager.playbackStatus.value.currentUri)
+            val recording = File(filesDir.canonicalFile, "audio_notes/voice note.m4a")
+            assertEquals("file://${recording.toURI().rawPath}", itemFactory.lastUri)
+            manager.release()
+        }
 
     @Test
     fun `startPlayback starts service and configures media controller with metadata`() =
@@ -384,6 +411,7 @@ class AndroidAudioPlaybackManagerTest {
             controllerExecutor = directExecutor,
             mediaItemFactory = itemFactory,
             serviceStarter = serviceStarter,
+            mediaFiles = mediaFiles,
         )
     }
 

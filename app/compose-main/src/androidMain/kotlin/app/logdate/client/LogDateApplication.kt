@@ -21,6 +21,7 @@ import app.logdate.client.rewind.RewindGenerationScheduler
 import app.logdate.client.shortcuts.DynamicShortcutRefreshObserver
 import app.logdate.client.shortcuts.DynamicShortcutScheduler
 import app.logdate.di.initializeKoin
+import app.logdate.ui.media.LocalMediaImageMapper
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.disk.DiskCache
@@ -53,6 +54,9 @@ class LogdateApplication :
             // it, the gallery and timeline feel smooth on scroll.
             .crossfade(IMAGE_CROSSFADE_MS)
             .components {
+                // Stored media strings name files by LogDate reference or by a path that may come
+                // from another install; resolve them before Coil's own file handling sees them.
+                add(LocalMediaImageMapper(get()))
                 add(VideoFrameDecoder.Factory())
                 add(DataSaverImageInterceptor(get<DataUsagePolicy>()))
             }.memoryCache {

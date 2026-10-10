@@ -1,5 +1,6 @@
 package app.logdate.client.image
 
+import app.logdate.client.media.storage.MediaReference
 import app.logdate.client.networking.DataUsageMode
 import app.logdate.client.networking.DataUsagePolicy
 import coil3.intercept.Interceptor
@@ -58,11 +59,11 @@ class DataSaverImageInterceptor(
     }
 }
 
-private val LOCAL_URI_SCHEMES = listOf("content://", "file://", "android.resource://")
+private val LOCAL_PROVIDER_SCHEMES = listOf("content://", "android.resource://")
 
 private fun Any?.isLocalMediaSource(): Boolean {
     val uriString = this?.toString() ?: return false
-    return LOCAL_URI_SCHEMES.any { uriString.startsWith(it) }
+    return MediaReference.parse(uriString) !is MediaReference.External || LOCAL_PROVIDER_SCHEMES.any { uriString.startsWith(it) }
 }
 
 private fun Size.constrainTo(maxDimension: Int): Size {

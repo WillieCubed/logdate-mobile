@@ -13,6 +13,8 @@ import android.graphics.Typeface
 import android.net.Uri
 import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
+import app.logdate.client.media.storage.androidMediaFileResolver
+import app.logdate.client.media.storage.playableUri
 import app.logdate.feature.postcards.model.CanvasBackground
 import app.logdate.feature.postcards.model.CanvasElement
 import app.logdate.feature.postcards.model.InkTool
@@ -38,6 +40,8 @@ import kotlin.uuid.Uuid
 class AndroidExportEngine(
     private val context: Context,
 ) : ExportEngine {
+    private val mediaFiles = androidMediaFileResolver(context)
+
     override suspend fun exportToImage(
         document: PostcardDocument,
         captureRegion: ExportCaptureRegion,
@@ -159,7 +163,7 @@ class AndroidExportEngine(
     ): Bitmap? {
         val uri =
             try {
-                Uri.parse(uriString)
+                Uri.parse(mediaFiles.playableUri(uriString))
             } catch (e: Exception) {
                 Napier.w("Could not parse URI for bitmap decode: $uriString", e)
                 return null

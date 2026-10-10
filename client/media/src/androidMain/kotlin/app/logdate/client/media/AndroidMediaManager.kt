@@ -13,6 +13,8 @@ import android.os.Looper
 import android.provider.MediaStore
 import android.webkit.MimeTypeMap
 import app.logdate.client.media.storage.AndroidCanonicalMediaStore
+import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.androidMediaFileResolver
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -45,6 +47,7 @@ class AndroidMediaManager(
     private val context: Context,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val canonicalMediaStore: AndroidCanonicalMediaStore = AndroidCanonicalMediaStore(context.filesDir),
+    private val mediaFiles: MediaFileResolver = androidMediaFileResolver(context),
 ) : MediaManager {
     private val filesDir = context.filesDir
     private val legacyBackfillMutex = Mutex()
@@ -62,7 +65,7 @@ class AndroidMediaManager(
             // through MediaMetadataRetriever for file:// URIs, so the entire
             // body is IO. Keep it dispatched off the caller's thread so this
             // can never freeze a Compose render scope.
-            val parsedUri = Uri.parse(uri)
+            val parsedUri = localUri(uri)
             val fileName = resolveFileName(parsedUri)
 
             when (resolveMediaKind(parsedUri, fileName)) {
@@ -240,10 +243,10 @@ class AndroidMediaManager(
             awaitClose { contentResolver.unregisterContentObserver(observer) }
         }.conflate()
 
-    override suspend fun deleteOwnedMedia(uri: String): Boolean = canonicalMediaStore.deleteOwned(uri)
+    override suspend fun deleteOwnedMedia(uri: String): Boolean = canonicalMediaStore.deleteOwned(localUri(uri).toString())
 
     override suspend fun exists(mediaId: String): Boolean {
-        val parsedUri = Uri.parse(mediaId)
+        val parsedUri = localUri(mediaId)
 
         return withContext(ioDispatcher) {
             when (parsedUri.scheme) {
@@ -261,7 +264,7 @@ class AndroidMediaManager(
     }
 
     override suspend fun addToDefaultCollection(uri: String) {
-        val parsedUri = Uri.parse(uri)
+        val parsedUri = localUri(uri)
         val fileName = resolveFileName(parsedUri)
         val mimeType =
             requirePublishableMimeType(
@@ -523,7 +526,7 @@ class AndroidMediaManager(
 
     override suspend fun readMedia(uri: String): MediaPayload =
         withContext(ioDispatcher) {
-            val parsedUri = Uri.parse(uri)
+            val parsedUri = localUri(uri)
             val fileName = resolveFileName(parsedUri)
             val mimeType = resolveSupportedMimeType(parsedUri, fileName)
             val data = readBytes(parsedUri)
@@ -537,7 +540,7 @@ class AndroidMediaManager(
 
     override suspend fun openMedia(uri: String): MediaFileSource =
         withContext(ioDispatcher) {
-            val parsedUri = Uri.parse(uri)
+            val parsedUri = localUri(uri)
             val sizeBytes = resolveSizeBytes(parsedUri) ?: return@withContext super.openMedia(uri)
             val fileName = resolveFileName(parsedUri)
             MediaFileSource(
@@ -988,6 +991,12 @@ class AndroidMediaManager(
             .replace("/", "_")
             .replace("\\", "_")
             .replace('\u0000', '_')
+
+    /**
+     * [reference] as a URI the code below can open: a `file:` URI for LogDate media references and
+     * local files (including paths from another Android user), the parsed [reference] otherwise.
+     */
+    private fun localUri(reference: String): Uri = mediaFiles.filePath(reference)?.let { Uri.fromFile(File(it)) } ?: Uri.parse(reference)
 
     private fun requireFileFromUri(uri: Uri): File {
         val path =

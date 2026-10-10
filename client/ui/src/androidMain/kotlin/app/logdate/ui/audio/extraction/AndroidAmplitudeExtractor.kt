@@ -5,6 +5,8 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.Uri
+import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.androidMediaFileResolver
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +25,7 @@ private const val PROGRESS_EMIT_INTERVAL = 32
  */
 class AndroidAmplitudeExtractor(
     private val context: Context,
+    private val mediaFiles: MediaFileResolver = androidMediaFileResolver(context),
 ) : AmplitudeExtractor {
     override suspend fun extractAmplitudes(
         uri: String,
@@ -54,11 +57,11 @@ class AndroidAmplitudeExtractor(
     ): List<Float>? {
         val extractor = MediaExtractor()
         return try {
-            val parsedUri = Uri.parse(uri)
-            if (parsedUri.scheme.isNullOrBlank()) {
-                extractor.setDataSource(uri)
+            val path = mediaFiles.filePath(uri)
+            if (path != null) {
+                extractor.setDataSource(path)
             } else {
-                extractor.setDataSource(context, parsedUri, null)
+                extractor.setDataSource(context, Uri.parse(uri), null)
             }
 
             val audioTrackIndex =

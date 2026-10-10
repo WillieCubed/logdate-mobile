@@ -6,6 +6,8 @@ import app.logdate.client.media.display.RemoteDisplayManager
 import android.hardware.display.DisplayManager
 import android.net.Uri
 import android.view.Display
+import app.logdate.client.media.storage.androidMediaFileResolver
+import app.logdate.client.media.storage.playableUri
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -23,6 +25,7 @@ class AndroidRemoteDisplayManager(
     private val context: Context,
 ) : RemoteDisplayManager {
     private val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+    private val mediaFiles = androidMediaFileResolver(context)
     private var activePresentation: MediaPresentation? = null
     private val isPresentingState = MutableStateFlow(false)
 
@@ -79,7 +82,7 @@ class AndroidRemoteDisplayManager(
 
         try {
             val presentation = MediaPresentation(context, display)
-            presentation.showMedia(Uri.parse(mediaUri), mimeType)
+            presentation.showMedia(Uri.parse(mediaFiles.playableUri(mediaUri)), mimeType)
             presentation.show()
             activePresentation = presentation
             isPresentingState.value = true
@@ -96,7 +99,7 @@ class AndroidRemoteDisplayManager(
     ) {
         val presentation = activePresentation ?: return
         try {
-            presentation.showMedia(Uri.parse(mediaUri), mimeType)
+            presentation.showMedia(Uri.parse(mediaFiles.playableUri(mediaUri)), mimeType)
         } catch (e: Exception) {
             Napier.e("Failed to update presentation", e)
         }

@@ -3,6 +3,7 @@ package app.logdate.client.media
 import android.content.Context
 import android.net.Uri
 import android.provider.MediaStore
+import app.logdate.client.media.storage.MediaReference
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -23,15 +24,16 @@ class AndroidManagedMediaDiscarder(
 
     suspend fun discard(managedUri: String) {
         val uri = Uri.parse(managedUri)
+        val isLocalFile = MediaReference.parse(managedUri) !is MediaReference.External
 
         withContext(NonCancellable) {
             withContext(ioDispatcher) {
-                when (uri.scheme) {
-                    "file" ->
+                when {
+                    isLocalFile ->
                         check(mediaManager.deleteOwnedMedia(managedUri)) {
                             "Managed media no longer exists: $managedUri"
                         }
-                    "content" -> {
+                    uri.scheme == "content" -> {
                         require(uri.authority == MediaStore.AUTHORITY) {
                             "Refusing to discard a URI outside MediaStore"
                         }

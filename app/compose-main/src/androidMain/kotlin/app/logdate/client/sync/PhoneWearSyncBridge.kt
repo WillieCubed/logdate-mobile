@@ -4,6 +4,8 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import app.logdate.client.media.device.MediaDeviceSelectionUiState
+import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.androidMediaFileResolver
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.sync.datalayer.NoteDataMapper
@@ -19,7 +21,6 @@ import com.google.android.gms.wearable.Wearable
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
-import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
 import kotlin.uuid.Uuid
@@ -192,16 +193,16 @@ class GooglePhoneWearTransport(
 
 class AndroidPhoneAudioStreamOpener(
     private val contentResolver: ContentResolver,
+    private val mediaFiles: MediaFileResolver,
 ) : PhoneAudioStreamOpener {
-    constructor(context: Context) : this(context.contentResolver)
+    constructor(context: Context) : this(context.contentResolver, androidMediaFileResolver(context))
 
     override fun open(mediaRef: String): InputStream? =
         runCatching {
-            when {
-                mediaRef.startsWith("content://") -> contentResolver.openInputStream(Uri.parse(mediaRef))
-                mediaRef.startsWith("file://") -> Uri.parse(mediaRef).path?.let(::FileInputStream)
-                mediaRef.startsWith("/") -> FileInputStream(File(mediaRef))
-                else -> null
+            if (mediaRef.startsWith("content://")) {
+                contentResolver.openInputStream(Uri.parse(mediaRef))
+            } else {
+                mediaFiles.filePath(mediaRef)?.let(::FileInputStream)
             }
         }.getOrElse { error ->
             Napier.w("Failed to open phone audio stream: $mediaRef", error)

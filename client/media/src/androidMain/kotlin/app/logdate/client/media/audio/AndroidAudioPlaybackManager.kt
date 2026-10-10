@@ -12,6 +12,9 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.androidMediaFileResolver
+import app.logdate.client.media.storage.playableUri
 import com.google.common.util.concurrent.ListenableFuture
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
@@ -50,6 +53,7 @@ class AndroidAudioPlaybackManager(
     private val controllerExecutor: Executor = mainThreadExecutor(),
     private val mediaItemFactory: AudioPlaybackItemFactory = defaultMediaItemFactory,
     private val serviceStarter: AudioPlaybackServiceStarter = defaultAudioPlaybackServiceStarter,
+    private val mediaFiles: MediaFileResolver = androidMediaFileResolver(context),
 ) : AudioPlaybackManager,
     AudioPlaybackStatusProvider {
     override val playbackStatus: StateFlow<AudioPlaybackStatus>
@@ -82,7 +86,7 @@ class AndroidAudioPlaybackManager(
         // is only bound via BIND_AUTO_CREATE and stops itself ~1s after the controller connects.
         serviceStarter.start(context)
         withController { player ->
-            val mediaItem = mediaItemFactory.create(uri, metadata)
+            val mediaItem = mediaItemFactory.create(mediaFiles.playableUri(uri), metadata)
             player.setMediaItem(mediaItem)
             player.prepare()
             player.play()

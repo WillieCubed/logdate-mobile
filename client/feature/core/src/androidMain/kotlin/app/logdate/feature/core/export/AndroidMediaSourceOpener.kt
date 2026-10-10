@@ -5,6 +5,8 @@ import android.net.Uri
 import android.provider.MediaStore
 import androidx.core.net.toUri
 import app.logdate.client.domain.export.archive.MediaSourceOpener
+import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.androidMediaFileResolver
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -22,13 +24,14 @@ import kotlin.coroutines.cancellation.CancellationException
  */
 class AndroidMediaSourceOpener(
     private val context: Context,
+    private val mediaFiles: MediaFileResolver = androidMediaFileResolver(context),
 ) : MediaSourceOpener {
     override suspend fun open(reference: String): Source? = withContext(Dispatchers.IO) { openStream(reference)?.source() }
 
     private fun openStream(reference: String): InputStream? {
-        if (!reference.startsWith("/") && !reference.startsWith("file://")) return openContent(reference.toUri())
+        val path = mediaFiles.filePath(reference) ?: return openContent(reference.toUri())
 
-        val original = File(reference.removePrefix("file://"))
+        val original = File(path)
         if (original.exists()) return original.inputStream()
         return recover(original)?.also { Napier.w("Recovered a stale media reference for export") }
     }

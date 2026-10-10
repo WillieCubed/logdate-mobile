@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import app.logdate.client.media.audio.transcription.AndroidTranscriptionManager.Companion.KEY_AUDIO_URI
 import app.logdate.client.media.audio.transcription.AndroidTranscriptionManager.Companion.KEY_NOTE_ID
+import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
@@ -31,6 +32,7 @@ class TranscriptionWorker(
     // Inject dependencies from Koin
     private val transcriptionRepository: TranscriptionRepository by inject()
     private val transcriptionService: TranscriptionService by inject()
+    private val mediaFiles: MediaFileResolver by inject()
 
     companion object {
         const val TAG = "TranscriptionWorker"
@@ -63,7 +65,7 @@ class TranscriptionWorker(
                         transcribe = transcriptionService::transcribeAudioFile,
                         repository = transcriptionRepository,
                     )
-                when (runner.run(noteId, audioUri)) {
+                when (runner.run(noteId, mediaFiles.filePath(audioUri) ?: audioUri)) {
                     TranscriptionWorkOutcome.Success -> Result.success()
                     TranscriptionWorkOutcome.Retry -> Result.retry()
                     TranscriptionWorkOutcome.Failure -> Result.failure()

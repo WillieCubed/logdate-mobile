@@ -48,6 +48,7 @@ import androidx.glance.layout.width
 import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
+import app.logdate.client.media.storage.androidMediaFileResolver
 import java.io.FileInputStream
 import java.io.InputStream
 import kotlin.math.roundToInt
@@ -731,12 +732,7 @@ fun loadScaledThumbnail(
             null
         }
     }
-    val path =
-        if (uriString.startsWith("file://")) {
-            Uri.parse(uriString).path ?: uriString
-        } else {
-            uriString
-        }
+    val path = androidMediaFileResolver(context).filePath(uriString) ?: return null
     val key = thumbnailCacheKey(path)
     if (key != null) {
         synchronized(thumbnailCacheLock) {

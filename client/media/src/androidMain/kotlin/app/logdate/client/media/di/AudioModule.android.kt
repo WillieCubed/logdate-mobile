@@ -37,8 +37,8 @@ actual val audioModule: Module =
                 serviceController = AndroidRecordingServiceController(androidContext()),
             )
         }
-        single<AudioPlaybackManager> { AndroidAudioPlaybackManager(androidContext(), get()) }
-        single<AudioDurationResolver> { AndroidAudioDurationResolver(androidContext()) }
+        single<AudioPlaybackManager> { AndroidAudioPlaybackManager(androidContext(), get(), mediaFiles = get()) }
+        single<AudioDurationResolver> { AndroidAudioDurationResolver(androidContext(), mediaFiles = get()) }
         single<AudioRouteRepository> { AndroidAudioRouteRepository(androidContext()) }
 
         single { SpeechFeatureProviderLoader() }

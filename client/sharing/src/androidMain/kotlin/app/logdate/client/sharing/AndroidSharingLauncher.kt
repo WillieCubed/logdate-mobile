@@ -8,6 +8,8 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import androidx.core.graphics.ColorUtils
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.androidMediaFileResolver
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.shared.model.Journal
 import io.github.aakira.napier.Napier
@@ -30,6 +32,7 @@ class AndroidSharingLauncher(
     private val journalRepository: JournalRepository,
     private val shareAssetGenerator: ShareAssetInterface,
     private val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+    private val mediaFiles: MediaFileResolver = androidMediaFileResolver(context),
 ) : SharingLauncher {
     override fun shareContent(
         text: String?,
@@ -220,13 +223,13 @@ class AndroidSharingLauncher(
     }
 
     override fun getUriFromMedia(uid: String): Uri {
-        if (uid.startsWith("content://") || uid.startsWith("file://")) {
+        if (uid.startsWith("content://")) {
             return Uri.parse(uid)
         }
 
-        val directFile = File(uid)
-        if (directFile.exists()) {
-            return FileProvider.getUriForFile(context, "${context.packageName}.provider", directFile)
+        val localFile = mediaFiles.filePath(uid)?.let(::File)
+        if (localFile != null && localFile.exists()) {
+            return FileProvider.getUriForFile(context, "${context.packageName}.provider", localFile)
         }
 
         val managedMediaFile = context.filesDir.resolve("media/$uid")

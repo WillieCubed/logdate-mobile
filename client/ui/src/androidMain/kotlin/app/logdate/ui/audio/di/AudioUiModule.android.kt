@@ -12,6 +12,6 @@ import org.koin.dsl.module
 actual val audioUiModule: Module =
     module {
         single<WaveformStorage> { AndroidWaveformStorage(androidContext()) }
-        single<AmplitudeExtractor> { AndroidAmplitudeExtractor(androidContext()) }
+        single<AmplitudeExtractor> { AndroidAmplitudeExtractor(androidContext(), get()) }
         factory { AudioContextProcessor(get(), get()) }
     }
