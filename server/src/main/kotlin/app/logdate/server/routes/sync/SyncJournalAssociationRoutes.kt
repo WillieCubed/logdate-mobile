@@ -1,6 +1,6 @@
 package app.logdate.server.routes.sync
 
-import app.logdate.server.auth.TokenService
+import app.logdate.server.auth.AccessTokenVerifier
 import app.logdate.server.logdate.JournalMergeConflictException
 import app.logdate.server.logdate.JournalMergeDestinationMissingException
 import app.logdate.server.logdate.JournalMergedException
@@ -41,13 +41,13 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.route
 
 internal fun Route.journalRoutes(
-    tokenService: TokenService?,
+    accessTokenVerifier: AccessTokenVerifier?,
     metrics: SyncMetricsRegistry,
     collectionsRepository: LogDateCollectionsRepository,
 ) {
     route("/journals") {
         post("/{journalId}/merge", SyncJournalMergeDocs.merge) {
-            val userId = extractUserId(call, tokenService) ?: return@post
+            val userId = extractFullAccessUserId(call, accessTokenVerifier) ?: return@post
             val journalId = call.requiredPathParam("journalId")
             val request = call.receive<JournalMergeRequest>()
             try {
@@ -65,7 +65,7 @@ internal fun Route.journalRoutes(
             val start = System.currentTimeMillis()
             var success = false
             try {
-                val userId = extractUserId(call, tokenService) ?: return@put
+                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@put
                 val journalId = call.requiredPathParam("journalId")
                 val req = call.receive<JournalUploadRequest>()
                 if (req.id != journalId) {
@@ -129,7 +129,7 @@ internal fun Route.journalRoutes(
             val start = System.currentTimeMillis()
             var success = false
             try {
-                val userId = extractUserId(call, tokenService) ?: return@get
+                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@get
                 val since = parseSinceParameter(call) ?: return@get
                 val pageSize = call.resolvePageSize()
                 val changeSet = collectionsRepository.journalChanges(userId, since, pageSize)
@@ -154,7 +154,7 @@ internal fun Route.journalRoutes(
             val start = System.currentTimeMillis()
             var success = false
             try {
-                val userId = extractUserId(call, tokenService) ?: return@get
+                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@get
                 val journalId = call.requiredPathParam("journalId")
                 val record =
                     collectionsRepository.getJournal(userId, journalId)
@@ -170,7 +170,7 @@ internal fun Route.journalRoutes(
             val start = System.currentTimeMillis()
             var success = false
             try {
-                val userId = extractUserId(call, tokenService) ?: return@patch
+                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@patch
                 val journalId = call.requiredPathParam("journalId")
                 val req = call.receive<JournalUpdateRequest>()
                 collectionsRepository.journalMergeDestination(userId, journalId)?.let { throw JournalMergedException(it) }
@@ -220,7 +220,7 @@ internal fun Route.journalRoutes(
             val start = System.currentTimeMillis()
             var success = false
             try {
-                val userId = extractUserId(call, tokenService) ?: return@delete
+                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@delete
                 val journalId = call.requiredPathParam("journalId")
                 collectionsRepository.deleteJournal(userId, journalId, System.currentTimeMillis())
                 call.respond(HttpStatusCode.NoContent)
@@ -233,7 +233,7 @@ internal fun Route.journalRoutes(
 }
 
 internal fun Route.associationRoutes(
-    tokenService: TokenService?,
+    accessTokenVerifier: AccessTokenVerifier?,
     metrics: SyncMetricsRegistry,
     collectionsRepository: LogDateCollectionsRepository,
 ) {
@@ -243,7 +243,7 @@ internal fun Route.associationRoutes(
 
             var success = false
             try {
-                val userId = extractUserId(call, tokenService) ?: return@post
+                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@post
                 val req = call.receive<AssociationUploadRequest>()
                 val uploadedAt = System.currentTimeMillis()
                 collectionsRepository.upsertAssociations(
@@ -270,7 +270,7 @@ internal fun Route.associationRoutes(
             val start = System.currentTimeMillis()
             var success = false
             try {
-                val userId = extractUserId(call, tokenService) ?: return@get
+                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@get
                 val since = parseSinceParameter(call) ?: return@get
                 val pageSize = call.resolvePageSize()
                 val changeSet = collectionsRepository.associationChanges(userId, since, pageSize)
@@ -295,7 +295,7 @@ internal fun Route.associationRoutes(
             val start = System.currentTimeMillis()
             var success = false
             try {
-                val userId = extractUserId(call, tokenService) ?: return@put
+                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@put
                 val journalId = call.requiredPathParam("journalId")
                 val contentId = call.requiredPathParam("contentId")
                 val req = call.receive<AssociationLinkUpsertRequest>()
@@ -323,7 +323,7 @@ internal fun Route.associationRoutes(
             val start = System.currentTimeMillis()
             var success = false
             try {
-                val userId = extractUserId(call, tokenService) ?: return@delete
+                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@delete
                 val journalId = call.requiredPathParam("journalId")
                 val contentId = call.requiredPathParam("contentId")
                 collectionsRepository.deleteAssociations(
@@ -342,7 +342,7 @@ internal fun Route.associationRoutes(
             val start = System.currentTimeMillis()
             var success = false
             try {
-                val userId = extractUserId(call, tokenService) ?: return@delete
+                val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@delete
                 val req = call.receive<AssociationDeleteRequest>()
                 collectionsRepository.deleteAssociations(
                     userId,

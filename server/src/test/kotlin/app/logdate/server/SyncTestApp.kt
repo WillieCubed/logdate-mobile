@@ -1,7 +1,9 @@
 package app.logdate.server
 
+import app.logdate.server.auth.AccessTokenVerifier
 import app.logdate.server.auth.InMemoryAccountRepository
 import app.logdate.server.auth.JwtTokenService
+import app.logdate.server.devices.DeviceSessionGuard
 import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
 import app.logdate.server.identity.InMemorySigningKeyRepository
@@ -46,6 +48,7 @@ fun TestApplicationBuilder.configureSyncTestApp(
     metrics: SyncMetricsRegistry = SyncMetricsRegistry(),
     mediaStorage: GcsMediaStorage? = null,
     mediaAccessPolicy: MediaAccessPolicy = MediaAccessPolicy(useSignedUrls = false, signedUrlTtlHours = 1),
+    accessTokenVerifier: AccessTokenVerifier? = null,
 ): SyncTestEnvironment {
     val accountRepository = InMemoryAccountRepository()
     val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "sync-test-kek")
@@ -90,6 +93,7 @@ fun TestApplicationBuilder.configureSyncTestApp(
                     collectionsRepository = MergeAwareLogDateCollectionsRepository(collectionsRepository, InMemoryJournalMergeStore()),
                     mediaBlobRepository = mediaRepository.asLogDateMediaBlobRepository(),
                     backupRepository = backupRepository,
+                    accessTokenVerifier = accessTokenVerifier ?: AccessTokenVerifier(tokenService, DeviceSessionGuard.Disabled),
                 )
             }
         }

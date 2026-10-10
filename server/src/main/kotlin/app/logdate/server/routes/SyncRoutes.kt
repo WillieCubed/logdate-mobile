@@ -1,7 +1,9 @@
 package app.logdate.server.routes
 
+import app.logdate.server.auth.AccessTokenVerifier
 import app.logdate.server.auth.TokenService
 import app.logdate.server.crypto.EncryptionService
+import app.logdate.server.devices.DeviceSessionGuard
 import app.logdate.server.diagnostics.DiagnosticReportService
 import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.logdate.LogDateBackupRepository
@@ -32,6 +34,10 @@ import io.ktor.server.routing.Route
  *  - [syncBackupRoutes] — `/backups` CRUD + binary download.
  *  - [syncMaintenanceRoutes] — `/ops/sync/tombstones:purge`, `/ops/backups:purge`.
  *
+ * The data routes (status, collections, media) accept a linked device token through
+ * [accessTokenVerifier]; every other route needs a full-access token. Without an explicit verifier,
+ * linked device tokens are refused everywhere.
+ *
  * This function is the single entry point so `Application.module` doesn't need to know about the
  * split and existing callers (including `testApplication` harnesses) stay untouched. Each
  * sub-route takes only the collaborators it uses as individual parameters; the one shared bundle
@@ -49,12 +55,13 @@ fun Route.syncRoutes(
     entitlementEnforcer: EntitlementEnforcer? = null,
     rateLimiter: SlidingWindowRateLimiter? = SlidingWindowRateLimiter(),
     diagnosticReportService: DiagnosticReportService? = null,
+    accessTokenVerifier: AccessTokenVerifier? = tokenService?.let { AccessTokenVerifier(it, DeviceSessionGuard.Disabled) },
 ) {
     val config = SyncRouteConfig(mediaAccessPolicy = mediaAccessPolicy)
-    syncStatusRoutes(tokenService, metrics, collectionsRepository)
-    syncCollectionRoutes(tokenService, metrics, collectionsRepository)
+    syncStatusRoutes(tokenService, accessTokenVerifier, metrics, collectionsRepository)
+    syncCollectionRoutes(accessTokenVerifier, metrics, collectionsRepository)
     syncMediaRoutes(
-        tokenService = tokenService,
+        accessTokenVerifier = accessTokenVerifier,
         mediaStorage = mediaStorage,
         metrics = metrics,
         encryptionService = encryptionService,

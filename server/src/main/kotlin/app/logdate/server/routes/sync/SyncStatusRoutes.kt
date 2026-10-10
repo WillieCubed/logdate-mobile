@@ -1,5 +1,6 @@
 package app.logdate.server.routes.sync
 
+import app.logdate.server.auth.AccessTokenVerifier
 import app.logdate.server.auth.TokenService
 import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.responses.simpleSuccess
@@ -22,6 +23,7 @@ import kotlinx.serialization.Serializable
  */
 internal fun Route.syncStatusRoutes(
     tokenService: TokenService?,
+    accessTokenVerifier: AccessTokenVerifier?,
     metrics: SyncMetricsRegistry,
     collectionsRepository: LogDateCollectionsRepository,
 ) {
@@ -29,7 +31,7 @@ internal fun Route.syncStatusRoutes(
         val start = System.currentTimeMillis()
         var success = false
         try {
-            val userId = extractUserId(call, tokenService) ?: return@get
+            val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@get
             val status = collectionsRepository.status(userId)
             val snapshot =
                 SyncStatusSnapshot(

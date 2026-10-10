@@ -2,7 +2,11 @@ package app.logdate.server.routes.sync
 
 import app.logdate.server.audit.AuditCategory
 import app.logdate.server.audit.AuditLogger
+import app.logdate.server.auth.AccessCheck
+import app.logdate.server.auth.AccessTokenVerifier
+import app.logdate.server.auth.TokenScope
 import app.logdate.server.auth.TokenService
+import app.logdate.server.auth.bearerToken
 import app.logdate.server.entitlements.QuotaCheck
 import app.logdate.server.entitlements.QuotaReason
 import app.logdate.server.logdate.LogDateAssociation
@@ -16,6 +20,7 @@ import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.responses.error
 import app.logdate.server.sync.MediaAccessPolicy
 import app.logdate.server.sync.SyncMetricsSnapshot
+import app.logdate.shared.model.devices.DeviceLinkErrorCodes
 import app.logdate.shared.model.sync.AssociationChange
 import app.logdate.shared.model.sync.ContentChange
 import app.logdate.shared.model.sync.JournalChange
@@ -196,9 +201,14 @@ internal suspend fun ApplicationCall.receiveMediaMultipartUpload(): ParsedMediaM
 
 // --- Auth helpers -------------------------------------------------------------------------------
 
+private const val DEVICE_SESSION_REVOKED_MESSAGE = "This device was removed from the account"
+private const val DEVICE_SCOPE_DENIED_MESSAGE = "A linked device cannot do this"
+
 /**
- * Extracts and validates the user ID from the Authorization header. Returns null and responds with
- * 401/500 if authentication fails, so callers just early-return.
+ * Extracts the user ID from a full-access token. The routes that call this act on the whole account
+ * (backups, location history, diagnostics, maintenance, device enrollment, key envelopes), so a linked
+ * device token answers 403. Returns null and responds with 401/403/500 if authentication fails, so
+ * callers just early-return.
  */
 internal suspend fun extractUserId(
     call: ApplicationCall,
@@ -224,24 +234,100 @@ internal suspend fun extractUserId(
     val token = authHeader.removePrefix("Bearer ").trim()
     val accountId = tokenService.validateAccessToken(token)
     if (accountId == null) {
+        if (tokenService.decodeAccessToken(token)?.scope == TokenScope.SYNC) {
+            return call.rejectAccess(HttpStatusCode.Forbidden, DeviceLinkErrorCodes.DEVICE_SCOPE_DENIED, DEVICE_SCOPE_DENIED_MESSAGE)
+        }
+        return call.rejectAccess(HttpStatusCode.Unauthorized, "UNAUTHORIZED", "Invalid or expired token")
+    }
+
+    return call.parseAccountId(accountId)
+}
+
+/**
+ * Extracts the user ID for a sync data route (contents, journals, associations, drafts, media, sync
+ * status, moments). Full-access tokens pass, and so does a linked device token while its session is
+ * active; a removed session answers `401 DEVICE_SESSION_REVOKED` so the device knows to stop.
+ */
+internal suspend fun extractSyncUserId(
+    call: ApplicationCall,
+    verifier: AccessTokenVerifier?,
+): UUID? {
+    if (verifier == null) {
         call.respond(
-            HttpStatusCode.Unauthorized,
-            error("UNAUTHORIZED", "Invalid or expired token"),
+            HttpStatusCode.InternalServerError,
+            error("SERVER_MISCONFIGURED", "Token service is not configured"),
         )
         return null
     }
+    val token = bearerToken(call.request.header(HttpHeaders.Authorization))
+    val claims =
+        when (val check = verifier.verify(token, allowSyncScope = true)) {
+            is AccessCheck.Granted -> check.claims
+            AccessCheck.Missing ->
+                return call.rejectAccess(HttpStatusCode.Unauthorized, "UNAUTHORIZED", "Missing or invalid Authorization header")
+            AccessCheck.Invalid ->
+                return call.rejectAccess(HttpStatusCode.Unauthorized, "UNAUTHORIZED", "Invalid or expired token")
+            AccessCheck.SessionRevoked ->
+                return call.rejectAccess(
+                    HttpStatusCode.Unauthorized,
+                    DeviceLinkErrorCodes.DEVICE_SESSION_REVOKED,
+                    DEVICE_SESSION_REVOKED_MESSAGE,
+                )
+            AccessCheck.ScopeDenied ->
+                return call.rejectAccess(HttpStatusCode.Forbidden, DeviceLinkErrorCodes.DEVICE_SCOPE_DENIED, DEVICE_SCOPE_DENIED_MESSAGE)
+        }
+    return call.parseAccountId(claims.accountId)
+}
 
-    return try {
-        UUID.fromString(accountId)
-    } catch (e: IllegalArgumentException) {
-        Napier.e("Account reference validation failed")
+/**
+ * Extracts the user ID for a sync route that changes the whole account (merging journals). Only a
+ * full-access token passes; a linked device token answers 403 `DEVICE_SCOPE_DENIED`.
+ */
+internal suspend fun extractFullAccessUserId(
+    call: ApplicationCall,
+    verifier: AccessTokenVerifier?,
+): UUID? {
+    if (verifier == null) {
         call.respond(
+            HttpStatusCode.InternalServerError,
+            error("SERVER_MISCONFIGURED", "Token service is not configured"),
+        )
+        return null
+    }
+    val token = bearerToken(call.request.header(HttpHeaders.Authorization))
+    val claims =
+        when (val check = verifier.verify(token, allowSyncScope = false)) {
+            is AccessCheck.Granted -> check.claims
+            AccessCheck.Missing ->
+                return call.rejectAccess(HttpStatusCode.Unauthorized, "UNAUTHORIZED", "Missing or invalid Authorization header")
+            AccessCheck.Invalid, AccessCheck.SessionRevoked ->
+                return call.rejectAccess(HttpStatusCode.Unauthorized, "UNAUTHORIZED", "Invalid or expired token")
+            AccessCheck.ScopeDenied ->
+                return call.rejectAccess(HttpStatusCode.Forbidden, DeviceLinkErrorCodes.DEVICE_SCOPE_DENIED, DEVICE_SCOPE_DENIED_MESSAGE)
+        }
+    return call.parseAccountId(claims.accountId)
+}
+
+private suspend fun ApplicationCall.rejectAccess(
+    status: HttpStatusCode,
+    code: String,
+    message: String,
+): UUID? {
+    respond(status, error(code, message))
+    return null
+}
+
+private suspend fun ApplicationCall.parseAccountId(accountId: String): UUID? =
+    try {
+        UUID.fromString(accountId)
+    } catch (_: IllegalArgumentException) {
+        Napier.e("Account reference validation failed")
+        respond(
             HttpStatusCode.Unauthorized,
             error("UNAUTHORIZED", "Invalid token payload"),
         )
         null
     }
-}
 
 internal fun ApplicationCall.requiredPathParam(name: String): String =
     requireNotNull(parameters[name]) { "Missing required route parameter: $name" }
