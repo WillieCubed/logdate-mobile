@@ -36,10 +36,14 @@ private const val OrgUrl = "https://thehypertext.studio"
  * - optionally wires a remote `atproto` Maven repository
  * - optionally enables in-memory PGP signing
  *
- * Property precedence is always:
+ * Property precedence is:
  * 1. Gradle property
  * 2. environment variable
  * 3. hard-coded default, when one exists
+ *
+ * The version is the exception: `ATPROTO_VERSION` wins over `atproto.version`. The release
+ * workflow sets `ATPROTO_VERSION` from the release tag, and `atproto.version` is always present
+ * because the root `gradle.properties` defines it, so the tag could otherwise never take effect.
  *
  * Recognized overrides:
  * - `atproto.group` or `ATPROTO_GROUP`
@@ -62,7 +66,7 @@ class AtprotoPublishedModulePlugin : Plugin<Project> {
             pluginManager.apply("signing")
 
             group = propertyOrEnv("atproto.group", "ATPROTO_GROUP") ?: DefaultAtprotoGroup
-            version = propertyOrEnv("atproto.version", "ATPROTO_VERSION") ?: DefaultAtprotoVersion
+            version = envOrProperty("ATPROTO_VERSION", "atproto.version") ?: DefaultAtprotoVersion
 
             val dokkaHtmlJar =
                 tasks.register("dokkaHtmlJar", Jar::class.java) {
@@ -237,6 +241,11 @@ class AtprotoPublishedModulePlugin : Plugin<Project> {
         propertyName: String,
         envName: String,
     ): String? = providers.gradleProperty(propertyName).orNull ?: providers.environmentVariable(envName).orNull
+
+    private fun Project.envOrProperty(
+        envName: String,
+        propertyName: String,
+    ): String? = providers.environmentVariable(envName).orNull ?: providers.gradleProperty(propertyName).orNull
 
     /**
      * Appends a child XML node only when it does not already exist.

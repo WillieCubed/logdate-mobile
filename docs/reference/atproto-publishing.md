@@ -66,7 +66,7 @@ policy and one POM shape.
 
 ## Property Precedence
 
-For every configurable value, precedence is:
+For every configurable value except the version, precedence is:
 
 1. Gradle property
 2. environment variable
@@ -88,12 +88,17 @@ Supported overrides:
 | Signing key | `signingKey` | `SIGNING_KEY` | none |
 | Signing password | `signingPassword` | `SIGNING_PASSWORD` | none |
 
-Gradle properties include the entries in the repository's root
-[`gradle.properties`](../../gradle.properties), not only `-P` flags. That file sets
-`atproto.version=0.1.0`, so in this repository an `ATPROTO_VERSION` environment variable has no
-effect: the Gradle property always wins. To publish a different version, change `atproto.version`
-in `gradle.properties` or pass `-Patproto.version=<version>` on the command line, which overrides
-the file.
+The version is the one exception: `ATPROTO_VERSION` wins over `atproto.version`. Gradle
+properties include the entries in the repository's root
+[`gradle.properties`](../../gradle.properties), not only `-P` flags, and that file always sets
+`atproto.version=0.1.0`. If the Gradle property won, the version the release workflow derives
+from a tag could never take effect. So:
+
+1. `ATPROTO_VERSION`, when set (the release workflow sets it from the tag)
+2. `atproto.version` from `-P` or `gradle.properties`
+3. `0.1.0`
+
+The BOM resolves its version the same way.
 
 The plugin registers up to two named remote Maven repositories, each
 independently gated:
@@ -233,13 +238,10 @@ git push origin atproto-v0.1.0
 modules plus the BOM. It can also be started by hand (`workflow_dispatch`)
 with an optional `version` input, which sets `ATPROTO_VERSION` the same way.
 
-> **The tag does not set the published version today.** The workflow passes the
-> version only as the `ATPROTO_VERSION` environment variable, and the
-> `atproto.version` entry in `gradle.properties` takes precedence over it (see
-> [Property Precedence](#property-precedence)). Every run publishes the version
-> in `gradle.properties`, whatever the tag says. Until the workflow passes
-> `-Patproto.version`, bump `atproto.version` in `gradle.properties` to match
-> before you push the tag.
+Because `ATPROTO_VERSION` takes precedence over `gradle.properties` (see
+[Property Precedence](#property-precedence)), the tag decides the published
+version. Keep `atproto.version` in `gradle.properties` in step with the latest
+release anyway, since local builds and the consumer sample use it.
 
 The workflow uses:
 
@@ -259,8 +261,9 @@ repo's **Packages** sidebar.
 ### Manual or local publishes against a remote
 
 If you need to publish from a workstation (e.g. testing a snapshot version),
-set the same repository env vars yourself and pass the version with `-P`,
-because `gradle.properties` overrides an `ATPROTO_VERSION` env var:
+set the same repository env vars yourself and choose the version with either
+`ATPROTO_VERSION` or `-Patproto.version` (an `ATPROTO_VERSION` in your
+environment wins over `-P`):
 
 ```bash
 ATPROTO_PUBLISH_URL=https://maven.pkg.github.com/WillieCubed/logdate-mobile \

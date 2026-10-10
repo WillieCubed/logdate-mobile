@@ -13,9 +13,11 @@ group =
     providers.gradleProperty("atproto.group").orNull
         ?: providers.environmentVariable("ATPROTO_GROUP").orNull
         ?: "studio.hypertext.atproto"
+// ATPROTO_VERSION comes first so a release tag's version wins over the default in gradle.properties,
+// matching AtprotoPublishedModulePlugin.
 version =
-    providers.gradleProperty("atproto.version").orNull
-        ?: providers.environmentVariable("ATPROTO_VERSION").orNull
+    providers.environmentVariable("ATPROTO_VERSION").orNull
+        ?: providers.gradleProperty("atproto.version").orNull
         ?: "0.1.0"
 
 javaPlatform {
