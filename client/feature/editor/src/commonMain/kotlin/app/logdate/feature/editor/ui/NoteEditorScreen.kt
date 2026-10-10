@@ -10,6 +10,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import app.logdate.feature.editor.navigation.EditorLaunchMode
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.shared.model.location.VisitMemoryContext
 import io.github.aakira.napier.Napier
@@ -40,6 +41,10 @@ import kotlin.uuid.Uuid
  *        entryId is null (creating new entries). Ignored when editing existing entries.
  * @param attachments Optional list of attachment URIs (images, audio, video) to add to a new entry.
  *        Only used when entryId is null. Ignored when editing existing entries.
+ * @param launchMode What a new entry opens ready to capture: text, a voice recording, or the camera
+ *        for photos or video. Ignored when editing existing entries.
+ * @param promptPhotoUri A photo to start a new entry with, followed by text or (in voice mode) a
+ *        recording. Ignored when editing existing entries.
  * @param viewModel The ViewModel managing editor state and operations. Typically injected via Koin.
  */
 @Suppress("ktlint:standard:function-naming")
@@ -55,9 +60,8 @@ fun NoteEditorScreen(
     journalIds: List<Uuid> = emptyList(),
     initialTextContent: String? = null,
     attachments: List<String> = emptyList(),
-    widgetPhotoUri: String? = null,
-    widgetRecord: Boolean = false,
-    widgetCamera: Boolean = false,
+    launchMode: EditorLaunchMode = EditorLaunchMode.Text,
+    promptPhotoUri: String? = null,
     viewModel: EntryEditorViewModel = koinViewModel(),
     visitContext: VisitMemoryContext? = null,
 ) {
@@ -111,13 +115,12 @@ fun NoteEditorScreen(
         }
     }
 
-    LaunchedEffect(widgetPhotoUri, widgetRecord, widgetCamera, entryId) {
-        if (entryId == null) {
-            when {
-                widgetCamera -> viewModel.initializeWidgetCamera()
-                widgetPhotoUri != null -> viewModel.initializePhotoPrompt(widgetPhotoUri, record = widgetRecord)
-                widgetRecord -> viewModel.initializeWidgetAudio()
-            }
+    LaunchedEffect(launchMode, promptPhotoUri, entryId) {
+        if (entryId != null) return@LaunchedEffect
+        if (promptPhotoUri != null) {
+            viewModel.initializePhotoPrompt(promptPhotoUri, record = launchMode == EditorLaunchMode.Voice)
+        } else {
+            viewModel.initializeLaunchMode(launchMode)
         }
     }
 

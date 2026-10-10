@@ -35,6 +35,7 @@ import app.logdate.client.rewind.MilestoneRewindCoordinator
 import app.logdate.client.rewind.RewindGenerationWorker
 import app.logdate.client.rewind.RewindNotificationCoordinator
 import app.logdate.client.sensor.di.sensorModule
+import app.logdate.client.shortcuts.AndroidCaptureUsageReporter
 import app.logdate.client.shortcuts.AndroidDynamicShortcutApplier
 import app.logdate.client.shortcuts.DynamicShortcutRefreshObserver
 import app.logdate.client.shortcuts.DynamicShortcutRefreshWorker
@@ -70,6 +71,7 @@ import app.logdate.feature.core.export.CloudBackupWorker
 import app.logdate.feature.core.restore.CloudRestoreScheduler
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
 import app.logdate.feature.core.settings.updates.AppUpdateController
+import app.logdate.feature.editor.ui.editor.CaptureUsageReporter
 import coil3.SingletonImageLoader
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -163,6 +165,7 @@ actual val appModule: Module =
             )
         }
         workerOf(::DynamicShortcutRefreshWorker)
+        single<CaptureUsageReporter> { AndroidCaptureUsageReporter(androidContext()) }
 
         single { NoteDataMapper() }
         single { WearSyncNotificationHelper(androidContext()) }

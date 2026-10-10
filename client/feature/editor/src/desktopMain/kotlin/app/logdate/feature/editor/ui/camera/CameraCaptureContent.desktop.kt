@@ -33,6 +33,7 @@ actual fun CameraCaptureContent(
     onClose: () -> Unit,
     modifier: Modifier,
     remoteControl: CameraRemoteControl,
+    initialCaptureMode: CaptureMode,
 ) {
     Card(
         modifier =

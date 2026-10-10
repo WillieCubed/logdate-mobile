@@ -76,6 +76,7 @@ fun CameraBlockEditor(
             },
             onClose = onDeleteRequested,
             modifier = modifier,
+            initialCaptureMode = block.initialCaptureMode,
         )
     }
 }
@@ -162,6 +163,7 @@ private fun formatDuration(durationMs: Long): String = formatMediaDuration(durat
  * @param onMediaCaptured Callback when media is captured, providing URI, type, and duration
  * @param onClose Callback when the user closes the camera without capturing
  * @param modifier Modifier for layout customization
+ * @param initialCaptureMode Whether the camera opens ready for photos or video
  */
 @Suppress("ktlint:standard:function-naming")
 @Composable
@@ -170,4 +172,5 @@ expect fun CameraCaptureContent(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     remoteControl: CameraRemoteControl = CameraRemoteControl.None,
+    initialCaptureMode: CaptureMode = CaptureMode.PHOTO,
 )

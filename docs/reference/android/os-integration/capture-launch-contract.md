@@ -1,6 +1,6 @@
 # Capture Launch Contract
 
-Status: planned. Today, the editor opens in a specific mode only through widget extras.
+Status: shipped. Launcher shortcuts, tiles, notifications, and assistants adopt it as each of those surfaces lands.
 
 ## What it is
 
@@ -26,9 +26,11 @@ Whichever surface they use, the editor opens already doing the thing they asked 
 | --- | --- |
 | `Text` | An empty text block and the keyboard up |
 | `Voice` | An audio block, already recording |
-| `Camera` | A camera block showing the live preview |
-| `Video` | A camera block in video mode |
-| `PhotoPrompt(uri)` | The chosen photo and a writing prompt (used by the New entry widget) |
+| `Camera` | A camera block showing the live preview, ready for photos |
+| `Video` | A camera block showing the live preview, ready for video |
+
+A route can also carry a `promptPhotoUri`: the New entry widget's photo prompts start the entry with
+that photo, followed by text, or by a recording in `Voice` mode.
 
 Screenshots of each mode are added here when the contract ships.
 
@@ -38,14 +40,18 @@ Screenshots of each mode are added here when the contract ships.
 
 `EntryEditorRoute` in
 `client/feature/editor/src/commonMain/kotlin/app/logdate/feature/editor/navigation/EditorNavRoute.kt`
-gains `launchMode: EditorLaunchMode`. `NoteEditorScreen` reads it once, when the editor first
-composes, and calls the matching view model initializer. The existing initializers are
-`initializeWidgetAudio`, `initializeWidgetCamera`, and `initializePhotoPrompt`, plus a new video
-initializer.
+carries `launchMode: EditorLaunchMode` and an optional `promptPhotoUri`. When a new entry first
+composes, `NoteEditorScreen` calls `EntryEditorViewModel.initializeLaunchMode` (or
+`initializePhotoPrompt` for a photo prompt). The view model adds the matching block once. A camera
+block opened in `Video` mode carries `initialCaptureMode = VIDEO`, which the camera applies before
+the first frame. An audio block opened in `Voice` mode carries `startOnOpen = true`: as soon as the
+microphone is allowed, `AudioBlockEditor` clears the flag and starts recording, so the person who
+tapped Record voice does not have to tap Record again.
 
 Before the contract, the route carried three widget-specific fields: `widgetRecord`, `widgetCamera`,
-and `widgetPhotoUri`. The launch mode replaces them. A test checks that a back stack saved by an older
-version, with the old fields, still restores without crashing.
+and `widgetPhotoUri`. The launch mode replaced them. Saved back stacks that still hold the old
+fields restore as a plain new entry, because unknown saved fields are ignored and both new fields
+have defaults.
 
 ### The intent
 
@@ -55,16 +61,18 @@ extras:  mode        text | voice | camera | video    optional, defaults to text
          journal_id  journal UUID                     optional, pre-selects that journal
 ```
 
-The equivalent deep link is:
+The equivalent deep links are:
 
 ```text
+logdate://capture/voice?journal=<uuid>
 logdate://capture?mode=voice&journal=<uuid>
 ```
 
-`resolveMainActivityNavKey` in
+The constants and the parsing live in `app/compose-main/src/commonMain/kotlin/app/logdate/client/capture/CaptureLaunch.kt`
+(`ACTION_CAPTURE`, `captureRoute`, `widgetCaptureRoute`). `resolveMainActivityNavKey` in
 `app/compose-main/src/androidMain/kotlin/app/logdate/client/DeepLinkResolver.kt` checks the capture
 action before anything else. An unknown `mode` falls back to `Text` rather than failing, so a newer
-shortcut cannot break an older app.
+shortcut cannot break an older app. An invalid journal id is ignored for the same reason.
 
 ### Legacy extras that keep working
 
@@ -75,7 +83,7 @@ They must keep resolving:
 | --- | --- |
 | `EXTRA_NAV_SOURCE=widget_new_entry` with `widget_record=true` | `Voice` |
 | `EXTRA_NAV_SOURCE=widget_new_entry` with `widget_camera=true` | `Camera` |
-| `EXTRA_NAV_SOURCE=widget_new_entry` with `widget_photo_uri` | `PhotoPrompt(uri)` |
+| `EXTRA_NAV_SOURCE=widget_new_entry` with `widget_photo_uri` | `Text` with that `promptPhotoUri` (or `Voice` with `widget_record=true`) |
 | `ambient_prompt_target=new_entry` | `Text` |
 
 ### The lock
@@ -94,15 +102,17 @@ A capture intent can only create. It never returns journal data to the caller.
 
 ## How to test
 
-- Host tests in `app/compose-main/src/androidHostTest/` cover every mode, an unknown mode, a journal
-  pre-selection, and every legacy extra.
+- `CaptureLaunchTest` (compose-main `commonTest`) covers every mode, case and spacing, an unknown
+  mode, valid and invalid journal ids, and every legacy widget extra.
+- The editor's `TextEditingTest` checks that each launch mode adds exactly one capture block, and
+  that video opens the camera ready for video.
 - `DeepLinkResolverTest` runs the same cases on a managed device:
 
   ```bash
   ./gradlew :app:android-main:smokeDevicesGroupDebugAndroidTest -Plogdate.androidTestClass=app.logdate.client.DeepLinkResolverTest
   ```
 
-- On an emulator, once the contract ships:
+- On an emulator:
 
   ```bash
   adb -s emulator-5554 shell am start -a app.logdate.action.CAPTURE --es mode voice

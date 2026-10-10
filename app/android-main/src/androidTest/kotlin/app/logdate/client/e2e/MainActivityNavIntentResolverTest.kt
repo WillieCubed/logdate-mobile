@@ -63,14 +63,17 @@ class MainActivityNavIntentResolverTest {
     fun `new entry widget opens photo first with the selected input`() {
         val photoUri = "content://media/external/images/media/42"
         assertEquals(
-            app.logdate.feature.editor.navigation.EntryEditorRoute(widgetPhotoUri = photoUri),
+            app.logdate.feature.editor.navigation.EntryEditorRoute(promptPhotoUri = photoUri),
             resolveMainActivityNavKey(Intent().apply {
                 putExtra(EXTRA_WIDGET_NAV_SOURCE, NAV_SOURCE_NEW_ENTRY_WIDGET)
                 putExtra(app.logdate.client.feature.widgets.EXTRA_WIDGET_PHOTO_URI, photoUri)
             }),
         )
         assertEquals(
-            app.logdate.feature.editor.navigation.EntryEditorRoute(widgetPhotoUri = photoUri, widgetRecord = true),
+            app.logdate.feature.editor.navigation.EntryEditorRoute(
+                launchMode = app.logdate.feature.editor.navigation.EditorLaunchMode.Voice,
+                promptPhotoUri = photoUri,
+            ),
             resolveMainActivityNavKey(Intent().apply {
                 putExtra(EXTRA_WIDGET_NAV_SOURCE, NAV_SOURCE_NEW_ENTRY_WIDGET)
                 putExtra(app.logdate.client.feature.widgets.EXTRA_WIDGET_PHOTO_URI, photoUri)
@@ -82,13 +85,40 @@ class MainActivityNavIntentResolverTest {
     @Test
     fun `new entry camera action opens camera capture`() {
         assertEquals(
-            app.logdate.feature.editor.navigation.EntryEditorRoute(widgetCamera = true),
+            app.logdate.feature.editor.navigation.EntryEditorRoute(
+                launchMode = app.logdate.feature.editor.navigation.EditorLaunchMode.Camera,
+            ),
             resolveMainActivityNavKey(Intent().apply {
                 putExtra(EXTRA_WIDGET_NAV_SOURCE, NAV_SOURCE_NEW_ENTRY_WIDGET)
                 putExtra(app.logdate.client.feature.widgets.EXTRA_WIDGET_CAMERA, true)
             }),
         )
     }
+    @Test
+    fun `capture action opens the editor in the requested mode with the journal selected`() {
+        val journalId = Uuid.random()
+        assertEquals(
+            app.logdate.feature.editor.navigation.EntryEditorRoute(
+                launchMode = app.logdate.feature.editor.navigation.EditorLaunchMode.Voice,
+                journalIds = listOf(journalId.toString()),
+            ),
+            resolveMainActivityNavKey(Intent(app.logdate.client.capture.ACTION_CAPTURE).apply {
+                putExtra(app.logdate.client.capture.EXTRA_CAPTURE_MODE, "voice")
+                putExtra(app.logdate.client.capture.EXTRA_CAPTURE_JOURNAL_ID, journalId.toString())
+            }),
+        )
+    }
+
+    @Test
+    fun `capture deep link opens the editor in the requested mode`() {
+        assertEquals(
+            app.logdate.feature.editor.navigation.EntryEditorRoute(
+                launchMode = app.logdate.feature.editor.navigation.EditorLaunchMode.Video,
+            ),
+            resolveMainActivityNavKey(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("logdate://capture/video"))),
+        )
+    }
+
     @Test
     fun `custom scheme journal intent resolves journal details route`() {
         val journalId = Uuid.random()

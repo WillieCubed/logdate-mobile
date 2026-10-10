@@ -145,6 +145,7 @@ actual fun CameraCaptureContent(
     onClose: () -> Unit,
     modifier: Modifier,
     remoteControl: CameraRemoteControl,
+    initialCaptureMode: CaptureMode,
 ) {
     if (LocalInspectionMode.current) {
         CameraCapturePreviewContent(
@@ -155,6 +156,9 @@ actual fun CameraCaptureContent(
     }
 
     val viewModel: CameraViewModel = koinViewModel()
+    LaunchedEffect(viewModel, initialCaptureMode) {
+        if (initialCaptureMode != CaptureMode.PHOTO) viewModel.setCaptureMode(initialCaptureMode)
+    }
     val uiState by viewModel.uiState.collectAsState()
     val currentOnClose by rememberUpdatedState(onClose)
     val currentOnMediaCaptured by rememberUpdatedState(onMediaCaptured)

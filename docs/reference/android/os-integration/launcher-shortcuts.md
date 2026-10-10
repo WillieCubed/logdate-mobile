@@ -1,7 +1,7 @@
 # Launcher Shortcuts and Direct Share
 
-Status: partial. The New note static shortcut, four dynamic shortcut kinds, and Direct Share ship
-today. Record voice, Take photo, usage reporting, and pinning are planned.
+Status: partial. New entry, Record voice, and Take photo static shortcuts, the dynamic shortcuts,
+Direct Share, and usage reporting ship. Pinning is planned.
 
 ## What it is
 
@@ -10,7 +10,7 @@ a label, an icon, and an `Intent`. Android has three kinds:
 
 | Kind | Declared | Changes at runtime? | LogDate uses it for |
 | --- | --- | --- | --- |
-| Static | `res/xml/shortcuts.xml` | No | Starting an entry (New note today; Record voice and Take photo planned) |
+| Static | `res/xml/shortcuts.xml` | No | Starting an entry: New entry, Record voice, and Take photo |
 | Dynamic | `ShortcutManagerCompat` at runtime | Yes | Continue draft, Today, Last week, and one share target per journal |
 | Pinned | `requestPinShortcut`, after the person agrees | Owned by the person once placed | Journals on the home screen (planned) |
 
@@ -24,9 +24,10 @@ how many exist.
 
 ## What the person sees
 
-- **Long-press the LogDate icon:** New note, plus up to three dynamic shortcuts. These are Continue
-  draft (when a draft changed in the last 7 days), Today, and Last week. Planned: Record voice and
-  Take photo join the static set, with themed icons that follow the wallpaper.
+- **Long-press the LogDate icon:** New entry, Record voice, and Take photo, each opening the editor
+  already in that mode, plus one dynamic shortcut. That is Continue draft when a draft changed in the
+  last 7 days, otherwise Today. The icons are adaptive icons with a monochrome layer, so launchers
+  with themed icons recolor them to match the wallpaper.
 - **Share sheet:** recently used and favorite journals appear as Direct Share targets.
 - **Planned:** journal detail gets "Add to home screen", and widget settings get "Add widget".
 
@@ -42,7 +43,10 @@ the share sheet row, and the pin dialogs.
 
 - Each `<shortcut>` uses `@string/logdate_application_id` as its target package. That string is
   generated per build variant, so debug (`.debug`) and release builds both point at themselves.
-- The planned static shortcuts send the [capture launch contract](capture-launch-contract.md) intent.
+- Each static shortcut sends the [capture launch contract](capture-launch-contract.md) intent:
+  `app.logdate.action.CAPTURE` with `mode` set to `text`, `voice`, or `camera`.
+- The icons (`ic_shortcut_new_entry`, `ic_shortcut_record_voice`, `ic_shortcut_take_photo`) are
+  adaptive icons on the launcher icon's brown, with the glyph reused as the monochrome layer.
 - **Shortcut ids are permanent.** A person may have pinned a static shortcut, so changing its id
   orphans the pinned copy.
 
@@ -58,14 +62,28 @@ the share sheet row, and the pin dialogs.
 3. **Refresh.** `DynamicShortcutRefreshObserver` watches drafts, rewinds, and journals (debounced
    500 ms). `DynamicShortcutRefreshWorker` re-publishes, scheduled daily by `DynamicShortcutScheduler`.
 
-Planned changes:
+Launchers show four shortcuts. The publisher's cap is that number minus the three static
+shortcuts, so it decides which dynamic shortcut appears instead of the launcher trimming silently.
 
-- The publisher caps launcher shortcuts at `max − staticCount` instead of a fixed 3, so the launcher
-  never trims entries silently.
-- Drafts are published with `pushDynamicShortcut`, which keeps usage history and respects rank.
-- Share targets get a `LocusId`.
-- A `ShortcutUsageReporter` calls `reportShortcutUsed` when an entry is saved through a mode or into a
-  shared journal. Launchers and the share sheet use these signals to rank predictions.
+Drafts stay in the atomic `setDynamicShortcuts` call rather than moving to `pushDynamicShortcut`.
+Shortcut ids are stable across refreshes, so usage history is not lost, and one atomic call cannot
+leave launcher and share shortcuts half-updated.
+
+### Usage reporting
+
+Android asks apps to call `reportShortcutUsed` whenever the person does what a shortcut does, whether
+or not they used the shortcut. Launchers use these reports to predict which shortcut to offer, and
+the share sheet uses them to order journals.
+
+When an entry is saved, `EntryEditorViewModel` passes what it captured and which journals it went to
+to a `CaptureUsageReporter` (editor module; it does nothing outside Android).
+`AndroidCaptureUsageReporter` reports:
+
+- the static shortcut for each kind of capture in the entry, from `captureShortcutId`: writing
+  reports New entry, voice reports Record voice, and a photo reports Take photo;
+- the share target of each journal the entry was saved to.
+
+A failed report is logged and never affects the save.
 
 ### Direct Share intake
 

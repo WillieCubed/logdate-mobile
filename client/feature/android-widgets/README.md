@@ -81,7 +81,9 @@ A widget never bypasses the app's configured lock to show private content.
   - `TodayTimeline`
   - `WeekRewind`
   - `ShareToJournal` (one per journal; a Direct Share target)
-- **`DynamicShortcutPublisher`** chooses up to `DEFAULT_MAX_SHORTCUTS` (3) launcher shortcuts. It
+- **`DynamicShortcutPublisher`** chooses up to `DEFAULT_MAX_SHORTCUTS` launcher shortcuts: the four
+  slots launchers show, minus the three static capture shortcuts (New entry, Record voice, Take
+  photo). That leaves one slot, filled in priority order: Continue draft, then Today. It
   drops drafts older than `DEFAULT_DRAFT_FRESHNESS` (7 days). It orders share targets favorites first,
   then by most recent activity.
 - **Strings and icons** live in this module: `R.string.dynamic_shortcut_*` and

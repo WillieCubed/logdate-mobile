@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.editor.ObserveEditorDataUseCase
 import app.logdate.client.domain.editor.SaveEntryUseCase
 import app.logdate.client.repository.journals.EntryDraft
+import app.logdate.feature.editor.navigation.EditorLaunchMode
+import app.logdate.feature.editor.ui.camera.CaptureMode
 import app.logdate.feature.editor.ui.editor.delegate.AudioBlockFinalizer
 import app.logdate.feature.editor.ui.editor.delegate.ContentLoader
 import app.logdate.feature.editor.ui.editor.delegate.DraftManager
@@ -62,6 +64,7 @@ class EntryEditorViewModel(
             }
         },
     private val pendingAudioRecoverer: PendingAudioRecoverer? = null,
+    private val captureUsage: CaptureUsageReporter = CaptureUsageReporter.None,
 ) : ViewModel() {
     /**
      * Per-block finalizers bound by each block's own `AudioBlockEditor` composable, keyed by
@@ -815,6 +818,8 @@ class EntryEditorViewModel(
                 return@withLock
             }
             applyResolvedAudio(resolvedAudio)
+            runCatching { captureUsage.entrySaved(captureModesOf(notes), publishSnapshot.selectedJournalIds) }
+                .onFailure { error -> Napier.w("Could not report capture usage", error) }
             mutableEditorState.update {
                 it.copy(
                     draftState = DraftState.None,
@@ -1261,14 +1266,26 @@ class EntryEditorViewModel(
         createNewBlock(if (record) BlockType.AUDIO else BlockType.TEXT)
     }
 
-    fun initializeWidgetAudio() {
-        if (mutableEditorState.value.blocks.any { it is AudioBlockUiState }) return
-        createNewBlock(BlockType.AUDIO)
-    }
-
-    fun initializeWidgetCamera() {
-        if (mutableEditorState.value.blocks.any { it is CameraBlockUiState }) return
-        createNewBlock(BlockType.CAMERA)
+    /**
+     * Prepares a new entry for [mode]: a recording for voice, the camera for photos or video, and
+     * nothing extra for text. Safe to call again when the screen recomposes; it never adds a second
+     * capture block.
+     */
+    fun initializeLaunchMode(mode: EditorLaunchMode) {
+        val blocks = mutableEditorState.value.blocks
+        when (mode) {
+            EditorLaunchMode.Text -> Unit
+            EditorLaunchMode.Voice -> {
+                if (blocks.any { it is AudioBlockUiState }) return
+                val audio = createNewBlock(BlockType.AUDIO) as AudioBlockUiState
+                updateBlock(audio.copy(startOnOpen = true))
+            }
+            EditorLaunchMode.Camera, EditorLaunchMode.Video -> {
+                if (blocks.any { it is CameraBlockUiState }) return
+                val camera = createNewBlock(BlockType.CAMERA) as CameraBlockUiState
+                if (mode == EditorLaunchMode.Video) updateBlock(camera.copy(initialCaptureMode = CaptureMode.VIDEO))
+            }
+        }
     }
 
     /** Creates blocks for attachment URIs supplied when opening the editor. */

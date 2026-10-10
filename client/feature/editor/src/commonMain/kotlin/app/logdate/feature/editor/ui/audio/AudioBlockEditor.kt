@@ -10,7 +10,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.logdate.client.media.audio.AudioPlaybackMetadata
@@ -26,6 +28,7 @@ import app.logdate.ui.audio.AudioContextProcessor
 import app.logdate.util.formatDateLocalized
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.koin.compose.koinInject
@@ -249,6 +252,16 @@ fun AudioBlockEditor(
                         onInputSelected = audioRouteRepository::selectInputDevice,
                     )
                 } else {
+                    // A voice launch asked to record. Start once the microphone is allowed and the
+                    // editor's window has focus: launched from Quick Settings, the shade is still
+                    // closing over the editor, and Android refuses to start recording until it has.
+                    val windowInfo = LocalWindowInfo.current
+                    LaunchedEffect(block.id, block.startOnOpen) {
+                        if (!block.startOnOpen) return@LaunchedEffect
+                        snapshotFlow { windowInfo.isWindowFocused }.first { it }
+                        onBlockUpdated(block.copy(startOnOpen = false))
+                        audioViewModel.startRecording(targetNoteId = block.id)
+                    }
                     AudioRecordingControls(
                         recordingState = recordingState,
                         audioLevels = audioLevels,

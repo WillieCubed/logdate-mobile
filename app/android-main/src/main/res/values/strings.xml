@@ -17,9 +17,14 @@
     <string name="action_add_to_library">Add to library</string>
 
     <!-- Shortcuts -->
-    <string name="shortcut_label_new_note_short">New note</string>
-    <string name="shortcut_label_new_note_long">Create a new note</string>
-    <string name="shortcut_label_new_note_disabled">Can\'t create new note</string>
+    <string name="shortcut_label_new_note_short">New entry</string>
+    <string name="shortcut_label_new_note_long">Write a new entry</string>
+    <string name="shortcut_label_new_note_disabled">Can\'t create new entry</string>
+    <string name="shortcut_label_record_voice_short">Record voice</string>
+    <string name="shortcut_label_record_voice_long">Record a voice entry</string>
+    <string name="shortcut_label_take_photo_short">Take photo</string>
+    <string name="shortcut_label_take_photo_long">Take a photo for a new entry</string>
+    <string name="shortcut_label_capture_disabled">This shortcut is no longer available</string>
 
     <!-- Settings -->
     <string name="screen_title_settings">Settings</string>

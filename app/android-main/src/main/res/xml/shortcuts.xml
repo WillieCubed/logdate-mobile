@@ -1,47 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Static launcher shortcut + share-target declaration.
+  Static launcher shortcuts and the Direct Share target declaration.
 
-  Three things live here:
-
-   1. The always-on "new note" launcher shortcut — fallback when no dynamic
-      shortcuts are published yet (cold install, post-restore, etc.). It uses
-      the existing AMBIENT_PROMPT_TARGET extras that MainActivity.resolveNavKey
-      already understands.
+   1. New entry, Record voice, and Take photo: the capture shortcuts people see
+      when they long-press the LogDate icon. Each sends app.logdate.action.CAPTURE
+      with a mode, the shared capture launch contract that every surface uses
+      (docs/reference/android/os-integration/capture-launch-contract.md).
+      Shortcut ids are permanent: people pin these, and a renamed id orphans
+      the pinned copy. new_note keeps its original id for that reason.
 
    2. <share-target> entries that tell the system which dynamic shortcut
-      categories can receive which mime types from the share sheet. The runtime
-      sharing shortcuts are published per-journal by DynamicShortcutPublisher /
-      AndroidDynamicShortcutApplier and tagged with the
-      android.shortcut.conversation category — combined with these
-      <share-target> declarations, the OS surfaces them as Direct Share
-      targets in the system share sheet for any text/plain, image, or video
-      share. The mime types here must match the existing <intent-filter>s on
-      MainActivity.
+      categories can receive which MIME types from the share sheet. The
+      per-journal sharing shortcuts are published by DynamicShortcutPublisher /
+      AndroidDynamicShortcutApplier with the android.shortcut.conversation
+      category, so the share sheet offers them as Direct Share targets. The
+      MIME types here must match the SEND intent filters on MainActivity.
 
-   3. Stateful launcher shortcuts (continue draft, today's timeline, last
-      week's rewind) are published dynamically — not declared here.
-
-  Note: Assistant App Actions / capability bindings (CREATE_THING etc.) will
-  return as App Functions (androidx.appfunctions) in a later tier — they were
-  removed from this file because the legacy bindings pointed at a class that
-  doesn't exist in this build and had no parameter handling either.
+   3. Stateful launcher shortcuts (continue draft, today's timeline) are
+      published dynamically, not declared here.
 -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
         android:enabled="true"
-        android:icon="@drawable/note_stack_add"
+        android:icon="@drawable/ic_shortcut_new_entry"
         android:shortcutDisabledMessage="@string/shortcut_label_new_note_disabled"
         android:shortcutId="new_note"
         android:shortcutLongLabel="@string/shortcut_label_new_note_long"
         android:shortcutShortLabel="@string/shortcut_label_new_note_short">
         <intent
-            android:action="android.intent.action.VIEW"
+            android:action="app.logdate.action.CAPTURE"
             android:targetClass="app.logdate.client.MainActivity"
             android:targetPackage="@string/logdate_application_id">
             <extra
-                android:name="ambient_prompt_target"
-                android:value="new_entry" />
+                android:name="mode"
+                android:value="text" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_record_voice"
+        android:shortcutDisabledMessage="@string/shortcut_label_capture_disabled"
+        android:shortcutId="record_voice"
+        android:shortcutLongLabel="@string/shortcut_label_record_voice_long"
+        android:shortcutShortLabel="@string/shortcut_label_record_voice_short">
+        <intent
+            android:action="app.logdate.action.CAPTURE"
+            android:targetClass="app.logdate.client.MainActivity"
+            android:targetPackage="@string/logdate_application_id">
+            <extra
+                android:name="mode"
+                android:value="voice" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_take_photo"
+        android:shortcutDisabledMessage="@string/shortcut_label_capture_disabled"
+        android:shortcutId="take_photo"
+        android:shortcutLongLabel="@string/shortcut_label_take_photo_long"
+        android:shortcutShortLabel="@string/shortcut_label_take_photo_short">
+        <intent
+            android:action="app.logdate.action.CAPTURE"
+            android:targetClass="app.logdate.client.MainActivity"
+            android:targetPackage="@string/logdate_application_id">
+            <extra
+                android:name="mode"
+                android:value="camera" />
         </intent>
     </shortcut>
 

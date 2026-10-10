@@ -111,7 +111,16 @@ class DynamicShortcutPublisher(
         /** Drafts older than this are considered abandoned and not surfaced as shortcuts. */
         val DEFAULT_DRAFT_FRESHNESS: Duration = 7.days
 
-        /** Three slots leaves room for the static "new entry" shortcut as the fourth launcher entry. */
-        const val DEFAULT_MAX_SHORTCUTS: Int = 3
+        /** How many shortcuts launchers show when someone long-presses the app icon. */
+        const val LAUNCHER_VISIBLE_SHORTCUTS: Int = 4
+
+        /** New entry, Record voice, and Take photo, declared in the app's shortcuts.xml. */
+        const val STATIC_LAUNCHER_SHORTCUTS: Int = 3
+
+        /**
+         * Dynamic launcher shortcuts that fit beside the static capture shortcuts. Publishing more
+         * would let the launcher drop entries silently instead of in this class's priority order.
+         */
+        const val DEFAULT_MAX_SHORTCUTS: Int = LAUNCHER_VISIBLE_SHORTCUTS - STATIC_LAUNCHER_SHORTCUTS
     }
 }

@@ -59,6 +59,7 @@ actual fun CameraCaptureContent(
     onClose: () -> Unit,
     modifier: Modifier,
     remoteControl: CameraRemoteControl,
+    initialCaptureMode: CaptureMode,
 ) {
     val manager = koinInject<CameraCaptureManager>() as? IosCameraCaptureManager
     if (manager == null) {
@@ -67,6 +68,9 @@ actual fun CameraCaptureContent(
     }
     val state by manager.state.collectAsState()
     val scope = rememberCoroutineScope()
+    LaunchedEffect(manager, initialCaptureMode) {
+        if (initialCaptureMode != CaptureMode.PHOTO) manager.setCaptureMode(initialCaptureMode)
+    }
 
     LaunchedEffect(state.cameraFacing) {
         manager.startPreview(state.cameraFacing)

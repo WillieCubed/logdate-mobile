@@ -96,6 +96,7 @@
                 <data android:host="event" />
                 <data android:host="location" />
                 <data android:host="search" />
+                <data android:host="capture" />
             </intent-filter>
 
             <!--
@@ -122,11 +123,22 @@
                 <data android:host="event" />
                 <data android:host="location" />
                 <data android:host="search" />
+                <data android:host="capture" />
             </intent-filter>
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+                Starts a new entry from launcher shortcuts, Quick Settings tiles, notifications,
+                assistants, and other apps. Extras: mode (text|voice|camera|video), journal_id.
+                See docs/reference/android/os-integration/capture-launch-contract.md.
+            -->
+            <intent-filter>
+                <action android:name="app.logdate.action.CAPTURE" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
 
             <intent-filter>

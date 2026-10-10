@@ -11,6 +11,13 @@ import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_DRAFT_ID
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_EVENT_ID
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_RECALL_DATE
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_TARGET
+import app.logdate.client.capture.ACTION_CAPTURE
+import app.logdate.client.capture.CAPTURE_HOST
+import app.logdate.client.capture.CAPTURE_JOURNAL_PARAM
+import app.logdate.client.capture.EXTRA_CAPTURE_JOURNAL_ID
+import app.logdate.client.capture.EXTRA_CAPTURE_MODE
+import app.logdate.client.capture.captureRoute
+import app.logdate.client.capture.widgetCaptureRoute
 import app.logdate.client.feature.widgets.EXTRA_WIDGET_CAMERA
 import app.logdate.client.feature.widgets.EXTRA_WIDGET_NOTE_ID
 import app.logdate.client.feature.widgets.EXTRA_WIDGET_PHOTO_URI
@@ -101,6 +108,11 @@ private fun resolveCustomSchemeHost(
         PATH_LOCATION -> LocationTimelineRoute
         PATH_EVENT -> segments.firstOrNull()?.let { EventDetailRoute(it) }
         PATH_SEARCH -> uri.toSearchRoute()
+        CAPTURE_HOST ->
+            captureRoute(
+                mode = segments.firstOrNull() ?: uri.getQueryParameter(EXTRA_CAPTURE_MODE),
+                journalId = uri.getQueryParameter(CAPTURE_JOURNAL_PARAM),
+            )
         else -> null
     }
 
@@ -203,6 +215,13 @@ fun resolveMainActivityNavKey(intent: Intent?): NavKey? {
     if (intent == null) return null
     intent.readNavigationTestDestination()?.let { return it }
     return when {
+        intent.action == ACTION_CAPTURE -> {
+            captureRoute(
+                mode = intent.getStringExtra(EXTRA_CAPTURE_MODE),
+                journalId = intent.getStringExtra(EXTRA_CAPTURE_JOURNAL_ID),
+            )
+        }
+
         intent.getStringExtra(EXTRA_NAV_SOURCE) == NAV_SOURCE_AUDIO_PLAYBACK -> {
             val noteId = intent.getStringExtra(EXTRA_NOTE_ID) ?: return null
             runCatching { NoteDetailRoute(Uuid.parse(noteId)) }.getOrNull()
@@ -222,10 +241,10 @@ fun resolveMainActivityNavKey(intent: Intent?): NavKey? {
         }
 
         intent.getStringExtra(EXTRA_NAV_SOURCE) == NAV_SOURCE_NEW_ENTRY_WIDGET -> {
-            EntryEditorRoute(
-                widgetPhotoUri = intent.getStringExtra(EXTRA_WIDGET_PHOTO_URI),
-                widgetRecord = intent.getBooleanExtra(EXTRA_WIDGET_RECORD, false),
-                widgetCamera = intent.getBooleanExtra(EXTRA_WIDGET_CAMERA, false),
+            widgetCaptureRoute(
+                photoUri = intent.getStringExtra(EXTRA_WIDGET_PHOTO_URI),
+                record = intent.getBooleanExtra(EXTRA_WIDGET_RECORD, false),
+                camera = intent.getBooleanExtra(EXTRA_WIDGET_CAMERA, false),
             )
         }
 

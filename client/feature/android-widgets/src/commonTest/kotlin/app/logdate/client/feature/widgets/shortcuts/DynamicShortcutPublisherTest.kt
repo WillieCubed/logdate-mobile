@@ -108,6 +108,7 @@ class DynamicShortcutPublisherTest {
                 publisher(
                     draft = null,
                     rewind = RewindQueryResult.Success(rewindWith(uid = rewindId)),
+                    maxShortcuts = 3,
                 )
 
             val descriptors = publisher.computeShortcuts()
@@ -174,7 +175,7 @@ class DynamicShortcutPublisherTest {
         runTest {
             val draft = textDraft(updatedAt = NOW - 30.minutes)
             val rewind = RewindQueryResult.Success(rewindWith(uid = Uuid.random()))
-            val publisher = publisher(draft = draft, rewind = rewind)
+            val publisher = publisher(draft = draft, rewind = rewind, maxShortcuts = 3)
 
             val descriptors = publisher.computeShortcuts()
 
@@ -201,6 +202,30 @@ class DynamicShortcutPublisherTest {
             assertEquals(2, descriptors.size)
             assertIs<DynamicShortcutDescriptor.ContinueDraft>(descriptors[0])
             assertIs<DynamicShortcutDescriptor.TodayTimeline>(descriptors[1])
+        }
+
+    @Test
+    fun `the default cap leaves room for the static capture shortcuts`() =
+        runTest {
+            val draft = textDraft(updatedAt = NOW - 1.hours)
+            val rewind = RewindQueryResult.Success(rewindWith(uid = Uuid.random()))
+
+            val descriptors =
+                publisher(draft = draft, rewind = rewind, maxShortcuts = DynamicShortcutPublisher.DEFAULT_MAX_SHORTCUTS).computeShortcuts()
+
+            assertEquals(
+                DynamicShortcutPublisher.LAUNCHER_VISIBLE_SHORTCUTS - DynamicShortcutPublisher.STATIC_LAUNCHER_SHORTCUTS,
+                descriptors.size,
+            )
+            assertIs<DynamicShortcutDescriptor.ContinueDraft>(descriptors.single())
+        }
+
+    @Test
+    fun `without a fresh draft the remaining slot shows today`() =
+        runTest {
+            val descriptors = publisher(draft = null, maxShortcuts = DynamicShortcutPublisher.DEFAULT_MAX_SHORTCUTS).computeShortcuts()
+
+            assertIs<DynamicShortcutDescriptor.TodayTimeline>(descriptors.single())
         }
 
     @Test
@@ -377,7 +402,8 @@ class DynamicShortcutPublisherTest {
         journals: List<Journal> = emptyList(),
         clockInstant: Instant = NOW,
         timeZone: TimeZone = TimeZone.UTC,
-        maxShortcuts: Int = DynamicShortcutPublisher.DEFAULT_MAX_SHORTCUTS,
+        // Generous, so ordering tests see every launcher descriptor; cap tests pass their own.
+        maxShortcuts: Int = 3,
         draftFreshness: Duration = DynamicShortcutPublisher.DEFAULT_DRAFT_FRESHNESS,
     ): DynamicShortcutPublisher =
         DynamicShortcutPublisher(

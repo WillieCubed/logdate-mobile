@@ -34,6 +34,10 @@ private val FabEditorBoundsTransform =
  *
  * Strings rather than `Uuid`s because Navigation 3's saved-state serialization on iOS does
  * not handle `Uuid` natively yet.
+ *
+ * @property launchMode What a new entry opens ready to capture. Ignored when resuming [entryId].
+ * @property promptPhotoUri A photo to start the entry with, followed by text or, in
+ *   [EditorLaunchMode.Voice], a recording. The New entry widget uses it for its photo prompts.
  */
 @Serializable
 data class EntryEditorRoute(
@@ -42,9 +46,8 @@ data class EntryEditorRoute(
     val journalIds: List<String> = emptyList(),
     val firstEntry: Boolean = false,
     val visitContext: VisitMemoryContext? = null,
-    val widgetPhotoUri: String? = null,
-    val widgetRecord: Boolean = false,
-    val widgetCamera: Boolean = false,
+    val launchMode: EditorLaunchMode = EditorLaunchMode.Text,
+    val promptPhotoUri: String? = null,
 ) : NavKey
 
 /** Pushes the editor onto the back stack with optional entry / draft / journal context. */
@@ -102,9 +105,8 @@ fun EntryProviderScope<NavKey>.editorEntry(
                 firstEntry = route.firstEntry,
                 journalIds = route.journalIds.map(Uuid::parse),
                 visitContext = route.visitContext,
-                widgetPhotoUri = route.widgetPhotoUri,
-                widgetRecord = route.widgetRecord,
-                widgetCamera = route.widgetCamera,
+                launchMode = route.launchMode,
+                promptPhotoUri = route.promptPhotoUri,
                 modifier = sharedBoundsModifier,
             )
         }

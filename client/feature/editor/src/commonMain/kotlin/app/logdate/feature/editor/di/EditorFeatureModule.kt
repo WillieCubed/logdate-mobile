@@ -3,6 +3,7 @@ package app.logdate.feature.editor.di
 import app.logdate.client.domain.di.domainModule
 import app.logdate.feature.editor.ui.audio.audioModule
 import app.logdate.feature.editor.ui.camera.CameraViewModel
+import app.logdate.feature.editor.ui.editor.CaptureUsageReporter
 import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.delegate.ContentLoader
 import app.logdate.feature.editor.ui.editor.delegate.DefaultPendingAudioRecoverer
@@ -45,6 +46,7 @@ val editorFeatureModule: Module =
                 draftManager = get(),
                 contentLoader = get(),
                 pendingAudioRecoverer = get(),
+                captureUsage = getOrNull<CaptureUsageReporter>() ?: CaptureUsageReporter.None,
             )
         }
     }

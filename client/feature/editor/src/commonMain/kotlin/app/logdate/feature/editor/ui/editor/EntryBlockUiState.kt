@@ -1,6 +1,7 @@
 package app.logdate.feature.editor.ui.editor
 
 import app.logdate.client.repository.journals.SystemCaptureTimeZone
+import app.logdate.feature.editor.ui.camera.CaptureMode
 import app.logdate.feature.editor.ui.camera.CapturedMediaType
 import app.logdate.feature.editor.ui.formatMediaDuration
 import app.logdate.shared.model.Location
@@ -92,6 +93,8 @@ data class CameraBlockUiState(
     val mediaType: CapturedMediaType = CapturedMediaType.PHOTO,
     val durationMs: Long = 0,
     override val timeZoneId: String? = SystemCaptureTimeZone.currentTimeZoneId(),
+    /** Whether the live camera starts ready for photos or video, before anything is captured. */
+    val initialCaptureMode: CaptureMode = CaptureMode.PHOTO,
 ) : MediaBlockUiState {
     override fun hasContent(): Boolean = uri != null
 
@@ -155,6 +158,12 @@ data class AudioBlockUiState(
     override val caption: String = "",
     val transcription: String = "",
     override val timeZoneId: String? = SystemCaptureTimeZone.currentTimeZoneId(),
+    /**
+     * Start recording as soon as the block appears and the microphone is allowed. Voice launches
+     * (the Record voice shortcut, tile, and widget) set it, because the person already chose to
+     * record; it clears once recording is requested.
+     */
+    val startOnOpen: Boolean = false,
 ) : MediaBlockUiState {
     override val uri: String?
         get() = (captureState as? AudioCaptureState.Ready)?.uri

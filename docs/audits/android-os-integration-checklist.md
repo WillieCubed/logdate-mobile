@@ -82,8 +82,8 @@ A row reaches `[done]` only when its Evidence column lists:
 
 | Status | Requirement | Evidence |
 | --- | --- | --- |
-| `[partial]` | The editor opens in Text, Voice, Camera, Video, or PhotoPrompt mode from one `EditorLaunchMode` | Voice, Camera, and PhotoPrompt work today through the widget extras (`EntryEditorRoute.widgetRecord`, `widgetCamera`, `widgetPhotoUri`). Video has no launch path. |
-| `[todo]` | `app.logdate.action.CAPTURE` and `logdate://capture` resolve to the editor; legacy widget and ambient extras keep resolving | |
+| `[done]` | The editor opens in Text, Voice, Camera, Video, or PhotoPrompt mode from one `EditorLaunchMode` | `EditorLaunchMode` on `EntryEditorRoute`; voice launches start recording once the microphone is allowed and the window has focus. `TextEditingTest` launch tests; verified on API 36 and 37 managed devices from the Record voice tile. |
+| `[done]` | `app.logdate.action.CAPTURE` and `logdate://capture` resolve to the editor; legacy widget and ambient extras keep resolving | `CaptureLaunch.kt` and `DeepLinkResolver`; `CaptureLaunchTest`, `MainActivityNavIntentResolverTest`. Used by the launcher shortcuts and tiles in the system UI captures. |
 | `[todo]` | OS integration flags exist with debug-only toggles | |
 | `[todo]` | `PlatformComponentToggler` enables and disables flagged manifest components | |
 | `[todo]` | Manifest declares the touchscreen as optional, `configChanges`, editor `<layout>` minimums, and multi-instance support | |
@@ -95,12 +95,12 @@ A row reaches `[done]` only when its Evidence column lists:
 
 | Status | Requirement | Evidence |
 | --- | --- | --- |
-| `[partial]` | Static shortcuts for New entry, Record voice, and Take photo, with themed icons | `new_note` ships with the plain vector icon `note_stack_add`, which has no adaptive or monochrome layer for themed icons. Record voice and Take photo are missing. |
-| `[partial]` | Dynamic shortcuts for Continue draft, Today, and Last week | Ship today. `DynamicShortcutPublisherTest`. Missing: Lane 2 capture. |
-| `[todo]` | The dynamic shortcut cap leaves room for static shortcuts | |
+| `[done]` | Static shortcuts for New entry, Record voice, and Take photo, with themed icons | Three static shortcuts on the capture action, with adaptive icons and monochrome layers. Lane 2: `launcher-shortcuts/long-press--{phone-api36,phone-api37,tablet-api37}.png`. |
+| `[done]` | Dynamic shortcuts for Continue draft, Today, and Last week | Ship today (`DynamicShortcutPublisherTest`). Their icons were bare white glyphs that launchers drew white on white; they now use the same adaptive icons as the static shortcuts (visible in the launcher captures). |
+| `[done]` | The dynamic shortcut cap leaves room for static shortcuts | `DynamicShortcutPublisher` caps dynamic shortcuts at four visible minus three static; `DynamicShortcutPublisherTest`. |
 | `[todo]` | Drafts are pushed with `pushDynamicShortcut`; share targets carry a `LocusId` | |
 | `[partial]` | Direct Share targets for each journal | Ship today. `SharingShortcutParsersTest`, `IncomingShareE2ETest`. Missing: Lane 2 share sheet capture. |
-| `[todo]` | `reportShortcutUsed` is called on save for each mode and shared journal | |
+| `[done]` | `reportShortcutUsed` is called on save for each mode and shared journal | `CaptureUsageReporter` (editor) and `AndroidCaptureUsageReporter`; ids from `captureShortcutId`, tested in `CaptureLaunchTest`. |
 | `[todo]` | Journals and widgets can be pinned from inside the app | |
 
 ## System Capture Surfaces

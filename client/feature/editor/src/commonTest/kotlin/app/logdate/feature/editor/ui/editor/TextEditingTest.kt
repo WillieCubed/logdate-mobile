@@ -19,6 +19,8 @@ import app.logdate.client.domain.notes.drafts.GetAllDraftsUseCase
 import app.logdate.client.domain.notes.drafts.UpdateEntryDraftUseCase
 import app.logdate.client.domain.world.LogLocationUseCase
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.feature.editor.navigation.EditorLaunchMode
+import app.logdate.feature.editor.ui.camera.CaptureMode
 import app.logdate.feature.editor.ui.editor.delegate.ContentLoader
 import app.logdate.feature.editor.ui.editor.delegate.DraftManager
 import app.logdate.feature.editor.ui.editor.fakes.FakeActivityTimelineRepository
@@ -565,28 +567,51 @@ class TextEditingTest {
         }
 
     @Test
-    fun `widget audio action starts one recording block without a photo`() =
+    fun `voice launch starts one recording block without a photo`() =
         testScope.runTest {
-            viewModel.initializeWidgetAudio()
-            viewModel.initializeWidgetAudio()
+            viewModel.initializeLaunchMode(EditorLaunchMode.Voice)
+            viewModel.initializeLaunchMode(EditorLaunchMode.Voice)
             advanceUntilIdle()
             assertEquals(1, viewModel.editorState.value.blocks.size)
-            assertTrue(
+            val audio =
                 viewModel.editorState.value.blocks
-                    .single() is AudioBlockUiState,
-            )
+                    .single()
+            assertTrue(audio is AudioBlockUiState)
+            assertTrue(audio.startOnOpen, "A voice launch starts recording without a second tap")
         }
 
     @Test
-    fun `widget camera action opens one camera block`() =
+    fun `camera launch opens one camera block ready for photos`() =
         testScope.runTest {
-            viewModel.initializeWidgetCamera()
-            viewModel.initializeWidgetCamera()
+            viewModel.initializeLaunchMode(EditorLaunchMode.Camera)
+            viewModel.initializeLaunchMode(EditorLaunchMode.Camera)
             advanceUntilIdle()
             val state = viewModel.editorState.value
             assertEquals(1, state.blocks.size)
-            assertTrue(state.blocks.single() is CameraBlockUiState)
-            assertEquals(state.blocks.single().id, state.expandedBlockId)
+            val camera = state.blocks.single() as CameraBlockUiState
+            assertEquals(CaptureMode.PHOTO, camera.initialCaptureMode)
+            assertEquals(camera.id, state.expandedBlockId)
+        }
+
+    @Test
+    fun `video launch opens one camera block ready for video`() =
+        testScope.runTest {
+            viewModel.initializeLaunchMode(EditorLaunchMode.Video)
+            viewModel.initializeLaunchMode(EditorLaunchMode.Video)
+            advanceUntilIdle()
+            val camera =
+                viewModel.editorState.value.blocks
+                    .single() as CameraBlockUiState
+            assertEquals(CaptureMode.VIDEO, camera.initialCaptureMode)
+        }
+
+    @Test
+    fun `text launch adds no capture blocks`() =
+        testScope.runTest {
+            val before = viewModel.editorState.value.blocks
+            viewModel.initializeLaunchMode(EditorLaunchMode.Text)
+            advanceUntilIdle()
+            assertEquals(before, viewModel.editorState.value.blocks)
         }
 
     @Test
