@@ -213,6 +213,12 @@ enum class SyncPausedReason {
      * waits for the recovery phrase to be entered again.
      */
     NEEDS_RECOVERY_PHRASE,
+
+    /**
+     * A linked watch has no session or identity key from its phone yet, or one that no longer
+     * matches its account. It never makes its own; sync waits until the phone links it again.
+     */
+    NEEDS_DEVICE_LINK,
 }
 
 /**

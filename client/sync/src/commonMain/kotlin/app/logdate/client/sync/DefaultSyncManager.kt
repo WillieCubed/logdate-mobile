@@ -67,7 +67,7 @@ class DefaultSyncManager(
     private val cloudMediaDataSource: CloudMediaDataSource,
     private val cloudDraftDataSource: CloudDraftDataSource,
     private val cloudAccountRepository: CloudAccountRepository,
-    internal val sessionStorage: SessionStorage,
+    private val sessionStorage: SessionStorage,
     private val mediaManager: MediaManager,
     private val mediaSyncRefStore: MediaSyncRefStore,
     private val journalRepository: JournalRepository,
@@ -86,11 +86,11 @@ class DefaultSyncManager(
     internal val identityKeyManager: IdentityKeyManager? = null,
     /**
      * Wired on every platform; optional so tests that never exercise identity provisioning can
-     * omit it. Used only to forget the cached media key when [provisionIdentityKey] silently
+     * omit it. Used only to forget the cached media key when [IdentityKeyProvisioner.provision] silently
      * restores an identity from an [app.logdate.client.device.crypto.IdentityKeyBackupStore] --
      * the cache otherwise keeps serving a key derived from whatever identity minted it.
      */
-    internal val mediaPayloadKeyProvider: MediaPayloadKeyProvider? = null,
+    private val mediaPayloadKeyProvider: MediaPayloadKeyProvider? = null,
     private val cloudQuotaManager: CloudQuotaManager? = null,
     private val backoff: SyncBackoff = SyncBackoff(),
     private val syncScope: CoroutineScope = CoroutineScope(platformIODispatcher),
@@ -98,14 +98,14 @@ class DefaultSyncManager(
     private val firstSyncEnqueueStore: FirstSyncEnqueueStore = InMemoryFirstSyncEnqueueStore(),
     /**
      * Wired on every platform; optional so tests that never exercise identity provisioning can
-     * omit it. Without it, [provisionIdentityKey] cannot check whether the account already has
+     * omit it. Without it, [IdentityKeyProvisioner.provision] cannot check whether the account already has
      * cloud data and falls back to minting a key on absence, matching behavior before that check
      * existed.
      */
-    internal val cloudApiClient: CloudApiClient? = null,
+    private val cloudApiClient: CloudApiClient? = null,
     internal val identityRecoveryNeededStore: IdentityRecoveryNeededStore = InMemoryIdentityRecoveryNeededStore(),
     private val unreadableCloudRecordStore: UnreadableCloudRecordStore = InMemoryUnreadableCloudRecordStore(),
-    internal val locationHistorySyncEngine: LocationHistorySyncEngine? = null,
+    private val locationHistorySyncEngine: LocationHistorySyncEngine? = null,
     internal val downloadInbox: app.logdate.client.sync.recovery.DownloadInbox? = null,
     private val supportsRichDrafts: () -> Boolean = { false },
     internal val diagnostics: app.logdate.client.sync.diagnostics.SyncDiagnosticRecorder? = null,
@@ -113,6 +113,8 @@ class DefaultSyncManager(
     private val mediaReferences: StoredMediaReferences = StoredMediaReferences.Unchanged,
     /** Told when the server revokes this device's session; a linked watch erases itself on it. */
     private val deviceSessionRevocationListener: DeviceSessionRevocationListener = DeviceSessionRevocationListener.None,
+    /** How this device syncs; a linked watch uses [SyncProfile.LinkedWatch]. */
+    internal val profile: SyncProfile = SyncProfile.Standard,
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     internal val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -120,6 +122,21 @@ class DefaultSyncManager(
     internal val syncMutex = Mutex()
 
     internal var isEnabled = true
+
+    internal val historyEngine = locationHistorySyncEngine.takeIf { profile.syncsLocationHistory }
+
+    internal val identityProvisioner =
+        IdentityKeyProvisioner(
+            identityKeyManager = identityKeyManager,
+            cloudApiClient = cloudApiClient,
+            sessionStorage = sessionStorage,
+            identityRecoveryNeededStore = identityRecoveryNeededStore,
+            mediaPayloadKeyProvider = mediaPayloadKeyProvider,
+            syncMetadataService = syncMetadataService,
+            downloadInbox = downloadInbox,
+            locationHistorySyncEngine = historyEngine,
+            mintsIdentityKey = profile.mintsIdentityKey,
+        )
 
     internal val statusPublisher =
         SyncStatusPublisher(
@@ -137,6 +154,8 @@ class DefaultSyncManager(
             identityRecoveryNeededStore = identityRecoveryNeededStore,
             unreadableCloudRecordStore = unreadableCloudRecordStore,
             pendingRecoveryCount = { downloadInbox?.count() ?: 0 },
+            linkedDevice = !profile.mintsIdentityKey,
+            identityKeyMissing = { identityKeyManager?.hasIdentityKey() == false },
         )
     override val syncStatusFlow: StateFlow<SyncStatus> = statusPublisher.syncStatusFlow
 
@@ -222,8 +241,9 @@ class DefaultSyncManager(
             upload = uploader::uploadAssociations,
         )
 
-    override suspend fun syncDrafts(): SyncResult =
-        syncEntityType(
+    override suspend fun syncDrafts(): SyncResult {
+        if (!profile.syncsDrafts) return SyncResult(success = true)
+        return syncEntityType(
             entityType = EntityType.DRAFT,
             quotaContext = "draft sync",
             disabledOrUnauthenticated = {
@@ -243,9 +263,11 @@ class DefaultSyncManager(
                 )
             },
         )
+    }
 
-    suspend fun isLocationHistorySyncEnabled(): Boolean = locationHistorySyncEngine?.isEnabled() == true
+    suspend fun isLocationHistorySyncEnabled(): Boolean = historyEngine?.isEnabled() == true
 
+    /** Null where the profile does not queue what is already on the device, as with the first sync's sweep. */
     internal val legacyBackfill =
         LegacyLocalBackfill(
             downloadInbox,
@@ -254,9 +276,10 @@ class DefaultSyncManager(
             journalNotesRepository,
             journalContentRepository,
             syncMetadataService,
-        )
+        ).takeIf { profile.sweepsOnFirstSync }
 
     internal suspend fun auditLegacyRecordsIfNeeded() {
+        if (!profile.sweepsOnFirstSync) return
         val inbox = downloadInbox ?: return
         if (identityKeyManager?.hasIdentityKey() != true) return
         val selected = inbox.currentScope()
@@ -357,6 +380,7 @@ class DefaultSyncManager(
         accessToken: String,
         entityType: EntityType,
     ) {
+        if (!profile.downloadsMedia) return
         val inbox = downloadInbox ?: return
         when (entityType) {
             EntityType.NOTE ->
@@ -420,6 +444,8 @@ class DefaultSyncManager(
             mapCloudApiError = statusPublisher::handleCloudApiError,
             mapException = statusPublisher::handleSyncException,
             downloadInbox = downloadInbox,
+            downloadsMedia = profile.downloadsMedia,
+            remoteApplyFilter = profile.remoteApplyFilter,
         )
 
     internal val mergeUploader =
@@ -456,5 +482,6 @@ class DefaultSyncManager(
             mapException = statusPublisher::handleSyncException,
             recordProgress = statusPublisher::recordProgress,
             setMediaDeferredForNetwork = statusPublisher::setMediaDeferredForNetwork,
+            profile = profile,
         )
 }

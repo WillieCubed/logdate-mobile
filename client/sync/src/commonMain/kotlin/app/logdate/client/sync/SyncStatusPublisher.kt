@@ -39,6 +39,9 @@ import kotlin.time.Instant
  *   exception into a [SyncResult] -- [handleSyncException]/[handleCloudApiError] -- is itself
  *   part of deciding what the published status's `lastError` should say, so it lives with the
  *   rest of that decision instead of splitting the two.
+ * @param linkedDevice,identityKeyMissing A linked watch never signs in or creates a key of its own, so
+ *   a missing session or key is [SyncPausedReason.NEEDS_DEVICE_LINK] on it, and a recovery phrase is
+ *   never asked for.
  * @param latestSyncTime,isEnabled Reused from [DefaultSyncManager] rather than duplicated: the
  *   former is independently useful for a [SyncResult]'s own `lastSyncTime`, and the latter is a
  *   plain field with no reason to move.
@@ -59,6 +62,8 @@ internal class SyncStatusPublisher(
     private val identityRecoveryNeededStore: IdentityRecoveryNeededStore,
     private val unreadableCloudRecordStore: UnreadableCloudRecordStore,
     private val pendingRecoveryCount: suspend () -> Int = { 0 },
+    private val linkedDevice: Boolean = false,
+    private val identityKeyMissing: suspend () -> Boolean = { false },
 ) {
     /**
      * Whether the last upload pass held a photo or video back for want of Wi-Fi.
@@ -234,7 +239,8 @@ internal class SyncStatusPublisher(
      * separately because an open app can still request a manual backup.
      */
     suspend fun currentPausedReason(authenticated: Boolean): SyncPausedReason? {
-        if (!authenticated) return SyncPausedReason.NOT_SIGNED_IN
+        if (!authenticated) return if (linkedDevice) SyncPausedReason.NEEDS_DEVICE_LINK else SyncPausedReason.NOT_SIGNED_IN
+        if (linkedDevice && (identityKeyMissing() || identityRecoveryNeededStore.isNeeded())) return SyncPausedReason.NEEDS_DEVICE_LINK
         if (identityRecoveryNeededStore.isNeeded()) return SyncPausedReason.NEEDS_RECOVERY_PHRASE
         val restriction = runCatching { dataUsagePolicy.currentRestriction() }.getOrNull()
         return when (restriction) {

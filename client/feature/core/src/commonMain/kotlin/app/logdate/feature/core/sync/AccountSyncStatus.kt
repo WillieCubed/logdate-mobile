@@ -20,6 +20,7 @@ enum class AccountSyncStatus {
     WAITING_FOR_WIFI,
     BACKGROUND_RESTRICTED,
     DEVICE_ACCESS_REQUIRED,
+    DEVICE_LINK_REQUIRED,
     CONFLICT,
     LOCAL_DATA_UNAVAILABLE,
     MEDIA_TOO_LARGE,
@@ -41,6 +42,7 @@ internal fun accountSyncStatus(
         SyncIssue.Waiting.RetryBackoff -> return AccountSyncStatus.RETRYING
         SyncIssue.Failure.SignIn -> return AccountSyncStatus.SIGN_IN_REQUIRED
         SyncIssue.Failure.JournalAccess -> return AccountSyncStatus.DEVICE_ACCESS_REQUIRED
+        SyncIssue.Failure.DeviceLink -> return AccountSyncStatus.DEVICE_LINK_REQUIRED
         SyncIssue.Failure.CloudStorage -> return AccountSyncStatus.STORAGE_FULL
         SyncIssue.Failure.Conflict -> return AccountSyncStatus.CONFLICT
         SyncIssue.Failure.LocalData -> return AccountSyncStatus.LOCAL_DATA_UNAVAILABLE

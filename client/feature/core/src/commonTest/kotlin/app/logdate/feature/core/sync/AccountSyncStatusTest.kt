@@ -51,6 +51,13 @@ class AccountSyncStatusTest {
     }
 
     @Test
+    fun `a linked watch waiting for its phone says so`() {
+        val waiting = clear.copy(pausedReason = SyncPausedReason.NEEDS_DEVICE_LINK)
+
+        assertEquals(AccountSyncStatus.DEVICE_LINK_REQUIRED, accountSyncStatus(waiting))
+    }
+
+    @Test
     fun `retained failures explain the cause without exposing operations or raw errors`() {
         assertEquals(AccountSyncStatus.LOCAL_DATA_UNAVAILABLE, accountSyncStatus(clear, setOf(SyncDeadLetterReason.MISSING_FILE)))
         assertEquals(AccountSyncStatus.MEDIA_TOO_LARGE, accountSyncStatus(clear, setOf(SyncDeadLetterReason.FILE_TOO_LARGE)))

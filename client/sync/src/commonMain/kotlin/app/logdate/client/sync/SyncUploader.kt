@@ -59,6 +59,7 @@ internal class SyncUploader(
     private val setMediaDeferredForNetwork: (Boolean) -> Unit,
     supportsRichDrafts: () -> Boolean = { false },
     draftRepairScope: () -> DownloadScope? = { null },
+    private val profile: SyncProfile = SyncProfile.Standard,
 ) {
     private val associationUploader =
         AssociationUploader(
@@ -68,6 +69,7 @@ internal class SyncUploader(
             tokenRefresher = tokenRefresher,
             retryCoordinator = retryCoordinator,
             recordProgress = recordProgress,
+            createsIfAbsent = profile.createsConditionally,
         )
 
     private val draftUploader =
@@ -84,6 +86,8 @@ internal class SyncUploader(
             supportsRichDrafts = supportsRichDrafts,
             draftRepairScope = draftRepairScope,
         )
+
+    private val conditionalCreates = ConditionalCreateSettler(retryCoordinator, recordProgress)
 
     /**
      * Runs one upload pass, reporting an unexpected failure as a [SyncResult] for [operation]. A pass
@@ -171,6 +175,10 @@ internal class SyncUploader(
                     PendingOperation.CREATE,
                     PendingOperation.UPDATE,
                     -> {
+                        if (pending.operation == PendingOperation.UPDATE && !profile.uploadsUpdates) {
+                            Napier.d("Leaving a journal edit for the phone to relay")
+                            continue
+                        }
                         val journal = journalsById[pending.entityId]
                         if (journal == null) {
                             errors.add(retryCoordinator.recordUnavailableOutboxEntry(EntityType.JOURNAL, pending))
@@ -178,6 +186,34 @@ internal class SyncUploader(
                         }
 
                         if (!retryCoordinator.beginAttempt(EntityType.JOURNAL, pending, errors)) continue
+                        if (pending.operation == PendingOperation.CREATE && profile.createsConditionally) {
+                            val created =
+                                tokenRefresher.withFreshToken(
+                                    { token -> cloudJournalDataSource.createJournalIfAbsent(token, journal) },
+                                    "createJournalIfAbsent(${journal.id})",
+                                    expectedScope = pending.scope,
+                                )
+                            uploadedCount +=
+                                conditionalCreates.settle(
+                                    entityType = EntityType.JOURNAL,
+                                    pending = pending,
+                                    result = created,
+                                    errors = errors,
+                                    onCreated = { upload ->
+                                        syncableRepository?.updateSyncMetadata(journalId, upload.serverVersion, upload.syncedAt)
+                                    },
+                                    onDeleted = {
+                                        if (syncableRepository !=
+                                            null
+                                        ) {
+                                            syncableRepository.deleteFromSync(journalId)
+                                        } else {
+                                            journalRepository.delete(journalId)
+                                        }
+                                    },
+                                )
+                            continue
+                        }
                         val result =
                             if (pending.operation == PendingOperation.CREATE) {
                                 tokenRefresher.withFreshToken(
@@ -323,6 +359,10 @@ internal class SyncUploader(
                     PendingOperation.CREATE,
                     PendingOperation.UPDATE,
                     -> {
+                        if (pending.operation == PendingOperation.UPDATE && !profile.uploadsUpdates) {
+                            Napier.d("Leaving an entry edit for the phone to relay")
+                            continue
+                        }
                         val note = notesById[pending.entityId]
                         if (note == null) {
                             errors.add(retryCoordinator.recordUnavailableOutboxEntry(EntityType.NOTE, pending))
@@ -404,6 +444,36 @@ internal class SyncUploader(
                             } else {
                                 note
                             }
+
+                        if (pending.operation == PendingOperation.CREATE && profile.createsConditionally) {
+                            val created =
+                                tokenRefresher.withFreshToken(
+                                    { token -> cloudContentDataSource.createNoteIfAbsent(token, uploadReadyNote) },
+                                    "createNoteIfAbsent(${note.uid})",
+                                    expectedScope = pending.scope,
+                                )
+                            uploadedCount +=
+                                conditionalCreates.settle(
+                                    entityType = EntityType.NOTE,
+                                    pending = pending,
+                                    result = created,
+                                    errors = errors,
+                                    onCreated = { upload ->
+                                        syncableRepository?.updateSyncMetadata(note, upload.serverVersion, upload.syncedAt)
+                                    },
+                                    onDeleted = {
+                                        if (syncableRepository !=
+                                            null
+                                        ) {
+                                            syncableRepository.deleteFromSync(noteId)
+                                        } else {
+                                            journalNotesRepository.removeById(noteId)
+                                        }
+                                        mediaSyncRefStore.deleteScoped(noteId, pending.scope)
+                                    },
+                                )
+                            continue
+                        }
 
                         val result =
                             if (pending.operation == PendingOperation.CREATE && note.syncVersion == 0L) {

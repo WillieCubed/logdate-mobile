@@ -3,6 +3,7 @@ package app.logdate.feature.core.sync
 import logdate.client.feature.core.generated.resources.Res
 import logdate.client.feature.core.generated.resources.sync_account_background
 import logdate.client.feature.core.generated.resources.sync_account_checking
+import logdate.client.feature.core.generated.resources.sync_account_device_link
 import logdate.client.feature.core.generated.resources.sync_account_disabled
 import logdate.client.feature.core.generated.resources.sync_account_offline
 import logdate.client.feature.core.generated.resources.sync_account_retrying
@@ -30,6 +31,7 @@ internal fun AccountSyncStatus.messageResource(): StringResource =
         AccountSyncStatus.WAITING_FOR_WIFI -> Res.string.sync_account_wifi
         AccountSyncStatus.BACKGROUND_RESTRICTED -> Res.string.sync_account_background
         AccountSyncStatus.DEVICE_ACCESS_REQUIRED -> Res.string.sync_account_unknown
+        AccountSyncStatus.DEVICE_LINK_REQUIRED -> Res.string.sync_account_device_link
         AccountSyncStatus.CONFLICT -> Res.string.sync_account_unknown
         AccountSyncStatus.LOCAL_DATA_UNAVAILABLE -> Res.string.sync_account_unknown
         AccountSyncStatus.MEDIA_TOO_LARGE -> Res.string.sync_account_unknown

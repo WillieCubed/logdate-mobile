@@ -19,6 +19,9 @@ sealed interface SyncIssue {
 
         data object JournalAccess : Failure
 
+        /** A linked watch waits for its phone to set it up again; nothing on the watch can fix it. */
+        data object DeviceLink : Failure
+
         data object CloudStorage : Failure
 
         data object Conflict : Failure
@@ -42,6 +45,7 @@ fun SyncStatus.issue(): SyncIssue? {
         SyncPausedReason.MEDIA_WAITING_FOR_WIFI ->
             return if (backgroundWorkLimited) SyncIssue.Waiting.BackgroundData else SyncIssue.Waiting.WiFi
         SyncPausedReason.NEEDS_RECOVERY_PHRASE -> return SyncIssue.Failure.JournalAccess
+        SyncPausedReason.NEEDS_DEVICE_LINK -> return SyncIssue.Failure.DeviceLink
         null -> Unit
     }
     if (!queueReadable) return SyncIssue.Failure.LocalData

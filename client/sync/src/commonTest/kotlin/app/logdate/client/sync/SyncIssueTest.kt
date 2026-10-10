@@ -30,6 +30,11 @@ class SyncIssueTest {
     }
 
     @Test
+    fun `a linked device waiting for its phone is a failure only the phone can fix`() {
+        assertEquals(SyncIssue.Failure.DeviceLink, status.copy(pausedReason = SyncPausedReason.NEEDS_DEVICE_LINK).issue())
+    }
+
+    @Test
     fun `system background restriction takes precedence over wifi consent`() {
         assertEquals(
             SyncIssue.Waiting.BackgroundData,

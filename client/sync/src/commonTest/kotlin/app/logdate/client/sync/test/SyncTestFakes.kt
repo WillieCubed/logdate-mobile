@@ -20,6 +20,7 @@ import app.logdate.client.sync.SyncError
 import app.logdate.client.sync.SyncErrorType
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.SyncMediaTransfer
+import app.logdate.client.sync.SyncProfile
 import app.logdate.client.sync.SyncResult
 import app.logdate.client.sync.SyncRetryCoordinator
 import app.logdate.client.sync.SyncStatus
@@ -230,6 +231,7 @@ fun testDefaultSyncManager(
     supportsRichDrafts: () -> Boolean = { false },
     diagnostics: app.logdate.client.sync.diagnostics.SyncDiagnosticRecorder? = null,
     deviceSessionRevocationListener: DeviceSessionRevocationListener = DeviceSessionRevocationListener.None,
+    profile: SyncProfile = SyncProfile.Standard,
 ): DefaultSyncManager =
     if (syncScope == null) {
         DefaultSyncManager(
@@ -266,6 +268,7 @@ fun testDefaultSyncManager(
             supportsRichDrafts = supportsRichDrafts,
             diagnostics = diagnostics,
             deviceSessionRevocationListener = deviceSessionRevocationListener,
+            profile = profile,
         )
     } else {
         DefaultSyncManager(
@@ -302,6 +305,7 @@ fun testDefaultSyncManager(
             supportsRichDrafts = supportsRichDrafts,
             diagnostics = diagnostics,
             deviceSessionRevocationListener = deviceSessionRevocationListener,
+            profile = profile,
             syncScope = syncScope,
         )
     }

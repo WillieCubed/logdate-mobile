@@ -45,7 +45,7 @@ internal suspend fun DefaultSyncManager.runFullSyncPhase(
 
         try {
             val accessToken = tokenRefresher.getAccessToken() ?: return authError()
-            provisionIdentityKey(accessToken)
+            identityProvisioner.provision(accessToken)
             if (identityRecoveryNeededStore.isNeeded() || identityKeyManager?.hasIdentityKey() == false) {
                 return SyncResult(success = false)
             }
@@ -82,8 +82,8 @@ internal suspend fun DefaultSyncManager.runPendingUploads(): SyncResult =
                 SyncResult(success = false)
             }
         val associationResult = uploader.uploadAssociations(accessToken)
-        val draftResult = uploader.uploadDrafts(accessToken)
-        val historyResult = locationHistorySyncEngine?.upload(accessToken) ?: SyncResult(success = true)
+        val draftResult = if (profile.syncsDrafts) uploader.uploadDrafts(accessToken) else SyncResult(success = true)
+        val historyResult = historyEngine?.upload(accessToken) ?: SyncResult(success = true)
         val totalUploaded =
             journalResult.uploadedItems +
                 contentResult.uploadedItems +
@@ -132,11 +132,11 @@ internal suspend fun DefaultSyncManager.runRemoteDownload(): SyncResult =
         // was enough on its own to starve every request thread it had.
         val journalResult = downloader.downloadJournals(accessToken, journalSince)
         val contentResult = downloader.downloadContent(accessToken, contentSince)
-        if (journalResult.remoteInventoryComplete) legacyBackfill.enqueueRecordsIfNeeded(EntityType.JOURNAL)
-        if (contentResult.remoteInventoryComplete) legacyBackfill.enqueueRecordsIfNeeded(EntityType.NOTE)
+        if (journalResult.remoteInventoryComplete) legacyBackfill?.enqueueRecordsIfNeeded(EntityType.JOURNAL)
+        if (contentResult.remoteInventoryComplete) legacyBackfill?.enqueueRecordsIfNeeded(EntityType.NOTE)
         val associationResult = downloader.downloadAssociations(accessToken, associationSince)
-        if (associationResult.success) legacyBackfill.enqueueMembershipsIfNeeded()
-        val historyResult = locationHistorySyncEngine?.download(accessToken) ?: SyncResult(success = true)
+        if (associationResult.success) legacyBackfill?.enqueueMembershipsIfNeeded()
+        val historyResult = historyEngine?.download(accessToken) ?: SyncResult(success = true)
         recoverMedia(accessToken, EntityType.NOTE)
         val totalDownloaded =
             journalResult.downloadedItems +
@@ -207,7 +207,7 @@ internal suspend fun DefaultSyncManager.syncEntityType(
         syncStateFlow.value = SyncState.Syncing
         try {
             val accessToken = tokenRefresher.getAccessToken() ?: return@withLock authError()
-            provisionIdentityKey(accessToken)
+            identityProvisioner.provision(accessToken)
             if (identityRecoveryNeededStore.isNeeded() || identityKeyManager?.hasIdentityKey() == false) {
                 return@withLock SyncResult(success = false)
             }
@@ -249,7 +249,7 @@ internal suspend fun DefaultSyncManager.syncEntityType(
 internal suspend fun DefaultSyncManager.runCompleteSync(): SyncResult {
     val run = SyncRunDiagnostics(diagnostics, diagnosticSource())
     return run.phase(DiagnosticPhase.RECOVERY) {
-        uploader.enqueueEverythingOnFirstSync()
+        if (profile.sweepsOnFirstSync) uploader.enqueueEverythingOnFirstSync()
         val downloadResult = run.phase(DiagnosticPhase.FETCH) { downloadRemoteChanges() }
         val uploadResult = run.phase(DiagnosticPhase.UPLOAD) { uploadPendingChanges() }
         val draftResult = run.phase(DiagnosticPhase.RECOVERY) { syncDrafts() }

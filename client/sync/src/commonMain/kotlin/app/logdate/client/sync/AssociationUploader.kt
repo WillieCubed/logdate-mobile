@@ -26,6 +26,8 @@ internal class AssociationUploader(
     private val retryCoordinator: SyncRetryCoordinator,
     private val recordProgress: (Int) -> Unit,
     private val journalRepository: JournalRepository? = null,
+    /** Creates links only if the server has none, for a linked watch. */
+    private val createsIfAbsent: Boolean = false,
 ) {
     private class Batch {
         val associations = mutableListOf<JournalContentAssociation>()
@@ -118,7 +120,13 @@ internal class AssociationUploader(
     ): Int {
         val result =
             tokenRefresher.withFreshToken(
-                { token -> cloudAssociationDataSource.uploadAssociations(token, batch.associations) },
+                { token ->
+                    if (createsIfAbsent) {
+                        cloudAssociationDataSource.uploadAssociationsIfAbsent(token, batch.associations)
+                    } else {
+                        cloudAssociationDataSource.uploadAssociations(token, batch.associations)
+                    }
+                },
                 "uploadAssociations(${batch.associations.size} items)",
                 expectedScope = pendingById.getValue(batch.ids.first()).scope,
             )
