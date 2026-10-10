@@ -22,6 +22,7 @@ kotlin {
             libs.versions.android.minSdk
                 .get()
                 .toInt()
+        withHostTestBuilder {}
         optimization {
             consumerKeepRules.apply {
                 publish = true
@@ -55,6 +56,9 @@ kotlin {
         }
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
+        }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
         }
     }
 }

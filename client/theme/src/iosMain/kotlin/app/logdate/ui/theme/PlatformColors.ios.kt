@@ -13,8 +13,8 @@ import androidx.compose.ui.graphics.Color
  * reference. A later pass can swap in a UIKit-driven resolution that also picks up Increase
  * Contrast / Reduce Transparency accessibility settings.
  *
- * Brand colors (primary / tint) intentionally stay null so the LogDate purple keeps its role
- * as the brand accent.
+ * Brand colors (primary / tint) intentionally stay null so the graphite primary from
+ * [LightColorScheme] / [DarkColorScheme] stays the accent.
  */
 @Composable
 actual fun rememberPlatformSemanticColors(darkTheme: Boolean): PlatformSemanticColors? =
