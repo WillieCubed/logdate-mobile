@@ -39,6 +39,42 @@ val LocalWorkspaceCaptionBar = staticCompositionLocalOf<WorkspaceCaptionBar?> { 
 internal expect fun rememberPlatformCaptionBar(canvas: Color): WorkspaceCaptionBar?
 
 /**
+ * Counts the screens in each window that want its caption bar transparent. Screens can share a
+ * window, such as Home and the editor during navigation, so only the last one to leave hands the
+ * caption back to the system.
+ */
+internal class CaptionRequests<W : Any> {
+    private val counts = mutableMapOf<W, Int>()
+
+    fun acquire(window: W) {
+        counts[window] = (counts[window] ?: 0) + 1
+    }
+
+    /** Returns true when no screen in [window] wants a transparent caption any longer. */
+    fun release(window: W): Boolean {
+        val remaining = (counts[window] ?: 1) - 1
+        if (remaining > 0) {
+            counts[window] = remaining
+            return false
+        }
+        counts.remove(window)
+        return true
+    }
+}
+
+/**
+ * Lets a screen's own [background] show through the window's caption bar in Android desktop
+ * windowing, instead of the system's tinted bar, for screens that keep their controls below the
+ * caption, such as the editor. The workspace does the same while it places its app bar inside the
+ * caption. Has no effect outside desktop windowing or before Android 15.
+ */
+@Suppress("ktlint:standard:function-naming")
+@Composable
+fun BlendedCaptionBar(background: Color) {
+    rememberPlatformCaptionBar(background)
+}
+
+/**
  * The widths, in pixels, that the system's caption controls take at the left and right edges of a
  * window [windowWidth] wide, from their bounding rectangles in window coordinates. A rectangle counts
  * toward the edge nearer its center. Each width stays between zero and half the window: while a

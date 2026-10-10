@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.captionBar
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,6 +44,7 @@ import app.logdate.ui.foldable.rememberFoldableLayoutInfo
 import app.logdate.ui.foldable.rememberWindowOrigin
 import app.logdate.ui.platform.rememberScreenCornerRadius
 import app.logdate.ui.theme.Spacing
+import app.logdate.ui.workspace.BlendedCaptionBar
 
 /**
  * Signals to editor components nested anywhere beneath [ImmersiveEditorLayout] that the
@@ -125,11 +127,14 @@ fun ImmersiveEditorLayout(
                 else -> 1200.dp
             }
 
-        val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        // In a desktop window the caption bar is transparent over the editor, so content starts below it.
+        val topBars = WindowInsets.statusBars.union(WindowInsets.captionBar)
+        val statusBarTop = topBars.asPaddingValues().calculateTopPadding()
         val topOffset = lerp(0.dp, statusBarTop + 64.dp, immersiveExitProgress)
         val horizontalPadding = lerp(0.dp, Spacing.sm, immersiveExitProgress)
         val bottomPadding = lerp(0.dp, Spacing.lg, immersiveExitProgress)
         val bottomInsets = if (isImmersiveBlockActive) WindowInsets.ime else WindowInsets.ime.union(WindowInsets.navigationBars)
+        BlendedCaptionBar(background = MaterialTheme.colorScheme.surfaceDim)
         Box(
             modifier =
                 Modifier
@@ -231,7 +236,7 @@ fun ImmersiveEditorLayout(
                     Modifier
                         .fillMaxWidth()
                         .align(Alignment.TopStart)
-                        .windowInsetsPadding(WindowInsets.statusBars),
+                        .windowInsetsPadding(topBars),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 topBarContent()

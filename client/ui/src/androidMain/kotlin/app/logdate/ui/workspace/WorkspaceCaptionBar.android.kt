@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.IntRect
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 
+private val transparentCaptionRequests = CaptionRequests<View>()
+
 @Composable
 internal actual fun rememberPlatformCaptionBar(canvas: Color): WorkspaceCaptionBar? {
     // Apps may draw in the caption bar from Android 15.
@@ -33,8 +35,12 @@ internal actual fun rememberPlatformCaptionBar(canvas: Color): WorkspaceCaptionB
         val controller = view.windowInsetsController
         val transparent = WindowInsetsController.APPEARANCE_TRANSPARENT_CAPTION_BAR_BACKGROUND
         val lightControls = WindowInsetsController.APPEARANCE_LIGHT_CAPTION_BARS
+        val window = view.rootView
+        transparentCaptionRequests.acquire(window)
         controller?.setSystemBarsAppearance(transparent or (if (lightCanvas) lightControls else 0), transparent or lightControls)
-        onDispose { controller?.setSystemBarsAppearance(0, transparent or lightControls) }
+        onDispose {
+            if (transparentCaptionRequests.release(window)) controller?.setSystemBarsAppearance(0, transparent or lightControls)
+        }
     }
     val density = LocalDensity.current
     // Read after every layout of the window: resizing changes the window's width and the controls'

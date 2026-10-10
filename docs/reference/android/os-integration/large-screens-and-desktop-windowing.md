@@ -108,10 +108,11 @@ Android 15 lets an app draw in its caption bar. The Home workspace shell does, i
 `client/ui/.../workspace`:
 
 1. `rememberPlatformCaptionBar` (androidMain) sets `APPEARANCE_TRANSPARENT_CAPTION_BAR_BACKGROUND`
-   with `WindowInsetsController.setSystemBarsAppearance` while Home is on screen, and clears it when
-   Home leaves, so other screens keep the standard bar. It also sets
+   with `WindowInsetsController.setSystemBarsAppearance` while Home is on screen. It also sets
    `APPEARANCE_LIGHT_CAPTION_BARS` when the workspace canvas is light, so Android draws its controls
-   dark enough to read.
+   dark enough to read. `CaptionRequests` counts the screens in each window that want the bar
+   transparent, and the bar goes back to Android's own only when the last one leaves: Home and the
+   editor share the main window during navigation, and one leaving must not undo the other.
 2. It reads the bar's height from `WindowInsets.captionBar`, and where Android's controls are from
    `WindowInsetsCompat.getBoundingRects(Type.captionBar())`: one rectangle for the app menu at one
    edge and one for the window buttons at the other. These are screen sides, not reading-direction
@@ -122,6 +123,12 @@ Android 15 lets an app draw in its caption bar. The Home workspace shell does, i
 4. A press in the caption bar normally starts dragging the window. The search pill and the account
    action use `Modifier.systemGestureExclusion()` (`captionBarControl`), which tells Android to send
    presses there to LogDate; the rest of the bar still drags.
+
+The editor uses the same transparent bar without putting controls in it. `ImmersiveEditorLayout`
+calls `BlendedCaptionBar` with its `surfaceDim` background and pads its content for
+`WindowInsets.captionBar` as well as the status bar, so an editor window reads as one surface: the
+editor's color runs up through the title bar, and Back, Drafts, and Save sit just below it. Without
+this, Android tints the bar with its own theme color, a band of a different color above the editor.
 
 If the bar is shorter than 40dp, or the text is at 150% or more, the app bar stays below the bar, so
 search and the account action never shrink below a readable size. Desktop and iOS builds have no
