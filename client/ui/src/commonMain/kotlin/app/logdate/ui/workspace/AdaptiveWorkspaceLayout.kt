@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.key
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -50,7 +51,11 @@ fun AdaptiveWorkspaceLayout(
             } else {
                 PanelPlacement.Floating
             }
-        PositionedPanel(composition.focus, PanelRole.Focus, placement, focus)
+        // When a detail opens beside the list, the list moves to the browse panel and the detail takes
+        // the focus panel. Starting the focus panel afresh, instead of swapping what is inside it, keeps
+        // the detail's layout position where it is drawn; reusing the panel on Android left menus and
+        // accessibility bounds where the list had been.
+        key(browse != null) { PositionedPanel(composition.focus, PanelRole.Focus, placement, focus) }
         composition.browse?.let { bounds -> PositionedPanel(bounds, PanelRole.Browse, PanelPlacement.Floating, browse!!) }
         composition.inspector?.let { bounds -> PositionedPanel(bounds, PanelRole.Inspector, PanelPlacement.Floating, inspector!!) }
     }
