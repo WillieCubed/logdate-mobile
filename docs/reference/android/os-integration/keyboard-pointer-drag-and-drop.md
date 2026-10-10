@@ -78,6 +78,13 @@ A photo copied in another app and pasted with Ctrl+V on a tablet with a USB keyb
 
 - Dragging a photo or video out of LogDate into another app sends the actual file, not a path string.
 
+A photo dragged from the Files app into a new entry, with the two side by side on the Android 17
+desktop. While it is over the editor, the editor is outlined in the theme's primary color:
+
+| While dragging | Once dropped |
+| --- | --- |
+| ![The Files app on the left with a photo being dragged, its name label following the pointer, and the LogDate editor on the right outlined as a drop target](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/cross-app-drag--tablet-api37.png) | ![The editor with the dropped photo in the entry, still filed to Summer in Lisbon](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/cross-app-drop--tablet-api37.png) |
+
 ### Stylus
 
 On Android 14 and later, writing with a pen over an entry's text turns the handwriting into typed
@@ -105,8 +112,7 @@ A person can also start writing on two controls that open a text field rather th
 | ![Writing "hello" where the Write something card was: the card opened a text entry as soon as the pen touched it, and the ink stays over the entry](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/stylus-write-card--tablet-api37.png) | ![A new text entry with "hello" typed in it](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/stylus-write-card-typed--tablet-api37.png) |
 | ![Search, opened as the pen touched Home's search bar, with "hello" handwritten over its field](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/stylus-search--tablet-api37.png) | ![Search with "hello" typed as the query and the entry it finds](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/stylus-search-typed--tablet-api37.png) |
 
-Screenshots are added here as each part ships: desktop menus, the context menu and tooltip states,
-drop states, and a cross-app drag on a tablet.
+Still to be added: the context menu and tooltip states as app screenshots.
 
 ## How it works
 
@@ -224,15 +230,21 @@ Dragging out shares only the file the person dragged, with read-only access gran
 - **Stylus:** `OsSurfaceScreenshotsTest#stylusHandwriting` writes "hello" with pen events and fails
   if the keyboard does not type it into the entry, and `stylusWritingOnControls` does the same on the
   "Write something" card and the search pill (see Updating screenshots).
-- **Manual check:** on an API 37 tablet emulator with a hardware keyboard and mouse, press Meta+/ and
-  drag between LogDate and Files in split screen.
+- **Cross-app drag:** `OsSurfaceScreenshotsTest#crossAppDrag` drags a photo from Files into a new
+  entry on the Android desktop and waits for it in the entry.
+- **Manual check:** on an API 37 tablet emulator with a hardware keyboard and mouse, press Meta+/.
 
 ## Updating screenshots
 
 - Desktop menus, menus, tooltips, and drop states are Lane 1 references.
-- The shortcut helper, cross-app drags, and stylus input are Lane 2 captures, recorded with
-  `./run screenshots:os`. They land in
+- The shortcut helper and stylus input are Lane 2 captures, recorded with `./run screenshots:os`. The
+  cross-app drag is recorded with `./run screenshots:desktop`, on the desktop windowing emulator,
+  where Files and LogDate sit in windows side by side. They land in
   `docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/`.
+- The cross-app drag test saves the sample photo to Downloads, opens Files there, places the two
+  windows with `am task resize`, selects the photo with a long press, and drags it with
+  `input touchscreen draganddrop`. In Files a first long press only selects a file; a drag starts
+  from a file that is already selected.
 - The shortcut helper capture plugs in a USB keyboard through Android's `uinput` shell tool
   (`HardwareKeyboard` in the instrumented tests). Key presses that UiAutomator injects come from
   Android's virtual keyboard, which has no physical keys, and Android 17's helper then drops every app

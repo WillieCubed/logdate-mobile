@@ -5,11 +5,16 @@ import android.app.NotificationManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ComponentName
+import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Point
+import android.graphics.Rect
 import android.os.Build
+import android.os.Environment
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
+import android.provider.MediaStore
 import android.view.WindowManager
 import androidx.core.content.FileProvider
 import androidx.test.platform.app.InstrumentationRegistry
@@ -59,6 +64,7 @@ object OsSurfaceCapture {
     private const val RECORDING_NOTIFICATION_ID = 1001
     private const val DEMO_MODE_ATTEMPTS = 10
     private const val RETURN_HOME_STEPS = 6
+    private const val DRAG_CAPTURE_LEAD_MS = 1_200L
     private const val SPLASH_WAIT_MS = 5_000L
 
     /** `FLAG_ACTIVITY_NEW_TASK` with `FLAG_ACTIVITY_CLEAR_TASK`, so the activity starts over. */
@@ -258,9 +264,10 @@ object OsSurfaceCapture {
     fun waitForText(
         text: String,
         timeoutMs: Long = TIMEOUT_MS,
+        partial: Boolean = false,
     ): UiObject2 {
         // Android 17 can show Quick Settings tiles as icons only, naming them in the description.
-        val visible = By.text(text)
+        val visible = if (partial) By.textStartsWith(text) else By.text(text)
         val described = By.desc(Pattern.compile(".*\\Q$text\\E.*"))
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
@@ -432,6 +439,67 @@ object OsSurfaceCapture {
                 .getSystemService(ClipboardManager::class.java)
                 .setPrimaryClip(ClipData.newUri(context.contentResolver, "Photo", uri))
         }
+    }
+
+    /**
+     * Saves the debug build's sample photo to Downloads as [name], replacing a copy an earlier run
+     * left, so the Files app lists it once.
+     */
+    fun putPhotoInDownloads(name: String) {
+        val resolver = InstrumentationRegistry.getInstrumentation().targetContext.contentResolver
+        // MediaStore renames a second copy "name (1).jpg", so copies are matched by the name's stem.
+        resolver.delete(
+            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+            "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ?",
+            arrayOf("${name.substringBeforeLast('.')}%"),
+        )
+        val values =
+            ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            }
+        val uri = checkNotNull(resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)) { "Could not add $name to Downloads" }
+        val assets = InstrumentationRegistry.getInstrumentation().targetContext.assets
+        resolver.openOutputStream(uri).use { output -> assets.open("sample_note_photo.jpg").use { it.copyTo(checkNotNull(output)) } }
+    }
+
+    /**
+     * Moves the most recent window of the app with [packageName] to [bounds] on the desktop, through
+     * `am task resize`.
+     */
+    fun placeWindow(
+        packageName: String,
+        bounds: Rect,
+    ) {
+        val task =
+            shell("dumpsys activity recents")
+                .lines()
+                .firstOrNull { "Recent #" in it && packageName in it }
+                ?.let { Regex("#(\\d+) type=").find(it)?.groupValues?.get(1) }
+                ?: error("$packageName has no window")
+        shell("am task resize $task ${bounds.left} ${bounds.top} ${bounds.right} ${bounds.bottom}")
+        Thread.sleep(1_500L)
+    }
+
+    /**
+     * Drags with a finger from [from] to [to] over [durationMs], the way Android's `input
+     * draganddrop` does: a long press, then a steady move. [whileDragging] runs partway through, while
+     * the item is over [to].
+     */
+    fun drag(
+        from: Point,
+        to: Point,
+        durationMs: Long,
+        whileDragging: () -> Unit,
+    ) {
+        val command = "input touchscreen draganddrop ${from.x} ${from.y} ${to.x} ${to.y} $durationMs"
+        val output = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
+        Thread.sleep(durationMs - DRAG_CAPTURE_LEAD_MS)
+        whileDragging()
+        // Reading to the end waits for the drag to finish.
+        ParcelFileDescriptor.AutoCloseInputStream(output).use { it.readBytes() }
+        device.waitForIdle()
     }
 
     /**

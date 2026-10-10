@@ -1,5 +1,6 @@
 package app.logdate.client.e2e.osintegration
 
+import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.Rect
 import android.os.Build
@@ -218,6 +219,8 @@ class OsSurfaceScreenshotsTest {
         assumeTrue(InstrumentationRegistry.getArguments().getString("logdate.desktopWindowing") == "true")
         OsSurfaceCapture.prepareOnboardedApp()
         OsSurfaceCapture.createJournal("Summer in Lisbon")
+        // Closes the Files window crossAppDrag leaves open on this reused emulator.
+        OsSurfaceCapture.shell("am force-stop $FILES_PACKAGE")
         OsSurfaceCapture.shell(
             "am start --windowingMode $WINDOWING_MODE_FREEFORM -n ${OsSurfaceCapture.packageName}/app.logdate.client.MainActivity",
         )
@@ -233,6 +236,49 @@ class OsSurfaceScreenshotsTest {
         // The labels Android holds for each window, which the caption bar and Recents may show.
         val labels = OsSurfaceCapture.shell("dumpsys activity activities").lines().filter { "taskDescription: label" in it }
         OsSurfaceCapture.writeEvidence("large-screens-and-desktop-windowing", "desktop-window-labels", labels.joinToString("\n") { it.trim() })
+    }
+
+    /**
+     * A photo dragged from the Files app into a new entry, with the two apps side by side on the
+     * Android desktop: once while the photo is over the editor, and once after it is dropped. Runs
+     * with [desktopWindows], from `scripts/desktop-windowing-screenshots.sh`.
+     */
+    @Test fun crossAppDrag() {
+        assumeTrue(InstrumentationRegistry.getArguments().getString("logdate.desktopWindowing") == "true")
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.createJournal("Summer in Lisbon")
+        OsSurfaceCapture.putPhotoInDownloads(DRAGGED_PHOTO)
+        // Starts from Home, discarding an entry an earlier run left open.
+        OsSurfaceCapture.openMainActivity()
+        OsSurfaceCapture.returnHome()
+        // One Files window, freshly opened at Downloads.
+        OsSurfaceCapture.shell("am force-stop $FILES_PACKAGE")
+        OsSurfaceCapture.shell(
+            "am start --windowingMode $WINDOWING_MODE_FREEFORM -n $FILES_ACTIVITY -d $DOWNLOADS_ROOT",
+        )
+        OsSurfaceCapture.shell(
+            "am start --windowingMode $WINDOWING_MODE_FREEFORM -a app.logdate.action.CAPTURE --es mode text " +
+                "-f 0x10000000 ${OsSurfaceCapture.packageName}",
+        )
+        val screen = Rect(0, 0, OsSurfaceCapture.device.displayWidth, OsSurfaceCapture.device.displayHeight)
+        val top = screen.height() / 16
+        val bottom = screen.height() * 15 / 16
+        OsSurfaceCapture.placeWindow("documentsui", Rect(top, top, screen.centerX() - top / 4, bottom))
+        OsSurfaceCapture.placeWindow(OsSurfaceCapture.packageName, Rect(screen.centerX() + top / 4, top, screen.width() - top, bottom))
+
+        val label = OsSurfaceCapture.waitForText(DRAGGED_PHOTO.substringBefore('.'), partial = true).visibleBounds
+        val thumbnail = OsSurfaceCapture.device.findObject(By.res(FILES_PACKAGE, "icon_thumb"))?.visibleBounds
+        val from = thumbnail?.let { Point(it.centerX(), it.centerY()) } ?: Point(label.centerX(), label.top - label.height() * 3)
+        val editor = OsSurfaceCapture.waitForText("Write something").visibleCenter
+        // A long press selects the file in Files; dragging the selected file starts the drag.
+        OsSurfaceCapture.device.swipe(from.x, from.y, from.x, from.y, LONG_PRESS_STEPS)
+        Thread.sleep(1_000L)
+        OsSurfaceCapture.drag(from, editor, durationMs = 5_000L) {
+            OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "cross-app-drag")
+        }
+        OsSurfaceCapture.waitForText("Add a caption...")
+        Thread.sleep(1_500L)
+        OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "cross-app-drop")
     }
 
     /**
@@ -554,6 +600,15 @@ class OsSurfaceScreenshotsTest {
     private companion object {
         /** `WindowConfiguration.WINDOWING_MODE_FREEFORM`, which `am start --windowingMode` takes. */
         const val WINDOWING_MODE_FREEFORM = 5
+
+        /** The Files app, opened at Downloads, for the cross-app drag. */
+        const val FILES_PACKAGE = "com.google.android.documentsui"
+        const val FILES_ACTIVITY = "$FILES_PACKAGE/com.android.documentsui.files.FilesActivity"
+        const val DOWNLOADS_ROOT = "content://com.android.providers.downloads.documents/root/downloads"
+        const val DRAGGED_PHOTO = "milo-after-the-rain.jpg"
+
+        /** About a second of holding still: `UiDevice.swipe` takes 5 ms a step. */
+        const val LONG_PRESS_STEPS = 200
 
         /** Where the handwriting starts in the entry's text field, and how large it is, in dp. */
         const val HANDWRITING_INSET_DP = 48

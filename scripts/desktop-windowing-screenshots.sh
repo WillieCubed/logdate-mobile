@@ -6,8 +6,8 @@
 # restart, and a Gradle Managed Device cannot restart in the middle of a run, so this script runs its
 # own emulator instead. It creates the emulator the first time, boots it without a window, turns
 # desktop windowing on and restarts it if needed, installs the debug app and its tests, and runs
-# OsSurfaceScreenshotsTest#desktopWindows. It only ever talks to that emulator's serial, never to a
-# physical device, and shuts the emulator down again if it started it.
+# OsSurfaceScreenshotsTest#desktopWindows and #crossAppDrag. It only ever talks to that emulator's
+# serial, never to a physical device, and shuts the emulator down again if it started it.
 #
 # Usage:
 #   scripts/desktop-windowing-screenshots.sh
@@ -23,7 +23,9 @@ IMAGE="system-images;android-37.0;google_apis_ps16k;arm64-v8a"
 PORT=5580
 SERIAL="emulator-$PORT"
 APP_ID="studio.hypertext.logdate.debug"
-TEST_CLASS="app.logdate.client.e2e.osintegration.OsSurfaceScreenshotsTest#desktopWindows"
+TESTS=(desktopWindows crossAppDrag)
+TEST_CLASS="$(printf 'app.logdate.client.e2e.osintegration.OsSurfaceScreenshotsTest#%s,' "${TESTS[@]}")"
+TEST_CLASS="${TEST_CLASS%,}"
 DEVICE_OUTPUT="/sdcard/Android/media/$APP_ID/additional_test_output"
 
 adb() { "$SDK/platform-tools/adb" -s "$SERIAL" "$@"; }
@@ -96,7 +98,7 @@ while IFS= read -r -d '' image; do
     copied=$((copied + 1))
 done < <(find "$staging/os-integration" \( -name '*.png' -o -name '*.txt' \) -not -path '*/failures/*' -print0 2>/dev/null)
 
-if ! grep -q "OK (1 test)" <<<"$instrument_output" || [[ $copied -eq 0 ]]; then
+if ! grep -q "OK (${#TESTS[@]} tests)" <<<"$instrument_output" || [[ $copied -eq 0 ]]; then
     echo "The desktop windowing capture did not complete. Failure captures, if any, are in $staging." >&2
     exit 1
 fi
