@@ -51,8 +51,8 @@ import kotlin.uuid.Uuid
  * later is swept the day it is registered. A route counts as protected when the OpenAPI document gives
  * it a security requirement, or when it is listed in [HIDDEN_PROTECTED_ROUTES]; a route that is neither
  * documented nor listed fails the sweep until someone classifies it. A protected route must refuse a
- * linked device token or be added to [SYNC_DATA_ROUTES], which is a deliberate decision about what a
- * watch may do.
+ * linked device token or be added to [SYNC_DATA_ROUTES] or [ACCOUNT_DEVICE_ROUTES], which is a deliberate
+ * decision about what a watch may do.
  */
 @OptIn(ExperimentalUuidApi::class)
 class LinkedDeviceRouteScopeTest {
@@ -72,11 +72,11 @@ class LinkedDeviceRouteScopeTest {
             val deviceToken = tokenService.generateDeviceAccessToken(Uuid.random().toString(), null, Uuid.random().toString())
 
             val routes = registeredRoutes(server)
-            val unclassified = routes.filter { it.label !in SYNC_DATA_ROUTES && classify(it, documented) == null }
+            val unclassified = routes.filter { it.label !in LINKED_DEVICE_ROUTES && classify(it, documented) == null }
             assertTrue(unclassified.isEmpty(), "Classify these routes as public or protected: ${unclassified.map { it.label }}")
-            assertEquals(emptySet(), SYNC_DATA_ROUTES - routes.map { it.label }.toSet(), "Allowlisted routes that are not registered")
+            assertEquals(emptySet(), LINKED_DEVICE_ROUTES - routes.map { it.label }.toSet(), "Allowlisted routes that are not registered")
 
-            val protectedRoutes = routes.filter { it.label !in SYNC_DATA_ROUTES && classify(it, documented) == RouteAccess.Protected }
+            val protectedRoutes = routes.filter { it.label !in LINKED_DEVICE_ROUTES && classify(it, documented) == RouteAccess.Protected }
             val accepted =
                 protectedRoutes.mapNotNull { route ->
                     val response = client.send(route, deviceToken)
@@ -90,7 +90,7 @@ class LinkedDeviceRouteScopeTest {
         }
 
     @Test
-    fun `the sync data routes ask the session store about a linked device token`() =
+    fun `every route a linked device may call asks the session store about its token`() =
         testApplication {
             lateinit var server: Application
             application {
@@ -103,13 +103,13 @@ class LinkedDeviceRouteScopeTest {
 
             val answers =
                 registeredRoutes(server)
-                    .filter { it.label in SYNC_DATA_ROUTES }
+                    .filter { it.label in LINKED_DEVICE_ROUTES }
                     .associate { route ->
                         val response = client.send(route, deviceToken)
                         route.label to (response.status to response.bodyAsText().contains(DeviceLinkErrorCodes.DEVICE_SESSION_REVOKED))
                     }
 
-            assertEquals(SYNC_DATA_ROUTES.associateWith { HttpStatusCode.Unauthorized to true }, answers)
+            assertEquals(LINKED_DEVICE_ROUTES.associateWith { HttpStatusCode.Unauthorized to true }, answers)
         }
 
     @Test
@@ -257,6 +257,19 @@ class LinkedDeviceRouteScopeTest {
                 "DELETE /api/v1/media/{mediaId}",
             )
 
+        /**
+         * Routes outside `syncRoutes` that a linked device may call: read its account, list the linked devices
+         * and unlink itself. Every other `/auth` route refuses it.
+         */
+        val ACCOUNT_DEVICE_ROUTES =
+            setOf(
+                "GET /api/v1/auth/me",
+                "GET /api/v1/auth/devices",
+                "DELETE /api/v1/auth/devices/self",
+            )
+
+        val LINKED_DEVICE_ROUTES = SYNC_DATA_ROUTES + ACCOUNT_DEVICE_ROUTES
+
         /** Routes missing from the OpenAPI document that never read an access token. */
         val HIDDEN_PUBLIC_ROUTES =
             setOf(
@@ -284,7 +297,9 @@ class LinkedDeviceRouteScopeTest {
         val KNOWN_PROTECTED_ROUTES =
             setOf(
                 "GET /api/v1/backups",
-                "GET /api/v1/auth/me",
+                "PUT /api/v1/auth/me",
+                "POST /api/v1/auth/devices/link",
+                "DELETE /api/v1/auth/devices/{id}",
                 "GET /api/v1/identity",
                 "GET /api/v1/location-history",
                 "GET /api/v1/quota",

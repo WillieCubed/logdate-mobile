@@ -7,6 +7,7 @@ import app.logdate.server.atproto.InMemoryAtprotoPasswordCredentialRepository
 import app.logdate.server.atproto.InMemoryAtprotoSessionRepository
 import app.logdate.server.atproto.LogDatePdsBlobStore
 import app.logdate.server.atproto.LogDateRepoStore
+import app.logdate.server.auth.AccessTokenVerifier
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.AuthMetricsRegistry
@@ -21,6 +22,8 @@ import app.logdate.server.auth.InMemorySessionManager
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.RefreshTokenRevocationRepository
 import app.logdate.server.auth.SessionManager
+import app.logdate.server.devices.DeviceLinkService
+import app.logdate.server.devices.DeviceSessionGuard
 import app.logdate.server.entitlements.EntitlementService
 import app.logdate.server.identity.AtprotoIdentityConfig
 import app.logdate.server.identity.AtprotoIdentityService
@@ -103,6 +106,8 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
     oauthClientMetadataResolver: OAuthClientMetadataResolver? = null,
     emailVerificationService: EmailVerificationService? = null,
     entitlementService: EntitlementService? = null,
+    deviceLinkService: DeviceLinkService? = null,
+    accessTokenVerifier: AccessTokenVerifier? = null,
 ): AuthV1TestEnvironment {
     val verifier: GoogleIdTokenVerifier = googleIdTokenVerifier ?: FakeGoogleIdTokenVerifier(googleClaimsByToken)
     val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "test-signing-key-kek")
@@ -237,6 +242,8 @@ fun TestApplicationBuilder.configureAuthV1TestApp(
                     metrics = metrics,
                     entitlementService = entitlementService,
                     emailVerificationService = emailVerificationService,
+                    deviceLinkService = deviceLinkService,
+                    accessTokenVerifier = accessTokenVerifier ?: AccessTokenVerifier(tokenService, DeviceSessionGuard.Disabled),
                 )
                 identityApiRoutes(
                     accountRepository = accountRepository,

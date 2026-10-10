@@ -49,6 +49,7 @@ data class ServerDescriptorConfig(
                     add(ServerProtocolFeature.CANONICAL_OWNER_BINDING_V1)
                     add(ServerProtocolFeature.RICH_DRAFTS_V1)
                     add(ServerProtocolFeature.JOURNAL_MERGE_V1)
+                    add(ServerProtocolFeature.DEVICE_LINKING_V1)
                     if (diagnosticReportsEnabled) {
                         add(ServerProtocolFeature.DIAGNOSTIC_REPORTS_V1)
                     }

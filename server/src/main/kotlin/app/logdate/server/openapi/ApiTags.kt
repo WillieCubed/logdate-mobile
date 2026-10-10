@@ -106,6 +106,10 @@ internal val apiTagGroups: List<ApiTagGroup> =
 
                     Account-key envelopes contain only client-encrypted ciphertext. A compatible passkey unlocks
                     them locally; the server never receives a journal key or a passkey unlock secret.
+
+                    A watch links differently: the signed-in phone mints a one-time code and the watch redeems it
+                    for its own session, with no sign-in on the watch. That session reaches only the sync routes,
+                    and the phone can remove it at any time.
                     """.trimIndent(),
                 ),
             ),

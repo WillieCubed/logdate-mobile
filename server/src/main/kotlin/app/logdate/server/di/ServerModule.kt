@@ -12,6 +12,7 @@ import app.logdate.server.atproto.InMemoryAtprotoPasswordCredentialRepository
 import app.logdate.server.atproto.InMemoryAtprotoSessionRepository
 import app.logdate.server.atproto.LogDatePdsBlobStore
 import app.logdate.server.atproto.LogDateRepoStore
+import app.logdate.server.auth.AccessTokenVerifier
 import app.logdate.server.auth.AccountDeletionService
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
@@ -39,6 +40,7 @@ import app.logdate.server.database.PostgreSQLAccountRepository
 import app.logdate.server.database.PostgreSQLAtprotoPasswordCredentialRepository
 import app.logdate.server.database.PostgreSQLAtprotoSessionRepository
 import app.logdate.server.database.PostgreSQLDeviceEnrollmentRepository
+import app.logdate.server.database.PostgreSQLDeviceSessionRepository
 import app.logdate.server.database.PostgreSQLDiagnosticReportStore
 import app.logdate.server.database.PostgreSQLHostedPlcOperationRepository
 import app.logdate.server.database.PostgreSQLJournalMergeStore
@@ -54,6 +56,10 @@ import app.logdate.server.database.PostgreSQLRepoBlockStore
 import app.logdate.server.database.PostgreSQLResourceRouteRepository
 import app.logdate.server.database.PostgreSQLSessionManager
 import app.logdate.server.database.PostgreSQLSigningKeyRepository
+import app.logdate.server.devices.DeviceLinkService
+import app.logdate.server.devices.DeviceSessionGuard
+import app.logdate.server.devices.DeviceSessionRepository
+import app.logdate.server.devices.InMemoryDeviceSessionRepository
 import app.logdate.server.diagnostics.DiagnosticReportAvailability
 import app.logdate.server.diagnostics.DiagnosticReportStore
 import app.logdate.server.diagnostics.InMemoryDiagnosticReportStore
@@ -179,6 +185,10 @@ fun serverModule(isDatabaseAvailable: Boolean) =
         single<DeviceEnrollmentRepository> {
             if (isDatabaseAvailable) PostgreSQLDeviceEnrollmentRepository() else InMemoryDeviceEnrollmentRepository()
         }
+        single<DeviceSessionRepository> {
+            if (isDatabaseAvailable) PostgreSQLDeviceSessionRepository() else InMemoryDeviceSessionRepository()
+        }
+        single { DeviceSessionGuard(repository = get()) }
         single<AccountKeyEnvelopeRepository> {
             if (isDatabaseAvailable) PostgreSQLAccountKeyEnvelopeRepository() else InMemoryAccountKeyEnvelopeRepository()
         }
@@ -347,6 +357,9 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 secret = System.getenv("JWT_SECRET") ?: JwtTokenService.generateSecret(),
             )
         }
+
+        single { AccessTokenVerifier(tokenService = get(), guard = get()) }
+        single { DeviceLinkService(repository = get(), tokenService = get(), accountRepository = get(), guard = get()) }
 
         single {
             CompositeLogDateMediaBlobRepository(

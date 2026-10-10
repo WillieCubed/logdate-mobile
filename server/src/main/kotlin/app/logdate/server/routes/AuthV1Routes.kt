@@ -3,6 +3,9 @@ package app.logdate.server.routes
 import app.logdate.server.audit.AuditCategory
 import app.logdate.server.audit.AuditKey
 import app.logdate.server.audit.formatAuditLog
+import app.logdate.server.auth.AccessCheck
+import app.logdate.server.auth.AccessTokenClaims
+import app.logdate.server.auth.AccessTokenVerifier
 import app.logdate.server.auth.Account
 import app.logdate.server.auth.AccountDeletionService
 import app.logdate.server.auth.AccountIdentity
@@ -17,7 +20,12 @@ import app.logdate.server.auth.IdentityProvider
 import app.logdate.server.auth.RefreshTokenRevocationRepository
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.SessionType
+import app.logdate.server.auth.TokenScope
 import app.logdate.server.auth.TokenService
+import app.logdate.server.auth.bearerToken
+import app.logdate.server.devices.DeviceLinkService
+import app.logdate.server.devices.DeviceSessionGuard
+import app.logdate.server.devices.DeviceSessionRefresh
 import app.logdate.server.entitlements.EntitlementService
 import app.logdate.server.entitlements.EntitlementStatus
 import app.logdate.server.entitlements.EntitlementTier
@@ -50,6 +58,7 @@ import app.logdate.shared.model.PasskeyRegistrationResponse
 import app.logdate.shared.model.UpdateAccountProfileRequest
 import app.logdate.shared.model.UsernameAvailabilityData
 import app.logdate.shared.model.UsernameAvailabilityResponse
+import app.logdate.shared.model.devices.DeviceLinkErrorCodes
 import io.github.aakira.napier.Napier
 import io.github.smiley4.ktoropenapi.delete
 import io.github.smiley4.ktoropenapi.get
@@ -233,6 +242,8 @@ data class LogoutRequestV1(
 @Serializable
 data class RefreshTokenDataV1(
     val accessToken: String,
+    /** A new refresh token, sent only when a linked device's session was just renewed. Store it. */
+    val refreshToken: String? = null,
 )
 
 @Serializable
@@ -315,6 +326,8 @@ fun Route.authV1Routes(
     accountDeletionService: AccountDeletionService? = null,
     entitlementService: EntitlementService? = null,
     emailVerificationService: EmailVerificationService? = null,
+    deviceLinkService: DeviceLinkService? = null,
+    accessTokenVerifier: AccessTokenVerifier = AccessTokenVerifier(tokenService, DeviceSessionGuard.Disabled),
 ) {
     val rateLimiter = InMemoryAuthRateLimiter()
 
@@ -1052,12 +1065,8 @@ fun Route.authV1Routes(
                     }
                     val accountId = tokenService.validateRefreshToken(request.refreshToken)
                     if (accountId == null) {
-                        return@post call.respondApiError(
-                            HttpStatusCode.Unauthorized,
-                            "INVALID_REFRESH_TOKEN",
-                            "Invalid or expired refresh token",
-                            metrics,
-                        )
+                        success = call.respondDeviceRefresh(request.refreshToken, tokenService, deviceLinkService, metrics)
+                        return@post
                     }
                     val did =
                         runCatching { Uuid.parse(accountId) }
@@ -1130,8 +1139,8 @@ fun Route.authV1Routes(
 
         get("/me", AccountDocs.getCurrentAccount) {
             try {
-                val account =
-                    resolveAuthenticatedAccount(call, accountRepository, tokenService, metrics)
+                val (account, claims) =
+                    resolveAuthenticatedSession(call, accountRepository, accessTokenVerifier, metrics)
                         ?: return@get
                 val response =
                     issueAuthResponse(
@@ -1141,6 +1150,7 @@ fun Route.authV1Routes(
                         webAuthnService = webAuthnService,
                         atprotoIdentityService = atprotoIdentityService,
                         tokenService = tokenService,
+                        deviceSessionId = claims.sessionId,
                     )
                 call.respond(HttpStatusCode.OK, response)
             } catch (e: Exception) {
@@ -1727,17 +1737,27 @@ private suspend fun issueAuthResponse(
     webAuthnService: WebAuthnPasskeyService,
     atprotoIdentityService: AtprotoIdentityService,
     tokenService: TokenService,
+    deviceSessionId: String? = null,
 ): AuthResponse {
     val fresh = atprotoIdentityService.ensureIdentity(accountRepository.findById(account.id) ?: account)
     val identities = identityRepository.findByAccountId(fresh.id)
     val linkedProviders = identities.map { it.provider.name.lowercase() }.distinct().sorted()
     val passkeyCredentialIds = webAuthnService.getPasskeysForUser(fresh.id).map { it.credentialId }
 
+    val accountId = fresh.id.toString()
+    // A linked device stays on its own session and scope, so this call can never turn it into a full sign-in.
     val tokens =
-        AccountTokens(
-            accessToken = tokenService.generateAccessToken(fresh.id.toString(), fresh.did),
-            refreshToken = tokenService.generateRefreshToken(fresh.id.toString(), fresh.did),
-        )
+        if (deviceSessionId == null) {
+            AccountTokens(
+                accessToken = tokenService.generateAccessToken(accountId, fresh.did),
+                refreshToken = tokenService.generateRefreshToken(accountId, fresh.did),
+            )
+        } else {
+            AccountTokens(
+                accessToken = tokenService.generateDeviceAccessToken(accountId, fresh.did, deviceSessionId),
+                refreshToken = tokenService.generateDeviceRefreshToken(accountId, fresh.did, deviceSessionId),
+            )
+        }
 
     return AuthResponse(
         success = true,
@@ -1905,6 +1925,15 @@ private suspend fun resolveAuthenticatedAccount(
 
     val accountId = tokenService.validateAccessToken(token)
     if (accountId == null) {
+        if (tokenService.decodeAccessToken(token)?.scope == TokenScope.SYNC) {
+            call.respondApiError(
+                HttpStatusCode.Forbidden,
+                DeviceLinkErrorCodes.DEVICE_SCOPE_DENIED,
+                "A linked device cannot do this",
+                metrics,
+            )
+            return null
+        }
         call.respondApiError(HttpStatusCode.Unauthorized, "INVALID_TOKEN", "Invalid or expired access token", metrics)
         return null
     }
@@ -1916,6 +1945,72 @@ private suspend fun resolveAuthenticatedAccount(
     }
 
     return account
+}
+
+/** Like [resolveAuthenticatedAccount], but also accepts a linked device while its session is active. */
+@OptIn(ExperimentalUuidApi::class)
+private suspend fun resolveAuthenticatedSession(
+    call: ApplicationCall,
+    accountRepository: AccountRepository,
+    verifier: AccessTokenVerifier,
+    metrics: AuthMetricsRegistry?,
+): Pair<Account, AccessTokenClaims>? {
+    val token = bearerToken(call.request.header(HttpHeaders.Authorization))
+    if (token.isNullOrBlank()) {
+        call.respondApiError(HttpStatusCode.Unauthorized, "INVALID_TOKEN", "Access token is required", metrics)
+        return null
+    }
+    val claims =
+        when (val check = verifier.verify(token, allowSyncScope = true)) {
+            is AccessCheck.Granted -> check.claims
+            AccessCheck.SessionRevoked -> {
+                call.respondApiError(
+                    HttpStatusCode.Unauthorized,
+                    DeviceLinkErrorCodes.DEVICE_SESSION_REVOKED,
+                    "This device was removed from the account",
+                    metrics,
+                )
+                return null
+            }
+            AccessCheck.Missing, AccessCheck.Invalid, AccessCheck.ScopeDenied -> {
+                call.respondApiError(HttpStatusCode.Unauthorized, "INVALID_TOKEN", "Invalid or expired access token", metrics)
+                return null
+            }
+        }
+    val account = runCatching { Uuid.parse(claims.accountId) }.getOrNull()?.let { accountRepository.findById(it) }
+    if (account == null) {
+        call.respondApiError(HttpStatusCode.NotFound, "ACCOUNT_NOT_FOUND", "Account not found", metrics)
+        return null
+    }
+    return account to claims
+}
+
+/** Refreshes a linked device's tokens, or answers why it cannot. Returns whether it answered 200. */
+private suspend fun ApplicationCall.respondDeviceRefresh(
+    refreshToken: String,
+    tokenService: TokenService,
+    deviceLinkService: DeviceLinkService?,
+    metrics: AuthMetricsRegistry,
+): Boolean {
+    val claims = tokenService.decodeRefreshToken(refreshToken)?.takeIf { it.sessionId != null }
+    if (claims == null) {
+        respondApiError(HttpStatusCode.Unauthorized, "INVALID_REFRESH_TOKEN", "Invalid or expired refresh token", metrics)
+        return false
+    }
+    when (val refreshed = deviceLinkService?.refresh(claims) ?: DeviceSessionRefresh.Revoked) {
+        DeviceSessionRefresh.Revoked -> {
+            respondApiError(
+                HttpStatusCode.Unauthorized,
+                DeviceLinkErrorCodes.DEVICE_SESSION_REVOKED,
+                "This device was removed from the account",
+                metrics,
+            )
+            return false
+        }
+        is DeviceSessionRefresh.Refreshed ->
+            respond(HttpStatusCode.OK, RefreshTokenResponseV1(true, RefreshTokenDataV1(refreshed.accessToken, refreshed.refreshToken)))
+    }
+    return true
 }
 
 private suspend fun ApplicationCall.respondApiError(

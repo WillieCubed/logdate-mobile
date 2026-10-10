@@ -97,6 +97,15 @@ class ServerDescriptorConfigTest {
         assertTrue(descriptor.hasProtocolFeature(ServerProtocolFeature.CANONICAL_OWNER_BINDING_V1))
     }
 
+    @Test
+    fun `device linking is advertised on every deployment`() {
+        val identity = AtprotoIdentityConfig()
+        listOf(DeploymentKind.FIRST_PARTY, DeploymentKind.SELF_HOSTED).forEach { kind ->
+            val descriptor = ServerDescriptorConfig(deploymentKind = kind).toDescriptor(identity, "logdate.app", "LogDate")
+            assertTrue(descriptor.hasProtocolFeature(ServerProtocolFeature.DEVICE_LINKING_V1), kind.name)
+        }
+    }
+
     private fun descriptorFor(identityConfig: AtprotoIdentityConfig) =
         ServerDescriptorConfig().toDescriptor(
             identityConfig = identityConfig,

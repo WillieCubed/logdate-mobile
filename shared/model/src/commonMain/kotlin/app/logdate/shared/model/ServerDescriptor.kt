@@ -28,6 +28,13 @@ object ServerProtocolFeature {
     const val DIAGNOSTIC_REPORTS_V1 = "diagnosticReportsV1"
 
     /**
+     * Devices link to an account with a one-time code and no sign-in (`/auth/devices`). Their tokens contain
+     * `sid` and `scp=sync`, refreshes check that the session still exists, and removed devices answer
+     * `401 DEVICE_SESSION_REVOKED`.
+     */
+    const val DEVICE_LINKING_V1 = "deviceLinkingV1"
+
+    /**
      * The server publishes hosted `did:plc` operations to the PLC directory, so identity changes
      * that need a published operation -- rotating the signing key, registering a recovery key,
      * recovering with one -- can succeed. Without it those requests are refused, and clients must

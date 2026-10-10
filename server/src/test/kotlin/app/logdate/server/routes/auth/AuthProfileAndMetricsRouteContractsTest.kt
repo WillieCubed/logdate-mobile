@@ -64,6 +64,8 @@ class AuthProfileAndMetricsRouteContractsTest {
             coEvery { accountRepository.findById(accountId) } returns account
             every { tokenService.validateAccessToken("access-ok") } returns accountId.toString()
             every { tokenService.validateRefreshToken(any()) } throws IllegalStateException("refresh-boom")
+            every { tokenService.decodeAccessToken(any()) } returns null
+            every { tokenService.decodeRefreshToken(any()) } returns null
             every { webAuthn.getPasskeysForUser(any()) } returns emptyList()
             coEvery { accountRepository.usernameExists("taken_username") } returns true
 
@@ -131,6 +133,8 @@ class AuthProfileAndMetricsRouteContractsTest {
             coEvery { accountRepository.findById(accountId) } returns account
             every { tokenService.validateAccessToken("access-ok") } returns accountId.toString()
             every { tokenService.validateAccessToken("missing-account") } returns Uuid.random().toString()
+            every { tokenService.decodeAccessToken(any()) } returns null
+            every { tokenService.decodeRefreshToken(any()) } returns null
             every { metrics.snapshot() } throws IllegalStateException("metrics-boom")
             coEvery { identityRepository.findByAccountId(any()) } throws IllegalStateException("identities-boom")
             coEvery { accountRepository.findById(any()) } throws IllegalStateException("me-boom")
@@ -215,6 +219,8 @@ class AuthProfileAndMetricsRouteContractsTest {
             val tokenService = mockk<JwtTokenService>(relaxed = true)
             every { tokenService.validateAccessToken("access-good") } returns accountId.toString()
             every { tokenService.validateAccessToken("invalid-token") } returns null
+            every { tokenService.decodeAccessToken(any()) } returns null
+            every { tokenService.decodeRefreshToken(any()) } returns null
 
             val webAuthn = mockk<WebAuthnPasskeyService>(relaxed = true)
             every { webAuthn.getPasskeysForUser(any()) } returns emptyList()

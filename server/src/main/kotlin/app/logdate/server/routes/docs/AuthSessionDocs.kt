@@ -20,6 +20,7 @@ import app.logdate.server.routes.bearerUnauthorized
 import app.logdate.server.routes.jsonBody
 import app.logdate.server.routes.ok
 import app.logdate.server.routes.publicOperation
+import app.logdate.shared.model.devices.DeviceLinkErrorCodes
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.HttpStatusCode
 
@@ -171,13 +172,16 @@ internal object AuthSessionDocs {
             routinely: whenever a request answers `401`, refresh once and retry it. The refresh token itself is
             not rotated; keep using it until it expires or the person logs out.
 
+            A linked device's refresh also checks that its session still exists. In the last 15 days of the
+            session the response also contains a new `refreshToken`; store it and use it from then on.
+
             No `Authorization` header is needed; the refresh token in the body is the credential.
             """,
         )
         request { jsonBody(RefreshTokenRequestV1(refreshToken = DocExamples.REFRESH_TOKEN), "The refresh token from sign-in.") }
         response {
             ok(
-                "A new access token. The refresh token stays the same.",
+                "A new access token. The refresh token stays the same unless the response contains a new one for a linked device.",
                 RefreshTokenResponseV1(success = true, data = RefreshTokenDataV1(accessToken = DocExamples.ACCESS_TOKEN)),
             )
             apiError(HttpStatusCode.BadRequest, DocExamples.apiInvalidRequest)
@@ -192,6 +196,12 @@ internal object AuthSessionDocs {
                     "REFRESH_TOKEN_REVOKED",
                     "This refresh token was invalidated by **Log out**. Sign the person in again; do not retry.",
                     "Refresh token has been revoked",
+                ),
+                ErrorCase(
+                    DeviceLinkErrorCodes.DEVICE_SESSION_REVOKED,
+                    "The linked device was removed from the account or its session expired. Stop syncing; the device " +
+                        "needs a new link from the phone.",
+                    "This device was removed from the account",
                 ),
             )
             apiServerError()

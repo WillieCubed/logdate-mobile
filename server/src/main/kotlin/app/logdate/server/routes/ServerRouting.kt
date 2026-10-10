@@ -3,6 +3,7 @@ package app.logdate.server.routes
 import app.logdate.server.ServerDescriptorConfig
 import app.logdate.server.accountkeys.AccountKeyEnvelopeRepository
 import app.logdate.server.atproto.AtprotoSessionTokenService
+import app.logdate.server.auth.AccessTokenVerifier
 import app.logdate.server.auth.AccountDeletionService
 import app.logdate.server.auth.AccountIdentityRepository
 import app.logdate.server.auth.AccountRepository
@@ -13,6 +14,7 @@ import app.logdate.server.auth.RefreshTokenRevocationRepository
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.TokenService
 import app.logdate.server.devices.AccountDeviceRepository
+import app.logdate.server.devices.DeviceLinkService
 import app.logdate.server.enrollment.DeviceEnrollmentRepository
 import app.logdate.server.entitlements.EntitlementEnforcer
 import app.logdate.server.entitlements.EntitlementService
@@ -126,11 +128,14 @@ internal fun Application.accountApiRoutes() {
     val accountKeyEnvelopes by inject<AccountKeyEnvelopeRepository>()
     val passkeys by inject<PasskeyRepository>()
     val descriptorConfig by inject<ServerDescriptorConfig>()
+    val deviceLinkService by inject<DeviceLinkService>()
+    val accessTokenVerifier by inject<AccessTokenVerifier>()
 
     routing {
         route("/api/v1") {
             serverInfoRoutes(serverDescriptor())
             deviceEnrollmentRoutes(tokenService, deviceEnrollmentRepository, accountRepository)
+            deviceRoutes(deviceLinkService, accessTokenVerifier)
             accountDeviceRoutes(tokenService, accountDevices)
             accountKeyEnvelopeRoutes(tokenService, passkeys, accountKeyEnvelopes, descriptorConfig.encryptedAccountKeysEnabled)
             planRoutes(planCatalogService)
@@ -148,6 +153,8 @@ internal fun Application.accountApiRoutes() {
                 accountDeletionService = accountDeletionService,
                 entitlementService = entitlementService,
                 emailVerificationService = emailVerificationService,
+                deviceLinkService = deviceLinkService,
+                accessTokenVerifier = accessTokenVerifier,
             )
             identityApiRoutes(
                 accountRepository = accountRepository,
@@ -176,6 +183,7 @@ internal fun Application.contentApiRoutes() {
     val logDateBackupRepository by inject<LogDateBackupRepository>()
     val resourceRouteRepository by inject<ResourceRouteRepository>()
     val httpClient by inject<HttpClient>()
+    val accessTokenVerifier by inject<AccessTokenVerifier>()
     val syncRateLimiter = SlidingWindowRateLimiter()
 
     routing {
@@ -197,6 +205,7 @@ internal fun Application.contentApiRoutes() {
                             app.logdate.server.diagnostics
                                 .DiagnosticReportService(diagnosticReportStore, it)
                         },
+                accessTokenVerifier = accessTokenVerifier,
             )
             quotaRoutes(
                 tokenService = tokenService,

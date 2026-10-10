@@ -346,6 +346,7 @@ class OpenApiContractTest {
                 "createAtprotoAccount",
                 "createAtprotoSession",
                 "claimDeviceEnrollment",
+                "redeemDeviceLink",
             )
 
         /** XRPC methods that work without any optional service and therefore never answer 501. */
@@ -366,6 +367,8 @@ class OpenApiContractTest {
                 "beginPasskeySignin",
                 "completePasskeySignin",
                 "signinWithGoogle",
+                "createDeviceLink",
+                "redeemDeviceLink",
             )
         private val RATE_LIMITED_WITH_RETRY_AFTER = setOf("uploadMedia", "uploadBackup", "createTranscriptionSession")
         private val QUOTA_ENFORCED = setOf("uploadMedia", "uploadBackup", "createTranscriptionSession")

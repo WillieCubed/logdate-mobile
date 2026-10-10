@@ -294,7 +294,13 @@ internal object AuthSchemaDocs {
                 ),
             "RefreshTokenResponseV1" to SchemaDoc("A new access token.", mapOf("success" to SUCCESS_FLAG, "data" to "The token.")),
             "RefreshTokenDataV1" to
-                SchemaDoc("The new access token.", mapOf("accessToken" to "Send as `Authorization: Bearer <accessToken>`.")),
+                SchemaDoc(
+                    "The new access token, and for a linked device whose session was just renewed, a new refresh token.",
+                    mapOf(
+                        "accessToken" to "Send as `Authorization: Bearer <accessToken>`.",
+                        "refreshToken" to "Present only when a linked device's session was renewed. Replace the stored refresh token.",
+                    ),
+                ),
             "LogoutRequestV1" to SchemaDoc("A refresh token to revoke.", mapOf("refreshToken" to "The refresh token to invalidate.")),
             // ---- Passkey management ---------------------------------------------------------
             "PasskeyListResponse" to SchemaDoc("The account's passkeys.", mapOf("success" to SUCCESS_FLAG, "data" to "Active passkeys.")),

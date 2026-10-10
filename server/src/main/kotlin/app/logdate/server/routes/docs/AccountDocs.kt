@@ -86,6 +86,7 @@ internal object AccountDocs {
             token still works.
 
             Because the response includes fresh tokens, treat it like a sign-in: replace the ones you stored.
+            A linked device gets tokens for its own session and scope again, never full-access tokens.
             """,
         )
         response {

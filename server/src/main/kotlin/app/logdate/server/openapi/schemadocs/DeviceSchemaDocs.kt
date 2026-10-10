@@ -81,5 +81,47 @@ internal object DeviceSchemaDocs {
                     "Client-encrypted account keys, bound to a passkey credential and account.",
                     mapOf("ciphertext" to "Canonical base64 LDKE1 ciphertext; the server never has the unlock secret."),
                 ),
+            "DeviceLinkCodeResponse" to
+                SchemaDoc(
+                    "A one-time code that links another device to the signed-in account.",
+                    mapOf(
+                        "code" to "43 characters of unpadded base64url (256 random bits). Works once; pass it to the device privately.",
+                        "expiresAt" to "When the code stops working, in Unix epoch milliseconds. Two minutes after it was minted.",
+                    ),
+                ),
+            "DeviceLinkRedeemRequest" to
+                SchemaDoc(
+                    "A device exchanging a link code for its own session.",
+                    mapOf(
+                        "code" to "The code from **Create a device link code**.",
+                        "deviceName" to
+                            "A name the account owner will recognize in the device list. 1–120 characters, no control characters.",
+                        "platform" to "A short lowercase identifier for the device type. Watches send `wear_os`.",
+                    ),
+                ),
+            "DeviceLinkRedeemResponse" to
+                SchemaDoc(
+                    "The new linked device session.",
+                    mapOf(
+                        "accountId" to "The account the device now belongs to.",
+                        "sessionId" to "The device's session ID; the `id` in **List linked devices** and **Remove a linked device**.",
+                        "tokens" to "Sync-only tokens (`scp=sync`). Store both; refresh them like any other tokens.",
+                    ),
+                ),
+            "LinkedDevice" to
+                SchemaDoc(
+                    "One active linked device.",
+                    mapOf(
+                        "id" to "The device's session ID.",
+                        "deviceName" to "The name the device sent when it was linked.",
+                        "platform" to "The device type, such as `wear_os`.",
+                        "createdAt" to "When the device was linked, in Unix epoch milliseconds.",
+                        "lastRefreshedAt" to "When its session was last renewed, in Unix epoch milliseconds.",
+                        "expiresAt" to "When its session ends unless renewed, in Unix epoch milliseconds.",
+                        "current" to "`true` on the entry for the device that made the request; absent otherwise.",
+                    ),
+                ),
+            "LinkedDeviceListResponse" to
+                SchemaDoc("The account's active linked devices.", mapOf("devices" to "Oldest first.")),
         )
 }
