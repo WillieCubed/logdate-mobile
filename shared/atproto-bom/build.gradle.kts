@@ -47,7 +47,7 @@ publishing {
                         "`platform(\"studio.hypertext.atproto:atproto-bom\")` and reference " +
                         "any atproto-* module without an explicit version.",
                 )
-                url.set("https://github.com/TheHypertextStudio/logdate-android")
+                url.set("https://github.com/WillieCubed/logdate-mobile")
                 inceptionYear.set("2026")
                 organization {
                     name.set("The Hypertext Studio")
@@ -67,13 +67,13 @@ publishing {
                     }
                 }
                 scm {
-                    url.set("https://github.com/TheHypertextStudio/logdate-android")
-                    connection.set("scm:git:https://github.com/TheHypertextStudio/logdate-android.git")
-                    developerConnection.set("scm:git:ssh://git@github.com/TheHypertextStudio/logdate-android.git")
+                    url.set("https://github.com/WillieCubed/logdate-mobile")
+                    connection.set("scm:git:https://github.com/WillieCubed/logdate-mobile.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/WillieCubed/logdate-mobile.git")
                 }
                 issueManagement {
                     system.set("GitHub")
-                    url.set("https://github.com/TheHypertextStudio/logdate-android/issues")
+                    url.set("https://github.com/WillieCubed/logdate-mobile/issues")
                 }
             }
         }

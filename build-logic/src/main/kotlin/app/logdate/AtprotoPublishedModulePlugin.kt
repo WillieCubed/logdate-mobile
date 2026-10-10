@@ -14,7 +14,9 @@ import org.gradle.plugins.signing.SigningExtension
 
 private const val DefaultAtprotoGroup = "studio.hypertext.atproto"
 private const val DefaultAtprotoVersion = "0.1.0"
-private const val RepoUrl = "https://github.com/TheHypertextStudio/logdate-android"
+private const val RepoUrl = "https://github.com/WillieCubed/logdate-mobile"
+private const val ScmConnection = "scm:git:$RepoUrl.git"
+private const val ScmDeveloperConnection = "scm:git:ssh://git@github.com/WillieCubed/logdate-mobile.git"
 private const val OrgUrl = "https://thehypertext.studio"
 
 /**
@@ -192,8 +194,8 @@ class AtprotoPublishedModulePlugin : Plugin<Project> {
                                 }
                                 root.appendNodeIfMissing("scm").apply {
                                     appendNodeIfMissing("url").setValue(RepoUrl)
-                                    appendNodeIfMissing("connection").setValue("scm:git:https://github.com/TheHypertextStudio/logdate-android.git")
-                                    appendNodeIfMissing("developerConnection").setValue("scm:git:ssh://git@github.com/TheHypertextStudio/logdate-android.git")
+                                    appendNodeIfMissing("connection").setValue(ScmConnection)
+                                    appendNodeIfMissing("developerConnection").setValue(ScmDeveloperConnection)
                                 }
                                 root.appendNodeIfMissing("issueManagement").apply {
                                     appendNodeIfMissing("system").setValue("GitHub")
