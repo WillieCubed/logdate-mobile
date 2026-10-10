@@ -13,6 +13,7 @@ import app.logdate.client.media.audio.AndroidRecordingServiceController
 import app.logdate.client.media.audio.CrashSafeRecording
 import app.logdate.client.media.audio.RecordingSessionOptions
 import app.logdate.client.media.device.AndroidAudioRouteRepository
+import app.logdate.client.media.storage.StoredMediaReferences
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.data.storage.StorageSpaceChecker
@@ -277,11 +278,12 @@ class WearRecorderServiceE2ETest {
             val count = koin.get<WearRecordingRecovery>().recover()
 
             val repository = koin.get<JournalNotesRepository>()
+            val recoveredRef = koin.get<StoredMediaReferences>().storedReference(recovered.absolutePath)
             val note =
                 repository.allNotesObserved
                     .first()
                     .filterIsInstance<JournalNote.Audio>()
-                    .singleOrNull { it.mediaRef == recovered.absolutePath }
+                    .singleOrNull { it.mediaRef == recoveredRef }
             try {
                 assertEquals("One note should be recovered", 1, count)
                 assertNotNull("The recovered recording should be a note", note)
