@@ -74,6 +74,10 @@ passes the app lock before the rest of the journal is reachable.
 - `CaptureTileStateTest` (compose-main `androidHostTest`) covers the tile appearance for idle,
   recording, and paused, and what a tap does in each.
 - `PlatformComponentTogglerTest` covers enabling and disabling the services with the flag.
+- `OsSurfaceScreenshotsTest#recordVoiceTileShowsRecordingWindow` starts a recording in a separate
+  editor window, brings Home forward, taps the active Record voice tile, and fails unless the editor
+  window is in front again. It saves which window was in front at each step to
+  `quick-settings-tiles/recording-window--{phone,tablet}-api37.txt`.
 - On an emulator with the flag on, add the tile from the shade's edit screen.
 
 ## Updating screenshots

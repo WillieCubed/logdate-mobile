@@ -1,0 +1,8 @@
+# Front window while recording in a separate editor window
+topResumedActivity=ActivityRecord{23201261 u0 studio.hypertext.logdate.debug/app.logdate.client.EditorActivity t9}
+
+# Front window after bringing Home forward
+topResumedActivity=ActivityRecord{172149316 u0 studio.hypertext.logdate.debug/app.logdate.client.MainActivity t10}
+
+# Front window after tapping the active Record voice tile
+topResumedActivity=ActivityRecord{23201261 u0 studio.hypertext.logdate.debug/app.logdate.client.EditorActivity t9}

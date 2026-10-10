@@ -37,8 +37,11 @@ pin-journal|system|docs/screenshots/android-os-integration/launcher-shortcuts/jo
 pin-journal|system|docs/screenshots/android-os-integration/launcher-shortcuts/pin-journal--phone-api37.png
 pin-journal|system|docs/screenshots/android-os-integration/launcher-shortcuts/pin-journal--tablet-api37.png
 
-# Quick Settings tiles: idle, starting a recording, and the active Record voice tile.
+# Quick Settings tiles: idle, starting a recording, and the active Record voice tile, which brings
+# a recording in a separate editor window forward.
 quick-settings-tiles|system|docs/screenshots/android-os-integration/quick-settings-tiles/idle--phone-api37.png
+quick-settings-tiles|system|docs/screenshots/android-os-integration/quick-settings-tiles/recording-window--phone-api37.txt
+quick-settings-tiles|system|docs/screenshots/android-os-integration/quick-settings-tiles/recording-window--tablet-api37.txt
 quick-settings-tiles|system|docs/screenshots/android-os-integration/quick-settings-tiles/recording-editor--phone-api37.png
 quick-settings-tiles|system|docs/screenshots/android-os-integration/quick-settings-tiles/recording--phone-api37.png
 quick-settings-tiles|system|docs/screenshots/android-os-integration/quick-settings-tiles/idle--tablet-api37.png

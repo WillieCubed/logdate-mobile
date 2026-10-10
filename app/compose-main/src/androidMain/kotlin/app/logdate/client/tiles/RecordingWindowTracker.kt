@@ -37,15 +37,15 @@ class RecordingWindowTracker(
         job =
             scope.launch {
                 recorder.getRecordingStateFlow().distinctUntilChanged().collect { recording ->
-                    // A recording starts from the window in front, so that window holds it.
+                    // A recording starts from the window in front, so it runs in that window.
                     recordingTaskId = if (recording) resumedActivity?.get()?.taskId else null
                 }
             }
     }
 
     /**
-     * Brings the window holding the running recording in front of [from]. Returns false when nothing
-     * is recording, the recording is in [from]'s own window, or its window has closed.
+     * Brings the window the running recording is in to the front, ahead of [from]. Returns false when
+     * nothing is recording, the recording is in [from]'s own window, or its window has closed.
      */
     fun bringRecordingWindowForward(from: Activity): Boolean {
         val taskId = recordingTaskId ?: return false

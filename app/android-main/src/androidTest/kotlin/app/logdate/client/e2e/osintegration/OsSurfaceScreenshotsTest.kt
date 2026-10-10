@@ -814,6 +814,65 @@ class OsSurfaceScreenshotsTest {
         OsSurfaceCapture.collapseShade()
     }
 
+    /**
+     * A recording started in a separate editor window, with Home in front of it: the active Record
+     * voice tile has to bring that editor window forward, not Home.
+     */
+    @Test fun recordVoiceTileShowsRecordingWindow() {
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.enableFlags(FeatureFlag.QUICK_SETTINGS_TILES)
+        OsSurfaceCapture.addQuickSettingsTile("app.logdate.client.tiles.RecordVoiceTileService")
+
+        val pkg = OsSurfaceCapture.packageName
+        OsSurfaceCapture.shell("am start -n $pkg/$EDITOR_ACTIVITY -f 0x10000000")
+        OsSurfaceCapture.waitForText("Record audio").click()
+        // The audio block opens ready to record; recording starts from its record button.
+        OsSurfaceCapture.device
+            .wait(Until.findObject(By.desc("Start Recording")), 10_000L)
+            ?.click()
+            ?: error("The audio block's record button did not appear")
+        OsSurfaceCapture.waitForText("Finish")
+        val recordingIn = topResumedActivity()
+
+        OsSurfaceCapture.shell("am start -n $pkg/app.logdate.client.MainActivity -f 0x10000000")
+        OsSurfaceCapture.waitForText("Search your log")
+        val beforeTile = topResumedActivity()
+
+        OsSurfaceCapture.openQuickSettings()
+        OsSurfaceCapture.waitForText("Record voice").click()
+        OsSurfaceCapture.waitForText("Finish")
+        Thread.sleep(1_000L)
+        val afterTile = topResumedActivity()
+        OsSurfaceCapture.writeEvidence(
+            surface = "quick-settings-tiles",
+            state = "recording-window",
+            text =
+                buildString {
+                    appendLine("# Front window while recording in a separate editor window")
+                    appendLine(recordingIn)
+                    appendLine()
+                    appendLine("# Front window after bringing Home forward")
+                    appendLine(beforeTile)
+                    appendLine()
+                    appendLine("# Front window after tapping the active Record voice tile")
+                    appendLine(afterTile)
+                },
+        )
+        check(EDITOR_ACTIVITY in recordingIn) { "The recording did not start in an editor window: $recordingIn" }
+        check("MainActivity" in beforeTile) { "Home did not come forward: $beforeTile" }
+        check(EDITOR_ACTIVITY in afterTile) { "The tile did not bring the recording's window forward: $afterTile" }
+        OsSurfaceCapture.device.findObject(By.text("Finish"))?.click()
+    }
+
+    /** The activity Android reports as the top resumed one, with its task. */
+    private fun topResumedActivity(): String =
+        OsSurfaceCapture
+            .shell("dumpsys activity activities")
+            .lines()
+            .firstOrNull { "topResumedActivity=" in it }
+            ?.trim()
+            .orEmpty()
+
     @Test fun recordingBubble() {
         OsSurfaceCapture.prepareOnboardedApp()
         OsSurfaceCapture.enableFlags(FeatureFlag.RECORDING_BUBBLE, FeatureFlag.LIVE_UPDATES)
