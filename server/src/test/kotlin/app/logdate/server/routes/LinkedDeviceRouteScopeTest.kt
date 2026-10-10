@@ -3,6 +3,7 @@ package app.logdate.server.routes
 import app.logdate.server.auth.InMemoryAccountRepository
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.auth.TokenService
+import app.logdate.server.inMemoryMomentsRepository
 import app.logdate.server.logdate.asLogDateBackupRepository
 import app.logdate.server.logdate.asLogDateCollectionsRepository
 import app.logdate.server.logdate.asLogDateMediaBlobRepository
@@ -116,7 +117,8 @@ class LinkedDeviceRouteScopeTest {
     fun `with an active session only the sync data routes accept a linked device token`() =
         testApplication {
             val tokenService = JwtTokenService("linked-device-route-scope-secret")
-            val kit = DeviceLinkTestKit(tokenService, InMemoryAccountRepository())
+            val accounts = InMemoryAccountRepository()
+            val kit = DeviceLinkTestKit(tokenService, accounts)
             val repository = InMemorySyncRepository()
             lateinit var server: Application
             application {
@@ -130,6 +132,7 @@ class LinkedDeviceRouteScopeTest {
                             mediaBlobRepository = repository.asLogDateMediaRepository().asLogDateMediaBlobRepository(),
                             backupRepository = repository.asLogDateBackupRepository(),
                             accessTokenVerifier = kit.verifier,
+                            momentsRepository = inMemoryMomentsRepository(accounts),
                         )
                     }
                 }
@@ -230,7 +233,7 @@ class LinkedDeviceRouteScopeTest {
                 "GET /xrpc/com.atproto.repo.listRecords" to "?repo=$SWEEP_DID&collection=app.bsky.feed.post",
             )
 
-        /** Everything a linked device may call today: sync status and the content, journal, association, draft and media routes. */
+        /** Everything a linked device may call today: sync status and the content, journal, association, draft, media and moment routes. */
         val SYNC_DATA_ROUTES =
             setOf(
                 "GET /api/v1/ops/sync/status",
@@ -257,6 +260,11 @@ class LinkedDeviceRouteScopeTest {
                 "GET /api/v1/media/{mediaId}",
                 "GET /api/v1/media/{mediaId}/binary",
                 "DELETE /api/v1/media/{mediaId}",
+                "PUT /api/v1/moments/{momentId}",
+                "GET /api/v1/moments",
+                "GET /api/v1/moments/{momentId}",
+                "PATCH /api/v1/moments/{momentId}",
+                "DELETE /api/v1/moments/{momentId}",
             )
 
         /**

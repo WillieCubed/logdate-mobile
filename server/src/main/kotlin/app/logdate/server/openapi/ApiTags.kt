@@ -15,6 +15,7 @@ internal object ApiTags {
     const val ASSOCIATIONS = "Associations"
     const val LOCATION_HISTORY = "Location history"
     const val DRAFTS = "Drafts"
+    const val MOMENTS = "Moments"
     const val MEDIA = "Media"
     const val BACKUPS = "Backups"
     const val SYNC_STATUS = "Sync status"
@@ -150,6 +151,15 @@ internal val apiTagGroups: List<ApiTagGroup> =
                     A draft is an entry someone is still writing. Syncing drafts lets a person start a note on their
                     phone and finish it on their laptop. Drafts have their own, simpler change feed and are meant to be
                     short-lived: delete the draft once the finished entry has been saved as a content.
+                    """.trimIndent(),
+                ),
+                ApiTag(
+                    ApiTags.MOMENTS,
+                    """
+                    A marked moment is a point in time someone flagged, usually with one tap on a watch, to fill in
+                    later. Moments have a collection of their own: entry and journal feeds never include them, so
+                    clients that do not know moments never see one. Everything but the times is encrypted on the
+                    device. Use these endpoints only when the server descriptor lists `momentsV1`.
                     """.trimIndent(),
                 ),
                 ApiTag(

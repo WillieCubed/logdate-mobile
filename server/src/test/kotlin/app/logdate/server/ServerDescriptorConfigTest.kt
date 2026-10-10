@@ -115,6 +115,15 @@ class ServerDescriptorConfigTest {
         }
     }
 
+    @Test
+    fun `marked moments are advertised on every deployment`() {
+        val identity = AtprotoIdentityConfig()
+        listOf(DeploymentKind.FIRST_PARTY, DeploymentKind.SELF_HOSTED).forEach { kind ->
+            val descriptor = ServerDescriptorConfig(deploymentKind = kind).toDescriptor(identity, "logdate.app", "LogDate")
+            assertTrue(descriptor.hasProtocolFeature(ServerProtocolFeature.MOMENTS_V1), kind.name)
+        }
+    }
+
     private fun descriptorFor(identityConfig: AtprotoIdentityConfig) =
         ServerDescriptorConfig().toDescriptor(
             identityConfig = identityConfig,

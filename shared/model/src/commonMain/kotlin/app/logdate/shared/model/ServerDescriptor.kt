@@ -42,6 +42,9 @@ object ServerProtocolFeature {
      */
     const val CONDITIONAL_CREATE_V1 = "conditionalCreateV1"
 
+    /** Marked moments sync through `/moments`, a collection of their own that the entry feeds never carry. */
+    const val MOMENTS_V1 = "momentsV1"
+
     /**
      * The server publishes hosted `did:plc` operations to the PLC directory, so identity changes
      * that need a published operation -- rotating the signing key, registering a recovery key,

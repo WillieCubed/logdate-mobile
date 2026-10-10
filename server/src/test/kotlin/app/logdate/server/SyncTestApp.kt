@@ -1,6 +1,7 @@
 package app.logdate.server
 
 import app.logdate.server.auth.AccessTokenVerifier
+import app.logdate.server.auth.AccountRepository
 import app.logdate.server.auth.InMemoryAccountRepository
 import app.logdate.server.auth.JwtTokenService
 import app.logdate.server.devices.DeviceSessionGuard
@@ -12,8 +13,10 @@ import app.logdate.server.logdate.InMemoryJournalMergeStore
 import app.logdate.server.logdate.InMemoryLogDateBackupRepository
 import app.logdate.server.logdate.InMemoryLogDateCollectionsMetadataStore
 import app.logdate.server.logdate.InMemoryLogDateMediaRepository
+import app.logdate.server.logdate.LogDateMomentsRepository
 import app.logdate.server.logdate.MergeAwareLogDateCollectionsRepository
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
+import app.logdate.server.logdate.RepoBackedLogDateMomentsRepository
 import app.logdate.server.logdate.asLogDateMediaBlobRepository
 import app.logdate.server.routes.syncRoutes
 import app.logdate.server.sync.GcsMediaStorage
@@ -58,13 +61,23 @@ fun TestApplicationBuilder.configureSyncTestApp(
             signingKeyService = signingKeyService,
             config = AtprotoIdentityConfig(handleDomain = "logdate.app", pdsServiceEndpoint = "https://logdate.app"),
         )
+    val blockStore = InMemoryRepoBlockStore()
+    val metadataStore = InMemoryLogDateCollectionsMetadataStore()
     val collectionsRepository =
         RepoBackedLogDateCollectionsRepository(
             accountRepository = accountRepository,
             identityService = atprotoIdentityService,
             signingKeyService = signingKeyService,
-            blockStore = InMemoryRepoBlockStore(),
-            metadataStore = InMemoryLogDateCollectionsMetadataStore(),
+            blockStore = blockStore,
+            metadataStore = metadataStore,
+        )
+    val momentsRepository =
+        RepoBackedLogDateMomentsRepository(
+            accountRepository = accountRepository,
+            signingKeyService = signingKeyService,
+            blockStore = blockStore,
+            metadataStore = metadataStore,
+            repoDidFor = collectionsRepository::canonicalRepoDid,
         )
     val mediaRepository = InMemoryLogDateMediaRepository()
     val backupRepository = InMemoryLogDateBackupRepository()
@@ -94,10 +107,33 @@ fun TestApplicationBuilder.configureSyncTestApp(
                     mediaBlobRepository = mediaRepository.asLogDateMediaBlobRepository(),
                     backupRepository = backupRepository,
                     accessTokenVerifier = accessTokenVerifier ?: AccessTokenVerifier(tokenService, DeviceSessionGuard.Disabled),
+                    momentsRepository = momentsRepository,
                 )
             }
         }
     }
 
     return SyncTestEnvironment(tokenService, repository, mediaRepository, backupRepository, metrics)
+}
+
+/** A moments repository over its own in-memory repo, for tests that mount `syncRoutes` themselves. */
+internal fun inMemoryMomentsRepository(accountRepository: AccountRepository): LogDateMomentsRepository {
+    val signingKeyService = SigningKeyService(InMemorySigningKeyRepository(), "moments-test-kek")
+    val identityService =
+        AtprotoIdentityService(
+            accountRepository = accountRepository,
+            signingKeyService = signingKeyService,
+            config = AtprotoIdentityConfig(handleDomain = "logdate.app", pdsServiceEndpoint = "https://logdate.app"),
+        )
+    val blockStore = InMemoryRepoBlockStore()
+    val metadataStore = InMemoryLogDateCollectionsMetadataStore()
+    val collections =
+        RepoBackedLogDateCollectionsRepository(accountRepository, identityService, signingKeyService, blockStore, metadataStore)
+    return RepoBackedLogDateMomentsRepository(
+        accountRepository,
+        signingKeyService,
+        blockStore,
+        metadataStore,
+        collections::canonicalRepoDid,
+    )
 }

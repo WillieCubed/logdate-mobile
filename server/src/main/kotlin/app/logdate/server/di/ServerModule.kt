@@ -90,8 +90,10 @@ import app.logdate.server.logdate.LogDateCollectionsMetadataStore
 import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.logdate.LogDateMediaBlobRepository
 import app.logdate.server.logdate.LogDateMediaRepository
+import app.logdate.server.logdate.LogDateMomentsRepository
 import app.logdate.server.logdate.MergeAwareLogDateCollectionsRepository
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
+import app.logdate.server.logdate.RepoBackedLogDateMomentsRepository
 import app.logdate.server.logdate.ResourceRouteRepository
 import app.logdate.server.oauth.InMemoryOAuthRuntimeStateRepository
 import app.logdate.server.oauth.InMemoryOAuthSigningKeyRepository
@@ -408,6 +410,16 @@ fun serverModule(isDatabaseAvailable: Boolean) =
         }
         single<LogDateCollectionsRepository> {
             MergeAwareLogDateCollectionsRepository(get<RepoBackedLogDateCollectionsRepository>(), get())
+        }
+        single<LogDateMomentsRepository> {
+            val collections = get<RepoBackedLogDateCollectionsRepository>()
+            RepoBackedLogDateMomentsRepository(
+                accountRepository = get(),
+                signingKeyService = get(),
+                blockStore = get(),
+                metadataStore = get(),
+                repoDidFor = collections::canonicalRepoDid,
+            )
         }
         single {
             LogDateRepoStore(

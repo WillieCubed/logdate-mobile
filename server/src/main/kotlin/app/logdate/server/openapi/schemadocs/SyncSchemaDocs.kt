@@ -398,6 +398,81 @@ internal object SyncSchemaDocs {
                         "is_deleted" to "Always `false`; deleted drafts arrive in `deletions` instead.",
                     ),
                 ),
+            // ---- Moments --------------------------------------------------------------------------
+            "MomentUploadRequest" to
+                SchemaDoc(
+                    "A whole marked moment.",
+                    mapOf(
+                        "id" to "The moment's ID. Must match the path.",
+                        "capturedAt" to "When the moment was marked. $EPOCH_MS",
+                        "lastUpdated" to "When it was last edited on the device. $EPOCH_MS",
+                        "deviceId" to DEVICE_ID,
+                        "payload" to "Everything else about the moment as one `LDSE2:` encrypted value, at most 64 KiB. $ENCRYPTED_BY_APPS",
+                        "schema" to "The version of the payload's format. Starts at `1`.",
+                    ),
+                ),
+            "MomentUploadResponse" to
+                SchemaDoc(
+                    "Confirmation that a moment was saved.",
+                    mapOf(
+                        "id" to "The moment's ID.",
+                        "serverVersion" to SERVER_VERSION_ASSIGNED,
+                        "uploadedAt" to "When the server accepted the write. $EPOCH_MS",
+                    ),
+                ),
+            "MomentUpdateRequest" to
+                SchemaDoc(
+                    "A new payload for an existing moment.",
+                    mapOf(
+                        "payload" to "The moment's new encrypted payload. $ENCRYPTED_BY_APPS",
+                        "schema" to "The version of the payload's format.",
+                        "capturedAt" to "A corrected capture time, or absent to keep the stored one. $EPOCH_MS",
+                        "lastUpdated" to "When it was edited on the device. $EPOCH_MS",
+                        "deviceId" to DEVICE_ID,
+                        "versionConstraint" to "Send `known` with the version you last saw to get `409 CONFLICT` instead of overwriting.",
+                    ),
+                ),
+            "MomentUpdateResponse" to
+                SchemaDoc(
+                    "Confirmation that a moment was updated.",
+                    mapOf(
+                        "id" to "The moment's ID.",
+                        "serverVersion" to SERVER_VERSION_ASSIGNED,
+                        "updatedAt" to "When the server accepted the write. $EPOCH_MS",
+                    ),
+                ),
+            "MomentChange" to
+                SchemaDoc(
+                    "A marked moment as the server stores it.",
+                    mapOf(
+                        "id" to "The moment's ID.",
+                        "capturedAt" to "When the moment was marked. $EPOCH_MS",
+                        "lastUpdated" to "When it was last edited on the device. $EPOCH_MS",
+                        "deviceId" to "Which device last saved it.",
+                        "payload" to "The encrypted payload. $ENCRYPTED_BY_APPS",
+                        "schema" to "The version of the payload's format.",
+                        "serverVersion" to SERVER_VERSION_ASSIGNED,
+                    ),
+                ),
+            "MomentDeletion" to
+                SchemaDoc(
+                    "A tombstone: a moment that was deleted.",
+                    mapOf(
+                        "id" to "The deleted moment's ID.",
+                        "deletedAt" to "When it was deleted. $EPOCH_MS",
+                        "serverVersion" to DELETION_VERSION,
+                    ),
+                ),
+            "MomentChangesResponse" to
+                SchemaDoc(
+                    "Moments changed or deleted since a cursor.",
+                    mapOf(
+                        "changes" to "Moments created or updated after `since`.",
+                        "deletions" to "Moments deleted after `since`.",
+                        "lastTimestamp" to CURSOR_LAST_TIMESTAMP,
+                        "hasMore" to HAS_MORE,
+                    ),
+                ),
             // ---- Media ----------------------------------------------------------------------------
             "MediaUploadResponse" to
                 SchemaDoc(

@@ -51,6 +51,7 @@ data class ServerDescriptorConfig(
                     add(ServerProtocolFeature.JOURNAL_MERGE_V1)
                     add(ServerProtocolFeature.DEVICE_LINKING_V1)
                     add(ServerProtocolFeature.CONDITIONAL_CREATE_V1)
+                    add(ServerProtocolFeature.MOMENTS_V1)
                     if (diagnosticReportsEnabled) {
                         add(ServerProtocolFeature.DIAGNOSTIC_REPORTS_V1)
                     }

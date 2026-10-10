@@ -10,6 +10,7 @@ import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateCollectionsRepository
 import app.logdate.server.logdate.LogDateMediaBlobRepository
+import app.logdate.server.logdate.LogDateMomentsRepository
 import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.routes.sync.SyncRouteConfig
 import app.logdate.server.routes.sync.diagnosticReportRoutes
@@ -17,6 +18,7 @@ import app.logdate.server.routes.sync.syncBackupRoutes
 import app.logdate.server.routes.sync.syncCollectionRoutes
 import app.logdate.server.routes.sync.syncMaintenanceRoutes
 import app.logdate.server.routes.sync.syncMediaRoutes
+import app.logdate.server.routes.sync.syncMomentRoutes
 import app.logdate.server.routes.sync.syncStatusRoutes
 import app.logdate.server.sync.MediaAccessPolicy
 import app.logdate.server.sync.SyncMetricsRegistry
@@ -30,11 +32,12 @@ import io.ktor.server.routing.Route
  *
  *  - [syncStatusRoutes] — `/ops/sync/status`, `/ops/sync/metrics`, Prometheus export.
  *  - [syncCollectionRoutes] — `/contents`, `/journals`, `/associations`, `/drafts`.
+ *  - [syncMomentRoutes] — `/moments`.
  *  - [syncMediaRoutes] — `/media` CRUD + binary download.
  *  - [syncBackupRoutes] — `/backups` CRUD + binary download.
  *  - [syncMaintenanceRoutes] — `/ops/sync/tombstones:purge`, `/ops/backups:purge`.
  *
- * The data routes (status, collections, media) accept a linked device token through
+ * The data routes (status, collections, moments, media) accept a linked device token through
  * [accessTokenVerifier]; every other route needs a full-access token. Without an explicit verifier,
  * linked device tokens are refused everywhere.
  *
@@ -56,10 +59,12 @@ fun Route.syncRoutes(
     rateLimiter: SlidingWindowRateLimiter? = SlidingWindowRateLimiter(),
     diagnosticReportService: DiagnosticReportService? = null,
     accessTokenVerifier: AccessTokenVerifier? = tokenService?.let { AccessTokenVerifier(it, DeviceSessionGuard.Disabled) },
+    momentsRepository: LogDateMomentsRepository? = null,
 ) {
     val config = SyncRouteConfig(mediaAccessPolicy = mediaAccessPolicy)
     syncStatusRoutes(tokenService, accessTokenVerifier, metrics, collectionsRepository)
     syncCollectionRoutes(accessTokenVerifier, metrics, collectionsRepository)
+    if (momentsRepository != null) syncMomentRoutes(accessTokenVerifier, metrics, momentsRepository)
     syncMediaRoutes(
         accessTokenVerifier = accessTokenVerifier,
         mediaStorage = mediaStorage,

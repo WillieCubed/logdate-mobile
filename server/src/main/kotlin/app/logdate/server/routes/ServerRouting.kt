@@ -27,6 +27,7 @@ import app.logdate.server.logdate.CompositeLogDateMediaBlobRepository
 import app.logdate.server.logdate.LogDateBackupRepository
 import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateCollectionsRepository
+import app.logdate.server.logdate.LogDateMomentsRepository
 import app.logdate.server.logdate.ResourceRouteRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
@@ -184,6 +185,7 @@ internal fun Application.contentApiRoutes() {
     val resourceRouteRepository by inject<ResourceRouteRepository>()
     val httpClient by inject<HttpClient>()
     val accessTokenVerifier by inject<AccessTokenVerifier>()
+    val momentsRepository by inject<LogDateMomentsRepository>()
     val syncRateLimiter = SlidingWindowRateLimiter()
 
     routing {
@@ -206,6 +208,7 @@ internal fun Application.contentApiRoutes() {
                                 .DiagnosticReportService(diagnosticReportStore, it)
                         },
                 accessTokenVerifier = accessTokenVerifier,
+                momentsRepository = momentsRepository,
             )
             quotaRoutes(
                 tokenService = tokenService,

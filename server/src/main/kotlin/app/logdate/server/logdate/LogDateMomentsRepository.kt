@@ -4,7 +4,7 @@ import app.logdate.shared.model.sync.DeviceId
 import java.util.UUID
 
 /**
- * A marked moment as the server stores it. [payload] is one client-encrypted `LDSE2:` value holding
+ * A marked moment as the server stores it. [payload] is one client-encrypted `LDSE2:` value containing
  * everything but the times; the server never reads it. [schema] versions that payload.
  */
 data class LogDateMoment(
@@ -24,7 +24,7 @@ data class LogDateMomentDeletion(
 )
 
 /**
- * Marked moments live in their own collection: the entry and journal feeds never carry them, so clients
+ * Marked moments live in their own collection: the entry and journal feeds never include them, so clients
  * that do not know moments never download one.
  */
 interface LogDateMomentsRepository {

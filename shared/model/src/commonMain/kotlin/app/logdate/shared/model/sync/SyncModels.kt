@@ -401,3 +401,70 @@ data class DraftChange(
     @SerialName("is_deleted")
     val isDeleted: Boolean = false,
 )
+
+// --- Marked moment sync models ---
+
+/**
+ * A marked moment: a point in time someone flagged, usually with one tap on the watch, to fill in later.
+ * Everything about it except the times is in [payload], encrypted on the device (`LDSE2:`); [schema]
+ * versions that payload. All times are milliseconds since epoch (UTC).
+ */
+@Serializable
+data class MomentUploadRequest(
+    val id: String,
+    val capturedAt: Long,
+    val lastUpdated: Long,
+    val deviceId: DeviceId = DeviceId.UNKNOWN,
+    val payload: String,
+    val schema: Int = 1,
+)
+
+@Serializable
+data class MomentUploadResponse(
+    val id: String,
+    val serverVersion: Long,
+    val uploadedAt: Long,
+)
+
+@Serializable
+data class MomentUpdateRequest(
+    val payload: String,
+    val schema: Int = 1,
+    val capturedAt: Long? = null,
+    val lastUpdated: Long,
+    val deviceId: DeviceId = DeviceId.UNKNOWN,
+    val versionConstraint: VersionConstraint = VersionConstraint.None,
+)
+
+@Serializable
+data class MomentUpdateResponse(
+    val id: String,
+    val serverVersion: Long,
+    val updatedAt: Long,
+)
+
+@Serializable
+data class MomentChange(
+    val id: String,
+    val capturedAt: Long,
+    val lastUpdated: Long,
+    val deviceId: DeviceId,
+    val payload: String,
+    val schema: Int,
+    val serverVersion: Long,
+)
+
+@Serializable
+data class MomentDeletion(
+    val id: String,
+    val deletedAt: Long,
+    val serverVersion: Long,
+)
+
+@Serializable
+data class MomentChangesResponse(
+    val changes: List<MomentChange>,
+    val deletions: List<MomentDeletion>,
+    val lastTimestamp: Long,
+    val hasMore: Boolean = false,
+)
