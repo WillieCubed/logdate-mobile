@@ -9,7 +9,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyShortcut
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.MenuBar
@@ -17,7 +16,10 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
 import app.logdate.feature.core.AppViewModel
 import app.logdate.feature.core.GlobalAppUiLoadedState
+import app.logdate.navigation.AppShortcutRequests
 import app.logdate.navigation.LogDateNavDisplay
+import app.logdate.ui.keyboard.AppKeyboardShortcut
+import app.logdate.ui.keyboard.KeyChord
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -34,6 +36,7 @@ internal fun MainWindow(
     state: MainWindowState = rememberMainWindowState(appState),
 ) {
     val preferences = remember { DesktopWindowPreferences() }
+    val shortcutRequests = remember { AppShortcutRequests() }
     val windowState =
         rememberWindowState(
             size = preferences.readMainWindowSize(DEFAULT_MAIN_WINDOW_SIZE),
@@ -64,30 +67,36 @@ internal fun MainWindow(
         // JVM's default Quit handler would skip every editor's save-before-close.
         MenuBar {
             Menu(text = "File", mnemonic = 'F') {
+                ShortcutItems(listOf(AppKeyboardShortcut.NewEntry, AppKeyboardShortcut.RecordVoice), shortcutRequests::request)
+                Separator()
                 Item(
-                    text = "Close Window",
-                    shortcut = KeyShortcut(Key.W, meta = true),
+                    text = "Close window",
+                    shortcut = KeyChord(Key.W, primary = true).toKeyShortcut(),
                     onClick = { appState.closeWindow(state) },
                 )
                 Separator()
                 Item(
                     text = "Quit LogDate",
-                    shortcut = KeyShortcut(Key.Q, meta = true),
+                    shortcut = KeyChord(Key.Q, primary = true).toKeyShortcut(),
                     onClick = appState::exit,
                 )
                 // Only surfaced while the cascade is fanning out so the keyboard shortcut and
                 // menu both vanish back to normal once there's nothing to cancel.
                 if (appState.exitCascadeInFlight) {
                     Item(
-                        text = "Cancel Quit",
-                        shortcut = KeyShortcut(Key.Period, meta = true),
+                        text = "Cancel quit",
+                        shortcut = KeyChord(Key.Period, primary = true).toKeyShortcut(),
                         onClick = appState::cancelExit,
                     )
                 }
             }
+            Menu(text = "Go", mnemonic = 'G') {
+                ShortcutItems(listOf(AppKeyboardShortcut.Search, AppKeyboardShortcut.Settings), shortcutRequests::request)
+            }
         }
         MainWindowContent(
             onOpenEditor = onOpenEditor,
+            shortcutRequests = shortcutRequests,
         )
     }
 }
@@ -99,6 +108,7 @@ internal fun MainWindow(
 @Composable
 private fun MainWindowContent(
     onOpenEditor: () -> Unit,
+    shortcutRequests: AppShortcutRequests,
     viewModel: AppViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -107,6 +117,7 @@ private fun MainWindowContent(
     LogDateNavDisplay(
         appUiState = loadedState,
         onShowUnlockPrompt = viewModel::showNativeUnlockPrompt,
+        shortcutRequests = shortcutRequests,
     )
 }
 

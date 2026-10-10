@@ -16,7 +16,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.KeyShortcut
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.DpSize
@@ -31,6 +30,7 @@ import app.logdate.feature.editor.ui.editor.EntryEditorViewModel
 import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
+import app.logdate.ui.keyboard.KeyChord
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -141,22 +141,22 @@ internal fun EntryEditorWindow(
         MenuBar {
             Menu(text = "File", mnemonic = 'F') {
                 Item(
-                    text = "Close Window",
-                    shortcut = KeyShortcut(Key.W, meta = true),
+                    text = "Close window",
+                    shortcut = KeyChord(Key.W, primary = true).toKeyShortcut(),
                     onClick = handleClose,
                 )
                 Separator()
                 Item(
                     text = "Quit LogDate",
-                    shortcut = KeyShortcut(Key.Q, meta = true),
+                    shortcut = KeyChord(Key.Q, primary = true).toKeyShortcut(),
                     onClick = appState::exit,
                 )
                 // Cmd+. mirrors macOS's standard "cancel current operation"; only rendered while
                 // a quit is fanning out, so the shortcut and menu disappear once it's irrelevant.
                 if (appState.exitCascadeInFlight) {
                     Item(
-                        text = "Cancel Quit",
-                        shortcut = KeyShortcut(Key.Period, meta = true),
+                        text = "Cancel quit",
+                        shortcut = KeyChord(Key.Period, primary = true).toKeyShortcut(),
                         onClick = appState::cancelExit,
                     )
                 }

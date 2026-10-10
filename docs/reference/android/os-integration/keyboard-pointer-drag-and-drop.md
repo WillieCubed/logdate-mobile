@@ -2,11 +2,10 @@
 
 Status: partial.
 
-- **Built:** the shared shortcut catalog (Compose handlers and Android's Meta+/ helper), right-click
-  menus at the pointer, tooltips on the workspace account button, dropping text and media from other
-  apps into the editor, and dragging photos and videos out as real files.
-- **Planned:** desktop menu bar entries from the catalog, a new-window shortcut, and stylus
-  verification.
+- **Built:** the shared shortcut catalog (Compose handlers, Android's Meta+/ helper, and the desktop
+  menu bar), right-click menus at the pointer, tooltips on the workspace account button, dropping
+  text and media from other apps into the editor, and dragging photos and videos out as real files.
+- **Planned:** a new-window shortcut and stylus verification.
 
 ## What it is
 
@@ -86,8 +85,13 @@ it, so a shortcut is defined once:
 4. **Home**, whose `HomeScreen` handles the `Home` scope. Each tab shortcut carries a `homeTabIndex`,
    counted in the visible tabs, so Ctrl+4 still opens the fourth tab shown when Library is hidden.
 
-Desktop builds get the `App` shortcuts through the same Compose handler. Listing them in the desktop
-`MenuBar` is planned.
+Desktop builds get the `App` shortcuts through the same Compose handler, and the main window's menu
+bar lists them: New entry and Record a voice entry under File, Search and Settings under Go.
+`ShortcutItems` (app/compose-main desktopMain) labels each item and binds its accelerator from the
+catalog, with Command as the primary modifier on macOS and Ctrl elsewhere. A menu item does not open
+a screen itself; it sends the shortcut through `AppShortcutRequests` to `LogDateNavDisplay`, which
+opens it with the same code as the keys (`AppKeyboardShortcut.appRoute`), so a menu item and its keys
+cannot disagree, and both do nothing while LogDate is locked.
 
 The editor's shortcuts are scoped to the editor, so they never fight with text editing keys.
 

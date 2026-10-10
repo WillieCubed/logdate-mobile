@@ -12,6 +12,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -52,7 +53,6 @@ import app.logdate.feature.core.settings.navigation.WatchTroubleshootingRoute
 import app.logdate.feature.core.settings.navigation.settingsEntries
 import app.logdate.feature.core.settings.navigation.watchEntries
 import app.logdate.feature.core.sync.navigation.syncIssuesEntry
-import app.logdate.feature.editor.navigation.EditorLaunchMode
 import app.logdate.feature.editor.navigation.EntryEditorRoute
 import app.logdate.feature.editor.navigation.editorEntry
 import app.logdate.feature.events.navigation.EventDetailRoute
@@ -126,6 +126,7 @@ fun LogDateNavDisplay(
     onShareSearchResult: ((SearchResult) -> Unit)? = null,
     onCloudSignIn: () -> Unit = {},
     sceneStrategy: SceneStrategy<NavKey> = rememberHomeSceneStrategy(),
+    shortcutRequests: AppShortcutRequests? = null,
 ) {
     val workspaceFlags: FeatureFlagStore = koinInject()
     val workspaceEnabled by remember(workspaceFlags) { workspaceFlags.observe(FeatureFlag.HOME_WORKSPACE_V2) }
@@ -182,6 +183,24 @@ fun LogDateNavDisplay(
         }
     }
 
+    val currentAppUiState by rememberUpdatedState(appUiState)
+    // Opens an app-wide shortcut's screen, from its keys or from a request such as a menu item.
+    val openShortcut: (AppKeyboardShortcut) -> Boolean =
+        remember(backStack) {
+            { shortcut ->
+                val target = shortcut.appRoute()
+                if (target == null || currentAppUiState.requiresUnlock || !currentAppUiState.isOnboarded) {
+                    false
+                } else {
+                    if (backStack.lastOrNull() != target) backStack.add(target)
+                    true
+                }
+            }
+        }
+    LaunchedEffect(shortcutRequests) {
+        shortcutRequests?.requests?.collect { openShortcut(it) }
+    }
+
     val haptics = rememberPlatformHapticsController()
     val reduceMotion = rememberSystemReduceMotion()
     val logDateHaptics = remember(haptics) { DefaultLogDateHaptics(haptics) { reduceMotion.value } }
@@ -211,20 +230,7 @@ fun LogDateNavDisplay(
                                         enabled = backStack.size > 1,
                                         onBack = { backStack.removeLastOrNull() },
                                     ).onPreviewKeyEvent { event ->
-                                        val target =
-                                            when (AppKeyboardShortcut.match(event, AppShortcutScope.App)) {
-                                                AppKeyboardShortcut.NewEntry -> EntryEditorRoute()
-                                                AppKeyboardShortcut.RecordVoice -> EntryEditorRoute(launchMode = EditorLaunchMode.Voice)
-                                                AppKeyboardShortcut.Search -> SearchRoute()
-                                                AppKeyboardShortcut.Settings -> SettingsRoute()
-                                                else -> null
-                                            }
-                                        if (target == null || appUiState.requiresUnlock || !appUiState.isOnboarded) {
-                                            false
-                                        } else {
-                                            if (backStack.lastOrNull() != target) backStack.add(target)
-                                            true
-                                        }
+                                        AppKeyboardShortcut.match(event, AppShortcutScope.App)?.let(openShortcut) ?: false
                                     },
                             entryDecorators =
                                 listOf(
