@@ -249,6 +249,28 @@ class OsSurfaceScreenshotsTest {
         // The labels Android holds for each window, which the caption bar and Recents may show.
         val labels = OsSurfaceCapture.shell("dumpsys activity activities").lines().filter { "taskDescription: label" in it }
         OsSurfaceCapture.writeEvidence("large-screens-and-desktop-windowing", "desktop-window-labels", labels.joinToString("\n") { it.trim() })
+
+        // Writing names the new window after the entry's first line. Android 17's Alt+Tab switcher
+        // reads each window out by that name, which tells two editor windows apart.
+        OsSurfaceCapture.waitForText("Write something").click()
+        OsSurfaceCapture.waitForText("What's on your mind?")
+        OsSurfaceCapture.device.findObject(By.clazz("android.widget.EditText")).text = WINDOW_TITLE_ENTRY
+        Thread.sleep(1_500L)
+        // The switcher keeps the names it last read and reads them again when the window order
+        // changes, so the Journals window comes forward first.
+        OsSurfaceCapture.shell("am start --windowingMode $WINDOWING_MODE_FREEFORM -n ${OsSurfaceCapture.packageName}/app.logdate.client.MainActivity")
+        Thread.sleep(1_500L)
+        HardwareKeyboard().use { keyboard ->
+            keyboard.hold(HardwareKeyboard.KEY_LEFTALT, HardwareKeyboard.KEY_TAB)
+            keyboard.release(HardwareKeyboard.KEY_TAB)
+            checkNotNull(OsSurfaceCapture.device.wait(Until.findObject(By.desc(SWITCHER_ITEM)), 5_000L)) { "Alt+Tab did not open the switcher" }
+            Thread.sleep(1_000L)
+            val names = OsSurfaceCapture.device.findObjects(By.desc(SWITCHER_ITEM)).map { it.contentDescription }
+            OsSurfaceCapture.capture(surface = "large-screens-and-desktop-windowing", state = "alt-tab-switcher")
+            OsSurfaceCapture.writeEvidence("large-screens-and-desktop-windowing", "alt-tab-window-names", names.joinToString("\n"))
+            keyboard.release(HardwareKeyboard.KEY_LEFTALT)
+            check(names.any { "LogDate $WINDOW_TITLE_ENTRY" in it }) { "The switcher did not name the editor window by its entry: $names" }
+        }
     }
 
     /**
@@ -801,6 +823,8 @@ class OsSurfaceScreenshotsTest {
 
         /** The Files app, opened at Downloads, for the cross-app drag. */
         const val EDITOR_ACTIVITY = "app.logdate.client.EditorActivity"
+        const val WINDOW_TITLE_ENTRY = "Ferry to Cacilhas at sunset"
+        val SWITCHER_ITEM: Pattern = Pattern.compile(".*release key bindings to select.*")
         const val EXTRA_HANDOFF_DRAFT_ID = "app.logdate.extra.HANDOFF_DRAFT_ID"
         const val HANDOFF_ENTRY = "Halfway up the ridge trail and the fog is finally lifting. Finishing this at home."
         const val GBOARD_PACKAGE = "com.google.android.inputmethod.latin"

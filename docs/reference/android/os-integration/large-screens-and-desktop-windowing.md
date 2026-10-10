@@ -29,8 +29,10 @@ covers the window and system side.
 - **Resizing.** A window can be resized, docked to a keyboard, or bubbled without losing what is on
   screen.
 - **Window titles.** Each editor window carries its entry's first line as its label ("New entry" until
-  there is text). Android 17's desktop caption bar shows the app's name, LogDate, instead of that
-  label, so the label is not visible there.
+  there is text). Android 17 uses it in the Alt+Tab window switcher, where screen readers announce
+  each window as "LogDate" and its label, so two editor windows can be told apart without looking.
+  The desktop caption bar, Manage Windows, and Recents show the app's name and window thumbnails
+  instead, so the label is not printed anywhere on screen.
 - **New windows.** A journal's menu (its overflow menu, a long-press, or a right-click on its cover)
   offers "New entry in a new window", and an entry in a day offers "Open in new window" on a
   long-press or right-click. Either opens the editor beside LogDate in split screen when there is
@@ -94,7 +96,11 @@ still reloads correctly.
   window to place the editor beside and opens it full screen.
 - `EditorActivity` calls `setTaskDescription` with the entry's first line, which Android records as
   the window's label. The desktop capture saves the labels Android holds
-  (`desktop-window-labels--tablet-api37.txt`): the editor window's is "New entry".
+  (`desktop-window-labels--tablet-api37.txt`): the editor window's is "New entry". It then types a
+  first line into that window, holds Alt+Tab on a virtual USB keyboard, and saves what the switcher
+  announces for each window (`alt-tab-window-names--tablet-api37.txt`); the test fails unless the
+  editor window is announced by its first line. The switcher reads labels again only when the window
+  order changes, so the test brings the Journals window forward before pressing Alt+Tab.
 
 ### The caption bar
 
@@ -146,14 +152,20 @@ The main window, and a new entry opened from a journal's menu as a second window
 
 ![Two LogDate windows on the Android desktop, the editor in front of the Journals window, whose title bar holds Home's search and account button, with LogDate in the taskbar](../../../screenshots/android-os-integration/large-screens-and-desktop-windowing/desktop-windows--tablet-api37.png)
 
+Alt+Tab with an entry started in the editor window. The switcher shows thumbnails; its spoken names
+are in `alt-tab-window-names--tablet-api37.txt`:
+
+![Android's Alt+Tab window switcher over the desktop, listing LogDate's editor and Journals windows as thumbnails](../../../screenshots/android-os-integration/large-screens-and-desktop-windowing/alt-tab-switcher--tablet-api37.png)
+
 ## Flag and rollout
 
 None. These are platform requirements and fixes.
 
 ## Privacy
 
-An editor window's label holds the first line of its entry. Android 17 does not show it in the caption
-bar or Recents, but a launcher that lists task labels would, as it would for any document app.
+An editor window's label holds the first line of its entry. Android 17 does not print it in the
+caption bar, Manage Windows, or Recents, but a screen reader speaks it in the Alt+Tab switcher, and a
+launcher that lists task labels would show it, as it would for any document app.
 
 ## How to test
 

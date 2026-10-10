@@ -42,6 +42,18 @@ class HardwareKeyboard : AutoCloseable {
         send("""{"id": $DEVICE_ID, "command": "inject", "events": [${events.joinToString()}]}""")
     }
 
+    /** Presses [keys] in order and keeps them held until [release]. */
+    fun hold(vararg keys: Int) {
+        val events = keys.flatMap { listOf(EV_KEY, it, 1, EV_SYN, SYN_REPORT, 0) }
+        send("""{"id": $DEVICE_ID, "command": "inject", "events": [${events.joinToString()}]}""")
+    }
+
+    /** Lets go of [keys], in order. */
+    fun release(vararg keys: Int) {
+        val events = keys.flatMap { listOf(EV_KEY, it, 0, EV_SYN, SYN_REPORT, 0) }
+        send("""{"id": $DEVICE_ID, "command": "inject", "events": [${events.joinToString()}]}""")
+    }
+
     override fun close() {
         // Closing standard input ends `uinput`, which unplugs the keyboard.
         commands.close()
@@ -55,7 +67,9 @@ class HardwareKeyboard : AutoCloseable {
     }
 
     companion object {
+        const val KEY_TAB = 15
         const val KEY_V = 47
+        const val KEY_LEFTALT = 56
         const val KEY_SLASH = 53
         const val KEY_LEFTCTRL = 29
         const val KEY_LEFTMETA = 125

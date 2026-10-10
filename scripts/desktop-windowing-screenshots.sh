@@ -12,6 +12,7 @@
 #
 # Usage:
 #   scripts/desktop-windowing-screenshots.sh
+#   DESKTOP_TEST=desktopWindows scripts/desktop-windowing-screenshots.sh
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -24,7 +25,8 @@ IMAGE="system-images;android-37.0;google_apis_ps16k;arm64-v8a"
 PORT=5580
 SERIAL="emulator-$PORT"
 APP_ID="studio.hypertext.logdate.debug"
-TESTS=(desktopWindows crossAppDrag dragPhotoBetweenWindows)
+# DESKTOP_TEST runs one test method, or several separated by commas, instead of all three.
+IFS=',' read -r -a TESTS <<<"${DESKTOP_TEST:-desktopWindows,crossAppDrag,dragPhotoBetweenWindows}"
 TEST_CLASS="$(printf 'app.logdate.client.e2e.osintegration.OsSurfaceScreenshotsTest#%s,' "${TESTS[@]}")"
 TEST_CLASS="${TEST_CLASS%,}"
 DEVICE_OUTPUT="/sdcard/Android/media/$APP_ID/additional_test_output"
@@ -99,7 +101,7 @@ while IFS= read -r -d '' image; do
     copied=$((copied + 1))
 done < <(find "$staging/os-integration" \( -name '*.png' -o -name '*.txt' \) -not -path '*/failures/*' -print0 2>/dev/null)
 
-if ! grep -q "OK (${#TESTS[@]} tests)" <<<"$instrument_output" || [[ $copied -eq 0 ]]; then
+if ! grep -Eq "OK \(${#TESTS[@]} tests?\)" <<<"$instrument_output" || [[ $copied -eq 0 ]]; then
     echo "The desktop windowing capture did not complete. Failure captures, if any, are in $staging." >&2
     exit 1
 fi

@@ -105,6 +105,8 @@ keyboard-shortcuts|system|docs/screenshots/android-os-integration/keyboard-point
 # Desktop windowing: two LogDate windows on the Android 17 desktop, and the labels Android holds for them.
 desktop-windowing|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/desktop-windows--tablet-api37.png
 desktop-windowing|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/desktop-window-labels--tablet-api37.txt
+desktop-windowing|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/alt-tab-switcher--tablet-api37.png
+desktop-windowing|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/alt-tab-window-names--tablet-api37.txt
 
 # Caption bar: Home's search and account button in a desktop window's caption bar.
 caption-bar|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/caption-bar--tablet-api37.png
