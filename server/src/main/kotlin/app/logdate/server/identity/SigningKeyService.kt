@@ -3,8 +3,6 @@ package app.logdate.server.identity
 import kotlinx.serialization.Serializable
 import studio.hypertext.atproto.crypto.EcCurve
 import studio.hypertext.atproto.crypto.EcKeySupport
-import java.nio.ByteBuffer
-import java.security.MessageDigest
 import java.security.PrivateKey
 import java.security.SecureRandom
 import javax.crypto.Cipher
@@ -24,9 +22,10 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class, ExperimentalEncodingApi::class)
 class SigningKeyService(
     private val repository: SigningKeyRepository,
-    private val encryptionKeySeed: String,
+    encryptionKeySeed: String,
 ) {
     private val secureRandom = SecureRandom()
+    private val atRestCipher = AtRestKeyCipher(encryptionKeySeed, secureRandom)
 
     fun generateKeyPair(curve: EcCurve = DEFAULT_SIGNING_CURVE): GeneratedSigningKey {
         val keyPair = EcKeySupport.generateKeyPair(curve = curve, secureRandom = secureRandom)
@@ -84,19 +83,8 @@ class SigningKeyService(
         )
     }
 
-    fun decryptPrivateKey(record: StoredSigningKey): PrivateKey {
-        val encoded = Base64.decode(record.privateKeyEncrypted)
-        val buffer = ByteBuffer.wrap(encoded)
-        val iv = ByteArray(GCM_IV_SIZE)
-        buffer.get(iv)
-        val cipherText = ByteArray(buffer.remaining())
-        buffer.get(cipherText)
-
-        val cipher = Cipher.getInstance(AES_GCM_TRANSFORMATION)
-        cipher.init(Cipher.DECRYPT_MODE, aesKey(), GCMParameterSpec(GCM_TAG_BITS, iv))
-        val privateKeyBytes = cipher.doFinal(cipherText)
-        return EcKeySupport.decodePrivateKey(privateKeyBytes)
-    }
+    fun decryptPrivateKey(record: StoredSigningKey): PrivateKey =
+        EcKeySupport.decodePrivateKey(atRestCipher.decrypt(record.privateKeyEncrypted))
 
     fun decryptExportedKey(
         exportedKey: ExportedSigningKey,
@@ -179,18 +167,7 @@ class SigningKeyService(
             createdAt = Clock.System.now(),
         )
 
-    private fun encryptPrivateKey(privateKeyPkcs8: ByteArray): String {
-        val iv = ByteArray(GCM_IV_SIZE).also(secureRandom::nextBytes)
-        val cipher = Cipher.getInstance(AES_GCM_TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, aesKey(), GCMParameterSpec(GCM_TAG_BITS, iv))
-        val cipherText = cipher.doFinal(privateKeyPkcs8)
-        return Base64.encode(iv + cipherText)
-    }
-
-    private fun aesKey(): SecretKeySpec {
-        val digest = MessageDigest.getInstance(SHA_256_ALGORITHM).digest(encryptionKeySeed.toByteArray())
-        return SecretKeySpec(digest, AES_ALGORITHM)
-    }
+    private fun encryptPrivateKey(privateKeyPkcs8: ByteArray): String = atRestCipher.encrypt(privateKeyPkcs8)
 
     private fun exportAesKey(
         passphrase: String,
@@ -224,7 +201,6 @@ class SigningKeyService(
         private val DEFAULT_SIGNING_CURVE: EcCurve = EcCurve.K256
         private const val AES_ALGORITHM = "AES"
         private const val AES_GCM_TRANSFORMATION = "AES/GCM/NoPadding"
-        private const val SHA_256_ALGORITHM = "SHA-256"
         private const val PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256"
         private const val GCM_IV_SIZE = 12
         private const val GCM_TAG_BITS = 128

@@ -216,13 +216,13 @@ These development/test-only variables provide the local PostgreSQL fallback when
   - Rotate periodically. Hosted AT Protocol signing keys are encrypted with `ATPROTO_SIGNING_KEY_KEK`, and AT Protocol session tokens are signed with `ATPROTO_SESSION_SECRET`, so rotating this secret affects neither.
 
 ### `ATPROTO_SIGNING_KEY_KEK`
-- **Description**: The secret that encrypts each account's hosted AT Protocol signing key at rest (a *key-encryption key*). The server derives an AES-256 key from it to wrap the private keys stored in the database, and unwraps them whenever it signs a repository commit, a PLC operation or a key export.
+- **Description**: The secret that encrypts the server's stored private keys at rest (a *key-encryption key*): each account's hosted AT Protocol signing key, and the key that signs OAuth access tokens for third-party AT Protocol apps. The server derives an AES-256 key from it to wrap the private keys stored in the database, and unwraps them whenever it signs a repository commit, a PLC operation, a key export or an OAuth access token.
 - **Type**: String (minimum 32 characters in production). The value is used byte for byte, including any trailing newline.
 - **Default**: None in production. Development and test fall back to a fixed value published in the source code, which only ever protects keys on a developer's machine.
 - **Example**: `ATPROTO_SIGNING_KEY_KEK=$(openssl rand -base64 48)`
 - **Required**: **Yes, in production.** `LOGDATE_ENV=production` refuses to start without it. The server never falls back to `JWT_SECRET`.
 - **Security**:
-  - A different value leaves every stored signing key unreadable: commits, PLC operations and key exports fail. Never change it in place. Moving to a new value means re-encrypting every stored key first.
+  - A different value leaves every stored signing key unreadable: commits, PLC operations and key exports fail, and so does every OAuth access token for third-party apps. Never change it in place. Moving to a new value means re-encrypting every stored key first.
   - Before this variable existed, deployed servers encrypted signing keys with `JWT_SECRET`. An existing deployment must therefore start this secret from the **exact bytes** of the `JWT_SECRET` version it has been running with. Copy the version byte for byte, then compare SHA-256 digests of the two versions before deploying.
   - A new deployment with no stored keys uses a fresh random value, independent of `JWT_SECRET`.
   - Store in a secret manager; never commit.

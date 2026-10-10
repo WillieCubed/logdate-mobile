@@ -49,6 +49,7 @@ import app.logdate.server.database.PostgreSQLLogDateBackupRepository
 import app.logdate.server.database.PostgreSQLLogDateCollectionsMetadataStore
 import app.logdate.server.database.PostgreSQLLogDateMediaRepository
 import app.logdate.server.database.PostgreSQLOAuthRuntimeStateRepository
+import app.logdate.server.database.PostgreSQLOAuthSigningKeyRepository
 import app.logdate.server.database.PostgreSQLPendingEmailVerificationRepository
 import app.logdate.server.database.PostgreSQLRefreshTokenRevocationRepository
 import app.logdate.server.database.PostgreSQLRepoBlockStore
@@ -85,6 +86,7 @@ import app.logdate.server.logdate.LogDateMediaRepository
 import app.logdate.server.logdate.RepoBackedLogDateCollectionsRepository
 import app.logdate.server.logdate.ResourceRouteRepository
 import app.logdate.server.oauth.InMemoryOAuthRuntimeStateRepository
+import app.logdate.server.oauth.InMemoryOAuthSigningKeyRepository
 import app.logdate.server.oauth.OAuthAccessTokenService
 import app.logdate.server.oauth.OAuthAuthorizationService
 import app.logdate.server.oauth.OAuthClientMetadataResolver
@@ -93,6 +95,7 @@ import app.logdate.server.oauth.OAuthDpopVerifier
 import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthNonceService
 import app.logdate.server.oauth.OAuthRuntimeStateRepository
+import app.logdate.server.oauth.OAuthSigningKeyRepository
 import app.logdate.server.sync.DbLocationHistoryRepository
 import app.logdate.server.sync.DbSyncRepository
 import app.logdate.server.sync.GcsMediaStorage
@@ -276,7 +279,15 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             )
         }
         single { HttpClient(OkHttp) }
-        single { OAuthKeyService() }
+        single<OAuthSigningKeyRepository> {
+            if (isDatabaseAvailable) PostgreSQLOAuthSigningKeyRepository() else InMemoryOAuthSigningKeyRepository()
+        }
+        single {
+            OAuthKeyService(
+                repository = get(),
+                encryptionKeySeed = AtprotoSigningKeyKek.resolve(),
+            )
+        }
         single { OAuthNonceService() }
         single { OAuthDpopVerifier() }
         single<OAuthRuntimeStateRepository> {

@@ -114,6 +114,16 @@ object OAuthAuthorizationCodesTable : Table("oauth_authorization_codes") {
     override val primaryKey = PrimaryKey(code)
 }
 
+object OAuthSigningKeysTable : Table("oauth_signing_keys") {
+    val slot = varchar("slot", 32)
+    val keyId = varchar("key_id", 255)
+    val privateKeyEncrypted = text("private_key_encrypted")
+    val publicKeySpki = text("public_key_spki")
+    val createdAt = timestamp("created_at")
+
+    override val primaryKey = PrimaryKey(slot)
+}
+
 object OAuthRefreshTokensTable : Table("oauth_refresh_tokens") {
     val token = varchar("token", 255)
     val clientId = text("client_id")
