@@ -72,8 +72,9 @@
         </service>
 
         <!--
-            Data Layer listener: receives notes, journals, associations and remote camera updates from
-            the paired phone. Play services delivers only events whose path is listed here.
+            Data Layer listener: receives notes, journals, associations, remote camera updates and the
+            phone's state document from the paired phone. Play services delivers only events whose
+            path is listed here.
         -->
         <service
             android:name=".sync.WearDataLayerListenerService"
@@ -96,6 +97,10 @@
                     android:scheme="wear"
                     android:host="*"
                     android:pathPrefix="/logdate/camera" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:path="/logdate/state" />
             </intent-filter>
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />

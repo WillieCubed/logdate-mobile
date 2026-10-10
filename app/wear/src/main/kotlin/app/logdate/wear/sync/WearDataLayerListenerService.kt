@@ -13,8 +13,11 @@ import app.logdate.client.sync.datalayer.AssociationDataMapper
 import app.logdate.client.sync.datalayer.JournalDataMapper
 import app.logdate.client.sync.datalayer.RemoteCameraCaptureResultDataMapper
 import app.logdate.client.sync.datalayer.RemoteCameraDeviceDataMapper
+import app.logdate.client.sync.datalayer.v2.WearPaths
+import app.logdate.client.sync.peer.state.StateDocumentCodec
 import app.logdate.wear.presentation.camera.WearRemoteCameraCaptureResultStore
 import app.logdate.wear.presentation.camera.WearRemoteCameraDeviceStore
+import app.logdate.wear.sync.v2.WatchStateMirror
 import com.google.android.gms.wearable.CapabilityInfo
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -37,7 +40,7 @@ import kotlinx.coroutines.withContext
 /**
  * Receives data items from the paired phone via the Wear Data Layer API.
  *
- * Handles notes, journals, and journal-content associations.
+ * Handles notes, journals, journal-content associations, and the phone's state document.
  * Uses [SyncableJournalNotesRepository.createFromSync] (and equivalents) to
  * avoid re-triggering outbound sync.
  *
@@ -105,6 +108,7 @@ class WearDataLayerListenerService : WearableListenerService() {
                     RemoteCameraCaptureResultDataMapper.PATH_CAMERA_CAPTURE_RESULT -> {
                         handleRemoteCameraCaptureResult(event.data)
                     }
+                    WearPaths.STATE -> mirrorPhoneState(event, localNodeId)
                     else -> syncEvents.add(event)
                 }
             }
@@ -157,6 +161,25 @@ class WearDataLayerListenerService : WearableListenerService() {
 
     private fun handleRemoteCameraCaptureResult(stringMap: Map<String, String>) {
         WearRemoteCameraCaptureResultStore.publish(RemoteCameraCaptureResultDataMapper.fromDataMap(stringMap))
+    }
+
+    private suspend fun mirrorPhoneState(
+        event: SnapshotDataEvent,
+        localNodeId: String?,
+    ) {
+        val sourceNodeId = event.sourceNodeId
+        if (sourceNodeId == null) {
+            Napier.w("A state document arrived without the node that wrote it; ignoring it")
+            return
+        }
+        val koin = resolveKoin()
+        if (koin == null) {
+            Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries; the phone's state is read again when LogDate next starts")
+            return
+        }
+        withContext(NonCancellable) {
+            koin.get<WatchStateMirror>().onPhoneDocument(sourceNodeId, localNodeId, StateDocumentCodec.fromDataMap(event.data))
+        }
     }
 
     private suspend fun handleNoteDelete(

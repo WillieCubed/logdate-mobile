@@ -21,7 +21,7 @@ private const val INTRO = "These features are unfinished."
 private const val SECTION = "Unreleased features"
 private const val EMPTY = "No unreleased features to try."
 private const val WATCH_TITLE = "Redesigned watch app"
-private const val WATCH_DESCRIPTION = "The new watch app and its phone screens. Applies to this phone only."
+private const val WATCH_DESCRIPTION = "The new watch app and its phone screens, on this phone and your watch."
 
 /**
  * The Labs page is the only place a tester can turn an unreleased feature on in a release build, so

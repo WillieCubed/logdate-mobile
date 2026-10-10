@@ -7,5 +7,5 @@
     <string name="labs_section_unreleased">Unreleased features</string>
     <string name="labs_empty">No unreleased features to try.</string>
     <string name="labs_watch_experience_title">Redesigned watch app</string>
-    <string name="labs_watch_experience_description">The new watch app and its phone screens. Applies to this phone only.</string>
+    <string name="labs_watch_experience_description">The new watch app and its phone screens, on this phone and your watch.</string>
 </resources>

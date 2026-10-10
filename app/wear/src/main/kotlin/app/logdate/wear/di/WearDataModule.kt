@@ -13,6 +13,8 @@ import app.logdate.client.data.notes.StoredMediaReferenceMigration
 import app.logdate.client.data.notes.StoredMediaReferenceMigrationLauncher
 import app.logdate.client.data.rewind.OfflineFirstRewindRepository
 import app.logdate.client.database.databaseModule
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.di.datastoreModule
 import app.logdate.client.location.di.locationModule
@@ -28,11 +30,19 @@ import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.datalayer.AssociationDataMapper
 import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
 import app.logdate.client.sync.datalayer.JournalDataMapper
+import app.logdate.client.sync.datalayer.v2.WearProtocol
+import app.logdate.client.sync.datalayer.v2.WearProtocolGate
 import app.logdate.client.sync.di.conflictResolverModule
 import app.logdate.client.sync.metadata.KeyValueSyncDeadLetterStore
 import app.logdate.client.sync.metadata.KeyValueSyncRetryScheduleStore
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
+import app.logdate.client.sync.peer.state.LocalCapabilities
+import app.logdate.client.sync.peer.state.PeerCapabilityPresence
+import app.logdate.client.sync.peer.state.PeerRole
+import app.logdate.client.sync.peer.state.PeerStateStore
+import app.logdate.client.sync.peer.state.StateDocumentChannel
+import app.logdate.client.sync.peer.state.StateMerger
 import app.logdate.shared.config.configModule
 import app.logdate.shared.model.Journal
 import app.logdate.wear.health.HealthServicesWearHealthSensorManager
@@ -53,6 +63,8 @@ import app.logdate.wear.sync.WearNoteAckHandler
 import app.logdate.wear.sync.WearNoteRemovalNotifier
 import app.logdate.wear.sync.WearPhoneMessageHandler
 import app.logdate.wear.sync.WorkManagerWatchSyncWork
+import app.logdate.wear.sync.v2.WatchPeerLink
+import app.logdate.wear.sync.v2.WatchStateMirror
 import com.google.android.gms.wearable.Wearable
 import io.github.aakira.napier.Napier
 import kotlinx.serialization.json.Json
@@ -123,6 +135,32 @@ val wearDataModule =
                 syncMetadataService = get(),
                 retryScheduleStore = get(),
                 dataLayerClient = get(),
+            )
+        }
+        single { PeerStateStore() }
+        single { StateMerger() }
+        single {
+            WatchPeerLink(
+                dataLayerClient = get(),
+                dataClient = Wearable.getDataClient(get<Context>()),
+                capabilityClient = Wearable.getCapabilityClient(get<Context>()),
+                nodeClient = Wearable.getNodeClient(get<Context>()),
+            )
+        } binds arrayOf(StateDocumentChannel::class, LocalCapabilities::class, PeerCapabilityPresence::class)
+        single {
+            WatchStateMirror(
+                featureFlags = get(),
+                channel = get(),
+                capabilities = get(),
+                peerStates = get(),
+                merger = get(),
+            )
+        }
+        single {
+            WearProtocolGate(
+                flagEnabled = get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),
+                peerHasV2Capability = get<PeerCapabilityPresence>().observe(WearProtocol.PHONE_CAPABILITY_V2),
+                peerFeatures = get<PeerStateStore>().features(PeerRole.PHONE),
             )
         }
 

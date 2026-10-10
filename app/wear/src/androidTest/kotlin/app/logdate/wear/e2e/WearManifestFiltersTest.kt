@@ -12,6 +12,7 @@ import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.sync.datalayer.RemoteCameraCaptureResultDataMapper
 import app.logdate.client.sync.datalayer.RemoteCameraDeviceDataMapper
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
+import app.logdate.client.sync.datalayer.v2.WearPaths
 import app.logdate.wear.sync.WearDataLayerClient
 import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.DataClient
@@ -46,6 +47,7 @@ class WearManifestFiltersTest {
             AssociationDataMapper.associationDeletePath(journalId, noteId),
             RemoteCameraDeviceDataMapper.PATH_CAMERA_DEVICES,
             RemoteCameraCaptureResultDataMapper.PATH_CAMERA_CAPTURE_RESULT,
+            WearPaths.STATE,
         ).forEach { path -> assertResolvesToListener(DataClient.ACTION_DATA_CHANGED, path) }
     }
 
