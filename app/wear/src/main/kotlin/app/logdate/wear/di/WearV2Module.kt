@@ -13,6 +13,7 @@ import app.logdate.wear.v2.flow.FlowViewModel
 import app.logdate.wear.v2.haptics.HapticsPreferenceStore
 import app.logdate.wear.v2.haptics.SharedPreferencesHapticsPreferenceStore
 import app.logdate.wear.v2.haptics.watchHaptics
+import app.logdate.wear.v2.mark.MarkedMomentStore
 import app.logdate.wear.v2.permissions.AndroidPermissionChecker
 import app.logdate.wear.v2.permissions.PermissionChecker
 import app.logdate.wear.v2.permissions.PermissionPromptStore
@@ -57,6 +58,7 @@ val wearV2Module =
         single { PermissionPrompts(checker = get(), store = get()) }
 
         single { QuickNoteWriter(notesRepository = get(), locationCaptureCoordinator = get()) }
+        single { MarkedMomentStore(markedMomentDao = get(), peerDeliveryDao = get(), syncMetadataService = get()) }
         factory {
             AudioMomentSaver(
                 notesRepository = get(),
