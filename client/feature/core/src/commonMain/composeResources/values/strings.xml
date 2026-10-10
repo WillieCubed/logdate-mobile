@@ -47,7 +47,7 @@
     <string name="data_management">Data Management</string>
     <string name="system_search_visibility_section">System Search</string>
     <string name="system_search_visibility_label">Show LogDate in system search</string>
-    <string name="system_search_visibility_description">Allow Android launcher and other system search surfaces to show your LogDate entries and journals.</string>
+    <string name="system_search_visibility_description">Let your launcher and other Android search surfaces show your entries and journals.</string>
     <string name="terms_of_service">Terms of Service</string>
     <string name="advanced">Advanced</string>
 
@@ -169,7 +169,7 @@
     <string name="text_2_of_3">2 of 3</string>
     <string name="text_3_of_3">3 of 3</string>
     <string name="diagnostics_local_title">Sync Diagnostics</string>
-    <string name="diagnostics_local_description">Review a local report before sharing it. The report contains sync steps and counts, not journal content.</string>
+    <string name="diagnostics_local_description">Review a report of sync steps and counts before sharing it. No journal content.</string>
     <string name="diagnostics_preview">Preview report</string>
     <string name="diagnostics_empty">No sync history has been recorded yet.</string>
     <string name="diagnostics_export_description">A ZIP of the same report, ready to send to support.</string>
