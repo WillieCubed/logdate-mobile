@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -126,6 +127,7 @@ class SharingEntryPointsE2ETest {
                 LogDateTheme(dynamicColor = false) {
                     ShareJournalContent(
                         journal = journal,
+                        linkSharingAvailable = true,
                         onShareToInstagram = {},
                         onShareQrCode = { qrJournal = journal },
                         onShareJournal = { sharedJournal = journal },
@@ -143,6 +145,34 @@ class SharingEntryPointsE2ETest {
     }
 
     @Test
+    fun `journal share offers no link when the server cannot host shared journals`() {
+        val journal = Journal(title = "Road Trip")
+        var instagramShares = 0
+
+        composeRule.runOnUiThread {
+            composeRule.activity.setContent {
+                LogDateTheme(dynamicColor = false) {
+                    ShareJournalContent(
+                        journal = journal,
+                        linkSharingAvailable = false,
+                        onShareToInstagram = { instagramShares++ },
+                        onShareQrCode = {},
+                        onShareJournal = {},
+                    )
+                }
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("share_journal_qr_action").assertDoesNotExist()
+        composeRule.onNodeWithTag("share_journal_sheet_action").assertDoesNotExist()
+        composeRule.onNodeWithText("Only you can see what’s inside this journal.").assertIsDisplayed()
+        composeRule.onNodeWithTag("share_journal_instagram_action").assertIsDisplayed().performClick()
+
+        assertEquals(1, instagramShares)
+    }
+
+    @Test
     fun `journal share shows its saved cover photo`() {
         val journal =
             Journal(
@@ -155,6 +185,7 @@ class SharingEntryPointsE2ETest {
                 LogDateTheme(dynamicColor = false) {
                     ShareJournalContent(
                         journal = journal,
+                        linkSharingAvailable = false,
                         onShareToInstagram = {},
                         onShareQrCode = {},
                         onShareJournal = {},
@@ -207,6 +238,7 @@ class SharingEntryPointsE2ETest {
                         provideFoldableLayoutInfo(foldableLayoutInfo) {
                             ShareJournalContent(
                                 journal = journal,
+                                linkSharingAvailable = false,
                                 onShareToInstagram = {},
                                 onShareQrCode = {},
                                 onShareJournal = {},
@@ -220,7 +252,7 @@ class SharingEntryPointsE2ETest {
         composeRule.waitForIdle()
         val preview = composeRule.onNodeWithTag("share_journal_preview").fetchSemanticsNode().boundsInRoot
         val access = composeRule.onNodeWithTag("share_journal_access").fetchSemanticsNode().boundsInRoot
-        val share = composeRule.onNodeWithTag("share_journal_sheet_action").fetchSemanticsNode().boundsInRoot
+        val share = composeRule.onNodeWithTag("share_journal_instagram_action").fetchSemanticsNode().boundsInRoot
 
         assertTrue(preview.right < access.left)
         assertTrue(preview.width / composeRule.activity.resources.displayMetrics.density >= 380f)
@@ -236,6 +268,7 @@ class SharingEntryPointsE2ETest {
                 LogDateTheme(dynamicColor = false) {
                     ShareJournalContent(
                         journal = journal,
+                        linkSharingAvailable = false,
                         onShareToInstagram = {},
                         onShareQrCode = {},
                         onShareJournal = {},
@@ -262,6 +295,7 @@ class SharingEntryPointsE2ETest {
                 LogDateTheme(dynamicColor = false) {
                     ShareJournalContent(
                         journal = journal,
+                        linkSharingAvailable = false,
                         onShareToInstagram = {},
                         onShareQrCode = {},
                         onShareJournal = {},
@@ -274,7 +308,7 @@ class SharingEntryPointsE2ETest {
         composeRule.waitForIdle()
         val preview = composeRule.onNodeWithTag("share_journal_preview").fetchSemanticsNode().boundsInRoot
         val access = composeRule.onNodeWithTag("share_journal_access").fetchSemanticsNode().boundsInRoot
-        val share = composeRule.onNodeWithTag("share_journal_sheet_action").fetchSemanticsNode().boundsInRoot
+        val share = composeRule.onNodeWithTag("share_journal_instagram_action").fetchSemanticsNode().boundsInRoot
 
         assertTrue(preview.right < access.left, "preview=$preview, access=$access")
         assertTrue(share.top < preview.bottom, "share=$share, preview=$preview")

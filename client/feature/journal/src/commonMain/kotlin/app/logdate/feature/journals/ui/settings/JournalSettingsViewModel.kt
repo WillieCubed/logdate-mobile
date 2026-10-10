@@ -9,6 +9,7 @@ import app.logdate.client.domain.journals.GetJournalByIdUseCase
 import app.logdate.client.domain.journals.UpdateJournalUseCase
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.sharing.JournalLinkSharingAvailability
 import app.logdate.client.sharing.SharingLauncher
 import app.logdate.shared.model.Journal
 import io.github.aakira.napier.Napier
@@ -37,6 +38,7 @@ class JournalSettingsViewModel(
     private val deleteJournalUseCase: DeleteJournalUseCase,
     private val journalContentRepository: JournalContentRepository,
     private val sharingLauncher: SharingLauncher,
+    private val linkSharingAvailability: JournalLinkSharingAvailability,
 ) : ViewModel() {
     private val journalIdState = MutableStateFlow<Uuid?>(null)
 
@@ -107,10 +109,17 @@ class JournalSettingsViewModel(
     }
 
     /**
+     * Whether the journal can be shared as a link that reaches someone else.
+     */
+    val canShareJournalLink: Boolean
+        get() = linkSharingAvailability.isAvailable()
+
+    /**
      * Shares the journal using the platform-specific sharing launcher.
      * Launches a system share sheet with the journal link.
      */
     fun shareJournal() {
+        if (!canShareJournalLink) return
         val journalId = journalIdState.value ?: return
 
         try {

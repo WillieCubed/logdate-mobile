@@ -61,8 +61,9 @@ val journalsFeatureModule: Module =
                 deleteJournalUseCase = get(),
                 journalContentRepository = get(),
                 sharingLauncher = get(),
+                linkSharingAvailability = get(),
             )
         }
-        viewModel { ShareJournalViewModel(get(), get()) }
+        viewModel { ShareJournalViewModel(get(), get(), get()) }
         viewModel { JournalContentPickerViewModel(get(), get(), get(), get()) }
     }

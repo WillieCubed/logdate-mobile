@@ -5,6 +5,7 @@ package app.logdate.feature.journals.ui.share
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.sharing.JournalLinkSharingAvailability
 import app.logdate.client.sharing.ShareTheme
 import app.logdate.client.sharing.SharingLauncher
 import app.logdate.shared.model.Journal
@@ -27,11 +28,13 @@ import kotlin.uuid.Uuid
  *
  * @param journalRepository Repository for accessing journal data
  * @param sharingLauncher Platform-specific implementation to handle sharing
+ * @param linkSharingAvailability Whether the connected server lets a journal link reach someone else
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ShareJournalViewModel(
     private val journalRepository: JournalRepository,
     private val sharingLauncher: SharingLauncher,
+    private val linkSharingAvailability: JournalLinkSharingAvailability,
 ) : ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
 
@@ -56,6 +59,7 @@ class ShareJournalViewModel(
                         ShareJournalUiState.Success(
                             journal = journal,
                             lastUpdatedDisplay = "Last updated ${journal.lastUpdated.toReadableDateShort()}",
+                            linkSharingAvailable = linkSharingAvailability.isAvailable(),
                         ) as ShareJournalUiState
                     }
             }.catch { error ->
@@ -95,6 +99,7 @@ class ShareJournalViewModel(
      * @param journal The journal to share
      */
     fun shareJournalQrCode(journal: Journal) {
+        if (!linkSharingAvailability.isAvailable()) return
         try {
             sharingLauncher.shareJournalQrCode(journal.id)
         } catch (e: Exception) {
@@ -108,6 +113,7 @@ class ShareJournalViewModel(
      * @param journal The journal to share
      */
     fun shareJournal(journal: Journal) {
+        if (!linkSharingAvailability.isAvailable()) return
         try {
             sharingLauncher.shareJournalLink(journal.id)
         } catch (e: Exception) {
@@ -135,9 +141,12 @@ sealed interface ShareJournalUiState {
      *
      * @param journal The journal to be shared
      * @param lastUpdatedDisplay Formatted string showing when the journal was last updated
+     * @param linkSharingAvailable Whether a journal link can reach someone else. When false, only
+     * the cover can be shared and the screen says the journal stays private.
      */
     data class Success(
         val journal: Journal,
         val lastUpdatedDisplay: String,
+        val linkSharingAvailable: Boolean = false,
     ) : ShareJournalUiState
 }

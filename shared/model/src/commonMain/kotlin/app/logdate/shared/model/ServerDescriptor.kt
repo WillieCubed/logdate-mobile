@@ -39,6 +39,12 @@ object ServerProtocolFeature {
 
     /** Account-bound passkey envelopes contain ciphertext only, unlocked locally with the PRF. */
     const val ENCRYPTED_ACCOUNT_KEYS_V1 = "encryptedAccountKeysV1"
+
+    /**
+     * The server hosts shared journals, so a journal link opens a readable copy for the people it
+     * was shared with. Without it a journal link reaches no one, and clients must not offer one.
+     */
+    const val JOURNAL_SHARE_LINKS_V1 = "journalShareLinksV1"
 }
 
 @Serializable

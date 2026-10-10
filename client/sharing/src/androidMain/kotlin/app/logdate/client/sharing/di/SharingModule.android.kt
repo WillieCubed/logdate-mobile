@@ -6,9 +6,11 @@ import app.logdate.client.sharing.AndroidRewindQuoteCardRenderer
 import app.logdate.client.sharing.AndroidRewindStatsSummaryRenderer
 import app.logdate.client.sharing.AndroidShareAssetGenerator
 import app.logdate.client.sharing.AndroidSharingLauncher
+import app.logdate.client.sharing.JournalLinkSharingAvailability
 import app.logdate.client.sharing.RewindPanelCardRenderer
 import app.logdate.client.sharing.RewindQuoteCardRenderer
 import app.logdate.client.sharing.RewindStatsSummaryRenderer
+import app.logdate.client.sharing.ServerJournalLinkSharingAvailability
 import app.logdate.client.sharing.ShareAssetInterface
 import app.logdate.client.sharing.SharingLauncher
 import org.koin.android.ext.koin.androidContext
@@ -29,4 +31,5 @@ actual val sharingModule: Module =
             AndroidRewindStatsSummaryRenderer(androidContext(), get(named("io-dispatcher")))
         }
         factory<SharingLauncher> { AndroidSharingLauncher(get(), get(), get(), get()) }
+        factory<JournalLinkSharingAvailability> { ServerJournalLinkSharingAvailability(get()) }
     }

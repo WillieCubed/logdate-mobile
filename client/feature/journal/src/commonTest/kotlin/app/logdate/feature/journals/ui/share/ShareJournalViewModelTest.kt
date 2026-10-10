@@ -5,43 +5,104 @@ import app.logdate.client.sharing.ShareTheme
 import app.logdate.client.sharing.SharingLauncher
 import app.logdate.shared.model.EditorDraft
 import app.logdate.shared.model.Journal
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import kotlinx.datetime.LocalDate
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
 /**
  * Tests for [ShareJournalViewModel], which manages the user interactions for sharing
  * entire journals with others.
  *
- * This suite verifies that the view model correctly handles requests to share journals
- * via deep links or QR codes by delegating to the appropriate system sharing mechanisms.
+ * A journal link only reaches someone else when the connected server hosts shared journals, so
+ * link and QR code sharing are offered only when the server advertises that support.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class ShareJournalViewModelTest {
+    private val dispatcher = StandardTestDispatcher()
     private val journal = Journal(id = Uuid.random(), title = "Weekend Trip")
     private val sharingLauncher = RecordingSharingLauncher()
-    private val viewModel =
-        ShareJournalViewModel(
-            journalRepository = FakeShareJournalRepository(journal),
-            sharingLauncher = sharingLauncher,
-        )
+
+    @BeforeTest
+    fun setUp() {
+        Dispatchers.setMain(dispatcher)
+    }
+
+    @AfterTest
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `offers link sharing when the server hosts shared journals`() =
+        runTest(dispatcher) {
+            val viewModel = viewModel(linkSharingAvailable = true)
+            backgroundScope.launch { viewModel.uiState.collect {} }
+            advanceUntilIdle()
+
+            val state = assertIs<ShareJournalUiState.Success>(viewModel.uiState.value)
+            assertTrue(state.linkSharingAvailable)
+        }
+
+    @Test
+    fun `withholds link sharing when the server does not host shared journals`() =
+        runTest(dispatcher) {
+            val viewModel = viewModel(linkSharingAvailable = false)
+            backgroundScope.launch { viewModel.uiState.collect {} }
+            advanceUntilIdle()
+
+            val state = assertIs<ShareJournalUiState.Success>(viewModel.uiState.value)
+            assertFalse(state.linkSharingAvailable)
+        }
 
     @Test
     fun `shareJournal delegates to system share launcher`() {
-        viewModel.shareJournal(journal)
+        viewModel(linkSharingAvailable = true).shareJournal(journal)
 
         assertEquals(journal.id, sharingLauncher.sharedJournalLinkId)
     }
 
     @Test
     fun `shareJournalQrCode delegates to QR share launcher`() {
-        viewModel.shareJournalQrCode(journal)
+        viewModel(linkSharingAvailable = true).shareJournalQrCode(journal)
 
         assertEquals(journal.id, sharingLauncher.sharedJournalQrCodeId)
     }
+
+    @Test
+    fun `link and QR sharing do nothing when the server does not host shared journals`() {
+        val viewModel = viewModel(linkSharingAvailable = false)
+
+        viewModel.shareJournal(journal)
+        viewModel.shareJournalQrCode(journal)
+
+        assertNull(sharingLauncher.sharedJournalLinkId)
+        assertNull(sharingLauncher.sharedJournalQrCodeId)
+    }
+
+    private fun viewModel(linkSharingAvailable: Boolean) =
+        ShareJournalViewModel(
+            journalRepository = FakeShareJournalRepository(journal),
+            sharingLauncher = sharingLauncher,
+            linkSharingAvailability = { linkSharingAvailable },
+        ).apply { setJournalId(journal.id) }
 
     private class RecordingSharingLauncher : SharingLauncher {
         var sharedJournalLinkId: Uuid? = null

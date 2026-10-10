@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -51,7 +52,6 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.logdate.feature.journals.ui.JournalShape
 import app.logdate.feature.journals.ui.deriveCoverColor
@@ -73,7 +73,8 @@ import logdate.client.ui.generated.resources.Res as UiRes
 /**
  * Screen for sharing a journal with others.
  *
- * Provides options to share via the system share sheet, a QR code, or Instagram.
+ * Always offers the journal cover as an Instagram story. A link and QR code are offered only when
+ * the connected server hosts shared journals, because otherwise a link reaches no one.
  *
  * @param journalId ID of the journal to share
  * @param onGoBack Callback to navigate back
@@ -152,6 +153,7 @@ fun ShareJournalScreenContent(
             is ShareJournalUiState.Success -> {
                 ShareJournalContent(
                     journal = state.journal,
+                    linkSharingAvailable = state.linkSharingAvailable,
                     onShareToInstagram = { onShareToInstagram(state.journal) },
                     onShareQrCode = { onShareQrCode(state.journal) },
                     onShareJournal = { onShareJournal(state.journal) },
@@ -169,6 +171,7 @@ fun ShareJournalScreenContent(
  * Displays a share-specific journal card alongside sharing actions.
  *
  * @param journal Journal to be shared
+ * @param linkSharingAvailable Whether a journal link can reach someone else
  * @param onShareToInstagram Callback when sharing to Instagram
  * @param onShareQrCode Callback when sharing a QR code
  * @param onShareJournal Callback when using general share sheet
@@ -177,6 +180,7 @@ fun ShareJournalScreenContent(
 @Composable
 fun ShareJournalContent(
     journal: Journal,
+    linkSharingAvailable: Boolean,
     onShareToInstagram: () -> Unit,
     onShareQrCode: () -> Unit,
     onShareJournal: () -> Unit,
@@ -195,6 +199,7 @@ fun ShareJournalContent(
         },
         endPane = {
             ShareJournalActionPane(
+                linkSharingAvailable = linkSharingAvailable,
                 onShareToInstagram = onShareToInstagram,
                 onShareQrCode = onShareQrCode,
                 onShareJournal = onShareJournal,
@@ -204,6 +209,7 @@ fun ShareJournalContent(
         standardContent = {
             ShareJournalStandardContent(
                 journal = journal,
+                linkSharingAvailable = linkSharingAvailable,
                 onShareToInstagram = onShareToInstagram,
                 onShareQrCode = onShareQrCode,
                 onShareJournal = onShareJournal,
@@ -217,6 +223,7 @@ fun ShareJournalContent(
 @Composable
 private fun ShareJournalStandardContent(
     journal: Journal,
+    linkSharingAvailable: Boolean,
     onShareToInstagram: () -> Unit,
     onShareQrCode: () -> Unit,
     onShareJournal: () -> Unit,
@@ -236,6 +243,7 @@ private fun ShareJournalStandardContent(
                     previewCoverPainter = previewCoverPainter,
                 )
                 ShareJournalActionPane(
+                    linkSharingAvailable = linkSharingAvailable,
                     onShareToInstagram = onShareToInstagram,
                     onShareQrCode = onShareQrCode,
                     onShareJournal = onShareJournal,
@@ -259,17 +267,14 @@ private fun ShareJournalStandardContent(
                     previewCoverPainter = previewCoverPainter,
                 )
 
-                ShareJournalDescription()
+                ShareJournalDescription(linkSharingAvailable = linkSharingAvailable)
 
                 ShareJournalActions(
+                    linkSharingAvailable = linkSharingAvailable,
                     onShareQrCode = onShareQrCode,
                     onShareJournal = onShareJournal,
                     onShareToInstagram = onShareToInstagram,
                 )
-
-                Spacer(modifier = Modifier.height(Spacing.lg))
-
-                NearbySharingInfo()
             }
         }
     }
@@ -307,6 +312,7 @@ private fun ShareJournalPrimaryPane(
 
 @Composable
 private fun ShareJournalActionPane(
+    linkSharingAvailable: Boolean,
     onShareToInstagram: () -> Unit,
     onShareQrCode: () -> Unit,
     onShareJournal: () -> Unit,
@@ -323,33 +329,39 @@ private fun ShareJournalActionPane(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Spacing.xl, Alignment.CenterVertically),
         ) {
-            ShareJournalDescription()
+            ShareJournalDescription(linkSharingAvailable = linkSharingAvailable)
 
             ShareJournalActions(
+                linkSharingAvailable = linkSharingAvailable,
                 onShareQrCode = onShareQrCode,
                 onShareJournal = onShareJournal,
                 onShareToInstagram = onShareToInstagram,
             )
-
-            NearbySharingInfo()
         }
     }
 }
 
 @Composable
-private fun ShareJournalDescription() {
+private fun ShareJournalDescription(linkSharingAvailable: Boolean) {
     Row(
         modifier = Modifier.fillMaxWidth().testTag("share_journal_access"),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         Icon(
-            Icons.Rounded.Public,
+            if (linkSharingAvailable) Icons.Rounded.Public else Icons.Rounded.Lock,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            text = stringResource(Res.string.share_journal_description),
+            text =
+                stringResource(
+                    if (linkSharingAvailable) {
+                        Res.string.share_journal_description
+                    } else {
+                        Res.string.share_journal_private_description
+                    },
+                ),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -358,50 +370,14 @@ private fun ShareJournalDescription() {
 
 @Composable
 private fun ShareJournalActions(
+    linkSharingAvailable: Boolean,
     onShareQrCode: () -> Unit,
     onShareJournal: () -> Unit,
     onShareToInstagram: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Button(
-                onClick = onShareQrCode,
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .height(56.dp)
-                        .testTag("share_journal_qr_action"),
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                    ),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.QrCode,
-                    contentDescription = stringResource(Res.string.share_qr_code),
-                    modifier = Modifier.size(24.dp),
-                )
-            }
-
-            Button(
-                onClick = onShareJournal,
-                modifier =
-                    Modifier
-                        .weight(3f)
-                        .height(56.dp)
-                        .testTag("share_journal_sheet_action"),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Share,
-                    contentDescription = null,
-                )
-                Spacer(modifier = Modifier.width(Spacing.sm))
-                Text(text = stringResource(Res.string.share))
-            }
+        if (linkSharingAvailable) {
+            ShareJournalLinkActions(onShareQrCode = onShareQrCode, onShareJournal = onShareJournal)
         }
 
         Button(
@@ -409,7 +385,8 @@ private fun ShareJournalActions(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
+                    .height(56.dp)
+                    .testTag("share_journal_instagram_action"),
             colors =
                 ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -422,27 +399,49 @@ private fun ShareJournalActions(
 }
 
 @Composable
-private fun NearbySharingInfo() {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+private fun ShareJournalLinkActions(
+    onShareQrCode: () -> Unit,
+    onShareJournal: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Icon(
-            imageVector = Icons.Default.QrCode,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = stringResource(Res.string.also_sharing_to_nearby_logdate_contacts),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = stringResource(Res.string.journal_invite_description),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
+        Button(
+            onClick = onShareQrCode,
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .height(56.dp)
+                    .testTag("share_journal_qr_action"),
+            colors =
+                ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+        ) {
+            Icon(
+                imageVector = Icons.Default.QrCode,
+                contentDescription = stringResource(Res.string.share_qr_code),
+                modifier = Modifier.size(24.dp),
+            )
+        }
+
+        Button(
+            onClick = onShareJournal,
+            modifier =
+                Modifier
+                    .weight(3f)
+                    .height(56.dp)
+                    .testTag("share_journal_sheet_action"),
+        ) {
+            Icon(
+                imageVector = Icons.Default.Share,
+                contentDescription = null,
+            )
+            Spacer(modifier = Modifier.width(Spacing.sm))
+            Text(text = stringResource(Res.string.share))
+        }
     }
 }
 

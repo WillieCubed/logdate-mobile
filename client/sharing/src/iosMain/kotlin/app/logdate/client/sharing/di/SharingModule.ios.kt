@@ -4,9 +4,11 @@ import app.logdate.client.sharing.IosRewindPanelCardRenderer
 import app.logdate.client.sharing.IosRewindQuoteCardRenderer
 import app.logdate.client.sharing.IosRewindStatsSummaryRenderer
 import app.logdate.client.sharing.IosSharingLauncher
+import app.logdate.client.sharing.JournalLinkSharingAvailability
 import app.logdate.client.sharing.RewindPanelCardRenderer
 import app.logdate.client.sharing.RewindQuoteCardRenderer
 import app.logdate.client.sharing.RewindStatsSummaryRenderer
+import app.logdate.client.sharing.ServerJournalLinkSharingAvailability
 import app.logdate.client.sharing.SharingLauncher
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -25,4 +27,5 @@ actual val sharingModule: Module =
         single<RewindQuoteCardRenderer> { IosRewindQuoteCardRenderer() }
         single<RewindStatsSummaryRenderer> { IosRewindStatsSummaryRenderer() }
         single<RewindPanelCardRenderer> { IosRewindPanelCardRenderer() }
+        factory<JournalLinkSharingAvailability> { ServerJournalLinkSharingAvailability(get()) }
     }

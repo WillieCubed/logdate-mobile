@@ -107,7 +107,7 @@ fun JournalSettingsScreen(
         onNameChange = viewModel::updateJournalName,
         onDescriptionChange = viewModel::updateJournalDescription,
         onSaveChanges = { viewModel.saveJournalChanges { onGoBack() } },
-        onShareJournal = viewModel::shareJournal,
+        onShareJournal = if (viewModel.canShareJournalLink) viewModel::shareJournal else null,
         onRequestDelete = { openDeleteConfirmation = true },
         showDeleteConfirmation = openDeleteConfirmation,
         onDismissDeleteConfirmation = { openDeleteConfirmation = false },
@@ -128,7 +128,7 @@ fun JournalSettingsScreenContent(
     onNameChange: (String) -> Unit = {},
     onDescriptionChange: (String) -> Unit = {},
     onSaveChanges: () -> Unit = {},
-    onShareJournal: () -> Unit = {},
+    onShareJournal: (() -> Unit)? = null,
     onRequestDelete: () -> Unit = {},
     showDeleteConfirmation: Boolean = false,
     onDismissDeleteConfirmation: () -> Unit = {},
@@ -228,6 +228,7 @@ fun JournalSettingsScreenContent(
                     endPane = {
                         JournalSettingsEditPane(
                             uiState = uiState,
+                            canShareJournal = onShareJournal != null,
                             onNameChange = onNameChange,
                             onDescriptionChange = onDescriptionChange,
                             onRequestDelete = onRequestDelete,
@@ -356,7 +357,7 @@ private fun DeleteConfirmationCard(
 @Composable
 private fun JournalSettingsStandardList(
     uiState: JournalSettingsUiState.Loaded,
-    onShareJournal: () -> Unit,
+    onShareJournal: (() -> Unit)?,
     onNameChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
     onRequestDelete: () -> Unit,
@@ -401,6 +402,7 @@ private fun JournalSettingsStandardList(
 
         item {
             JournalPrivacySettings(
+                canShareJournal = onShareJournal != null,
                 modifier = Modifier.padding(horizontal = Spacing.lg),
             )
         }
@@ -421,7 +423,7 @@ private fun JournalSettingsStandardList(
 @Composable
 private fun JournalSettingsOverviewPane(
     uiState: JournalSettingsUiState.Loaded,
-    onShareJournal: () -> Unit,
+    onShareJournal: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -454,6 +456,7 @@ private fun JournalSettingsOverviewPane(
 @Composable
 private fun JournalSettingsEditPane(
     uiState: JournalSettingsUiState.Loaded,
+    canShareJournal: Boolean,
     onNameChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
     onRequestDelete: () -> Unit,
@@ -481,6 +484,7 @@ private fun JournalSettingsEditPane(
 
         item {
             JournalPrivacySettings(
+                canShareJournal = canShareJournal,
                 modifier = Modifier.padding(horizontal = Spacing.lg),
             )
         }
@@ -570,7 +574,10 @@ private fun JournalInsightsCard(
 }
 
 @Composable
-private fun JournalPrivacySettings(modifier: Modifier = Modifier) {
+private fun JournalPrivacySettings(
+    canShareJournal: Boolean,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -585,11 +592,13 @@ private fun JournalPrivacySettings(modifier: Modifier = Modifier) {
             text = stringResource(Res.string.journal_visibility_private),
             style = MaterialTheme.typography.bodyMedium,
         )
-        Text(
-            text = stringResource(Res.string.journal_visibility_shared_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (canShareJournal) {
+            Text(
+                text = stringResource(Res.string.journal_visibility_shared_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -631,7 +640,7 @@ private fun JournalDangerZone(
 private fun JournalOverviewSection(
     journal: Journal,
     modifier: Modifier = Modifier,
-    onShareJournal: () -> Unit = {},
+    onShareJournal: (() -> Unit)? = null,
 ) {
     // Use BoxWithConstraints to create a responsive layout
     BoxWithConstraints(
@@ -682,16 +691,18 @@ private fun JournalOverviewSection(
                 // Fixed spacing
                 Spacer(modifier = Modifier.padding(Spacing.sm))
 
-                // Button sized to its content
-                ElevatedButton(
-                    onClick = onShareJournal,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = stringResource(Res.string.journal_share_action),
-                        modifier = Modifier.padding(end = Spacing.sm),
-                    )
-                    Text(stringResource(Res.string.journal_share_action))
+                // A journal link reaches someone else only when the server hosts shared journals.
+                if (onShareJournal != null) {
+                    ElevatedButton(
+                        onClick = onShareJournal,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = stringResource(Res.string.journal_share_action),
+                            modifier = Modifier.padding(end = Spacing.sm),
+                        )
+                        Text(stringResource(Res.string.journal_share_action))
+                    }
                 }
             }
         }
