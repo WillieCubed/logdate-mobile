@@ -40,12 +40,16 @@ actual fun Modifier.entryDropTarget(
                     onActiveChanged(false)
                     val dragEvent = event.toAndroidDragEvent()
                     val clip = dragEvent.clipData ?: return false
+                    // Reading another app's file, even its type, needs this permission, and it ends
+                    // when released.
+                    val hasFiles = (0 until clip.itemCount).any { clip.getItemAt(it).uri != null }
+                    val permissions = if (hasFiles) context.findActivity()?.requestDragAndDropPermissions(dragEvent) else null
                     val drop = routeDroppedItems(clip.droppedItems(context))
                     drop.texts.forEach(onText)
-                    if (drop.mediaUris.isEmpty()) return drop.texts.isNotEmpty()
-
-                    // Reading another app's file needs this permission, and it ends when released.
-                    val permissions = context.findActivity()?.requestDragAndDropPermissions(dragEvent)
+                    if (drop.mediaUris.isEmpty()) {
+                        permissions?.release()
+                        return drop.texts.isNotEmpty()
+                    }
                     scope.launch {
                         try {
                             val imported = importIntoEntry(context, mediaManager, drop.mediaUris)
