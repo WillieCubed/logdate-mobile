@@ -104,6 +104,8 @@ class LogDateCloudApiClient(
 
     override suspend fun refreshAccessToken(refreshToken: String): Result<String> = requestRefreshAccessToken(refreshToken)
 
+    override suspend fun refreshSession(refreshToken: String): Result<RefreshedSession> = requestRefreshSession(refreshToken)
+
     override suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount> = requestGetAccountInfo(accessToken)
 
     override suspend fun uploadContent(

@@ -3,6 +3,7 @@ package app.logdate.client.sync.cloud.account
 import app.logdate.client.sync.InMemoryKeyValueStorage
 import app.logdate.client.sync.cloud.CheckUsernameAvailabilityResponse
 import app.logdate.client.sync.cloud.CloudApiClient
+import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.ContentChangesResponse
 import app.logdate.client.sync.cloud.ContentUpdateRequest
 import app.logdate.client.sync.cloud.ContentUpdateResponse
@@ -17,6 +18,7 @@ import app.logdate.client.sync.cloud.JournalUploadResponse
 import app.logdate.client.sync.cloud.MediaDownloadResponse
 import app.logdate.client.sync.cloud.MediaUpload
 import app.logdate.client.sync.cloud.MediaUploadResponse
+import app.logdate.client.sync.cloud.RefreshedSession
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.model.BeginAccountCreationRequest
 import app.logdate.shared.model.BeginAccountCreationResponse
@@ -168,6 +170,61 @@ class DefaultCloudAccountRepositoryTest {
         }
 
     @Test
+    fun `a rotated refresh token is stored for its server`() =
+        runTest {
+            val storage = InMemoryKeyValueStorage()
+            val config = DefaultLogDateConfigRepository(initialBackendUrl = "https://test.logdate.app")
+            val repository =
+                DefaultCloudAccountRepository(
+                    apiClient = FakeCloudApiClient(refreshSessionResult = Result.success(RefreshedSession("access-2", "refresh-2"))),
+                    secureStorage = storage,
+                    configRepository = config,
+                    coroutineScope = TestScope(StandardTestDispatcher(testScheduler)),
+                )
+
+            assertEquals(RefreshedSession("access-2", "refresh-2"), repository.refreshSession("refresh-1").getOrThrow())
+            assertEquals("access-2", storage.getString(scopedKey("cloud_access_token", config.getCurrentBackendUrl())))
+            assertEquals("refresh-2", storage.getString(scopedKey("cloud_refresh_token", config.getCurrentBackendUrl())))
+        }
+
+    @Test
+    fun `a server without rotation still refreshes the access token`() =
+        runTest {
+            val storage = InMemoryKeyValueStorage()
+            val config = DefaultLogDateConfigRepository(initialBackendUrl = "https://test.logdate.app")
+            val repository =
+                DefaultCloudAccountRepository(
+                    apiClient = FakeCloudApiClient(),
+                    secureStorage = storage,
+                    configRepository = config,
+                    coroutineScope = TestScope(StandardTestDispatcher(testScheduler)),
+                )
+
+            assertEquals(RefreshedSession("access", null), repository.refreshSession("refresh-1").getOrThrow())
+            assertEquals("access", storage.getString(scopedKey("cloud_access_token", config.getCurrentBackendUrl())))
+            assertNull(storage.getString(scopedKey("cloud_refresh_token", config.getCurrentBackendUrl())))
+        }
+
+    @Test
+    fun `a refused session refresh stores nothing and says why`() =
+        runTest {
+            val storage = InMemoryKeyValueStorage()
+            val config = DefaultLogDateConfigRepository(initialBackendUrl = "https://test.logdate.app")
+            val revoked = CloudApiException("DEVICE_SESSION_REVOKED", "revoked", statusCode = 401)
+            val repository =
+                DefaultCloudAccountRepository(
+                    apiClient = FakeCloudApiClient(refreshSessionResult = Result.failure(revoked)),
+                    secureStorage = storage,
+                    configRepository = config,
+                    coroutineScope = TestScope(StandardTestDispatcher(testScheduler)),
+                )
+
+            assertEquals(revoked, repository.refreshSession("refresh-1").exceptionOrNull())
+            assertNull(storage.getString(scopedKey("cloud_access_token", config.getCurrentBackendUrl())))
+            assertNull(storage.getString(scopedKey("cloud_refresh_token", config.getCurrentBackendUrl())))
+        }
+
+    @Test
     fun `changing backend clears active identity instead of reviving another server account`() =
         runTest {
             val storage = InMemoryKeyValueStorage()
@@ -235,7 +292,11 @@ private fun scopedKey(
  */
 private class FakeCloudApiClient(
     private val completeAccountCreationResult: CompleteAccountCreationResponse? = null,
+    private val refreshSessionResult: Result<RefreshedSession>? = null,
 ) : CloudApiClient {
+    override suspend fun refreshSession(refreshToken: String): Result<RefreshedSession> =
+        refreshSessionResult ?: Result.failure(UnsupportedOperationException("No session refresh configured"))
+
     override suspend fun checkUsernameAvailability(username: String): Result<CheckUsernameAvailabilityResponse> =
         Result.success(CheckUsernameAvailabilityResponse(available = true, username = username))
 

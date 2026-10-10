@@ -182,6 +182,13 @@ internal suspend fun LogDateCloudApiClient.requestCompleteAccountCreation(
  * @throws CloudApiException If the request fails.
  */
 internal suspend fun LogDateCloudApiClient.requestRefreshAccessToken(refreshToken: String): Result<String> =
+    requestRefreshSession(refreshToken).map { it.accessToken }
+
+/**
+ * Refreshes the session. A linked device's refresh also checks that its session still exists, and
+ * answers `401 DEVICE_SESSION_REVOKED` when it was removed.
+ */
+internal suspend fun LogDateCloudApiClient.requestRefreshSession(refreshToken: String): Result<RefreshedSession> =
     try {
         val baseUrl = getBaseUrl(refreshToken = refreshToken)
         val response =
@@ -194,7 +201,7 @@ internal suspend fun LogDateCloudApiClient.requestRefreshAccessToken(refreshToke
             HttpStatusCode.OK -> {
                 val responseBody = response.body<RefreshTokenResponseV1Dto>()
                 if (responseBody.success) {
-                    Result.success(responseBody.data.accessToken)
+                    Result.success(RefreshedSession(responseBody.data.accessToken, responseBody.data.refreshToken))
                 } else {
                     handleApiError(response)
                 }
@@ -326,6 +333,8 @@ private data class RefreshTokenResponseV1Dto(
 @Serializable
 private data class RefreshTokenDataV1Dto(
     val accessToken: String,
+    /** Sent only when the server rotated a linked device's refresh token. */
+    val refreshToken: String? = null,
 )
 
 private fun AuthAccountDto.toLogDateAccount(): LogDateAccount =

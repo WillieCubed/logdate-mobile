@@ -7,8 +7,12 @@ import app.logdate.client.networking.PasskeyApiErrorCodes
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.CloudRequestBinding
 import app.logdate.client.sync.cloud.CloudRequestLocationProvider
+import app.logdate.client.sync.cloud.DeviceSessionRevocationListener
+import app.logdate.client.sync.cloud.RefreshedSession
+import app.logdate.client.sync.cloud.SessionRefreshingAccountRepository
 import app.logdate.client.sync.metadata.UploadScope
 import app.logdate.shared.model.CloudAccountRepository
+import app.logdate.shared.model.devices.DeviceLinkErrorCodes
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
@@ -24,6 +28,7 @@ import kotlinx.coroutines.withContext
 internal class SyncTokenRefresher(
     private val sessionStorage: SessionStorage,
     private val cloudAccountRepository: CloudAccountRepository,
+    private val revocationListener: DeviceSessionRevocationListener = DeviceSessionRevocationListener.None,
 ) {
     fun currentUploadScope(): UploadScope? = sessionStorage.getOriginBoundSession()?.let { UploadScope(it.session.accountId, it.origin) }
 
@@ -111,55 +116,65 @@ internal class SyncTokenRefresher(
         binding: CloudRequestBinding?,
         locationProvider: CloudRequestLocationProvider?,
     ): Result<T> {
-        // Token expired, attempt refresh
         Napier.i("Token expired (401), attempting refresh")
         if (binding != null && !isStillBound(binding, locationProvider)) return Result.failure(scopeChanged())
-        val refreshResult = runBound(binding) { cloudAccountRepository.refreshAccessToken(currentSession.refreshToken) }
+        val refreshResult = runBound(binding) { refreshSession(currentSession.refreshToken) }
         refreshResult.rethrowCancellation()
-        if (refreshResult.isFailure) {
-            val refreshError = refreshResult.exceptionOrNull()
-            Napier.e("Token refresh failed")
-            // Settings observes this same session. A refused refresh token must stop looking
-            // signed in, while an outage must preserve credentials for the next attempt.
-            if (refreshError is CloudApiException &&
-                refreshError.statusCode == 401 &&
-                refreshError.errorCode in
-                setOf(PasskeyApiErrorCodes.INVALID_REFRESH_TOKEN, PasskeyApiErrorCodes.REFRESH_TOKEN_REVOKED) &&
-                sessionStorage.getSession() == currentSession
-            ) {
-                sessionStorage.clearSession()
+        val refreshed =
+            refreshResult.getOrElse { refreshError ->
+                Napier.e("Token refresh failed")
+                endSessionIfRefused(refreshError, currentSession)
+                return Result.failure(refreshError)
             }
-            return Result.failure(refreshError ?: initialResult.exceptionOrNull() ?: scopeChanged())
-        }
-
-        // Refresh succeeded, retry operation with new token
-        val newToken = refreshResult.getOrNull()
-        if (newToken == null) {
-            Napier.w("Token refresh succeeded but returned null")
-            return initialResult
-        }
 
         // A sign-out or a new sign-in may finish while the refresh request is in flight.
         if (sessionStorage.getSession() != currentSession) return initialResult
 
-        // Keep the refreshed token. The account repository persists it under its own storage key,
+        // Store the refreshed tokens. The account repository persists them under its own storage keys,
         // which the session storage never reads, so without this the session keeps handing out the
-        // token the server just rejected and every single request pays a 401 and a refresh before
-        // it does any work.
+        // token the server just rejected, and a linked device loses the refresh token it rotated to.
         if (binding != null && !isStillBound(binding, locationProvider)) return Result.failure(scopeChanged())
-        val updatedSession = currentSession.copy(accessToken = newToken)
+        val updatedSession =
+            currentSession.copy(
+                accessToken = refreshed.accessToken,
+                refreshToken = refreshed.refreshToken ?: currentSession.refreshToken,
+            )
         if (!saveRefreshedSession(binding, currentSession, updatedSession, locationProvider)) {
             return Result.failure(scopeChanged())
         }
 
         Napier.d("Token refreshed successfully, retrying")
         val refreshedBinding = binding?.let { CloudRequestBinding(it.location, updatedSession) }
-        val retried = runBound(refreshedBinding) { operation(newToken) }
+        val retried = runBound(refreshedBinding) { operation(refreshed.accessToken) }
         retried.rethrowCancellation()
         if (refreshedBinding != null && !isStillBound(refreshedBinding, locationProvider)) {
             return Result.failure(scopeChanged())
         }
         return retried
+    }
+
+    private suspend fun refreshSession(refreshToken: String): Result<RefreshedSession> {
+        val rotating = cloudAccountRepository as? SessionRefreshingAccountRepository
+        if (rotating != null) return rotating.refreshSession(refreshToken)
+        return cloudAccountRepository.refreshAccessToken(refreshToken).map { RefreshedSession(it, refreshToken = null) }
+    }
+
+    /**
+     * Settings observes this same session. A refused or revoked refresh token must stop looking signed
+     * in, while an outage must preserve credentials for the next attempt. A revoked device session is also
+     * reported, so a linked watch can stop and erase what it holds.
+     */
+    private suspend fun endSessionIfRefused(
+        refreshError: Throwable,
+        currentSession: UserSession,
+    ) {
+        if (refreshError !is CloudApiException || refreshError.statusCode != 401) return
+        if (refreshError.errorCode !in SESSION_ENDED_CODES) return
+        if (sessionStorage.getSession() != currentSession) return
+        sessionStorage.clearSession()
+        if (refreshError.errorCode != DeviceLinkErrorCodes.DEVICE_SESSION_REVOKED) return
+        Napier.w("The server revoked this device's session")
+        revocationListener.onDeviceSessionRevoked()
     }
 
     /** Returns false when a bound session was replaced or its origin changed while refreshing. */
@@ -228,3 +243,10 @@ internal class SyncTokenRefresher(
 
     suspend fun isAuthenticated(): Boolean = getAccessToken() != null
 }
+
+private val SESSION_ENDED_CODES =
+    setOf(
+        PasskeyApiErrorCodes.INVALID_REFRESH_TOKEN,
+        PasskeyApiErrorCodes.REFRESH_TOKEN_REVOKED,
+        DeviceLinkErrorCodes.DEVICE_SESSION_REVOKED,
+    )

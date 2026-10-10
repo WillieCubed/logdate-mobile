@@ -5,6 +5,8 @@ import app.logdate.client.sync.cloud.CloudApiClient
 import app.logdate.client.sync.cloud.CloudRequestBinding
 import app.logdate.client.sync.cloud.CloudRequestLocation
 import app.logdate.client.sync.cloud.CloudRequestLocationProvider
+import app.logdate.client.sync.cloud.RefreshedSession
+import app.logdate.client.sync.cloud.SessionRefreshingAccountRepository
 import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.config.LogDateConfigRepository
@@ -47,7 +49,8 @@ class DefaultCloudAccountRepository(
     private val configRepository: LogDateConfigRepository = DefaultLogDateConfigRepository(),
     private val coroutineScope: CoroutineScope = CoroutineScope(platformIODispatcher),
 ) : CloudAccountRepository,
-    CloudRequestLocationProvider {
+    CloudRequestLocationProvider,
+    SessionRefreshingAccountRepository {
     override fun captureLocation(): CloudRequestLocation {
         val origin = configRepository.getCurrentBackendUrl()
         val apiBaseUrl = configRepository.getCurrentApiBaseUrl()
@@ -346,6 +349,38 @@ class DefaultCloudAccountRepository(
         } catch (e: Exception) {
             if (e is CancellationException) throw e
             Napier.e("Error refreshing access token")
+            Result.failure(e)
+        }
+
+    /**
+     * Refreshes the session and stores both tokens for the server it came from. Against a cloud client
+     * without session refresh it falls back to refreshing the access token alone.
+     */
+    override suspend fun refreshSession(refreshToken: String): Result<RefreshedSession> =
+        try {
+            val binding = currentCoroutineContext()[CloudRequestBinding]
+            if (binding != null && binding.session.refreshToken != refreshToken) {
+                error("Cloud request session changed")
+            }
+            val origin = binding?.location?.origin ?: configRepository.getCurrentBackendUrl()
+            val rotated = apiClient.refreshSession(refreshToken)
+            val result =
+                if (rotated.exceptionOrNull() is UnsupportedOperationException) {
+                    apiClient.refreshAccessToken(refreshToken).map { RefreshedSession(it, refreshToken = null) }
+                } else {
+                    rotated
+                }
+
+            result.onSuccess { session ->
+                check(isCurrentOrigin(origin)) { "Cloud request origin changed" }
+                secureStorage.putString(scopedKey(StorageKeys.ACCESS_TOKEN, origin), session.accessToken)
+                session.refreshToken?.let { secureStorage.putString(scopedKey(StorageKeys.REFRESH_TOKEN, origin), it) }
+            }
+
+            result
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Napier.e("Error refreshing the session")
             Result.failure(e)
         }
 

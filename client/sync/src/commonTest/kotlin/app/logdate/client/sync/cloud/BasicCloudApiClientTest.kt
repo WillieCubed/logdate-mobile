@@ -232,6 +232,89 @@ class BasicCloudApiClientTest {
         }
 
     @Test
+    fun `a session refresh returns a rotated refresh token`() =
+        runTest {
+            val client =
+                createApiClient(
+                    MockEngine { request ->
+                        assertEquals("$baseUrl/auth/token/refresh", request.url.toString())
+                        respond(
+                            content = """{"success":true,"data":{"accessToken":"new-access","refreshToken":"new-refresh"}}""",
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        )
+                    },
+                )
+
+            assertEquals(RefreshedSession("new-access", "new-refresh"), client.refreshSession("refresh").getOrThrow())
+        }
+
+    @Test
+    fun `a session refresh without rotation has no new refresh token`() =
+        runTest {
+            val bodies =
+                listOf(
+                    """{"success":true,"data":{"accessToken":"new-access"}}""",
+                    """{"success":true,"data":{"accessToken":"new-access","refreshToken":null}}""",
+                )
+
+            bodies.forEach { body ->
+                val client =
+                    createApiClient(
+                        MockEngine {
+                            respond(
+                                content = body,
+                                status = HttpStatusCode.OK,
+                                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                            )
+                        },
+                    )
+
+                assertEquals(RefreshedSession("new-access", null), client.refreshSession("refresh").getOrThrow())
+            }
+        }
+
+    @Test
+    fun `a revoked device session keeps its error code on the refresh route`() =
+        runTest {
+            val client =
+                createApiClient(
+                    MockEngine {
+                        respond(
+                            content = """{"error":{"code":"DEVICE_SESSION_REVOKED","message":"This device was removed"}}""",
+                            status = HttpStatusCode.Unauthorized,
+                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        )
+                    },
+                )
+
+            val error = assertIs<CloudApiException>(client.refreshSession("refresh").exceptionOrNull())
+            assertEquals("DEVICE_SESSION_REVOKED", error.errorCode)
+            assertEquals(401, error.statusCode)
+        }
+
+    @Test
+    fun `a revoked device session keeps its error code on a sync route`() =
+        runTest {
+            val client =
+                createApiClient(
+                    MockEngine {
+                        respond(
+                            content =
+                                """{"code":"DEVICE_SESSION_REVOKED","message":"This device was removed from the account",""" +
+                                    """"details":{},"timestamp":"2026-01-01T00:00:00Z"}""",
+                            status = HttpStatusCode.Unauthorized,
+                            headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        )
+                    },
+                )
+
+            val error = assertIs<CloudApiException>(client.getContentChanges("token", since = 0).exceptionOrNull())
+            assertEquals("DEVICE_SESSION_REVOKED", error.errorCode)
+            assertEquals(401, error.statusCode)
+        }
+
+    @Test
     fun `auth error envelope maps into cloud api exception`() =
         runTest {
             val client =

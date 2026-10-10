@@ -53,6 +53,7 @@ import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
 import app.logdate.client.sync.cloud.DefaultCloudDraftDataSource
 import app.logdate.client.sync.cloud.DefaultCloudJournalDataSource
 import app.logdate.client.sync.cloud.DefaultCloudMediaDataSource
+import app.logdate.client.sync.cloud.DeviceSessionRevocationListener
 import app.logdate.client.sync.cloud.DraftChangesResponse
 import app.logdate.client.sync.cloud.DraftUploadRequest
 import app.logdate.client.sync.cloud.DraftUploadResponse
@@ -228,6 +229,7 @@ fun testDefaultSyncManager(
     downloadInbox: app.logdate.client.sync.recovery.DownloadInbox? = null,
     supportsRichDrafts: () -> Boolean = { false },
     diagnostics: app.logdate.client.sync.diagnostics.SyncDiagnosticRecorder? = null,
+    deviceSessionRevocationListener: DeviceSessionRevocationListener = DeviceSessionRevocationListener.None,
 ): DefaultSyncManager =
     if (syncScope == null) {
         DefaultSyncManager(
@@ -263,6 +265,7 @@ fun testDefaultSyncManager(
             downloadInbox = downloadInbox,
             supportsRichDrafts = supportsRichDrafts,
             diagnostics = diagnostics,
+            deviceSessionRevocationListener = deviceSessionRevocationListener,
         )
     } else {
         DefaultSyncManager(
@@ -298,6 +301,7 @@ fun testDefaultSyncManager(
             downloadInbox = downloadInbox,
             supportsRichDrafts = supportsRichDrafts,
             diagnostics = diagnostics,
+            deviceSessionRevocationListener = deviceSessionRevocationListener,
             syncScope = syncScope,
         )
     }

@@ -16,6 +16,7 @@ import app.logdate.client.sync.cloud.CloudContentDataSource
 import app.logdate.client.sync.cloud.CloudDraftDataSource
 import app.logdate.client.sync.cloud.CloudJournalDataSource
 import app.logdate.client.sync.cloud.CloudMediaDataSource
+import app.logdate.client.sync.cloud.DeviceSessionRevocationListener
 import app.logdate.client.sync.conflict.ConflictResolver
 import app.logdate.client.sync.conflict.SyncConflictStore
 import app.logdate.client.sync.crypto.MediaPayloadKeyProvider
@@ -110,6 +111,8 @@ class DefaultSyncManager(
     internal val diagnostics: app.logdate.client.sync.diagnostics.SyncDiagnosticRecorder? = null,
     internal val diagnosticSource: () -> app.logdate.client.sync.diagnostics.DiagnosticSource? = { null },
     private val mediaReferences: StoredMediaReferences = StoredMediaReferences.Unchanged,
+    /** Told when the server revokes this device's session; a linked watch erases itself on it. */
+    private val deviceSessionRevocationListener: DeviceSessionRevocationListener = DeviceSessionRevocationListener.None,
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     internal val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -331,7 +334,7 @@ class DefaultSyncManager(
             errors = listOf(SyncError(SyncErrorType.AUTHENTICATION_ERROR, "No access token")),
         )
 
-    internal val tokenRefresher = SyncTokenRefresher(sessionStorage, cloudAccountRepository)
+    internal val tokenRefresher = SyncTokenRefresher(sessionStorage, cloudAccountRepository, deviceSessionRevocationListener)
 
     internal suspend fun cursorFor(entityType: EntityType): Instant =
         syncMetadataService.getLastSyncTime(entityType)

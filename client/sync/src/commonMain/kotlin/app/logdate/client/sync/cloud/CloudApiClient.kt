@@ -74,6 +74,13 @@ interface CloudApiClient {
     suspend fun refreshAccessToken(refreshToken: String): Result<String>
 
     /**
+     * Refreshes the session, returning the refresh token the server rotated to, when it did. A linked
+     * device's session slides forward on every refresh, so a rotated refresh token must be saved.
+     */
+    suspend fun refreshSession(refreshToken: String): Result<RefreshedSession> =
+        Result.failure(UnsupportedOperationException("Session refresh is not supported by this cloud client"))
+
+    /**
      * Gets the current account information.
      *
      * @param accessToken The access token for authentication.

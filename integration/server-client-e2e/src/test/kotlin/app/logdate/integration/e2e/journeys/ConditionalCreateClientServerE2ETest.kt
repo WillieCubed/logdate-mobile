@@ -111,7 +111,7 @@ class ConditionalCreateClientServerE2ETest {
                     DefaultServerDiscoveryClient(httpClient).discoverServer(origin).getOrThrow().copy(serverOrigin = origin),
                 )
                 val journalId = Uuid.random().toString()
-                val kept = Uuid.random().toString()
+                val alreadyLinked = Uuid.random().toString()
                 val removed = Uuid.random().toString()
                 val fresh = Uuid.random().toString()
 
@@ -126,17 +126,17 @@ class ConditionalCreateClientServerE2ETest {
                 assertEquals(HttpStatusCode.NoContent, httpClient.delete("$baseUrl/journals/$journalId") { bearer(phoneToken) }.status)
                 assertIs<ConditionalCreateResult.Deleted>(client.createJournalIfAbsent(watchToken, journal(journalId, "Back")).getOrThrow())
 
-                val first = client.uploadAssociationsIfAbsent(watchToken, links(journalId, kept, removed)).getOrThrow()
+                val first = client.uploadAssociationsIfAbsent(watchToken, links(journalId, alreadyLinked, removed)).getOrThrow()
                 assertEquals(2, first.uploadedCount)
                 assertEquals(
                     HttpStatusCode.NoContent,
                     httpClient.delete("$baseUrl/associations/$journalId/$removed") { bearer(phoneToken) }.status,
                 )
 
-                val second = client.uploadAssociationsIfAbsent(watchToken, links(journalId, kept, removed, fresh)).getOrThrow()
+                val second = client.uploadAssociationsIfAbsent(watchToken, links(journalId, alreadyLinked, removed, fresh)).getOrThrow()
 
                 assertEquals(1, second.uploadedCount)
-                assertEquals(listOf(AssociationDeleteItem(journalId, kept)), second.existing)
+                assertEquals(listOf(AssociationDeleteItem(journalId, alreadyLinked)), second.existing)
                 assertEquals(listOf(removed), second.deleted.map { it.contentId })
             }
         }
