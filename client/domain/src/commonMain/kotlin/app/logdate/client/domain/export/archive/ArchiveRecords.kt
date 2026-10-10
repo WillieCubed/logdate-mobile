@@ -104,6 +104,7 @@ internal fun JournalNote.toArchiveNote(
         textFormat = ArchiveTextFormat.MARKDOWN.takeIf { text != null },
         caption = caption.ifEmpty { null },
         photoPresentation = (this as? JournalNote.Image)?.presentation?.name,
+        capturedOn = capturedOn?.wireName,
         media = mediaRefOrNull()?.let(media::refFor),
         durationMs = (this as? JournalNote.Audio)?.durationMs,
         transcript = (this as? JournalNote.Audio)?.transcript,

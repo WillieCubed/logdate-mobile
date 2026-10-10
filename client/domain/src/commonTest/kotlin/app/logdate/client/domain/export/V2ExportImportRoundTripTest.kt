@@ -15,6 +15,7 @@ import app.logdate.client.domain.restore.RestoreArchiveReader
 import app.logdate.client.domain.restore.RestoreTestDeviceIdProvider
 import app.logdate.client.domain.restore.RestoreTestOwnerProvider
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
+import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.transcription.TranscriptDocument
 import app.logdate.shared.model.PhotoPresentation
@@ -24,6 +25,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class V2ExportImportRoundTripTest : ArchiveExportFixture() {
@@ -37,6 +39,7 @@ class V2ExportImportRoundTripTest : ArchiveExportFixture() {
                     audioNote.copy(
                         caption = "A walk by the water",
                         transcript = TranscriptDocument.fromPlainText("Spoken archived audio").copy(revision = 4),
+                        capturedOn = CaptureDevice.WATCH,
                     ),
                     videoNote,
                 )
@@ -108,6 +111,8 @@ class V2ExportImportRoundTripTest : ArchiveExportFixture() {
                 TranscriptDocument.fromPlainText("Spoken archived audio").copy(revision = 4),
                 (notes.getNoteById(audioNote.uid) as JournalNote.Audio).transcript,
             )
+            assertEquals(CaptureDevice.WATCH, notes.getNoteById(audioNote.uid)?.capturedOn)
+            assertNull(notes.getNoteById(textNote.uid)?.capturedOn)
             assertTrue(result.warnings.any { "not restored" in it || "Skipped" in it })
         }
 }

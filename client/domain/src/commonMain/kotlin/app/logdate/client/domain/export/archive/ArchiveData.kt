@@ -49,6 +49,8 @@ data class ArchiveNote(
     val textFormat: ArchiveTextFormat? = null,
     val caption: String? = null,
     val photoPresentation: String? = null,
+    /** The kind of device the note was captured on, `phone` or `watch`. Absent when it was not recorded. */
+    val capturedOn: String? = null,
     val media: ArchiveMediaRef? = null,
     val durationMs: Long? = null,
     val transcript: TranscriptDocument? = null,

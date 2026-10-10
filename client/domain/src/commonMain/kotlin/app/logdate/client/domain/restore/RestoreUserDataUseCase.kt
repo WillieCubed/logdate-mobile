@@ -15,6 +15,7 @@ import app.logdate.client.domain.export.ExportStats
 import app.logdate.client.domain.export.LocationHistoryPayload
 import app.logdate.client.domain.export.PlacesPayload
 import app.logdate.client.domain.export.ProfilePayload
+import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -496,6 +497,7 @@ class RestoreUserDataUseCase(
                     lastUpdated = updatedAt,
                     content = content.orEmpty(),
                     timeZoneId = timeZone,
+                    capturedOn = CaptureDevice.fromWireName(capturedOn),
                     syncVersion = syncVersion,
                     location = location,
                 )
@@ -508,6 +510,7 @@ class RestoreUserDataUseCase(
                     caption = caption.orEmpty(),
                     presentation = PhotoPresentation.entries.firstOrNull { it.name == photoPresentation } ?: PhotoPresentation.EdgeToEdge,
                     timeZoneId = timeZone,
+                    capturedOn = CaptureDevice.fromWireName(capturedOn),
                     syncVersion = syncVersion,
                     location = location,
                 )
@@ -519,6 +522,7 @@ class RestoreUserDataUseCase(
                     mediaRef = resolvedMediaRef ?: return null,
                     caption = caption.orEmpty(),
                     timeZoneId = timeZone,
+                    capturedOn = CaptureDevice.fromWireName(capturedOn),
                     syncVersion = syncVersion,
                     location = location,
                 )
@@ -532,6 +536,7 @@ class RestoreUserDataUseCase(
                     transcript = transcript,
                     caption = caption.orEmpty(),
                     timeZoneId = timeZone,
+                    capturedOn = CaptureDevice.fromWireName(capturedOn),
                     syncVersion = syncVersion,
                     location = location,
                 )

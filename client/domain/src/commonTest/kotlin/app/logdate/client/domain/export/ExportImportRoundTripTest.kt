@@ -17,6 +17,7 @@ import app.logdate.client.domain.restore.RestoreStrategy
 import app.logdate.client.domain.restore.RestoreTestDeviceIdProvider
 import app.logdate.client.domain.restore.RestoreTestOwnerProvider
 import app.logdate.client.domain.restore.RestoreUserDataUseCase
+import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
@@ -205,6 +206,7 @@ class ExportImportRoundTripTest {
             assertEquals("file:///storage/audio/voice_memo.m4a", audio.mediaRef)
             assertEquals("A walk by the water", audio.caption)
             assertEquals(TranscriptDocument.fromPlainText("Spoken walk by the water").copy(revision = 12), audio.transcript)
+            assertEquals(CaptureDevice.WATCH, audio.capturedOn)
         }
 
     @Test
@@ -565,6 +567,7 @@ class ExportImportRoundTripTest {
                 syncVersion = 17,
                 caption = "A walk by the water",
                 transcript = TranscriptDocument.fromPlainText("Spoken walk by the water").copy(revision = 12),
+                capturedOn = CaptureDevice.WATCH,
             )
         val textWithLocationNote =
             JournalNote.Text(

@@ -162,6 +162,7 @@ private fun V2RestoreBundle.decodeAndMapNotes(): Pair<List<ExportNote>, List<Exp
                 createdAt = note.createdAt,
                 updatedAt = note.updatedAt,
                 timeZone = note.timeZone,
+                capturedOn = note.capturedOn,
                 location = note.location?.toExportLocation(),
             )
         }

@@ -64,6 +64,7 @@ object ArchiveSamples {
             text = "Walk by the river",
             textFormat = ArchiveTextFormat.MARKDOWN,
             caption = "Sunset",
+            capturedOn = "watch",
             media = includedMedia,
             durationMs = 1_000,
             location = location,

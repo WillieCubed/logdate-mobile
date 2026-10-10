@@ -157,6 +157,7 @@ object ArchiveSchemas {
                                 "textFormat" to enumOf(ArchiveTextFormat.serializer()),
                                 "caption" to string(),
                                 "photoPresentation" to string(),
+                                "capturedOn" to string(minLength = 1),
                                 "transcript" to transcript(),
                                 "media" to ref("mediaRef"),
                                 "durationMs" to count(),
