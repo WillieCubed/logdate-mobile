@@ -1,5 +1,6 @@
 package app.logdate.server.routes.docs
 
+import app.logdate.server.openapi.renderApiText
 import app.logdate.server.routes.ErrorEnvelope
 import app.logdate.server.routes.bearerUnauthorized
 import app.logdate.server.routes.syncError
@@ -58,3 +59,32 @@ internal val journalChange =
         lastUpdated = SyncExamples.CREATED_AT,
         serverVersion = SyncExamples.SERVER_VERSION,
     )
+
+/** The `ifAbsent` query parameter on the create-only uploads. [what] says what a taken or deleted ID answers. */
+internal fun RequestConfig.ifAbsentQuery(what: String) {
+    queryParameter<Boolean>("ifAbsent") {
+        description =
+            "Send `true` to create only: $what Servers that list `conditionalCreateV1` in their descriptor honor it; " +
+            "older servers ignore it and save normally, so check the descriptor first."
+        required = false
+        example("Create only") { value = true }
+    }
+}
+
+/** The version and tombstone details a `412` or `410` create-only answer puts in its `details` map. */
+internal val existsDetails = mapOf("serverVersion" to SyncExamples.SERVER_VERSION.toString())
+
+internal val deletedDetails =
+    mapOf("deletedAt" to (SyncExamples.CREATED_AT - 60_000).toString(), "serverVersion" to SyncExamples.SERVER_VERSION.toString())
+
+/** A bodiless answer whose meaning is in the status and the version headers; `HEAD` responses look like this. */
+internal fun ResponsesConfig.recordState(
+    status: HttpStatusCode,
+    description: String,
+    vararg headers: Pair<String, String>,
+) {
+    code(status) {
+        this.description = renderApiText(description.trimIndent())
+        headers.forEach { (name, text) -> header<Long>(name) { this.description = text } }
+    }
+}

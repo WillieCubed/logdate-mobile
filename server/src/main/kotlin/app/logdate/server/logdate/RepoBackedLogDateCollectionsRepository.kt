@@ -10,7 +10,6 @@ import app.logdate.server.identity.SigningKeyService
 import io.github.aakira.napier.Napier
 import studio.hypertext.atproto.identity.AtprotoDid
 import studio.hypertext.atproto.repo.DefaultRepoEngine
-import studio.hypertext.atproto.repo.InvalidSwapException
 import studio.hypertext.atproto.repo.RepoBlockStore
 import studio.hypertext.atproto.repo.RepoRecordId
 import studio.hypertext.atproto.syntax.RecordKey
@@ -73,36 +72,6 @@ internal class RepoBackedLogDateCollectionsRepository(
         userId: UUID,
         id: String,
     ): Boolean = metadataStore.metadata(userId, LogDateCollectionKind.ENTRY, id) != null
-
-    override suspend fun createEntryIfAbsent(
-        userId: UUID,
-        entry: LogDateEntry,
-    ): LogDateEntry? {
-        val repoDid = canonicalRepoDid(userId)
-        val written = repoEngine.putRecordIfAbsent(entryRecordId(repoDid, entry.id), entry.toRepoJson())
-        if (written.exceptionOrNull() is InvalidSwapException) {
-            indexExistingRecordIfNeeded(userId, repoDid, LogDateCollectionKind.ENTRY, entryRecordId(repoDid, entry.id))
-            return null
-        }
-        written.getOrThrow()
-        val metadata = metadataStore.upsert(userId, repoDid, LogDateCollectionKind.ENTRY, entry.id)
-        return entry.copy(version = metadata.version, lastUpdated = System.currentTimeMillis())
-    }
-
-    override suspend fun createJournalIfAbsent(
-        userId: UUID,
-        journal: LogDateJournal,
-    ): LogDateJournal? {
-        val repoDid = canonicalRepoDid(userId)
-        val written = repoEngine.putRecordIfAbsent(journalRecordId(repoDid, journal.id), journal.toRepoJson())
-        if (written.exceptionOrNull() is InvalidSwapException) {
-            indexExistingRecordIfNeeded(userId, repoDid, LogDateCollectionKind.JOURNAL, journalRecordId(repoDid, journal.id))
-            return null
-        }
-        written.getOrThrow()
-        val metadata = metadataStore.upsert(userId, repoDid, LogDateCollectionKind.JOURNAL, journal.id)
-        return journal.copy(version = metadata.version, lastUpdated = System.currentTimeMillis())
-    }
 
     override suspend fun journalExists(
         userId: UUID,
@@ -179,21 +148,6 @@ internal class RepoBackedLogDateCollectionsRepository(
             }
         }
         return AssociationCreateResults(created, existing, deleted)
-    }
-
-    private suspend fun indexExistingRecordIfNeeded(
-        userId: UUID,
-        repoDid: AtprotoDid,
-        collection: LogDateCollectionKind,
-        recordId: RepoRecordId,
-    ) {
-        val key = recordId.recordKey.toString()
-        if (metadataStore.metadata(userId, collection, key) != null) return
-        // A process may stop after its canonical write but before indexing it for sync.
-        // Rebuild that index from the surviving record; a retry must never replace its body.
-        if (repoEngine.getRecord(recordId).getOrThrow() != null) {
-            metadataStore.upsert(userId, repoDid, collection, key)
-        }
     }
 
     override suspend fun getEntry(

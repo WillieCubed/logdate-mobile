@@ -236,6 +236,10 @@ data class Association(
 data class AssociationUploadResponse(
     val uploadedCount: Int,
     val uploadedAt: Long,
+    /** With `?ifAbsent=true`: links that already existed and were left alone. */
+    val existing: List<AssociationDeleteItem> = emptyList(),
+    /** With `?ifAbsent=true`: links that were deleted and stay deleted. */
+    val deleted: List<AssociationDeletion> = emptyList(),
 )
 
 @Serializable

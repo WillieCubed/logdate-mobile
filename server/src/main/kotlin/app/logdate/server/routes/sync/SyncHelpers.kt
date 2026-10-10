@@ -9,12 +9,14 @@ import app.logdate.server.auth.TokenService
 import app.logdate.server.auth.bearerToken
 import app.logdate.server.entitlements.QuotaCheck
 import app.logdate.server.entitlements.QuotaReason
+import app.logdate.server.logdate.ConditionalCreate
 import app.logdate.server.logdate.LogDateAssociation
 import app.logdate.server.logdate.LogDateBackup
 import app.logdate.server.logdate.LogDateBlobStorage
 import app.logdate.server.logdate.LogDateEntry
 import app.logdate.server.logdate.LogDateJournal
 import app.logdate.server.logdate.LogDateMedia
+import app.logdate.server.logdate.LogDateRecordState
 import app.logdate.server.ratelimit.RateLimitPolicy
 import app.logdate.server.ratelimit.SlidingWindowRateLimiter
 import app.logdate.server.responses.error
@@ -331,6 +333,61 @@ private suspend fun ApplicationCall.parseAccountId(accountId: String): UUID? =
 
 internal fun ApplicationCall.requiredPathParam(name: String): String =
     requireNotNull(parameters[name]) { "Missing required route parameter: $name" }
+
+// --- Create-only writes --------------------------------------------------------------------------
+
+internal const val SERVER_VERSION_HEADER = "X-LogDate-Server-Version"
+internal const val DELETED_AT_HEADER = "X-LogDate-Deleted-At"
+
+/** `?ifAbsent=true`: create only, and answer 410 instead of recreating a deleted record. */
+internal fun ApplicationCall.isStrictCreate(): Boolean = request.queryParameters["ifAbsent"] == "true"
+
+/** `If-None-Match: *`: create only; a deleted record may be recreated, which the Mac app relies on. */
+internal fun ApplicationCall.isCreateOnly(): Boolean = request.header(HttpHeaders.IfNoneMatch) == "*"
+
+/**
+ * Answers a create-only write: `201` with a `Location`, `412 <NOUN>_EXISTS` with `details.serverVersion`,
+ * or `410 <NOUN>_DELETED` with `details.deletedAt` and `details.serverVersion`.
+ */
+internal suspend inline fun <T, reified R : Any> ApplicationCall.respondConditionalCreate(
+    outcome: ConditionalCreate<T>,
+    noun: String,
+    location: String,
+    created: (T) -> R,
+) {
+    val label = noun.replaceFirstChar(Char::uppercaseChar)
+    val code = noun.uppercase()
+    when (outcome) {
+        is ConditionalCreate.Created -> {
+            response.headers.append(HttpHeaders.Location, location)
+            respond(HttpStatusCode.Created, created(outcome.record))
+        }
+        is ConditionalCreate.Exists -> {
+            val details = outcome.serverVersion?.let { mapOf("serverVersion" to it.toString()) }.orEmpty()
+            respond(HttpStatusCode.PreconditionFailed, error("${code}_EXISTS", "$label already exists", details))
+        }
+        is ConditionalCreate.Deleted -> {
+            val details = mapOf("deletedAt" to outcome.deletedAt.toString(), "serverVersion" to outcome.serverVersion.toString())
+            respond(HttpStatusCode.Gone, error("${code}_DELETED", "$label was deleted", details))
+        }
+    }
+}
+
+/** Answers `HEAD` for one record: `200` or `410` with its server version, or `404`. */
+internal suspend fun ApplicationCall.respondRecordState(state: LogDateRecordState) {
+    when (state) {
+        is LogDateRecordState.Live -> {
+            response.headers.append(SERVER_VERSION_HEADER, state.serverVersion.toString())
+            respond(HttpStatusCode.OK)
+        }
+        is LogDateRecordState.Deleted -> {
+            response.headers.append(SERVER_VERSION_HEADER, state.serverVersion.toString())
+            response.headers.append(DELETED_AT_HEADER, state.deletedAt.toString())
+            respond(HttpStatusCode.Gone)
+        }
+        LogDateRecordState.Absent -> respond(HttpStatusCode.NotFound)
+    }
+}
 
 // --- Wire-shape mappers --------------------------------------------------------------------------
 

@@ -296,7 +296,7 @@ class OpenApiContractTest {
 
     companion object {
         private const val SCHEMA_REF_PREFIX = "#/components/schemas/"
-        private val HTTP_METHODS = setOf("get", "post", "put", "patch", "delete")
+        private val HTTP_METHODS = setOf("get", "head", "post", "put", "patch", "delete")
         private val MACHINE_TEXT = Regex("^(Get|Post|Put|Patch|Delete) [A-Za-z.]+\\.?$")
         private val OPERATION_ID = Regex("^[a-z][A-Za-z0-9]*$")
         private val PATH_PARAM = Regex("\\{([^}]+)}")
@@ -353,7 +353,7 @@ class OpenApiContractTest {
         private val XRPC_ALWAYS_AVAILABLE = setOf("resolveHandle", "describeAtprotoServer", "describeRepo")
 
         /** Operations whose success status is the whole answer, so they reply with an empty body. */
-        private val SUCCESS_WITHOUT_BODY = setOf("revokeOAuthToken", "putAccountKeyEnvelope")
+        private val SUCCESS_WITHOUT_BODY = setOf("revokeOAuthToken", "putAccountKeyEnvelope", "headContent")
 
         /** Operations that answer 201 without a Location header because the created thing has no URL of its own. */
         private val CREATED_WITHOUT_LOCATION =

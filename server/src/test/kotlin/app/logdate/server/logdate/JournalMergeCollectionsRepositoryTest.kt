@@ -96,6 +96,42 @@ class JournalMergeCollectionsRepositoryTest {
         }
 
     @Test
+    fun `create-only link uploads for a merged journal land on its destination`() =
+        runTest {
+            val repository =
+                MergeAwareLogDateCollectionsRepository(
+                    SyncBackedLogDateCollectionsRepository(InMemorySyncRepository()),
+                    InMemoryJournalMergeStore(),
+                )
+            val user = UUID.randomUUID()
+            val source = journal()
+            val destination = journal()
+            val note = Uuid.random().toString()
+            val lateNote = Uuid.random().toString()
+            repository.upsertJournal(user, source)
+            repository.upsertJournal(user, destination)
+            repository.upsertAssociations(user, listOf(association(source.id, note)))
+            repository.merge(user, source.id, JournalMergeRequest(Uuid.random().toString(), destination.id, listOf(note)))
+
+            val results =
+                repository.createAssociationsIfAbsent(
+                    user,
+                    listOf(association(source.id, note), association(source.id, lateNote)),
+                )
+
+            assertEquals(listOf(lateNote), results.created.map { it.entryId })
+            assertEquals(listOf(note), results.existing.map { it.entryId })
+            assertEquals(
+                setOf(note, lateNote),
+                repository
+                    .listAssociations(user)
+                    .filter { it.journalId == destination.id }
+                    .map { it.entryId }
+                    .toSet(),
+            )
+        }
+
+    @Test
     fun `interrupted merge resumes from durable membership snapshot after wrapper restart`() =
         runTest {
             val backend = SyncBackedLogDateCollectionsRepository(InMemorySyncRepository())

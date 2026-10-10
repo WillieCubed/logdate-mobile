@@ -16,6 +16,7 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -35,7 +36,7 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class)
 class RepoBackedLogDateCollectionsRepositoryTest {
     @Test
-    fun `retry indexes a canonical create interrupted before its sync metadata was saved`() =
+    fun `a retry after a failed index write creates the entry once`() =
         runTest {
             val accounts = InMemoryAccountRepository()
             val identity = identityService(accounts)
@@ -78,8 +79,8 @@ class RepoBackedLogDateCollectionsRepositoryTest {
             val userId = account.id.toJavaUUID()
             val entry = LogDateEntry("legacy-entry", "TEXT", "Opaque encrypted entry", null, 0, 10, 20, 0, DeviceId("device"))
 
-            assertFailsWith<IllegalStateException> { repository.createEntryIfAbsent(userId, entry) }
-            assertNull(repository.createEntryIfAbsent(userId, entry))
+            assertFailsWith<IllegalStateException> { repository.createEntryIfAbsent(userId, entry, respectTombstones = false) }
+            assertIs<ConditionalCreate.Created<LogDateEntry>>(repository.createEntryIfAbsent(userId, entry, respectTombstones = false))
             assertEquals(entry.content, repository.getEntry(userId, entry.id)?.content)
             assertEquals(entry.createdAt, repository.getEntry(userId, entry.id)?.createdAt)
             assertEquals(1, repository.entryChanges(userId, 0, 20).changes.size)
@@ -131,7 +132,10 @@ class RepoBackedLogDateCollectionsRepositoryTest {
                         ),
                 )
 
-            assertNull(repository.createEntryIfAbsent(userId, stored.copy(content = "Stale legacy copy")))
+            assertEquals(
+                ConditionalCreate.Exists(stored.version),
+                repository.createEntryIfAbsent(userId, stored.copy(content = "Stale legacy copy"), respectTombstones = false),
+            )
             repository.upsertEntry(userId, stored.copy(transcript = null))
             val fetched = repository.getEntry(userId = userId, id = "entry-1")
             val snapshot = repository.listEntries(userId)

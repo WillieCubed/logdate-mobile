@@ -35,6 +35,14 @@ object ServerProtocolFeature {
     const val DEVICE_LINKING_V1 = "deviceLinkingV1"
 
     /**
+     * `?ifAbsent=true` on `PUT /contents/{id}`, `PUT /journals/{id}`, `PUT /moments/{id}` and
+     * `POST /associations` creates only: a live ID answers `412` with `details.serverVersion`, a deleted
+     * one answers `410` with `details.deletedAt`, and nothing is written. Also `HEAD /contents/{id}`.
+     * Servers without this flag ignore `ifAbsent` and overwrite, so never send it to them.
+     */
+    const val CONDITIONAL_CREATE_V1 = "conditionalCreateV1"
+
+    /**
      * The server publishes hosted `did:plc` operations to the PLC directory, so identity changes
      * that need a published operation -- rotating the signing key, registering a recovery key,
      * recovering with one -- can succeed. Without it those requests are refused, and clients must

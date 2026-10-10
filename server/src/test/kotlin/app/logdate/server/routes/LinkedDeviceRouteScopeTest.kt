@@ -203,7 +203,7 @@ class LinkedDeviceRouteScopeTest {
         request(route.path + ROUTE_QUERIES[route.label].orEmpty()) {
             method = HttpMethod.parse(route.method)
             header(HttpHeaders.Authorization, "Bearer $token")
-            if (method != HttpMethod.Get && method != HttpMethod.Delete) {
+            if (method !in BODYLESS_METHODS) {
                 contentType(ContentType.Application.Json)
                 setBody("{}")
             }
@@ -211,8 +211,9 @@ class LinkedDeviceRouteScopeTest {
 
     private companion object {
         val PATH_PARAMETER = Regex("\\{[^}]+}")
-        val HTTP_METHODS = setOf("GET", "POST", "PUT", "PATCH", "DELETE")
+        val HTTP_METHODS = setOf("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE")
         val REFUSALS = setOf(HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden)
+        val BODYLESS_METHODS = setOf(HttpMethod.Get, HttpMethod.Head, HttpMethod.Delete)
 
         const val SWEEP_DID = "did:plc:ewvi7nxzyoun6zhxrhs64oiz"
         val SWEEP_CID = Cid.rawSha256(byteArrayOf(1)).toString()
@@ -236,6 +237,7 @@ class LinkedDeviceRouteScopeTest {
                 "PUT /api/v1/contents/{contentId}",
                 "GET /api/v1/contents",
                 "GET /api/v1/contents/{contentId}",
+                "HEAD /api/v1/contents/{contentId}",
                 "PATCH /api/v1/contents/{contentId}",
                 "DELETE /api/v1/contents/{contentId}",
                 "PUT /api/v1/journals/{journalId}",

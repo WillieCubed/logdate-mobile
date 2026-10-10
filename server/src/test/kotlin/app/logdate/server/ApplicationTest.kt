@@ -273,7 +273,7 @@ class ApplicationTest {
                 val ids = mutableSetOf<String>()
                 paths.forEach { (path, item) ->
                     item.jsonObject.forEach operation@{ (method, value) ->
-                        if (method !in setOf("get", "post", "put", "patch", "delete")) return@operation
+                        if (method !in setOf("get", "head", "post", "put", "patch", "delete")) return@operation
                         val operation = value.jsonObject
                         val label = "$method $path"
                         assertTrue(operation["summary"]?.jsonPrimitive?.content?.isNotBlank() == true, "$label needs summary")

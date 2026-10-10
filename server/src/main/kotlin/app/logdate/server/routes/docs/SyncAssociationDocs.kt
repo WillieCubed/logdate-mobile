@@ -36,6 +36,10 @@ internal object SyncAssociationDocs {
 
             The server does not check that the journal or entry exist, so you can upload links before, after,
             or alongside the things they connect.
+
+            With `?ifAbsent=true` only links that were never written are saved: links that already exist are
+            listed in `existing` and deleted links in `deleted`, and neither is touched. `uploadedCount` then
+            counts only the new links.
             """,
         )
         request {
@@ -53,6 +57,7 @@ internal object SyncAssociationDocs {
                 ),
                 "The links to create or refresh.",
             )
+            ifAbsentQuery("links that exist or were deleted are reported in the response and left alone.")
         }
         response {
             ok(

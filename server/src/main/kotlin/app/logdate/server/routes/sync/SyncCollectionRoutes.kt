@@ -26,12 +26,12 @@ import app.logdate.shared.model.sync.VersionConstraint
 import io.github.aakira.napier.Napier
 import io.github.smiley4.ktoropenapi.delete
 import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.head
 import io.github.smiley4.ktoropenapi.patch
 import io.github.smiley4.ktoropenapi.put
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
-import io.ktor.server.request.header
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -73,14 +73,6 @@ private fun Route.contentRoutes(
                         error("VALIDATION_ERROR", "Request body id must match path contentId"),
                     )
                 }
-                val wasCreated = !collectionsRepository.entryExists(userId, contentId)
-                if (call.request.header(HttpHeaders.IfNoneMatch) == "*" && !wasCreated) {
-                    return@put call.respond(
-                        HttpStatusCode.PreconditionFailed,
-                        error("CONTENT_EXISTS", "Content already exists"),
-                    )
-                }
-                Napier.d("Content upsert completed")
                 val entry =
                     LogDateEntry(
                         id = contentId,
@@ -97,13 +89,19 @@ private fun Route.contentRoutes(
                         location = req.location,
                         transcript = req.transcript,
                     )
-                val stored =
-                    if (call.request.header(HttpHeaders.IfNoneMatch) == "*") {
-                        collectionsRepository.createEntryIfAbsent(userId, entry)
-                            ?: return@put call.respond(HttpStatusCode.PreconditionFailed, error("CONTENT_EXISTS", "Content already exists"))
-                    } else {
-                        collectionsRepository.upsertEntry(userId, entry)
-                    }
+                val strictCreate = call.isStrictCreate()
+                if (strictCreate || call.isCreateOnly()) {
+                    call.respondConditionalCreate(
+                        outcome = collectionsRepository.createEntryIfAbsent(userId, entry, respectTombstones = strictCreate),
+                        noun = "content",
+                        location = "/api/v1/contents/$contentId",
+                    ) { ContentUploadResponse(id = it.id, serverVersion = it.version, uploadedAt = it.lastUpdated) }
+                    success = true
+                    return@put
+                }
+                val wasCreated = !collectionsRepository.entryExists(userId, contentId)
+                Napier.d("Content upsert completed")
+                val stored = collectionsRepository.upsertEntry(userId, entry)
                 val response =
                     ContentUploadResponse(
                         id = stored.id,
@@ -160,6 +158,11 @@ private fun Route.contentRoutes(
             } finally {
                 metrics.recordOperation(METRIC_CONTENT_CHANGES, System.currentTimeMillis() - start, success)
             }
+        }
+
+        head("/{contentId}", SyncCollectionDocs.headContent) {
+            val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@head
+            call.respondRecordState(collectionsRepository.entryState(userId, call.requiredPathParam("contentId")))
         }
 
         patch("/{contentId}", SyncCollectionDocs.patchContent) {

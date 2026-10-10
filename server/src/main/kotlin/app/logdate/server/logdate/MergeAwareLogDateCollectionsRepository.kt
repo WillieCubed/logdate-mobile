@@ -34,10 +34,11 @@ internal class MergeAwareLogDateCollectionsRepository(
     override suspend fun createJournalIfAbsent(
         userId: UUID,
         journal: LogDateJournal,
-    ): LogDateJournal? =
+        respectTombstones: Boolean,
+    ): ConditionalCreate<LogDateJournal> =
         store.withAccountLock(userId) {
             rejectMergedJournal(userId, journal.id)
-            delegate.createJournalIfAbsent(userId, journal)
+            delegate.createJournalIfAbsent(userId, journal, respectTombstones)
         }
 
     override suspend fun getJournal(
@@ -128,6 +129,23 @@ internal class MergeAwareLogDateCollectionsRepository(
             delegate.upsertAssociations(userId, redirected)
         }
 
+    override suspend fun createAssociationsIfAbsent(
+        userId: UUID,
+        associations: List<LogDateAssociation>,
+    ): AssociationCreateResults {
+        val operations = store.operations(userId)
+        val redirected =
+            associations
+                .map { association ->
+                    val destination = resolveMergeDestination(association.journalId, operations)
+                    if (destination != association.journalId && delegate.getJournal(userId, destination) == null) {
+                        throw JournalMergeDestinationMissingException()
+                    }
+                    association.copy(journalId = destination)
+                }.distinctBy { it.journalId to it.entryId }
+        return super<LogDateCollectionsRepository>.createAssociationsIfAbsent(userId, redirected)
+    }
+
     private suspend fun retainPendingMemberships(
         userId: UUID,
         associations: List<LogDateAssociation>,
@@ -171,7 +189,8 @@ internal class MergeAwareLogDateCollectionsRepository(
     override suspend fun createEntryIfAbsent(
         userId: UUID,
         entry: LogDateEntry,
-    ): LogDateEntry? = store.withAccountLock(userId) { delegate.createEntryIfAbsent(userId, entry) }
+        respectTombstones: Boolean,
+    ): ConditionalCreate<LogDateEntry> = store.withAccountLock(userId) { delegate.createEntryIfAbsent(userId, entry, respectTombstones) }
 
     override suspend fun deleteEntry(
         userId: UUID,

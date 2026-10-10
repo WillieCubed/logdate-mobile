@@ -235,11 +235,12 @@ internal fun ResponsesConfig.apiError(
     vararg cases: ErrorCase,
 ) = errorResponse(status, ErrorEnvelope.API, cases.toList())
 
-/** An error in the sync envelope. */
+/** An error in the sync envelope; [details] is the example's `details` map. */
 internal fun ResponsesConfig.syncError(
     status: HttpStatusCode,
     vararg cases: ErrorCase,
-) = errorResponse(status, ErrorEnvelope.SYNC, cases.toList())
+    details: Map<String, String> = emptyMap(),
+) = errorResponse(status, ErrorEnvelope.SYNC, cases.toList(), details = details)
 
 /** An error in the XRPC envelope; [ErrorCase.code] is the AT Protocol error name. */
 internal fun ResponsesConfig.pdsError(

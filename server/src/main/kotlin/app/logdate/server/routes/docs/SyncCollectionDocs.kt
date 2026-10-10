@@ -9,7 +9,9 @@ import app.logdate.server.routes.noContent
 import app.logdate.server.routes.ok
 import app.logdate.server.routes.sinceAndLimit
 import app.logdate.server.routes.sync.DEFAULT_SYNC_PAGE_SIZE
+import app.logdate.server.routes.sync.DELETED_AT_HEADER
 import app.logdate.server.routes.sync.MAX_SYNC_PAGE_SIZE
+import app.logdate.server.routes.sync.SERVER_VERSION_HEADER
 import app.logdate.server.routes.syncError
 import app.logdate.shared.model.sync.ContentChangesResponse
 import app.logdate.shared.model.sync.ContentDeletion
@@ -47,12 +49,17 @@ internal object SyncCollectionDocs {
             order this write relative to others. Whatever `syncVersion` you send is ignored; the server owns
             versions.
 
+            Send `?ifAbsent=true` instead for a strict create, as linked watches do: nothing is written if the ID
+            is live (`412 CONTENT_EXISTS`, with `details.serverVersion`) or was deleted (`410 CONTENT_DELETED`,
+            with `details.deletedAt`). `If-None-Match: *` alone may recreate a deleted entry.
+
             The `id` in the body must equal the `contentId` in the path. The LogDate apps encrypt `content`,
             `caption` and `location` on the device before saving; the server never reads them.
             """,
         )
         request {
             contentId("Must match `id` in the body.")
+            ifAbsentQuery("a live entry answers `412 CONTENT_EXISTS` and a deleted one `410 CONTENT_DELETED`; neither writes anything.")
             jsonBody(
                 ContentUploadRequest(
                     id = SyncExamples.CONTENT_ID,
@@ -96,9 +103,21 @@ internal object SyncCollectionDocs {
                 HttpStatusCode.PreconditionFailed,
                 ErrorCase(
                     "CONTENT_EXISTS",
-                    "An entry already exists when `If-None-Match: *` is sent.",
+                    "An entry already holds this ID and `If-None-Match: *` or `?ifAbsent=true` was sent. Nothing was " +
+                        "written; `details.serverVersion` is the stored version.",
                     "Content already exists",
                 ),
+                details = existsDetails,
+            )
+            syncError(
+                HttpStatusCode.Gone,
+                ErrorCase(
+                    "CONTENT_DELETED",
+                    "The entry was deleted and `?ifAbsent=true` was sent. Nothing was written; `details.deletedAt` says " +
+                        "when. Drop the local copy instead of uploading it again.",
+                    "Content was deleted",
+                ),
+                details = deletedDetails,
             )
             syncUnauthorized()
             syncServerError()
@@ -156,6 +175,41 @@ internal object SyncCollectionDocs {
                 HttpStatusCode.NotFound,
                 ErrorCase("NOT_FOUND", "No entry with that ID belongs to this account, or it was deleted.", "Content not found"),
             )
+            syncServerError()
+        }
+    }
+
+    val headContent: RouteConfig.() -> Unit = {
+        bearerOperation(
+            "headContent",
+            ApiTags.CONTENTS,
+            "Check whether an entry exists",
+            """
+            Answers whether an entry ID is live, deleted or unknown without sending the entry, so a device can
+            skip an upload the server already has. The status and headers carry the answer, because a `HEAD`
+            response has no body.
+
+            `200` means the entry exists, `410` means it was deleted and its tombstone is still stored, and
+            `404` means the server has no record of the ID: it was never written, or its tombstone was purged.
+            `200` and `410` send `X-LogDate-Server-Version`; `410` also sends `X-LogDate-Deleted-At`. A `401` has
+            no error body either; repeat the request as **Get one entry** to read its code.
+            """,
+        )
+        request { contentId("") }
+        response {
+            recordState(
+                HttpStatusCode.OK,
+                "The entry exists.",
+                SERVER_VERSION_HEADER to "The entry's current `serverVersion`.",
+            )
+            recordState(
+                HttpStatusCode.Gone,
+                "The entry was deleted. Do not upload it again.",
+                SERVER_VERSION_HEADER to "The `serverVersion` of the deletion.",
+                DELETED_AT_HEADER to "When the entry was deleted, in epoch milliseconds.",
+            )
+            recordState(HttpStatusCode.NotFound, "The server has no record of this ID.")
+            syncUnauthorized()
             syncServerError()
         }
     }
@@ -232,12 +286,17 @@ internal object SyncCollectionDocs {
             Send `If-None-Match: *` when creating an offline journal so a retry cannot replace a newer copy;
             an existing journal then answers `412 Precondition Failed`. Without that header, the first save
             answers `201 Created` with a `Location` header and later saves answer `200 OK`.
+
+            Send `?ifAbsent=true` for a strict create: a live ID answers `412 JOURNAL_EXISTS` and a deleted one
+            `410 JOURNAL_DELETED`, and nothing is written.
+
             The `id` in the body must equal the `journalId` in the path, and any `syncVersion` you send is
             ignored: the server assigns versions.
             """,
         )
         request {
             journalId("Must match `id` in the body.")
+            ifAbsentQuery("a live journal answers `412 JOURNAL_EXISTS` and a deleted one `410 JOURNAL_DELETED`; neither writes anything.")
             jsonBody(
                 JournalUploadRequest(
                     id = SyncExamples.JOURNAL_ID,
@@ -280,9 +339,20 @@ internal object SyncCollectionDocs {
                 HttpStatusCode.PreconditionFailed,
                 ErrorCase(
                     "JOURNAL_EXISTS",
-                    "A journal already exists when `If-None-Match: *` is sent.",
+                    "A journal already holds this ID and `If-None-Match: *` or `?ifAbsent=true` was sent. Nothing was " +
+                        "written; `details.serverVersion` is the stored version.",
                     "Journal already exists",
                 ),
+                details = existsDetails,
+            )
+            syncError(
+                HttpStatusCode.Gone,
+                ErrorCase(
+                    "JOURNAL_DELETED",
+                    "The journal was deleted and `?ifAbsent=true` was sent. Nothing was written; `details.deletedAt` says when.",
+                    "Journal was deleted",
+                ),
+                details = deletedDetails,
             )
             syncError(
                 HttpStatusCode.Conflict,

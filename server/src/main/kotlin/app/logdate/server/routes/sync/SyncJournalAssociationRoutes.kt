@@ -14,6 +14,7 @@ import app.logdate.server.routes.docs.SyncCollectionDocs
 import app.logdate.server.routes.docs.SyncJournalMergeDocs
 import app.logdate.server.sync.SyncMetricsRegistry
 import app.logdate.shared.model.sync.AssociationChangesResponse
+import app.logdate.shared.model.sync.AssociationDeleteItem
 import app.logdate.shared.model.sync.AssociationDeleteRequest
 import app.logdate.shared.model.sync.AssociationDeletion
 import app.logdate.shared.model.sync.AssociationUploadRequest
@@ -34,7 +35,6 @@ import io.github.smiley4.ktoropenapi.put
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
-import io.ktor.server.request.header
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -75,14 +75,6 @@ internal fun Route.journalRoutes(
                     )
                 }
                 collectionsRepository.journalMergeDestination(userId, journalId)?.let { throw JournalMergedException(it) }
-                val wasCreated = !collectionsRepository.journalExists(userId, journalId)
-                if (call.request.header(HttpHeaders.IfNoneMatch) == "*" && !wasCreated) {
-                    return@put call.respond(
-                        HttpStatusCode.PreconditionFailed,
-                        error("JOURNAL_EXISTS", "Journal already exists"),
-                    )
-                }
-                Napier.d("Journal upsert completed")
                 val journal =
                     LogDateJournal(
                         id = journalId,
@@ -93,13 +85,19 @@ internal fun Route.journalRoutes(
                         version = 0L,
                         deviceId = req.deviceId,
                     )
-                val stored =
-                    if (call.request.header(HttpHeaders.IfNoneMatch) == "*") {
-                        collectionsRepository.createJournalIfAbsent(userId, journal)
-                            ?: return@put call.respond(HttpStatusCode.PreconditionFailed, error("JOURNAL_EXISTS", "Journal already exists"))
-                    } else {
-                        collectionsRepository.upsertJournal(userId, journal)
-                    }
+                val strictCreate = call.isStrictCreate()
+                if (strictCreate || call.isCreateOnly()) {
+                    call.respondConditionalCreate(
+                        outcome = collectionsRepository.createJournalIfAbsent(userId, journal, respectTombstones = strictCreate),
+                        noun = "journal",
+                        location = "/api/v1/journals/$journalId",
+                    ) { JournalUploadResponse(journalId, it.version, it.lastUpdated) }
+                    success = true
+                    return@put
+                }
+                val wasCreated = !collectionsRepository.journalExists(userId, journalId)
+                Napier.d("Journal upsert completed")
+                val stored = collectionsRepository.upsertJournal(userId, journal)
                 val response = JournalUploadResponse(journalId, stored.version, stored.lastUpdated)
                 if (wasCreated) {
                     call.response.headers.append(HttpHeaders.Location, "/api/v1/journals/$journalId")
@@ -246,19 +244,33 @@ internal fun Route.associationRoutes(
                 val userId = extractSyncUserId(call, accessTokenVerifier) ?: return@post
                 val req = call.receive<AssociationUploadRequest>()
                 val uploadedAt = System.currentTimeMillis()
-                collectionsRepository.upsertAssociations(
-                    userId = userId,
-                    associations =
-                        req.associations.map {
-                            LogDateAssociation(
-                                journalId = it.journalId,
-                                entryId = it.contentId,
-                                createdAt = it.createdAt,
-                                version = 0L,
-                                deviceId = it.deviceId,
-                            )
-                        },
-                )
+                val associations =
+                    req.associations.map {
+                        LogDateAssociation(
+                            journalId = it.journalId,
+                            entryId = it.contentId,
+                            createdAt = it.createdAt,
+                            version = 0L,
+                            deviceId = it.deviceId,
+                        )
+                    }
+                if (call.isStrictCreate()) {
+                    val results = collectionsRepository.createAssociationsIfAbsent(userId, associations)
+                    call.respond(
+                        AssociationUploadResponse(
+                            uploadedCount = results.created.size,
+                            uploadedAt = uploadedAt,
+                            existing = results.existing.map { AssociationDeleteItem(it.journalId, it.entryId) },
+                            deleted =
+                                results.deleted.map {
+                                    AssociationDeletion(it.association.journalId, it.association.entryId, it.deletedAt, it.serverVersion)
+                                },
+                        ),
+                    )
+                    success = true
+                    return@post
+                }
+                collectionsRepository.upsertAssociations(userId = userId, associations = associations)
                 call.respond(AssociationUploadResponse(req.associations.size, uploadedAt))
                 success = true
             } finally {

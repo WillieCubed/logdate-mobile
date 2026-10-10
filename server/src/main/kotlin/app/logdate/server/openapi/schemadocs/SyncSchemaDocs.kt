@@ -289,8 +289,10 @@ internal object SyncSchemaDocs {
                 SchemaDoc(
                     "Confirmation that links were saved.",
                     mapOf(
-                        "uploadedCount" to "How many links were in the request.",
+                        "uploadedCount" to "How many links were in the request; with `?ifAbsent=true`, how many were new.",
                         "uploadedAt" to "When the server accepted them. $EPOCH_MS",
+                        "existing" to "With `?ifAbsent=true`: links that already existed and were left alone. Absent when there are none.",
+                        "deleted" to "With `?ifAbsent=true`: links that were deleted and stay deleted. Absent when there are none.",
                     ),
                 ),
             "AssociationChangesResponse" to
