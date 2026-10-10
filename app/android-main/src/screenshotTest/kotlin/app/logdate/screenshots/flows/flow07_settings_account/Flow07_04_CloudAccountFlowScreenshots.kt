@@ -125,7 +125,6 @@ fun S06_CloudAccountCreationFinal() {
             errorMessage = null,
             onClearError = {},
             isPasskeySupported = true,
-            handleDomain = "logdate.app",
             serverDisplayName = "LogDate Cloud",
         )
     }
@@ -147,7 +146,6 @@ fun S07_CloudAccountCreationFinalCreating() {
             errorMessage = null,
             onClearError = {},
             isPasskeySupported = true,
-            handleDomain = "logdate.app",
             serverDisplayName = "LogDate Cloud",
         )
     }
@@ -169,7 +167,6 @@ fun S08_CloudAccountCreationFinalError() {
             errorMessage = "Failed to create passkey. Please try again.",
             onClearError = {},
             isPasskeySupported = true,
-            handleDomain = "logdate.app",
             serverDisplayName = "LogDate Cloud",
         )
     }

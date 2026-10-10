@@ -1572,7 +1572,6 @@ fun A102_CloudAccountCreationBookPosture() {
                 errorMessage = null,
                 onClearError = {},
                 isPasskeySupported = true,
-                handleDomain = "logdate.app",
                 serverDisplayName = "LogDate Cloud",
             )
         }
@@ -1596,7 +1595,6 @@ fun A103_CloudAccountCreationTabletopPosture() {
                 errorMessage = null,
                 onClearError = {},
                 isPasskeySupported = true,
-                handleDomain = "logdate.app",
                 serverDisplayName = "LogDate Cloud",
             )
         }

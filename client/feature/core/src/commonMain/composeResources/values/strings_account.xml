@@ -302,8 +302,7 @@
     <string name="error_checking_availability">Error checking availability</string>
     <string name="error_checking_username">Error checking username</string>
     <string name="account_username_passkey_hint">Providing your username helps find your passkey faster</string>
-    <string name="unique_address_username">Your unique address will be @%1$s@%2$s</string>
-    <string name="account_username_network_address_description">Your unique address on the LogDate network. This is how others will find and mention you.</string>
+    <string name="account_username_network_address_description">Your username identifies your account.</string>
     <string name="this_username_will_identify_you_on_logdate_cloud_you_can_change_it_later">This username will identify you on LogDate Cloud. You can change it later.</string>
     <string name="this_will_be_your_unique_identifier_on_logdate_cloud">This will be your unique identifier on LogDate Cloud.</string>
     <string name="your_username">your_username</string>
@@ -362,7 +361,7 @@
     <string name="email_verification_no_credential_body">No verifiable email was found on this device.</string>
     <!-- Account confirmation step -->
     <string name="account_step_progress">Step %1$d of %2$d</string>
-    <string name="account_username_domain_hint">Your address will end in @%1$s</string>
+    <string name="account_username_domain_hint">Usernames are unique on %1$s.</string>
     <string name="account_handle_change">Change</string>
     <string name="account_confirm_title">Confirm your account</string>
     <string name="account_passkey_headline">You'll sign in with a passkey</string>

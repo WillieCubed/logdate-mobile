@@ -31,7 +31,6 @@ import logdate.client.feature.core.generated.resources.account_username_network_
 import logdate.client.feature.core.generated.resources.account_username_requirements
 import logdate.client.feature.core.generated.resources.at
 import logdate.client.feature.core.generated.resources.error_checking_username
-import logdate.client.feature.core.generated.resources.unique_address_username
 import logdate.client.feature.core.generated.resources.username
 import logdate.client.feature.core.generated.resources.username_available
 import logdate.client.feature.core.generated.resources.username_is_already_taken
@@ -119,7 +118,6 @@ private fun UsernameSetupContent(
             label = { Text(stringResource(Res.string.username)) },
             placeholder = { Text(stringResource(Res.string.your_username)) },
             prefix = { Text(stringResource(Res.string.at)) },
-            suffix = { Text("@$handleDomain") },
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.AlternateEmail,
@@ -182,19 +180,7 @@ private fun UsernameSetupContent(
                             color = MaterialTheme.colorScheme.error,
                         )
                     else ->
-                        Text(
-                            // A blank username would render "@@domain"; show the plain
-                            // domain hint until there is something to preview.
-                            if (username.isBlank()) {
-                                stringResource(Res.string.account_username_domain_hint, handleDomain)
-                            } else {
-                                stringResource(
-                                    Res.string.unique_address_username,
-                                    username,
-                                    handleDomain,
-                                )
-                            },
-                        )
+                        Text(stringResource(Res.string.account_username_domain_hint, handleDomain))
                 }
             },
             isError = usernameAvailability == UsernameAvailability.Taken,

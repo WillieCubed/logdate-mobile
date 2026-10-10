@@ -661,7 +661,6 @@ object SharedScreenshotCatalog {
                     errorMessage = null,
                     onClearError = {},
                     isPasskeySupported = true,
-                    handleDomain = "logdate.app",
                     serverDisplayName = "LogDate Cloud",
                     stepNumber = 2,
                     stepCount = 2,

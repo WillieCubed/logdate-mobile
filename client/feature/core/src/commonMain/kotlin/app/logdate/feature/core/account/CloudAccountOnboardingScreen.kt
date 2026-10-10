@@ -249,7 +249,6 @@ fun CloudAccountOnboardingScreen(
                     errorMessage = uiState.errorMessage,
                     onClearError = viewModel::clearError,
                     isPasskeySupported = uiState.isPasskeySupported,
-                    handleDomain = serverPresentation.handleDomain,
                     serverDisplayName = serverPresentation.displayName,
                     stepNumber = stepCount,
                     stepCount = stepCount,

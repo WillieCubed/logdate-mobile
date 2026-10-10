@@ -87,7 +87,6 @@ fun PasskeyAccountCreationFinalContent(
     errorMessage: String?,
     onClearError: () -> Unit,
     isPasskeySupported: Boolean,
-    handleDomain: String,
     serverDisplayName: String,
     stepNumber: Int,
     stepCount: Int,
@@ -139,7 +138,6 @@ fun PasskeyAccountCreationFinalContent(
         AccountIdentity(
             displayName = displayName,
             username = username,
-            handleDomain = handleDomain,
             onChange = onBack,
             changeEnabled = !isCreatingAccount,
         )
@@ -161,16 +159,15 @@ fun PasskeyAccountCreationFinalContent(
 }
 
 /**
- * The account as the user will see it elsewhere: a monogram, their name, and one canonical handle.
+ * The account being created: the person's name and their username.
  *
- * The handle is rendered as a single `@user@domain` token rather than a sentence in a value slot,
- * which is what produced the doubled `@@domain` when the username was still blank.
+ * The username is shown as `@username` only. A fediverse-style `@user@domain` address would
+ * promise that other servers can find and mention the account, which nothing supports yet.
  */
 @Composable
 private fun AccountIdentity(
     displayName: String,
     username: String,
-    handleDomain: String,
     onChange: () -> Unit,
     changeEnabled: Boolean,
 ) {
@@ -187,15 +184,13 @@ private fun AccountIdentity(
 
         Spacer(Modifier.height(Spacing.sm))
 
-        // Only render a handle once there is a username to put in it; interpolating a blank
-        // one produces the doubled "@@domain" this screen was rebuilt to stop showing.
         if (username.isNotBlank()) {
             Surface(
                 shape = MaterialTheme.shapes.large,
                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
             ) {
                 Text(
-                    text = "@$username@$handleDomain",
+                    text = "@$username",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -377,7 +372,6 @@ private fun PasskeyAccountCreationFinalScreenPreview() {
                 errorMessage = null,
                 onClearError = {},
                 isPasskeySupported = true,
-                handleDomain = "logdate.app",
                 serverDisplayName = "LogDate Cloud",
                 stepNumber = 2,
                 stepCount = 2,
@@ -400,7 +394,6 @@ private fun PasskeyAccountCreationFinalScreenErrorPreview() {
                 errorMessage = "Too many attempts. Please wait a moment before trying again.",
                 onClearError = {},
                 isPasskeySupported = true,
-                handleDomain = "logdate.app",
                 serverDisplayName = "LogDate Cloud",
                 stepNumber = 3,
                 stepCount = 3,
