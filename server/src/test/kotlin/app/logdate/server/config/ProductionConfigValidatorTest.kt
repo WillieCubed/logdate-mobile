@@ -96,6 +96,35 @@ class ProductionConfigValidatorTest {
     }
 
     @Test
+    fun `production requires ATPROTO_SIGNING_KEY_KEK even when JWT_SECRET is set`() {
+        val failure =
+            assertFailsWith<InsecureProductionConfigException> {
+                ProductionConfigValidator.validate(
+                    profile = RuntimeProfile.PRODUCTION,
+                    readEnv = productionEnvWithout("ATPROTO_SIGNING_KEY_KEK"),
+                )
+            }
+        assertTrue(failure.message!!.contains("ATPROTO_SIGNING_KEY_KEK is required"))
+    }
+
+    @Test
+    fun `production rejects short or placeholder ATPROTO_SIGNING_KEY_KEK`() {
+        mapOf(
+            AtprotoSigningKeyKek.DEVELOPMENT_VALUE to "at least 32",
+            "your-secret-key-change-in-production" to "known placeholder",
+        ).forEach { (value, expected) ->
+            val failure =
+                assertFailsWith<InsecureProductionConfigException> {
+                    ProductionConfigValidator.validate(
+                        profile = RuntimeProfile.PRODUCTION,
+                        readEnv = productionEnv("ATPROTO_SIGNING_KEY_KEK" to value),
+                    )
+                }
+            assertTrue(failure.message!!.contains(expected), value)
+        }
+    }
+
+    @Test
     fun `production rejects short JWT_SECRET`() {
         val failure =
             assertFailsWith<InsecureProductionConfigException> {
@@ -498,6 +527,7 @@ class ProductionConfigValidatorTest {
 
     companion object {
         private const val VALID_JWT_SECRET = "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789+/=abc"
+        private const val VALID_SIGNING_KEY_KEK = "ZyXwVuTsRqPoNmLkJiHgFeDcBa9876543210+/=xyz"
         private const val VALID_DB_PASSWORD = "a-real-secret-password"
         private const val VALID_RELEASE = "logdate-server@0123456789abcdef0123456789abcdef01234567"
         private const val VALID_ENCRYPTION_KEY = "MDEyMzQ1Njc4OWFiY2RlZg=="
@@ -507,6 +537,7 @@ class ProductionConfigValidatorTest {
         private val VALID_PRODUCTION_ENV =
             mapOf(
                 "JWT_SECRET" to VALID_JWT_SECRET,
+                "ATPROTO_SIGNING_KEY_KEK" to VALID_SIGNING_KEY_KEK,
                 "DATABASE_PASSWORD" to VALID_DB_PASSWORD,
                 "DATABASE_URL" to "jdbc:postgresql://user:pass@host:5432/logdate",
                 "GCS_BUCKET_NAME" to "logdate-media-production",

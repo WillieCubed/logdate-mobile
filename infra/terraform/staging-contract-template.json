@@ -39,6 +39,7 @@
     "timeout_seconds": 60
   },
   "secret_env": {
+    "ATPROTO_SIGNING_KEY_KEK": {"secret_id": "logdate-atproto-signing-key-kek", "version": "1"},
     "DATABASE_PASSWORD": {"secret_id": "logdate-db-password", "version": "1"},
     "DATABASE_URL": {"secret_id": "logdate-db-url", "version": "1"},
     "DATABASE_USER": {"secret_id": "logdate-db-user", "version": "1"},

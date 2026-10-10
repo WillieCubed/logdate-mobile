@@ -24,7 +24,7 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class, ExperimentalEncodingApi::class)
 class SigningKeyService(
     private val repository: SigningKeyRepository,
-    private val encryptionKeySeed: String = System.getenv("ATPROTO_SIGNING_KEY_KEK") ?: "logdate-atproto-dev-signing-key",
+    private val encryptionKeySeed: String,
 ) {
     private val secureRandom = SecureRandom()
 

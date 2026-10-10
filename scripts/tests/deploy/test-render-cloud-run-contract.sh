@@ -191,6 +191,7 @@ cat >"$FIXTURE_DIR/staging-source.json" <<'EOF'
     "DATABASE_USER": {"secret_id": "logdate-db-user", "version": "7"},
     "DATABASE_PASSWORD": {"secret_id": "logdate-db-password", "version": "11"},
     "JWT_SECRET": {"secret_id": "logdate-jwt-secret", "version": "3"},
+    "ATPROTO_SIGNING_KEY_KEK": {"secret_id": "logdate-atproto-signing-key-kek", "version": "2"},
     "SERVER_ENCRYPTION_KEY": {"secret_id": "logdate-server-encryption-key", "version": "5"},
     "SERVER_ENCRYPTION_KEY_ID": {"secret_id": "logdate-server-encryption-key-id", "version": "2"},
     "HEALTH_INTERNAL_TOKEN": {"secret_id": "logdate-health-internal-token", "version": "13"}
@@ -254,6 +255,7 @@ cat >"$FIXTURE_DIR/production-source.json" <<'EOF'
     "DATABASE_USER": {"secret_id": "logdate-db-user", "version": "7"},
     "DATABASE_PASSWORD": {"secret_id": "logdate-db-password", "version": "11"},
     "JWT_SECRET": {"secret_id": "logdate-jwt-secret", "version": "3"},
+    "ATPROTO_SIGNING_KEY_KEK": {"secret_id": "logdate-atproto-signing-key-kek", "version": "2"},
     "SERVER_ENCRYPTION_KEY": {"secret_id": "logdate-server-encryption-key", "version": "5"},
     "SERVER_ENCRYPTION_KEY_ID": {"secret_id": "logdate-server-encryption-key-id", "version": "2"},
     "HEALTH_INTERNAL_TOKEN": {"secret_id": "logdate-health-internal-token", "version": "13"}
@@ -350,6 +352,7 @@ cloud_run_secret_env = {
   DATABASE_USER            = { secret_id = "logdate-db-user", version = "7" }
   DATABASE_PASSWORD        = { secret_id = "logdate-db-password", version = "11" }
   JWT_SECRET               = { secret_id = "logdate-jwt-secret", version = "3" }
+  ATPROTO_SIGNING_KEY_KEK  = { secret_id = "logdate-atproto-signing-key-kek", version = "2" }
   SERVER_ENCRYPTION_KEY    = { secret_id = "logdate-server-encryption-key", version = "5" }
   SERVER_ENCRYPTION_KEY_ID = { secret_id = "logdate-server-encryption-key-id", version = "2" }
   HEALTH_INTERNAL_TOKEN    = { secret_id = "logdate-health-internal-token", version = "13" }
@@ -399,6 +402,7 @@ cloud_run_secret_env = {
   DATABASE_USER            = { secret_id = "logdate-db-user", version = "7" }
   DATABASE_PASSWORD        = { secret_id = "logdate-db-password", version = "11" }
   JWT_SECRET               = { secret_id = "logdate-jwt-secret", version = "3" }
+  ATPROTO_SIGNING_KEY_KEK  = { secret_id = "logdate-atproto-signing-key-kek", version = "2" }
   SERVER_ENCRYPTION_KEY    = { secret_id = "logdate-server-encryption-key", version = "5" }
   SERVER_ENCRYPTION_KEY_ID = { secret_id = "logdate-server-encryption-key-id", version = "2" }
   HEALTH_INTERNAL_TOKEN    = { secret_id = "logdate-health-internal-token", version = "13" }
@@ -673,6 +677,7 @@ cat >"$FIXTURE_DIR/staging-contract.json" <<EOF
     "DATABASE_USER": {"secret_id": "logdate-db-user", "version": "7"},
     "HEALTH_INTERNAL_TOKEN": {"secret_id": "logdate-health-internal-token", "version": "13"},
     "JWT_SECRET": {"secret_id": "logdate-jwt-secret", "version": "3"},
+    "ATPROTO_SIGNING_KEY_KEK": {"secret_id": "logdate-atproto-signing-key-kek", "version": "2"},
     "SERVER_ENCRYPTION_KEY": {"secret_id": "logdate-server-encryption-key", "version": "5"},
     "SERVER_ENCRYPTION_KEY_ID": {"secret_id": "logdate-server-encryption-key-id", "version": "2"}
   },
@@ -779,6 +784,7 @@ cat >"$FIXTURE_DIR/production-contract.json" <<EOF
     "DATABASE_USER": {"secret_id": "logdate-db-user", "version": "7"},
     "HEALTH_INTERNAL_TOKEN": {"secret_id": "logdate-health-internal-token", "version": "13"},
     "JWT_SECRET": {"secret_id": "logdate-jwt-secret", "version": "3"},
+    "ATPROTO_SIGNING_KEY_KEK": {"secret_id": "logdate-atproto-signing-key-kek", "version": "2"},
     "SERVER_ENCRYPTION_KEY": {"secret_id": "logdate-server-encryption-key", "version": "5"},
     "SERVER_ENCRYPTION_KEY_ID": {"secret_id": "logdate-server-encryption-key-id", "version": "2"}
   },

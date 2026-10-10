@@ -112,12 +112,12 @@ class SigningKeyServiceTest {
     }
 
     @Test
-    fun `default constructor seed and fixed width helper branches are covered`() =
+    fun `seeded service generates and decrypts K-256 keys`() =
         kotlinx.coroutines.test.runTest {
-            val defaultSeedService = SigningKeyService(InMemorySigningKeyRepository())
+            val service = SigningKeyService(InMemorySigningKeyRepository(), "test-kek")
 
-            val generated = defaultSeedService.generateKeyPair()
-            val decrypted = defaultSeedService.decryptPrivateKey(defaultSeedService.ensureActiveKey(Uuid.random()))
+            val generated = service.generateKeyPair()
+            val decrypted = service.decryptPrivateKey(service.ensureActiveKey(Uuid.random()))
 
             assertEquals("K-256", generated.algorithm)
             assertTrue(generated.publicKeyMultibase.startsWith("z"))

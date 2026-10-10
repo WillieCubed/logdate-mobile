@@ -88,6 +88,10 @@ cloud_run_secret_env = {
   DATABASE_USER     = { secret_id = "logdate-db-user", version = "1" }
   DATABASE_PASSWORD = { secret_id = "logdate-db-password", version = "1" }
   JWT_SECRET        = { secret_id = "logdate-jwt-secret", version = "1" }
+  # Encrypts hosted AT Protocol signing keys. Version 1 must hold exactly the bytes of
+  # logdate-jwt-secret version 1, which encrypted every key stored before this secret existed
+  # (server/docs/environment-variables.md#atproto_signing_key_kek).
+  ATPROTO_SIGNING_KEY_KEK = { secret_id = "logdate-atproto-signing-key-kek", version = "1" }
   # Required by the first-party contract. Create a version for each of these in the production
   # project's Secret Manager before deploying; Cloud Run rejects an empty mounted secret.
   SERVER_ENCRYPTION_KEY    = { secret_id = "logdate-server-encryption-key", version = "1" }

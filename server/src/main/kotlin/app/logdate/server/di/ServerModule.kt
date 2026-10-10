@@ -31,6 +31,7 @@ import app.logdate.server.auth.PendingEmailVerificationRepository
 import app.logdate.server.auth.RefreshTokenRevocationRepository
 import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.TokenService
+import app.logdate.server.config.AtprotoSigningKeyKek
 import app.logdate.server.config.RuntimeProfile
 import app.logdate.server.config.profileAwareBoolEnv
 import app.logdate.server.database.DatabaseConfig
@@ -300,10 +301,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
         single {
             SigningKeyService(
                 repository = get(),
-                encryptionKeySeed =
-                    System.getenv("ATPROTO_SIGNING_KEY_KEK")
-                        ?: System.getenv("JWT_SECRET")
-                        ?: "logdate-atproto-dev-signing-key",
+                encryptionKeySeed = AtprotoSigningKeyKek.resolve(),
             )
         }
         single {

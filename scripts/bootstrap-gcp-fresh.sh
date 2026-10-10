@@ -728,7 +728,19 @@ bootstrap_runtime_secrets() {
     local db_password_file="$SENSITIVE_WORKDIR/database-password"
     ensure_secret_file "logdate-db-user" generate_database_user "$db_user_file"
     ensure_secret_file "logdate-db-password" generate_password_secret "$db_password_file"
+    local jwt_secret_existed=false
+    if gcloud secrets versions describe latest --secret="logdate-jwt-secret" --project="$PROJECT_ID" >/dev/null 2>&1; then
+        jwt_secret_existed=true
+    fi
     ensure_secret_file "logdate-jwt-secret" generate_base64_secret "$SENSITIVE_WORKDIR/jwt-secret"
+    # Signing keys stored before this secret existed were encrypted with the JWT secret, so an
+    # existing project must copy that value rather than start from a new one.
+    if [[ "$jwt_secret_existed" == "true" ]] &&
+        ! gcloud secrets versions describe latest --secret="logdate-atproto-signing-key-kek" --project="$PROJECT_ID" >/dev/null 2>&1; then
+        log_error "logdate-atproto-signing-key-kek has no version, but logdate-jwt-secret already did. Copy the exact bytes of the JWT secret version the server runs with into logdate-atproto-signing-key-kek (server/docs/environment-variables.md#atproto_signing_key_kek), then rerun."
+        exit 1
+    fi
+    ensure_secret_file "logdate-atproto-signing-key-kek" generate_base64_secret "$SENSITIVE_WORKDIR/atproto-signing-key-kek"
     ensure_secret_file "logdate-server-encryption-key" generate_base64_secret "$SENSITIVE_WORKDIR/encryption-key"
     ensure_literal_secret_file "logdate-server-encryption-key-id" "${SERVICE_NAME}-v1" "$SENSITIVE_WORKDIR/encryption-key-id"
     ensure_secret_file "logdate-health-internal-token" generate_health_token "$SENSITIVE_WORKDIR/health-token"
@@ -819,6 +831,7 @@ ${github_repo_line}  "artifact_registry_repo": "${ARTIFACT_REGISTRY_REPO}",
     "DATABASE_USER": { "secret_id": "logdate-db-user"${database_user_version_json} },
     "DATABASE_PASSWORD": { "secret_id": "logdate-db-password"${database_password_version_json} },
     "JWT_SECRET": { "secret_id": "logdate-jwt-secret" },
+    "ATPROTO_SIGNING_KEY_KEK": { "secret_id": "logdate-atproto-signing-key-kek" },
     "SERVER_ENCRYPTION_KEY": { "secret_id": "logdate-server-encryption-key" },
     "SERVER_ENCRYPTION_KEY_ID": { "secret_id": "logdate-server-encryption-key-id" },
     "HEALTH_INTERNAL_TOKEN": { "secret_id": "logdate-health-internal-token" }

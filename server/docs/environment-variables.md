@@ -2,15 +2,18 @@
 
 **Authoritative reference for all environment variables used by the LogDate server.**
 
-> Last updated: 2026-08-01
+> Last updated: 2026-10-09
 
 ---
 
 ## Table of Contents
 
+- [Runtime Profile](#runtime-profile)
+- [Network Edge](#network-edge)
 - [Server Configuration](#server-configuration)
 - [Database Configuration](#database-configuration)
 - [Authentication & Security](#authentication--security)
+- [Blob Storage](#blob-storage)
 - [Encryption](#encryption)
 - [Media Storage](#media-storage)
 - [Sync & Maintenance](#sync--maintenance)
@@ -27,7 +30,7 @@
 - **Example**: `LOGDATE_ENV=production`
 - **Required**: No (but must be `production` for real deployments)
 - **Notes**:
-  - When set to `production`, the server refuses to start if durable storage, database, public identity, encryption, signed-media, health, release, JWT, or WebAuthn configuration is incomplete or unsafe.
+  - When set to `production`, the server refuses to start if durable storage, database, public identity, encryption, signed-media, health, release, JWT, AT Protocol signing-key, or WebAuthn configuration is incomplete or unsafe.
   - Development and test profiles skip this validation so local runs and the test suite work without extra setup.
 
 ### `LOGDATE_EXPECT_FIRST_PARTY`
@@ -209,7 +212,19 @@ These development/test-only variables provide the local PostgreSQL fallback when
   - Must be at least 32 characters.
   - Known placeholder values (e.g. `your-secret-key-change-in-production`) are rejected at startup.
   - Store in a secret manager; never commit.
-  - Rotate periodically.
+  - Rotate periodically. Hosted AT Protocol signing keys are encrypted with `ATPROTO_SIGNING_KEY_KEK`, not with this secret, so rotating it does not affect them.
+
+### `ATPROTO_SIGNING_KEY_KEK`
+- **Description**: The secret that encrypts each account's hosted AT Protocol signing key at rest (a *key-encryption key*). The server derives an AES-256 key from it to wrap the private keys stored in the database, and unwraps them whenever it signs a repository commit, a PLC operation or a key export.
+- **Type**: String (minimum 32 characters in production). The value is used byte for byte, including any trailing newline.
+- **Default**: None in production. Development and test fall back to a fixed value published in the source code, which only ever protects keys on a developer's machine.
+- **Example**: `ATPROTO_SIGNING_KEY_KEK=$(openssl rand -base64 48)`
+- **Required**: **Yes, in production.** `LOGDATE_ENV=production` refuses to start without it. The server never falls back to `JWT_SECRET`.
+- **Security**:
+  - A different value leaves every stored signing key unreadable: commits, PLC operations and key exports fail. Never change it in place. Moving to a new value means re-encrypting every stored key first.
+  - Before this variable existed, deployed servers encrypted signing keys with `JWT_SECRET`. An existing deployment must therefore start this secret from the **exact bytes** of the `JWT_SECRET` version it has been running with. Copy the version byte for byte, then compare SHA-256 digests of the two versions before deploying.
+  - A new deployment with no stored keys uses a fresh random value, independent of `JWT_SECRET`.
+  - Store in a secret manager; never commit.
 
 ### `GOOGLE_OIDC_CLIENT_IDS`
 - **Description**: Comma-separated Google OAuth client IDs accepted for ID token verification
@@ -477,6 +492,7 @@ AUTO_MIGRATE=false
 
 # Auth
 JWT_SECRET=${JWT_SECRET_FROM_SECRET_MANAGER}
+ATPROTO_SIGNING_KEY_KEK=${ATPROTO_SIGNING_KEY_KEK_FROM_SECRET_MANAGER}
 
 # Public identity, release, and internal health
 LOGDATE_PUBLIC_ORIGIN=https://cloud.logdate.app
@@ -532,11 +548,13 @@ ALLOW_PASSTHROUGH_CLIENT_CIPHERTEXT=true
 
 2. **Rotate secrets periodically**
    - `JWT_SECRET`: Rotate quarterly
+   - `ATPROTO_SIGNING_KEY_KEK`: Never change in place; stored signing keys must be re-encrypted under the new value first
    - `SERVER_ENCRYPTION_KEY`: Support multiple keys via key rotation (increment `SERVER_ENCRYPTION_KEY_ID`)
    - Database passwords: Rotate annually or after security incidents
 
 3. **Use strong values**
    - `JWT_SECRET`: Minimum 32 characters, random
+   - `ATPROTO_SIGNING_KEY_KEK`: Minimum 32 characters, random, and independent of `JWT_SECRET` for new deployments
    - `SERVER_ENCRYPTION_KEY`: Use `openssl rand -base64 32` for AES-256
    - Database passwords: 16+ characters, random
 

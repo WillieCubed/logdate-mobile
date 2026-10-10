@@ -658,6 +658,7 @@ cloud_run_secret_env = {
   DATABASE_USER            = { secret_id = "logdate-db-user", version = "1" }
   DATABASE_PASSWORD        = { secret_id = "logdate-db-password", version = "1" }
   JWT_SECRET               = { secret_id = "logdate-jwt-secret", version = "1" }
+  ATPROTO_SIGNING_KEY_KEK  = { secret_id = "logdate-atproto-signing-key-kek", version = "1" }
   SERVER_ENCRYPTION_KEY    = { secret_id = "logdate-server-encryption-key", version = "1" }
   SERVER_ENCRYPTION_KEY_ID = { secret_id = "logdate-server-encryption-key-id", version = "1" }
   HEALTH_INTERNAL_TOKEN    = { secret_id = "logdate-health-internal-token", version = "1" }
@@ -1016,11 +1017,24 @@ phase_4_secrets() {
 
     load_production_env
 
+    local jwt_secret_existed=false
     if secret_has_version logdate-jwt-secret; then
+        jwt_secret_existed=true
         log_info "logdate-jwt-secret already has a version — skipping"
     else
         log_info "Generating JWT secret via openssl rand -base64 48"
         put_secret_value logdate-jwt-secret "$(openssl rand -base64 48 | tr -d '\n')"
+    fi
+
+    # Signing keys stored before this secret existed were encrypted with the JWT secret, so an
+    # existing deployment must copy that value rather than start from a new one.
+    if secret_has_version logdate-atproto-signing-key-kek; then
+        log_info "logdate-atproto-signing-key-kek already has a version — skipping"
+    elif [[ "$jwt_secret_existed" == "true" ]]; then
+        die "logdate-atproto-signing-key-kek has no version, but logdate-jwt-secret already did. Copy the exact bytes of the pinned logdate-jwt-secret version into logdate-atproto-signing-key-kek version 1 (server/docs/environment-variables.md#atproto_signing_key_kek), then rerun."
+    else
+        log_info "Generating AT Protocol signing-key secret via openssl rand -base64 48"
+        put_secret_value logdate-atproto-signing-key-kek "$(openssl rand -base64 48 | tr -d '\n')"
     fi
 
     resolve_and_put_secret logdate-db-url      DATABASE_URL      ""         "DATABASE_URL (jdbc:postgresql://host/db?user=X&password=Y&sslmode=require)"
