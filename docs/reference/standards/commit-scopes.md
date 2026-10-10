@@ -62,8 +62,16 @@ These are the main scopes for user-facing features. **Prefer these scopes** for 
 | Directory | Scope |
 |-----------|-------|
 | `shared/activitypub/` | `activitypub` |
-| `shared/atproto-syntax/` | `atproto` |
+| `shared/atproto-bom/` | `atproto` |
+| `shared/atproto-crypto/` | `atproto` |
 | `shared/atproto-identity/` | `atproto` |
+| `shared/atproto-lexicon/` | `atproto` |
+| `shared/atproto-licensing/` | `atproto` |
+| `shared/atproto-pds/` | `atproto` |
+| `shared/atproto-pds-runtime/` | `atproto` |
+| `shared/atproto-plc/` | `atproto` |
+| `shared/atproto-repo/` | `atproto` |
+| `shared/atproto-syntax/` | `atproto` |
 | `shared/atproto-xrpc/` | `atproto` |
 
 ## Cross-Cutting Changes

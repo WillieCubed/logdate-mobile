@@ -151,9 +151,17 @@ For hosted PLC identities, the same public key is also embedded in the PLC genes
 - migrate a hosted `did:web` or hosted `did:plc` account to a different exported signing key when
   the server can publish the matching public-identity update
 
+Every PLC-publishing step above only runs when `ATPROTO_PLC_PUBLISH_ENABLED=true`. Production
+does not set it, so for production's `did:plc` accounts the server refuses rotation, migration to a
+different key, and recovery-key registration with `409 Conflict`. See the
+[plan README](./README.md#plc-publishing-in-production).
+
 ### What LogDate cannot yet do
 
-- derive a hosted PLC recovery key directly from the recovery phrase on-device
+- derive a hosted PLC recovery key directly from the recovery phrase on-device (Status
+  2026-10-09: `PlcRecoveryKeyManager` in `client/device` does this on Android and desktop; the iOS
+  implementation, `IosPlcRecoveryKeyManager`, throws `UnsupportedOperationException`, and no client
+  screen uses the derivation)
 - offer a full user-controlled PLC recovery-key signing flow
 
 ## Current Limits
@@ -166,7 +174,9 @@ For hosted PLC identities, the same public key is also embedded in the PLC genes
 - the current import route can restore the current active hosted key and can perform migration-safe
   cross-key import for hosted `did:web` and hosted `did:plc` identities when the matching public
   identity update can be published
-- deterministic user-controlled recovery-key derivation for PLC updates is not implemented yet
+- deterministic recovery-key derivation exists on Android and desktop but not iOS, and the client
+  data layer can sign a recovery import with the derived key, but no client screen uses either; a
+  recovery path that does not depend on the server publishing the PLC update is not implemented
 - this document does not claim a full self-custody story beyond encrypted export, server-managed
   recovery-key registration, and server-published recovery of the active hosted identity key
 

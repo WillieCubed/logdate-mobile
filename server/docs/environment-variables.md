@@ -18,6 +18,7 @@
 - [Media Storage](#media-storage)
 - [Sync & Maintenance](#sync--maintenance)
 - [Redis (Optional)](#redis-optional)
+- [AT Protocol](#at-protocol)
 
 ---
 
@@ -466,6 +467,91 @@ These development/test-only variables provide the local PostgreSQL fallback when
 - **Example**: `REDIS_URL=redis://localhost:6379`
 - **Required**: No
 - **Notes**: Currently not actively used, reserved for future caching features
+
+---
+
+## AT Protocol
+
+Every LogDate account has an AT Protocol identity: a handle such as `alice.logdate.app`, a DID
+(the permanent account identifier that handles point to), and a signing key the server holds for
+the account. The server also hosts each account's repository and acts as an OAuth server for
+third-party AT Protocol apps. These variables control that behavior. Most have safe defaults; in
+production only `ATPROTO_PDS_SERVICE_URL` and `ATPROTO_HANDLE_DOMAIN` are set.
+
+The secrets that sign AT Protocol session tokens and protect stored signing keys are documented
+with the change that makes them required.
+
+### `ATPROTO_PDS_SERVICE_URL`
+- **Description**: Public HTTPS URL of this server as an AT Protocol data server (PDS). It is
+  written into each account's DID document, so other AT Protocol services know where the
+  account's data lives.
+- **Type**: HTTPS URL
+- **Default**: `https://<ATPROTO_HANDLE_DOMAIN>`
+- **Example**: `ATPROTO_PDS_SERVICE_URL=https://cloud.logdate.app`
+- **Required**: Yes in production.
+- **Notes**: Must equal `LOGDATE_PUBLIC_ORIGIN` in production, or the server refuses to start.
+  Plain `http` is accepted only for loopback hosts outside production, so an emulator can reach a
+  server on the developer's machine. `ATPROTO_PDS_SERVICE_ENDPOINT` is an older name that is
+  still read when this variable is unset.
+
+### `ATPROTO_HANDLE_DOMAIN`
+- **Description**: Domain under which accounts get their handles. An account with username
+  `alice` gets the handle `alice.<domain>`.
+- **Type**: Domain name
+- **Default**: `logdate.app`
+- **Example**: `ATPROTO_HANDLE_DOMAIN=logdate.app`
+- **Required**: No
+- **Notes**: The server's own identity is `did:web:<domain>`. Self-hosted servers should set
+  their own domain so handles don't claim `logdate.app`.
+
+### `ATPROTO_HOSTED_DID_METHOD`
+- **Description**: Which kind of DID new hosted accounts get. `plc` creates a `did:plc` registered
+  in the PLC directory. `web` creates a hostname-level `did:web` such as
+  `did:web:alice.logdate.app`, which the server serves itself.
+- **Type**: `plc` or `web`
+- **Default**: `plc`
+- **Example**: `ATPROTO_HOSTED_DID_METHOD=web`
+- **Required**: No
+- **Notes**: Any other value is rejected with a configuration error. Changing it affects new identities
+  only.
+
+### `ATPROTO_PLC_PUBLISH_ENABLED`
+- **Description**: Whether the server sends `did:plc` operations to the PLC directory. Until an
+  account's operations are published, nobody outside LogDate can resolve its DID.
+- **Type**: Boolean (`true` to enable)
+- **Default**: `false`
+- **Example**: `ATPROTO_PLC_PUBLISH_ENABLED=true`
+- **Required**: No
+- **Notes**: Only applies when `ATPROTO_HOSTED_DID_METHOD` is `plc`. When enabled, the server
+  advertises the `atprotoPlcPublishingV1` protocol feature, and clients may then offer identity
+  changes such as signing-key rotation and recovery-key registration. When disabled, the server
+  refuses those changes. Production leaves it off. DIDs created while it is off are never
+  published later on their own, so turning it on needs a backfill for existing accounts.
+
+### `ATPROTO_PLC_DIRECTORY_URL`
+- **Description**: The PLC directory to publish to and resolve `did:plc` identities from.
+- **Type**: HTTPS URL
+- **Default**: `https://plc.directory`
+- **Example**: `ATPROTO_PLC_DIRECTORY_URL=https://plc.directory`
+- **Required**: No
+- **Notes**: Must use `https`. Point it at a test directory when exercising publishing outside
+  production.
+
+### `ATPROTO_OAUTH_ISSUER`
+- **Description**: Issuer URL of the server's OAuth authorization server for third-party AT
+  Protocol apps. It appears in the OAuth discovery documents and in issued tokens.
+- **Type**: HTTPS URL
+- **Default**: The value of `ATPROTO_PDS_SERVICE_URL`
+- **Example**: `ATPROTO_OAUTH_ISSUER=https://cloud.logdate.app`
+- **Required**: No
+
+### `ATPROTO_OAUTH_RESOURCE`
+- **Description**: The protected resource URL that OAuth access tokens are issued for, published
+  in the protected-resource discovery document.
+- **Type**: HTTPS URL
+- **Default**: The value of `ATPROTO_OAUTH_ISSUER`
+- **Example**: `ATPROTO_OAUTH_RESOURCE=https://cloud.logdate.app`
+- **Required**: No
 
 ---
 

@@ -174,6 +174,11 @@ Final names and fields come from the lexicon family project. The starting set:
 | Key declaration | Public record that publishes a person's sharing keys, similar to Germ's MLS declaration |
 | Permission sets | `app.logdate.authFull` and narrower sets for other apps |
 
+The share grant builds on an earlier proposal from logdate-web (`docs/share-lexicon-proposal.md` in that repository). That proposal defines a `share` record separate from the content it points to. The record names an audience: `public`, `link` or `limited`, where `limited` lists the DIDs (account identifiers) allowed to read. Revoking a share deletes only that record, and the content stays untouched. The idea of sharing as its own record, revocable without touching the content, carries over. Two parts change:
+
+- Circle shares live in a circle space and are encrypted to the circle's members. The proposal assumed the server could read shared content.
+- Timestamps become RFC 3339 strings.
+
 ### Lexicons reused as they are
 
 | Lexicon | Use |

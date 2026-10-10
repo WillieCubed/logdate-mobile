@@ -9,7 +9,17 @@ publish flows without guessing.
 
 The publishing convention is implemented in
 [`AtprotoPublishedModulePlugin.kt`](../../build-logic/src/main/kotlin/app/logdate/AtprotoPublishedModulePlugin.kt)
-and applied by every `shared/atproto-*` module.
+and applied by the nine Kotlin Multiplatform modules: `atproto-crypto`, `atproto-syntax`,
+`atproto-identity`, `atproto-xrpc`, `atproto-repo`, `atproto-plc`, `atproto-lexicon`,
+`atproto-pds`, and `atproto-pds-runtime`.
+
+Two other `shared/atproto-*` directories do not apply it:
+
+- `shared/atproto-bom` is a `java-platform` project. The plugin assumes Kotlin Multiplatform
+  publications, so the BOM's own `build.gradle.kts` repeats the plugin's group, version,
+  repository, POM, and signing settings.
+- `shared/atproto-licensing` is not a Gradle module. It holds the Apache 2.0 `LICENSE` and
+  `NOTICE` that the plugin copies into each published jar.
 
 Today it is intentionally ATProto-specific, not a generic repo-wide publishing
 plugin.
@@ -46,6 +56,8 @@ When applied, the plugin:
 - registers `dokkaHtmlJar`
 - attaches that jar to every Maven publication as the `javadoc` artifact
 - attaches shared POM metadata to every publication
+- copies `LICENSE` and `NOTICE` from `shared/atproto-licensing` into the `META-INF/` of each
+  binary jar (not the sources or javadoc jars)
 - optionally registers a remote Maven repository named `atproto`
 - optionally signs all publications with in-memory PGP keys
 
@@ -75,6 +87,13 @@ Supported overrides:
 | Signing key ID | `signingKeyId` | `SIGNING_KEY_ID` | optional |
 | Signing key | `signingKey` | `SIGNING_KEY` | none |
 | Signing password | `signingPassword` | `SIGNING_PASSWORD` | none |
+
+Gradle properties include the entries in the repository's root
+[`gradle.properties`](../../gradle.properties), not only `-P` flags. That file sets
+`atproto.version=0.1.0`, so in this repository an `ATPROTO_VERSION` environment variable has no
+effect: the Gradle property always wins. To publish a different version, change `atproto.version`
+in `gradle.properties` or pass `-Patproto.version=<version>` on the command line, which overrides
+the file.
 
 The plugin registers up to two named remote Maven repositories, each
 independently gated:
@@ -138,7 +157,7 @@ The convention writes the same POM metadata to every ATProto module:
 
 - project name from the Gradle project name
 - project description from the module `description`
-- repository URL pointing at the main repo
+- repository URL pointing at the main repo, <https://github.com/WillieCubed/logdate-mobile>
 - Apache 2.0 license
 - organization metadata for The Hypertext Studio
 - developer metadata for The Hypertext Studio
@@ -146,15 +165,21 @@ The convention writes the same POM metadata to every ATProto module:
 - GitHub issue tracker URL
 
 If you change ownership, licensing, or repository location, update the
-convention plugin instead of patching individual modules.
+convention plugin instead of patching individual modules, and make the same
+change in `shared/atproto-bom/build.gradle.kts`, which repeats this metadata
+because it cannot apply the plugin.
 
 ## Local Publish Flow
 
 Publish the current ATProto module set to Maven Local:
 
 ```bash
-./gradlew publishAtprotoToMavenLocal
+./gradlew publishAtprotoToMavenLocal :shared:atproto-bom:publishToMavenLocal
 ```
+
+`publishAtprotoToMavenLocal` covers the nine Kotlin Multiplatform modules only. The BOM needs its
+own `:shared:atproto-bom:publishToMavenLocal`, and the standalone sample imports the BOM, so it
+needs both.
 
 This is the correct flow for:
 
@@ -204,8 +229,19 @@ git push origin atproto-v0.1.0
 
 `.github/workflows/publish-atproto.yml` fires on the tag, derives
 `ATPROTO_VERSION` from the tag name (`atproto-v0.1.0` → `0.1.0`), and runs
-`publishAllPublicationsToAtprotoRepository` for every `shared/atproto-*`
-module plus the BOM. The workflow uses:
+`publishAllPublicationsToAtprotoRepository` for the nine Kotlin Multiplatform
+modules plus the BOM. It can also be started by hand (`workflow_dispatch`)
+with an optional `version` input, which sets `ATPROTO_VERSION` the same way.
+
+> **The tag does not set the published version today.** The workflow passes the
+> version only as the `ATPROTO_VERSION` environment variable, and the
+> `atproto.version` entry in `gradle.properties` takes precedence over it (see
+> [Property Precedence](#property-precedence)). Every run publishes the version
+> in `gradle.properties`, whatever the tag says. Until the workflow passes
+> `-Patproto.version`, bump `atproto.version` in `gradle.properties` to match
+> before you push the tag.
+
+The workflow uses:
 
 - `ATPROTO_PUBLISH_URL`: `https://maven.pkg.github.com/${{ github.repository }}`
 - `ATPROTO_PUBLISH_USERNAME`: `${{ github.actor }}` (the user who pushed the tag)
@@ -222,15 +258,16 @@ repo's **Packages** sidebar.
 
 ### Manual or local publishes against a remote
 
-If you need to publish from a workstation (e.g. testing a snapshot version
-under a different `ATPROTO_VERSION`), set the same env vars yourself:
+If you need to publish from a workstation (e.g. testing a snapshot version),
+set the same repository env vars yourself and pass the version with `-P`,
+because `gradle.properties` overrides an `ATPROTO_VERSION` env var:
 
 ```bash
 ATPROTO_PUBLISH_URL=https://maven.pkg.github.com/WillieCubed/logdate-mobile \
 ATPROTO_PUBLISH_USERNAME=<your-github-username> \
 ATPROTO_PUBLISH_PASSWORD=<personal-access-token-with-write:packages> \
-ATPROTO_VERSION=0.1.0-SNAPSHOT \
-  ./gradlew :shared:atproto-syntax:publishAllPublicationsToAtprotoRepository
+  ./gradlew :shared:atproto-syntax:publishAllPublicationsToAtprotoRepository \
+    -Patproto.version=0.1.0-SNAPSHOT
 ```
 
 Generate the PAT at <https://github.com/settings/tokens/new> with the

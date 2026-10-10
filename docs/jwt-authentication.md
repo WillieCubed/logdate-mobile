@@ -29,13 +29,20 @@ shape:
   "exp": 1735689600,
   "iat": 1735686000,
   "type": "access" | "refresh" | "session",
-  "did": "did:web:logdate.app:<...>"
+  "did": "did:plc:ewvi7nxzyoun6zhxrhs64oiz"
 }
 ```
 
 `did` is set on access and refresh tokens for accounts that have a
 registered AT Protocol identity; it's omitted from session tokens. The
 `iss`/`aud` pair is validated on every token check.
+
+The `did` value is the account's AT Protocol DID. Hosted accounts get a
+`did:plc` by default; a server configured with `ATPROTO_HOSTED_DID_METHOD=web`
+gives each account a hostname-level `did:web` instead, such as
+`did:web:alice.logdate.app`. AT Protocol only accepts those two forms, so a
+path-based `did:web` such as `did:web:logdate.app:users:alice` never appears
+here.
 
 ## Token security
 

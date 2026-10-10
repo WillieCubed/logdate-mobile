@@ -88,7 +88,9 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
   - a normalized handle
   - an active signing key
   - a DID using the configured hosted DID method
-- Existing accounts can be backfilled idempotently.
+- Existing accounts can be backfilled idempotently. (Status 2026-10-09: `backfillMissingIdentities()`
+  exists and is tested, but nothing calls it outside the test. Accounts get their identity on
+  demand through `ensureIdentity()`, for example at sign-in.)
 - Hosted multi-user accounts can default to `did:plc`.
 - Dedicated deployments can use hostname-level `did:web`.
 
@@ -159,9 +161,11 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
 ### P4.3 Current Limits
 
 - Hosted PLC update operations are supported for first-party signing-key rotation and recovery-key
-  registration when PLC publishing is enabled.
+  registration when PLC publishing is enabled. Production does not enable it
+  (`ATPROTO_PLC_PUBLISH_ENABLED` is unset in `infra/terraform/production.tfvars`).
 - Deterministic recovery-key derivation from the recovery phrase and user-controlled PLC signing
-  remain future work.
+  remain future work. (Status 2026-10-09: derivation exists in `client/device` for Android and
+  desktop; the iOS implementation throws. See the [plan README](./README.md).)
 - No path-based `did:web` upgrade flow is considered valid.
 
 ## Phase 5: PDS-Compatible XRPC Slice
@@ -263,11 +267,14 @@ These criteria describe the current AT Protocol plan and shipped slices in this 
   account when a hosted PLC identity exists.
 - The first-party settings surface exposes identity refresh, signing-key export, signing-key
   rotation, signing-key import, recovery-key registration, and hosted PLC operation-history
-  visibility.
+  visibility. (Status 2026-10-09: removed from the clients on 2026-09-23. The server APIs remain.)
 - First-party onboarding recovery guidance points signed-in users at the AT Protocol identity
-  settings flow rather than a placeholder recovery screen.
+  settings flow rather than a placeholder recovery screen. (Status 2026-10-09: removed on
+  2026-09-23. The sign-in recovery dialog now points at a saved passkey or a linked Google
+  account.)
 - Deterministic recovery-key derivation from the recovery phrase, user-controlled PLC signing, and
-  full migration flows remain future work.
+  full migration flows remain future work. (Status 2026-10-09: derivation exists in
+  `client/device` for Android and desktop; the iOS implementation throws.)
 
 ### P7.2 Interoperability Hardening
 

@@ -9,7 +9,8 @@
 - `shared/atproto-identity`
   - AT Protocol DID rules, DID documents, handle resolution, `did:web`, and `did:plc`
 - `shared/atproto-crypto`
-  - signing, JWT/JWK helpers, and protocol-facing crypto utilities
+  - base58btc and multikey encoding, P-256 and K-256 curve definitions, and JVM-only EC key
+    generation, signing, verification, and JWK public-key decoding
 - `shared/atproto-plc`
   - PLC directory models and client/runtime behavior
 - `shared/atproto-repo`
@@ -17,11 +18,15 @@
 - `shared/atproto-xrpc`
   - Ktor-backed XRPC client primitives
 - `shared/atproto-lexicon`
-  - lexicon parsing, validation, registry lookups, official `com.atproto.*` resources, and deterministic codegen output
+  - lexicon parsing, validation, registry lookups, checked-in LogDate and official `com.atproto.*` resources, and deterministic codegen output
 - `shared/atproto-pds`
-  - shared request/response models and service contracts for discovery, identity, OAuth, and repo surfaces
+  - shared request/response models and service contracts for discovery, identity, OAuth, session, repo, blob, and sync surfaces
 - `shared/atproto-pds-runtime`
-  - reusable runtime implementations for discovery and repo services backed by the shared PDS contracts
+  - reusable runtime implementations for discovery, repo, blob, and sync services backed by the shared PDS contracts
+- `shared/atproto-bom`
+  - a Gradle `java-platform` bill of materials that pins every module above to one version
+- `shared/atproto-licensing`
+  - not a Gradle module: the Apache 2.0 `LICENSE` and `NOTICE` that the publishing convention copies into each published jar
 
 ## Maven Coordinates
 
@@ -147,8 +152,12 @@ artifact expectations.
 Publish locally:
 
 ```bash
-./gradlew publishAtprotoToMavenLocal
+./gradlew publishAtprotoToMavenLocal :shared:atproto-bom:publishToMavenLocal
 ```
+
+`publishAtprotoToMavenLocal` publishes the nine Kotlin Multiplatform modules but not the BOM, so
+add `:shared:atproto-bom:publishToMavenLocal` whenever a consumer, such as the standalone sample,
+imports the BOM.
 
 Publish to a remote Maven repository by setting:
 
@@ -188,9 +197,10 @@ The consumer sample in [`samples/atproto-consumer`](../../samples/atproto-consum
 outside the main Gradle build. It depends on `mavenLocal()` artifacts, not project modules, so it
 verifies the published API surface the way an external JVM consumer would.
 
-Run it after publishing the ATProto modules locally:
+The sample imports `atproto-bom`, so publish the BOM along with the modules first:
 
 ```bash
+./gradlew publishAtprotoToMavenLocal :shared:atproto-bom:publishToMavenLocal
 ./gradlew -p samples/atproto-consumer run
 ```
 
@@ -206,7 +216,12 @@ Run it after publishing the ATProto modules locally:
 
 ## Not Yet Complete
 
-- Lexicon code generation for the full protocol surface
+- Lexicon code generation for the full protocol surface. `LexiconParser` recognizes `object`,
+  `query`, `procedure`, `params`, `string`, `boolean`, `integer`, `array`, `blob`, `token`, and
+  `ref`, and maps every other type to `UNKNOWN`. That includes `record`, `union`, `cid-link`,
+  `bytes`, and `subscription`. In practice:
+  - a definition of type `record` or `subscription` produces no Kotlin class
+  - a field of type `union`, `cid-link`, `bytes`, or `blob` becomes an untyped `JsonElement`
 - A durable standalone PDS deployment story outside this repository's `server` module
 
 The current library is a strong standalone core for syntax, identity, repo, PDS contracts/runtime,

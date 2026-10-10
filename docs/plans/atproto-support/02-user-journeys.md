@@ -19,7 +19,9 @@ These journeys describe the current target architecture and the shipped AT Proto
 3. AT Protocol identity provisioning runs for the new account.
 4. LogDate assigns a managed handle such as `alice.logdate.app`.
 5. LogDate ensures an active signing key exists for the account.
-6. When hosted PLC identities are enabled, LogDate provisions a hosted `did:plc`.
+6. With the default hosted DID method (`plc`), LogDate provisions a hosted `did:plc`. It submits
+   the genesis operation to the PLC directory only when `ATPROTO_PLC_PUBLISH_ENABLED=true`, which
+   production does not set, so production DIDs cannot be resolved outside LogDate.
 7. The account record stores:
    - `did`
    - `handle`
@@ -34,15 +36,23 @@ These journeys describe the current target architecture and the shipped AT Proto
 
 ## Journey 2: Existing User Is Backfilled Into AT Protocol Identity
 
+> **Status (2026-10-09):** The March 2026 version of this journey said the server runs
+> `backfillMissingIdentities()` at startup. Nothing calls it outside a test. Identities are created
+> on demand instead, as described below.
+
 **Actor**: An existing LogDate user created before AT Protocol identity support.
 
-1. The server starts and runs `backfillMissingIdentities()`.
-2. For each account missing identity data, LogDate:
+1. The user signs in, refreshes an AT Protocol session, or reaches any other path where the
+   server needs their identity (OAuth, XRPC, or the `/api/v1/identity` APIs).
+2. The server calls `AtprotoIdentityService.ensureIdentity()` for the account. If the account
+   is missing identity data, LogDate:
    - normalizes any existing handle or DID
    - provisions a unique managed handle if needed
    - provisions a hosted DID using the configured hosted DID method
    - ensures an active signing key exists
 3. The account is saved back with normalized identity fields.
+
+An account that never signs in again has no DID until some request needs one.
 
 **Outcome**
 
@@ -55,7 +65,8 @@ These journeys describe the current target architecture and the shipped AT Proto
 1. The client resolves the handle through standard AT Protocol handle resolution.
 2. For hosted LogDate users, the handle resolves to a `did:plc`.
 3. The client resolves the DID:
-   - `did:plc` through the PLC directory
+   - `did:plc` through the PLC directory. This step fails against production today, because
+     production does not publish hosted `did:plc` operations to the directory.
    - `did:web` through `/.well-known/did.json` on the hostname
 4. The DID Document exposes:
    - `alsoKnownAs = at://<handle>`
@@ -86,7 +97,8 @@ These journeys describe the current target architecture and the shipped AT Proto
    - PKCE parameters
    - a DPoP proof
 4. LogDate fetches and validates the client metadata document at `client_id`.
-5. LogDate stores the pushed request in memory and returns a `request_uri` plus the current DPoP nonce.
+5. LogDate stores the pushed request through `OAuthRuntimeStateRepository` (PostgreSQL when the
+   server has a database) and returns a `request_uri` plus the current DPoP nonce.
 6. The user authenticates to LogDate through the existing first-party session path.
 7. The user visits `GET /oauth/authorize?request_uri=...` while authenticated.
 8. LogDate resolves the authenticated account to its DID and handle and shows the consent prompt payload.
@@ -126,6 +138,9 @@ These journeys describe the current target architecture and the shipped AT Proto
 ## Journey 6: User Exports Their Signing Key
 
 **Actor**: A user who wants a recoverable copy of their AT Protocol signing key.
+
+> **Status (2026-10-09):** The server endpoint still exists, but the settings screen that called
+> it was removed from the clients on 2026-09-23. No current client screen starts this journey.
 
 1. The app calls `POST /api/v1/identity/signing-key/export` with the current bearer token and a passphrase.
 2. LogDate loads the active signing key for the account.
@@ -181,4 +196,4 @@ These journeys describe the current target architecture and the shipped AT Proto
 
 **Outcome**
 
-- LogDate exposes a hosted standalone PDS slice now with canonical repo persistence, first-party recovery tooling, and a unified media/blob boundary. Broader protocol surface area remains future work.
+- LogDate exposes a hosted standalone PDS slice now with canonical repo persistence, first-party recovery APIs, and a unified media/blob boundary. Broader protocol surface area remains future work.

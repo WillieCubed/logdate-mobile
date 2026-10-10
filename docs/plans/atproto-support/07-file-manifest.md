@@ -1,6 +1,41 @@
 # File Manifest
 
-This manifest reflects the current AT Protocol implementation shape in the repo. It replaces the older `shared/did`-based manifest.
+> **Status: historical snapshot (March 2026).** This list records the files of the March 2026
+> implementation and has not been maintained since. Do not use it to find code; list the current
+> files with `git ls-files 'shared/atproto-*' server/src/main/kotlin/app/logdate/server/identity
+> server/src/main/kotlin/app/logdate/server/oauth server/src/main/kotlin/app/logdate/server/atproto`.
+>
+> Where the snapshot is now wrong:
+>
+> - **LogDate lexicons.** It lists three (`content`, `journal`, `association`). The repository has
+>   seven under `shared/atproto-lexicon/src/commonMain/resources/studio/hypertext/logdate/`:
+>   `profile`, `entry`, `media`, `journal`, `association`, `device`, and the legacy `content`, each
+>   with a generated `*Lexicon.kt`.
+> - **Official lexicons.** It omits `com.atproto.server.createAccount`, `createSession`,
+>   `deleteSession`, `getSession`, and `refreshSession`, and `com.atproto.sync.getLatestCommit`,
+>   `getRepo`, and `getRepoStatus`, along with their generated Kotlin.
+> - **Removed client screens.** `AtprotoIdentitySection.kt`, `AccountSettingsScreen.kt`, and
+>   `AccountSettingsViewModel.kt` were deleted on 2026-09-23 (commit `298061926`), when the
+>   identity settings screens and onboarding recovery guidance were removed from the clients.
+> - **Renamed file.** `StubAccountIdentityRepository.kt` is now
+>   `UnavailableAccountIdentityRepository.kt` (commit `8dbbf95e0`).
+> - **Missing modules.** `shared/atproto-bom` (the BOM) and `shared/atproto-licensing` (the
+>   `LICENSE` and `NOTICE` copied into published jars) are not listed.
+> - **Missing server files.** OAuth runtime state (`OAuthRuntimeStateRepository.kt`,
+>   `PostgreSQLOAuthRuntimeStateRepository.kt`, `V15__Add_oauth_runtime_state_tables.sql`), AT
+>   Protocol sessions (`atproto/AtprotoSessionService.kt`,
+>   `database/PostgreSQLAtprotoSessionRepositories.kt`,
+>   `V13__Add_atproto_session_credentials.sql`), `atproto/HostedRepoCommitSigner.kt`, and
+>   `V14__Set_signing_key_default_to_k256.sql` are not listed.
+> - **Missing client files.** PLC recovery-key derivation in `client/device`
+>   (`PlcRecoveryKeyManager.kt`, the Android and desktop `JvmPlcRecoveryKeySupport.kt`, and
+>   `IosPlcRecoveryKeyManager.kt`) is not listed.
+> - **Missing library files.** Several source files in the shared modules are not listed,
+>   for example `SessionModels.kt` and `SyncModels.kt` in `atproto-pds`,
+>   `DefaultPdsSyncService.kt` in `atproto-pds-runtime`, and `EcCurve.kt` and `EcKeySupport.kt`
+>   in `atproto-crypto`.
+
+This manifest reflects the AT Protocol implementation shape in the repo as of March 2026. It replaced the older `shared/did`-based manifest.
 
 ## Shared Kotlin AT Protocol Library
 
