@@ -104,9 +104,13 @@ import app.logdate.client.domain.timeline.GetTimelineUseCase
 import app.logdate.client.domain.timeline.GroupNotesByDayBoundsUseCase
 import app.logdate.client.domain.timeline.InferMomentsUseCase
 import app.logdate.client.domain.timeline.SummarizeJournalEntriesUseCase
+import app.logdate.client.domain.watch.DefaultWatchPreferencesRepository
+import app.logdate.client.domain.watch.StampedPreferenceStore
+import app.logdate.client.domain.watch.WatchPreferencesRepository
 import app.logdate.client.intelligence.availability.RewindAIAvailability
 import app.logdate.client.intelligence.curation.CurationConfigProvider
 import app.logdate.client.intelligence.events.EventNamingExtractor
+import app.logdate.client.sync.peer.state.PeerRole
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
@@ -290,4 +294,8 @@ val domainModule: Module =
 
         // Day boundaries
         single<DayBoundarySettingsRepository> { DefaultDayBoundarySettingsRepository(get()) }
+
+        // Preferences shared with a paired watch. The watch app binds its own store with its role.
+        single { StampedPreferenceStore(storage = get(), localRole = PeerRole.PHONE) }
+        single<WatchPreferencesRepository> { DefaultWatchPreferencesRepository(get()) }
     }

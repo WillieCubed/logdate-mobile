@@ -32,16 +32,22 @@ class StateMerger(
         return MergedState(
             phone = phoneDocument?.phone,
             watch = watchDocument?.watch?.let { it.copy(presence = it.presence.asOf(now)) },
-            shared = mergeShared(phoneDocument?.shared.orEmpty(), watchDocument?.shared.orEmpty(), now),
+            shared = mergeStamped(phoneDocument?.shared.orEmpty(), watchDocument?.shared.orEmpty()).mapValues { it.value.value },
             lastReminderAt = listOfNotNull(phoneDocument?.lastReminderAt, watchDocument?.lastReminderAt).maxOrNull(),
         )
     }
 
-    private fun mergeShared(
+    /**
+     * The winning entry for every key either device wrote, with its stamp, so a device can store the
+     * result and stamp its next write after it.
+     */
+    fun mergeStamped(
         phone: Map<String, Stamped>,
         watch: Map<String, Stamped>,
-        now: Long,
-    ): Map<String, JsonElement> = (phone.keys + watch.keys).associateWith { key -> later(phone[key], watch[key], now).value }
+    ): Map<String, Stamped> {
+        val now = clock.now().toEpochMilliseconds()
+        return (phone.keys + watch.keys).associateWith { key -> later(phone[key], watch[key], now) }
+    }
 
     private fun later(
         phone: Stamped?,

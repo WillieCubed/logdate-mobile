@@ -515,6 +515,7 @@ dependencies {
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.kotlinx.datetime)
+    testImplementation(libs.kotlinx.serialization.json)
     testImplementation(libs.mockk)
     testImplementation(libs.compose.runtime)
     testImplementation(libs.nav3.runtime)

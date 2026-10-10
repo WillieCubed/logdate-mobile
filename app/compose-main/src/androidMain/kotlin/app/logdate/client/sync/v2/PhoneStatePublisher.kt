@@ -1,28 +1,36 @@
 package app.logdate.client.sync.v2
 
 import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.datalayer.v2.WearProtocol
 import app.logdate.client.sync.peer.state.LocalCapabilities
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
 import app.logdate.client.sync.peer.state.PhoneState
+import app.logdate.client.sync.peer.state.Stamped
 import app.logdate.client.sync.peer.state.StateDocument
 import app.logdate.client.sync.peer.state.StateDocumentChannel
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlin.time.Clock
 
 /**
- * Publishes this phone's state document whenever the Labs watch switch changes, and advertises
- * [WearProtocol.PHONE_CAPABILITY_V2] only while it is on.
+ * Publishes this phone's state document whenever the Labs watch switch or a shared preference
+ * changes, and advertises [WearProtocol.PHONE_CAPABILITY_V2] only while the switch is on.
  *
  * The document goes out whatever the switch says, because the watch takes the switch from it. It lists
- * no version 2 features yet: each one is added by the work that ships it.
+ * [WearFeatures.PREFS], the only version 2 feature the phone serves so far; each other feature
+ * is added by the work that ships it. Preferences a watch wrote are handed to [adoptWatchPreferences],
+ * which takes the entries that are later than this phone's.
  */
 class PhoneStatePublisher(
     private val v2Enabled: Flow<Boolean>,
@@ -31,11 +39,21 @@ class PhoneStatePublisher(
     private val peerStates: PeerStateStore,
     private val clock: Clock = Clock.System,
     private val timeZone: () -> TimeZone = { TimeZone.currentSystemDefault() },
+    private val sharedPreferences: Flow<Map<String, Stamped>> = flowOf(emptyMap()),
+    private val adoptWatchPreferences: suspend (Map<String, Stamped>) -> Unit = {},
 ) {
     fun start(scope: CoroutineScope): Job =
         scope.launch {
             catchUpWithWatches()
-            v2Enabled.distinctUntilChanged().collect { enabled -> publish(enabled) }
+            launch { adoptPreferencesFromWatches() }
+            var advertised: Boolean? = null
+            combine(v2Enabled.distinctUntilChanged(), sharedPreferences.distinctUntilChanged()) { enabled, shared -> enabled to shared }
+                .collect { (enabled, shared) ->
+                    publish(enabled, shared)
+                    if (enabled == advertised) return@collect
+                    updateCapability(enabled)
+                    advertised = enabled
+                }
         }
 
     /** Reads the documents the watches published while this phone's app was not running. */
@@ -43,7 +61,10 @@ class PhoneStatePublisher(
         channel.peerDocuments().forEach { peer -> peerStates.accept(peer.nodeId, peer.decoded, PeerRole.WATCH) }
     }
 
-    suspend fun publish(v2Enabled: Boolean) {
+    suspend fun publish(
+        v2Enabled: Boolean,
+        shared: Map<String, Stamped> = emptyMap(),
+    ) {
         val document =
             StateDocument(
                 role = PeerRole.PHONE,
@@ -52,11 +73,18 @@ class PhoneStatePublisher(
                     PhoneState(
                         flags = mapOf(FeatureFlag.WATCH_EXPERIENCE_V2.key to v2Enabled),
                         zone = timeZone().id,
+                        features = setOf(WearFeatures.PREFS),
                     ),
+                shared = shared,
             )
         if (!channel.publish(document)) {
-            Napier.e("Could not publish this phone's state; watches use the old Labs setting until the next change or restart")
+            Napier.e(
+                "Could not publish this phone's state; watches use the old Labs setting and preferences until the next change or restart",
+            )
         }
+    }
+
+    private suspend fun updateCapability(v2Enabled: Boolean) {
         val capabilityUpdated =
             if (v2Enabled) {
                 capabilities.add(WearProtocol.PHONE_CAPABILITY_V2)
@@ -68,5 +96,14 @@ class PhoneStatePublisher(
                 "Could not update ${WearProtocol.PHONE_CAPABILITY_V2}; watches use the old protocol until the next change or restart",
             )
         }
+    }
+
+    private suspend fun adoptPreferencesFromWatches() {
+        peerStates
+            .latest(PeerRole.WATCH)
+            .filterNotNull()
+            .map { document -> document.shared }
+            .distinctUntilChanged()
+            .collect { shared -> adoptWatchPreferences(shared) }
     }
 }

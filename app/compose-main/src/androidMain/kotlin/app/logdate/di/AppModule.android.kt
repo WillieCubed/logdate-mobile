@@ -24,6 +24,7 @@ import app.logdate.client.domain.events.EventInferenceLauncher
 import app.logdate.client.domain.journals.GetCurrentUserJournalsUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.rewind.GetWeekRewindUseCase
+import app.logdate.client.domain.watch.StampedPreferenceStore
 import app.logdate.client.events.AndroidEventInferenceLauncher
 import app.logdate.client.events.EventInferenceScheduler
 import app.logdate.client.events.EventInferenceWorker
@@ -275,11 +276,14 @@ actual val appModule: Module =
             )
         } binds arrayOf(StateDocumentChannel::class, LocalCapabilities::class, PeerCapabilityPresence::class)
         single {
+            val watchPreferences = get<StampedPreferenceStore>()
             PhoneStatePublisher(
                 v2Enabled = get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),
                 channel = get(),
                 capabilities = get(),
                 peerStates = get(),
+                sharedPreferences = watchPreferences.observe(),
+                adoptWatchPreferences = { shared -> watchPreferences.adopt(shared) },
             )
         }
         single {

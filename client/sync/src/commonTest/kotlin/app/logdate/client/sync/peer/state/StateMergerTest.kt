@@ -137,6 +137,34 @@ class StateMergerTest {
         )
     }
 
+    @Test
+    fun `merging stamped entries keeps the winning stamp`() {
+        val merged =
+            merger.mergeStamped(
+                phone = mapOf("a" to stamp("phone", NOW - 10), "b" to stamp("phone", NOW - 1)),
+                watch = mapOf("a" to stamp("watch", NOW - 5), "c" to stamp("watch", NOW - 2)),
+            )
+
+        assertEquals(
+            mapOf("a" to stamp("watch", NOW - 5), "b" to stamp("phone", NOW - 1), "c" to stamp("watch", NOW - 2)),
+            merged,
+        )
+    }
+
+    @Test
+    fun `merging stamped entries gives a tie to the phone`() {
+        val merged = merger.mergeStamped(phone = mapOf("a" to stamp("phone", NOW - 5)), watch = mapOf("a" to stamp("watch", NOW - 5)))
+
+        assertEquals(stamp("phone", NOW - 5), merged["a"])
+    }
+
+    @Test
+    fun `a stamped entry from the future cannot beat a current one`() {
+        val merged = merger.mergeStamped(phone = mapOf("a" to stamp("phone", NOW)), watch = mapOf("a" to stamp("watch", NOW + 60_000)))
+
+        assertEquals(stamp("phone", NOW), merged["a"])
+    }
+
     private fun phoneDocument(
         phone: PhoneState,
         shared: Map<String, Stamped> = emptyMap(),

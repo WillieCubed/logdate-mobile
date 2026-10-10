@@ -6,6 +6,7 @@ import app.logdate.client.sync.peer.state.PeerDocument
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
 import app.logdate.client.sync.peer.state.PhoneState
+import app.logdate.client.sync.peer.state.Stamped
 import app.logdate.client.sync.peer.state.StateDocument
 import app.logdate.client.sync.peer.state.StateDocumentChannel
 import app.logdate.client.sync.peer.state.WatchState
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Clock
@@ -27,6 +29,8 @@ import kotlin.time.Instant
 @OptIn(ExperimentalCoroutinesApi::class)
 class PhoneStatePublisherTest {
     private val enabled = MutableStateFlow(false)
+    private val preferences = MutableStateFlow<Map<String, Stamped>>(emptyMap())
+    private val adopted = mutableListOf<Map<String, Stamped>>()
     private val channel = FakeChannel()
     private val capabilities = FakeCapabilities()
     private val peerStates = PeerStateStore()
@@ -38,6 +42,8 @@ class PhoneStatePublisherTest {
             peerStates = peerStates,
             clock = FixedClock(1_000),
             timeZone = { TimeZone.of("Europe/Paris") },
+            sharedPreferences = preferences,
+            adoptWatchPreferences = { adopted += it },
         )
 
     @Test
@@ -51,7 +57,7 @@ class PhoneStatePublisherTest {
                     StateDocument(
                         role = PeerRole.PHONE,
                         writtenAt = 1_000,
-                        phone = PhoneState(flags = mapOf(FLAG_KEY to false), zone = "Europe/Paris"),
+                        phone = PhoneState(flags = mapOf(FLAG_KEY to false), zone = "Europe/Paris", features = setOf("prefs.v1")),
                     ),
                 ),
                 channel.published,
@@ -100,6 +106,37 @@ class PhoneStatePublisherTest {
             runCurrent()
 
             assertEquals(listOf("remove $PHONE_V2"), capabilities.calls)
+        }
+
+    @Test
+    fun `a preference change republishes the document without touching the capability`() =
+        runTest {
+            publisher.start(backgroundScope)
+            runCurrent()
+
+            preferences.value = mapOf("window.days" to Stamped(JsonPrimitive(30), 900))
+            runCurrent()
+
+            assertEquals(2, channel.published.size)
+            assertEquals(mapOf("window.days" to Stamped(JsonPrimitive(30), 900)), channel.published.last().shared)
+            assertEquals(listOf("remove $PHONE_V2"), capabilities.calls)
+        }
+
+    @Test
+    fun `preferences a watch wrote are handed over to be adopted`() =
+        runTest {
+            publisher.start(backgroundScope)
+            runCurrent()
+            val shared = mapOf("capture.places" to Stamped(JsonPrimitive(true), 950))
+
+            peerStates.accept(
+                "watch-node",
+                Decoded.Supported(StateDocument(role = PeerRole.WATCH, writtenAt = 950, watch = WatchState(), shared = shared)),
+                PeerRole.WATCH,
+            )
+            runCurrent()
+
+            assertEquals(listOf(shared), adopted)
         }
 
     private class FakeChannel : StateDocumentChannel {
