@@ -10,6 +10,7 @@ import androidx.core.app.RemoteInput
 import app.logdate.client.MainActivity
 import app.logdate.client.capture.ACTION_CAPTURE
 import app.logdate.client.capture.EXTRA_CAPTURE_MODE
+import app.logdate.client.capture.EXTRA_CAPTURE_TEXT
 import app.logdate.client.domain.notes.AddNoteUseCase
 import app.logdate.client.notifications.LogDateNotificationChannelKey
 import io.github.aakira.napier.Napier
@@ -127,12 +128,15 @@ class QuickReplyReceiver :
         ).setStyle(NotificationCompat.BigTextStyle().bigText(context.getString(R.string.quick_reply_failed_body, content)))
         .setContentText(context.getString(R.string.quick_reply_failed_body, quickReplyPreview(content)))
         .setContentIntent(
+            // Opening the notification starts a new entry with the reply's text, since the
+            // notification is the only other copy and opening it dismisses it.
             PendingIntent.getActivity(
                 context,
-                ACTION_QUICK_REPLY.hashCode(),
+                notificationId,
                 Intent(ACTION_CAPTURE)
                     .setClass(context, MainActivity::class.java)
                     .putExtra(EXTRA_CAPTURE_MODE, "text")
+                    .putExtra(EXTRA_CAPTURE_TEXT, content)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             ),

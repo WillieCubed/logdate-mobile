@@ -21,7 +21,8 @@ A capture nudge gains two actions:
 - **Record.** This opens the editor already recording. It is the same as the Record voice shortcut.
 
 If saving fails, the notification changes to "Entry not saved", keeps the reply text, and offers
-Retry. Tapping it opens a new entry in LogDate. The text is never dropped silently.
+Retry. Tapping it opens a new entry in LogDate that already holds the reply, so the words survive
+the notification closing. The text is never dropped silently.
 
 The evening reminder answered from the shade on Android 17. Write opens the reply field inside the
 notification:

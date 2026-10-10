@@ -16,6 +16,7 @@ import app.logdate.client.capture.CAPTURE_HOST
 import app.logdate.client.capture.CAPTURE_JOURNAL_PARAM
 import app.logdate.client.capture.EXTRA_CAPTURE_JOURNAL_ID
 import app.logdate.client.capture.EXTRA_CAPTURE_MODE
+import app.logdate.client.capture.EXTRA_CAPTURE_TEXT
 import app.logdate.client.capture.captureRoute
 import app.logdate.client.capture.widgetCaptureRoute
 import app.logdate.client.feature.widgets.EXTRA_WIDGET_CAMERA
@@ -219,6 +220,7 @@ fun resolveMainActivityNavKey(intent: Intent?): NavKey? {
             captureRoute(
                 mode = intent.getStringExtra(EXTRA_CAPTURE_MODE),
                 journalId = intent.getStringExtra(EXTRA_CAPTURE_JOURNAL_ID),
+                text = intent.getStringExtra(EXTRA_CAPTURE_TEXT),
             )
         }
 

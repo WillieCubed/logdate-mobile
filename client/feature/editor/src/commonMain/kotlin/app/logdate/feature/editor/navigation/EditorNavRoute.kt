@@ -38,6 +38,8 @@ private val FabEditorBoundsTransform =
  * @property launchMode What a new entry opens ready to capture. Ignored when resuming [entryId].
  * @property promptPhotoUri A photo to start the entry with, followed by text or, in
  *   [EditorLaunchMode.Voice], a recording. The New entry widget uses it for its photo prompts.
+ * @property initialText Text to start a new entry with, such as a notification reply that could not
+ *   be saved on its own.
  */
 @Serializable
 data class EntryEditorRoute(
@@ -48,6 +50,7 @@ data class EntryEditorRoute(
     val visitContext: VisitMemoryContext? = null,
     val launchMode: EditorLaunchMode = EditorLaunchMode.Text,
     val promptPhotoUri: String? = null,
+    val initialText: String? = null,
 ) : NavKey
 
 /** Pushes the editor onto the back stack with optional entry / draft / journal context. */
@@ -107,6 +110,7 @@ fun EntryProviderScope<NavKey>.editorEntry(
                 visitContext = route.visitContext,
                 launchMode = route.launchMode,
                 promptPhotoUri = route.promptPhotoUri,
+                initialTextContent = route.initialText,
                 modifier = sharedBoundsModifier,
             )
         }

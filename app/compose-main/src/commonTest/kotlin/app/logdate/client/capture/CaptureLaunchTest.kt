@@ -66,4 +66,13 @@ class CaptureLaunchTest {
         assertEquals("take_photo", captureShortcutId(EditorLaunchMode.Camera))
         assertEquals(null, captureShortcutId(EditorLaunchMode.Video))
     }
+
+    @Test
+    fun `a capture can start the entry with text, such as an unsaved notification reply`() {
+        assertEquals(
+            EntryEditorRoute(initialText = "Dinner on the steps"),
+            captureRoute(mode = "text", journalId = null, text = "Dinner on the steps"),
+        )
+        assertEquals(EntryEditorRoute(), captureRoute(mode = "text", journalId = null, text = "  "))
+    }
 }

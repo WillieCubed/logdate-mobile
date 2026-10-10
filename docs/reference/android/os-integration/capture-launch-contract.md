@@ -59,6 +59,7 @@ have defaults.
 action:  app.logdate.action.CAPTURE
 extras:  mode        text | voice | camera | video    optional, defaults to text
          journal_id  journal UUID                     optional, pre-selects that journal
+         text        text                             optional, starts the entry with it
 ```
 
 The equivalent deep links are:

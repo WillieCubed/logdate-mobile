@@ -8,8 +8,8 @@ import kotlin.uuid.Uuid
  * The public way to start a new LogDate entry from outside the editor.
  *
  * Launcher shortcuts, Quick Settings tiles, notifications, assistants, and other apps send
- * [ACTION_CAPTURE] (or open `logdate://capture`) with an optional [EXTRA_CAPTURE_MODE] and
- * [EXTRA_CAPTURE_JOURNAL_ID]. The intent resolver turns that into an [EntryEditorRoute] through
+ * [ACTION_CAPTURE] (or open `logdate://capture`) with an optional [EXTRA_CAPTURE_MODE],
+ * [EXTRA_CAPTURE_JOURNAL_ID], and [EXTRA_CAPTURE_TEXT]. The intent resolver turns that into an [EntryEditorRoute] through
  * [captureRoute], so every surface opens the editor the same way.
  */
 const val ACTION_CAPTURE = "app.logdate.action.CAPTURE"
@@ -19,6 +19,9 @@ const val EXTRA_CAPTURE_MODE = "mode"
 
 /** A journal UUID to pre-select for the new entry. */
 const val EXTRA_CAPTURE_JOURNAL_ID = "journal_id"
+
+/** Text to start the new entry with. */
+const val EXTRA_CAPTURE_TEXT = "text"
 
 /** The `logdate://capture` deep-link host. */
 const val CAPTURE_HOST = "capture"
@@ -35,10 +38,12 @@ const val CAPTURE_JOURNAL_PARAM = "journal"
 fun captureRoute(
     mode: String?,
     journalId: String?,
+    text: String? = null,
 ): EntryEditorRoute =
     EntryEditorRoute(
         launchMode = captureLaunchMode(mode),
         journalIds = journalId?.takeIf { runCatching { Uuid.parse(it) }.isSuccess }?.let(::listOf).orEmpty(),
+        initialText = text?.takeIf(String::isNotBlank),
     )
 
 /** The editor route for the New entry widget's legacy extras, which placed widgets still send. */
