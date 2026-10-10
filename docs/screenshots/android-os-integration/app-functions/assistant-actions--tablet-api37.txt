@@ -36,34 +36,45 @@
   "androidAppfunctionsReturnValue": [
     {
       "id": [
-        "a42d3894-93c7-43dc-9499-4294d03c5346"
+        "12b8f398-bb15-47bb-bad1-5ac09c776651"
       ],
       "text": [
         "Walked the long way home along the river."
       ],
       "createdAt": [
-        "2026-10-10T07:36:44.273995Z"
+        "2026-10-10T21:07:02.557696Z"
       ]
     }
   ]
 }
 
 # searchEntries with system search visibility off
-Error executing app function: android.app.appfunctions.AppFunctionException: LogDate only lets assistants read entries when the person turns on system search visibility in LogDate Settings > Privacy. (code 1000). See logcat for more details.
+Error executing app function: android.app.appfunctions.AppFunctionException: LogDate only lets assistants read journals and entries when the person turns on system search visibility in LogDate Settings > Privacy. (code 1000). See logcat for more details.
+
+# listJournals with system search visibility off
+Error executing app function: android.app.appfunctions.AppFunctionException: LogDate only lets assistants read journals and entries when the person turns on system search visibility in LogDate Settings > Privacy. (code 1000). See logcat for more details.
+
+# searchEntries with visibility on and the app lock on, never unlocked
+Error executing app function: android.app.appfunctions.AppFunctionException: LogDate is locked. The person needs to open LogDate and unlock it first. (code 1000). See logcat for more details.
 
 # searchEntries with system search visibility on
 {
   "androidAppfunctionsReturnValue": [
     {
       "id": [
-        "a42d3894-93c7-43dc-9499-4294d03c5346"
+        "12b8f398-bb15-47bb-bad1-5ac09c776651"
       ],
       "text": [
         "Walked the long way home along the river."
       ],
       "createdAt": [
-        "2026-10-10T07:36:44.273Z"
+        "2026-10-10T21:07:02.557Z"
       ]
     }
   ]
+}
+
+# listJournals with system search visibility on
+{
+  "androidAppfunctionsReturnValue": []
 }

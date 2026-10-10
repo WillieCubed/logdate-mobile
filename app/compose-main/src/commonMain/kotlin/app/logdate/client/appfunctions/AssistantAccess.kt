@@ -17,8 +17,8 @@ enum class AssistantReadRefusal(
 ) {
     /** The person has not let Android search surfaces see their entries. */
     SystemSearchOff(
-        "LogDate only lets assistants read entries when the person turns on system search " +
-            "visibility in LogDate Settings > Privacy.",
+        "LogDate only lets assistants read journals and entries when the person turns on " +
+            "system search visibility in LogDate Settings > Privacy.",
     ),
 
     /** LogDate's app lock is on and the person has not unlocked it in this session. */
@@ -26,9 +26,9 @@ enum class AssistantReadRefusal(
 }
 
 /**
- * Whether an assistant may read entries. Reading needs the same consent as Android search (system
- * search visibility) and an unlocked app; writing a new entry needs neither, because it reveals
- * nothing.
+ * Whether an assistant may read the journal: its entries or its journals' titles. Reading needs the
+ * same consent as Android search (system search visibility) and an unlocked app; writing a new entry
+ * needs neither, because it reveals nothing.
  *
  * @return why reading is refused, or null when it is allowed.
  */
@@ -41,6 +41,15 @@ fun assistantReadRefusal(
         !unlocked -> AssistantReadRefusal.Locked
         else -> null
     }
+
+/**
+ * Whether LogDate counts as unlocked for an assistant. With the app lock on, only an unlock in this
+ * process counts: a process Android starts just to answer an assistant has never asked.
+ */
+fun assistantUnlocked(
+    appLockOn: Boolean,
+    authenticated: Boolean,
+): Boolean = !appLockOn || authenticated
 
 /** An entry's text as an assistant receives it: on one line, shortened with an ellipsis when long. */
 fun assistantExcerpt(

@@ -375,6 +375,11 @@ object OsSurfaceCapture {
         Thread.sleep(1_000L)
     }
 
+    /** Turns LogDate's app lock (biometric unlock) on or off. */
+    fun setAppLock(enabled: Boolean) {
+        runBlocking { GlobalContext.get().get<LogdatePreferencesDataSource>().setShouldShowBiometric(enabled) }
+    }
+
     /** Turns LogDate's system search visibility, the consent assistants need to read entries, on or off. */
     fun setSystemSearchVisibility(enabled: Boolean) {
         runBlocking { GlobalContext.get().get<LogdatePreferencesDataSource>().setSystemSearchVisibilityEnabled(enabled) }

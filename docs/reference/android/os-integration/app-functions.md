@@ -19,7 +19,7 @@ removed because they pointed at a class that no longer exists.
 | Function | What it does | Needs consent? |
 | --- | --- | --- |
 | `createTextEntry(text)` | Saves a text entry, dated now, and returns it | No |
-| `listJournals()` | Returns each journal's id and title, so an agent can name one | No |
+| `listJournals()` | Returns each journal's id and title, so an agent can name one | Yes |
 | `searchEntries(query)` | Returns up to 10 matching entries, best match first, each shortened to one line | Yes |
 
 The entry an assistant saves appears in the timeline like any other:
@@ -36,18 +36,21 @@ Two functions from the original plan were left out on purpose:
 
 ## Consent and the app lock
 
-Reading someone's journal is far more sensitive than adding to it. `searchEntries` checks two things
-on every call:
+Reading someone's journal is far more sensitive than adding to it. `listJournals` and
+`searchEntries` check two things on every call:
 
 1. **System search visibility.** The person controls this in Privacy settings. It is the same setting
    that lets LogDate entries appear in Android search, read through
    `LogdatePreferencesDataSource.getSystemSearchVisibilityEnabled()`.
-2. **The app lock.** If `BiometricGatekeeper` reports that LogDate still needs unlocking in this
-   session, the call is refused.
+2. **The app lock.** If the lock is on in Settings (`UserData.securityLevel`) and the person has not
+   unlocked LogDate in this process (`BiometricGatekeeper` reports `AUTHENTICATED`), the call is
+   refused. The setting is read directly because the gatekeeper starts every new process as "no
+   prompt needed", including one Android starts just to answer an assistant.
 
 A refusal throws `AppFunctionDeniedException` with a message that says which check failed and what the
-person can do; it never returns partial data. The decision is `assistantReadRefusal`
-(app/compose-main commonMain, `client/appfunctions/AssistantAccess.kt`), a pure function with tests.
+person can do; it never returns partial data. The decisions are `assistantUnlocked` and
+`assistantReadRefusal` (app/compose-main commonMain, `client/appfunctions/AssistantAccess.kt`), pure
+functions with tests.
 
 ## How it works
 
@@ -74,9 +77,12 @@ through Android's own registry.
 
 ## Privacy
 
-- `createTextEntry` and `listJournals` return nothing from the person's entries.
-- `searchEntries` follows the consent and lock rules above on every call, and returns short
-  excerpts rather than whole entries.
+- `createTextEntry` returns nothing from the person's journal beyond the entry it saved.
+- `listJournals` and `searchEntries` follow the consent and lock rules above on every call. Journal
+  titles count as journal content, and search returns short excerpts rather than whole entries.
+- Whether the app lock is on comes from the lock setting, not from the unlock screen's state: a
+  process Android starts only to answer an assistant has never shown that screen, so with the lock
+  on, LogDate stays locked to assistants until the person unlocks it in the app.
 
 ## How to test
 

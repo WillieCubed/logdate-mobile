@@ -15,6 +15,7 @@ import app.logdate.client.domain.notes.AddNoteUseCase
 import app.logdate.client.repository.search.SearchRepository
 import app.logdate.feature.core.AppAuthState
 import app.logdate.feature.core.BiometricGatekeeper
+import app.logdate.shared.model.user.AppSecurityLevel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -24,10 +25,10 @@ import java.util.TimeZone
 import kotlin.time.Clock
 
 /**
- * LogDate's assistant actions on Android 16 and later. An assistant can save an entry and list
- * journals at any time, because that reveals nothing. Searching entries needs the person's consent
- * (system search visibility) and an unlocked app; otherwise the assistant is told why and what the
- * person can do.
+ * LogDate's assistant actions on Android 16 and later. An assistant can save an entry at any time,
+ * because that reveals nothing. Reading, which means listing journals or searching entries, needs the
+ * person's consent (system search visibility) and an unlocked app; otherwise the assistant is told
+ * why and what the person can do.
  *
  * The AppFunctions compiler generates `LogDateAppFunctionService` from this class, with the schema
  * `logdate_app_functions.xml`. The service is declared disabled and enabled by
@@ -66,13 +67,15 @@ abstract class LogDateAppFunctions :
 
     /**
      * Lists the person's LogDate journals by title, so they can be named when the person talks
-     * about one.
+     * about one. Only works when the person has turned on system search visibility in LogDate and
+     * LogDate is unlocked; otherwise it fails with a message to pass on.
      *
      * @return Every journal the person has.
      */
     @AppFunction(isDescribedByKDoc = true)
     suspend fun listJournals(): List<AssistantJournal> =
         withContext(Dispatchers.IO) {
+            requireReadAccess()
             journals().first().map { AssistantJournal(id = it.id.toString(), title = it.title) }
         }
 
@@ -87,15 +90,23 @@ abstract class LogDateAppFunctions :
     @AppFunction(isDescribedByKDoc = true)
     suspend fun searchEntries(query: String): List<AssistantEntry> =
         withContext(Dispatchers.IO) {
-            val unlocked = gatekeeper.authState.value.let { it == AppAuthState.NO_PROMPT_NEEDED || it == AppAuthState.AUTHENTICATED }
-            assistantReadRefusal(preferences.getSystemSearchVisibilityEnabled(), unlocked)?.let { refusal ->
-                throw AppFunctionDeniedException(refusal.message)
-            }
+            requireReadAccess()
             if (query.isBlank()) throw AppFunctionInvalidArgumentException("The search query is empty.")
             search.searchWithLimit(query, ASSISTANT_SEARCH_LIMIT).first().map { result ->
                 AssistantEntry(id = result.uid.toString(), text = assistantExcerpt(result.content), createdAt = result.created.toString())
             }
         }
+
+    /** Refuses the call, with the reason to pass on, unless the person allows reading right now. */
+    private suspend fun requireReadAccess() {
+        // The gatekeeper starts out as "no prompt needed" in every new process, so whether the app
+        // lock is on comes from the setting itself.
+        val appLockOn = preferences.userData.first().securityLevel != AppSecurityLevel.NONE
+        val unlocked = assistantUnlocked(appLockOn, authenticated = gatekeeper.authState.value == AppAuthState.AUTHENTICATED)
+        assistantReadRefusal(preferences.getSystemSearchVisibilityEnabled(), unlocked)?.let { refusal ->
+            throw AppFunctionDeniedException(refusal.message)
+        }
+    }
 }
 
 /** An entry as an assistant sees it. */

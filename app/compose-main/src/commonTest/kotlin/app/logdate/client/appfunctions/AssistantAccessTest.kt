@@ -22,6 +22,18 @@ class AssistantAccessTest {
     }
 
     @Test
+    fun `with the app lock on, LogDate counts as locked until the person unlocks it`() {
+        // A process started only for an assistant has never shown the unlock prompt.
+        assertEquals(false, assistantUnlocked(appLockOn = true, authenticated = false))
+        assertEquals(true, assistantUnlocked(appLockOn = true, authenticated = true))
+    }
+
+    @Test
+    fun `without the app lock, LogDate is always unlocked`() {
+        assertEquals(true, assistantUnlocked(appLockOn = false, authenticated = false))
+    }
+
+    @Test
     fun `excerpts are one line and shortened when long`() {
         assertEquals("Walked home. Quiet light.", assistantExcerpt("Walked home.\n  Quiet light.  "))
         val excerpt = assistantExcerpt("a".repeat(400))

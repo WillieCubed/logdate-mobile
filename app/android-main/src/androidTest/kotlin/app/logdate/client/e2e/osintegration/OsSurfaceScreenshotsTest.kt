@@ -76,12 +76,21 @@ class OsSurfaceScreenshotsTest {
 
         val pkg = OsSurfaceCapture.packageName
         val functions = "app.logdate.client.appfunctions.LogDateAppFunctions"
+        // A settings change re-indexes LogDate's search schema, and the function registry can briefly
+        // report a function as missing (code 1003) while that settles, so that answer is retried.
         fun execute(
             function: String,
             parameters: String,
-        ) = OsSurfaceCapture.shellScript(
-            "cmd app_function execute-app-function --package $pkg --function '$functions#$function' --parameters '$parameters'",
-        )
+        ): String {
+            val command =
+                "cmd app_function execute-app-function --package $pkg --function '$functions#$function' --parameters '$parameters'"
+            repeat(FUNCTION_LOOKUP_ATTEMPTS - 1) {
+                val output = OsSurfaceCapture.shellScript(command)
+                if ("(code 1003)" !in output) return output
+                Thread.sleep(1_000L)
+            }
+            return OsSurfaceCapture.shellScript(command)
+        }
 
         val listing =
             OsSurfaceCapture
@@ -91,9 +100,17 @@ class OsSurfaceScreenshotsTest {
                 .joinToString("\n")
         val created = execute("createTextEntry", """{"text":["Walked the long way home along the river."]}""")
         val refused = execute("searchEntries", """{"query":["river"]}""")
+        val journalsRefused = execute("listJournals", "{}")
         OsSurfaceCapture.setSystemSearchVisibility(true)
+        // With the app lock on and no unlock in this process, reading stays refused.
+        OsSurfaceCapture.setAppLock(true)
+        Thread.sleep(1_000L)
+        val locked = execute("searchEntries", """{"query":["river"]}""")
+        OsSurfaceCapture.setAppLock(false)
         Thread.sleep(1_000L)
         val found = execute("searchEntries", """{"query":["river"]}""")
+        val journals = execute("listJournals", "{}")
+        check("Locked" in locked || "locked" in locked) { "A search with the app lock on was not refused: $locked" }
         OsSurfaceCapture.writeEvidence(
             surface = "app-functions",
             state = "assistant-actions",
@@ -108,8 +125,17 @@ class OsSurfaceScreenshotsTest {
                     appendLine("# searchEntries with system search visibility off")
                     appendLine(refused.trim())
                     appendLine()
+                    appendLine("# listJournals with system search visibility off")
+                    appendLine(journalsRefused.trim())
+                    appendLine()
+                    appendLine("# searchEntries with visibility on and the app lock on, never unlocked")
+                    appendLine(locked.trim())
+                    appendLine()
                     appendLine("# searchEntries with system search visibility on")
                     appendLine(found.trim())
+                    appendLine()
+                    appendLine("# listJournals with system search visibility on")
+                    appendLine(journals.trim())
                 },
         )
 
@@ -821,7 +847,9 @@ class OsSurfaceScreenshotsTest {
         /** `WindowConfiguration.WINDOWING_MODE_FREEFORM`, which `am start --windowingMode` takes. */
         const val WINDOWING_MODE_FREEFORM = 5
 
-        /** The Files app, opened at Downloads, for the cross-app drag. */
+        /** How many times an assistant call is tried while the function registry settles. */
+        const val FUNCTION_LOOKUP_ATTEMPTS = 15
+
         const val EDITOR_ACTIVITY = "app.logdate.client.EditorActivity"
         const val WINDOW_TITLE_ENTRY = "Ferry to Cacilhas at sunset"
         val SWITCHER_ITEM: Pattern = Pattern.compile(".*release key bindings to select.*")
@@ -831,6 +859,8 @@ class OsSurfaceScreenshotsTest {
         const val KEYBOARD_SUGGESTION_TIMEOUT_MS = 15_000L
         const val GIF_PANEL_TIMEOUT_MS = 30_000L
         val GIF_DESCRIPTION: Pattern = Pattern.compile(".{24,}")
+
+        /** The Files app, opened at Downloads, for the cross-app drag. */
         const val FILES_PACKAGE = "com.google.android.documentsui"
         const val FILES_ACTIVITY = "$FILES_PACKAGE/com.android.documentsui.files.FilesActivity"
         const val DOWNLOADS_ROOT = "content://com.android.providers.downloads.documents/root/downloads"
