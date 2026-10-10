@@ -67,7 +67,7 @@ internal fun MainActivity.editorWindows(): EditorWindows? {
         override fun openNewEntry(journalId: String?) {
             val journalIds = listOfNotNull(journalId?.let { runCatching { Uuid.parse(it) }.getOrNull() })
             val adjacent = isInMultiWindowMode || resources.configuration.screenWidthDp >= EXPANDED_WIDTH_DP
-            editorManager.openNewEditorWindow(journalIds = journalIds, adjacent = adjacent)
+            editorManager.openNewEditorWindow(journalIds = journalIds, adjacentTo = this@editorWindows.takeIf { adjacent })
         }
     }
 }

@@ -2,10 +2,9 @@
 
 Status: partial.
 
-- **Ships today:** the adaptive Home workspace, foldable postures, separate editor windows, and video
-  picture-in-picture.
-- **Planned:** manifest hygiene, window titles, "Open in new window", the caption bar, and desktop
-  windowing evidence.
+- **Ships today:** the adaptive Home workspace, foldable postures, separate editor windows, video
+  picture-in-picture, manifest hygiene, window titles, and "New entry in a new window".
+- **Planned:** the caption bar and desktop windowing evidence.
 
 ## What it is
 
@@ -30,8 +29,9 @@ covers the window and system side.
   screen.
 - **Window titles.** Each editor window is named after its entry ("New entry" until it has a title)
   in Recents, the taskbar, and the caption bar.
-- **New windows.** "Open in new window" on an entry or journal opens it beside the current window
-  when there is room. Launchers and the taskbar offer "New window" for the editor.
+- **New windows.** A journal's menu (its overflow menu, a long-press, or a right-click on its cover)
+  offers "New entry in a new window", which opens the editor beside LogDate in split screen when
+  there is room. Launchers and the taskbar offer "New window" for the editor.
 - **The caption bar.** In desktop windowing, Search and the account button sit in the caption bar,
   between the system controls.
 
@@ -59,9 +59,12 @@ still reloads correctly.
 
 - `EditorActivity` is a separate document task (`documentLaunchMode="always"`,
   `taskAffinity=".editor"`), so each entry can have its own window.
-- `EditorManager.openNewEditorWindow` and `openEntryInNewWindow` start it. The "Open in new window"
-  action adds `FLAG_ACTIVITY_LAUNCH_ADJACENT` when the app is in multi-window mode or the window is
-  wide. Android then places the new window beside the current one.
+- `EditorManager.openNewEditorWindow` and `openEntryInNewWindow` start it. "New entry in a new
+  window" passes the current activity as `adjacentTo` when the app is in multi-window mode or the
+  window is at least 840dp wide. `EditorManager` then adds `FLAG_ACTIVITY_LAUNCH_ADJACENT` and starts
+  the editor from that activity. On Android 12L and later, that request splits the screen even from
+  full screen. The launch must come from the activity: from the application context, Android has no
+  window to place the editor beside and opens it full screen.
 - `EditorActivity` calls `setTaskDescription` with the entry's title, which names the window
   everywhere the system lists it.
 

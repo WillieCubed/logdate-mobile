@@ -25,14 +25,15 @@ class EditorManager(
     /**
      * Opens a new entry in its own window.
      *
-     * @param adjacent Ask Android to place the window beside the current one, for split screen and
-     *   wide windows. Android ignores the request where there is no room.
+     * @param adjacentTo The activity to place the window beside, in split screen. Android needs the
+     *   launch to come from that activity: a launch from the application context has no window to be
+     *   adjacent to, so it opens full screen. Android ignores the request where there is no room.
      */
     fun openNewEditorWindow(
         initialText: String? = null,
         attachments: List<String>? = null,
         journalIds: List<Uuid> = emptyList(),
-        adjacent: Boolean = false,
+        adjacentTo: Activity? = null,
     ) {
         try {
             val intent =
@@ -42,8 +43,8 @@ class EditorManager(
                     attachments = attachments,
                     journalIds = journalIds,
                 )
-            if (adjacent) intent.addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT)
-            context.startActivity(intent)
+            if (adjacentTo != null) intent.addFlags(Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT)
+            (adjacentTo ?: context).startActivity(intent)
             Napier.d("Launched new editor window")
         } catch (e: Exception) {
             Napier.e("Failed to open new editor window", e)
