@@ -5,6 +5,7 @@ import app.logdate.client.media.storage.MediaDirectories
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.wear.capture.Feeling
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -21,12 +22,14 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-/** Tests [AfterSaveController]: the five seconds after a save, and what Undo does in them. */
+/** Tests [AfterSaveController]: the seconds after a save, what Undo does in them, and the five feelings. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AfterSaveControllerTest {
     private val notesRepository = mockk<JournalNotesRepository>(relaxed = true)
     private val removedNotes = mutableListOf<Uuid>()
     private val deletedFiles = mutableListOf<String>()
+    private val savedFeelings = mutableListOf<Feeling>()
+    private var feelingSaves = true
     private val noteId = Uuid.random()
 
     @Test
@@ -141,6 +144,56 @@ class AfterSaveControllerTest {
             assertEquals(listOf(noteId), removedNotes)
         }
 
+    @Test
+    fun `offered feelings go after four seconds and Undo stays until five`() =
+        runTest {
+            val controller = controller()
+
+            controller.open(noteId, offerFeelings = true)
+            assertEquals(AfterSaveWindow(noteId, feelingsOffered = true), controller.window.value)
+            advanceTimeBy(AfterSaveController.FEELINGS_WINDOW_MS + 1)
+            runCurrent()
+
+            assertEquals(AfterSaveWindow(noteId, feelingsOffered = false), controller.window.value)
+        }
+
+    @Test
+    fun `choosing a feeling saves a check-in and shows which`() =
+        runTest {
+            val controller = controller()
+            controller.open(noteId, offerFeelings = true)
+
+            assertTrue(controller.chooseFeeling(Feeling.GOOD))
+
+            assertEquals(listOf(Feeling.GOOD), savedFeelings)
+            assertEquals(AfterSaveWindow(noteId, feelingsOffered = false, feeling = Feeling.GOOD), controller.window.value)
+        }
+
+    @Test
+    fun `a feeling that cannot be saved leaves the five feelings offered`() =
+        runTest {
+            feelingSaves = false
+            val controller = controller()
+            controller.open(noteId, offerFeelings = true)
+
+            assertFalse(controller.chooseFeeling(Feeling.GOOD))
+
+            assertEquals(AfterSaveWindow(noteId, feelingsOffered = true), controller.window.value)
+        }
+
+    @Test
+    fun `no feeling is saved once the feelings are gone`() =
+        runTest {
+            val controller = controller()
+            controller.open(noteId, offerFeelings = true)
+            advanceTimeBy(AfterSaveController.FEELINGS_WINDOW_MS + 1)
+            runCurrent()
+
+            assertFalse(controller.chooseFeeling(Feeling.GOOD))
+
+            assertTrue(savedFeelings.isEmpty())
+        }
+
     private fun TestScope.controller(mediaFiles: MediaFileResolver? = null) =
         AfterSaveController(
             scope = backgroundScope,
@@ -148,6 +201,10 @@ class AfterSaveControllerTest {
             removalNotifier = { removedNotes += it },
             deleteFile = { deletedFiles += it },
             mediaFiles = mediaFiles,
+            feelingSaver = { feeling ->
+                if (feelingSaves) savedFeelings += feeling
+                feelingSaves
+            },
         )
 
     private fun mediaFiles() =

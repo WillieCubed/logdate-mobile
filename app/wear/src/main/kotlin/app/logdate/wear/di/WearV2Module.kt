@@ -7,6 +7,8 @@ import app.logdate.client.domain.streak.ObserveCampfireUseCase
 import app.logdate.ui.platform.LogDateHaptics
 import app.logdate.ui.platform.createAndroidPlatformHapticsController
 import app.logdate.ui.platform.isSystemHapticFeedbackOff
+import app.logdate.wear.capture.QuickNoteWriter
+import app.logdate.wear.recording.AudioMomentSaver
 import app.logdate.wear.v2.flow.FlowViewModel
 import app.logdate.wear.v2.haptics.HapticsPreferenceStore
 import app.logdate.wear.v2.haptics.SharedPreferencesHapticsPreferenceStore
@@ -54,6 +56,16 @@ val wearV2Module =
         }
         single { PermissionPrompts(checker = get(), store = get()) }
 
+        single { QuickNoteWriter(notesRepository = get(), locationCaptureCoordinator = get()) }
+        factory {
+            AudioMomentSaver(
+                notesRepository = get(),
+                durationResolver = get(),
+                noteHealthAnnotator = get(),
+                locationCaptureCoordinator = get(),
+            )
+        }
+
         single { DayClock(timeChanges = timeChangeSignals(get())) }
         // The phone shares its day-start hour through the state document (Track A, C2); until then there is none.
         single {
@@ -89,6 +101,18 @@ val wearV2Module =
                 phoneHandoff = get(),
             )
         }
-        viewModel { RecorderViewModel() }
+        viewModel {
+            RecorderViewModel(
+                recorder = get(),
+                saver = get(),
+                notesRepository = get(),
+                removalNotifier = get(),
+                feelingSaver = get<QuickNoteWriter>(),
+                haptics = get(),
+                permissions = get(),
+                applicationScope = get(),
+                mediaFiles = get(),
+            )
+        }
         viewModel { FlowViewModel(dayClock = get(), notesRepository = get()) }
     }
