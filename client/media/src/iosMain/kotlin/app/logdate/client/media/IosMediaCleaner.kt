@@ -2,23 +2,26 @@
 
 package app.logdate.client.media
 
+import app.logdate.client.media.storage.MediaFileResolver
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSFileManager
-import platform.Foundation.NSURL
 
 /**
  * iOS filesystem-backed [MediaCleaner].
  *
- * Accepts absolute filesystem paths and `file://` URIs. Other schemes are ignored — they
- * refer to assets the editor doesn't own (Photos library entries, remote URLs, etc.).
+ * Accepts `logdate-media://` references, `file:` URIs and absolute paths, including paths from an
+ * earlier app container. Other schemes are ignored — they refer to assets the editor doesn't own
+ * (Photos library entries, remote URLs, etc.).
  */
-class IosMediaCleaner : MediaCleaner {
+class IosMediaCleaner(
+    private val mediaFiles: MediaFileResolver,
+) : MediaCleaner {
     private val fileManager = NSFileManager.defaultManager
 
     override suspend fun delete(path: String) {
         val absolutePath =
-            path.toFilesystemPath() ?: run {
+            mediaFiles.filePath(path) ?: run {
                 Napier.d("MediaCleaner: ignoring non-filesystem path: $path")
                 return
             }
@@ -28,11 +31,4 @@ class IosMediaCleaner : MediaCleaner {
             Napier.w("MediaCleaner: failed to delete $absolutePath")
         }
     }
-
-    private fun String.toFilesystemPath(): String? =
-        when {
-            startsWith("/") -> this
-            startsWith("file:") -> NSURL.URLWithString(this)?.path
-            else -> null
-        }
 }

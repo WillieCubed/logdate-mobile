@@ -1,6 +1,7 @@
 package app.logdate.feature.core.export
 
 import app.logdate.client.domain.export.archive.MediaSourceOpener
+import app.logdate.client.media.storage.MediaFileResolver
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
@@ -8,15 +9,11 @@ import okio.Source
 
 /** Opens only local iOS media references; exports never fetch network URLs. */
 class IosMediaSourceOpener(
+    private val mediaFiles: MediaFileResolver,
     private val fileSystem: FileSystem = FileSystem.SYSTEM,
 ) : MediaSourceOpener {
     override suspend fun open(reference: String): Source? {
-        val sourcePath =
-            when {
-                reference.startsWith("file://") -> reference.removePrefix("file://")
-                reference.startsWith("/") -> reference
-                else -> return null
-            }.takeIf(String::isNotBlank)?.toPath() ?: return null
+        val sourcePath = mediaFiles.filePath(reference)?.toPath() ?: return null
 
         val candidate = existingFile(sourcePath) ?: existingFile(sourcePath.withoutDoubledExtension()) ?: return null
         return runCatching { fileSystem.source(candidate) }.getOrNull()

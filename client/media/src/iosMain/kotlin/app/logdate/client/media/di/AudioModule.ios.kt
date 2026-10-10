@@ -24,16 +24,16 @@ actual val audioModule: Module =
     module {
         single<AudioStorage> { IosAudioStorage() }
         single<AudioRecordingManager> { IosAudioRecordingManager(get()) }
-        single<AudioPlaybackManager> { IosAudioPlaybackManager() }
-        single<AudioDurationResolver> { IosAudioDurationResolver() }
+        single<AudioPlaybackManager> { IosAudioPlaybackManager(get()) }
+        single<AudioDurationResolver> { IosAudioDurationResolver(get()) }
         single<AudioRouteRepository> { SystemControlledAudioRouteRepository() }
 
         // On-device transcription via Apple's Speech Recognition framework.
         // The system model is always present — no download required.
-        single<TranscriptionService> { IosTranscriptionService() }
+        single<TranscriptionService> { IosTranscriptionService(get()) }
 
         // On-device ambient sound detection via Apple's Sound Analysis
         // framework (iOS 15+). Detects birds, traffic, music, rain, and
         // ~300 other categories without any model download.
-        single<AudioTaggingService> { IosSoundAnalysisTaggingService() }
+        single<AudioTaggingService> { IosSoundAnalysisTaggingService(get()) }
     }

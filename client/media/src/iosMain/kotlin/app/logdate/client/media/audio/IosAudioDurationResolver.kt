@@ -2,24 +2,22 @@
 
 package app.logdate.client.media.audio
 
+import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.fileUrl
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import platform.AVFoundation.AVURLAsset
 import platform.CoreMedia.CMTimeGetSeconds
-import platform.Foundation.NSURL
 import kotlin.math.roundToLong
 
-class IosAudioDurationResolver : AudioDurationResolver {
+class IosAudioDurationResolver(
+    private val mediaFiles: MediaFileResolver,
+) : AudioDurationResolver {
     override suspend fun resolveDurationMs(uri: String): Long? =
         withContext(Dispatchers.Default) {
             try {
-                val url =
-                    if (uri.startsWith("file://")) {
-                        NSURL.URLWithString(uri)
-                    } else {
-                        NSURL.fileURLWithPath(uri)
-                    }
+                val url = mediaFiles.fileUrl(uri)
 
                 if (url == null) {
                     Napier.e("Failed to resolve audio URL for $uri")

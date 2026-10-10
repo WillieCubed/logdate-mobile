@@ -1,5 +1,7 @@
 package app.logdate.client.media.audio
 
+import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.fileUrl
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.CoroutineScope
@@ -11,13 +13,14 @@ import kotlinx.coroutines.launch
 import platform.AVFAudio.AVAudioPlayer
 import platform.AVFAudio.AVAudioSession
 import platform.AVFAudio.AVAudioSessionCategoryPlayback
-import platform.Foundation.NSURL
 
 /**
  * iOS implementation of AudioPlaybackManager using AVAudioPlayer.
  */
 @OptIn(ExperimentalForeignApi::class)
-class IosAudioPlaybackManager : AudioPlaybackManager {
+class IosAudioPlaybackManager(
+    private val mediaFiles: MediaFileResolver,
+) : AudioPlaybackManager {
     private var audioPlayer: AVAudioPlayer? = null
     private var progressUpdateJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main)
@@ -50,8 +53,7 @@ class IosAudioPlaybackManager : AudioPlaybackManager {
             // Stop any existing playback
             stopPlayback()
 
-            // Create URL from string
-            val fileUrl = NSURL.fileURLWithPath(uri)
+            val fileUrl = mediaFiles.fileUrl(uri) ?: error("Not a local audio file: $uri")
 
             // Create the audio player
             val player =

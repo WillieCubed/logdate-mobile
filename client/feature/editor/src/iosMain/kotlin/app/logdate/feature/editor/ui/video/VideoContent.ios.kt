@@ -50,6 +50,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.UIKitView
 import app.logdate.client.media.IosMediaManager
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.playableUrl
 import app.logdate.ui.common.AspectRatios
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.BetaInteropApi
@@ -95,7 +97,8 @@ actual fun VideoPlayerContent(
     uri: String,
     modifier: Modifier,
 ) {
-    val url = remember(uri) { NSURL.URLWithString(uri) }
+    val mediaFiles = koinInject<MediaFileResolver>()
+    val url = remember(uri) { mediaFiles.playableUrl(uri) }
     if (url == null) {
         Box(modifier = modifier.background(Color.Black))
         return
@@ -277,6 +280,7 @@ actual fun VideoPickerContent(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val mediaManager = koinInject<MediaManager>() as? IosMediaManager
+    val mediaFiles = koinInject<MediaFileResolver>()
     var activeDelegate by remember { mutableStateOf<VideoPickerDelegate?>(null) }
 
     Card(
@@ -320,7 +324,7 @@ actual fun VideoPickerContent(
                                         val resolvedUri = mediaManager?.resolvePhotoLibraryVideoUri(localIdentifier)
                                         activeDelegate = null
                                         if (resolvedUri != null) {
-                                            onVideoSelected(resolvedUri, resolveDurationMs(resolvedUri))
+                                            onVideoSelected(resolvedUri, resolveDurationMs(mediaFiles.playableUrl(resolvedUri)))
                                         }
                                     }
                                 },
@@ -347,8 +351,8 @@ actual fun VideoPickerContent(
     }
 }
 
-private fun resolveDurationMs(uri: String): Long {
-    val url = NSURL.URLWithString(uri) ?: return 0L
+private fun resolveDurationMs(url: NSURL?): Long {
+    if (url == null) return 0L
     val asset = AVURLAsset.URLAssetWithURL(url, options = null)
     return (asset.duration.useContents { value.toDouble() / timescale.toDouble() } * 1000.0).toLong()
 }

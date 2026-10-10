@@ -88,7 +88,7 @@ actual val coreFeatureModule: Module =
         single<AppUpdateController> { UnsupportedAppUpdateController(get()) }
         single<MemoriesWidgetInstallController> { HiddenMemoriesWidgetInstallController() }
         single<DeviceTransferSealer> { CryptographyDeviceTransfer() }
-        single<MediaSourceOpener> { IosMediaSourceOpener() }
+        single<MediaSourceOpener> { IosMediaSourceOpener(get()) }
 
         // TODO: Verify this iOS export implementation works correctly with the root view controller
         // Export functionality for iOS - gets root view controller from the main application window

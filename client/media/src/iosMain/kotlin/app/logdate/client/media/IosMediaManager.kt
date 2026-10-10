@@ -5,6 +5,9 @@
 
 package app.logdate.client.media
 
+import app.logdate.client.media.storage.IosMediaDirectories
+import app.logdate.client.media.storage.MediaCollection
+import app.logdate.client.media.storage.MediaFileResolver
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
@@ -20,7 +23,6 @@ import platform.CoreMedia.CMTimeGetSeconds
 import platform.Foundation.NSCachesDirectory
 import platform.Foundation.NSData
 import platform.Foundation.NSDate
-import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSFileModificationDate
 import platform.Foundation.NSFileSize
@@ -62,9 +64,10 @@ import kotlin.uuid.Uuid
  * can pass selected images through save/sync flows before they are copied into app storage.
  */
 class IosMediaManager(
-    private val mediaRootPath: String = defaultMediaPath(),
+    private val mediaFiles: MediaFileResolver = MediaFileResolver(IosMediaDirectories()),
 ) : MediaManager {
     private val fileManager = NSFileManager.defaultManager
+    private val mediaRootPath = mediaFiles.directory(MediaCollection.Library)
     private val imageExtensions = setOf("jpg", "jpeg", "png", "gif", "webp", "heic", "heif")
     private val videoExtensions = setOf("mp4", "mov", "m4v")
 
@@ -88,18 +91,13 @@ class IosMediaManager(
      * Deletes a file LogDate itself copied into app storage, and reports whether it was there.
      *
      * A `ph://` URI is an asset in the user's photo library and is refused outright -- removing an
-     * entry must never remove a photo from their library. A file path is deleted only when it
-     * resolves inside this app's own media directory, so a file referenced from anywhere else is
-     * left alone.
+     * entry must never remove a photo from their library. A file is deleted only when it is in
+     * LogDate's media library, so a file referenced from anywhere else is left alone.
      */
     override suspend fun deleteOwnedMedia(uri: String): Boolean =
         withContext(Dispatchers.Default) {
-            if (uri.isPhotoLibraryUri()) return@withContext false
-
             val path = resolvePath(uri) ?: return@withContext false
-            val root = mediaRootPath.trimEnd('/')
-            if (!path.startsWith("$root/")) return@withContext false
-            if (path.contains("/../")) return@withContext false
+            if (mediaFiles.refFor(path)?.collection != MediaCollection.Library) return@withContext false
             if (!fileManager.fileExistsAtPath(path)) return@withContext false
 
             fileManager.removeItemAtPath(path, error = null)
@@ -161,7 +159,7 @@ class IosMediaManager(
 
             val sourcePath = resolvePath(uri) ?: return@withContext
             ensureMediaDir()
-            if (sourcePath.startsWith(mediaRootPath)) {
+            if (mediaFiles.refFor(sourcePath)?.collection == MediaCollection.Library) {
                 return@withContext
             }
             val destination = buildMediaPath(sourcePath.substringAfterLast('/'))
@@ -457,14 +455,7 @@ class IosMediaManager(
         return (seconds * 1000).toLong().milliseconds
     }
 
-    private fun resolvePath(uri: String): String? =
-        if (uri.isPhotoLibraryUri()) {
-            null
-        } else if (uri.startsWith("file://")) {
-            NSURL.URLWithString(uri)?.path
-        } else {
-            uri
-        }
+    private fun resolvePath(uri: String): String? = mediaFiles.filePath(uri)
 
     private fun ensureMediaDir() {
         fileManager.createDirectoryAtPath(
@@ -589,18 +580,4 @@ class IosMediaManager(
             "public.mpeg-4" -> "video/mp4"
             else -> "application/octet-stream"
         }
-}
-
-private fun defaultMediaPath(): String {
-    val fileManager = NSFileManager.defaultManager
-    val url: NSURL? =
-        fileManager.URLForDirectory(
-            directory = NSDocumentDirectory,
-            inDomain = NSUserDomainMask,
-            appropriateForURL = null,
-            create = true,
-            error = null,
-        )
-    val basePath = requireNotNull(url?.path)
-    return "$basePath/media"
 }

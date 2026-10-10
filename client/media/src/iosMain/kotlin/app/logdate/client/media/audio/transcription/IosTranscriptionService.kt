@@ -6,6 +6,8 @@
 package app.logdate.client.media.audio.transcription
 
 import app.logdate.client.media.audio.download.ModelDownloadStatus
+import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.fileUrl
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -16,7 +18,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import platform.Foundation.NSURL
 import platform.Speech.SFSpeechRecognizer
 import platform.Speech.SFSpeechURLRecognitionRequest
 import kotlin.coroutines.resume
@@ -37,7 +38,9 @@ import kotlin.coroutines.resumeWithException
  * attempt. We don't pre-request it — if the user denies, the recognition task
  * returns an error which surfaces as a [TranscriptionResult.Error].
  */
-internal class IosTranscriptionService : TranscriptionService {
+internal class IosTranscriptionService(
+    private val mediaFiles: MediaFileResolver,
+) : TranscriptionService {
     private val _transcriptionFlow = MutableSharedFlow<TranscriptionResult>(replay = 1)
     private val unsupportedLiveResult = TranscriptionResult.Error(TranscriptionFailure.NotSupported)
 
@@ -66,7 +69,7 @@ internal class IosTranscriptionService : TranscriptionService {
             return TranscriptionResult.Error(TranscriptionFailure.NotAvailable)
         }
 
-        val url = NSURL.fileURLWithPath(audioUri)
+        val url = mediaFiles.fileUrl(audioUri) ?: return TranscriptionResult.Error(TranscriptionFailure.AudioError)
         val request = SFSpeechURLRecognitionRequest(uRL = url)
         // Force on-device recognition — no audio leaves the device.
         request.requiresOnDeviceRecognition = true

@@ -1,5 +1,7 @@
 package app.logdate
 
+import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.ui.media.LocalMediaImageMapper
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.disk.DiskCache
@@ -16,13 +18,18 @@ import platform.Foundation.NSUserDomainMask
  *
  * Matches the Android configuration: bounded memory and disk caches plus a
  * crossfade default, so timelines, Rewinds, and galleries feel consistent
- * across platforms. The disk cache lives under the app's caches directory
+ * across platforms. [LocalMediaImageMapper] lets every request load stored
+ * `logdate-media://` references and files from an earlier app container. The disk cache lives under the app's caches directory
  * (`Library/Caches`), the standard iOS location for purgeable data.
  */
-fun buildLogDateImageLoader(context: PlatformContext): ImageLoader =
+fun buildLogDateImageLoader(
+    context: PlatformContext,
+    mediaFiles: MediaFileResolver,
+): ImageLoader =
     ImageLoader
         .Builder(context)
         .crossfade(IMAGE_CROSSFADE_MS)
+        .components { add(LocalMediaImageMapper(mediaFiles)) }
         .memoryCache {
             MemoryCache
                 .Builder()

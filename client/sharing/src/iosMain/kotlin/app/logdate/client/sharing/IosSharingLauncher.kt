@@ -3,6 +3,9 @@
 package app.logdate.client.sharing
 
 import app.logdate.client.media.MediaManager
+import app.logdate.client.media.storage.LocalMediaRef
+import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.fileUrl
 import app.logdate.client.repository.journals.JournalRepository
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.BetaInteropApi
@@ -69,6 +72,7 @@ import kotlin.uuid.Uuid
 class IosSharingLauncher(
     private val journalRepository: JournalRepository,
     private val mediaManager: MediaManager,
+    private val mediaFiles: MediaFileResolver,
     private val coroutineScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
 ) : SharingLauncher {
     override fun shareContent(
@@ -204,7 +208,8 @@ class IosSharingLauncher(
     }
 
     override fun getUriFromMedia(uid: String): String {
-        if (uid.startsWith("file://") ||
+        if (uid.startsWith("file:") ||
+            uid.startsWith("${LocalMediaRef.SCHEME}:") ||
             uid.startsWith("https://") ||
             uid.startsWith("photo://") ||
             uid.startsWith("http://")
@@ -232,7 +237,7 @@ class IosSharingLauncher(
         val items = mutableListOf<Any>()
         text?.takeIf { it.isNotBlank() }?.let { items += it }
         mediaUris.forEach { raw ->
-            val url = NSURL.URLWithString(raw)
+            val url = mediaFiles.fileUrl(raw) ?: NSURL.URLWithString(raw)
             if (url == null) {
                 Napier.w("shareContent: skipping unparseable URI $raw")
                 return@forEach

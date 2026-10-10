@@ -5,6 +5,8 @@
 
 package app.logdate.ui.audio.extraction
 
+import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.fileUrl
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.ObjCObjectVar
 import kotlinx.cinterop.addressOf
@@ -31,23 +33,20 @@ import platform.CoreMedia.CMBlockBufferGetDataLength
 import platform.CoreMedia.CMSampleBufferGetDataBuffer
 import platform.CoreMedia.CMSampleBufferInvalidate
 import platform.Foundation.NSError
-import platform.Foundation.NSURL
 
 /**
  * iOS implementation of AmplitudeExtractor using AVAssetReader.
  */
-class IosAmplitudeExtractor : AmplitudeExtractor {
+class IosAmplitudeExtractor(
+    private val mediaFiles: MediaFileResolver,
+) : AmplitudeExtractor {
     override suspend fun extractAmplitudes(
         uri: String,
         targetSampleCount: Int,
     ): List<Float> =
         withContext(Dispatchers.Default) {
             val url =
-                if (uri.startsWith("file://")) {
-                    NSURL.URLWithString(uri)
-                } else {
-                    NSURL.fileURLWithPath(uri)
-                } ?: run {
+                mediaFiles.fileUrl(uri) ?: run {
                     Napier.w { "Unable to resolve audio URL for $uri" }
                     return@withContext emptyList()
                 }

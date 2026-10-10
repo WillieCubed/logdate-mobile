@@ -11,6 +11,6 @@ import org.koin.dsl.module
 actual val audioUiModule: Module =
     module {
         single<WaveformStorage> { IosWaveformStorage() }
-        single<AmplitudeExtractor> { IosAmplitudeExtractor() }
+        single<AmplitudeExtractor> { IosAmplitudeExtractor(get()) }
         factory { AudioContextProcessor(get(), get()) }
     }

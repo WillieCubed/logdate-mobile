@@ -5,6 +5,8 @@
 
 package app.logdate.client.media.audio.tagging
 
+import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.media.storage.fileUrl
 import io.github.aakira.napier.Napier
 import kotlinx.cinterop.ObjCObjectVar
 import kotlinx.cinterop.alloc
@@ -43,14 +45,20 @@ import platform.darwin.NSObject
  * the KN-generated protocol type is not guaranteed to be stable across toolchain
  * versions; "confidence" and "identifier" are stable public API keys.
  */
-internal class IosSoundAnalysisTaggingService : AudioTaggingService {
+internal class IosSoundAnalysisTaggingService(
+    private val mediaFiles: MediaFileResolver,
+) : AudioTaggingService {
     override val isAvailable: Boolean = true
 
     override suspend fun warmUp(): Boolean = true
 
     override fun tagAudio(audioUri: String): Flow<AudioTaggingResult> =
         flow {
-            val url = NSURL.fileURLWithPath(audioUri)
+            val url = mediaFiles.fileUrl(audioUri)
+            if (url == null) {
+                emit(AudioTaggingResult.Error("Not a local audio file: $audioUri"))
+                return@flow
+            }
             val result =
                 withContext(Dispatchers.Default) {
                     analyzeFile(url)

@@ -22,6 +22,7 @@ actual val sharingModule: Module =
             IosSharingLauncher(
                 journalRepository = get(),
                 mediaManager = get(),
+                mediaFiles = get(),
             )
         }
         single<RewindQuoteCardRenderer> { IosRewindQuoteCardRenderer() }
