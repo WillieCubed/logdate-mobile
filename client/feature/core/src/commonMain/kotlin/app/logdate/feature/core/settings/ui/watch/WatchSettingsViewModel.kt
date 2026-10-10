@@ -2,13 +2,17 @@ package app.logdate.feature.core.settings.ui.watch
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.logdate.client.domain.watch.SharedPreferenceKey
 import app.logdate.client.domain.watch.WatchNotificationSettings
 import app.logdate.client.domain.watch.WatchSettingsRepository
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -21,11 +25,19 @@ import kotlinx.coroutines.launch
 class WatchSettingsViewModel(
     private val connectionManager: WatchConnectionManager,
     private val settingsRepository: WatchSettingsRepository,
+    peerSnapshots: WatchPeerSnapshotSource = WatchPeerSnapshotSource { flowOf(WatchPeerSnapshot.Inactive) },
+    windowDays: Flow<Int> = flowOf(SharedPreferenceKey.WindowDays.default),
 ) : ViewModel() {
     val connectionState: StateFlow<WatchConnectionState> =
         connectionManager
             .observeConnectionState()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WatchConnectionState.Loading)
+
+    /** What the Watch page shows: null until the phone has looked for the watch. */
+    val status: StateFlow<WatchStatus?> =
+        combine(connectionState, peerSnapshots.observe(), windowDays) { connection, peer, days ->
+            WatchStatusResolver.resolve(connection, peer, days)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     val notificationSettings: StateFlow<WatchNotificationSettings> =
         settingsRepository

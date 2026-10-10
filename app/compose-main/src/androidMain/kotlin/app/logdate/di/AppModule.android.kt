@@ -97,7 +97,9 @@ import app.logdate.dynamic.PlayDynamicFeatureLoader
 import app.logdate.feature.core.export.CloudBackupScheduler
 import app.logdate.feature.core.export.CloudBackupWorker
 import app.logdate.feature.core.restore.CloudRestoreScheduler
+import app.logdate.feature.core.settings.ui.watch.PeerStateWatchSnapshotSource
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
+import app.logdate.feature.core.settings.ui.watch.WatchPeerSnapshotSource
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import app.logdate.feature.editor.handoff.DraftRefresher
 import app.logdate.feature.editor.handoff.HandoffDraftReceiver
@@ -293,6 +295,7 @@ actual val appModule: Module =
                 peerFeatures = get<PeerStateStore>().features(PeerRole.WATCH),
             )
         }
+        single<WatchPeerSnapshotSource> { PeerStateWatchSnapshotSource(gate = get(), peerStates = get()) }
 
         single { PlayInAppUpdateController(androidContext(), get()) }
         single<AppUpdateController> { get<PlayInAppUpdateController>() }

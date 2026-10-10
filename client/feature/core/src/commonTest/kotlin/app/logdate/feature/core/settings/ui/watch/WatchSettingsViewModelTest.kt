@@ -2,6 +2,8 @@ package app.logdate.feature.core.settings.ui.watch
 
 import app.logdate.client.domain.watch.WatchNotificationSettings
 import app.logdate.client.domain.watch.WatchSettingsRepository
+import app.logdate.client.sync.datalayer.v2.WearFeatures
+import app.logdate.client.sync.peer.state.WatchState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -9,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -76,6 +79,40 @@ class WatchSettingsViewModelTest {
             assertEquals(
                 WatchConnectionState.NeedsAssociation("Pixel Watch"),
                 viewModel.connectionState.value,
+            )
+        }
+
+    @Test
+    fun `status combines the connection with what the watch reported`() =
+        runTest {
+            val report =
+                WatchPeerSnapshot(
+                    v2Active = true,
+                    watch = WatchState(outboxCount = 3),
+                    features = setOf(WearFeatures.RECEIPTS, WearFeatures.WINDOW),
+                )
+            val viewModel =
+                WatchSettingsViewModel(
+                    connectionManager =
+                        FakeWatchConnectionManager(
+                            initialState = WatchConnectionState.Connected(watchName = "Pixel Watch", lastSynced = null, pendingCount = 0),
+                        ),
+                    settingsRepository = FakeWatchSettingsRepository(),
+                    peerSnapshots = { flowOf(report) },
+                    windowDays = flowOf(30),
+                )
+            backgroundScope.launch { viewModel.status.collect {} }
+            advanceUntilIdle()
+
+            assertEquals(
+                WatchStatus.Ready(
+                    watchName = "Pixel Watch",
+                    nearby = true,
+                    sync = WatchSyncLine(waiting = 3),
+                    window = WatchWindowLine(days = 30),
+                    capabilities = setOf(WearFeatures.RECEIPTS, WearFeatures.WINDOW),
+                ),
+                viewModel.status.value,
             )
         }
 
