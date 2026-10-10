@@ -21,7 +21,9 @@ import kotlin.time.Clock
 /**
  * Handler for audio recording notifications on Android.
  *
- * Creates and manages foreground notification required for audio recording.
+ * Creates and manages foreground notification required for audio recording. When the app's
+ * `Application` supplies a [RecordingNotificationDecorator], every recording notification goes
+ * through it before it is built.
  */
 class AndroidAudioNotificationHandler(
     private val context: Context,
@@ -29,6 +31,7 @@ class AndroidAudioNotificationHandler(
         KoinPlatform.getKoinOrNull()?.getOrNull<LiveUpdatesSwitch>() ?: LiveUpdatesSwitch.Off,
     private val recordingBubble: RecordingBubbleSwitch =
         KoinPlatform.getKoinOrNull()?.getOrNull<RecordingBubbleSwitch>() ?: RecordingBubbleSwitch.Off,
+    private val decorator: RecordingNotificationDecorator? = recordingNotificationDecoratorOf(context.applicationContext),
 ) {
     companion object {
         val CHANNEL_ID = LogDateNotificationChannelKey.AUDIO_RECORDING.id
@@ -84,6 +87,7 @@ class AndroidAudioNotificationHandler(
     fun createRecordingNotification(
         isRecording: Boolean = true,
         startTimeMillis: Long = Clock.System.now().toEpochMilliseconds(),
+        recordedMillis: Long = 0L,
     ): Notification {
         val titleRes =
             if (isRecording) {
@@ -117,6 +121,7 @@ class AndroidAudioNotificationHandler(
 
         applyLiveUpdate(builder, isRecording)
         addRecordingActions(builder, isRecording)
+        decorate(builder, RecordingNotificationState(isRecording, startTimeMillis, recordedMillis))
         return builder.build()
     }
 
@@ -175,6 +180,19 @@ class AndroidAudioNotificationHandler(
         )
     }
 
+    /** A decorator that fails never stops the recording notification; it is posted without the decoration. */
+    private fun decorate(
+        builder: NotificationCompat.Builder,
+        state: RecordingNotificationState,
+    ) {
+        val decorator = decorator ?: return
+        try {
+            decorator.decorate(context, builder, NOTIFICATION_ID, state)
+        } catch (e: Exception) {
+            Napier.e("The recording notification decorator failed; posting the notification without it", e)
+        }
+    }
+
     /**
      * Shows the recording notification
      */
@@ -215,9 +233,10 @@ class AndroidAudioNotificationHandler(
     fun updateRecordingNotification(
         isRecording: Boolean,
         startTimeMillis: Long,
+        recordedMillis: Long = 0L,
     ) {
         try {
-            val notification = createRecordingNotification(isRecording, startTimeMillis)
+            val notification = createRecordingNotification(isRecording, startTimeMillis, recordedMillis)
             notificationManager.notify(NOTIFICATION_ID, notification)
         } catch (e: Exception) {
             Napier.e("Failed to update recording notification", e)

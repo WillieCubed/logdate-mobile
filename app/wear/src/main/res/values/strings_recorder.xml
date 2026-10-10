@@ -30,4 +30,7 @@
     <string name="wear_today_recorder_open_storage">Storage</string>
     <string name="wear_today_recorder_try_again">Try again</string>
     <string name="wear_today_recorder_ok">OK</string>
+
+    <!-- The recording's Ongoing Activity on the watch face -->
+    <string name="wear_ongoing_recording_title">Recording</string>
 </resources>

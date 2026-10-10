@@ -3,12 +3,16 @@ package app.logdate.wear
 import android.app.Application
 import app.logdate.client.data.notes.StoredMediaReferenceMigrationLauncher
 import app.logdate.client.database.LogDateDatabase
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.media.audio.RecordingNotificationDecorator
 import app.logdate.client.notifications.LogDateNotificationChannelKey
 import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.wear.di.wearAudioModule
 import app.logdate.wear.di.wearDataModule
 import app.logdate.wear.di.wearExperienceModule
 import app.logdate.wear.di.wearV2Module
+import app.logdate.wear.launch.FeatureSwitch
+import app.logdate.wear.recording.OngoingRecordingDecorator
 import app.logdate.wear.recording.WearRecordingRecovery
 import app.logdate.wear.reminders.LegacyPromptAlarms
 import app.logdate.wear.sync.WatchSyncScheduler
@@ -32,8 +36,28 @@ import kotlin.concurrent.thread
  * - Koin dependency injection
  * - Napier logging
  * - Audio recording modules
+ *
+ * It also supplies the recording notification's decorator, which shows a recording on the watch
+ * face as an Ongoing Activity while the new watch app is on.
  */
-class LogDateWearApplication : Application() {
+class LogDateWearApplication :
+    Application(),
+    RecordingNotificationDecorator.Provider {
+    /** WATCH_EXPERIENCE_V2 for code that can't suspend, such as the recording notification. */
+    internal val newWatchApp: FeatureSwitch by lazy {
+        FeatureSwitch(
+            featureFlags =
+                org.koin.java.KoinJavaComponent
+                    .getKoin()
+                    .get(),
+            flag = FeatureFlag.WATCH_EXPERIENCE_V2,
+        )
+    }
+
+    override val recordingNotificationDecorator: RecordingNotificationDecorator by lazy {
+        OngoingRecordingDecorator(enabled = { newWatchApp.isOn })
+    }
+
     override fun onCreate() {
         super.onCreate()
         val launchedAtMs = System.currentTimeMillis()
@@ -61,6 +85,11 @@ class LogDateWearApplication : Application() {
 
         recoverInterruptedRecordings(launchedAtMs)
         startSync()
+        newWatchApp.start(
+            org.koin.java.KoinJavaComponent
+                .getKoin()
+                .get<CoroutineScope>(),
+        )
 
         runCatching { LegacyPromptAlarms.cancel(this) }
             .onFailure { error -> Napier.w("Failed to remove the legacy journal prompts", error) }

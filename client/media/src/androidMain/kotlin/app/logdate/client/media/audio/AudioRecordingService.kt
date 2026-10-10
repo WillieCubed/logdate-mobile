@@ -271,6 +271,7 @@ class AudioRecordingService : Service() {
             notificationHandler.updateRecordingNotification(
                 isRecording = false,
                 startTimeMillis = recordingStartTime,
+                recordedMillis = recordedMillis(),
             )
 
             Napier.d("Recording paused")
@@ -302,6 +303,7 @@ class AudioRecordingService : Service() {
             notificationHandler.updateRecordingNotification(
                 isRecording = true,
                 startTimeMillis = recordingStartTime,
+                recordedMillis = recordedMillis(),
             )
 
             Napier.d("Recording resumed")
@@ -608,6 +610,9 @@ class AudioRecordingService : Service() {
      * Checks if recording is currently paused
      */
     fun isRecordingPaused(): Boolean = isPaused && _recordingState.value.isRecording
+
+    /** How much has been recorded so far, without pauses, to the second the duration ticker counts. */
+    private fun recordedMillis(): Long = _recordingState.value.durationSeconds * 1_000L
 
     /**
      * Re-applies the preferred microphone route while recording is active.
