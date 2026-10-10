@@ -666,6 +666,14 @@ class EntryEditorViewModel(
             mutableEditorState.update {
                 it.copy(
                     draftState = DraftState.Active(draftId),
+                    // The journal shown by default is only derived while there is no draft, so the
+                    // one the draft was saved with becomes the selection.
+                    selectedJournalIds =
+                        if (it.selectedJournalIds.isEmpty() && !it.hasJournalSelectionChanges) {
+                            state.selectedJournalIds
+                        } else {
+                            it.selectedJournalIds
+                        },
                     hasJournalSelectionChanges =
                         if (it.selectedJournalIds == state.selectedJournalIds) {
                             false

@@ -698,6 +698,25 @@ class DraftManagementTest {
         }
 
     @Test
+    fun `derived default journal stays selected once the entry has a draft`() =
+        testScope.runTest {
+            val defaultJournalId = Uuid.random()
+            journalRepository.create(Journal(id = defaultJournalId, title = "Default"))
+            val block = viewModel.createNewBlock(BlockType.TEXT) as TextBlockUiState
+            viewModel.updateBlock(block.copy(content = "Filed by default"))
+            advanceUntilIdle()
+            assertEquals(listOf(defaultJournalId), viewModel.editorState.value.selectedJournalIds)
+
+            assertNotNull(viewModel.persistDraft(viewModel.editorState.value))
+            advanceUntilIdle()
+
+            assertEquals(listOf(defaultJournalId), viewModel.editorState.value.selectedJournalIds)
+            viewModel.saveEntry(viewModel.editorState.value)
+            advanceUntilIdle()
+            assertEquals(listOf(defaultJournalId), journalContentRepository.addedJournalIds.distinct())
+        }
+
+    @Test
     fun `draft manager rethrows load cancellation`() =
         testScope.runTest {
             entryDraftRepository.getDraftFailure = CancellationException("load cancelled")
