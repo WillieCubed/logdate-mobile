@@ -1,9 +1,10 @@
 package app.logdate.client.sync
 
+import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
-import app.logdate.client.sync.datalayer.AudioFileDigest
+import app.logdate.client.repository.journals.withCapturedOn
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.sync.datalayer.copyToDigesting
 import io.mockk.coEvery
@@ -24,7 +25,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -184,8 +184,8 @@ class WatchNoteIngestorTest {
 
             ingestor.onNoteMetadata(mapper.toDataMap(note))
 
-            coVerify(exactly = 1) { notesRepository.create(note) }
-            assertEquals(listOf<JournalNote>(note), notified)
+            coVerify(exactly = 1) { notesRepository.create(note.withCapturedOn(CaptureDevice.WATCH)) }
+            assertEquals(listOf(note.withCapturedOn(CaptureDevice.WATCH)), notified)
             assertTrue(acknowledger.acknowledged.isEmpty())
         }
 
@@ -198,7 +198,7 @@ class WatchNoteIngestorTest {
             ingestor.onNoteMetadata(mapper.toDataMap(note))
 
             coVerify(exactly = 1) { notesRepository.create(any<JournalNote>()) }
-            coVerify(exactly = 1) { notesRepository.createFromSync(note) }
+            coVerify(exactly = 1) { notesRepository.createFromSync(note.withCapturedOn(CaptureDevice.WATCH)) }
             assertEquals(1, notified.size)
         }
 
@@ -297,7 +297,7 @@ class WatchNoteIngestorTest {
 
             ingestor.onNoteMetadata(mapper.toDataMap(other))
 
-            coVerify(exactly = 1) { notesRepository.create(other) }
+            coVerify(exactly = 1) { notesRepository.create(other.withCapturedOn(CaptureDevice.WATCH)) }
         }
 
     @Test
@@ -312,7 +312,7 @@ class WatchNoteIngestorTest {
 
             ingestor.onNoteMetadata(mapper.toDataMap(other))
 
-            coVerify(exactly = 1) { notesRepository.create(other) }
+            coVerify(exactly = 1) { notesRepository.create(other.withCapturedOn(CaptureDevice.WATCH)) }
             gate.complete(Unit)
             transfer.await()
         }
@@ -477,76 +477,5 @@ class WatchNoteIngestorTest {
     private fun watchTextNote(id: Uuid = Uuid.random()): JournalNote.Text {
         val now = Clock.System.now()
         return JournalNote.Text(uid = id, creationTimestamp = now, lastUpdated = now, content = "From the watch")
-    }
-
-    private class RecordingAcknowledger : WatchNoteAcknowledger {
-        val acknowledged = mutableListOf<Uuid>()
-        val versions = mutableListOf<Instant>()
-
-        override suspend fun acknowledge(
-            noteId: Uuid,
-            lastUpdated: Instant,
-        ) {
-            acknowledged += noteId
-            versions += lastUpdated
-        }
-    }
-
-    private class InMemoryWatchAudioStore : WatchAudioStore {
-        private val audio = mutableMapOf<Uuid, ByteArray>()
-        private val metadata = mutableMapOf<Uuid, Map<String, String>>()
-        var failNextWrite = false
-
-        fun audioText(noteId: Uuid): String? = audio[noteId]?.decodeToString()
-
-        override fun audioPath(noteId: Uuid): String = "/phone/audio_notes/wear_$noteId.m4a"
-
-        override fun hasAudio(noteId: Uuid): Boolean = noteId in audio
-
-        var writeGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
-        var writes = 0
-
-        override suspend fun writeAudio(
-            noteId: Uuid,
-            source: InputStream,
-        ): Boolean {
-            writeGate?.await()
-            writes++
-            if (failNextWrite) {
-                failNextWrite = false
-                return false
-            }
-            audio[noteId] = source.readBytes()
-            return true
-        }
-
-        override suspend fun storedDigest(noteId: Uuid): AudioFileDigest? =
-            audio[noteId]?.let { bytes -> ByteArrayInputStream(bytes).copyToDigesting(ByteArrayOutputStream()) }
-
-        override suspend fun stashMetadata(
-            noteId: Uuid,
-            data: Map<String, String>,
-        ) {
-            metadata[noteId] = data
-        }
-
-        override suspend fun stashedMetadata(noteId: Uuid): Map<String, String>? = metadata[noteId]
-
-        override suspend fun clearMetadata(noteId: Uuid) {
-            metadata.remove(noteId)
-        }
-
-        override suspend fun discard(noteId: Uuid) {
-            audio.remove(noteId)
-            metadata.remove(noteId)
-        }
-
-        private val deleted = mutableSetOf<Uuid>()
-
-        override suspend fun markDeleted(noteId: Uuid) {
-            deleted += noteId
-        }
-
-        override suspend fun isDeleted(noteId: Uuid): Boolean = noteId in deleted
     }
 }

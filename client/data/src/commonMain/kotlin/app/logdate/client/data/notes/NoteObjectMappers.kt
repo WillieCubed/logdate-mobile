@@ -5,6 +5,7 @@ import app.logdate.client.database.entities.ImageNoteEntity
 import app.logdate.client.database.entities.PlaceEntity
 import app.logdate.client.database.entities.TextNoteEntity
 import app.logdate.client.database.entities.VideoNoteEntity
+import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
@@ -54,6 +55,7 @@ fun TextNoteEntity.toModel(place: NotePlace? = null) =
         syncVersion = syncVersion,
         location = mapLocation(latitude, longitude, altitude, locationAccuracy, place),
         timeZoneId = timeZoneId,
+        capturedOn = CaptureDevice.fromWireName(capturedOn),
     )
 
 fun JournalNote.Text.toEntity() =
@@ -69,6 +71,7 @@ fun JournalNote.Text.toEntity() =
         locationAccuracy = location?.coordinates?.accuracy,
         placeId = location?.place?.id,
         timeZoneId = timeZoneId,
+        capturedOn = capturedOn?.wireName,
     )
 
 fun ImageNoteEntity.toModel(
@@ -84,6 +87,7 @@ fun ImageNoteEntity.toModel(
     syncVersion = syncVersion,
     location = mapLocation(latitude, longitude, altitude, locationAccuracy, place),
     timeZoneId = timeZoneId,
+    capturedOn = CaptureDevice.fromWireName(capturedOn),
 )
 
 fun JournalNote.Image.toEntity() =
@@ -100,6 +104,7 @@ fun JournalNote.Image.toEntity() =
         locationAccuracy = location?.coordinates?.accuracy,
         placeId = location?.place?.id,
         timeZoneId = timeZoneId,
+        capturedOn = capturedOn?.wireName,
     )
 
 fun VideoNoteEntity.toModel(
@@ -114,6 +119,7 @@ fun VideoNoteEntity.toModel(
     syncVersion = syncVersion,
     location = mapLocation(latitude, longitude, altitude, locationAccuracy, place),
     timeZoneId = timeZoneId,
+    capturedOn = CaptureDevice.fromWireName(capturedOn),
 )
 
 fun JournalNote.Video.toEntity() =
@@ -129,6 +135,7 @@ fun JournalNote.Video.toEntity() =
         locationAccuracy = location?.coordinates?.accuracy,
         placeId = location?.place?.id,
         timeZoneId = timeZoneId,
+        capturedOn = capturedOn?.wireName,
     )
 
 fun AudioNoteEntity.toModel(
@@ -144,6 +151,7 @@ fun AudioNoteEntity.toModel(
         syncVersion = syncVersion,
         location = mapLocation(latitude, longitude, altitude, locationAccuracy, place),
         timeZoneId = timeZoneId,
+        capturedOn = CaptureDevice.fromWireName(capturedOn),
         caption = caption,
     )
 
@@ -161,6 +169,7 @@ fun JournalNote.Audio.toEntity() =
         locationAccuracy = location?.coordinates?.accuracy,
         placeId = location?.place?.id,
         timeZoneId = timeZoneId,
+        capturedOn = capturedOn?.wireName,
     )
 
 internal fun PlaceEntity.toNotePlace() =

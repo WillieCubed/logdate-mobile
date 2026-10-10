@@ -1,8 +1,10 @@
 package app.logdate.client.sync
 
+import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
+import app.logdate.client.repository.journals.withCapturedOn
 import app.logdate.client.sync.datalayer.AudioFileDigest
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import io.github.aakira.napier.Napier
@@ -81,6 +83,9 @@ fun interface WatchNoteNotifier {
  *
  * Work is serialized per note, not globally, so a long audio transfer for one note does not hold up
  * the others.
+ *
+ * A note from a watch build that does not record its capture device is stored as captured on the
+ * watch, because everything this path receives was captured there.
  */
 class WatchNoteIngestor(
     private val notesRepository: JournalNotesRepository,
@@ -114,7 +119,7 @@ class WatchNoteIngestor(
 
     /** @throws IllegalArgumentException if [data] carries no decodable note. */
     suspend fun onNoteMetadata(data: Map<String, String>) {
-        val note = noteDataMapper.fromDataMap(data)
+        val note = noteDataMapper.fromDataMap(data).capturedOnWatchUnlessNamed()
         withNoteLock(note.uid) {
             when {
                 audioStore.isDeleted(note.uid) -> Napier.d("Ignoring note ${note.uid}: the watch deleted it")
@@ -181,7 +186,7 @@ class WatchNoteIngestor(
         val watchNote = noteDataMapper.fromDataMap(data) as? JournalNote.Audio ?: return
         if (!audioMatchesWhatTheWatchSent(noteId, data)) return
 
-        val note = watchNote.copy(mediaRef = audioStore.audioPath(noteId))
+        val note = watchNote.copy(mediaRef = audioStore.audioPath(noteId), capturedOn = watchNote.capturedOn ?: CaptureDevice.WATCH)
         notesRepository.create(note)
         audioStore.clearMetadata(noteId)
         acknowledger.acknowledge(noteId, note.lastUpdated)
@@ -205,4 +210,7 @@ class WatchNoteIngestor(
         audioStore.discard(noteId)
         return false
     }
+
+    private fun JournalNote.capturedOnWatchUnlessNamed(): JournalNote =
+        if (capturedOn != null) this else withCapturedOn(CaptureDevice.WATCH)
 }

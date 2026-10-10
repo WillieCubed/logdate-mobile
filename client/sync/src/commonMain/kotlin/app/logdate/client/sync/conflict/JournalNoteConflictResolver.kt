@@ -1,7 +1,9 @@
 package app.logdate.client.sync.conflict
 
+import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.NoteLocation
+import app.logdate.client.repository.journals.withCapturedOn
 import app.logdate.client.repository.journals.withTimeZoneId
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -9,9 +11,9 @@ import kotlin.time.Instant
 /**
  * Conflict resolver for notes that attempts content-safe merges before deferring to manual review.
  *
- * A note's capture time zone is set once, where the note was captured, and never edited. Whichever
- * copy wins, the resolved note records a zone taken from either copy: a copy from an app version or
- * server that predates the field must not erase it.
+ * A note's capture time zone and capture device are set once, where the note was captured, and never
+ * edited. Whichever copy wins, the resolved note records each of them from either copy: a copy from
+ * an app version or server that predates a field must not erase it.
  */
 class JournalNoteConflictResolver : ConflictResolver<JournalNote> {
     override fun resolve(
@@ -20,19 +22,33 @@ class JournalNoteConflictResolver : ConflictResolver<JournalNote> {
         localTimestamp: Instant,
         remoteTimestamp: Instant,
     ): ConflictResolution<JournalNote> {
-        val zone = local.timeZoneId ?: remote.timeZoneId
-        val resolution = resolveContent(local, remote.withZoneIfMissing(local.timeZoneId), localTimestamp, remoteTimestamp)
-        return resolution.withZoneFallback(zone)
+        val either =
+            CaptureFacts(
+                timeZoneId = local.timeZoneId ?: remote.timeZoneId,
+                capturedOn = local.capturedOn ?: remote.capturedOn,
+            )
+        val localFacts = CaptureFacts(timeZoneId = local.timeZoneId, capturedOn = local.capturedOn)
+        val resolution = resolveContent(local, remote.withCaptureFactsIfMissing(localFacts), localTimestamp, remoteTimestamp)
+        return resolution.withCaptureFactsFallback(either)
     }
 
-    private fun JournalNote.withZoneIfMissing(timeZoneId: String?): JournalNote =
-        if (this.timeZoneId == null && timeZoneId != null) withTimeZoneId(timeZoneId) else this
+    /** What a note records once, where it is captured. */
+    private data class CaptureFacts(
+        val timeZoneId: String?,
+        val capturedOn: CaptureDevice?,
+    )
 
-    private fun ConflictResolution<JournalNote>.withZoneFallback(timeZoneId: String?): ConflictResolution<JournalNote> =
+    private fun JournalNote.withCaptureFactsIfMissing(facts: CaptureFacts): JournalNote {
+        val withZone = if (timeZoneId == null && facts.timeZoneId != null) withTimeZoneId(facts.timeZoneId) else this
+        if (withZone.capturedOn != null || facts.capturedOn == null) return withZone
+        return withZone.withCapturedOn(facts.capturedOn)
+    }
+
+    private fun ConflictResolution<JournalNote>.withCaptureFactsFallback(facts: CaptureFacts): ConflictResolution<JournalNote> =
         when (this) {
-            is ConflictResolution.KeepLocal -> ConflictResolution.KeepLocal(value.withZoneIfMissing(timeZoneId))
-            is ConflictResolution.KeepRemote -> ConflictResolution.KeepRemote(value.withZoneIfMissing(timeZoneId))
-            is ConflictResolution.Merge -> ConflictResolution.Merge(merged.withZoneIfMissing(timeZoneId))
+            is ConflictResolution.KeepLocal -> ConflictResolution.KeepLocal(value.withCaptureFactsIfMissing(facts))
+            is ConflictResolution.KeepRemote -> ConflictResolution.KeepRemote(value.withCaptureFactsIfMissing(facts))
+            is ConflictResolution.Merge -> ConflictResolution.Merge(merged.withCaptureFactsIfMissing(facts))
             is ConflictResolution.RequiresManualResolution -> this
         }
 

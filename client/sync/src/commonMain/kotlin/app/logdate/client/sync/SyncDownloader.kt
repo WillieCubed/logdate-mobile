@@ -344,7 +344,11 @@ private fun JournalNote.withVersion(version: Long): JournalNote =
         is JournalNote.Audio -> copy(syncVersion = version)
     }
 
-/** Compare only fields carried by the existing content contract, after resolving cached media. */
+/**
+ * Compare only the fields the content contract sends, after resolving cached media. The capture time
+ * zone and device are left out: a server that predates them returns none, and neither changes after
+ * capture.
+ */
 private fun JournalNote.uploadedFields(
     version: Long,
     ref: String?,
@@ -360,6 +364,7 @@ private fun JournalNote.uploadedFields(
                 lastUpdated = updated,
                 location = uploadedLocation,
                 timeZoneId = null,
+                capturedOn = null,
             )
         is JournalNote.Image ->
             copy(
@@ -369,6 +374,7 @@ private fun JournalNote.uploadedFields(
                 mediaRef = ref.orEmpty(),
                 location = uploadedLocation,
                 timeZoneId = null,
+                capturedOn = null,
             )
         is JournalNote.Video ->
             copy(
@@ -378,6 +384,7 @@ private fun JournalNote.uploadedFields(
                 mediaRef = ref.orEmpty(),
                 location = uploadedLocation,
                 timeZoneId = null,
+                capturedOn = null,
             )
         is JournalNote.Audio ->
             copy(
@@ -387,6 +394,7 @@ private fun JournalNote.uploadedFields(
                 mediaRef = ref.orEmpty(),
                 location = uploadedLocation,
                 timeZoneId = null,
+                capturedOn = null,
             )
     }
 }

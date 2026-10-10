@@ -1,5 +1,6 @@
 package app.logdate.client.sync
 
+import app.logdate.client.repository.journals.CaptureDevice
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.sync.cloud.DefaultCloudContentDataSource
 import app.logdate.client.sync.metadata.EntityType
@@ -40,6 +41,7 @@ class CreateReplayReconciliationTest {
                 Instant.parse("1970-01-01T00:00:00.002654321Z"),
                 "Original entry",
                 timeZoneId = "America/Los_Angeles",
+                capturedOn = CaptureDevice.WATCH,
                 syncVersion = if (operation == PendingOperation.UPDATE) 41 else 0,
             )
         val notes = FakeJournalNotesRepository().apply { create(local) }
@@ -83,6 +85,7 @@ class CreateReplayReconciliationTest {
         assertEquals(local.creationTimestamp, notes.getNoteById(local.uid)?.creationTimestamp)
         assertEquals(local.lastUpdated, notes.getNoteById(local.uid)?.lastUpdated)
         assertEquals(local.timeZoneId, notes.getNoteById(local.uid)?.timeZoneId)
+        assertEquals(local.capturedOn, notes.getNoteById(local.uid)?.capturedOn)
         assertEquals(if (acknowledge) remoteVersion else local.syncVersion, notes.getNoteById(local.uid)?.syncVersion)
         assertEquals(0, manager.getSyncStatus().conflictCount)
     }

@@ -43,4 +43,6 @@ data class ImageNoteEntity(
     override val timeZoneId: String? = null,
     @ColumnInfo(defaultValue = "'EdgeToEdge'")
     val presentation: String = "EdgeToEdge",
+    @ColumnInfo(name = "captured_on")
+    override val capturedOn: String? = null,
 ) : GenericNoteData()

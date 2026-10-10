@@ -263,6 +263,13 @@ sealed class JournalNote(
     abstract val timeZoneId: String?
 
     /**
+     * The device the note was captured on, or null when it was not recorded: notes from before this
+     * was tracked, and notes written on this device, which does not record itself yet. Set once where
+     * the note is captured and never edited; no copy of the note may erase it.
+     */
+    abstract val capturedOn: CaptureDevice?
+
+    /**
      * A text note, like a unit of content on a microblog (e.g. post, tweet).
      *
      * Text notes can constitute simple statements or long form content.
@@ -277,6 +284,8 @@ sealed class JournalNote(
         override val syncVersion: Long = 0,
         override val location: NoteLocation? = null,
         override val timeZoneId: String? = null,
+        @Serializable(with = LenientCaptureDeviceSerializer::class)
+        override val capturedOn: CaptureDevice? = null,
     ) : JournalNote(NoteType.TEXT)
 
     @Serializable
@@ -291,6 +300,8 @@ sealed class JournalNote(
         override val syncVersion: Long = 0,
         override val location: NoteLocation? = null,
         override val timeZoneId: String? = null,
+        @Serializable(with = LenientCaptureDeviceSerializer::class)
+        override val capturedOn: CaptureDevice? = null,
     ) : JournalNote(NoteType.IMAGE)
 
     @Serializable
@@ -304,6 +315,8 @@ sealed class JournalNote(
         override val syncVersion: Long = 0,
         override val location: NoteLocation? = null,
         override val timeZoneId: String? = null,
+        @Serializable(with = LenientCaptureDeviceSerializer::class)
+        override val capturedOn: CaptureDevice? = null,
     ) : JournalNote(NoteType.VIDEO)
 
     @Serializable
@@ -320,6 +333,8 @@ sealed class JournalNote(
         val caption: String = "",
         val transcription: String = "",
         val transcript: TranscriptDocument? = null,
+        @Serializable(with = LenientCaptureDeviceSerializer::class)
+        override val capturedOn: CaptureDevice? = null,
     ) : JournalNote(NoteType.AUDIO)
 }
 

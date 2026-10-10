@@ -35,4 +35,10 @@ abstract class GenericNoteData {
      * is still worth keeping.
      */
     abstract val timeZoneId: String?
+
+    /**
+     * The wire name of the device the note was captured on (`phone` or `watch`), or null when it was
+     * not recorded.
+     */
+    abstract val capturedOn: String?
 }
