@@ -58,9 +58,13 @@ Capture and New Entry widgets' buttons mirror, so Write is at the right.
 The widget on the lock screen or the hub is not captured, because Android's emulator images cannot
 show the hub. Its widget features are on, but the hub service itself is a device setting
 (`config_communalServiceEnabled`) that is off on emulators and cannot be changed from the shell; a
-shell resource overlay for it fails to apply. Placing the widget on the hub needs a tablet that
-offers the hub, such as a Pixel Tablet on its dock. The keyguard category in the widget's provider
-XML, and the picker capture above, are the evidence until then.
+shell resource overlay for it fails to apply. The other emulator route is a static overlay for that
+setting, preinstalled in the system image's `/product/overlay` on an emulator started with
+`-writable-system`; preinstalled overlays that target an SDK level below 29 may change resources the
+framework does not mark overlayable. It needs a writable copy of the 5 GB system image. Placing the
+widget on the hub with no emulator changes needs a tablet that offers the hub, such as a Pixel
+Tablet on its dock. The keyguard category in the widget's provider XML, and the picker capture
+above, are the evidence until then.
 
 ## How it works
 
