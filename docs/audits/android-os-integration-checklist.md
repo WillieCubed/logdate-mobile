@@ -69,14 +69,14 @@ A row reaches `[done]` only when its Evidence column lists:
 
 | Status | Requirement | Evidence |
 | --- | --- | --- |
-| `[partial]` | Design spec, hub guide, surface guides, and this checklist exist and are linked from `docs/README.md` | This commit. Missing: screenshots in each guide, which arrive with their features. |
+| `[done]` | Design spec, hub guide, surface guides, and this checklist exist and are linked from `docs/README.md` | Design spec, hub guide, ten surface guides, and this checklist, linked from `docs/README.md`. Guides for shipped surfaces embed their captures. |
 | `[done]` | `@OsIntegrationPreviewMatrix` covers phone, phone dark, compact, landscape, tablet, RTL, 200% text, dynamic color, and bubble size | `2b92186d6`. Matrix and `@BubbleWindowPreview` in `common/ScreenshotPreviewMatrix.kt`; shared viewports in `SharedScreenshotCatalog.kt` (`osIntegrationVariants`), tested by `SharedScreenshotCatalogTest` (7/7). First scene `S01_PrivacySystemSearchVisibility`: 8 Android and 3 new desktop references, each inspected. It found settings descriptions truncating at two lines (Docket bug). |
 | `[todo]` | Glance widgets render to committed references for light, dark, RTL, and 200% text | |
-| `[todo]` | `OsSurfaceScreenshotsTest` captures real system UI on API 37 phone and tablet managed devices with demo mode | |
+| `[done]` | `OsSurfaceScreenshotsTest` captures real system UI on API 37 phone and tablet managed devices with demo mode | `OsSurfaceScreenshotsTest` (launcher, Quick Settings and Live Update, recording bubble, App Bubble) passes on `flagshipPhoneApi37`, `largeScreenTabletApi37`, and `flagshipPhoneApi36` with demo mode. Captures in `docs/screenshots/android-os-integration/`; failed waits save the screen and view tree under `failures/`. |
 | `[todo]` | Desktop windowing capture spike decided | |
 | `[done]` | `checkOsIntegrationScreenshotCoverage` fails on missing images, missing tests, and stale references | `ScreenshotCoverageTest` (13/13, `cd build-logic && ../gradlew test`). Registry `config/screenshots/os-integration-coverage.txt`. Runs in `.githooks/pre-push` and `./run screenshots:check`. Its first run found 157 stale references, deleted in `f273b86a5`. The `ci.yml` step is prepared for the user to commit. |
 | `[done]` | `buildScreenshotComparisonSheet` generates labeled sheets per feature | `ScreenshotComparisonSheet` and `BuildScreenshotComparisonSheet` in build-logic, tested by `ScreenshotComparisonSheetTest`. `./run screenshots:sheet <feature>`. |
-| `[todo]` | `./run` runs every screenshot lane, plus `screenshots:os`, `screenshots:sheet`, and `screenshots:check` | |
+| `[partial]` | `./run` runs every screenshot lane, plus `screenshots:os`, `screenshots:sheet`, and `screenshots:check` | `screenshots:os`, `screenshots:sheet`, and `screenshots:check` exist. Missing: `test:screenshots` covering the Wear and desktop lanes. |
 
 ## Capture Launch Contract and Platform Hygiene
 
@@ -86,7 +86,7 @@ A row reaches `[done]` only when its Evidence column lists:
 | `[done]` | `app.logdate.action.CAPTURE` and `logdate://capture` resolve to the editor; legacy widget and ambient extras keep resolving | `CaptureLaunch.kt` and `DeepLinkResolver`; `CaptureLaunchTest`, `MainActivityNavIntentResolverTest`. Used by the launcher shortcuts and tiles in the system UI captures. |
 | `[done]` | OS integration flags exist with debug-only toggles | Six flags in `FeatureFlag.kt` (`FeatureFlagStoreTest`); toggles in Developer tools > Feature previews. Lane 1: `Flow20_02_FeaturePreviewsScreenshots.kt` and the desktop `feature-previews` scene. |
 | `[done]` | `PlatformComponentToggler` enables and disables flagged manifest components | `PlatformComponentToggler` with `PlatformComponentTogglerTest`. Tiles, the bubble activity, and its receiver are declared disabled; the API 37 captures show them appearing once their flags are on. |
-| `[done]` | Manifest declares the touchscreen as optional, `configChanges`, editor `<layout>` minimums, and multi-instance support | `touchscreen` optional, `configChanges` on both activities, editor `<layout>` minimums, and `PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI`. |
+| `[done]` | Manifest declares the touchscreen as optional, `configChanges`, editor `<layout>` minimums, and multi-instance support | `touchscreen` optional, `configChanges` on both activities, editor `<layout>` minimums, and `PROPERTY_SUPPORTS_MULTI_INSTANCE_SYSTEM_UI`. Resizing into an App Bubble keeps state (`app-bubble--phone-api37.png`). |
 | `[todo]` | `ShareReceiver` declares no SEND filters it cannot receive | |
 | `[partial]` | Editor windows are titled in Recents, the taskbar, and desktop captions | `editorWindowTitle` (`EditorWindowTitleTest`) sets the task title from the entry. Missing: Recents and taskbar capture. |
 | `[partial]` | The compat splash screen on API 30 matches Android 12+ | `Theme.LogDate.Starting` with the launcher brown and foreground. Missing: API 30 and API 37 cold-start captures. |
@@ -108,8 +108,8 @@ A row reaches `[done]` only when its Evidence column lists:
 | Status | Requirement | Evidence |
 | --- | --- | --- |
 | `[done]` | Tile microphone start spike decided | Decided without starting the microphone from the tile: Record voice opens the editor in voice mode through the capture action, which starts recording in the foreground. Recorded in `quick-settings-tiles.md`. |
-| `[partial]` | New entry and Record voice Quick Settings tiles, with an active recording state | Behind `QUICK_SETTINGS_TILES`; components toggled by `PlatformComponentToggler`. Tests: `CaptureTileStateTest`, `PlatformComponentTogglerTest`. Missing: Lane 2 captures of the tiles in the shade. |
-| `[partial]` | The recording notification is a Live Update with a status bar chip | Behind `LIVE_UPDATES`: promotion request and "Paused" chip text. Tests: `LiveUpdatesTest`. Missing: Lane 2 captures of the chip and the promoted notification. |
+| `[done]` | New entry and Record voice Quick Settings tiles, with an active recording state | Behind `QUICK_SETTINGS_TILES`. Tests: `CaptureTileStateTest`, `PlatformComponentTogglerTest`. Lane 2: `quick-settings-tiles/{idle,recording-editor,recording}--phone-api37.png`, plus API 36 and tablet. |
+| `[done]` | The recording notification is a Live Update with a status bar chip | Behind `LIVE_UPDATES`. Tests: `LiveUpdatesTest`. Lane 2: `live-updates/recording-status-chip--phone-api37.png` and `recording-notification`; `recording-promotion--phone-api37.txt` records `promotedOngoing=true`. |
 | `[partial]` | Export, restore, and sync progress are Live Updates, with semantic colors on API 37 | Built behind `LIVE_UPDATES`: `applyTransferLiveUpdate` with percent chip and `ProgressStyle`; restore phases become segments. Tests: `LiveUpdatesTest`. Missing: API 37 semantic colors and Lane 2 captures. |
 | `[partial]` | Capture nudges offer Write (direct reply) and Record | Built behind `NOTIFICATION_QUICK_REPLY`: `QuickReplyReceiver`, confirmation without the entry text, failure with Retry. Tests: `QuickReplyTest`. Lane 2 reply captures pending. |
 | `[todo]` | A capture-only lock-screen and hub widget, showing no journal content | |
@@ -125,9 +125,9 @@ A row reaches `[done]` only when its Evidence column lists:
 
 | Status | Requirement | Evidence |
 | --- | --- | --- |
-| `[partial]` | Home, the editor, and the recorder work at App Bubble sizes without being recreated on resize | `configChanges` on both activities. Lane 1 bubble window: every Home workspace scene, `Flow03_01` editor S01 and S02, and the recorder. Missing: Lane 2 capture of LogDate as an App Bubble. |
-| `[partial]` | Recording bubble spike decided | The bubble is a conversation notification tied to a long-lived "Voice recorder" shortcut, separate from the Live Update. Missing: emulator verification on API 36 and 37. |
-| `[partial]` | The voice recorder floats as a bubble with pause, stop, and save | Behind `RECORDING_BUBBLE`. Lane 1: `Flow20_03_RecorderBubbleScreenshots.kt` (matrix plus bubble window). Tests: `RecorderBubbleStatesTest`. Missing: Lane 2 captures of the floating recorder. |
+| `[done]` | Home, the editor, and the recorder work at App Bubble sizes without being recreated on resize | `configChanges` on both activities. Lane 1 bubble window: every Home workspace scene, `Flow03_01` editor S01 and S02, and the recorder. Lane 2: `bubbles/app-bubble--phone-api37.png`. |
+| `[done]` | Recording bubble spike decided | Ships as designed: the conversation bubble floats on API 36 and 37 phones and lands in the Bubble Bar on the API 37 tablet. Where bubbles are not allowed, the same notification offers the system bubble button. |
+| `[done]` | The voice recorder floats as a bubble with pause, stop, and save | Behind `RECORDING_BUBBLE`. Lane 1: `Flow20_03_RecorderBubbleScreenshots.kt` (matrix plus bubble window). Tests: `RecorderBubbleStatesTest`. Lane 2: `bubbles/{float-action,recorder-expanded,recorder-collapsed}--phone-api37.png`, `recorder-expanded--tablet-api37.png`. |
 
 ## Keyboard, Pointer, Drag and Drop
 

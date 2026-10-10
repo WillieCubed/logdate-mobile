@@ -35,8 +35,15 @@ The person can turn promotion off per app in system settings. The notification t
 On Android 17, failures use the system's semantic red and completion uses semantic green, so they
 read the same as other apps' Live Updates.
 
-Screenshots are added here when Live Updates ship: the chip, the expanded notification, and the lock
-screen, on API 36 and API 37.
+| The status bar chip | The promoted notification |
+| --- | --- |
+| ![A microphone and elapsed-time chip in the status bar](../../../screenshots/android-os-integration/live-updates/recording-status-chip--phone-api37.png) | ![The recording notification at the top of the shade](../../../screenshots/android-os-integration/live-updates/recording-notification--phone-api37.png) |
+
+Android shows the chip only while LogDate is not on screen. The capture also records Android's own
+verdict on the notification in
+[`recording-promotion--phone-api37.txt`](../../../screenshots/android-os-integration/live-updates/recording-promotion--phone-api37.txt):
+the app may promote, the notification qualifies, and it was promoted. The Android 16 emulator image
+predates the chip, so its captures show the notification only.
 
 ## How it works
 

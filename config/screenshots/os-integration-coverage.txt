@@ -25,3 +25,28 @@ recording-bubble|android|app/logdate/screenshots/flows/flow20_os_integration/Flo
 # Feature previews: Developer tools toggles for every flag-gated OS integration surface.
 feature-previews|android|app/logdate/screenshots/flows/flow20_os_integration/Flow20_02_FeaturePreviewsScreenshots.kt#S01_FeaturePreviews
 feature-previews|desktop|feature-previews
+
+# Launcher shortcuts: the long-press menu with New entry, Record voice, Take photo, and the dynamic shortcut.
+launcher-shortcuts|system|docs/screenshots/android-os-integration/launcher-shortcuts/long-press--phone-api36.png
+launcher-shortcuts|system|docs/screenshots/android-os-integration/launcher-shortcuts/long-press--phone-api37.png
+launcher-shortcuts|system|docs/screenshots/android-os-integration/launcher-shortcuts/long-press--tablet-api37.png
+
+# Quick Settings tiles: idle, starting a recording, and the active Record voice tile.
+quick-settings-tiles|system|docs/screenshots/android-os-integration/quick-settings-tiles/idle--phone-api37.png
+quick-settings-tiles|system|docs/screenshots/android-os-integration/quick-settings-tiles/recording-editor--phone-api37.png
+quick-settings-tiles|system|docs/screenshots/android-os-integration/quick-settings-tiles/recording--phone-api37.png
+quick-settings-tiles|system|docs/screenshots/android-os-integration/quick-settings-tiles/idle--tablet-api37.png
+
+# Live Updates: the status bar chip, the promoted notification, and Android's promotion verdict.
+live-updates|system|docs/screenshots/android-os-integration/live-updates/recording-status-chip--phone-api37.png
+live-updates|system|docs/screenshots/android-os-integration/live-updates/recording-notification--phone-api37.png
+live-updates|system|docs/screenshots/android-os-integration/live-updates/recording-promotion--phone-api37.txt
+live-updates|system|docs/screenshots/android-os-integration/live-updates/recording-status-chip--tablet-api37.png
+
+# Bubbles: the Float action, the floating recorder, the tablet Bubble Bar, and LogDate as an App Bubble.
+recording-bubble|system|docs/screenshots/android-os-integration/bubbles/float-action--phone-api37.png
+recording-bubble|system|docs/screenshots/android-os-integration/bubbles/recorder-expanded--phone-api37.png
+recording-bubble|system|docs/screenshots/android-os-integration/bubbles/recorder-collapsed--phone-api37.png
+recording-bubble|system|docs/screenshots/android-os-integration/bubbles/recorder-expanded--tablet-api37.png
+recording-bubble|system|docs/screenshots/android-os-integration/bubbles/recorder-expanded--phone-api36.png
+app-bubble|system|docs/screenshots/android-os-integration/bubbles/app-bubble--phone-api37.png

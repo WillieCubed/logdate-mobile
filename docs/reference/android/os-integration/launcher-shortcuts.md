@@ -31,8 +31,12 @@ how many exist.
 - **Share sheet:** recently used and favorite journals appear as Direct Share targets.
 - **Planned:** journal detail gets "Add to home screen", and widget settings get "Add widget".
 
-Screenshots are added here as each change ships: the long-press popup with themed icons on and off,
-the share sheet row, and the pin dialogs.
+| Android 17 phone | Android 17 tablet |
+| --- | --- |
+| ![The long-press menu with Write a new entry, Record a voice entry, Take photo, and Open today's timeline](../../../screenshots/android-os-integration/launcher-shortcuts/long-press--phone-api37.png) | ![The same menu on a tablet](../../../screenshots/android-os-integration/launcher-shortcuts/long-press--tablet-api37.png) |
+
+Every shortcut icon is an adaptive icon in the launcher icon's brown, with a monochrome layer for
+themed icons. The share sheet and pinning captures are added when those changes ship.
 
 ## How it works
 

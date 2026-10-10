@@ -1,0 +1,5 @@
+sdk=37
+recordingNotificationPosted=true
+canPostPromotedNotifications=true
+hasPromotableCharacteristics=true
+promotedOngoing=true

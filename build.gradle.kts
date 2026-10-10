@@ -716,6 +716,20 @@ private fun managedDeviceConfigFor(projectPath: String): ManagedDeviceProjectCon
                                 apiLevel = 36,
                                 systemImageSource = "google",
                             ),
+                            // Android 17: App Bubbles, the Bubble Bar, and Live Update chips. Used by
+                            // the OS integration captures (./run screenshots:os), not by test groups.
+                            ManagedVirtualDeviceConfig(
+                                deviceName = "flagshipPhoneApi37",
+                                hardwareProfile = "Pixel 9 Pro",
+                                apiLevel = 37,
+                                systemImageSource = "google",
+                            ),
+                            ManagedVirtualDeviceConfig(
+                                deviceName = "largeScreenTabletApi37",
+                                hardwareProfile = "Pixel Tablet",
+                                apiLevel = 37,
+                                systemImageSource = "google",
+                            ),
                             ManagedVirtualDeviceConfig(
                                 deviceName = "largeScreenTabletApi35",
                                 hardwareProfile = "Pixel Tablet",

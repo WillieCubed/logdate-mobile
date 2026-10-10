@@ -163,6 +163,29 @@ The first OS integration scene is `S01_PrivacySystemSearchVisibility` in
 `Flow20_01_SystemSearchVisibilityScreenshots.kt`. It shows the privacy setting that controls system
 search and assistant access.
 
+### Real system UI captures
+
+Some OS integration surfaces are drawn by Android, not by LogDate: the launcher's shortcut popup, the
+Quick Settings shade, notification chips, bubbles, and the lock screen. Compose screenshot tests cannot
+see them, so `OsSurfaceScreenshotsTest` captures them on Gradle Managed Devices:
+
+```bash
+# Every capture, on the Android 17 phone and tablet
+./run screenshots:os
+
+# One capture on the Android 16 phone
+OS_SURFACE_TEST=launcherShortcuts ./run screenshots:os flagshipPhoneApi36
+```
+
+The test drives Android with UI Automator, and pins the status bar with SystemUI demo mode. The clock
+reads 9:41, the battery is full, and no notification icons show, so captures of one state stay
+comparable. Text evidence, such as Android's verdict on a Live Update, is saved next to the images.
+When a wait fails, the test saves what the screen showed (a screenshot and the view tree) under
+`failures/` in the managed device output, which is never copied. Images are copied to
+`docs/screenshots/android-os-integration/<surface>/<state>--<phone|tablet>-api<level>.png`. They are
+reviewed evidence rather than pixel-compared goldens, because system UI changes slightly between
+emulator images. Look at each one, then register it under the `system` lane.
+
 ### Comparison sheets
 
 Reviewing a feature means comparing its screenshots side by side, not opening forty files one at a

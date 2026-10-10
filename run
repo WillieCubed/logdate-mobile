@@ -52,6 +52,7 @@ test|test:screenshots|Validate screenshot tests|./gradlew :app:android-main:vali
 test|test:screenshots:update|Regenerate golden screenshots|./gradlew :app:android-main:updateDebugScreenshotTest
 test|screenshots:check|Check OS integration screenshot coverage and find stale references|./gradlew checkOsIntegrationScreenshotCoverage
 test|screenshots:sheet|Build labeled comparison sheets for OS integration screenshots (add -Pfeature=<name> for one)|./gradlew buildScreenshotComparisonSheet
+test|screenshots:os|Capture real system UI (launcher, shade, bubbles) on managed devices into docs/screenshots|./scripts/os-surface-screenshots.sh
 test|location-replay|Replay exported location history through old and current reconstruction|./scripts/location-replay.sh
 
 quality|lint|Run Android lint|./gradlew lint

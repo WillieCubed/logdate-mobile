@@ -21,8 +21,11 @@ when the tile is added, shown, hidden, or clicked.
 | New entry | "New entry" | n/a | The shade closes and the editor opens in text mode |
 | Record voice | "Record voice" | Highlighted, with "Recording" or "Paused" | Starts a voice entry, or returns to the running recording |
 
-Screenshots are added here when the tiles ship: both tiles in the shade, the active voice tile, and
-light and dark themes on phone and tablet.
+| Both tiles in the shade | Record voice starts a recording | The tile while recording |
+| --- | --- | --- |
+| ![Record voice and New entry tiles in Quick Settings](../../../screenshots/android-os-integration/quick-settings-tiles/idle--phone-api37.png) | ![The editor recording after a tile tap](../../../screenshots/android-os-integration/quick-settings-tiles/recording-editor--phone-api37.png) | ![The Record voice tile highlighted while recording](../../../screenshots/android-os-integration/quick-settings-tiles/recording--phone-api37.png) |
+
+Android 17 shows small tiles as icons only; the tile's label stays its accessibility name.
 
 ## How it works
 
