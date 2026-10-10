@@ -67,7 +67,14 @@ And on an entry in a day, opened beside the timeline:
 
 - Dropping text, photos, videos, or audio onto the editor adds them to the entry. A highlighted drop
   area shows while dragging over it.
-- Pasting an image, or inserting a GIF from the keyboard, adds it to the entry.
+- Pasting with a keyboard (Ctrl+V) adds a copied photo, video, or audio file to the entry on
+  Android; any copied text is pasted into the text as usual. Pasting an image from the
+  touch text menu, and GIFs from on-screen keyboards, do not work yet (see How it works).
+
+A photo copied in another app and pasted with Ctrl+V on a tablet with a USB keyboard:
+
+![A new entry in the editor with the pasted photo of a dog wrapped in a blanket](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/paste-photo--tablet-api37.png)
+
 - Dragging a photo or video out of LogDate into another app sends the actual file, not a path string.
 
 Screenshots are added here as each part ships: desktop menus, the context menu and tooltip states,
@@ -131,7 +138,16 @@ button uses it.
   URIs from other apps need `requestDragAndDropPermissions`, and that permission ends when released,
   so each file is copied into LogDate's private store through `ManagedMediaImporter` (the same path
   shared files use) before the permission is released. While an acceptable drag hovers, the editor
-  draws a primary-color outline. Paste and keyboard media through `contentReceiver` are planned.
+  draws a primary-color outline.
+- **Pasting media.** `entryPasteTarget` (editor module) watches for the paste keys. When the
+  clipboard holds media, it routes the clip through the same `routeDroppedItems` and import as a
+  drop (`importIntoEntry`), and attaches the copies. It does not consume the keys, so the text field
+  still pastes any text. Compose's `Modifier.contentReceiver`, which would also handle the touch
+  paste menu and GIFs from on-screen keyboards, works only with the state-based `BasicTextField`
+  (`TextFieldState`). The editor's text block stays on the value-based field because its inline
+  Markdown styling is a `VisualTransformation`. The state-based field's `OutputTransformation` can
+  change the displayed text but cannot add styles (Compose foundation 1.11), so moving the editor
+  would drop its Markdown styling.
 - **Out of LogDate.** `mediaDragSource` in `client/ui` sends a `ClipData` with a content URI from the
   app's FileProvider (`${applicationId}.provider`, which covers the private media store) and the
   file's MIME type. It sets `DRAG_FLAG_GLOBAL | DRAG_FLAG_GLOBAL_URI_READ`, so the receiving app may

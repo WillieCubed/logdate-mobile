@@ -1,7 +1,6 @@
 package app.logdate.feature.editor.ui.drop
 
 import android.app.Activity
-import android.content.ClipDescription
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -14,12 +13,7 @@ import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.DragAndDropTarget
 import androidx.compose.ui.draganddrop.toAndroidDragEvent
 import androidx.compose.ui.platform.LocalContext
-import app.logdate.client.media.AndroidManagedMediaDiscarder
-import app.logdate.client.media.AndroidManagedMediaImportSource
-import app.logdate.client.media.ManagedMediaImporter
 import app.logdate.client.media.MediaManager
-import io.github.aakira.napier.Napier
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -46,17 +40,7 @@ actual fun Modifier.entryDropTarget(
                     onActiveChanged(false)
                     val dragEvent = event.toAndroidDragEvent()
                     val clip = dragEvent.clipData ?: return false
-                    val description = dragEvent.clipDescription
-                    val items =
-                        (0 until clip.itemCount).map { index ->
-                            val item = clip.getItemAt(index)
-                            val mimeType =
-                                item.uri?.let { context.contentResolver.getType(it) }
-                                    ?: description?.getMimeType(index.coerceAtMost(description.mimeTypeCount - 1))
-                                    ?: ClipDescription.MIMETYPE_TEXT_PLAIN
-                            DroppedItem(mimeType = mimeType, uri = item.uri?.toString(), text = item.text?.toString())
-                        }
-                    val drop = routeDroppedItems(items)
+                    val drop = routeDroppedItems(clip.droppedItems(context))
                     drop.texts.forEach(onText)
                     if (drop.mediaUris.isEmpty()) return drop.texts.isNotEmpty()
 
@@ -64,23 +48,7 @@ actual fun Modifier.entryDropTarget(
                     val permissions = context.findActivity()?.requestDragAndDropPermissions(dragEvent)
                     scope.launch {
                         try {
-                            val importer =
-                                ManagedMediaImporter(
-                                    mediaManager = mediaManager,
-                                    source = AndroidManagedMediaImportSource(context),
-                                    discardManagedMedia = AndroidManagedMediaDiscarder(context, mediaManager)::discard,
-                                )
-                            val imported =
-                                drop.mediaUris.mapNotNull { uri ->
-                                    try {
-                                        importer.import(uri)
-                                    } catch (cancellation: CancellationException) {
-                                        throw cancellation
-                                    } catch (error: Exception) {
-                                        Napier.w("Could not add the dropped file $uri to the entry", error)
-                                        null
-                                    }
-                                }
+                            val imported = importIntoEntry(context, mediaManager, drop.mediaUris)
                             if (imported.isNotEmpty()) onMediaImported(imported)
                         } finally {
                             permissions?.release()

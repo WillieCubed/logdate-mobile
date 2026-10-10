@@ -40,6 +40,7 @@ import app.logdate.feature.editor.ui.content.EditorBottomContent
 import app.logdate.feature.editor.ui.dialog.DraftsBottomSheet
 import app.logdate.feature.editor.ui.dialog.alert.ConfirmEntryExitDialog
 import app.logdate.feature.editor.ui.drop.entryDropTarget
+import app.logdate.feature.editor.ui.drop.entryPasteTarget
 import app.logdate.feature.editor.ui.editor.EditorBackgroundSaveEffect
 import app.logdate.feature.editor.ui.editor.EditorExitReason
 import app.logdate.feature.editor.ui.editor.EntryBlockUiState
@@ -258,7 +259,8 @@ fun EntryEditorContent(
                     onText = { viewModel.appendTextBlock(it) },
                     onMediaImported = { viewModel.setInitialAttachments(it) },
                     onActiveChanged = { dropActive = it },
-                ).then(
+                ).entryPasteTarget(onMediaImported = { viewModel.setInitialAttachments(it) })
+                .then(
                     if (dropActive) {
                         Modifier.border(3.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.large)
                     } else {
