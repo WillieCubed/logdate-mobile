@@ -1,8 +1,9 @@
 # Widgets
 
-Status: partial. Three home-screen widgets ship today, and pinning them from Settings works. The
-capture-only lock-screen and hub widget is built, behind `LOCK_SCREEN_CAPTURE_WIDGET`. Every widget
-has rendered references in light, dark, right-to-left, and 200% text.
+Status: done. Three home-screen widgets ship today, and pinning them from Settings works. The
+capture-only lock-screen and hub widget is built, behind `LOCK_SCREEN_CAPTURE_WIDGET`, and captured
+on the hub of an Android 17 tablet emulator. Every widget has rendered references in light, dark,
+right-to-left, and 200% text.
 
 ## What it is
 
@@ -57,16 +58,17 @@ is right-aligned with its opening quote mark at the right, and its closing "â€¦â
 word. In right-to-left, the
 Capture and New Entry widgets' buttons mirror, so Write is at the right.
 
-The widget on the lock screen or the hub is not captured, because Android's emulator images cannot
-show the hub. Its widget features are on, but the hub service itself is a device setting
-(`config_communalServiceEnabled`) that is off on emulators and cannot be changed from the shell; a
-shell resource overlay for it fails to apply. The other emulator route is a static overlay for that
-setting, preinstalled in the system image's `/product/overlay` on an emulator started with
-`-writable-system`; preinstalled overlays that target an SDK level below 29 may change resources the
-framework does not mark overlayable. It needs a writable copy of the 5 GB system image. Placing the
-widget on the hub with no emulator changes needs a tablet that offers the hub, such as a Pixel
-Tablet on its dock. The keyguard category in the widget's provider XML, and the picker capture
-above, are the evidence until then.
+On a tablet's hub, the lock screen widget picker offers LogDate's Capture widget and nothing else:
+
+![The lock screen widget picker searched for LogDate, listing only Capture, with its note that it shows nothing from the journal](../../../screenshots/android-os-integration/widgets/capture-widget-hub-picker--tablet-api37.png)
+
+Capture on the hub, over the locked tablet:
+
+![The hub over the lock screen with the Capture widget's Write, Record, and Photo buttons](../../../screenshots/android-os-integration/widgets/capture-widget-hub--tablet-api37.png)
+
+Write on the hub unlocks the tablet and opens a new entry:
+
+![A new LogDate entry opened from the hub's Write button](../../../screenshots/android-os-integration/widgets/capture-widget-hub-write--tablet-api37.png)
 
 ## How it works
 
@@ -137,5 +139,17 @@ Home-screen widgets have no flag. The lock-screen capture widget is behind `LOCK
   layouts take their direction from the default locale (`layoutDirection="locale"`), which a
   configuration context does not change, so the right-to-left render also sets the default locale
   while it draws. Record with `./run screenshots:os`.
-- **Real placements:** the home screen, the lock screen, the hub, and the picker are Lane 2 captures,
-  recorded with `./run screenshots:os`. They land in `docs/screenshots/android-os-integration/widgets/`.
+- **Real placements:** the home screen and the picker are Lane 2 captures, recorded with
+  `./run screenshots:os`. They land in `docs/screenshots/android-os-integration/widgets/`.
+- **The hub:** `./run screenshots:hub` (`scripts/hub-widget-screenshots.sh`) records
+  `OsSurfaceScreenshotsTest#captureWidgetOnHub`. Android's emulator images ship with the hub off,
+  through two device settings only the system image can change: `config_glanceableHubEnabled` in the
+  framework and `config_communalServiceEnabled` in SystemUI. A shell overlay cannot change them,
+  because neither is marked overlayable. The script builds two small resource overlays from
+  `scripts/emulator-hub-overlays/` and installs them in `/vendor/overlay` of the desktop-windowing
+  emulator, booted with `-writable-system`: Android lets an overlay preinstalled on the vendor
+  partition that targets SDK 28 or lower change resources that are not overlayable. It then empties
+  the hub and runs the test, which turns on a lock screen, swipes the hub open from the right edge,
+  adds Capture through the picker, and taps Write. The test fails if the picker offers any other
+  LogDate widget or if Write does not open LogDate. The overlays live only in that emulator's writable
+  copy of its system image.

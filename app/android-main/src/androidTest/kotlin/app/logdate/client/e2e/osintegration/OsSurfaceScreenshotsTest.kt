@@ -5,10 +5,12 @@ import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.Rect
 import android.os.Build
+import android.view.KeyEvent
 import android.view.accessibility.AccessibilityWindowInfo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.BySelector
 import androidx.test.uiautomator.Until
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.feature.widgets.CaptureWidget
@@ -755,6 +757,103 @@ class OsSurfaceScreenshotsTest {
         OsSurfaceCapture.capture(surface = "widgets", state = "capture-widget-picker")
     }
 
+    /**
+     * The Capture widget on the hub, the widget space a tablet shows over its lock screen while it
+     * charges. Emulator images ship with the hub off, so this runs only on an emulator that
+     * `scripts/hub-widget-screenshots.sh` prepared with the overlays that turn it on.
+     */
+    @Test fun captureWidgetOnHub() {
+        assumeTrue(OsSurfaceCapture.shell("cmd overlay list com.android.systemui").contains("[x] $HUB_OVERLAY"))
+        // The emulator starts without a lock screen; the hub needs one, and it is removed again after.
+        OsSurfaceCapture.shell("locksettings set-disabled true")
+        OsSurfaceCapture.shell("wm dismiss-keyguard")
+        try {
+            addCaptureWidgetToHub()
+        } finally {
+            OsSurfaceCapture.shell("locksettings set-disabled true")
+            OsSurfaceCapture.shell("wm dismiss-keyguard")
+        }
+    }
+
+    private fun addCaptureWidgetToHub() {
+        val device = OsSurfaceCapture.device
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.enableFlags(FeatureFlag.LOCK_SCREEN_CAPTURE_WIDGET)
+        OsSurfaceCapture.awaitComponentEnabled("app.logdate.client.feature.widgets.CaptureWidgetReceiver")
+
+        OsSurfaceCapture.shell("locksettings set-disabled false")
+        OsSurfaceCapture.shell("input keyevent KEYCODE_SLEEP")
+        Thread.sleep(1_500L)
+        OsSurfaceCapture.shell("input keyevent KEYCODE_WAKEUP")
+        Thread.sleep(2_500L)
+        openHub()
+        device.wait(Until.findObject(By.textStartsWith("Let")), 3_000L)?.click()
+
+        OsSurfaceCapture.waitForText("Add widgets").click()
+        device.wait(Until.findObject(By.text("Got it")), 5_000L)?.click()
+        // The picker's search field is labelled by its description; a Google widget is titled "Search".
+        val search =
+            device.wait(Until.findObject(By.desc("Search")), 5_000L)
+                ?: error("The lock screen widget picker did not show its search field")
+        search.click()
+        device.wait(Until.findObject(By.focused(true)), 5_000L)?.text = "LogDate"
+        device.pressKeyCode(KeyEvent.KEYCODE_ENTER)
+        // The result row names the LogDate widgets offered for the lock screen. Only Capture, which
+        // shows no journal content, may be there.
+        val offered =
+            device.wait(Until.findObject(By.text(LOGDATE_WIDGET_NAMES)), 5_000L)
+                ?: error("The lock screen widget picker did not list LogDate")
+        check(offered.text == "Capture") { "The lock screen picker offered journal widgets: ${offered.text}" }
+        offered.click()
+        Thread.sleep(2_000L)
+        OsSurfaceCapture.capture(surface = "widgets", state = "capture-widget-hub-picker")
+
+        // Tapping the preview, the widget image above its title, shows an Add button; adding opens the
+        // hub's editor with the widget. The rightmost "Capture" is the preview's title, not the list row.
+        val title =
+            device.findObjects(By.text("Capture")).maxByOrNull { it.visibleBounds.centerX() }
+                ?: error("The picker did not show the Capture widget's preview")
+        device.click(title.visibleBounds.centerX(), title.visibleBounds.top - HUB_PREVIEW_ABOVE_TITLE_PX)
+        val add =
+            device.wait(Until.findObject(By.desc("Add Capture widget")), 5_000L)
+                ?: error("The picker did not offer to add the Capture widget")
+        add.click()
+        // The first widget added shows a one-time note that opening apps from the hub needs an unlock.
+        device.wait(Until.findObject(By.text("Got it")), 4_000L)?.click()
+        OsSurfaceCapture.waitForText("Done").click()
+
+        val write =
+            device.wait(Until.findObject(By.desc("Write entry")), 10_000L)
+                ?: error("The hub did not show the Capture widget")
+        Thread.sleep(1_500L)
+        OsSurfaceCapture.capture(surface = "widgets", state = "capture-widget-hub")
+
+        // Write unlocks the device and opens a new entry.
+        write.click()
+        val opened = device.wait(Until.hasObject(By.pkg(OsSurfaceCapture.packageName).depth(0)), 15_000L)
+        check(opened) { "Write on the hub did not open LogDate" }
+        Thread.sleep(2_000L)
+        OsSurfaceCapture.capture(surface = "widgets", state = "capture-widget-hub-write")
+    }
+
+    /**
+     * Opens the hub with a slow swipe in from the right edge, as a person would. A swipe right after
+     * the screen wakes can fall short and slide back, so it is repeated until the hub shows. The
+     * swipe goes through `input`, because a swipe injected through UiDevice does not open the hub.
+     */
+    private fun openHub() {
+        val device = OsSurfaceCapture.device
+        val middle = device.displayHeight / 2
+        repeat(HUB_SWIPE_ATTEMPTS) {
+            OsSurfaceCapture.shell(
+                "input touchscreen swipe ${device.displayWidth - 2} $middle ${device.displayWidth / 12} $middle $HUB_SWIPE_MS",
+            )
+            if (device.wait(Until.hasObject(HUB_CONTENT), 3_000L)) return
+        }
+        OsSurfaceCapture.dumpHierarchy("hub-closed")
+        error("The hub did not open")
+    }
+
     @Test fun pinJournal() {
         OsSurfaceCapture.prepareOnboardedApp()
         OsSurfaceCapture.openJournal(OsSurfaceCapture.createJournal("Summer in Lisbon"))
@@ -905,6 +1004,22 @@ class OsSurfaceScreenshotsTest {
     private companion object {
         /** `WindowConfiguration.WINDOWING_MODE_FREEFORM`, which `am start --windowingMode` takes. */
         const val WINDOWING_MODE_FREEFORM = 5
+
+        /** The emulator overlay `scripts/hub-widget-screenshots.sh` installs to turn the hub on. */
+        const val HUB_OVERLAY = "studio.hypertext.logdate.emulator.hubsystemui"
+
+        /** The lock screen picker's list of LogDate widget names, such as "Memories, Capture". */
+        val LOGDATE_WIDGET_NAMES: Pattern = Pattern.compile("(Memories|Pinned Memory|New Entry|Capture)(, .+)?")
+
+        /** How far above a widget's title in the lock screen picker its preview image sits. */
+        const val HUB_PREVIEW_ABOVE_TITLE_PX = 140
+
+        /** About a second of swipe; a quicker swipe from the edge slides back before the hub opens. */
+        const val HUB_SWIPE_MS = 900
+        const val HUB_SWIPE_ATTEMPTS = 3
+
+        /** The open hub's own label; the plain lock screen is labelled "Lock screen". */
+        val HUB_CONTENT: BySelector = By.desc("Widgets on lock screen")
 
         /** How many times an assistant call is tried while the function registry settles. */
         const val FUNCTION_LOOKUP_ATTEMPTS = 15

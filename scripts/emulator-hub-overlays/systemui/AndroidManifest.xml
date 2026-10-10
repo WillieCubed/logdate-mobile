@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Emulator-only overlay that turns on SystemUI's side of the hub and its swipe in from the right edge.
+    Installed the same way as the framework overlay; see scripts/hub-widget-screenshots.sh.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="studio.hypertext.logdate.emulator.hubsystemui">
+    <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="28" />
+    <overlay android:targetPackage="com.android.systemui" android:isStatic="true" android:priority="10" />
+    <application android:hasCode="false" />
+</manifest>

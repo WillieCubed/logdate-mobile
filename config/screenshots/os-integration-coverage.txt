@@ -70,6 +70,9 @@ app-bubble|system|docs/screenshots/android-os-integration/bubbles/app-bubble--ph
 # Capture widget: listed in the widget picker with its capture-only preview.
 capture-widget|system|docs/screenshots/android-os-integration/widgets/capture-widget-picker--phone-api37.png
 capture-widget|system|docs/screenshots/android-os-integration/widgets/capture-widget-picker--tablet-api37.png
+capture-widget|system|docs/screenshots/android-os-integration/widgets/capture-widget-hub-picker--tablet-api37.png
+capture-widget|system|docs/screenshots/android-os-integration/widgets/capture-widget-hub--tablet-api37.png
+capture-widget|system|docs/screenshots/android-os-integration/widgets/capture-widget-hub-write--tablet-api37.png
 
 # Assistant actions: Android's registry and calls through cmd app_function, and the saved entry.
 app-functions|system|docs/screenshots/android-os-integration/app-functions/assistant-actions--phone-api37.txt
