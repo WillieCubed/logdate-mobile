@@ -34,7 +34,7 @@ class LiveUpdatesTest {
     }
 
     @Test
-    fun `data work is promoted at once, and the chip shows the percent once known`() {
+    fun `data work is promoted at once and the chip shows the percent once known`() {
         assertEquals(TransferLiveUpdate(promoted = true, chipPercent = null), transferLiveUpdate(enabled = true, percent = null))
         assertEquals(TransferLiveUpdate(promoted = true, chipPercent = 40), transferLiveUpdate(enabled = true, percent = 40))
         assertEquals(TransferLiveUpdate(promoted = true, chipPercent = 100), transferLiveUpdate(enabled = true, percent = 140))
@@ -45,5 +45,17 @@ class LiveUpdatesTest {
         assertEquals(listOf(100), progressSegmentLengths(emptyList()))
         assertEquals(listOf(5, 5, 10, 80), progressSegmentLengths(listOf(0, 0, 5, 10, 20)))
         assertEquals(listOf(40, 60), progressSegmentLengths(listOf(40, 40, 100, -3)))
+    }
+
+    @Test
+    fun `finished transfers keep plain titles with Live Updates off`() {
+        assertEquals(null, transferSemanticStyle(enabled = false, outcome = TransferOutcome.Failed))
+        assertEquals(null, transferSemanticStyle(enabled = false, outcome = TransferOutcome.Completed))
+    }
+
+    @Test
+    fun `failures read as danger and completions as safe`() {
+        assertEquals(TransferSemanticStyle.Danger, transferSemanticStyle(enabled = true, outcome = TransferOutcome.Failed))
+        assertEquals(TransferSemanticStyle.Safe, transferSemanticStyle(enabled = true, outcome = TransferOutcome.Completed))
     }
 }

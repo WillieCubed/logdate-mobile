@@ -1,5 +1,9 @@
 package app.logdate.client.notifications
 
+import android.app.Notification
+import android.os.Build
+import android.text.SpannableString
+import android.text.Spanned
 import androidx.core.app.NotificationCompat
 import org.koin.mp.KoinPlatform
 
@@ -28,4 +32,23 @@ fun NotificationCompat.Builder.applyTransferLiveUpdate(
             .setProgressIndeterminate(percent == null)
     percent?.let { style.setProgress(it.coerceIn(0, 100)) }
     return setStyle(style)
+}
+
+/**
+ * [text] marked with Android 17's semantic style for [style], so the system colors it as a success or
+ * a failure. Earlier versions, and a null [style], get [text] unchanged.
+ */
+fun semanticStyledText(
+    text: CharSequence,
+    style: TransferSemanticStyle?,
+): CharSequence {
+    if (style == null || Build.VERSION.SDK_INT < 37) return text
+    val annotation =
+        Notification.createSemanticStyleAnnotation(
+            when (style) {
+                TransferSemanticStyle.Safe -> Notification.SEMANTIC_STYLE_SAFE
+                TransferSemanticStyle.Danger -> Notification.SEMANTIC_STYLE_DANGER
+            },
+        )
+    return SpannableString(text).apply { setSpan(annotation, 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
 }

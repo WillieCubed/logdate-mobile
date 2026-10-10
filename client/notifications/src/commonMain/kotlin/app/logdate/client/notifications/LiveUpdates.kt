@@ -104,3 +104,24 @@ fun progressSegmentLengths(
     val starts = (phaseStarts.filter { it in 0 until max } + 0).distinct().sorted()
     return starts.mapIndexed { index, start -> (starts.getOrNull(index + 1) ?: max) - start }
 }
+
+/** How long-running data work ended, for the color Android 17 gives its notification. */
+enum class TransferOutcome { Completed, Failed }
+
+/** Android's semantic text styles for a finished transfer (Android 17 and later). */
+enum class TransferSemanticStyle { Safe, Danger }
+
+/**
+ * The semantic style for a finished transfer's title, or null to leave it plain. With Live Updates
+ * on, a failure reads in the system's danger red and a completion in its safe green, the same as
+ * other apps' Live Updates; with them off, every notification is built as before.
+ */
+fun transferSemanticStyle(
+    enabled: Boolean,
+    outcome: TransferOutcome,
+): TransferSemanticStyle? =
+    when {
+        !enabled -> null
+        outcome == TransferOutcome.Failed -> TransferSemanticStyle.Danger
+        else -> TransferSemanticStyle.Safe
+    }

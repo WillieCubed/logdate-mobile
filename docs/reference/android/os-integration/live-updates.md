@@ -1,7 +1,8 @@
 # Live Updates
 
-Status: recording, export, restore, and sync progress are built, behind `LIVE_UPDATES` (Settings >
-Advanced > Developer tools > Feature previews). Semantic colors on Android 17 are planned.
+Status: recording, export, restore, and sync progress, and Android 17's semantic colors for finished
+transfers, are built, behind `LIVE_UPDATES` (Settings > Advanced > Developer tools > Feature
+previews).
 
 ## What it is
 
@@ -64,8 +65,11 @@ predates the chip, so its captures show the notification only.
   phases begins, and `progressSegmentLengths` turns those into segments, so the bar shows which phase
   the restore is in, not just how much is done. The decision, `transferLiveUpdate`, is a pure function
   with tests. Work is promoted as soon as it starts; the chip shows a percent once progress is known.
-- **Semantic colors (API 37, planned).** `Notification.createSemanticStyleAnnotation` will mark
-  failure (red) and completion (green). Earlier versions get the plain style.
+- **Semantic colors (Android 17).** When an export or restore finishes or fails, its title carries
+  `Notification.createSemanticStyleAnnotation` with `SEMANTIC_STYLE_SAFE` or `SEMANTIC_STYLE_DANGER`,
+  so Android colors it green or red. `transferSemanticStyle` (client/notifications, tested) decides
+  the style and `semanticStyledText` applies it; earlier versions, and Live Updates off, get plain
+  text.
 - **Library.** `androidx.core` 1.18 provides the compat builders and `ProgressStyle`; the media and
   notifications modules depend on it directly, because transitive versions predate these methods.
 
