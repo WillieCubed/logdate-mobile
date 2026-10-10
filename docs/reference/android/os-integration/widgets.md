@@ -21,15 +21,17 @@ Each widget has three parts:
 
 The XML's `widgetCategory` says where the widget can be placed. `home_screen` is the home screen.
 `keyguard` is the lock screen, and on Android 16 tablets the hub, the widget space shown over the lock
-screen while charging or docked.
+screen while charging or docked. The hub also offers widgets declared only for the home screen, so a
+widget that must stay off the lock screen adds `not_keyguard` (Android 16 and later; older versions
+ignore it).
 
 ## What the person sees
 
 | Widget | Where | Shows | Tapping it |
 | --- | --- | --- | --- |
-| New entry | Home screen | Write, Record, and Camera actions, optionally over a chosen photo | Opens the editor in that mode |
-| On This Day ("Memories" in the widget picker) | Home screen | A memory from this date in past years | Opens that day |
-| Pinned memory ("Pinned Memory" in the widget picker) | Home screen | One memory the person chose | Opens that memory |
+| New entry | Home screen only | Write, Record, and Camera actions, optionally over a chosen photo | Opens the editor in that mode |
+| On This Day ("Memories" in the widget picker) | Home screen only | A memory from this date in past years | Opens that day |
+| Pinned memory ("Pinned Memory" in the widget picker) | Home screen only | One memory the person chose | Opens that memory |
 | Capture | Home screen, lock screen, and hub | Write, Record, and Photo actions only | Opens the editor in that mode |
 
 The Capture widget in the Android 17 widget picker, below New Entry, whose buttons it shares:
@@ -109,8 +111,9 @@ Home-screen widgets have no flag. The lock-screen capture widget is behind `LOCK
 ## Privacy
 
 - **Lock-screen widgets never show journal content.** The capture widget shows actions only, and
-  reads no journal data. On This Day and Pinned memory stay home-screen only, because their content
-  is private.
+  reads no journal data. On This Day, Pinned memory, and New entry (whose photo prompts come from the
+  person's library) declare `home_screen|not_keyguard`. Without `not_keyguard`, Android 17's hub
+  offers every home-screen widget, and anyone could read those widgets on the lock screen.
 - Capture from a widget still passes the app lock before the rest of the journal is reachable.
 
 ## How to test
