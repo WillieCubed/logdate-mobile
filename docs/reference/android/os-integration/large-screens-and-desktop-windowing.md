@@ -35,8 +35,12 @@ covers the window and system side.
 - **The caption bar.** In desktop windowing, Search and the account button sit in the caption bar,
   between the system controls.
 
-Screenshots are added here as each part ships: titled windows in Recents and the taskbar, side-by-side
-windows, and the caption bar.
+"New entry in a new window" on a Pixel Tablet running Android 17, started from full screen. LogDate
+keeps the left half, and the editor opens on the right, already filed to the journal:
+
+![LogDate's Journals on the left and a new entry's editor on the right, split down the middle, with the editor's journal picker showing Summer in Lisbon](../../../screenshots/android-os-integration/large-screens-and-desktop-windowing/side-by-side--tablet-api37.png)
+
+Titled windows in Recents and the taskbar, and the caption bar, are added as each part ships.
 
 ## How it works
 

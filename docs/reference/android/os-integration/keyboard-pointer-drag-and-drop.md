@@ -38,7 +38,12 @@ those devices people expect the same input conventions as any desktop app:
 Planned: Ctrl+Shift+N for a new editor window.
 
 On macOS desktop builds, Cmd replaces Ctrl. Pressing Meta+/ on Android lists all of these under
-LogDate.
+LogDate, here on a Pixel Tablet running Android 17 with a USB keyboard:
+
+![Android's Keyboard shortcuts sheet with LogDate selected in its category list, showing the LogDate group (New entry, Record a voice entry, Search, Settings) and the Home group (Ctrl+1 to Ctrl+3 visible)](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/shortcut-helper--tablet-api37.png)
+
+Android 17 gives the focused app its own category, with the app's icon, next to System and
+Multitasking. It lists an app's shortcuts only for keys that the attached keyboard has.
 
 ### Pointer
 
@@ -54,8 +59,8 @@ LogDate.
 - Pasting an image, or inserting a GIF from the keyboard, adds it to the entry.
 - Dragging a photo or video out of LogDate into another app sends the actual file, not a path string.
 
-Screenshots are added here as each part ships: the Meta+/ helper, desktop menus, the context menu and
-tooltip states, drop states, and a cross-app drag on a tablet.
+Screenshots are added here as each part ships: desktop menus, the context menu and tooltip states,
+drop states, and a cross-app drag on a tablet.
 
 ## How it works
 
@@ -147,3 +152,8 @@ Dragging out shares only the file the person dragged, with read-only access gran
 - The shortcut helper, cross-app drags, and stylus input are Lane 2 captures, recorded with
   `./run screenshots:os`. They land in
   `docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/`.
+- The shortcut helper capture plugs in a USB keyboard through Android's `uinput` shell tool
+  (`HardwareKeyboard` in the instrumented tests). Key presses that UiAutomator injects come from
+  Android's virtual keyboard, which has no physical keys, and Android 17's helper then drops every app
+  shortcut. The test also switches the on-screen keyboards off while it captures, because the
+  emulator's Gboard stays up next to a physical keyboard.

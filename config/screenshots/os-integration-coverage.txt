@@ -34,6 +34,7 @@ launcher-shortcuts|system|docs/screenshots/android-os-integration/launcher-short
 # Pinning: the journal menu's Add to home screen and the launcher's confirmation.
 pin-journal|system|docs/screenshots/android-os-integration/launcher-shortcuts/journal-menu--phone-api37.png
 pin-journal|system|docs/screenshots/android-os-integration/launcher-shortcuts/pin-journal--phone-api37.png
+pin-journal|system|docs/screenshots/android-os-integration/launcher-shortcuts/pin-journal--tablet-api37.png
 
 # Quick Settings tiles: idle, starting a recording, and the active Record voice tile.
 quick-settings-tiles|system|docs/screenshots/android-os-integration/quick-settings-tiles/idle--phone-api37.png
@@ -57,7 +58,21 @@ app-bubble|system|docs/screenshots/android-os-integration/bubbles/app-bubble--ph
 
 # Capture widget: listed in the widget picker with its capture-only preview.
 capture-widget|system|docs/screenshots/android-os-integration/widgets/capture-widget-picker--phone-api37.png
+capture-widget|system|docs/screenshots/android-os-integration/widgets/capture-widget-picker--tablet-api37.png
 
 # Assistant actions: Android's registry and calls through cmd app_function, and the saved entry.
 app-functions|system|docs/screenshots/android-os-integration/app-functions/assistant-actions--phone-api37.txt
 app-functions|system|docs/screenshots/android-os-integration/app-functions/entry-from-assistant--phone-api37.png
+app-functions|system|docs/screenshots/android-os-integration/app-functions/assistant-actions--tablet-api37.txt
+
+# Notification quick reply: Write's reply field on the capture reminder, and the saved confirmation.
+notification-quick-reply|system|docs/screenshots/android-os-integration/notification-quick-reply/reply-field--phone-api37.png
+notification-quick-reply|system|docs/screenshots/android-os-integration/notification-quick-reply/saved--phone-api37.png
+notification-quick-reply|system|docs/screenshots/android-os-integration/notification-quick-reply/reply-field--tablet-api37.png
+notification-quick-reply|system|docs/screenshots/android-os-integration/notification-quick-reply/saved--tablet-api37.png
+
+# Windows: a journal's New entry in a new window, opened beside LogDate in split screen.
+editor-windows|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/side-by-side--tablet-api37.png
+
+# Keyboard shortcuts: Android's Meta+/ helper listing LogDate's group with a USB keyboard attached.
+keyboard-shortcuts|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/shortcut-helper--tablet-api37.png

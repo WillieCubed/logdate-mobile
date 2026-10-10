@@ -11,9 +11,14 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
+import app.logdate.client.ambient.AmbientPromptNotificationCoordinator
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.client.domain.recommendation.AmbientCaptureNudgeStyle
+import app.logdate.client.domain.recommendation.AmbientPromptCandidate
+import app.logdate.client.domain.recommendation.AmbientPromptFamily
+import app.logdate.client.domain.recommendation.AmbientPromptPayload
 import app.logdate.client.media.audio.AudioRecordingManager
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.user.UserStateRepository
@@ -280,6 +285,36 @@ object OsSurfaceCapture {
     /** Turns LogDate's system search visibility, the consent assistants need to read entries, on or off. */
     fun setSystemSearchVisibility(enabled: Boolean) {
         runBlocking { GlobalContext.get().get<LogdatePreferencesDataSource>().setSystemSearchVisibilityEnabled(enabled) }
+    }
+
+    /**
+     * Holds a finger on [target] for about a second. [UiObject2.longClick] is short enough that
+     * Compose can read it as a tap.
+     */
+    fun longPress(target: UiObject2) {
+        val center = target.visibleCenter
+        device.swipe(center.x, center.y, center.x, center.y, 200)
+        device.waitForIdle()
+    }
+
+    /** Opens LogDate's main screen. */
+    fun openMainActivity() {
+        shell("am start -n $packageName/app.logdate.client.MainActivity -f 0x10000000")
+        device.wait(Until.hasObject(By.pkg(packageName).depth(0)), TIMEOUT_MS)
+        Thread.sleep(3_000L)
+    }
+
+    /** Posts the evening capture reminder now, as the scheduler would at the end of the day. */
+    fun postEveningCaptureReminder() {
+        GlobalContext.get().get<AmbientPromptNotificationCoordinator>().post(
+            AmbientPromptCandidate(
+                family = AmbientPromptFamily.CAPTURE_NUDGES,
+                score = 1,
+                dedupeKey = "os-surface-evening",
+                payload = AmbientPromptPayload.CaptureNudge(style = AmbientCaptureNudgeStyle.EVENING),
+            ),
+        )
+        Thread.sleep(1_000L)
     }
 
     /** Creates a journal named [title] and returns its id. */

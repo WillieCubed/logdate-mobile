@@ -95,6 +95,57 @@ class OsSurfaceScreenshotsTest {
         OsSurfaceCapture.capture(surface = "app-functions", state = "entry-from-assistant")
     }
 
+    /** Android's keyboard shortcut helper (Meta+/) listing LogDate's shortcuts. */
+    @Test fun keyboardShortcutHelper() {
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.openMainActivity()
+        // The emulator's Gboard keeps its on-screen keyboard up even with a keyboard attached, which
+        // most people turn off, so the on-screen keyboards are switched off for this capture.
+        val onScreenKeyboards = OsSurfaceCapture.shell("ime list -s").lines().filter { it.isNotBlank() }
+        onScreenKeyboards.forEach { OsSurfaceCapture.shell("ime disable $it") }
+        try {
+            HardwareKeyboard().use { keyboard ->
+                keyboard.press(HardwareKeyboard.KEY_LEFTMETA, HardwareKeyboard.KEY_SLASH)
+                // The helper opens on the focused app's shortcuts, grouped under its name.
+                OsSurfaceCapture.waitForText("Record a voice entry")
+                Thread.sleep(1_000L)
+                OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "shortcut-helper")
+            }
+        } finally {
+            onScreenKeyboards.forEach { OsSurfaceCapture.shell("ime enable $it") }
+        }
+    }
+
+    /** A capture reminder answered from the notification shade with Write. */
+    @Test fun notificationQuickReply() {
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.enableFlags(FeatureFlag.NOTIFICATION_QUICK_REPLY)
+        OsSurfaceCapture.postEveningCaptureReminder()
+        OsSurfaceCapture.openNotifications()
+        OsSurfaceCapture.waitForText("Write").click()
+        val field = OsSurfaceCapture.device.wait(Until.findObject(By.clazz("android.widget.EditText")), 5_000L)
+        field?.text = "Sunset over the bay, then dinner on the steps."
+        Thread.sleep(1_000L)
+        OsSurfaceCapture.capture(surface = "notification-quick-reply", state = "reply-field")
+        OsSurfaceCapture.device.wait(Until.findObject(By.desc("Send")), 3_000L)?.click()
+        OsSurfaceCapture.waitForText("Entry saved")
+        Thread.sleep(800L)
+        OsSurfaceCapture.capture(surface = "notification-quick-reply", state = "saved")
+    }
+
+    /** On a tablet, a journal's "New entry in a new window" opens the editor beside LogDate. */
+    @Test fun editorWindowSideBySide() {
+        if (OsSurfaceCapture.formFactor != "tablet") return
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.createJournal("Summer in Lisbon")
+        OsSurfaceCapture.openMainActivity()
+        OsSurfaceCapture.waitForText("Journals").click()
+        OsSurfaceCapture.longPress(OsSurfaceCapture.waitForText("Summer in Lisbon"))
+        OsSurfaceCapture.waitForText("New entry in a new window").click()
+        Thread.sleep(4_000L)
+        OsSurfaceCapture.capture(surface = "large-screens-and-desktop-windowing", state = "side-by-side")
+    }
+
     @Test fun captureWidgetInPicker() {
         OsSurfaceCapture.prepareOnboardedApp()
         OsSurfaceCapture.enableFlags(FeatureFlag.LOCK_SCREEN_CAPTURE_WIDGET)

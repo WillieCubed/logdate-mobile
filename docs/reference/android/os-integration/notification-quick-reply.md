@@ -1,7 +1,7 @@
 # Notification Quick Reply
 
 Status: built, behind `NOTIFICATION_QUICK_REPLY` (Settings > Advanced > Developer tools > Feature
-previews). Lane 2 captures are pending.
+previews). Verified on Android 17 phone and tablet emulators.
 
 ## What it is
 
@@ -23,8 +23,18 @@ A capture nudge gains two actions:
 If saving fails, the notification changes to "Entry not saved", keeps the reply text, and offers
 Retry. Tapping it opens a new entry in LogDate. The text is never dropped silently.
 
-Screenshots are added here when quick reply ships: the actions, the open reply field, the sending
-state, the confirmation, and the failure state.
+The evening reminder answered from the shade on Android 17. Write opens the reply field inside the
+notification:
+
+![The Reflect on today reminder with a reply field reading "Sunset over the bay, then dinner on the steps." and a send button](../../../screenshots/android-os-integration/notification-quick-reply/reply-field--phone-api37.png)
+
+After sending, the same notification confirms the save without repeating what was written:
+
+![The notification now reads Entry saved, Added to today's timeline](../../../screenshots/android-os-integration/notification-quick-reply/saved--phone-api37.png)
+
+Tablet captures sit next to these with the `--tablet-api37` suffix. The failure state is covered by
+`QuickReplyTest` but not captured, because forcing a save failure on a managed device needs a test
+hook that does not exist yet.
 
 ## How it works
 
