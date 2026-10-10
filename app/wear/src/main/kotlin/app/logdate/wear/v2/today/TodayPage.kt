@@ -25,6 +25,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.foundation.AmbientMode
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
@@ -55,6 +56,8 @@ import app.logdate.ui.streak.CampfirePresentation
 import app.logdate.ui.streak.campfireShortDescription
 import app.logdate.wear.R
 import app.logdate.wear.capture.Feeling
+import app.logdate.wear.v2.ambient.AmbientRecordingFace
+import app.logdate.wear.v2.ambient.currentAmbientMode
 import app.logdate.wear.v2.moments.formatClockDuration
 import app.logdate.wear.v2.moments.momentClockTime
 import app.logdate.wear.v2.moments.momentLabel
@@ -111,6 +114,11 @@ fun TodayPage(
     timeSource: TimeSource = TimeTextDefaults.rememberTimeSource(TimeTextDefaults.timeFormat()),
 ) {
     val recorderState = controls.recorder?.state
+    val ambient = currentAmbientMode()
+    if (recorderState is RecorderState.Live && ambient is AmbientMode.Ambient) {
+        AmbientRecordingFace(elapsed = recorderState.elapsed, burnInProtection = ambient.isBurnInProtectionRequired, modifier = modifier)
+        return
+    }
     val timeText: @Composable () -> Unit = { TodayTimeText(state = state, timeSource = timeSource) }
     TodayScaffold(listState = listState, timeText = timeText, recorder = controls.recorder) { contentPadding ->
         if (recorderState is RecorderState.Live) RecordingRing(levels = recorderState.levels, modifier = Modifier.fillMaxSize())

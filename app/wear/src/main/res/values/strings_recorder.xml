@@ -33,4 +33,10 @@
 
     <!-- The recording's Ongoing Activity on the watch face -->
     <string name="wear_ongoing_recording_title">Recording</string>
+
+    <!-- The recording face in ambient mode: the whole minutes recorded so far -->
+    <plurals name="wear_today_recorder_ambient_minutes">
+        <item quantity="one">%1$d&#160;min</item>
+        <item quantity="other">%1$d&#160;min</item>
+    </plurals>
 </resources>

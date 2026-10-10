@@ -20,12 +20,14 @@ import androidx.wear.compose.navigation3.rememberSwipeDismissableSceneStrategy
 import app.logdate.ui.platform.LocalLogDateHaptics
 import app.logdate.ui.platform.LogDateHaptics
 import app.logdate.wear.launch.WearLaunchRequest
+import app.logdate.wear.v2.ambient.WatchAmbientScope
 import app.logdate.wear.v2.flow.FlowPage
 import app.logdate.wear.v2.flow.FlowViewModel
 import app.logdate.wear.v2.home.HomeScreen
 import app.logdate.wear.v2.navigation.WearRoute
 import app.logdate.wear.v2.navigation.toV2BackStack
 import app.logdate.wear.v2.permissions.rememberPermissionRequester
+import app.logdate.wear.v2.recorder.RecorderState
 import app.logdate.wear.v2.recorder.RecorderViewModel
 import app.logdate.wear.v2.recorder.TodayRecorder
 import app.logdate.wear.v2.recorder.locksPaging
@@ -48,7 +50,8 @@ object WearAppV2Tags {
  * instead. Each item of [newRequests] replaces the back stack, as a cold launch from a tile does.
  * Swiping right dismisses the top screen. Each screen's view models live as long as its entry; the
  * recorder is resolved here, outside every entry, so it belongs to the activity, and the
- * permissions it asks for are requested here.
+ * permissions it asks for are requested here. While it records, the app stays on screen in ambient
+ * mode where the watch supports it.
  */
 @Composable
 fun WearAppV2(
@@ -56,6 +59,7 @@ fun WearAppV2(
     newRequests: Flow<WearLaunchRequest>,
 ) {
     val recorder = koinViewModel<RecorderViewModel>()
+    val recorderState by recorder.state.collectAsState()
     val backStack = rememberNavBackStack(*initialRequest.toV2BackStack().toTypedArray())
     LaunchedEffect(newRequests) {
         newRequests.collect { request ->
@@ -64,23 +68,25 @@ fun WearAppV2(
         }
     }
     RecorderPermissionPrompts(recorder)
-    LogDateWearTheme {
-        CompositionLocalProvider(LocalLogDateHaptics provides koinInject<LogDateHaptics>()) {
-            AppScaffold(modifier = Modifier.testTag(WearAppV2Tags.SHELL)) {
-                NavDisplay(
-                    backStack = backStack,
-                    onBack = { backStack.removeLastOrNull() },
-                    entryDecorators =
-                        listOf(
-                            rememberSaveableStateHolderNavEntryDecorator<NavKey>(),
-                            rememberViewModelStoreNavEntryDecorator<NavKey>(),
-                        ),
-                    sceneStrategies = listOf(rememberSwipeDismissableSceneStrategy<NavKey>()),
-                    entryProvider =
-                        entryProvider {
-                            entry<WearRoute.Home> { HomeEntry(recorder) }
-                        },
-                )
+    WatchAmbientScope(enabled = recorderState is RecorderState.Live) {
+        LogDateWearTheme {
+            CompositionLocalProvider(LocalLogDateHaptics provides koinInject<LogDateHaptics>()) {
+                AppScaffold(modifier = Modifier.testTag(WearAppV2Tags.SHELL)) {
+                    NavDisplay(
+                        backStack = backStack,
+                        onBack = { backStack.removeLastOrNull() },
+                        entryDecorators =
+                            listOf(
+                                rememberSaveableStateHolderNavEntryDecorator<NavKey>(),
+                                rememberViewModelStoreNavEntryDecorator<NavKey>(),
+                            ),
+                        sceneStrategies = listOf(rememberSwipeDismissableSceneStrategy<NavKey>()),
+                        entryProvider =
+                            entryProvider {
+                                entry<WearRoute.Home> { HomeEntry(recorder) }
+                            },
+                    )
+                }
             }
         }
     }
