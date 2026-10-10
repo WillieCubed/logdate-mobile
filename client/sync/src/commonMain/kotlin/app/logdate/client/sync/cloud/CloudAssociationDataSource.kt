@@ -1,5 +1,6 @@
 package app.logdate.client.sync.cloud
 
+import io.github.aakira.napier.Napier
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -19,6 +20,12 @@ interface CloudAssociationDataSource {
         accessToken: String,
         associations: List<JournalContentAssociation>,
     ): Result<Instant>
+
+    /** Uploads the associations the server has never had; see [CloudApiClient.uploadAssociationsIfAbsent]. */
+    suspend fun uploadAssociationsIfAbsent(
+        accessToken: String,
+        associations: List<JournalContentAssociation>,
+    ): Result<Instant> = Result.failure(UnsupportedOperationException("Create-if-absent is not supported by this data source"))
 
     /**
      * Deletes specific journal-content associations from the cloud.
@@ -74,6 +81,19 @@ class DefaultCloudAssociationDataSource(
                 associations = associations.map { it.toAssociation() },
             )
         return cloudApiClient.uploadAssociations(accessToken, request).map {
+            Instant.fromEpochMilliseconds(it.uploadedAt)
+        }
+    }
+
+    override suspend fun uploadAssociationsIfAbsent(
+        accessToken: String,
+        associations: List<JournalContentAssociation>,
+    ): Result<Instant> {
+        val request = AssociationUploadRequest(associations = associations.map { it.toAssociation() })
+        return cloudApiClient.uploadAssociationsIfAbsent(accessToken, request).map {
+            if (it.existing.isNotEmpty() || it.deleted.isNotEmpty()) {
+                Napier.i("Skipped ${it.existing.size} links the server already has and ${it.deleted.size} it deleted")
+            }
             Instant.fromEpochMilliseconds(it.uploadedAt)
         }
     }

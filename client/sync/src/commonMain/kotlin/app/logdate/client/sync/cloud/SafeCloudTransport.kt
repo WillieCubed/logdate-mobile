@@ -55,12 +55,17 @@ internal class SafeCloudTransport(
         block: HttpRequestBuilder.() -> Unit = {},
     ): HttpResponse = request(url, HttpMethod.Delete, block)
 
+    suspend fun head(
+        url: String,
+        block: HttpRequestBuilder.() -> Unit = {},
+    ): HttpResponse = request(url, HttpMethod.Head, block)
+
     private suspend fun request(
         url: String,
         method: HttpMethod,
         block: HttpRequestBuilder.() -> Unit,
     ): HttpResponse =
-        observe(route(url), method == HttpMethod.Get) { requestId, received ->
+        observe(route(url), method == HttpMethod.Get || method == HttpMethod.Head) { requestId, received ->
             client
                 .request(url) {
                     this.method = method

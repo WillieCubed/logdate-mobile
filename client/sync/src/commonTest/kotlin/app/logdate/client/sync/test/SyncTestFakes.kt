@@ -42,6 +42,7 @@ import app.logdate.client.sync.cloud.CloudContentDataSource
 import app.logdate.client.sync.cloud.CloudDraftDataSource
 import app.logdate.client.sync.cloud.CloudJournalDataSource
 import app.logdate.client.sync.cloud.CloudMediaDataSource
+import app.logdate.client.sync.cloud.ConditionalCreateResult
 import app.logdate.client.sync.cloud.ContentChangesResponse
 import app.logdate.client.sync.cloud.ContentUpdateRequest
 import app.logdate.client.sync.cloud.ContentUpdateResponse
@@ -395,6 +396,17 @@ open class FakeCloudApiClient : CloudApiClient {
 
     var deleteAssociationsResponse: Result<Unit> = Result.success(Unit)
 
+    var createContentIfAbsentResponse: Result<ConditionalCreateResult> =
+        Result.success(ConditionalCreateResult.Created(1, Clock.System.now()))
+
+    var createJournalIfAbsentResponse: Result<ConditionalCreateResult> =
+        Result.success(ConditionalCreateResult.Created(1, Clock.System.now()))
+
+    var uploadAssociationsIfAbsentResponse: Result<AssociationUploadResponse> =
+        Result.success(AssociationUploadResponse(0, Clock.System.now().toEpochMilliseconds()))
+
+    val createContentIfAbsentCalls = mutableListOf<ContentUploadRequest>()
+
     var uploadMediaResponse: Result<MediaUploadResponse> =
         Result.success(MediaUploadResponse("content-id", "media-id", "https://example.com/media", Clock.System.now().toEpochMilliseconds()))
 
@@ -554,6 +566,31 @@ open class FakeCloudApiClient : CloudApiClient {
     ): Result<Unit> {
         methodCalls.add("deleteAssociations")
         return deleteAssociationsResponse
+    }
+
+    override suspend fun createContentIfAbsent(
+        accessToken: String,
+        content: ContentUploadRequest,
+    ): Result<ConditionalCreateResult> {
+        methodCalls.add("createContentIfAbsent")
+        createContentIfAbsentCalls.add(content)
+        return createContentIfAbsentResponse
+    }
+
+    override suspend fun createJournalIfAbsent(
+        accessToken: String,
+        journal: JournalUploadRequest,
+    ): Result<ConditionalCreateResult> {
+        methodCalls.add("createJournalIfAbsent")
+        return createJournalIfAbsentResponse
+    }
+
+    override suspend fun uploadAssociationsIfAbsent(
+        accessToken: String,
+        associations: AssociationUploadRequest,
+    ): Result<AssociationUploadResponse> {
+        methodCalls.add("uploadAssociationsIfAbsent")
+        return uploadAssociationsIfAbsentResponse
     }
 
     // Draft sync methods

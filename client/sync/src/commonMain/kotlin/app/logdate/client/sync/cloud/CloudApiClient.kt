@@ -181,6 +181,39 @@ interface CloudApiClient {
         associations: AssociationDeleteRequest,
     ): Result<Unit>
 
+    // Create-if-absent operations, for linked devices. Never sent to a server that does not advertise
+    // ServerProtocolFeature.CONDITIONAL_CREATE_V1: an older server ignores the condition and overwrites.
+
+    /** Creates the content only if the server has no record with its ID, answering what it found. */
+    suspend fun createContentIfAbsent(
+        accessToken: String,
+        content: ContentUploadRequest,
+    ): Result<ConditionalCreateResult> =
+        Result.failure(UnsupportedOperationException("Create-if-absent is not supported by this cloud client"))
+
+    /** Creates the journal only if the server has no record with its ID, answering what it found. */
+    suspend fun createJournalIfAbsent(
+        accessToken: String,
+        journal: JournalUploadRequest,
+    ): Result<ConditionalCreateResult> =
+        Result.failure(UnsupportedOperationException("Create-if-absent is not supported by this cloud client"))
+
+    /** Reads whether the server holds a content record, without downloading it. */
+    suspend fun contentState(
+        accessToken: String,
+        contentId: String,
+    ): Result<ContentState> = Result.failure(UnsupportedOperationException("Content state is not supported by this cloud client"))
+
+    /**
+     * Uploads the associations the server has never had. Links it already holds or deleted are named in
+     * the response and left alone, so a deleted link is never brought back.
+     */
+    suspend fun uploadAssociationsIfAbsent(
+        accessToken: String,
+        associations: AssociationUploadRequest,
+    ): Result<AssociationUploadResponse> =
+        Result.failure(UnsupportedOperationException("Create-if-absent is not supported by this cloud client"))
+
     // Draft Operations
 
     suspend fun uploadDraft(

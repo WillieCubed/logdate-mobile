@@ -41,6 +41,13 @@ interface CloudContentDataSource {
         noteId: Uuid,
     ): Result<Unit>
 
+    /** Creates the note only if the server has no record with its id; see [CloudApiClient.createContentIfAbsent]. */
+    suspend fun createNoteIfAbsent(
+        accessToken: String,
+        note: JournalNote,
+    ): Result<ConditionalCreateResult> =
+        Result.failure(UnsupportedOperationException("Create-if-absent is not supported by this data source"))
+
     /**
      * Downloads all note changes since the specified timestamp.
      */
@@ -88,6 +95,19 @@ class DefaultCloudContentDataSource(
                 syncedAt = Instant.fromEpochMilliseconds(it.uploadedAt),
             )
         }
+    }
+
+    override suspend fun createNoteIfAbsent(
+        accessToken: String,
+        note: JournalNote,
+    ): Result<ConditionalCreateResult> {
+        val request =
+            try {
+                note.toUploadRequest()
+            } catch (error: Exception) {
+                return Result.failure(error)
+            }
+        return cloudApiClient.createContentIfAbsent(accessToken, request)
     }
 
     override suspend fun updateNote(

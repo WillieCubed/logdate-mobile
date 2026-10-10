@@ -38,6 +38,13 @@ interface CloudJournalDataSource {
         journalId: Uuid,
     ): Result<Unit>
 
+    /** Creates the journal only if the server has no record with its id; see [CloudApiClient.createJournalIfAbsent]. */
+    suspend fun createJournalIfAbsent(
+        accessToken: String,
+        journal: Journal,
+    ): Result<ConditionalCreateResult> =
+        Result.failure(UnsupportedOperationException("Create-if-absent is not supported by this data source"))
+
     /**
      * Downloads all journal metadata changes since the specified timestamp.
      */
@@ -87,6 +94,19 @@ class DefaultCloudJournalDataSource(
                 syncedAt = Instant.fromEpochMilliseconds(it.uploadedAt),
             )
         }
+    }
+
+    override suspend fun createJournalIfAbsent(
+        accessToken: String,
+        journal: Journal,
+    ): Result<ConditionalCreateResult> {
+        val request =
+            try {
+                journal.toUploadRequest()
+            } catch (error: Exception) {
+                return Result.failure(error)
+            }
+        return cloudApiClient.createJournalIfAbsent(accessToken, request)
     }
 
     override suspend fun updateJournal(

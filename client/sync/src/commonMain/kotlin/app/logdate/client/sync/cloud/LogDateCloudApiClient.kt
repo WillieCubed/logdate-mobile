@@ -8,6 +8,7 @@ import app.logdate.shared.model.BeginAccountCreationResponse
 import app.logdate.shared.model.CompleteAccountCreationRequest
 import app.logdate.shared.model.CompleteAccountCreationResponse
 import app.logdate.shared.model.LogDateAccount
+import app.logdate.shared.model.ServerProtocolFeature
 import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -153,6 +154,29 @@ class LogDateCloudApiClient(
         accessToken: String,
         associations: AssociationUploadRequest,
     ): Result<AssociationUploadResponse> = requestUploadAssociations(accessToken, associations)
+
+    override suspend fun createContentIfAbsent(
+        accessToken: String,
+        content: ContentUploadRequest,
+    ): Result<ConditionalCreateResult> = requestCreateContentIfAbsent(accessToken, content)
+
+    override suspend fun createJournalIfAbsent(
+        accessToken: String,
+        journal: JournalUploadRequest,
+    ): Result<ConditionalCreateResult> = requestCreateJournalIfAbsent(accessToken, journal)
+
+    override suspend fun contentState(
+        accessToken: String,
+        contentId: String,
+    ): Result<ContentState> = requestContentState(accessToken, contentId)
+
+    override suspend fun uploadAssociationsIfAbsent(
+        accessToken: String,
+        associations: AssociationUploadRequest,
+    ): Result<AssociationUploadResponse> = requestUploadAssociationsIfAbsent(accessToken, associations)
+
+    internal fun supportsConditionalCreate(): Boolean =
+        configRepository.getCurrentServerDescriptor()?.hasProtocolFeature(ServerProtocolFeature.CONDITIONAL_CREATE_V1) == true
 
     override suspend fun getAssociationChanges(
         accessToken: String,
