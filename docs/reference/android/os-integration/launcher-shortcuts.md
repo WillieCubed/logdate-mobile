@@ -114,6 +114,12 @@ person agrees.
   `logdate.shortcut.journal:{id}`, is separate from the journal's share target.
 - The icon comes from `JournalShortcutIcons`, which share targets also use: the journal's cover
   photo, or the colored monogram the in-app journal cover shows.
+- These icons are bitmaps. Share targets are long-lived shortcuts, and Android 17 logs
+  "Bitmaps are not allowed in long-lived shortcuts" each time they are published, but still
+  publishes them with their icons. Android's own code marks this as a future error. Moving to the
+  icon types it asks for means either a resource icon, which loses the journal's cover, or a
+  content URI the launcher can read, which would expose journal covers outside LogDate, so it is
+  left as is until Android enforces it.
 
 Widgets are pinned from Settings > Widgets, through `AndroidMemoriesWidgetInstallController`.
 
