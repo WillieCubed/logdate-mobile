@@ -16,14 +16,20 @@
     <string name="watch_install_on_watch">Install on Watch</string>
     <string name="watch_connected">Connected</string>
     <string name="watch_out_of_range">Out of range</string>
+    <string name="watch_unsupported">This device can&apos;t connect to a watch</string>
+    <string name="watch_link_through_phone">Syncs through this phone</string>
+    <string name="watch_link_on_its_own">Backs up on its own over Wi-Fi or mobile data</string>
+    <string name="watch_window_days">%1$d days of moments on your watch</string>
+    <string name="watch_attention_set_up_again">Set up LogDate on your watch again</string>
+    <string name="watch_attention_set_up_again_description">Your watch is no longer connected to your account. Open LogDate on your watch while it&apos;s near this phone.</string>
+    <string name="watch_attention_not_sent">%1$d moments on your watch didn&apos;t send</string>
+    <string name="watch_attention_not_sent_description">Your watch tries again on its own. Bring it close to this phone with Bluetooth on.</string>
 
     <!-- Watch sync -->
     <string name="watch_sync">Sync</string>
     <string name="watch_sync_now">Sync Now</string>
     <string name="watch_sync_up_to_date">Up to date</string>
-    <string name="watch_sync_not_yet">Not yet synced</string>
     <string name="watch_sync_pending">%1$d entries waiting to sync</string>
-    <string name="watch_sync_last_connected">Last synced while connected</string>
 
     <!-- Watch notifications -->
     <string name="watch_notifications">Notifications</string>

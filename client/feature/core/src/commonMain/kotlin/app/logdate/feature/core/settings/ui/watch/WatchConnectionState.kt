@@ -1,7 +1,5 @@
 package app.logdate.feature.core.settings.ui.watch
 
-import kotlin.time.Instant
-
 /**
  * Describes the current connection state between the phone and a Wear OS watch.
  */
@@ -35,8 +33,6 @@ sealed interface WatchConnectionState {
      */
     data class Connected(
         val watchName: String,
-        val lastSynced: Instant?,
-        val pendingCount: Int,
     ) : WatchConnectionState
 
     /**
@@ -44,7 +40,6 @@ sealed interface WatchConnectionState {
      */
     data class OutOfRange(
         val watchName: String,
-        val lastSynced: Instant?,
     ) : WatchConnectionState
 
     /**

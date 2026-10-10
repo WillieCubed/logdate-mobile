@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -33,9 +34,18 @@ class WatchSettingsViewModel(
             .observeConnectionState()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WatchConnectionState.Loading)
 
-    /** What the Watch page shows: null until the phone has looked for the watch. */
+    /**
+     * What the Watch page shows: null until the phone has looked for the watch.
+     *
+     * The watch's report starts as [WatchPeerSnapshot.Inactive], so the connection shows at once and a
+     * Data Layer that is slow or unavailable cannot hold the page on its loading state.
+     */
     val status: StateFlow<WatchStatus?> =
-        combine(connectionState, peerSnapshots.observe(), windowDays) { connection, peer, days ->
+        combine(
+            connectionState,
+            peerSnapshots.observe().onStart { emit(WatchPeerSnapshot.Inactive) },
+            windowDays,
+        ) { connection, peer, days ->
             WatchStatusResolver.resolve(connection, peer, days)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 

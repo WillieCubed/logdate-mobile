@@ -59,19 +59,9 @@ private fun resolveLegacyWatchConnectionState(transport: WatchTransportSnapshot)
     if (installedNodes.isEmpty()) {
         return WatchConnectionState.AppNotInstalled(connectedWatch.displayName)
     }
-
-    return if (installedNodes.any(WatchNodeSnapshot::isNearby)) {
-        WatchConnectionState.Connected(
-            watchName = installedNodes.first().displayName,
-            lastSynced = null,
-            pendingCount = 0,
-        )
-    } else {
-        WatchConnectionState.OutOfRange(
-            watchName = installedNodes.first().displayName,
-            lastSynced = null,
-        )
-    }
+    val watchName = installedNodes.first().displayName
+    if (installedNodes.any(WatchNodeSnapshot::isNearby)) return WatchConnectionState.Connected(watchName)
+    return WatchConnectionState.OutOfRange(watchName)
 }
 
 /** Resolves watch state once LogDate already has an app-level companion association. */
@@ -84,29 +74,10 @@ private fun resolveAssociatedWatchConnectionState(
     val watchName =
         installedNodes.firstOrNull()?.displayName ?: connectedWatch?.displayName ?: association.displayName ?: FALLBACK_WATCH_NAME
 
-    if (connectedWatch == null) {
-        return WatchConnectionState.OutOfRange(
-            watchName = watchName,
-            lastSynced = null,
-        )
-    }
-
-    if (installedNodes.isEmpty()) {
-        return WatchConnectionState.AppNotInstalled(watchName)
-    }
-
-    return if (installedNodes.any(WatchNodeSnapshot::isNearby)) {
-        WatchConnectionState.Connected(
-            watchName = watchName,
-            lastSynced = null,
-            pendingCount = 0,
-        )
-    } else {
-        WatchConnectionState.OutOfRange(
-            watchName = watchName,
-            lastSynced = null,
-        )
-    }
+    if (connectedWatch == null) return WatchConnectionState.OutOfRange(watchName)
+    if (installedNodes.isEmpty()) return WatchConnectionState.AppNotInstalled(watchName)
+    if (installedNodes.any(WatchNodeSnapshot::isNearby)) return WatchConnectionState.Connected(watchName)
+    return WatchConnectionState.OutOfRange(watchName)
 }
 
 /** Returns the connected nodes that also advertise the LogDate watch capability. */

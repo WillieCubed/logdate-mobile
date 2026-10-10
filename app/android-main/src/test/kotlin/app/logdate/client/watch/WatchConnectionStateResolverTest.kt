@@ -42,11 +42,7 @@ class WatchConnectionStateResolverTest {
             )
 
         assertEquals(
-            WatchConnectionState.Connected(
-                watchName = "Pixel Watch",
-                lastSynced = null,
-                pendingCount = 0,
-            ),
+            WatchConnectionState.Connected(watchName = "Pixel Watch"),
             state,
         )
     }
@@ -84,10 +80,7 @@ class WatchConnectionStateResolverTest {
             )
 
         assertEquals(
-            WatchConnectionState.OutOfRange(
-                watchName = "Pixel Watch",
-                lastSynced = null,
-            ),
+            WatchConnectionState.OutOfRange(watchName = "Pixel Watch"),
             state,
         )
     }

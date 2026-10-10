@@ -16,12 +16,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Watch
-import androidx.compose.material.icons.outlined.Watch
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
@@ -35,34 +31,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.adaptive.FoldableBookLayout
-import app.logdate.ui.common.MaterialContainer
 import app.logdate.ui.common.SettingsScaffold
 import app.logdate.ui.common.SettingsSection
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.core.generated.resources.Res
-import logdate.client.feature.core.generated.resources.watch_app_not_installed
-import logdate.client.feature.core.generated.resources.watch_app_not_installed_description
-import logdate.client.feature.core.generated.resources.watch_association_pending
-import logdate.client.feature.core.generated.resources.watch_association_pending_description
-import logdate.client.feature.core.generated.resources.watch_connected
 import logdate.client.feature.core.generated.resources.watch_help
-import logdate.client.feature.core.generated.resources.watch_install_on_watch
-import logdate.client.feature.core.generated.resources.watch_loading
-import logdate.client.feature.core.generated.resources.watch_needs_association
-import logdate.client.feature.core.generated.resources.watch_needs_association_description
-import logdate.client.feature.core.generated.resources.watch_no_paired
-import logdate.client.feature.core.generated.resources.watch_no_paired_description
 import logdate.client.feature.core.generated.resources.watch_notifications
 import logdate.client.feature.core.generated.resources.watch_notifications_description
 import logdate.client.feature.core.generated.resources.watch_notifications_title
-import logdate.client.feature.core.generated.resources.watch_out_of_range
-import logdate.client.feature.core.generated.resources.watch_pair_watch
 import logdate.client.feature.core.generated.resources.watch_privacy_description
 import logdate.client.feature.core.generated.resources.watch_privacy_title
 import logdate.client.feature.core.generated.resources.watch_settings
 import logdate.client.feature.core.generated.resources.watch_sync
-import logdate.client.feature.core.generated.resources.watch_sync_last_connected
-import logdate.client.feature.core.generated.resources.watch_sync_not_yet
 import logdate.client.feature.core.generated.resources.watch_sync_now
 import logdate.client.feature.core.generated.resources.watch_sync_pending
 import logdate.client.feature.core.generated.resources.watch_sync_up_to_date
@@ -79,11 +59,11 @@ fun WatchSettingsScreen(
     viewModel: WatchSettingsViewModel = koinViewModel(),
     modifier: Modifier = Modifier,
 ) {
-    val connectionState by viewModel.connectionState.collectAsState()
+    val status by viewModel.status.collectAsState()
     val requestFailure by viewModel.requestFailure.collectAsState()
 
     WatchSettingsContent(
-        connectionState = connectionState,
+        status = status,
         requestFailure = requestFailure,
         onBack = onBack,
         onBeginAssociation = viewModel::beginAssociation,
@@ -97,7 +77,7 @@ fun WatchSettingsScreen(
 
 @Composable
 fun WatchSettingsContent(
-    connectionState: WatchConnectionState,
+    status: WatchStatus?,
     requestFailure: WatchRequestFailure?,
     onBack: () -> Unit,
     onBeginAssociation: () -> Unit,
@@ -119,8 +99,8 @@ fun WatchSettingsContent(
                         .padding(vertical = Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                ConnectionStatusCard(
-                    connectionState = connectionState,
+                WatchStatusCard(
+                    status = status,
                     requestFailure = requestFailure,
                     onBeginAssociation = onBeginAssociation,
                     onInstallOnWatch = onInstallOnWatch,
@@ -139,7 +119,7 @@ fun WatchSettingsContent(
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
                 WatchConnectedSections(
-                    connectionState = connectionState,
+                    status = status,
                     onRequestSync = onRequestSync,
                     onNavigateToNotifications = onNavigateToNotifications,
                 )
@@ -153,42 +133,26 @@ fun WatchSettingsContent(
                 modifier = modifier,
             ) {
                 item {
-                    ConnectionStatusCard(
-                        connectionState = connectionState,
+                    WatchStatusCard(
+                        status = status,
                         requestFailure = requestFailure,
-                        modifier = Modifier.padding(horizontal = Spacing.lg),
                         onBeginAssociation = onBeginAssociation,
                         onInstallOnWatch = onInstallOnWatch,
+                        modifier = Modifier.padding(horizontal = Spacing.lg),
                     )
                 }
-
-                when (connectionState) {
-                    is WatchConnectionState.Connected,
-                    is WatchConnectionState.OutOfRange,
-                    -> {
-                        item {
-                            WatchConnectedSections(
-                                connectionState = connectionState,
-                                onRequestSync = onRequestSync,
-                                onNavigateToNotifications = onNavigateToNotifications,
-                            )
-                        }
-                    }
-
-                    is WatchConnectionState.AppNotInstalled,
-                    is WatchConnectionState.NeedsAssociation,
-                    is WatchConnectionState.AssociationPending,
-                    is WatchConnectionState.NoPairedWatch,
-                    is WatchConnectionState.Loading,
-                    -> {
-                        // No sync/notification sections when watch isn't set up.
+                if (status.hasLogDate()) {
+                    item {
+                        WatchConnectedSections(
+                            status = status,
+                            onRequestSync = onRequestSync,
+                            onNavigateToNotifications = onNavigateToNotifications,
+                        )
                     }
                 }
-
                 item {
                     WatchTroubleshootingSection(onNavigateToTroubleshooting)
                 }
-
                 item {
                     WatchPrivacyNote()
                 }
@@ -197,64 +161,77 @@ fun WatchSettingsContent(
     )
 }
 
+/** Sync and notification settings exist only for a watch that has LogDate. */
+private fun WatchStatus?.hasLogDate(): Boolean = this is WatchStatus.Ready || this is WatchStatus.NeedsAttention
+
 @Composable
 private fun WatchConnectedSections(
-    connectionState: WatchConnectionState,
+    status: WatchStatus?,
     onRequestSync: () -> Unit,
     onNavigateToNotifications: () -> Unit,
 ) {
-    when (connectionState) {
-        is WatchConnectionState.Connected,
-        is WatchConnectionState.OutOfRange,
-        -> {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    val nearby =
+        when (status) {
+            is WatchStatus.Ready -> status.nearby
+            is WatchStatus.NeedsAttention -> status.nearby
+            else -> return
+        }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        SettingsSection(
+            title = stringResource(Res.string.watch_sync),
+            modifier = Modifier.padding(horizontal = Spacing.lg),
+        ) {
+            (status as? WatchStatus.Ready)?.sync?.let { SyncStatusRow(it) }
+
+            OutlinedButton(
+                onClick = onRequestSync,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = Spacing.sm),
+                enabled = nearby,
             ) {
-                SettingsSection(
-                    title = stringResource(Res.string.watch_sync),
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                ) {
-                    SyncStatusRow(connectionState)
-
-                    OutlinedButton(
-                        onClick = onRequestSync,
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(top = Spacing.sm),
-                        enabled = connectionState is WatchConnectionState.Connected,
-                    ) {
-                        Icon(
-                            Icons.Default.Sync,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(Spacing.sm))
-                        Text(stringResource(Res.string.watch_sync_now))
-                    }
-                }
-
-                SettingsSection(
-                    title = stringResource(Res.string.watch_notifications),
-                    modifier = Modifier.padding(horizontal = Spacing.lg),
-                ) {
-                    SettingsNavItem(
-                        title = stringResource(Res.string.watch_notifications_title),
-                        description = stringResource(Res.string.watch_notifications_description),
-                        onClick = onNavigateToNotifications,
-                    )
-                }
+                Icon(
+                    Icons.Default.Sync,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(Spacing.sm))
+                Text(stringResource(Res.string.watch_sync_now))
             }
         }
 
-        is WatchConnectionState.AppNotInstalled,
-        is WatchConnectionState.NeedsAssociation,
-        is WatchConnectionState.AssociationPending,
-        is WatchConnectionState.NoPairedWatch,
-        is WatchConnectionState.Loading,
-        -> Unit
+        SettingsSection(
+            title = stringResource(Res.string.watch_notifications),
+            modifier = Modifier.padding(horizontal = Spacing.lg),
+        ) {
+            SettingsNavItem(
+                title = stringResource(Res.string.watch_notifications_title),
+                description = stringResource(Res.string.watch_notifications_description),
+                onClick = onNavigateToNotifications,
+            )
+        }
     }
+}
+
+/** Shown only when the watch reported how many moments wait; the phone does not know otherwise. */
+@Composable
+private fun SyncStatusRow(sync: WatchSyncLine) {
+    val text =
+        if (sync.waiting > 0) {
+            stringResource(Res.string.watch_sync_pending, sync.waiting)
+        } else {
+            stringResource(Res.string.watch_sync_up_to_date)
+        }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(vertical = Spacing.sm),
+    )
 }
 
 @Composable
@@ -267,215 +244,6 @@ private fun WatchTroubleshootingSection(onNavigateToTroubleshooting: () -> Unit)
             title = stringResource(Res.string.watch_troubleshooting),
             description = stringResource(Res.string.watch_troubleshooting_description),
             onClick = onNavigateToTroubleshooting,
-        )
-    }
-}
-
-@Composable
-private fun ConnectionStatusCard(
-    connectionState: WatchConnectionState,
-    requestFailure: WatchRequestFailure?,
-    onBeginAssociation: () -> Unit,
-    onInstallOnWatch: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    MaterialContainer(modifier = modifier) {
-        when (connectionState) {
-            is WatchConnectionState.Loading -> {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(Spacing.lg),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                    Text(
-                        text = stringResource(Res.string.watch_loading),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            }
-
-            is WatchConnectionState.NoPairedWatch -> {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(Spacing.lg),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                ) {
-                    Icon(
-                        Icons.Outlined.Watch,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = stringResource(Res.string.watch_no_paired),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = stringResource(Res.string.watch_no_paired_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            is WatchConnectionState.NeedsAssociation -> {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(Spacing.lg),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                ) {
-                    Icon(
-                        Icons.Default.Watch,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(
-                        text = stringResource(Res.string.watch_needs_association),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = stringResource(Res.string.watch_needs_association_description, connectionState.watchName),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Button(onClick = onBeginAssociation) {
-                        Text(stringResource(Res.string.watch_pair_watch))
-                    }
-                }
-            }
-
-            is WatchConnectionState.AssociationPending -> {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(Spacing.lg),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(32.dp))
-                    Text(
-                        text = stringResource(Res.string.watch_association_pending),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = stringResource(Res.string.watch_association_pending_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            is WatchConnectionState.AppNotInstalled -> {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(Spacing.lg),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                ) {
-                    Icon(
-                        Icons.Default.Download,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(
-                        text = stringResource(Res.string.watch_app_not_installed),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = stringResource(Res.string.watch_app_not_installed_description, connectionState.watchName),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Button(onClick = onInstallOnWatch) {
-                        Text(stringResource(Res.string.watch_install_on_watch))
-                    }
-                    requestFailure?.let { WatchRequestFailureMessage(it) }
-                }
-            }
-
-            is WatchConnectionState.Connected -> {
-                ListItem(
-                    headlineContent = { Text(connectionState.watchName) },
-                    supportingContent = {
-                        Text(
-                            text = stringResource(Res.string.watch_connected),
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    },
-                    leadingContent = {
-                        Icon(
-                            Icons.Default.Watch,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    },
-                )
-            }
-
-            is WatchConnectionState.OutOfRange -> {
-                ListItem(
-                    headlineContent = { Text(connectionState.watchName) },
-                    supportingContent = {
-                        Text(
-                            text = stringResource(Res.string.watch_out_of_range),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    },
-                    leadingContent = {
-                        Icon(
-                            Icons.Default.Watch,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SyncStatusRow(connectionState: WatchConnectionState) {
-    val statusText =
-        when (connectionState) {
-            is WatchConnectionState.Connected -> {
-                when {
-                    connectionState.pendingCount > 0 -> stringResource(Res.string.watch_sync_pending, connectionState.pendingCount)
-                    connectionState.lastSynced != null -> stringResource(Res.string.watch_sync_up_to_date)
-                    else -> stringResource(Res.string.watch_sync_not_yet)
-                }
-            }
-            is WatchConnectionState.OutOfRange -> {
-                if (connectionState.lastSynced != null) {
-                    stringResource(Res.string.watch_sync_last_connected)
-                } else {
-                    stringResource(Res.string.watch_sync_not_yet)
-                }
-            }
-            else -> null
-        }
-
-    if (statusText != null) {
-        Text(
-            text = statusText,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(vertical = Spacing.sm),
         )
     }
 }

@@ -21,7 +21,6 @@ import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.recommendation.RecallMode
 import app.logdate.client.domain.recommendation.WidgetContentType
 import app.logdate.client.domain.streak.StreakData
-import app.logdate.client.domain.watch.WatchNotificationSettings
 import app.logdate.client.location.settings.LocationCaptureMode
 import app.logdate.client.location.settings.LocationTrackingSettings
 import app.logdate.client.media.MediaObject
@@ -89,11 +88,6 @@ import app.logdate.feature.core.settings.ui.osIntegrationPreviewFlags
 import app.logdate.feature.core.settings.ui.labs.LabsFlag
 import app.logdate.feature.core.settings.ui.labs.LabsSettingsContent
 import app.logdate.feature.core.settings.ui.labs.LabsUiState
-import app.logdate.feature.core.settings.ui.watch.WatchConnectionState
-import app.logdate.feature.core.settings.ui.watch.WatchNotificationSettingsContent
-import app.logdate.feature.core.settings.ui.watch.WatchRequestFailure
-import app.logdate.feature.core.settings.ui.watch.WatchSettingsContent
-import app.logdate.feature.core.settings.ui.watch.WatchTroubleshootingContent
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.feature.events.ui.calendarsync.CalendarSyncOverviewUiState
@@ -217,6 +211,8 @@ enum class SharedScreenshotSceneId(
     AdvancedSettings("advanced-settings"),
     LabsSettings("labs-settings"),
     WatchSettings("watch-settings"),
+    WatchSettingsReporting("watch-settings-reporting"),
+    WatchSettingsAttention("watch-settings-attention"),
     WatchNotificationSettings("watch-notification-settings"),
     WatchTroubleshooting("watch-troubleshooting"),
     WatchTroubleshootingRequestFailed("watch-troubleshooting-request-failed"),
@@ -337,7 +333,7 @@ data class SharedScreenshotSceneSpec(
     val content: @Composable () -> Unit,
 )
 
-private val standardMatrixVariants =
+internal val standardMatrixVariants =
     listOf(
         ScreenshotSceneVariant(ScreenshotViewportId.PHONE_LIGHT),
         ScreenshotSceneVariant(ScreenshotViewportId.PHONE_DARK),
@@ -1178,58 +1174,6 @@ object SharedScreenshotCatalog {
                     onSetEnabled = { _, _ -> },
                 )
             },
-            sharedScene(SharedScreenshotSceneId.WatchSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
-                WatchSettingsContent(
-                    connectionState =
-                        WatchConnectionState.Connected(
-                            watchName = "Pixel Watch 3",
-                            lastSynced = baseInstant,
-                            pendingCount = 2,
-                        ),
-                    requestFailure = null,
-                    onBack = {},
-                    onBeginAssociation = {},
-                    onRequestSync = {},
-                    onInstallOnWatch = {},
-                    onNavigateToNotifications = {},
-                    onNavigateToTroubleshooting = {},
-                )
-            },
-            sharedScene(SharedScreenshotSceneId.WatchNotificationSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
-                WatchNotificationSettingsContent(
-                    settings = WatchNotificationSettings(showEntryNotifications = true),
-                    onBack = {},
-                    onSetShowEntryNotifications = {},
-                )
-            },
-            sharedScene(SharedScreenshotSceneId.WatchTroubleshooting, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
-                WatchTroubleshootingContent(
-                    connectionState =
-                        WatchConnectionState.AppNotInstalled(
-                            watchName = "Pixel Watch 3",
-                        ),
-                    requestFailure = null,
-                    onBack = {},
-                    onBeginAssociation = {},
-                    onInstallOnWatch = {},
-                    onOpenOnWatch = {},
-                )
-            },
-            sharedScene(SharedScreenshotSceneId.WatchTroubleshootingRequestFailed, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
-                WatchTroubleshootingContent(
-                    connectionState =
-                        WatchConnectionState.Connected(
-                            watchName = "Pixel Watch 3",
-                            lastSynced = baseInstant,
-                            pendingCount = 0,
-                        ),
-                    requestFailure = WatchRequestFailure.WATCH_DID_NOT_RESPOND,
-                    onBack = {},
-                    onBeginAssociation = {},
-                    onInstallOnWatch = {},
-                    onOpenOnWatch = {},
-                )
-            },
             sharedScene(SharedScreenshotSceneId.EventsSettings, ScreenshotSceneGroup.SETTINGS, standardMatrixVariants) {
                 EventsSettingsContent(
                     uiState =
@@ -1411,7 +1355,7 @@ object SharedScreenshotCatalog {
         )
 
     val allScenes: List<SharedScreenshotSceneSpec> =
-        onboardingMainScenes + onboardingExtendedScenes + settingsScenes + searchScenes + desktopOnlyScenes
+        onboardingMainScenes + onboardingExtendedScenes + settingsScenes + watchSettingsScenes + searchScenes + desktopOnlyScenes
 
     fun scene(id: SharedScreenshotSceneId): SharedScreenshotSceneSpec = allScenes.first { it.id == id }
 }
@@ -1430,7 +1374,7 @@ fun screenshotBaselineName(
         "${scene.id.value}--$suffix"
     } ?: scene.id.value
 
-private fun sharedScene(
+internal fun sharedScene(
     id: SharedScreenshotSceneId,
     group: ScreenshotSceneGroup,
     variants: List<ScreenshotSceneVariant>,

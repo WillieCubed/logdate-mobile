@@ -12,8 +12,8 @@ import kotlin.test.assertNull
  * line comes only from what the watch reported under a feature it listed while version 2 is active.
  */
 class WatchStatusResolverTest {
-    private val connected = WatchConnectionState.Connected(watchName = NAME, lastSynced = null, pendingCount = 0)
-    private val outOfRange = WatchConnectionState.OutOfRange(watchName = NAME, lastSynced = null)
+    private val connected = WatchConnectionState.Connected(watchName = NAME)
+    private val outOfRange = WatchConnectionState.OutOfRange(watchName = NAME)
 
     private fun reporting(
         watch: WatchState,

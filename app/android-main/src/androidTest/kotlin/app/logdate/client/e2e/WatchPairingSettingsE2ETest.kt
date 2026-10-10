@@ -91,13 +91,18 @@ class WatchPairingSettingsE2ETest {
     }
 
     @Test
+    fun `a connected watch that reports nothing shows no sync status`() {
+        fakeConnectionManager.updateState(WatchConnectionState.Connected(watchName = "Pixel Watch"))
+
+        composeRule.onNodeWithText("Connected").assertIsDisplayed()
+        composeRule.onNodeWithText("Not yet synced").assertDoesNotExist()
+        composeRule.onNodeWithText("Up to date").assertDoesNotExist()
+    }
+
+    @Test
     fun `watch settings offer no sync options and title the help section`() {
         fakeConnectionManager.updateState(
-            WatchConnectionState.Connected(
-                watchName = "Pixel Watch",
-                lastSynced = null,
-                pendingCount = 0,
-            ),
+            WatchConnectionState.Connected(watchName = "Pixel Watch"),
         )
 
         composeRule.onNodeWithText("Sync settings").assertDoesNotExist()
@@ -108,11 +113,7 @@ class WatchPairingSettingsE2ETest {
     @Test
     fun `troubleshooting install and open actions use connection manager`() {
         fakeConnectionManager.updateState(
-            WatchConnectionState.Connected(
-                watchName = "Pixel Watch",
-                lastSynced = null,
-                pendingCount = 0,
-            ),
+            WatchConnectionState.Connected(watchName = "Pixel Watch"),
         )
 
         composeRule.onNodeWithText("Troubleshooting").performClick()
@@ -126,11 +127,7 @@ class WatchPairingSettingsE2ETest {
     @Test
     fun `troubleshooting says why the watch did not open LogDate`() {
         fakeConnectionManager.updateState(
-            WatchConnectionState.Connected(
-                watchName = "Pixel Watch",
-                lastSynced = null,
-                pendingCount = 0,
-            ),
+            WatchConnectionState.Connected(watchName = "Pixel Watch"),
         )
         fakeConnectionManager.openResult = WatchRequestResult.Failed(WatchRequestFailure.WATCH_DID_NOT_RESPOND)
 

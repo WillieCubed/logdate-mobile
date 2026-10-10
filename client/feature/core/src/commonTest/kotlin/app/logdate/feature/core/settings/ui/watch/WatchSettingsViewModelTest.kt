@@ -6,11 +6,13 @@ import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.peer.state.WatchState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -95,7 +97,7 @@ class WatchSettingsViewModelTest {
                 WatchSettingsViewModel(
                     connectionManager =
                         FakeWatchConnectionManager(
-                            initialState = WatchConnectionState.Connected(watchName = "Pixel Watch", lastSynced = null, pendingCount = 0),
+                            initialState = WatchConnectionState.Connected(watchName = "Pixel Watch"),
                         ),
                     settingsRepository = FakeWatchSettingsRepository(),
                     peerSnapshots = { flowOf(report) },
@@ -114,6 +116,24 @@ class WatchSettingsViewModelTest {
                 ),
                 viewModel.status.value,
             )
+        }
+
+    @Test
+    fun `the connection shows before the watch has reported anything`() =
+        runTest {
+            val viewModel =
+                WatchSettingsViewModel(
+                    connectionManager =
+                        FakeWatchConnectionManager(
+                            initialState = WatchConnectionState.Connected(watchName = "Pixel Watch"),
+                        ),
+                    settingsRepository = FakeWatchSettingsRepository(),
+                    peerSnapshots = { flow { awaitCancellation() } },
+                )
+            backgroundScope.launch { viewModel.status.collect {} }
+            advanceUntilIdle()
+
+            assertEquals(WatchStatus.Ready(watchName = "Pixel Watch", nearby = true), viewModel.status.value)
         }
 
     @Test
