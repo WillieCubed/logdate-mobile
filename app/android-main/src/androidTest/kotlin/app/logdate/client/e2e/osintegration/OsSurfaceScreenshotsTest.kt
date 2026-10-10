@@ -7,8 +7,10 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Until
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.feature.widgets.CaptureWidget
+import app.logdate.client.feature.widgets.FixedMemoryWidget
 import app.logdate.client.feature.widgets.NewEntryWidget
 import app.logdate.client.feature.widgets.OnThisDayWidget
+import app.logdate.client.feature.widgets.OnThisDayWidgetState
 import app.logdate.client.sync.SyncForegroundNotification
 import app.logdate.feature.core.export.ExportNotificationHelper
 import app.logdate.feature.core.restore.RestoreNotificationHelper
@@ -287,6 +289,8 @@ class OsSurfaceScreenshotsTest {
                 Triple("capture-widget", CaptureWidget(), 250 to 80),
                 Triple("new-entry-widget", NewEntryWidget(), 250 to 180),
                 Triple("on-this-day-widget", OnThisDayWidget(), 250 to 180),
+                Triple("on-this-day-text-widget", OnThisDayWidget(previewState = TEXT_MEMORY), 250 to 180),
+                Triple("pinned-memory-widget", FixedMemoryWidget(), 250 to 180),
             )
         for ((name, widget, size) in widgets) {
             for (look in WidgetRenders.Look.entries) {
@@ -399,6 +403,15 @@ class OsSurfaceScreenshotsTest {
     private companion object {
         /** `WindowConfiguration.WINDOWING_MODE_FREEFORM`, which `am start --windowingMode` takes. */
         const val WINDOWING_MODE_FREEFORM = 5
+
+        /** A memory with no photo, so the widget shows its text, which follows the font size. */
+        val TEXT_MEMORY =
+            OnThisDayWidgetState.HasMemory(
+                dateIso = "2025-10-10",
+                dateFormatted = "October 10, 2025",
+                summary = "We stayed out until the rain stopped, then walked home the long way.",
+                thumbnailUri = null,
+            )
 
         /** `logdate_splash_background`, the launcher icon's brown. */
         const val SPLASH_BACKGROUND = 0xFF3B2929.toInt()

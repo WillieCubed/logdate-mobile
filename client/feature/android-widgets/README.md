@@ -133,15 +133,21 @@ These are in `app/android-main/src/androidTest/` and run on Gradle Managed Devic
 
 ### Screenshots
 
-Widget images from the managed-device tests are not committed or compared yet. The
-[Native Android integration](../../../docs/audits/android-os-integration-checklist.md) program adds a
-host-side Glance screenshot lane to this module, with committed references in light, dark,
-right-to-left, and 200% text. [`docs/testing/screenshot-tests.md`](../../../docs/testing/screenshot-tests.md)
-documents it once it exists.
+Each widget is rendered as a launcher draws it, in light, dark, right-to-left, and 200% text, and the
+images are committed under
+[`docs/screenshots/android-os-integration/widgets/`](../../../docs/screenshots/android-os-integration/widgets/)
+and shown in the [widgets guide](../../../docs/reference/android/os-integration/widgets.md).
+`OsSurfaceScreenshotsTest#widgetRenders` does this on the Android 17 phone managed device through
+`WidgetRenders`, which composes each widget's preview, inflates the RemoteViews through an
+`AppWidgetHostView` set to each look, and draws it to an image. It runs on a device rather than on
+the host because RemoteViews need Android's own view inflation to draw faithfully. To update them:
+
+```bash
+OS_SURFACE_TEST=widgetRenders scripts/os-surface-screenshots.sh flagshipPhoneApi37
+```
+
+Each widget is rendered at its preview size only.
 
 ## TODOs
 
-- Committed widget screenshot references (Glance host lane).
-- A capture-only lock-screen and hub widget, behind `LOCK_SCREEN_CAPTURE_WIDGET`.
-- "Add widget" pinning from widget settings.
-- Move widget taps onto the capture launch contract (`app.logdate.action.CAPTURE`).
+- Render each widget at its other launcher sizes, not only its preview size.

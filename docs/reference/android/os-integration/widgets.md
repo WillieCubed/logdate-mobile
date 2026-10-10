@@ -28,8 +28,8 @@ screen while charging or docked.
 | Widget | Where | Shows | Tapping it |
 | --- | --- | --- | --- |
 | New entry | Home screen | Write, Record, and Camera actions, optionally over a chosen photo | Opens the editor in that mode |
-| On This Day | Home screen | A memory from this date in past years | Opens that day |
-| Pinned memory | Home screen | One memory the person chose | Opens that memory |
+| On This Day ("Memories" in the widget picker) | Home screen | A memory from this date in past years | Opens that day |
+| Pinned memory ("Pinned Memory" in the widget picker) | Home screen | One memory the person chose | Opens that memory |
 | Capture | Home screen, lock screen, and hub | Write, Record, and Photo actions only | Opens the editor in that mode |
 
 The Capture widget in the Android 17 widget picker, below New Entry, whose buttons it shares:
@@ -42,13 +42,18 @@ Each widget as a launcher draws it, in light, dark, right-to-left, and 200% text
 | --- | --- | --- | --- | --- |
 | Capture | ![Capture widget, light](../../../screenshots/android-os-integration/widgets/capture-widget-light--phone-api37.png) | ![Capture widget, dark](../../../screenshots/android-os-integration/widgets/capture-widget-dark--phone-api37.png) | ![Capture widget, right-to-left](../../../screenshots/android-os-integration/widgets/capture-widget-rtl--phone-api37.png) | ![Capture widget, 200% text](../../../screenshots/android-os-integration/widgets/capture-widget-large-text--phone-api37.png) |
 | New Entry | ![New Entry widget, light](../../../screenshots/android-os-integration/widgets/new-entry-widget-light--phone-api37.png) | ![New Entry widget, dark](../../../screenshots/android-os-integration/widgets/new-entry-widget-dark--phone-api37.png) | ![New Entry widget, right-to-left](../../../screenshots/android-os-integration/widgets/new-entry-widget-rtl--phone-api37.png) | ![New Entry widget, 200% text](../../../screenshots/android-os-integration/widgets/new-entry-widget-large-text--phone-api37.png) |
-| On This Day | ![On This Day widget, light](../../../screenshots/android-os-integration/widgets/on-this-day-widget-light--phone-api37.png) | ![On This Day widget, dark](../../../screenshots/android-os-integration/widgets/on-this-day-widget-dark--phone-api37.png) | ![On This Day widget, right-to-left](../../../screenshots/android-os-integration/widgets/on-this-day-widget-rtl--phone-api37.png) | ![On This Day widget, 200% text](../../../screenshots/android-os-integration/widgets/on-this-day-widget-large-text--phone-api37.png) |
+| On This Day, photo memory | ![On This Day widget, light](../../../screenshots/android-os-integration/widgets/on-this-day-widget-light--phone-api37.png) | ![On This Day widget, dark](../../../screenshots/android-os-integration/widgets/on-this-day-widget-dark--phone-api37.png) | ![On This Day widget, right-to-left](../../../screenshots/android-os-integration/widgets/on-this-day-widget-rtl--phone-api37.png) | ![On This Day widget, 200% text](../../../screenshots/android-os-integration/widgets/on-this-day-widget-large-text--phone-api37.png) |
+| On This Day, written memory | ![On This Day widget with a written memory, light](../../../screenshots/android-os-integration/widgets/on-this-day-text-widget-light--phone-api37.png) | ![On This Day widget with a written memory, dark](../../../screenshots/android-os-integration/widgets/on-this-day-text-widget-dark--phone-api37.png) | ![On This Day widget with a written memory, right-to-left](../../../screenshots/android-os-integration/widgets/on-this-day-text-widget-rtl--phone-api37.png) | ![On This Day widget with a written memory, 200% text](../../../screenshots/android-os-integration/widgets/on-this-day-text-widget-large-text--phone-api37.png) |
+| Pinned memory | ![Pinned memory widget, light](../../../screenshots/android-os-integration/widgets/pinned-memory-widget-light--phone-api37.png) | ![Pinned memory widget, dark](../../../screenshots/android-os-integration/widgets/pinned-memory-widget-dark--phone-api37.png) | ![Pinned memory widget, right-to-left](../../../screenshots/android-os-integration/widgets/pinned-memory-widget-rtl--phone-api37.png) | ![Pinned memory widget, 200% text](../../../screenshots/android-os-integration/widgets/pinned-memory-widget-large-text--phone-api37.png) |
 
 The capture buttons have no text, so 200% text leaves them unchanged, and their colored circles are
-the same in light and dark. The On This Day photo, with its caption, is drawn as one tilted image,
-because a widget cannot rotate views; its caption keeps its size at 200% text. In right-to-left, the
-Capture widget's buttons mirror, but the New Entry widget's buttons over its photo keep their
-left-to-right order, as the render shows.
+the same in light and dark. A memory with a photo, on On This Day or a pinned memory, is drawn as one
+tilted print with its caption, because a widget cannot rotate views; the caption keeps its size at
+200% text. A written memory fills the widget with as many lines as fit, ending with "…" when it is
+longer. Widget text follows the system's direction, so on a right-to-left system an English memory
+is right-aligned with its opening quote mark at the right, and its closing "…”" stays after its last
+word. In right-to-left, the
+Capture and New Entry widgets' buttons mirror, so Write is at the right.
 
 A capture placed on the lock screen or the hub is not captured yet.
 
@@ -107,6 +112,11 @@ Home-screen widgets have no flag. The lock-screen capture widget is behind `LOCK
   Android 17 phone managed device, through `WidgetRenders` in the instrumented tests: it composes the
   RemoteViews, inflates them with a context set to each look, and draws them to an image. This runs
   on a device rather than on the host because RemoteViews need Android's real view inflation to
-  render faithfully. Record with `./run screenshots:os`.
+  render faithfully. A widget that lists several preview sizes gets one layout per size, so the
+  renderer inflates through an `AppWidgetHostView` laid out at the render size, which picks the
+  matching layout as a launcher does; a plain `RemoteViews.apply` always picks the smallest. Glance's
+  layouts take their direction from the default locale (`layoutDirection="locale"`), which a
+  configuration context does not change, so the right-to-left render also sets the default locale
+  while it draws. Record with `./run screenshots:os`.
 - **Real placements:** the home screen, the lock screen, the hub, and the picker are Lane 2 captures,
   recorded with `./run screenshots:os`. They land in `docs/screenshots/android-os-integration/widgets/`.

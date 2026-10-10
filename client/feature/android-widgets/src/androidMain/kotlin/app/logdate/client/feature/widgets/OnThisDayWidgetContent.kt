@@ -16,6 +16,7 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
 import android.net.Uri
+import android.text.BidiFormatter
 import android.text.StaticLayout
 import android.text.TextPaint
 import androidx.compose.runtime.Composable
@@ -51,6 +52,7 @@ import androidx.glance.text.TextStyle
 import app.logdate.client.media.storage.androidMediaFileResolver
 import java.io.FileInputStream
 import java.io.InputStream
+import java.util.Locale
 import kotlin.math.roundToInt
 import android.graphics.Color as AndroidColor
 
@@ -292,7 +294,7 @@ private fun quotedWidgetText(
             .lineCount <= maxLines
 
     val complete = "$content”"
-    if (fits(complete)) return complete
+    if (fits(complete)) return bidiSafe(complete)
     var low = 0
     var high = content.codePointCount(0, content.length)
     while (low < high) {
@@ -311,8 +313,15 @@ private fun quotedWidgetText(
         } else {
             candidate.substringBeforeLast(' ', missingDelimiterValue = candidate).trimEnd()
         }
-    return "$prefix…”"
+    return bidiSafe("$prefix…”")
 }
+
+/**
+ * Glance lays widget text out in the system's direction, so an English memory on a right-to-left
+ * system (or an Arabic one on a left-to-right system) would show its closing "…”" at the start of
+ * its last line. Marking the memory's own direction keeps the punctuation after its last word.
+ */
+private fun bidiSafe(text: String): String = BidiFormatter.getInstance(Locale.getDefault()).unicodeWrap(text)
 
 @Composable
 private fun PinnedPrintCard(
