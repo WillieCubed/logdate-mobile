@@ -1,12 +1,6 @@
 package app.logdate.wear.screenshots
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.wear.compose.material3.MaterialTheme
 import app.logdate.wear.playback.AudioOutputState
 import app.logdate.wear.presentation.memories.MemoryPlayerUiState
 import app.logdate.wear.presentation.memories.VoiceMemoriesUiState

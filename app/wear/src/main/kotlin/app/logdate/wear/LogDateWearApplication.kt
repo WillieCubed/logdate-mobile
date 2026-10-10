@@ -87,7 +87,9 @@ class LogDateWearApplication : Application() {
     private fun warmUpDatabase() {
         thread(name = "db-warmup", isDaemon = true) {
             try {
-                val koin = org.koin.java.KoinJavaComponent.getKoin()
+                val koin =
+                    org.koin.java.KoinJavaComponent
+                        .getKoin()
                 koin.get<LogDateDatabase>()
                 koin.get<StoredMediaReferenceMigrationLauncher>().start()
             } catch (e: Exception) {

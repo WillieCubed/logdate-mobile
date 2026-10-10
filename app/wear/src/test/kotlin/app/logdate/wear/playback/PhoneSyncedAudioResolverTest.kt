@@ -11,13 +11,13 @@ import app.logdate.wear.sync.WearDataLayerClient
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
-import java.nio.file.Files
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import java.io.File
+import java.nio.file.Files
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Instant
