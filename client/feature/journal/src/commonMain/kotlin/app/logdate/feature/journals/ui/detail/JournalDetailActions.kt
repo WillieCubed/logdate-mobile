@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AddToHomeScreen
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.DeleteOutline
@@ -36,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.common.LocalHomeScreenPins
 import app.logdate.ui.platform.rememberLogDateHaptics
 import app.logdate.ui.theme.Spacing
 import logdate.client.feature.journal.generated.resources.Res
@@ -43,6 +45,7 @@ import logdate.client.feature.journal.generated.resources.action_delete
 import logdate.client.feature.journal.generated.resources.action_remove
 import logdate.client.feature.journal.generated.resources.delete_journal_description
 import logdate.client.feature.journal.generated.resources.delete_journal_title
+import logdate.client.feature.journal.generated.resources.journal_add_to_home_screen
 import logdate.client.feature.journal.generated.resources.journal_delete_label
 import logdate.client.feature.journal.generated.resources.journal_merge_action
 import logdate.client.feature.journal.generated.resources.journal_settings_label
@@ -143,6 +146,13 @@ internal fun JournalDetailBookSummaryPane(
                 label = stringResource(Res.string.journal_settings_label),
                 onClick = { onNavigateToSettings(uiState.journalId) },
             )
+            LocalHomeScreenPins.current?.takeIf { it.canPin }?.let { pins ->
+                JournalDetailPaneAction(
+                    icon = Icons.Rounded.AddToHomeScreen,
+                    label = stringResource(Res.string.journal_add_to_home_screen),
+                    onClick = { pins.pinJournal(uiState.journalId, uiState.title) },
+                )
+            }
             if (mergeEnabled) {
                 JournalDetailPaneAction(
                     icon = Icons.Rounded.Merge,

@@ -12,7 +12,9 @@ import androidx.test.uiautomator.Until
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.media.audio.AudioRecordingManager
+import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.user.UserStateRepository
+import app.logdate.shared.model.Journal
 import kotlinx.coroutines.runBlocking
 import org.koin.core.context.GlobalContext
 import java.io.File
@@ -225,6 +227,17 @@ object OsSurfaceCapture {
         device.openNotification()
         device.waitForIdle()
         Thread.sleep(800L)
+    }
+
+    /** Creates a journal named [title] and returns its id. */
+    fun createJournal(title: String): String =
+        runBlocking { GlobalContext.get().get<JournalRepository>().create(Journal(title = title)).toString() }
+
+    /** Opens the journal [journalId] through its deep link. */
+    fun openJournal(journalId: String) {
+        shell("am start -a android.intent.action.VIEW -d logdate://journal/$journalId -f 0x10000000 $packageName")
+        device.wait(Until.hasObject(By.pkg(packageName).depth(0)), TIMEOUT_MS)
+        device.waitForIdle()
     }
 
     /** Lets every LogDate conversation float as a bubble, as if the person chose "All conversations". */

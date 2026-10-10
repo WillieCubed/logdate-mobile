@@ -101,7 +101,7 @@ A row reaches `[done]` only when its Evidence column lists:
 | `[done]` | Drafts are pushed with `pushDynamicShortcut`; share targets carry a `LocusId` | Share targets carry a `LocusId`. Drafts stay in the atomic `setDynamicShortcuts` call by decision (stable ids keep usage history); recorded in `launcher-shortcuts.md`. The recorder bubble's shortcut survives refreshes. |
 | `[partial]` | Direct Share targets for each journal | Ship today. `SharingShortcutParsersTest`, `IncomingShareE2ETest`. Missing: Lane 2 share sheet capture. |
 | `[done]` | `reportShortcutUsed` is called on save for each mode and shared journal | `CaptureUsageReporter` (editor) and `AndroidCaptureUsageReporter`; ids from `captureShortcutId`, tested in `CaptureLaunchTest`. |
-| `[todo]` | Journals and widgets can be pinned from inside the app | |
+| `[done]` | Journals and widgets can be pinned from inside the app | Journals: **Add to home screen** through `HomeScreenPins`. Widgets: Settings > Widgets (`AndroidMemoriesWidgetInstallController`). Lane 2: `launcher-shortcuts/{journal-menu,pin-journal}--phone-api37.png`. |
 
 ## System Capture Surfaces
 

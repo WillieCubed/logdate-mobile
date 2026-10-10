@@ -46,9 +46,11 @@ import app.logdate.client.rewind.RewindNotificationCoordinator
 import app.logdate.client.sensor.di.sensorModule
 import app.logdate.client.shortcuts.AndroidCaptureUsageReporter
 import app.logdate.client.shortcuts.AndroidDynamicShortcutApplier
+import app.logdate.client.shortcuts.AndroidHomeScreenPins
 import app.logdate.client.shortcuts.DynamicShortcutRefreshObserver
 import app.logdate.client.shortcuts.DynamicShortcutRefreshWorker
 import app.logdate.client.shortcuts.DynamicShortcutScheduler
+import app.logdate.client.shortcuts.JournalShortcutIcons
 import app.logdate.client.sync.AndroidPhoneAudioStreamOpener
 import app.logdate.client.sync.DefaultPhoneWearSyncBridge
 import app.logdate.client.sync.FileWatchAudioStore
@@ -82,6 +84,7 @@ import app.logdate.feature.core.restore.CloudRestoreScheduler
 import app.logdate.feature.core.settings.ui.watch.WatchConnectionManager
 import app.logdate.feature.core.settings.updates.AppUpdateController
 import app.logdate.feature.editor.ui.editor.CaptureUsageReporter
+import app.logdate.ui.common.HomeScreenPins
 import coil3.SingletonImageLoader
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -183,6 +186,14 @@ actual val appModule: Module =
         single<RecordingBubbleSwitch> { FlagRecordingBubbleSwitch(get(), get()) }
         single { RecordingBubbleNotifier(androidContext(), get()) }
         single<CaptureUsageReporter> { AndroidCaptureUsageReporter(androidContext()) }
+        single<HomeScreenPins> {
+            AndroidHomeScreenPins(
+                context = androidContext(),
+                icons = JournalShortcutIcons(androidContext(), SingletonImageLoader.get(androidContext())),
+                journals = get(),
+                scope = get(),
+            )
+        }
         single {
             PlatformComponentToggler(
                 flags = get(),

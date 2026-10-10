@@ -60,7 +60,9 @@ import app.logdate.feature.core.restore.AndroidRestoreLauncher
 import app.logdate.feature.core.settings.updates.AppUpdateCheckTrigger
 import app.logdate.feature.onboarding.flow.OnboardingDeviceStateRepository
 import app.logdate.navigation.LogDateNavDisplay
+import app.logdate.ui.common.HomeScreenPins
 import app.logdate.ui.common.LocalEditorWindows
+import app.logdate.ui.common.LocalHomeScreenPins
 import app.logdate.ui.keyboard.AppShortcutScope
 import app.logdate.ui.keyboard.appKeyboardShortcutGroups
 import io.github.aakira.napier.Napier
@@ -87,6 +89,7 @@ class MainActivity : FragmentActivity() {
     private val androidExportLauncher: AndroidExportLauncher by inject()
     private val androidRestoreLauncher: AndroidRestoreLauncher by inject()
     private val databaseStartupMonitor: DatabaseStartupMonitor by inject()
+    private val homeScreenPins: HomeScreenPins by inject()
     private val databaseRecoveryController: DatabaseRecoveryController by inject()
     private val postRestoreDetector: PostRestoreDetector by inject()
     private val playInAppUpdateController: PlayInAppUpdateController by inject()
@@ -177,7 +180,10 @@ class MainActivity : FragmentActivity() {
         setContent {
             val state = appUiState as? GlobalAppUiLoadedState
             if (state != null) {
-                CompositionLocalProvider(LocalEditorWindows provides remember { editorWindows() }) {
+                CompositionLocalProvider(
+                    LocalEditorWindows provides remember { editorWindows() },
+                    LocalHomeScreenPins provides homeScreenPins,
+                ) {
                     MainActivityContent(
                         state = state,
                         pendingNavKey = pendingNavKey,

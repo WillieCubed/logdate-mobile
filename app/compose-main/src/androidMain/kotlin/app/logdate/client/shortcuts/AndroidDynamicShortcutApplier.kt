@@ -2,11 +2,6 @@ package app.logdate.client.shortcuts
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Typeface
-import androidx.compose.ui.graphics.toArgb
 import androidx.core.app.Person
 import androidx.core.content.LocusIdCompat
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -24,17 +19,11 @@ import app.logdate.client.feature.widgets.shortcuts.DynamicShortcutDescriptor
 import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_ID
 import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_TARGET
 import app.logdate.client.rewind.REWIND_NOTIFICATION_TARGET_DETAIL
-import app.logdate.feature.journals.ui.deriveCoverColor
-import coil3.BitmapImage
 import coil3.ImageLoader
-import coil3.request.ImageRequest
-import coil3.request.SuccessResult
-import coil3.request.allowHardware
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlin.uuid.Uuid
 
 /**
  * Converts [DynamicShortcutDescriptor]s into Android `ShortcutInfoCompat` instances and
@@ -49,10 +38,9 @@ import kotlin.uuid.Uuid
  *   menu.
  * - **Sharing group** — one [DynamicShortcutDescriptor.ShareToJournal] per journal,
  *   marked with the conversation category so the OS hoists them into the share sheet.
- *   Each one carries a per-journal cover bitmap (loaded via Coil from the journal's
- *   `coverImageUri`, or a deterministic colored circle from [deriveCoverColor] if no
- *   cover is set — same color the in-app `JournalCover` uses, so visual identity stays
- *   consistent). Ranked at [SHARING_RANK_BASE]+ so they overflow past the launcher
+ *   Each one carries the journal's icon from [JournalShortcutIcons]: its cover photo, or
+ *   the colored monogram the in-app `JournalCover` uses, so a journal looks the same
+ *   everywhere. Ranked at [SHARING_RANK_BASE]+ so they overflow past the launcher
  *   entries in long-press while staying eligible for the share sheet.
  *
  * The publisher emits sharing descriptors uncapped; this applier queries the
@@ -65,8 +53,10 @@ import kotlin.uuid.Uuid
  */
 class AndroidDynamicShortcutApplier(
     private val context: Context,
-    private val imageLoader: ImageLoader,
+    imageLoader: ImageLoader,
 ) {
+    private val journalIcons = JournalShortcutIcons(context, imageLoader)
+
     suspend fun apply(descriptors: List<DynamicShortcutDescriptor>) {
         val (sharingDescriptors, launcherDescriptors) =
             descriptors.partition { it is DynamicShortcutDescriptor.ShareToJournal }
@@ -188,7 +178,7 @@ class AndroidDynamicShortcutApplier(
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 putExtra(EXTRA_SHORTCUT_TARGET_JOURNAL_ID, descriptor.journalId.toString())
             }
-        val icon = loadJournalIcon(descriptor)
+        val icon = journalIcons.icon(descriptor.journalId, descriptor.journalTitle, descriptor.coverImageUri)
         val person =
             Person
                 .Builder()
@@ -213,71 +203,7 @@ class AndroidDynamicShortcutApplier(
             .build()
     }
 
-    private suspend fun loadJournalIcon(descriptor: DynamicShortcutDescriptor.ShareToJournal): IconCompat {
-        val coverBitmap =
-            descriptor.coverImageUri?.let { uri ->
-                runCatching {
-                    val request =
-                        ImageRequest
-                            .Builder(context)
-                            .data(uri)
-                            .size(SHORTCUT_ICON_PX)
-                            .allowHardware(false)
-                            .build()
-                    val result = imageLoader.execute(request)
-                    (result as? SuccessResult)?.image?.let { it as? BitmapImage }?.bitmap
-                }.onFailure { error ->
-                    Napier.w("Failed to load journal cover for sharing shortcut: $uri", error)
-                }.getOrNull()
-            }
-
-        val bitmap = coverBitmap ?: renderJournalMonogramBitmap(descriptor.journalId, descriptor.journalTitle)
-        return IconCompat.createWithAdaptiveBitmap(bitmap)
-    }
-
-    private fun renderJournalMonogramBitmap(
-        journalId: Uuid,
-        journalTitle: String,
-    ): Bitmap {
-        val bitmap = Bitmap.createBitmap(SHORTCUT_ICON_PX, SHORTCUT_ICON_PX, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val backgroundPaint =
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = deriveCoverColor(journalId).toArgb()
-            }
-        canvas.drawRect(0f, 0f, SHORTCUT_ICON_PX.toFloat(), SHORTCUT_ICON_PX.toFloat(), backgroundPaint)
-
-        val monogram =
-            journalTitle
-                .trim()
-                .firstOrNull()
-                ?.uppercaseChar()
-                ?.toString()
-                .orEmpty()
-        if (monogram.isNotEmpty()) {
-            val textPaint =
-                Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = 0xFFFFFFFF.toInt()
-                    textAlign = Paint.Align.CENTER
-                    textSize = SHORTCUT_MONOGRAM_TEXT_PX
-                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                }
-            val centerX = SHORTCUT_ICON_PX / 2f
-            val centerY = (SHORTCUT_ICON_PX / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
-            canvas.drawText(monogram, centerX, centerY, textPaint)
-        }
-
-        return bitmap
-    }
-
     private companion object {
-        /**
-         * Pixel size for adaptive shortcut icons. 108dp at xxxhdpi works out to ~324px and
-         * is the recommended adaptive-icon canvas size.
-         */
-        const val SHORTCUT_ICON_PX = 324
-        const val SHORTCUT_MONOGRAM_TEXT_PX = 140f
-
         /**
          * Rank offset that pushes sharing shortcuts past launcher shortcuts in long-press
          * menu ordering. Sharing shortcuts still appear in the share sheet regardless of

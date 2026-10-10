@@ -51,12 +51,14 @@ import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.adaptive.FoldableBookLayout
+import app.logdate.ui.common.LocalHomeScreenPins
 import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.ui.workspace.PanelHeader
 import app.logdate.ui.workspace.WorkspacePanel
 import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.journal_add_to_home_screen
 import logdate.client.feature.journal.generated.resources.journal_delete_label
 import logdate.client.feature.journal.generated.resources.journal_merge_action
 import logdate.client.feature.journal.generated.resources.journal_merge_success
@@ -216,6 +218,7 @@ fun JournalDetailScreenContent(
                                         showOverflowMenu = false
                                         onNavigateToSettings(uiState.journalId)
                                     })
+                                    AddToHomeScreenItem(uiState) { showOverflowMenu = false }
                                     if (mergeEnabled) {
                                         DropdownMenuItem(text = { Text(stringResource(Res.string.journal_merge_action)) }, onClick = {
                                             showOverflowMenu = false
@@ -430,4 +433,24 @@ fun JournalDetailScreenContent(
             }
         }
     }
+}
+
+/**
+ * "Add to home screen" for a journal, shown only where the launcher accepts pinned shortcuts. The
+ * launcher then asks the person to confirm and place the shortcut.
+ */
+@Composable
+private fun AddToHomeScreenItem(
+    uiState: JournalDetailUiState.Success,
+    onDone: () -> Unit,
+) {
+    val pins = LocalHomeScreenPins.current ?: return
+    if (!pins.canPin) return
+    DropdownMenuItem(
+        text = { Text(stringResource(Res.string.journal_add_to_home_screen)) },
+        onClick = {
+            onDone()
+            pins.pinJournal(uiState.journalId, uiState.title)
+        },
+    )
 }

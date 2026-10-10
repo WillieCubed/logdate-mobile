@@ -61,6 +61,7 @@
     <string name="journal_visibility_shared_hint">Use the Share button to give others access.</string>
     <string name="journal_settings_title">Journal Settings</string>
     <string name="journal_settings_label">Journal settings</string>
+    <string name="journal_add_to_home_screen">Add to home screen</string>
     <string name="location">Location</string>
     <string name="new_journal">New Journal</string>
     <string name="no_entries_in_this_journal_yet">No entries in this journal yet</string>

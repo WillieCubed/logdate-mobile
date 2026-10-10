@@ -1,7 +1,7 @@
 # Launcher Shortcuts and Direct Share
 
 Status: partial. New entry, Record voice, and Take photo static shortcuts, the dynamic shortcuts,
-Direct Share, and usage reporting ship. Pinning is planned.
+Direct Share, usage reporting, and pinning journals to the home screen ship.
 
 ## What it is
 
@@ -36,7 +36,7 @@ how many exist.
 | ![The long-press menu with Write a new entry, Record a voice entry, Take photo, and Open today's timeline](../../../screenshots/android-os-integration/launcher-shortcuts/long-press--phone-api37.png) | ![The same menu on a tablet](../../../screenshots/android-os-integration/launcher-shortcuts/long-press--tablet-api37.png) |
 
 Every shortcut icon is an adaptive icon in the launcher icon's brown, with a monochrome layer for
-themed icons. The share sheet and pinning captures are added when those changes ship.
+themed icons. The share sheet capture is added when it ships.
 
 ## How it works
 
@@ -95,6 +95,27 @@ to a `CaptureUsageReporter` (editor module; it does nothing outside Android).
 - the share target of each journal the entry was saved to.
 
 A failed report is logged and never affects the save.
+
+### Pinning a journal
+
+A journal's menu offers **Add to home screen** wherever the launcher accepts pinned shortcuts. The
+launcher shows its own confirmation with the shortcut's icon and name; nothing is pinned until the
+person agrees.
+
+| The journal menu | The launcher's confirmation |
+| --- | --- |
+| ![A journal's menu with Add to home screen](../../../screenshots/android-os-integration/launcher-shortcuts/journal-menu--phone-api37.png) | ![The launcher asking to add Summer in Lisbon to the home screen](../../../screenshots/android-os-integration/launcher-shortcuts/pin-journal--phone-api37.png) |
+
+- `HomeScreenPins` (client/ui, `common/HomeScreenPins.kt`) is the platform-neutral interface,
+  provided through `LocalHomeScreenPins`. Where it is absent or `canPin` is false, the menu item
+  does not appear.
+- `AndroidHomeScreenPins` (app/compose-main androidMain, `shortcuts/`) builds a shortcut that opens
+  `logdate://journal/{id}` and calls `ShortcutManagerCompat.requestPinShortcut`. Its id,
+  `logdate.shortcut.journal:{id}`, is separate from the journal's share target.
+- The icon comes from `JournalShortcutIcons`, which share targets also use: the journal's cover
+  photo, or the colored monogram the in-app journal cover shows.
+
+Widgets are pinned from Settings > Widgets, through `AndroidMemoriesWidgetInstallController`.
 
 ### Direct Share intake
 

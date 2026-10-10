@@ -38,6 +38,20 @@ class OsSurfaceScreenshotsTest {
         OsSurfaceCapture.dumpHierarchy("launcher-long-press")
     }
 
+    @Test fun pinJournal() {
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.openJournal(OsSurfaceCapture.createJournal("Summer in Lisbon"))
+        val options =
+            OsSurfaceCapture.device.wait(Until.findObject(By.desc("Journal options")), 5_000L)
+                ?: OsSurfaceCapture.waitForText("Journal settings")
+        options.click()
+        OsSurfaceCapture.waitForText("Add to home screen")
+        OsSurfaceCapture.capture(surface = "launcher-shortcuts", state = "journal-menu")
+        OsSurfaceCapture.waitForText("Add to home screen").click()
+        Thread.sleep(2_500L)
+        OsSurfaceCapture.capture(surface = "launcher-shortcuts", state = "pin-journal")
+    }
+
     /** Android 17 lets people float any app from its launcher menu; LogDate must work at that size. */
     @Test fun appBubble() {
         if (Build.VERSION.SDK_INT < 37) return

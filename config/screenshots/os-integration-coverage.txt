@@ -31,6 +31,10 @@ launcher-shortcuts|system|docs/screenshots/android-os-integration/launcher-short
 launcher-shortcuts|system|docs/screenshots/android-os-integration/launcher-shortcuts/long-press--phone-api37.png
 launcher-shortcuts|system|docs/screenshots/android-os-integration/launcher-shortcuts/long-press--tablet-api37.png
 
+# Pinning: the journal menu's Add to home screen and the launcher's confirmation.
+pin-journal|system|docs/screenshots/android-os-integration/launcher-shortcuts/journal-menu--phone-api37.png
+pin-journal|system|docs/screenshots/android-os-integration/launcher-shortcuts/pin-journal--phone-api37.png
+
 # Quick Settings tiles: idle, starting a recording, and the active Record voice tile.
 quick-settings-tiles|system|docs/screenshots/android-os-integration/quick-settings-tiles/idle--phone-api37.png
 quick-settings-tiles|system|docs/screenshots/android-os-integration/quick-settings-tiles/recording-editor--phone-api37.png
