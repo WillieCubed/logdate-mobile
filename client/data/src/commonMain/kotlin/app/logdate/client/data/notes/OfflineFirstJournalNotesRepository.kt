@@ -6,11 +6,7 @@ import app.logdate.client.database.dao.MediaCaptionDao
 import app.logdate.client.database.dao.TextNoteDao
 import app.logdate.client.database.dao.VideoNoteDao
 import app.logdate.client.database.dao.journals.JournalContentDao
-import app.logdate.client.database.entities.AudioNoteEntity
-import app.logdate.client.database.entities.ImageNoteEntity
 import app.logdate.client.database.entities.MediaCaptionEntity
-import app.logdate.client.database.entities.TextNoteEntity
-import app.logdate.client.database.entities.VideoNoteEntity
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.media.MediaManager
 import app.logdate.client.media.MediaObject
@@ -18,7 +14,6 @@ import app.logdate.client.repository.journals.ExportableJournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
-import app.logdate.client.repository.journals.NotePlace
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.repository.media.IndexedMediaRepository
 import app.logdate.client.repository.transcription.TranscriptionRepository
@@ -34,19 +29,8 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.atStartOfDayIn
-import kotlinx.datetime.plus
-import kotlinx.datetime.toLocalDateTime
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -76,217 +60,54 @@ class OfflineFirstJournalNotesRepository(
         transcriptionRepository?.startAutomaticTranscriptions(syncScope)
     }
 
-    override val allNotesObserved: Flow<List<JournalNote>> =
-        notePlaceResolver
-            .observeAll()
-            .combine(
-                observeNoteBuckets(
-                    textFlow = textNoteDao.getAllNotes(),
-                    imageFlow = imageNoteDao.getAllNotes(),
-                    audioFlow = audioNoteDao.getAllNotes(),
-                    videoFlow = videoNoteDao.getAllNotes(),
-                ),
-            ) { placeLookup, buckets ->
-                buckets.toNotes(placeLookup)
-            }.combine(mediaCaptionDao.observeAll()) { notes, captions ->
-                val captionMap = captions.associate { it.noteId to it.caption }
-                notes.map { note -> note.withCaption(captionMap) }
-            }.withTranscripts(transcriptionRepository)
+    private val queries =
+        JournalNoteQueries(
+            textNoteDao,
+            imageNoteDao,
+            audioNoteDao,
+            videoNoteDao,
+            journalContentDao,
+            mediaCaptionDao,
+            notePlaceResolver,
+            transcriptionRepository,
+        )
 
-    override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> {
-        // Get all notes-to-journal mappings for this journal
-        return journalContentDao
-            .getContentForJournal(journalId)
-            .combine(allNotesObserved) { contentIds, allNotes ->
-                allNotes.filter { note -> contentIds.contains(note.uid) }
-            }
-    }
+    override val allNotesObserved: Flow<List<JournalNote>> = queries.allNotesObserved
 
-    override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> =
-        journalContentDao
-            .getAllLinks()
-            .map { link -> link.journalId to link.contentId }
+    override fun observeNotesInJournal(journalId: Uuid): Flow<List<JournalNote>> = queries.observeNotesInJournal(journalId)
+
+    override suspend fun getAllJournalNoteLinks(): List<Pair<Uuid, Uuid>> = queries.getAllJournalNoteLinks()
 
     override fun observeNotesInRange(
         start: Instant,
         end: Instant,
-    ): Flow<List<JournalNote>> {
-        val startMillis = start.toEpochMilliseconds()
-        val endMillis = end.toEpochMilliseconds()
-
-        return notePlaceResolver
-            .observeAll()
-            .combine(
-                observeNoteBuckets(
-                    textFlow = textNoteDao.getNotesInRange(startMillis, endMillis),
-                    imageFlow = imageNoteDao.getNotesInRange(startMillis, endMillis),
-                    audioFlow = audioNoteDao.getNotesInRange(startMillis, endMillis),
-                    videoFlow = videoNoteDao.getNotesInRange(startMillis, endMillis),
-                ),
-            ) { placeLookup, buckets ->
-                buckets.toNotes(placeLookup)
-            }.combine(mediaCaptionDao.observeAll()) { notes, captions ->
-                val captionMap = captions.associate { it.noteId to it.caption }
-                notes.map { note -> note.withCaption(captionMap) }
-            }.withTranscripts(transcriptionRepository)
-    }
+    ): Flow<List<JournalNote>> = queries.observeNotesInRange(start, end)
 
     override fun observeNotesPage(
         pageSize: Int,
         offset: Int,
-    ): Flow<List<JournalNote>> {
-        // Since AudioNoteDao and VideoNoteDao don't have getNotesPage, handle pagination in memory.
-        return allNotesObserved.map { notes ->
-            notes
-                .sortedByDescending { it.creationTimestamp }
-                .drop(offset)
-                .take(pageSize)
-        }
-    }
+    ): Flow<List<JournalNote>> = queries.observeNotesPage(pageSize, offset)
 
-    override fun observeNotesStream(pageSize: Int): Flow<List<JournalNote>> =
-        // Use the existing allNotesObserved for real-time updates
-        // This gives us immediate responsiveness since Room already caches data
-        allNotesObserved
+    override fun observeNotesStream(pageSize: Int): Flow<List<JournalNote>> = queries.observeNotesStream(pageSize)
 
-    override fun observeEntryTimestamps(): Flow<List<Instant>> =
-        combine(
-            textNoteDao.observeCreatedTimestamps(),
-            imageNoteDao.observeCreatedTimestamps(),
-            audioNoteDao.observeCreatedTimestamps(),
-            videoNoteDao.observeCreatedTimestamps(),
-        ) { text, image, audio, video ->
-            (text + image + audio + video).map(Instant::fromEpochMilliseconds)
-        }
+    override fun observeEntryTimestamps(): Flow<List<Instant>> = queries.observeEntryTimestamps()
 
-    override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> =
-        notePlaceResolver
-            .observeAll()
-            .combine(
-                observeNoteBuckets(
-                    textFlow = textNoteDao.getRecentNotes(limit),
-                    imageFlow = imageNoteDao.getRecentNotes(limit),
-                    audioFlow = audioNoteDao.getRecentNotes(limit),
-                    videoFlow = videoNoteDao.getRecentNotes(limit),
-                ),
-            ) { placeLookup, buckets ->
-                buckets
-                    .toNotes(placeLookup)
-                    .sortedByDescending { it.creationTimestamp }
-                    .take(limit)
-            }.combine(mediaCaptionDao.observeAll()) { notes, captions ->
-                val captionMap = captions.associate { it.noteId to it.caption }
-                notes.map { note -> note.withCaption(captionMap) }
-            }.withTranscripts(transcriptionRepository)
+    override fun observeRecentNotes(limit: Int): Flow<List<JournalNote>> = queries.observeRecentNotes(limit)
 
-    override fun observeRecentAudioNotes(limit: Int): Flow<List<JournalNote.Audio>> =
-        notePlaceResolver
-            .observeAll()
-            .combine(audioNoteDao.getRecentNotes(limit)) { placeLookup, entities ->
-                entities.map { it.toModel(it.placeId?.let(placeLookup::get)) }
-            }.combine(mediaCaptionDao.observeAll()) { notes, captions ->
-                val captionMap = captions.associate { it.noteId to it.caption }
-                notes.map { note -> note.copy(caption = captionMap[note.uid] ?: note.caption) }
-            }.withTranscripts(transcriptionRepository)
-            .map { it.filterIsInstance<JournalNote.Audio>() }
+    override fun observeRecentAudioNotes(limit: Int): Flow<List<JournalNote.Audio>> = queries.observeRecentAudioNotes(limit)
 
-    override fun observeNotesForDay(day: LocalDate): Flow<List<JournalNote>> {
-        val timezone = TimeZone.currentSystemDefault()
-        val start = day.atStartOfDayIn(timezone).toEpochMilliseconds()
-        val endExclusive = day.plus(1, DateTimeUnit.DAY).atStartOfDayIn(timezone).toEpochMilliseconds()
-
-        return notePlaceResolver
-            .observeAll()
-            .combine(
-                observeNoteBuckets(
-                    textFlow = textNoteDao.getNotesInRange(start, endExclusive),
-                    imageFlow = imageNoteDao.getNotesInRange(start, endExclusive),
-                    audioFlow = audioNoteDao.getNotesInRange(start, endExclusive),
-                    videoFlow = videoNoteDao.getNotesInRange(start, endExclusive),
-                ),
-            ) { placeLookup, buckets ->
-                buckets
-                    .toNotes(placeLookup)
-                    .filter { note ->
-                        note.creationTimestamp
-                            .toLocalDateTime(timezone)
-                            .date == day
-                    }.sortedByDescending(JournalNote::creationTimestamp)
-            }.combine(mediaCaptionDao.observeAll()) { notes, captions ->
-                val captionMap = captions.associate { it.noteId to it.caption }
-                notes.map { note -> note.withCaption(captionMap) }
-            }.withTranscripts(transcriptionRepository)
-    }
+    override fun observeNotesForDay(day: LocalDate): Flow<List<JournalNote>> = queries.observeNotesForDay(day)
 
     override suspend fun getNotesBefore(
         beforeExclusive: Instant,
         limit: Int,
-    ): List<JournalNote> =
-        NoteBuckets(
-            textNotes = textNoteDao.getRecentNotesBefore(beforeExclusive.toEpochMilliseconds(), limit),
-            imageNotes = imageNoteDao.getRecentNotesBefore(beforeExclusive.toEpochMilliseconds(), limit),
-            audioNotes = audioNoteDao.getRecentNotesBefore(beforeExclusive.toEpochMilliseconds(), limit),
-            videoNotes = videoNoteDao.getRecentNotesBefore(beforeExclusive.toEpochMilliseconds(), limit),
-        ).toNotes(notePlaceResolver.observeAll().first())
-            .sortedByDescending(JournalNote::creationTimestamp)
-            .take(limit)
-            .map { note ->
-                note
-                    .withCaption(mapOf(note.uid to (mediaCaptionDao.getCaption(note.uid)?.caption ?: "")))
-                    .withTranscript(transcriptionRepository)
-            }
+    ): List<JournalNote> = queries.getNotesBefore(beforeExclusive, limit)
 
-    override suspend fun hasNotesBefore(beforeExclusive: Instant): Boolean {
-        val beforeTimestamp = beforeExclusive.toEpochMilliseconds()
-        return textNoteDao.hasNotesBefore(beforeTimestamp) ||
-            imageNoteDao.hasNotesBefore(beforeTimestamp) ||
-            audioNoteDao.hasNotesBefore(beforeTimestamp) ||
-            videoNoteDao.hasNotesBefore(beforeTimestamp)
-    }
+    override suspend fun hasNotesBefore(beforeExclusive: Instant): Boolean = queries.hasNotesBefore(beforeExclusive)
 
-    override suspend fun notesReferencingMediaPaths(paths: Set<String>): Set<String> {
-        if (paths.isEmpty()) return emptySet()
-        val candidates = paths.toList()
-        return buildSet {
-            addAll(audioNoteDao.findReferencedContentUris(candidates))
-            addAll(imageNoteDao.findReferencedContentUris(candidates))
-            addAll(videoNoteDao.findReferencedContentUris(candidates))
-        }
-    }
+    override suspend fun notesReferencingMediaPaths(paths: Set<String>): Set<String> = queries.notesReferencingMediaPaths(paths)
 
-    override suspend fun getNoteById(noteId: Uuid): JournalNote? {
-        // Try each note type DAO until we find the note
-        runCatching {
-            textNoteDao.getNoteOneOff(noteId).let { note ->
-                note.toModel(note.placeId?.let { placeId -> notePlaceResolver.get(placeId) })
-            }
-        }.getOrNull()?.let { return it }
-        runCatching {
-            val caption = mediaCaptionDao.getCaption(noteId)?.caption ?: ""
-            imageNoteDao.getNoteOneOff(noteId).let { note ->
-                note.toModel(note.placeId?.let { placeId -> notePlaceResolver.get(placeId) }, caption)
-            }
-        }.getOrNull()?.let { return it }
-        runCatching {
-            val caption = mediaCaptionDao.getCaption(noteId)?.caption ?: ""
-            audioNoteDao.getNoteOneOff(noteId).let { note ->
-                note
-                    .toModel(
-                        note.placeId?.let { placeId ->
-                            notePlaceResolver.get(placeId)
-                        },
-                        caption,
-                    ).withTranscript(transcriptionRepository)
-            }
-        }.getOrNull()?.let { return it }
-        runCatching {
-            val caption = mediaCaptionDao.getCaption(noteId)?.caption ?: ""
-            videoNoteDao.getNoteOneOff(noteId).let { note ->
-                note.toModel(note.placeId?.let { placeId -> notePlaceResolver.get(placeId) }, caption)
-            }
-        }.getOrNull()?.let { return it }
-        return null
-    }
+    override suspend fun getNoteById(noteId: Uuid): JournalNote? = queries.getNoteById(noteId)
 
     override suspend fun create(note: JournalNote): Uuid {
         val pendingMediaIndex = buildPendingMediaIndex(note)
@@ -599,39 +420,6 @@ class OfflineFirstJournalNotesRepository(
         }
     }
 
-    private fun observeNoteBuckets(
-        textFlow: Flow<List<TextNoteEntity>>,
-        imageFlow: Flow<List<ImageNoteEntity>>,
-        audioFlow: Flow<List<AudioNoteEntity>>,
-        videoFlow: Flow<List<VideoNoteEntity>>,
-    ): Flow<NoteBuckets> =
-        textFlow
-            .combine(imageFlow) { textNotes, imageNotes ->
-                textNotes to imageNotes
-            }.combine(audioFlow) { textAndImageNotes, audioNotes ->
-                Triple(textAndImageNotes.first, textAndImageNotes.second, audioNotes)
-            }.combine(videoFlow) { textImageAndAudioNotes, videoNotes ->
-                NoteBuckets(
-                    textNotes = textImageAndAudioNotes.first,
-                    imageNotes = textImageAndAudioNotes.second,
-                    audioNotes = textImageAndAudioNotes.third,
-                    videoNotes = videoNotes,
-                )
-            }
-
-    private data class NoteBuckets(
-        val textNotes: List<TextNoteEntity>,
-        val imageNotes: List<ImageNoteEntity>,
-        val audioNotes: List<AudioNoteEntity>,
-        val videoNotes: List<VideoNoteEntity>,
-    ) {
-        fun toNotes(placeLookup: Map<Uuid, NotePlace>): List<JournalNote> =
-            textNotes.map { it.toModel(it.placeId?.let(placeLookup::get)) } +
-                imageNotes.map { it.toModel(it.placeId?.let(placeLookup::get)) } +
-                audioNotes.map { it.toModel(it.placeId?.let(placeLookup::get)) } +
-                videoNotes.map { it.toModel(it.placeId?.let(placeLookup::get)) }
-    }
-
     override suspend fun updateMediaRef(
         noteId: Uuid,
         mediaRef: String,
@@ -664,85 +452,16 @@ class OfflineFirstJournalNotesRepository(
         overwrite: Boolean,
         startTimestamp: Instant,
         endTimestamp: Instant,
-    ) {
-        // Get all notes within the time range
-        val textNotes =
-            textNoteDao
-                .getNotesInRange(
-                    startTimestamp.toEpochMilliseconds(),
-                    endTimestamp.toEpochMilliseconds(),
-                ).first()
-                .map { it.toModel() }
-
-        val imageNotes =
-            imageNoteDao
-                .getNotesInRange(
-                    startTimestamp.toEpochMilliseconds(),
-                    endTimestamp.toEpochMilliseconds(),
-                ).first()
-                .map { it.toModel() }
-
-        val audioNotes =
-            audioNoteDao
-                .getNotesInRange(
-                    startTimestamp.toEpochMilliseconds(),
-                    endTimestamp.toEpochMilliseconds(),
-                ).first()
-                .map { it.toModel() }
-
-        val videoNotes =
-            videoNoteDao
-                .getNotesInRange(
-                    startTimestamp.toEpochMilliseconds(),
-                    endTimestamp.toEpochMilliseconds(),
-                ).first()
-                .map { it.toModel() }
-
-        // Combine all notes
-        val captionMap = mediaCaptionDao.observeAll().first().associate { it.noteId to it.caption }
-        val allNotes =
-            (textNotes + imageNotes + audioNotes + videoNotes).map {
-                it.withCaption(captionMap).withTranscript(transcriptionRepository)
-            }
-
-        // Get all journals
-        val journals = journalRepository.allJournalsObserved.first()
-
-        // Create a map of journal ID to note IDs
-        val journalToNotesMap = mutableMapOf<Uuid, List<Uuid>>()
-
-        // For each journal, get all its notes and add them to the map
-        journals.forEach { journal ->
-            // Get notes for this journal
-            val journalNotes = observeNotesInJournal(journal.id).first()
-
-            // Map to just the IDs
-            val noteIds = journalNotes.map { it.uid }
-
-            // Only add to map if there are notes
-            if (noteIds.isNotEmpty()) {
-                journalToNotesMap[journal.id] = noteIds
-            }
-        }
-
-        // Create export structure
-        val backup =
-            JournalContentBackup(
-                notes = allNotes,
-                journalToNotesMap = journalToNotesMap,
-                generated = Clock.System.now(),
-            )
-
-        // Serialize to JSON
-        val json =
-            Json {
-                prettyPrint = true
-                encodeDefaults = true
-            }
-        val jsonContent = json.encodeToString(backup)
-
-        writeExportFile(destination, jsonContent, overwrite)
-    }
+    ) = JournalNoteExporter(
+        textNoteDao,
+        imageNoteDao,
+        audioNoteDao,
+        videoNoteDao,
+        mediaCaptionDao,
+        journalRepository,
+        transcriptionRepository,
+        queries,
+    ).exportContentToFile(destination, overwrite, startTimestamp, endTimestamp)
 }
 
 private sealed interface PendingMediaIndex {
@@ -763,50 +482,4 @@ private sealed interface PendingMediaIndex {
 
 private object PassthroughSyncTransactionManager : SyncTransactionManager {
     override suspend fun <T> withTransaction(block: suspend () -> T): T = block()
-}
-
-@Serializable
-data class JournalContentBackup(
-    val notes: List<JournalNote>,
-    @Serializable(with = UuidToUuidListMapSerializer::class)
-    val journalToNotesMap: Map<Uuid, List<Uuid>> = emptyMap(),
-    val generated: Instant = Clock.System.now(),
-    val version: String = "1.0",
-)
-
-/**
- * The media this note points at, or `null` for a note that has none.
- */
-private fun JournalNote.mediaRefOrNull(): String? =
-    when (this) {
-        is JournalNote.Image -> mediaRef
-        is JournalNote.Video -> mediaRef
-        is JournalNote.Audio -> mediaRef
-        is JournalNote.Text -> null
-    }
-
-private fun JournalNote.withCaption(captionMap: Map<Uuid, String>): JournalNote =
-    when (this) {
-        is JournalNote.Image -> copy(caption = captionMap[uid] ?: caption)
-        is JournalNote.Video -> copy(caption = captionMap[uid] ?: caption)
-        is JournalNote.Audio -> copy(caption = captionMap[uid] ?: caption)
-        else -> this
-    }
-
-private fun JournalNote.hasSamePersistedContent(other: JournalNote): Boolean {
-    if (creationTimestamp.toEpochMilliseconds() != other.creationTimestamp.toEpochMilliseconds() ||
-        timeZoneId != other.timeZoneId ||
-        location?.coordinates != other.location?.coordinates ||
-        location?.place?.id != other.location?.place?.id
-    ) {
-        return false
-    }
-    return when (this) {
-        is JournalNote.Text -> other is JournalNote.Text && content == other.content
-        is JournalNote.Image ->
-            other is JournalNote.Image && mediaRef == other.mediaRef && caption == other.caption && presentation == other.presentation
-        is JournalNote.Audio ->
-            other is JournalNote.Audio && mediaRef == other.mediaRef && durationMs == other.durationMs && caption == other.caption
-        is JournalNote.Video -> other is JournalNote.Video && mediaRef == other.mediaRef && caption == other.caption
-    }
 }
