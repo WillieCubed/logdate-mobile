@@ -128,7 +128,7 @@ class LegacyBackfillWithRetainedFailuresTest {
             assertEquals(PendingOperation.CREATE, metadata.getPendingUploads(EntityType.NOTE).single().operation)
             assertEquals(localNote, notes.getNoteById(localNote.uid))
             assertEquals(localJournal, journals.getJournalById(localJournal.id))
-            assertEquals(2, inbox.count(), "Encrypted original records must remain retained")
+            assertEquals(2, db.rows.count { it.state != "APPLIED" }, "Encrypted original records must remain retained")
             val calls = metadata.enqueuePendingCalls.size
             manager.downloadRemoteChanges()
             assertEquals(calls, metadata.enqueuePendingCalls.size, "Repeated sync must not duplicate backfill work")
