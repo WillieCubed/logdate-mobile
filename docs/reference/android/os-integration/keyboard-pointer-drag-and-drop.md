@@ -46,14 +46,22 @@ Multitasking. It lists an app's shortcuts only for keys that the attached keyboa
 
 ### Pointer
 
-- Right-clicking a journal cover, a media thumbnail, or a postcard opens its menu at the pointer.
-- Long-pressing a journal cover or a postcard opens the same menu without also opening the item.
-  Long-pressing a media thumbnail starts a drag instead (see below), so its menu is on right-click.
+- Right-clicking a journal cover, an entry in a day, a media thumbnail, or a postcard opens its menu
+  at the pointer.
+- Long-pressing a journal cover, an entry in a day, or a postcard opens the same menu without also
+  opening the item. Long-pressing a media thumbnail starts a drag instead (see below), so its menu is
+  on right-click.
+- An entry's only action is "Open in new window", so it has no menu on devices that cannot open
+  another LogDate window.
+- Hovering an icon-only button shows a tooltip naming its action.
 
 A long-press on a journal in the tablet's Journals carousel, on Android 17:
 
 ![The Journals screen on a tablet with a menu over the Summer in Lisbon cover offering Open journal and New entry in a new window](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/journal-context-menu--tablet-api37.png)
-- Hovering an icon-only button shows a tooltip naming its action.
+
+And on an entry in a day, opened beside the timeline:
+
+![A day opened beside the timeline, with an Open in new window menu under its entry](../../../screenshots/android-os-integration/keyboard-pointer-drag-and-drop/entry-context-menu--tablet-api37.png)
 
 ### Drag and drop
 

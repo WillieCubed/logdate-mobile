@@ -94,6 +94,23 @@ details are in [capture-launch-contract.md](os-integration/capture-launch-contra
 | Large screens and desktop windowing | [large-screens-and-desktop-windowing.md](os-integration/large-screens-and-desktop-windowing.md) | Manifest attributes, windows, titles, caption bar |
 | AppFunctions | [app-functions.md](os-integration/app-functions.md) | Assistant capture and consent-gated recall |
 
+## The splash screen
+
+Every surface above that opens LogDate shows the splash screen first. Android 12 and later draw it
+for every app from the theme's `windowSplashScreen*` attributes. Android 11 has no system splash, so
+`androidx.core:core-splashscreen` draws the same thing from the same attributes. `MainActivity`
+calls `installSplashScreen()` before `super.onCreate`, and keeps the splash up while the app's
+first state loads. The theme is `Theme.LogDate.Starting` in
+`app/android-main/src/main/res/values/themes.xml`: the launcher icon's brown behind its foreground.
+
+| Android 11 (compat) | Android 17 (system) |
+| --- | --- |
+| ![LogDate's splash on Android 11: the icon's two photos on a brown screen](../../screenshots/android-os-integration/splash/launch--phone-api30.png) | ![LogDate's splash on Android 17, the same icon on the same brown](../../screenshots/android-os-integration/splash/launch--phone-api37.png) |
+
+The capture (`OsSurfaceScreenshotsTest#splashScreen`) restarts the main screen in a new task and
+keeps the first frame that shows the splash's brown, because the splash is up for only a fraction
+of a second.
+
 ## Feature flags and manifest components
 
 New surfaces stay hidden behind a `FeatureFlag` until they are verified. The flag table is in the

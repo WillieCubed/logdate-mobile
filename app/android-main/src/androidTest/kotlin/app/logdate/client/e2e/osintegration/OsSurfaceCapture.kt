@@ -4,8 +4,10 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import android.view.WindowManager
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -17,18 +19,22 @@ import app.logdate.client.ambient.AmbientPromptNotificationCoordinator
 import app.logdate.client.datastore.LogdatePreferencesDataSource
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.client.domain.notes.AddNoteUseCase
 import app.logdate.client.domain.recommendation.AmbientCaptureNudgeStyle
 import app.logdate.client.domain.recommendation.AmbientPromptCandidate
 import app.logdate.client.domain.recommendation.AmbientPromptFamily
 import app.logdate.client.domain.recommendation.AmbientPromptPayload
 import app.logdate.client.media.audio.AudioRecordingManager
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.Journal
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.TimeZone
 import org.koin.core.context.GlobalContext
 import java.io.File
 import java.util.regex.Pattern
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
@@ -48,6 +54,10 @@ object OsSurfaceCapture {
     private const val TIMEOUT_MS = 10_000L
     private const val RECORDING_NOTIFICATION_ID = 1001
     private const val DEMO_MODE_ATTEMPTS = 10
+    private const val SPLASH_WAIT_MS = 5_000L
+
+    /** `FLAG_ACTIVITY_NEW_TASK` with `FLAG_ACTIVITY_CLEAR_TASK`, so the activity starts over. */
+    private const val FLAGS_NEW_CLEARED_TASK = "0x10008000"
 
     val device: UiDevice by lazy { UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()) }
 
@@ -123,6 +133,30 @@ object OsSurfaceCapture {
         file.parentFile?.mkdirs()
         check(device.takeScreenshot(file)) { "Screenshot failed for $surface/$state" }
         return file
+    }
+
+    /**
+     * Starts LogDate's main screen in a new task and saves the first frame that shows the splash
+     * screen, recognized by its [background] color. The splash is up for a fraction of a second, so
+     * frames are grabbed in a tight loop instead of after waiting for the screen to settle.
+     */
+    fun captureSplash(
+        surface: String,
+        state: String,
+        background: Int,
+    ): File {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        shell("am start -n $packageName/app.logdate.client.MainActivity -f $FLAGS_NEW_CLEARED_TASK")
+        val deadline = SystemClock.uptimeMillis() + SPLASH_WAIT_MS
+        while (SystemClock.uptimeMillis() < deadline) {
+            val frame = automation.takeScreenshot() ?: continue
+            if (frame.getPixel(frame.width / 2, frame.height / 5) != background) continue
+            val file = File(outputRoot, "$surface/$state--$formFactor-api${Build.VERSION.SDK_INT}.png")
+            file.parentFile?.mkdirs()
+            file.outputStream().use { frame.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            return file
+        }
+        error("The splash screen did not appear within ${SPLASH_WAIT_MS}ms")
     }
 
     /** Swipes up through a list until [text] is fully on screen, then centers it a little. */
@@ -336,6 +370,19 @@ object OsSurfaceCapture {
             ),
         )
         Thread.sleep(1_000L)
+    }
+
+    /** Saves a text entry with [text] now, the way the editor does, without capturing location. */
+    fun createTextEntry(text: String) {
+        val now = Clock.System.now()
+        val note =
+            JournalNote.Text(
+                creationTimestamp = now,
+                lastUpdated = now,
+                content = text,
+                timeZoneId = TimeZone.currentSystemDefault().id,
+            )
+        runBlocking { GlobalContext.get().get<AddNoteUseCase>()(notes = listOf(note), captureCurrentLocation = false) }
     }
 
     /** Creates a journal named [title] and returns its id. */

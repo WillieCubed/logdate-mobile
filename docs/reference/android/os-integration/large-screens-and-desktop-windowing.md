@@ -43,7 +43,11 @@ keeps the left half, and the editor opens on the right, already filed to the jou
 
 ![LogDate's Journals on the left and a new entry's editor on the right, split down the middle, with the editor's journal picker showing Summer in Lisbon](../../../screenshots/android-os-integration/large-screens-and-desktop-windowing/side-by-side--tablet-api37.png)
 
-Titled windows in Recents and the taskbar, and the caption bar, are added as each part ships.
+An existing entry opened from its menu in a day, beside that day:
+
+![The day on the left and the entry in the editor on the right, split down the middle](../../../screenshots/android-os-integration/large-screens-and-desktop-windowing/entry-side-by-side--tablet-api37.png)
+
+The caption bar is added when it ships.
 
 ## How it works
 

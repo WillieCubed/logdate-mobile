@@ -6,6 +6,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Until
 import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.sync.R as SyncR
+import app.logdate.client.sync.SyncForegroundNotification
 import app.logdate.feature.core.export.ExportNotificationHelper
 import app.logdate.feature.core.restore.RestoreNotificationHelper
 import app.logdate.feature.core.restore.RestoreStage
@@ -144,6 +146,32 @@ class OsSurfaceScreenshotsTest {
         OsSurfaceCapture.capture(surface = "live-updates", state = "transfer-finished")
     }
 
+    /** A backup to LogDate Cloud as a Live Update, with the share of entries uploaded in its chip. */
+    @Test fun syncLiveUpdate() {
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.enableFlags(FeatureFlag.LIVE_UPDATES)
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        OsSurfaceCapture.device.pressHome()
+        OsSurfaceCapture.postTransferNotification(
+            SyncForegroundNotification.info(
+                context,
+                context.getString(SyncR.string.sync_notification_progress, 128, 340),
+                completed = 128,
+                total = 340,
+            ),
+        )
+        OsSurfaceCapture.capture(surface = "live-updates", state = "sync-status-chip")
+        OsSurfaceCapture.openNotifications()
+        OsSurfaceCapture.waitForText("Backing up your journal")
+        OsSurfaceCapture.capture(surface = "live-updates", state = "sync-progress")
+    }
+
+    /** The splash screen on a fresh start: Android 12's system splash, or the compat splash before it. */
+    @Test fun splashScreen() {
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.captureSplash(surface = "splash", state = "launch", background = SPLASH_BACKGROUND)
+    }
+
     /** A capture reminder answered from the notification shade with Write. */
     @Test fun notificationQuickReply() {
         OsSurfaceCapture.prepareOnboardedApp()
@@ -198,6 +226,40 @@ class OsSurfaceScreenshotsTest {
         // The labels Android holds for each window, which the caption bar and Recents may show.
         val labels = OsSurfaceCapture.shell("dumpsys activity activities").lines().filter { "taskDescription: label" in it }
         OsSurfaceCapture.writeEvidence("large-screens-and-desktop-windowing", "desktop-window-labels", labels.joinToString("\n") { it.trim() })
+    }
+
+    /**
+     * On a tablet, a long-press on an entry in a day opens its menu, whose "Open in new window" opens
+     * that entry in the editor beside LogDate.
+     */
+    @Test fun entryWindowSideBySide() {
+        if (OsSurfaceCapture.formFactor != "tablet") return
+        val entry = "Walked the long way home along the river. The light on the water was gold."
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.createTextEntry(entry)
+        OsSurfaceCapture.openMainActivity()
+        OsSurfaceCapture.waitForText(entry).click()
+        // The day opens beside the timeline, so the entry is on screen twice; its menu is on the copy
+        // in the day, the rightmost one.
+        val deadline = System.currentTimeMillis() + 10_000L
+        while (OsSurfaceCapture.device.findObjects(By.text(entry)).size < 2 && System.currentTimeMillis() < deadline) {
+            Thread.sleep(250L)
+        }
+        // Lets the day finish opening before the long-press.
+        Thread.sleep(1_500L)
+        val copies = OsSurfaceCapture.device.findObjects(By.text(entry))
+        val inTimeline = copies.minBy { it.visibleCenter.x }.visibleBounds
+        OsSurfaceCapture.longPress(copies.maxBy { it.visibleCenter.x })
+        val openInNewWindow = OsSurfaceCapture.waitForText("Open in new window")
+        // The menu belongs to the entry in the day, so it opens to the right of the timeline's copy.
+        check(openInNewWindow.visibleBounds.left > inTimeline.right) {
+            "The entry's menu opened at ${openInNewWindow.visibleBounds}, over the timeline at $inTimeline"
+        }
+        Thread.sleep(500L)
+        OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "entry-context-menu")
+        openInNewWindow.click()
+        Thread.sleep(4_000L)
+        OsSurfaceCapture.capture(surface = "large-screens-and-desktop-windowing", state = "entry-side-by-side")
     }
 
     @Test fun captureWidgetInPicker() {
@@ -303,5 +365,8 @@ class OsSurfaceScreenshotsTest {
     private companion object {
         /** `WindowConfiguration.WINDOWING_MODE_FREEFORM`, which `am start --windowingMode` takes. */
         const val WINDOWING_MODE_FREEFORM = 5
+
+        /** `logdate_splash_background`, the launcher icon's brown. */
+        const val SPLASH_BACKGROUND = 0xFF3B2929.toInt()
     }
 }

@@ -32,10 +32,12 @@ for device in "${devices[@]}"; do
 done
 
 # Keep going when a test fails: the captures that did succeed are still worth copying and reviewing.
+# The passkey test provider is left out: no capture uses it, and it cannot install below Android 14.
 gradle_status=0
 ./gradlew "${tasks[@]}" \
     -Plogdate.androidTestClass="$test_class" \
     -Plogdate.androidTestOrchestrator=false \
+    -Plogdate.skipPasskeyTestProvider=true \
     -Pandroid.experimental.testOptions.managedDevices.maxConcurrentDevices=1 \
     --continue || gradle_status=$?
 

@@ -18,7 +18,7 @@ import app.logdate.client.notifications.transferLiveUpdate
  * it; a foreground service survives that. The notification is the price Android charges for it,
  * so it may as well say something true - how far along the backup is.
  */
-internal object SyncForegroundNotification {
+object SyncForegroundNotification {
     private val channel = LogDateNotificationChannelKey.CLOUD_SYNC
     private val notificationId = channel.notificationId ?: 1004
 

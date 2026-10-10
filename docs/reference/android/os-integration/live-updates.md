@@ -48,6 +48,11 @@ the restore's phases:
 
 `transfer-finished--phone-api37.png` shows the finished and failed notifications that follow.
 
+A backup to LogDate Cloud reports the same way: the chip shows the share uploaded, and the
+notification counts what is done (`sync-status-chip--phone-api37.png`):
+
+![Backing up your journal, 128 of 340 uploaded, with a progress bar, at the top of the shade](../../../screenshots/android-os-integration/live-updates/sync-progress--phone-api37.png)
+
 Android shows the chip only while LogDate is not on screen. The capture also records Android's own
 verdict on the notification in
 [`recording-promotion--phone-api37.txt`](../../../screenshots/android-os-integration/live-updates/recording-promotion--phone-api37.txt):

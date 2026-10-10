@@ -51,6 +51,9 @@ live-updates|system|docs/screenshots/android-os-integration/live-updates/transfe
 live-updates|system|docs/screenshots/android-os-integration/live-updates/transfer-progress--phone-api37.png
 live-updates|system|docs/screenshots/android-os-integration/live-updates/transfer-finished--phone-api37.png
 live-updates|system|docs/screenshots/android-os-integration/live-updates/transfer-progress--tablet-api37.png
+live-updates|system|docs/screenshots/android-os-integration/live-updates/sync-status-chip--phone-api37.png
+live-updates|system|docs/screenshots/android-os-integration/live-updates/sync-progress--phone-api37.png
+live-updates|system|docs/screenshots/android-os-integration/live-updates/sync-progress--tablet-api37.png
 
 # Bubbles: the Float action, the floating recorder, the tablet Bubble Bar, and LogDate as an App Bubble.
 recording-bubble|system|docs/screenshots/android-os-integration/bubbles/float-action--phone-api37.png
@@ -77,9 +80,11 @@ notification-quick-reply|system|docs/screenshots/android-os-integration/notifica
 
 # Windows: a journal's New entry in a new window, opened beside LogDate in split screen.
 editor-windows|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/side-by-side--tablet-api37.png
+editor-windows|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/entry-side-by-side--tablet-api37.png
 
 # Context menus: a long-press on a journal cover opens its menu instead of the journal.
 context-menus|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/journal-context-menu--tablet-api37.png
+context-menus|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/entry-context-menu--tablet-api37.png
 
 # Keyboard shortcuts: Android's Meta+/ helper listing LogDate's group with a USB keyboard attached.
 keyboard-shortcuts|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/shortcut-helper--tablet-api37.png
@@ -87,3 +92,7 @@ keyboard-shortcuts|system|docs/screenshots/android-os-integration/keyboard-point
 # Desktop windowing: two LogDate windows on the Android 17 desktop, and the labels Android holds for them.
 desktop-windowing|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/desktop-windows--tablet-api37.png
 desktop-windowing|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/desktop-window-labels--tablet-api37.txt
+
+# Splash screen: the Android 11 compat splash and the Android 17 system splash look the same.
+splash|system|docs/screenshots/android-os-integration/splash/launch--phone-api30.png
+splash|system|docs/screenshots/android-os-integration/splash/launch--phone-api37.png
