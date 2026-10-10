@@ -295,6 +295,53 @@ class BasicCloudApiClientTest {
         }
 
     @Test
+    fun `create-only and moment error codes reach callers with their own code and status`() =
+        runTest {
+            val answers =
+                listOf(
+                    Triple("CONTENT_EXISTS", HttpStatusCode.PreconditionFailed, "Content already exists"),
+                    Triple("CONTENT_DELETED", HttpStatusCode.Gone, "Content was deleted"),
+                    Triple("JOURNAL_EXISTS", HttpStatusCode.PreconditionFailed, "Journal already exists"),
+                    Triple("JOURNAL_DELETED", HttpStatusCode.Gone, "Journal was deleted"),
+                    Triple("MOMENT_EXISTS", HttpStatusCode.PreconditionFailed, "Moment already exists"),
+                    Triple("MOMENT_DELETED", HttpStatusCode.Gone, "Moment was deleted"),
+                    Triple("INVALID_MOMENT", HttpStatusCode.BadRequest, "Moment payload must be one LDSE2 encrypted value"),
+                )
+            answers.forEach { (code, status, serverMessage) ->
+                val client =
+                    createApiClient(
+                        MockEngine {
+                            respond(
+                                content = """{"code":"$code","message":"$serverMessage","details":{"deletedAt":1,"serverVersion":2}}""",
+                                status = status,
+                                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                            )
+                        },
+                    )
+
+                val result =
+                    client.uploadContent(
+                        accessToken = "token",
+                        content =
+                            ContentUploadRequest(
+                                id = "content-err",
+                                type = "TEXT",
+                                content = "test",
+                                mediaUri = null,
+                                createdAt = 1_700_000_000_000L,
+                                lastUpdated = 1_700_000_000_000L,
+                                deviceId = DeviceId("device-test"),
+                            ),
+                    )
+
+                val exception = result.exceptionOrNull() as CloudApiException
+                assertEquals(code, exception.errorCode, "$code must not be reported as UNKNOWN_ERROR")
+                assertEquals(status.value, exception.statusCode, code)
+                assertEquals("Request failed (HTTP ${status.value})", exception.message, code)
+            }
+        }
+
+    @Test
     fun `get account info uses auth me path`() =
         runTest {
             val client =
