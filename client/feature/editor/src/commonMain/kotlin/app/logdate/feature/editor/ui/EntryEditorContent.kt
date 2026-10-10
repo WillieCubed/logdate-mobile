@@ -57,6 +57,8 @@ import app.logdate.feature.editor.ui.state.rememberBlocksUiState
 import app.logdate.ui.keyboard.AppKeyboardShortcut
 import app.logdate.ui.keyboard.AppShortcutScope
 import app.logdate.ui.platform.rememberLogDateHaptics
+import app.logdate.ui.provenance.CapturedOnWatchBanner
+import app.logdate.ui.provenance.showsWatchProvenance
 import kotlinx.coroutines.launch
 import logdate.client.feature.editor.generated.resources.Res
 import logdate.client.feature.editor.generated.resources.draft_deleted
@@ -328,6 +330,9 @@ fun EntryEditorContent(
                 Column(Modifier.fillMaxSize()) {
                     if (!isImmersiveBlockActive) {
                         editorState.visitContext?.let { VisitMemoryContextBanner(it) }
+                        if (showsWatchProvenance(editorState.capturedOnWatch)) {
+                            CapturedOnWatchBanner()
+                        }
                     }
                     MainEditorContent(
                         modifier = Modifier.weight(1f),

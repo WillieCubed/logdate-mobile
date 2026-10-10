@@ -125,6 +125,10 @@ data class MomentUiState(
      * Whether this is the hero (most significant) moment in the day.
      */
     val isHero: Boolean = false,
+    /**
+     * Whether every note behind this moment was captured on the watch.
+     */
+    val capturedOnWatch: Boolean = false,
 )
 
 data class MomentMediaUiState(
@@ -176,6 +180,9 @@ val DEMO_PEOPLE =
 sealed interface NoteUiState {
     val noteId: Uuid
     val journals: List<JournalBadgeUiState>
+
+    /** Whether this note was captured on the watch. */
+    val capturedOnWatch: Boolean
 }
 
 data class TextNoteUiState(
@@ -183,6 +190,7 @@ data class TextNoteUiState(
     val text: String,
     val timestamp: Instant,
     override val journals: List<JournalBadgeUiState> = emptyList(),
+    override val capturedOnWatch: Boolean = false,
 ) : NoteUiState
 
 data class ImageNoteUiState(
@@ -192,6 +200,7 @@ data class ImageNoteUiState(
     val caption: String = "",
     val presentation: PhotoPresentation = PhotoPresentation.EdgeToEdge,
     override val journals: List<JournalBadgeUiState> = emptyList(),
+    override val capturedOnWatch: Boolean = false,
 ) : NoteUiState
 
 data class AudioNoteUiState(
@@ -200,6 +209,7 @@ data class AudioNoteUiState(
     val timestamp: Instant,
     val duration: Long = 0, // Duration in milliseconds
     override val journals: List<JournalBadgeUiState> = emptyList(),
+    override val capturedOnWatch: Boolean = false,
 ) : NoteUiState
 
 data class VideoNoteUiState(
@@ -210,6 +220,7 @@ data class VideoNoteUiState(
     val duration: Long = 0, // Duration in milliseconds
     val caption: String = "",
     override val journals: List<JournalBadgeUiState> = emptyList(),
+    override val capturedOnWatch: Boolean = false,
 ) : NoteUiState
 
 data class JournalBadgeUiState(

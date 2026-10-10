@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import app.logdate.client.domain.search.SearchInJournalUseCase
 import app.logdate.client.domain.timeline.GetJournalMembershipUseCase
 import app.logdate.client.repository.journals.JournalContentRepository
-import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.search.SearchResult
 import app.logdate.client.sharing.SharingLauncher
@@ -114,7 +113,7 @@ class JournalDetailViewModel(
                                             .orEmpty()
                                             .filter { it.id != journalId }
                                             .map { JournalReference(it.id, it.title) }
-                                    note.toDisplayData(otherJournals)
+                                    note.toEntryDisplayData(otherJournals)
                                 }
                             val sortedEntries =
                                 when (sortOrder) {
@@ -153,47 +152,6 @@ class JournalDetailViewModel(
             }
         }
     }
-
-    /**
-     * Converts a JournalNote to the appropriate EntryDisplayData subtype,
-     * preserving media references for rich rendering.
-     */
-    private fun JournalNote.toDisplayData(otherJournals: List<JournalReference> = emptyList()): EntryDisplayData =
-        when (this) {
-            is JournalNote.Text ->
-                EntryDisplayData.TextEntry(
-                    id = uid,
-                    timestamp = creationTimestamp,
-                    content = content,
-                    otherJournals = otherJournals,
-                )
-            is JournalNote.Image ->
-                EntryDisplayData.ImageEntry(
-                    id = uid,
-                    timestamp = creationTimestamp,
-                    mediaRef = mediaRef,
-                    caption = caption,
-                    presentation = presentation,
-                    otherJournals = otherJournals,
-                )
-            is JournalNote.Video ->
-                EntryDisplayData.VideoEntry(
-                    id = uid,
-                    timestamp = creationTimestamp,
-                    mediaRef = mediaRef,
-                    caption = caption,
-                    otherJournals = otherJournals,
-                )
-            is JournalNote.Audio ->
-                EntryDisplayData.AudioEntry(
-                    id = uid,
-                    timestamp = creationTimestamp,
-                    mediaRef = mediaRef,
-                    durationMs = durationMs,
-                    locationName = location?.displayName,
-                    otherJournals = otherJournals,
-                )
-        }
 
     /**
      * Sets the selected journal ID.

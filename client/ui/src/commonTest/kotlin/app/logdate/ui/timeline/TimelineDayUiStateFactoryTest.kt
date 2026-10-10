@@ -4,6 +4,7 @@ import app.logdate.ui.location.PlaceUiState
 import kotlinx.datetime.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -231,5 +232,24 @@ class TimelineDayUiStateFactoryTest {
             listOf("file://video-thumb.jpg", "file://photo.jpg"),
             state.mediaUris.map(MediaObjectUiState::uri),
         )
+    }
+
+    @Test
+    fun `a synthesized moment is captured on the watch only when all its notes were`() {
+        val at = Instant.fromEpochMilliseconds(1_000)
+
+        fun day(vararg fromWatch: Boolean) =
+            createSemanticTimelineDayUiState(
+                summary = "",
+                date = LocalDate(2025, 1, 17),
+                moments = emptyList(),
+                notes =
+                    fromWatch.mapIndexed { index, captured ->
+                        TextNoteUiState(noteId = Uuid.random(), text = "Note $index", timestamp = at, capturedOnWatch = captured)
+                    },
+            )
+
+        assertTrue(day(true, true).moments.single().capturedOnWatch)
+        assertFalse(day(true, false).moments.single().capturedOnWatch)
     }
 }

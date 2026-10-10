@@ -20,7 +20,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.logdate.ui.provenance.CaptureTimeLabel
 import app.logdate.ui.theme.Spacing
 import app.logdate.util.localTime
 import logdate.client.feature.journal.generated.resources.Res
@@ -47,17 +47,13 @@ internal fun VerticalEntryCardShell(
     modifier: Modifier = Modifier,
     cardModifier: Modifier = Modifier,
     contentPadding: Dp = Spacing.md,
+    capturedOnWatch: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
     Column(modifier = modifier) {
-        Text(
-            text = timestamp.localTime,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp),
-        )
+        CaptureTimeLabel(text = timestamp.localTime, capturedOnWatch = capturedOnWatch)
 
         Card(
             onClick = onClick,
@@ -95,17 +91,13 @@ internal fun InlineEntryCardShell(
     onRemoveFromJournal: () -> Unit,
     modifier: Modifier = Modifier,
     cardModifier: Modifier = Modifier,
+    capturedOnWatch: Boolean = false,
     content: @Composable RowScope.() -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
     Column(modifier = modifier) {
-        Text(
-            text = timestamp.localTime,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp),
-        )
+        CaptureTimeLabel(text = timestamp.localTime, capturedOnWatch = capturedOnWatch)
 
         Card(
             onClick = onClick,

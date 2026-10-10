@@ -27,6 +27,7 @@ import app.logdate.ui.common.ContextMenuItem
 import app.logdate.ui.common.EditorWindows
 import app.logdate.ui.common.LocalEditorWindows
 import app.logdate.ui.common.noteDragSource
+import app.logdate.ui.provenance.CaptureTimeLabel
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.ImageNoteUiState
@@ -96,12 +97,9 @@ private fun TextNoteSnippet(uiState: TextNoteUiState) {
     Column(
         modifier = Modifier.padding(vertical = Spacing.xs),
     ) {
-        // Date/time displayed above the card
-        Text(
+        CaptureTimeLabel(
             text = uiState.timestamp.toReadableDateTimeShort(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp),
+            capturedOnWatch = uiState.capturedOnWatch,
         )
 
         Surface(
@@ -128,12 +126,9 @@ private fun ImageNoteSnippet(uiState: ImageNoteUiState) {
     Column(
         modifier = Modifier.padding(vertical = Spacing.xs),
     ) {
-        // Date/time displayed above the card
-        Text(
+        CaptureTimeLabel(
             text = uiState.timestamp.toReadableDateTimeShort(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp),
+            capturedOnWatch = uiState.capturedOnWatch,
         )
 
         Surface(
@@ -203,12 +198,9 @@ private fun VideoNoteSnippet(uiState: VideoNoteUiState) {
     Column(
         modifier = Modifier.padding(vertical = Spacing.xs),
     ) {
-        // Date/time displayed above the card
-        Text(
+        CaptureTimeLabel(
             text = uiState.timestamp.toReadableDateTimeShort(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 4.dp),
+            capturedOnWatch = uiState.capturedOnWatch,
         )
 
         Surface(

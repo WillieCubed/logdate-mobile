@@ -37,6 +37,8 @@ import app.logdate.client.awareness.daylight.DaylightPeriod
 import app.logdate.client.awareness.daylight.stringRes
 import app.logdate.ui.audio.MomentAudioCard
 import app.logdate.ui.profiles.PersonUiState
+import app.logdate.ui.provenance.CapturedOnWatchGlyph
+import app.logdate.ui.provenance.showsWatchProvenance
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.DayPresentation
 import app.logdate.ui.timeline.MomentMediaUiState
@@ -132,9 +134,7 @@ private fun HeroMomentContainer(
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
         modifier = modifier.fillMaxWidth().animateContentSize(),
     ) {
-        if (moment.label.isNotBlank()) {
-            MomentLabel(label = moment.label, timeOfDay = null, color = style.accentColor)
-        }
+        MomentHeader(moment = moment, timeOfDay = null, color = style.accentColor)
 
         if (moment.media.isNotEmpty()) {
             Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp))) {
@@ -207,9 +207,7 @@ private fun SupportingMomentContainer(
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         modifier = modifier.fillMaxWidth().animateContentSize(),
     ) {
-        if (moment.label.isNotBlank()) {
-            MomentLabel(label = moment.label, timeOfDay = moment.timeOfDay, color = style.accentColor)
-        }
+        MomentHeader(moment = moment, timeOfDay = moment.timeOfDay, color = style.accentColor)
 
         if (useInlineLayout) {
             Row(
@@ -262,9 +260,7 @@ private fun StackedMomentCard(
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             modifier = Modifier.padding(cardPadding),
         ) {
-            if (moment.label.isNotBlank()) {
-                MomentLabel(label = moment.label, timeOfDay = moment.timeOfDay, color = style.accentColor)
-            }
+            MomentHeader(moment = moment, timeOfDay = moment.timeOfDay, color = style.accentColor)
             if (moment.media.isNotEmpty()) {
                 MomentMediaGrid(media = moment.media, layoutMode = layoutMode, emphasized = moment.isHero)
             }
@@ -358,6 +354,29 @@ private fun PersonAvatarRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+/**
+ * A moment's label, followed by the watch glyph when everything in the moment was captured on the
+ * watch. `MomentLabel` draws nothing for a blank label, so a moment with neither shows nothing.
+ */
+@Composable
+private fun MomentHeader(
+    moment: MomentUiState,
+    timeOfDay: DaylightPeriod?,
+    color: Color,
+) {
+    if (!showsWatchProvenance(moment.capturedOnWatch)) {
+        MomentLabel(label = moment.label, timeOfDay = timeOfDay, color = color)
+        return
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        MomentLabel(label = moment.label, timeOfDay = timeOfDay, color = color)
+        CapturedOnWatchGlyph()
     }
 }
 

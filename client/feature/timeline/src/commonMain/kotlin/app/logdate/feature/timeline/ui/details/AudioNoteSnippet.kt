@@ -12,6 +12,8 @@ import app.logdate.ui.audio.LocalAudioPlaybackState
 import app.logdate.ui.audio.MomentAudioCard
 import app.logdate.ui.common.noteDragSource
 import app.logdate.ui.media.MediaDeviceSelector
+import app.logdate.ui.provenance.CapturedOnWatchGlyph
+import app.logdate.ui.provenance.showsWatchProvenance
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.timeline.AudioNoteUiState
 import app.logdate.ui.timeline.MomentAudioUiState
@@ -35,6 +37,9 @@ fun AudioNoteSnippet(
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         modifier = modifier.padding(vertical = Spacing.xs).noteDragSource(uiState.noteId.toString()),
     ) {
+        if (showsWatchProvenance(uiState.capturedOnWatch)) {
+            CapturedOnWatchGlyph()
+        }
         MomentAudioCard(
             audio =
                 MomentAudioUiState(

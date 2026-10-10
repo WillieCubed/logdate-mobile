@@ -232,6 +232,7 @@ enum class SharedScreenshotSceneId(
     RewindUpgradeChip("rewind-upgrade-chip"),
     FirstRewindOnboardingSheet("first-rewind-onboarding-sheet"),
     DayBoundaryRecovery("day-boundary-recovery"),
+    CapturedOnWatch("captured-on-watch"),
 }
 
 enum class ScreenshotSceneGroup {
@@ -240,6 +241,7 @@ enum class ScreenshotSceneGroup {
     REWIND,
     SETTINGS,
     SECURITY,
+    TIMELINE,
 }
 
 /**
@@ -1355,7 +1357,13 @@ object SharedScreenshotCatalog {
         )
 
     val allScenes: List<SharedScreenshotSceneSpec> =
-        onboardingMainScenes + onboardingExtendedScenes + settingsScenes + watchSettingsScenes + searchScenes + desktopOnlyScenes
+        onboardingMainScenes +
+            onboardingExtendedScenes +
+            settingsScenes +
+            watchSettingsScenes +
+            searchScenes +
+            desktopOnlyScenes +
+            provenanceScenes
 
     fun scene(id: SharedScreenshotSceneId): SharedScreenshotSceneSpec = allScenes.first { it.id == id }
 }

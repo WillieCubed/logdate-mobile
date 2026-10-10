@@ -72,6 +72,7 @@ internal fun TextEntryCard(
 
     InlineEntryCardShell(
         timestamp = entry.timestamp,
+        capturedOnWatch = entry.capturedOnWatch,
         onClick = {
             if (expanded) onClick() else expanded = true
         },
@@ -114,6 +115,7 @@ internal fun ImageEntryCard(
 ) {
     VerticalEntryCardShell(
         timestamp = entry.timestamp,
+        capturedOnWatch = entry.capturedOnWatch,
         onClick = onClick,
         onRemoveFromJournal = onRemoveFromJournal,
         modifier = modifier,
@@ -134,6 +136,7 @@ internal fun VideoEntryCard(
 ) {
     VerticalEntryCardShell(
         timestamp = entry.timestamp,
+        capturedOnWatch = entry.capturedOnWatch,
         onClick = onClick,
         onRemoveFromJournal = onRemoveFromJournal,
         modifier = modifier,
@@ -226,6 +229,7 @@ internal fun AudioEntryCard(
 
     InlineEntryCardShell(
         timestamp = entry.timestamp,
+        capturedOnWatch = entry.capturedOnWatch,
         onClick = onClick,
         onRemoveFromJournal = onRemoveFromJournal,
         modifier = modifier,

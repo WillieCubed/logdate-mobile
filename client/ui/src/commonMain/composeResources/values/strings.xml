@@ -83,4 +83,6 @@
     <string name="search_type_label_person">Person</string>
     <string name="workspace_search_hint">Search your log</string>
     <string name="workspace_account_label">Account, backup and settings</string>
+    <!-- Provenance -->
+    <string name="captured_on_watch">Captured on your watch</string>
 </resources>

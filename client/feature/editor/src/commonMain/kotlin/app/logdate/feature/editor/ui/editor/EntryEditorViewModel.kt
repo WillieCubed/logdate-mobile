@@ -1383,7 +1383,7 @@ class EntryEditorViewModel(
             mutableEditorState.update { it.copy(isLoading = true) }
 
             contentLoader.loadEntry(entryId).fold(
-                onSuccess = { block ->
+                onSuccess = { loaded ->
                     mutableEditorState.update { currentState ->
                         if (generation != loadGeneration ||
                             currentState.contentRevision != requestedContentRevision ||
@@ -1395,7 +1395,8 @@ class EntryEditorViewModel(
                         currentState.copy(
                             contentRevision = currentState.contentRevision + 1,
                             expandedBlockId = null,
-                            blocks = listOf(block),
+                            blocks = listOf(loaded.block),
+                            capturedOnWatch = loaded.capturedOnWatch,
                             selectedJournalIds = journalId?.let(::listOf) ?: currentState.selectedJournalIds,
                             hasJournalSelectionChanges = false,
                             isLoading = false,

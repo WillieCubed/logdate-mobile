@@ -44,11 +44,15 @@ sealed interface EntryDisplayData {
     val timestamp: Instant
     val otherJournals: List<JournalReference>
 
+    /** Whether the entry was captured on the watch. */
+    val capturedOnWatch: Boolean
+
     data class TextEntry(
         override val id: Uuid,
         override val timestamp: Instant,
         val content: String,
         override val otherJournals: List<JournalReference> = emptyList(),
+        override val capturedOnWatch: Boolean = false,
     ) : EntryDisplayData
 
     data class ImageEntry(
@@ -58,6 +62,7 @@ sealed interface EntryDisplayData {
         val caption: String,
         val presentation: PhotoPresentation = PhotoPresentation.EdgeToEdge,
         override val otherJournals: List<JournalReference> = emptyList(),
+        override val capturedOnWatch: Boolean = false,
     ) : EntryDisplayData
 
     data class VideoEntry(
@@ -66,6 +71,7 @@ sealed interface EntryDisplayData {
         val mediaRef: String,
         val caption: String,
         override val otherJournals: List<JournalReference> = emptyList(),
+        override val capturedOnWatch: Boolean = false,
     ) : EntryDisplayData
 
     data class AudioEntry(
@@ -75,5 +81,6 @@ sealed interface EntryDisplayData {
         val durationMs: Long,
         val locationName: String? = null,
         override val otherJournals: List<JournalReference> = emptyList(),
+        override val capturedOnWatch: Boolean = false,
     ) : EntryDisplayData
 }

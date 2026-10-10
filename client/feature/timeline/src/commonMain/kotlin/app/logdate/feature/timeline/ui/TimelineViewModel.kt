@@ -14,7 +14,9 @@ import app.logdate.client.domain.timeline.Moment
 import app.logdate.client.domain.timeline.StreamingTimelineRequest
 import app.logdate.client.domain.timeline.TimelineDay
 import app.logdate.client.domain.timeline.TimelinePlaceVisit
+import app.logdate.client.domain.timeline.capturedOnWatch
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.isCapturedOnWatch
 import app.logdate.client.repository.transcription.TranscriptionData
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.repository.transcription.TranscriptionStatus
@@ -267,6 +269,7 @@ class TimelineViewModel(
             places = places.map { PlaceUiState(id = it.id, title = it.name, latitude = it.latitude, longitude = it.longitude) },
             people = resolvedPeople,
             isHero = isHero,
+            capturedOnWatch = capturedOnWatch(),
         )
     }
 
@@ -321,6 +324,7 @@ class TimelineViewModel(
                         text = note.content,
                         timestamp = note.creationTimestamp,
                         journals = noteJournals,
+                        capturedOnWatch = note.isCapturedOnWatch,
                     )
                 is JournalNote.Image ->
                     ImageNoteUiState(
@@ -330,6 +334,7 @@ class TimelineViewModel(
                         caption = note.caption,
                         presentation = note.presentation,
                         journals = noteJournals,
+                        capturedOnWatch = note.isCapturedOnWatch,
                     )
                 is JournalNote.Audio ->
                     AudioNoteUiState(
@@ -338,6 +343,7 @@ class TimelineViewModel(
                         timestamp = note.creationTimestamp,
                         duration = note.durationMs,
                         journals = noteJournals,
+                        capturedOnWatch = note.isCapturedOnWatch,
                     )
                 is JournalNote.Video ->
                     VideoNoteUiState(
@@ -346,6 +352,7 @@ class TimelineViewModel(
                         timestamp = note.creationTimestamp,
                         caption = note.caption,
                         journals = noteJournals,
+                        capturedOnWatch = note.isCapturedOnWatch,
                     )
             }
         }

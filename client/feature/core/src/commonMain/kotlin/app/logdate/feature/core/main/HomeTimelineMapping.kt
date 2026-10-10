@@ -7,7 +7,9 @@ import app.logdate.client.domain.recommendation.HomeRecommendation
 import app.logdate.client.domain.timeline.Moment
 import app.logdate.client.domain.timeline.TimelineDay
 import app.logdate.client.domain.timeline.TimelinePlaceVisit
+import app.logdate.client.domain.timeline.capturedOnWatch
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.isCapturedOnWatch
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.Person
 import app.logdate.ui.location.PlaceUiState
@@ -97,6 +99,7 @@ private fun Moment.toMomentUiState(
         places = places.map { PlaceUiState(id = it.id, title = it.name, latitude = it.latitude, longitude = it.longitude) },
         people = resolvedPeople,
         isHero = isHero,
+        capturedOnWatch = capturedOnWatch(),
     )
 }
 
@@ -113,6 +116,7 @@ private fun List<JournalNote>.toUiState(membershipMap: Map<Uuid, List<Journal>> 
                     text = note.content,
                     timestamp = note.creationTimestamp,
                     journals = noteJournals,
+                    capturedOnWatch = note.isCapturedOnWatch,
                 )
             is JournalNote.Image ->
                 ImageNoteUiState(
@@ -122,6 +126,7 @@ private fun List<JournalNote>.toUiState(membershipMap: Map<Uuid, List<Journal>> 
                     caption = note.caption,
                     presentation = note.presentation,
                     journals = noteJournals,
+                    capturedOnWatch = note.isCapturedOnWatch,
                 )
             is JournalNote.Audio ->
                 AudioNoteUiState(
@@ -130,6 +135,7 @@ private fun List<JournalNote>.toUiState(membershipMap: Map<Uuid, List<Journal>> 
                     timestamp = note.creationTimestamp,
                     duration = note.durationMs,
                     journals = noteJournals,
+                    capturedOnWatch = note.isCapturedOnWatch,
                 )
             is JournalNote.Video ->
                 VideoNoteUiState(
@@ -138,6 +144,7 @@ private fun List<JournalNote>.toUiState(membershipMap: Map<Uuid, List<Journal>> 
                     timestamp = note.creationTimestamp,
                     caption = note.caption,
                     journals = noteJournals,
+                    capturedOnWatch = note.isCapturedOnWatch,
                 )
         }
     }

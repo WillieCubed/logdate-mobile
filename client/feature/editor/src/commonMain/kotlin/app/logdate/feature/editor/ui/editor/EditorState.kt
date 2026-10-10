@@ -55,6 +55,7 @@ class EditorState(
     val isEditingLocked: Boolean = false,
     val contentRevision: Long = 0,
     val visitContext: VisitMemoryContext? = null,
+    val capturedOnWatch: Boolean = false,
 ) {
     val isRecordingAudio: Boolean
         get() =
@@ -132,6 +133,7 @@ class EditorState(
         isEditingLocked: Boolean = this.isEditingLocked,
         contentRevision: Long = this.contentRevision,
         visitContext: VisitMemoryContext? = this.visitContext,
+        capturedOnWatch: Boolean = this.capturedOnWatch,
     ): EditorState =
         EditorState(
             blocks = blocks,
@@ -153,6 +155,7 @@ class EditorState(
             isEditingLocked = isEditingLocked,
             contentRevision = contentRevision,
             visitContext = visitContext,
+            capturedOnWatch = capturedOnWatch,
         )
 
     override fun equals(other: Any?): Boolean {
@@ -178,6 +181,7 @@ class EditorState(
         if (isEditingLocked != other.isEditingLocked) return false
         if (contentRevision != other.contentRevision) return false
         if (visitContext != other.visitContext) return false
+        if (capturedOnWatch != other.capturedOnWatch) return false
 
         return true
     }
@@ -202,6 +206,7 @@ class EditorState(
         result = 31 * result + isSaving.hashCode()
         result = 31 * result + isEditingLocked.hashCode()
         result = 31 * result + contentRevision.hashCode()
+        result = 31 * result + capturedOnWatch.hashCode()
         return result
     }
 
