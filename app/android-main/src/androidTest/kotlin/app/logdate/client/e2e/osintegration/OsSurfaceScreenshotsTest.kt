@@ -10,6 +10,7 @@ import app.logdate.feature.core.export.ExportNotificationHelper
 import app.logdate.feature.core.restore.RestoreNotificationHelper
 import app.logdate.feature.core.restore.RestoreStage
 import org.junit.After
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -176,6 +177,29 @@ class OsSurfaceScreenshotsTest {
         OsSurfaceCapture.capture(surface = "large-screens-and-desktop-windowing", state = "side-by-side")
     }
 
+    /**
+     * LogDate in Android desktop windowing: the main window, and a new entry opened from a journal's
+     * menu in a window of its own. Desktop windowing needs developer settings and a restart, which a
+     * managed device cannot do, so this runs only when `scripts/desktop-windowing-screenshots.sh`
+     * passes `logdate.desktopWindowing=true` from an emulator that has desktop windowing turned on.
+     */
+    @Test fun desktopWindows() {
+        assumeTrue(InstrumentationRegistry.getArguments().getString("logdate.desktopWindowing") == "true")
+        OsSurfaceCapture.prepareOnboardedApp()
+        OsSurfaceCapture.createJournal("Summer in Lisbon")
+        OsSurfaceCapture.shell(
+            "am start --windowingMode $WINDOWING_MODE_FREEFORM -n ${OsSurfaceCapture.packageName}/app.logdate.client.MainActivity",
+        )
+        OsSurfaceCapture.waitForText("Journals").click()
+        OsSurfaceCapture.longPress(OsSurfaceCapture.waitForText("Summer in Lisbon"))
+        OsSurfaceCapture.waitForText("New entry in a new window").click()
+        Thread.sleep(4_000L)
+        OsSurfaceCapture.capture(surface = "large-screens-and-desktop-windowing", state = "desktop-windows")
+        // The labels Android holds for each window, which the caption bar and Recents may show.
+        val labels = OsSurfaceCapture.shell("dumpsys activity activities").lines().filter { "taskDescription: label" in it }
+        OsSurfaceCapture.writeEvidence("large-screens-and-desktop-windowing", "desktop-window-labels", labels.joinToString("\n") { it.trim() })
+    }
+
     @Test fun captureWidgetInPicker() {
         OsSurfaceCapture.prepareOnboardedApp()
         OsSurfaceCapture.enableFlags(FeatureFlag.LOCK_SCREEN_CAPTURE_WIDGET)
@@ -274,5 +298,10 @@ class OsSurfaceScreenshotsTest {
         OsSurfaceCapture.device.pressHome()
         Thread.sleep(1_500L)
         OsSurfaceCapture.capture(surface = "bubbles", state = "recorder-collapsed")
+    }
+
+    private companion object {
+        /** `WindowConfiguration.WINDOWING_MODE_FREEFORM`, which `am start --windowingMode` takes. */
+        const val WINDOWING_MODE_FREEFORM = 5
     }
 }

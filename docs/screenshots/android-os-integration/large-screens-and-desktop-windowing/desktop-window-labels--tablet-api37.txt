@@ -1,0 +1,4 @@
+taskDescription: label="New entry" icon=null iconResource=/0 iconFilename=null primaryColor=0
+taskDescription: label="null" icon=null iconResource=/0 iconFilename=null primaryColor=fff2f0f6
+taskDescription: label="null" icon=null iconResource=/0 iconFilename=null primaryColor=ff222222
+taskDescription: label="null" icon=null iconResource=/0 iconFilename=null primaryColor=fff2f0f6

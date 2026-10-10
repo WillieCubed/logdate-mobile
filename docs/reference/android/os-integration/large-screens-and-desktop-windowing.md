@@ -4,7 +4,8 @@ Status: partial.
 
 - **Ships today:** the adaptive Home workspace, foldable postures, separate editor windows, video
   picture-in-picture, manifest hygiene, window titles, and "New entry in a new window".
-- **Planned:** the caption bar and desktop windowing evidence.
+- **Verified:** separate LogDate windows in Android 17 desktop windowing.
+- **Planned:** the workspace app bar in the caption bar.
 
 ## What it is
 
@@ -27,8 +28,9 @@ covers the window and system side.
 - **Chromebooks and desktops.** LogDate installs, and it does not assume a touchscreen.
 - **Resizing.** A window can be resized, docked to a keyboard, or bubbled without losing what is on
   screen.
-- **Window titles.** Each editor window is named after its entry ("New entry" until it has a title)
-  in Recents, the taskbar, and the caption bar.
+- **Window titles.** Each editor window carries its entry's first line as its label ("New entry" until
+  there is text). Android 17's desktop caption bar shows the app's name, LogDate, instead of that
+  label, so the label is not visible there.
 - **New windows.** A journal's menu (its overflow menu, a long-press, or a right-click on its cover)
   offers "New entry in a new window", which opens the editor beside LogDate in split screen when
   there is room. Launchers and the taskbar offer "New window" for the editor.
@@ -69,8 +71,9 @@ still reloads correctly.
   the editor from that activity. On Android 12L and later, that request splits the screen even from
   full screen. The launch must come from the activity: from the application context, Android has no
   window to place the editor beside and opens it full screen.
-- `EditorActivity` calls `setTaskDescription` with the entry's title, which names the window
-  everywhere the system lists it.
+- `EditorActivity` calls `setTaskDescription` with the entry's first line, which Android records as
+  the window's label. The desktop capture saves the labels Android holds
+  (`desktop-window-labels--tablet-api37.txt`): the editor window's is "New entry".
 
 ### The caption bar
 
@@ -87,11 +90,20 @@ These changes are covered by the Home workspace contract (`checkHomeWorkspaceCon
 
 ### Desktop windowing evidence
 
-A spike decides how to capture desktop windowing on a Gradle Managed Device. If it cannot be captured
-there, the caption bar is verified with Compose screenshots that inject caption insets. Those are
-recorded in the checklist as layout-only evidence.
+Desktop windowing cannot be captured on a Gradle Managed Device. The Android 17 tablet image ships
+with desktop windowing off; turning it on takes the "Enable desktop windowing" developer setting, a
+system property that lifts the device check, and a restart. A managed device cannot restart in the
+middle of a run, and starting LogDate with `am start --windowingMode 5` there opens it full screen.
 
-Spike result: pending.
+`./run screenshots:desktop` (`scripts/desktop-windowing-screenshots.sh`) captures it on a regular
+emulator instead. It creates an Android 17 Pixel Tablet emulator the first time, turns desktop
+windowing on and restarts it, installs the debug app and its tests, and runs
+`OsSurfaceScreenshotsTest#desktopWindows`. That test skips everywhere else, because it runs only
+when the script passes `logdate.desktopWindowing=true`.
+
+The main window, and a new entry opened from a journal's menu as a second window:
+
+![Two LogDate windows on the Android desktop, each with a LogDate caption bar and minimize, maximize, and close buttons, the editor in front of the Journals window, with LogDate in the taskbar](../../../screenshots/android-os-integration/large-screens-and-desktop-windowing/desktop-windows--tablet-api37.png)
 
 ## Flag and rollout
 
@@ -99,8 +111,8 @@ None. These are platform requirements and fixes.
 
 ## Privacy
 
-Window titles show the entry title, which is visible in Recents. This matches how other document apps
-behave.
+An editor window's label holds the first line of its entry. Android 17 does not show it in the caption
+bar or Recents, but a launcher that lists task labels would, as it would for any document app.
 
 ## How to test
 
@@ -112,6 +124,6 @@ behave.
 ## Updating screenshots
 
 - Caption-aware app bar scenes are Lane 1 references.
-- Recents, the taskbar, side-by-side windows, and desktop windowing are Lane 2 captures, recorded with
-  `./run screenshots:os`. They land in
-  `docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/`.
+- Side-by-side windows are Lane 2 captures, recorded with `./run screenshots:os`. Desktop windowing
+  is recorded with `./run screenshots:desktop`, because it needs its own emulator (see above). Both
+  land in `docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/`.

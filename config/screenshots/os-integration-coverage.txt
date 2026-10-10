@@ -83,3 +83,7 @@ context-menus|system|docs/screenshots/android-os-integration/keyboard-pointer-dr
 
 # Keyboard shortcuts: Android's Meta+/ helper listing LogDate's group with a USB keyboard attached.
 keyboard-shortcuts|system|docs/screenshots/android-os-integration/keyboard-pointer-drag-and-drop/shortcut-helper--tablet-api37.png
+
+# Desktop windowing: two LogDate windows on the Android 17 desktop, and the labels Android holds for them.
+desktop-windowing|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/desktop-windows--tablet-api37.png
+desktop-windowing|system|docs/screenshots/android-os-integration/large-screens-and-desktop-windowing/desktop-window-labels--tablet-api37.txt

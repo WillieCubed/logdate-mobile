@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.view.WindowManager
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
@@ -50,14 +51,16 @@ object OsSurfaceCapture {
 
     val device: UiDevice by lazy { UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()) }
 
-    /** `phone` below a 600dp smallest width, `tablet` at or above it. */
+    /**
+     * `phone` below a 600dp smallest width, `tablet` at or above it. Read from the device's display
+     * rather than the app's window, which is smaller than the screen in desktop windowing.
+     */
     val formFactor: String
         get() {
-            val configuration =
-                InstrumentationRegistry
-                    .getInstrumentation()
-                    .targetContext.resources.configuration
-            return if (configuration.smallestScreenWidthDp >= 600) "tablet" else "phone"
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val display = context.getSystemService(WindowManager::class.java).maximumWindowMetrics.bounds
+            val smallestWidthDp = minOf(display.width(), display.height()) / context.resources.displayMetrics.density
+            return if (smallestWidthDp >= 600) "tablet" else "phone"
         }
 
     private val outputRoot: File
