@@ -3,10 +3,14 @@ package app.logdate.ui.common
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.unit.sp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -15,12 +19,12 @@ import kotlin.test.assertTrue
 class MarkdownPreviewTest {
     private val styles =
         MarkdownPreviewStyles(
-            h1 = SpanStyle(color = Color.Red),
-            h2 = SpanStyle(color = Color.Green),
-            h3 = SpanStyle(color = Color.Blue),
-            h4 = SpanStyle(color = Color.Cyan),
-            h5 = SpanStyle(color = Color.Magenta),
-            h6 = SpanStyle(color = Color.Yellow),
+            h1 = TextStyle(color = Color.Red, lineHeight = 36.sp),
+            h2 = TextStyle(color = Color.Green, lineHeight = 32.sp),
+            h3 = TextStyle(color = Color.Blue, lineHeight = 28.sp),
+            h4 = TextStyle(color = Color.Cyan, lineHeight = 24.sp),
+            h5 = TextStyle(color = Color.Magenta, lineHeight = 20.sp),
+            h6 = TextStyle(color = Color.Yellow, lineHeight = 20.sp),
             strong = SpanStyle(fontWeight = FontWeight.Bold),
             emphasis = SpanStyle(fontStyle = FontStyle.Italic),
             strikethrough = SpanStyle(textDecoration = TextDecoration.LineThrough),
@@ -38,11 +42,11 @@ class MarkdownPreviewTest {
             )
 
         assertEquals(
-            "Heading bold\n\nParagraph with em and link.\n\n• first\n• second",
-            preview.text,
+            listOf("Heading bold", "\nParagraph with em and link.\n\n• first\n• second"),
+            preview.paragraphTexts(),
         )
         assertFalse("https://logdate.app" in preview.text)
-        assertTrue(preview.hasStyle(styles.h1, "Heading"))
+        assertTrue(preview.hasStyle(styles.h1.toSpanStyle(), "Heading"))
         assertTrue(preview.hasStyle(styles.strong, "bold"))
         assertTrue(preview.hasStyle(styles.emphasis, "em"))
         assertTrue(preview.hasStyle(styles.link, "link"))
@@ -126,6 +130,70 @@ class MarkdownPreviewTest {
         assertEquals("label", reading.text)
         assertTrue(reading.getLinkAnnotations(0, reading.length).isEmpty())
     }
+
+    @Test
+    fun `headings lay out as their own paragraphs at their heading line height`() {
+        val preview =
+            buildMarkdownPreview(
+                "Intro\n\n# Title\n## Subtitle\n\nBody\n\n### Section\n\n#### Detail",
+                styles,
+            )
+
+        assertEquals(
+            listOf("Intro\n", "Title", "Subtitle", "\nBody\n", "Section", "", "Detail"),
+            preview.paragraphTexts(),
+        )
+        assertEquals(
+            listOf(
+                ParagraphStyle(textDirection = TextDirection.Content),
+                ParagraphStyle(textDirection = TextDirection.Content, lineHeight = 36.sp),
+                ParagraphStyle(textDirection = TextDirection.Content, lineHeight = 32.sp),
+                ParagraphStyle(textDirection = TextDirection.Content),
+                ParagraphStyle(textDirection = TextDirection.Content, lineHeight = 28.sp),
+                ParagraphStyle(textDirection = TextDirection.Content),
+                ParagraphStyle(textDirection = TextDirection.Content, lineHeight = 24.sp),
+            ),
+            preview.paragraphStyles.map { it.item },
+        )
+        assertTrue(preview.hasStyle(styles.h2.toSpanStyle(), "Subtitle"))
+    }
+
+    @Test
+    fun `preview without headings stays one paragraph`() {
+        val preview = buildMarkdownPreview("first\n\n- second\n- third", styles)
+
+        assertEquals(listOf("first\n\n• second\n• third"), preview.paragraphTexts())
+    }
+
+    @Test
+    fun `compact preview drops blank lines between blocks and keeps heading paragraphs`() {
+        val preview =
+            buildMarkdownPreview(
+                parseMarkdownDocument("# Title\n\nBody **bold**.\n\n- first\n- second\n\n> quote"),
+                styles,
+                compact = true,
+            )
+
+        assertEquals("TitleBody bold.\n• first\n• second\nquote", preview.text)
+        assertEquals(listOf("Title", "Body bold.\n• first\n• second\nquote"), preview.paragraphTexts())
+        assertEquals(
+            36.sp,
+            preview.paragraphStyles
+                .first()
+                .item.lineHeight,
+        )
+        assertTrue(preview.hasStyle(styles.strong, "bold"))
+        assertTrue(preview.hasStyle(styles.quote, "quote"))
+    }
+
+    @Test
+    fun `compact preview without blank lines matches the regular preview`() {
+        val document = parseMarkdownDocument("first line\nsecond line")
+
+        assertEquals(buildMarkdownPreview(document, styles), buildMarkdownPreview(document, styles, compact = true))
+    }
+
+    private fun AnnotatedString.paragraphTexts(): List<String> = paragraphStyles.map { text.substring(it.start, it.end) }
 
     private fun AnnotatedString.hasStyle(
         expected: SpanStyle,

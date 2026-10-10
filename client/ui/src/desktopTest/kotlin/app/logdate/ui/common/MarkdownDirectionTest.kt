@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.unit.LayoutDirection
 import app.logdate.ui.theme.LogDateTheme
@@ -69,7 +70,8 @@ class MarkdownDirectionTest {
     fun `preview model preserves newlines and Arabic runs within English and mixed content`() =
         runDesktopComposeUiTest(width = 480, height = 800) {
             val span = SpanStyle()
-            val styles = MarkdownPreviewStyles(span, span, span, span, span, span, span, span, span, span, span, span)
+            val heading = TextStyle()
+            val styles = MarkdownPreviewStyles(heading, heading, heading, heading, heading, heading, span, span, span, span, span, span)
             val preview = buildMarkdownPreview("Hello **world**.\nمرحبا بالعالم.\nHello مرحبا.", styles)
             setContent {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -89,7 +91,8 @@ class MarkdownDirectionTest {
     fun `Arabic preview keeps its paragraph and punctuation right to left`() =
         runDesktopComposeUiTest(width = 480, height = 800) {
             val span = SpanStyle()
-            val styles = MarkdownPreviewStyles(span, span, span, span, span, span, span, span, span, span, span, span)
+            val heading = TextStyle()
+            val styles = MarkdownPreviewStyles(heading, heading, heading, heading, heading, heading, span, span, span, span, span, span)
             val preview = buildMarkdownPreview("مرحبا **بالعالم**.", styles)
             setContent {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {

@@ -21,12 +21,14 @@ import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.mikepenz.markdown.compose.LocalMarkdownColors
 import com.mikepenz.markdown.compose.LocalMarkdownDimens
@@ -160,7 +162,7 @@ fun MarkdownPreviewText(
     maxLines: Int = 4,
 ) {
     val styles = markdownPreviewStyles()
-    val preview = remember(content, styles) { buildMarkdownPreview(content, styles) }
+    val preview = remember(content, styles) { buildMarkdownPreview(parseMarkdownDocument(content), styles, compact = true) }
     var semanticsText by remember(preview) { mutableStateOf(preview) }
 
     Text(
@@ -193,17 +195,17 @@ fun MarkdownPreviewText(
 }
 
 @Composable
-private fun markdownPreviewStyles(): MarkdownPreviewStyles {
+internal fun markdownPreviewStyles(): MarkdownPreviewStyles {
     val typography = MaterialTheme.typography
     val colors = MaterialTheme.colorScheme
     return remember(typography, colors) {
         MarkdownPreviewStyles(
-            h1 = typography.headlineMedium.toSpanStyle(),
-            h2 = typography.headlineSmall.toSpanStyle(),
-            h3 = typography.titleLarge.toSpanStyle(),
-            h4 = typography.titleMedium.toSpanStyle(),
-            h5 = typography.titleSmall.toSpanStyle(),
-            h6 = typography.labelLarge.toSpanStyle(),
+            h1 = typography.headlineMedium,
+            h2 = typography.headlineSmall,
+            h3 = typography.titleLarge,
+            h4 = typography.titleMedium,
+            h5 = typography.titleSmall,
+            h6 = typography.labelLarge,
             strong = SpanStyle(fontWeight = FontWeight.Bold),
             emphasis = SpanStyle(fontStyle = FontStyle.Italic),
             strikethrough = SpanStyle(textDecoration = TextDecoration.LineThrough),
@@ -228,12 +230,12 @@ private fun markdownPreviewStyles(): MarkdownPreviewStyles {
 }
 
 internal data class MarkdownPreviewStyles(
-    val h1: SpanStyle,
-    val h2: SpanStyle,
-    val h3: SpanStyle,
-    val h4: SpanStyle,
-    val h5: SpanStyle,
-    val h6: SpanStyle,
+    val h1: TextStyle,
+    val h2: TextStyle,
+    val h3: TextStyle,
+    val h4: TextStyle,
+    val h5: TextStyle,
+    val h6: TextStyle,
     val strong: SpanStyle,
     val emphasis: SpanStyle,
     val strikethrough: SpanStyle,
@@ -264,10 +266,65 @@ internal fun buildMarkdownPreview(
     document: MarkdownDocument,
     styles: MarkdownPreviewStyles,
     clickableLinks: Boolean = false,
+    compact: Boolean = false,
 ): AnnotatedString {
-    val result = AnnotatedString.Builder(buildMarkdownAnnotatedText(document, styles, clickableLinks))
-    if (document.plainText.isNotEmpty()) {
-        result.addStyle(ParagraphStyle(textDirection = TextDirection.Content), 0, document.plainText.length)
+    val text = buildMarkdownAnnotatedText(document, styles, clickableLinks)
+    if (text.isEmpty()) return text
+    val paragraphs = buildParagraphs(document, styles, text)
+    return if (compact) paragraphs.withoutBlankLines() else paragraphs
+}
+
+private fun buildParagraphs(
+    document: MarkdownDocument,
+    styles: MarkdownPreviewStyles,
+    text: AnnotatedString,
+): AnnotatedString {
+    // Android sizes every line of a paragraph from the paragraph's first line. A heading that shares the body's
+    // paragraph would shrink the body lines to the heading's baseline and clip their descenders, so each heading
+    // line is its own paragraph at its heading line height. A paragraph boundary is a line break, so it replaces
+    // the newline it falls on.
+    val body = ParagraphStyle(textDirection = TextDirection.Content)
+    return buildAnnotatedString {
+        var cursor = 0
+        document.spans.forEach { span ->
+            val heading = styles.headingFor(span.kind)
+            if (heading == null || span.textStart >= span.textEnd) return@forEach
+            val lineStart = text.text.lastIndexOf('\n', span.textStart - 1) + 1
+            if (lineStart < cursor) return@forEach
+            val lineEnd = text.text.indexOf('\n', span.textEnd).takeIf { it >= 0 } ?: text.length
+            if (lineStart > cursor) withStyle(body) { append(text.subSequence(cursor, lineStart - 1)) }
+            withStyle(body.copy(lineHeight = heading.lineHeight)) { append(text.subSequence(lineStart, lineEnd)) }
+            cursor = minOf(lineEnd + 1, text.length)
+        }
+        if (cursor < text.length || text[cursor - 1] == '\n') {
+            withStyle(body) { append(text.subSequence(cursor, text.length)) }
+        }
+    }
+}
+
+/**
+ * Drops the blank lines between blocks so a line-limited card spends its lines on content and never ends on an
+ * ellipsis that sits alone on an empty line. Heading paragraphs keep their own line height, which still sets
+ * them apart from the body.
+ */
+private fun AnnotatedString.withoutBlankLines(): AnnotatedString {
+    val paragraphStarts = paragraphStyles.map { it.start }.toSet()
+    val removed =
+        BooleanArray(length) { index ->
+            text[index] == '\n' && (index == 0 || text[index - 1] == '\n' || index in paragraphStarts)
+        }
+    val shifts = IntArray(length + 1)
+    for (index in 0 until length) shifts[index + 1] = shifts[index] + if (removed[index]) 1 else 0
+    val result = AnnotatedString.Builder(buildString { text.forEachIndexed { index, char -> if (!removed[index]) append(char) } })
+    spanStyles.forEach { range ->
+        val start = range.start - shifts[range.start]
+        val end = range.end - shifts[range.end]
+        if (start < end) result.addStyle(range.item, start, end)
+    }
+    paragraphStyles.forEach { range ->
+        val start = range.start - shifts[range.start]
+        val end = range.end - shifts[range.end]
+        if (start < end) result.addStyle(range.item, start, end)
     }
     return result.toAnnotatedString()
 }
@@ -302,7 +359,7 @@ private fun String.safeLinkDestination(): String? =
         else -> null
     }
 
-private fun MarkdownPreviewStyles.forKind(kind: MarkdownStyleKind): SpanStyle =
+private fun MarkdownPreviewStyles.headingFor(kind: MarkdownStyleKind): TextStyle? =
     when (kind) {
         MarkdownStyleKind.HEADING_1 -> h1
         MarkdownStyleKind.HEADING_2 -> h2
@@ -310,6 +367,17 @@ private fun MarkdownPreviewStyles.forKind(kind: MarkdownStyleKind): SpanStyle =
         MarkdownStyleKind.HEADING_4 -> h4
         MarkdownStyleKind.HEADING_5 -> h5
         MarkdownStyleKind.HEADING_6 -> h6
+        else -> null
+    }
+
+private fun MarkdownPreviewStyles.forKind(kind: MarkdownStyleKind): SpanStyle =
+    when (kind) {
+        MarkdownStyleKind.HEADING_1 -> h1.toSpanStyle()
+        MarkdownStyleKind.HEADING_2 -> h2.toSpanStyle()
+        MarkdownStyleKind.HEADING_3 -> h3.toSpanStyle()
+        MarkdownStyleKind.HEADING_4 -> h4.toSpanStyle()
+        MarkdownStyleKind.HEADING_5 -> h5.toSpanStyle()
+        MarkdownStyleKind.HEADING_6 -> h6.toSpanStyle()
         MarkdownStyleKind.STRONG -> strong
         MarkdownStyleKind.EMPHASIS -> emphasis
         MarkdownStyleKind.STRIKETHROUGH -> strikethrough
