@@ -22,6 +22,11 @@ import app.logdate.wear.v2.flow.FlowActions
 import app.logdate.wear.v2.flow.FlowPage
 import app.logdate.wear.v2.flow.FlowTags
 import app.logdate.wear.v2.flow.FlowUiState
+import app.logdate.wear.v2.memories.MemoryCardTags
+import app.logdate.wear.v2.memories.MemoryCards
+import app.logdate.wear.v2.memories.OnThisDay
+import app.logdate.wear.v2.memories.WeeklyRewind
+import app.logdate.wear.v2.memories.memoryCardItems
 import app.logdate.wear.v2.moments.MomentRowTags
 import app.logdate.wear.v2.playback.PlaybackFailure
 import app.logdate.wear.v2.playback.PlaybackState
@@ -94,6 +99,36 @@ class FlowPageTest {
     }
 
     @Test
+    fun the_on_this_day_card_opens_its_moment() {
+        val opened = mutableListOf<JournalNote>()
+        val onThisDay = OnThisDay(LocalDate(2025, 10, 10), yearsAgo = 1, leadMoment = text, momentCount = 2, summary = "A day at the beach")
+        showCards(MemoryCards(onThisDay = onThisDay), onOpenMoment = { opened += it })
+
+        composeRule.onNodeWithTag(MemoryCardTags.ON_THIS_DAY).performClick()
+
+        assertEquals(listOf<JournalNote>(text), opened)
+    }
+
+    @Test
+    fun the_rewind_card_opens_its_moment() {
+        val opened = mutableListOf<JournalNote>()
+        showCards(MemoryCards(rewind = WeeklyRewind("A week of quiet mornings", voice)), onOpenMoment = { opened += it })
+
+        composeRule.onNodeWithTag(MemoryCardTags.REWIND).performClick()
+
+        assertEquals(listOf<JournalNote>(voice), opened)
+    }
+
+    @Test
+    fun no_card_is_drawn_without_a_way_to_open_its_moment() {
+        val onThisDay = OnThisDay(LocalDate(2025, 10, 10), yearsAgo = 1, leadMoment = text, momentCount = 2, summary = "A day at the beach")
+        showCards(MemoryCards(onThisDay = onThisDay, rewind = WeeklyRewind("A week of quiet mornings", voice)), onOpenMoment = null)
+
+        assertTrue(composeRule.onAllNodesWithTag(MemoryCardTags.ON_THIS_DAY).fetchSemanticsNodes().isEmpty())
+        assertTrue(composeRule.onAllNodesWithTag(MemoryCardTags.REWIND).fetchSemanticsNodes().isEmpty())
+    }
+
+    @Test
     fun the_archive_lists_days_and_opens_their_moments() {
         val opened = mutableListOf<JournalNote>()
         composeRule.setContent {
@@ -124,6 +159,21 @@ class FlowPageTest {
                     timeSource = FlowFixedTime,
                     actions = actions,
                     playback = playback,
+                )
+            }
+        }
+    }
+
+    private fun showCards(
+        cards: MemoryCards,
+        onOpenMoment: ((JournalNote) -> Unit)?,
+    ) {
+        composeRule.setContent {
+            Scene {
+                FlowPage(
+                    state = FlowUiState.Ready(zone, emptyList(), earlierCount = 0),
+                    timeSource = FlowFixedTime,
+                    cards = { spec -> memoryCardItems(cards, spec, onOpenMoment) },
                 )
             }
         }

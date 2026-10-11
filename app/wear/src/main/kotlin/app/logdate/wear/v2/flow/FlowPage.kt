@@ -43,7 +43,7 @@ data class FlowActions(
 
 /**
  * Home's second page: the voice and text moments of the last 7 days, newest first, each playable
- * from its row, then Earlier when the library window has older moments.
+ * from its row, then the memory [cards], then Earlier when the library window has older moments.
  */
 @Composable
 fun FlowPage(
@@ -53,6 +53,7 @@ fun FlowPage(
     timeSource: TimeSource = TimeTextDefaults.rememberTimeSource(TimeTextDefaults.timeFormat()),
     actions: FlowActions = FlowActions(),
     playback: PlaybackState = PlaybackState.Idle,
+    cards: TransformingLazyColumnScope.(TransformationSpec) -> Unit = {},
 ) {
     val spec = rememberTransformationSpec()
     ScreenScaffold(scrollState = listState, timeText = { TimeText(timeSource = timeSource) }) { contentPadding ->
@@ -67,6 +68,7 @@ fun FlowPage(
                 FlowUiState.Failed -> item { FlowMessage(stringResource(R.string.wear_flow_failed)) }
                 is FlowUiState.Ready -> {
                     momentItems(state, actions, playback)
+                    cards(spec)
                     earlierItem(state, actions.onOpenArchive, spec)
                 }
             }

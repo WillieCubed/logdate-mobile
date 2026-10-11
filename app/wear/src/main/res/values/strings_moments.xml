@@ -28,4 +28,12 @@
     <string name="wear_archive_title">Earlier</string>
     <string name="wear_archive_empty">No earlier moments in the last 14 days</string>
     <string name="wear_archive_failed">Couldn’t load earlier moments</string>
+
+    <!-- Memory cards, in the new watch app -->
+    <string name="wear_memory_on_this_day">On this day</string>
+    <plurals name="wear_memory_years_ago">
+        <item quantity="one">%1$d year ago</item>
+        <item quantity="other">%1$d years ago</item>
+    </plurals>
+    <string name="wear_memory_rewind">This week’s Rewind</string>
 </resources>

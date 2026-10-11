@@ -5,6 +5,7 @@ import androidx.health.services.client.HealthServices
 import androidx.wear.phone.interactions.PhoneTypeHelper
 import androidx.wear.remote.interactions.RemoteActivityHelper
 import app.logdate.client.device.identity.DeviceIdProvider
+import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
 import app.logdate.client.domain.streak.ObserveCampfireUseCase
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.ui.platform.LogDateHaptics
@@ -28,6 +29,10 @@ import app.logdate.wear.v2.mark.BackgroundMarker
 import app.logdate.wear.v2.mark.MarkMomentUseCase
 import app.logdate.wear.v2.mark.MarkViewModel
 import app.logdate.wear.v2.mark.MarkedMomentStore
+import app.logdate.wear.v2.memories.MemoriesViewModel
+import app.logdate.wear.v2.memories.OnThisDayFinder
+import app.logdate.wear.v2.memories.WATCH_RECALL_TYPES
+import app.logdate.wear.v2.memories.WeeklyRewindSource
 import app.logdate.wear.v2.moments.MomentViewModel
 import app.logdate.wear.v2.permissions.AndroidPermissionChecker
 import app.logdate.wear.v2.permissions.PermissionChecker
@@ -53,6 +58,7 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -172,6 +178,14 @@ val wearV2Module =
         }
         viewModel { FlowViewModel(dayClock = get(), notesRepository = get()) }
         viewModel { ArchiveViewModel(dayClock = get(), notesRepository = get()) }
+
+        single { GetMemoryRecallUseCase(notesRepository = get()) }
+        single {
+            val recall = get<GetMemoryRecallUseCase>()
+            OnThisDayFinder(recall = { recall(contentTypes = WATCH_RECALL_TYPES).first() }, notesRepository = get())
+        }
+        single { WeeklyRewindSource(rewinds = get(), notesRepository = get()) }
+        viewModel { MemoriesViewModel(dayClock = get(), onThisDay = get(), weeklyRewind = get()) }
 
         single<PlaybackPreferencesStore> {
             SharedPreferencesPlaybackPreferencesStore(

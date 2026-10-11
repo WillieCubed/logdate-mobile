@@ -17,6 +17,7 @@ import androidx.navigation3.ui.NavDisplay
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.navigation3.rememberSwipeDismissableSceneStrategy
+import app.logdate.client.repository.journals.JournalNote
 import app.logdate.ui.platform.LocalLogDateHaptics
 import app.logdate.ui.platform.LogDateHaptics
 import app.logdate.wear.launch.WearLaunchRequest
@@ -35,6 +36,8 @@ import app.logdate.wear.v2.flow.FlowViewModel
 import app.logdate.wear.v2.home.HomeScreen
 import app.logdate.wear.v2.mark.MarkConfirmation
 import app.logdate.wear.v2.mark.MarkViewModel
+import app.logdate.wear.v2.memories.MemoriesViewModel
+import app.logdate.wear.v2.memories.memoryCardItems
 import app.logdate.wear.v2.moments.MomentActions
 import app.logdate.wear.v2.moments.MomentScreen
 import app.logdate.wear.v2.moments.MomentViewModel
@@ -187,19 +190,23 @@ private fun FlowEntry(
     navigate: (WearRoute) -> Unit,
 ) {
     val viewModel = koinViewModel<FlowViewModel>()
+    val memories = koinViewModel<MemoriesViewModel>()
     val player = koinInject<MomentPlayer>()
     val state by viewModel.uiState.collectAsState()
+    val memoryCards by memories.cards.collectAsState()
     val playback by player.state.collectAsState()
+    val openMoment: (JournalNote) -> Unit = { note -> navigate(WearRoute.Moment(note.uid.toString())) }
     FlowPage(
         state = state,
         listState = listState,
         playback = playback,
         actions =
             FlowActions(
-                onOpenMoment = { note -> navigate(WearRoute.Moment(note.uid.toString())) },
+                onOpenMoment = openMoment,
                 onPlayPause = player::playOrPause,
                 onOpenArchive = { navigate(WearRoute.Archive) },
             ),
+        cards = { spec -> memoryCardItems(memoryCards, spec, openMoment) },
     )
 }
 
