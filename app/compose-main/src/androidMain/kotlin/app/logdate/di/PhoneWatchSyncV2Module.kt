@@ -39,10 +39,12 @@ import app.logdate.client.sync.v2.link.PhoneLinkInitiator
 import app.logdate.client.sync.v2.link.PhoneWatchLinkStore
 import app.logdate.client.sync.v2.link.WatchLinkNotifier
 import app.logdate.client.sync.v2.localNodeIdOrNull
+import app.logdate.client.sync.v2.receipts.GoogleWatchPeerMessageSender
 import app.logdate.client.sync.v2.receipts.PhoneDeliveryPeers
 import app.logdate.client.sync.v2.receipts.PhoneReceiptBook
 import app.logdate.client.sync.v2.receipts.ReceiptAcknowledger
 import app.logdate.client.sync.v2.receipts.WatchCaptureCollisionPolicy
+import app.logdate.client.sync.v2.receipts.WatchPeerMessageSender
 import app.logdate.client.sync.v2.receipts.WatchReceiptNotifier
 import app.logdate.client.sync.v2.receipts.WatchReceiptResponder
 import app.logdate.client.sync.v2.receipts.WatchRecordIngestorV2
@@ -115,6 +117,7 @@ val phoneWatchSyncV2Module =
         }
         single { PhoneReceiptBook(notes = get(), outbox = get(), sessions = get(), ledger = get(), peers = get()) }
         single { WatchReceiptResponder(get()) }
+        single<WatchPeerMessageSender> { GoogleWatchPeerMessageSender(Wearable.getMessageClient(androidContext()), get()) }
         single {
             val gate = get<WearProtocolGate>()
             WatchReceiptNotifier(
@@ -122,6 +125,7 @@ val phoneWatchSyncV2Module =
                 ledger = get(),
                 sender = get(),
                 active = { gate.isFeatureActive(WearFeatures.RECEIPTS).first() },
+                peers = get(),
             )
         }
         single { ReceiptAcknowledger(get(), get()) }

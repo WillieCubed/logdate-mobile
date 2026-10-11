@@ -1,7 +1,9 @@
 package app.logdate.client.sync.v2.receipts
 
-import app.logdate.client.sync.WatchMessageSender
 import app.logdate.client.sync.WatchNoteAcknowledger
+import app.logdate.client.sync.datalayer.v2.CloudPresence
+import app.logdate.client.sync.datalayer.v2.LinkMode
+import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.datalayer.v2.Receipt
 import app.logdate.client.sync.datalayer.v2.ReceiptQuery
 import app.logdate.client.sync.datalayer.v2.ReceiptState
@@ -13,7 +15,6 @@ import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.peer.delivery.DeliveryDirection
 import app.logdate.client.sync.peer.delivery.DeliveryState
 import app.logdate.client.sync.peer.delivery.PeerDeliveryLedger
-import app.logdate.client.sync.peer.delivery.PeerScopes
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -25,7 +26,7 @@ import kotlinx.coroutines.launch
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-/** Tells the watches that a record they sent cannot be read here, so they stop sending it. */
+/** An unbound legacy ingestion callback; scoped ingestion supplies its authenticated audience. */
 fun interface RecordRejection {
     suspend fun reject(
         kind: RecordKind,
@@ -33,48 +34,58 @@ fun interface RecordRejection {
     )
 }
 
-/**
- * Pushes receipts to the watches as soon as something changes: a note arriving, the phone's outbox
- * draining, a record refused. Pushes are best effort; the watch also asks with a request.
- */
+/** Best-effort receipt pushes for a verified link; failed deliveries remain available for polling. */
 class WatchReceiptNotifier(
     private val book: PhoneReceiptBook,
     private val ledger: PeerDeliveryLedger,
-    private val sender: WatchMessageSender,
+    private val sender: WatchPeerMessageSender,
     private val active: suspend () -> Boolean,
+    private val peers: PhoneDeliveryPeers,
 ) : RecordRejection {
+    suspend fun isCurrent(context: PeerDeliveryContext): Boolean = active() && book.isCurrent(context)
+
     suspend fun push(
+        context: PeerDeliveryContext,
         noteId: String,
         contentVersion: Long,
-    ) {
-        if (!active()) return
-        val accountScope = book.accountScope()
-        val receipt = book.receiptFor(ReceiptQuery(RecordKind.NOTE, noteId, contentVersion)) ?: return
-        send(listOf(receipt), accountScope)
+    ): Boolean {
+        if (!isCurrent(context)) return false
+        val receipt = book.receiptFor(context, ReceiptQuery(RecordKind.NOTE, noteId, contentVersion)) ?: return false
+        return send(context, listOf(receipt))
     }
+
+    suspend fun reject(
+        context: PeerDeliveryContext,
+        kind: RecordKind,
+        id: String,
+    ): Boolean = send(context, listOf(PhoneReceiptBook.rejected(kind, id)))
 
     override suspend fun reject(
         kind: RecordKind,
         id: String,
     ) {
-        if (!active()) return
-        send(listOf(PhoneReceiptBook.rejected(kind, id)), book.accountScope())
+        Napier.w("A record rejection without a verified watch audience cannot be sent")
     }
 
-    /** Pushes a backed-up receipt for each watch note that was only on the phone until now; returns how many. */
+    /** Retains failed pushes for retry, with independent history for each current link. */
     suspend fun pushBackedUp(): Int {
         if (!active()) return 0
-        val accountScope = book.accountScope()
-        val backedUp =
-            ledger.inState(PeerScopes.WATCHES, DeliveryDirection.FROM_WATCH, DeliveryState.ON_PHONE).mapNotNull { entry ->
-                val receipt = book.receiptFor(ReceiptQuery(RecordKind.NOTE, entry.entityId, entry.contentVersion))
-                if (receipt?.state == ReceiptState.BACKED_UP) entry to receipt else null
-            }
-        if (book.accountScope() != accountScope || !active()) return 0
-        if (backedUp.isEmpty()) return 0
-        backedUp.forEach { (entry, _) -> ledger.moveTo(entry, DeliveryState.BACKED_UP) }
-        send(backedUp.map { it.second }, accountScope)
-        return backedUp.size
+        var delivered = 0
+        for (context in peers.all()) {
+            if (!isCurrent(context)) continue
+            val backedUp =
+                ledger
+                    .inState(context.ledgerScope, DeliveryDirection.FROM_WATCH, DeliveryState.ON_PHONE)
+                    .filter { it.entityType == EntityType.NOTE }
+                    .mapNotNull { entry ->
+                        val receipt = book.receiptFor(context, ReceiptQuery(RecordKind.NOTE, entry.entityId, entry.contentVersion))
+                        if (receipt?.state == ReceiptState.BACKED_UP) entry to receipt else null
+                    }
+            if (backedUp.isEmpty() || !send(context, backedUp.map { it.second }) || !isCurrent(context)) continue
+            backedUp.forEach { (entry, _) -> ledger.moveTo(entry, DeliveryState.BACKED_UP) }
+            delivered += backedUp.size
+        }
+        return delivered
     }
 
     @OptIn(FlowPreview::class)
@@ -89,21 +100,27 @@ class WatchReceiptNotifier(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    Napier.e("Could not tell the watches which of their notes are backed up; they ask on their next sync", e)
+                    Napier.e("Could not tell linked watches which notes are backed up; they ask on their next sync", e)
                 }
             }
         }
 
     private suspend fun send(
+        context: PeerDeliveryContext,
         receipts: List<Receipt>,
-        accountScope: Pair<String, String>?,
-    ) {
-        if (!active() || book.accountScope() != accountScope) return
-        val response = ReceiptsResponse(cloud = book.cloudPresence(), receipts = receipts)
+    ): Boolean {
+        if (!isCurrent(context)) return false
+        val response =
+            ReceiptsResponse(
+                cloud = if (context.mode == LinkMode.CLOUD) CloudPresence.SIGNED_IN else CloudPresence.NO_ACCOUNT,
+                receipts = receipts,
+                context = context,
+            )
         val bytes = WearJson.encodeToBytes(ReceiptsResponse.serializer(), response)
-        if (!sender.send(WearPaths.RECEIPTS_PUSH, bytes)) {
-            Napier.w("No watch took the phone's ${receipts.size} receipt(s); each watch asks for them on its next sync")
-        }
+        if (!isCurrent(context)) return false
+        if (sender.send(context, WearPaths.RECEIPTS_PUSH, bytes)) return true
+        Napier.w("The linked watch did not take ${receipts.size} receipt(s); it can ask on its next sync")
+        return false
     }
 
     private companion object {
@@ -111,18 +128,22 @@ class WatchReceiptNotifier(
     }
 }
 
-/** The version 2 acknowledgement: the note is recorded as received from the watch and an on-phone receipt goes out. */
+/** Records storage under the link that supplied the capture, then pushes to that watch only. */
 class ReceiptAcknowledger(
     private val ledger: PeerDeliveryLedger,
     private val receipts: WatchReceiptNotifier,
+    private val context: PeerDeliveryContext? = null,
 ) : WatchNoteAcknowledger {
     override suspend fun acknowledge(
         noteId: Uuid,
         lastUpdated: Instant,
     ) {
+        val peer = context ?: return
+        if (!receipts.isCurrent(peer)) return
         val version = lastUpdated.toEpochMilliseconds()
-        val entry = ledger.track(PeerScopes.WATCHES, DeliveryDirection.FROM_WATCH, EntityType.NOTE, noteId.toString(), version)
+        val entry = ledger.track(peer.ledgerScope, DeliveryDirection.FROM_WATCH, EntityType.NOTE, noteId.toString(), version)
+        if (entry.contentVersion != version || !receipts.isCurrent(peer)) return
         if (entry.state == DeliveryState.NEW) ledger.moveTo(entry, DeliveryState.ON_PHONE)
-        receipts.push(noteId.toString(), version)
+        receipts.push(peer, noteId.toString(), version)
     }
 }

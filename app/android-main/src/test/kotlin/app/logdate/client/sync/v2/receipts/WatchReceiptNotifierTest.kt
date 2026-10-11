@@ -4,9 +4,10 @@ import app.logdate.client.datastore.OriginBoundSession
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
-import app.logdate.client.sync.WatchMessageSender
 import app.logdate.client.sync.datalayer.v2.CloudPresence
 import app.logdate.client.sync.datalayer.v2.Decoded
+import app.logdate.client.sync.datalayer.v2.LinkMode
+import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.datalayer.v2.Receipt
 import app.logdate.client.sync.datalayer.v2.ReceiptQuery
 import app.logdate.client.sync.datalayer.v2.ReceiptState
@@ -21,7 +22,7 @@ import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.peer.delivery.DeliveryDirection
 import app.logdate.client.sync.peer.delivery.DeliveryState
 import app.logdate.client.sync.peer.delivery.PeerDeliveryLedger
-import app.logdate.client.sync.peer.delivery.PeerScopes
+import app.logdate.client.sync.peer.link.LinkWire
 import app.logdate.client.sync.v2.FakeSessions
 import app.logdate.client.sync.v2.MemoryPeerDeliveryDao
 import io.mockk.coEvery
@@ -39,7 +40,14 @@ class WatchReceiptNotifierTest {
     private val outbox = mockk<SyncMetadataService>()
     private val ledger = PeerDeliveryLedger(MemoryPeerDeliveryDao())
     private val sessions = FakeSessions(OriginBoundSession("https://logdate.test", UserSession("a", "r", "account")))
-    private val book = PhoneReceiptBook(notes, outbox, sessions, ledger)
+    private val context =
+        PeerDeliveryContext(LinkWire.encodeKey(ByteArray(32)), "phone", "watch", LinkMode.CLOUD, "account", "https://logdate.test")
+    private val peers =
+        mockk<PhoneDeliveryPeers> {
+            coEvery { isCurrent(context) } returns true
+            coEvery { all() } returns listOf(context)
+        }
+    private val book = PhoneReceiptBook(notes, outbox, sessions, ledger, peers)
     private val sent = mutableListOf<Pair<String, ByteArray>>()
     private var active = true
     private val notifier =
@@ -47,11 +55,13 @@ class WatchReceiptNotifierTest {
             book = book,
             ledger = ledger,
             sender =
-                WatchMessageSender { path, data ->
+                WatchPeerMessageSender { peer, path, data ->
+                    assertEquals(context, peer)
                     sent += path to data
                     true
                 },
             active = { active },
+            peers = peers,
         )
     private val id = Uuid.random()
 
@@ -60,9 +70,9 @@ class WatchReceiptNotifierTest {
         runTest {
             stored(syncVersion = 0, pending = true)
 
-            ReceiptAcknowledger(ledger, notifier).acknowledge(id, Instant.fromEpochMilliseconds(5))
+            ReceiptAcknowledger(ledger, notifier, context).acknowledge(id, Instant.fromEpochMilliseconds(5))
 
-            val entry = ledger.get(PeerScopes.WATCHES, DeliveryDirection.FROM_WATCH, EntityType.NOTE, id.toString())
+            val entry = ledger.get(context.ledgerScope, DeliveryDirection.FROM_WATCH, EntityType.NOTE, id.toString())
             assertEquals(DeliveryState.ON_PHONE, entry?.state)
             assertEquals(listOf(Receipt(RecordKind.NOTE, id.toString(), 5, ReceiptState.ON_PHONE)), pushedReceipts())
         }
@@ -71,7 +81,7 @@ class WatchReceiptNotifierTest {
     fun `a note backed up since it arrived is pushed once and recorded`() =
         runTest {
             stored(syncVersion = 0, pending = true)
-            ReceiptAcknowledger(ledger, notifier).acknowledge(id, Instant.fromEpochMilliseconds(5))
+            ReceiptAcknowledger(ledger, notifier, context).acknowledge(id, Instant.fromEpochMilliseconds(5))
             sent.clear()
             stored(syncVersion = 7, pending = false)
 
@@ -85,7 +95,7 @@ class WatchReceiptNotifierTest {
         runTest {
             active = false
 
-            notifier.push(id.toString(), 5)
+            notifier.push(context, id.toString(), 5)
 
             assertTrue(sent.isEmpty())
         }
@@ -93,7 +103,7 @@ class WatchReceiptNotifierTest {
     @Test
     fun `a rejection covers every version`() =
         runTest {
-            notifier.reject(RecordKind.MOMENT, id.toString())
+            notifier.reject(context, RecordKind.MOMENT, id.toString())
 
             assertEquals(
                 listOf(Receipt(RecordKind.MOMENT, id.toString(), PhoneReceiptBook.ANY_VERSION, ReceiptState.REJECTED_UNSUPPORTED)),
@@ -124,11 +134,12 @@ class WatchReceiptNotifierTest {
     fun `disabling receipts during lookup prevents the push`() =
         runTest {
             stored(syncVersion = 7, pending = false)
+            ledger.track(context.ledgerScope, DeliveryDirection.FROM_WATCH, EntityType.NOTE, id.toString(), 5)
             coEvery { outbox.hasPending(EntityType.NOTE, id.toString()) } answers {
                 active = false
                 false
             }
-            notifier.push(id.toString(), 5)
+            notifier.push(context, id.toString(), 5)
             assertTrue(sent.isEmpty())
         }
 
@@ -142,15 +153,15 @@ class WatchReceiptNotifierTest {
                         override fun now(): Instant = Instant.fromEpochMilliseconds(1_000)
                     },
                 )
-            val oldBook = PhoneReceiptBook(notes, outbox, sessions, oldLedger)
-            val oldNotifier = WatchReceiptNotifier(oldBook, oldLedger, WatchMessageSender { _, _ -> true }, { true })
+            val oldBook = PhoneReceiptBook(notes, outbox, sessions, oldLedger, peers)
+            val oldNotifier = WatchReceiptNotifier(oldBook, oldLedger, WatchPeerMessageSender { _, _, _ -> true }, { true }, peers)
             stored(syncVersion = 0, pending = true)
-            ReceiptAcknowledger(oldLedger, oldNotifier).acknowledge(id, Instant.fromEpochMilliseconds(5))
+            ReceiptAcknowledger(oldLedger, oldNotifier, context).acknowledge(id, Instant.fromEpochMilliseconds(5))
             stored(syncVersion = 7, pending = false)
             oldNotifier.pushBackedUp()
             oldNotifier.pushBackedUp()
             coEvery { notes.getNoteById(id) } returns null
-            assertEquals(ReceiptState.DELETED_ON_PHONE, oldBook.receiptFor(ReceiptQuery(RecordKind.NOTE, id.toString(), 5))?.state)
+            assertEquals(ReceiptState.DELETED_ON_PHONE, oldBook.receiptFor(context, ReceiptQuery(RecordKind.NOTE, id.toString(), 5))?.state)
         }
 
     private fun stored(
