@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- One moment, in the new watch app -->
+    <string name="wear_moment_open">Open</string>
+    <string name="wear_moment_missing">This moment isn’t on your watch anymore</string>
+    <string name="wear_moment_play">Play</string>
+    <string name="wear_moment_pause">Pause</string>
+    <string name="wear_moment_position">%1$s / %2$s</string>
+    <string name="wear_moment_speed">%1$s×</string>
+    <string name="wear_moment_speed_description">Playback speed %1$s×</string>
+    <string name="wear_moment_skip_silence">Skip silence</string>
+    <string name="wear_moment_place">Place</string>
+    <string name="wear_moment_failed_no_output">No speaker or headphones to play on</string>
+    <string name="wear_moment_failed_not_on_watch">This is on your phone. Bring your phone nearby.</string>
+    <string name="wear_moment_failed_no_room">Not enough space on your watch to play this</string>
+    <string name="wear_moment_failed_unplayable">Couldn’t play this recording</string>
+    <string name="wear_moment_delete">Delete</string>
+    <string name="wear_moment_delete_title">Delete this moment?</string>
+    <string name="wear_moment_delete_body">It’s deleted from your phone too.</string>
+    <string name="wear_moment_delete_failed">Couldn’t delete this moment</string>
+</resources>

@@ -6,6 +6,7 @@ import androidx.wear.phone.interactions.PhoneTypeHelper
 import androidx.wear.remote.interactions.RemoteActivityHelper
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.domain.streak.ObserveCampfireUseCase
+import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.ui.platform.LogDateHaptics
 import app.logdate.ui.platform.createAndroidPlatformHapticsController
 import app.logdate.ui.platform.isSystemHapticFeedbackOff
@@ -14,7 +15,9 @@ import app.logdate.wear.health.HeartRateSampler
 import app.logdate.wear.health.MeasureClientHeartRateReadings
 import app.logdate.wear.health.MeasuredHeartRateSampler
 import app.logdate.wear.location.WearLocationCaptureCoordinator
+import app.logdate.wear.playback.WatchMediaCache
 import app.logdate.wear.recording.AudioMomentSaver
+import app.logdate.wear.sync.deleteLocalAudio
 import app.logdate.wear.v2.capture.CaptureSheetViewModel
 import app.logdate.wear.v2.flow.FlowViewModel
 import app.logdate.wear.v2.haptics.HapticsPreferenceStore
@@ -24,6 +27,7 @@ import app.logdate.wear.v2.mark.BackgroundMarker
 import app.logdate.wear.v2.mark.MarkMomentUseCase
 import app.logdate.wear.v2.mark.MarkViewModel
 import app.logdate.wear.v2.mark.MarkedMomentStore
+import app.logdate.wear.v2.moments.MomentViewModel
 import app.logdate.wear.v2.permissions.AndroidPermissionChecker
 import app.logdate.wear.v2.permissions.PermissionChecker
 import app.logdate.wear.v2.permissions.PermissionPromptStore
@@ -48,8 +52,10 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.withContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
+import kotlin.uuid.Uuid
 
 /** Koin module for the redesigned watch app. Only the new app's screens resolve anything from it. */
 val wearV2Module =
@@ -179,6 +185,23 @@ val wearV2Module =
                 outputs = get(),
                 resolver = get(),
                 preferences = get(),
+            )
+        }
+        viewModel { params ->
+            val mediaCache = get<WatchMediaCache>()
+            val mediaFiles = get<MediaFileResolver>()
+            MomentViewModel(
+                noteId = Uuid.parseOrNull(params.get<String>()),
+                notesRepository = get(),
+                player = get(),
+                haptics = get(),
+                removalNotifier = get(),
+                discardAudio = { audio ->
+                    withContext(Dispatchers.IO) {
+                        mediaCache.evict(audio.uid)
+                        deleteLocalAudio(audio.mediaRef, mediaFiles)
+                    }
+                },
             )
         }
     }

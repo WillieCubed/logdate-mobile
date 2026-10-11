@@ -3,8 +3,8 @@ package app.logdate.wear.v2.navigation
 import app.logdate.wear.launch.WearLaunchRequest
 
 /**
- * The back stack the new watch app opens for this request. Only Home exists so far, so every
- * request opens Today; the change that adds a screen maps its requests here.
+ * The back stack the new watch app opens for this request: the screen the request names above
+ * Home, so going back lands on Today. A request whose screen does not exist yet opens Today.
  */
 internal fun WearLaunchRequest?.toV2BackStack(): List<WearRoute> =
     when (this) {
@@ -19,6 +19,6 @@ internal fun WearLaunchRequest?.toV2BackStack(): List<WearRoute> =
         WearLaunchRequest.Settings,
         WearLaunchRequest.Mark,
         WearLaunchRequest.OnThisDay,
-        is WearLaunchRequest.Moment,
         -> listOf(WearRoute.Home)
+        is WearLaunchRequest.Moment -> listOf(WearRoute.Home, WearRoute.Moment(noteId.toString()))
     }

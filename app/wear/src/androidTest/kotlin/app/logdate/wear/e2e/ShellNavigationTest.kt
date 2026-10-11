@@ -1,5 +1,6 @@
 package app.logdate.wear.e2e
 
+import android.content.Context
 import android.content.Intent
 import androidx.compose.ui.test.SemanticsNodeInteractionCollection
 import androidx.compose.ui.test.assertCountEquals
@@ -7,13 +8,18 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ActivityScenario
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.launch.WearLaunchRequest
 import app.logdate.wear.presentation.MainActivity
 import app.logdate.wear.v2.WearAppV2Tags
+import app.logdate.wear.v2.moments.MomentTags
 import app.logdate.wear.v2.today.TodayTags
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -22,6 +28,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.java.KoinJavaComponent
+import kotlin.time.Clock
 
 /**
  * Launches the real activity with WATCH_EXPERIENCE_V2 on and checks the new app's shell: it opens
@@ -81,6 +88,26 @@ class ShellNavigationTest {
 
         waitFor { composeRule.onAllNodesWithTag(TodayTags.PAGE) }
         composeRule.onNodeWithTag(TodayTags.PAGE).assertIsDisplayed()
+    }
+
+    @Test
+    fun a_moment_link_opens_that_moment() {
+        val now = Clock.System.now()
+        val note = JournalNote.Text(creationTimestamp = now, lastUpdated = now, content = "A moment opened from a link")
+        val notes = KoinJavaComponent.getKoin().get<JournalNotesRepository>()
+        runBlocking { notes.create(note) }
+        try {
+            val link =
+                Intent(ApplicationProvider.getApplicationContext<Context>(), MainActivity::class.java)
+                    .putExtra(WearLaunchRequest.EXTRA_ROUTE, "moment")
+                    .putExtra(WearLaunchRequest.EXTRA_NOTE_ID, note.uid.toString())
+            scenario = ActivityScenario.launch(link)
+
+            waitFor { composeRule.onAllNodesWithTag(MomentTags.DETAILS) }
+            composeRule.onNodeWithText("A moment opened from a link").assertIsDisplayed()
+        } finally {
+            runBlocking { notes.removeById(note.uid) }
+        }
     }
 
     private fun deliveredRoute(scenario: ActivityScenario<MainActivity>): String? {

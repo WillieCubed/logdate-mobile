@@ -27,11 +27,15 @@ import app.logdate.wear.v2.capture.CaptureConfirmation
 import app.logdate.wear.v2.capture.CaptureSheet
 import app.logdate.wear.v2.capture.CaptureSheetViewModel
 import app.logdate.wear.v2.capture.rememberRemoteTextInput
+import app.logdate.wear.v2.flow.FlowActions
 import app.logdate.wear.v2.flow.FlowPage
 import app.logdate.wear.v2.flow.FlowViewModel
 import app.logdate.wear.v2.home.HomeScreen
 import app.logdate.wear.v2.mark.MarkConfirmation
 import app.logdate.wear.v2.mark.MarkViewModel
+import app.logdate.wear.v2.moments.MomentActions
+import app.logdate.wear.v2.moments.MomentScreen
+import app.logdate.wear.v2.moments.MomentViewModel
 import app.logdate.wear.v2.navigation.WearRoute
 import app.logdate.wear.v2.navigation.toV2BackStack
 import app.logdate.wear.v2.permissions.rememberPermissionRequester
@@ -47,6 +51,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.merge
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 object WearAppV2Tags {
     const val SHELL = "wear_app_v2_shell"
@@ -95,8 +100,9 @@ fun WearAppV2(
                         entryProvider =
                             entryProvider {
                                 entry<WearRoute.Home> {
-                                    HomeEntry(recorder, marker, onAdd = { open(WearRoute.CaptureSheet) })
+                                    HomeEntry(recorder, marker, onAdd = { open(WearRoute.CaptureSheet) }, navigate = open)
                                 }
+                                entry<WearRoute.Moment> { route -> MomentEntry(route.id, onClose = { backStack.removeLastOrNull() }) }
                                 entry<WearRoute.CaptureSheet> {
                                     CaptureSheetEntry(
                                         onOpenPhoneCamera = { open(WearRoute.PhoneCamera) },
@@ -133,6 +139,7 @@ private fun HomeEntry(
     recorder: RecorderViewModel,
     marker: MarkViewModel,
     onAdd: () -> Unit,
+    navigate: (WearRoute) -> Unit,
 ) {
     val recorderState by recorder.state.collectAsState()
     val markFeedback by marker.feedback.collectAsState()
@@ -147,7 +154,7 @@ private fun HomeEntry(
     HomeScreen(
         pagingLocked = recorderState.locksPaging,
         today = { listState -> TodayEntry(listState, controls) },
-        flow = { listState -> FlowEntry(listState) },
+        flow = { listState -> FlowEntry(listState, navigate) },
     )
     MarkConfirmation(feedback = markFeedback, onDismiss = marker::dismissFeedback)
 }
@@ -171,10 +178,41 @@ private fun TodayEntry(
 }
 
 @Composable
-private fun FlowEntry(listState: TransformingLazyColumnState) {
+private fun FlowEntry(
+    listState: TransformingLazyColumnState,
+    navigate: (WearRoute) -> Unit,
+) {
     val viewModel = koinViewModel<FlowViewModel>()
     val state by viewModel.uiState.collectAsState()
-    FlowPage(state = state, listState = listState)
+    FlowPage(
+        state = state,
+        listState = listState,
+        actions = FlowActions(onOpenMoment = { note -> navigate(WearRoute.Moment(note.uid.toString())) }),
+    )
+}
+
+@Composable
+private fun MomentEntry(
+    id: String,
+    onClose: () -> Unit,
+) {
+    val viewModel = koinViewModel<MomentViewModel>(parameters = { parametersOf(id) })
+    val state by viewModel.uiState.collectAsState()
+    val deleted by viewModel.deleted.collectAsState()
+    LaunchedEffect(deleted) {
+        if (deleted) onClose()
+    }
+    MomentScreen(
+        state = state,
+        actions =
+            MomentActions(
+                onPlayPause = viewModel::playPause,
+                onCrown = viewModel::onCrown,
+                onCycleSpeed = viewModel::cycleSpeed,
+                onSkipSilenceChange = viewModel::setSkipSilence,
+                onDelete = viewModel::delete,
+            ),
+    )
 }
 
 @Composable

@@ -41,11 +41,20 @@ class WearRouteTest {
                 WearLaunchRequest.Settings,
                 WearLaunchRequest.Mark,
                 WearLaunchRequest.OnThisDay,
-                WearLaunchRequest.Moment(Uuid.random()),
             )
 
         requests.forEach { request ->
             assertEquals(listOf<WearRoute>(WearRoute.Home), request.toV2BackStack(), "for $request")
         }
+    }
+
+    @Test
+    fun `a moment link opens the moment above Today`() {
+        val noteId = Uuid.random()
+
+        assertEquals(
+            listOf(WearRoute.Home, WearRoute.Moment(noteId.toString())),
+            WearLaunchRequest.Moment(noteId).toV2BackStack(),
+        )
     }
 }
