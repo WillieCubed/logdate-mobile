@@ -310,6 +310,18 @@ commit_synthetic_repo() {
 assert_equals "true" "$(jq -r '.env_vars.LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED' \
     "$OPERATOR_ROOT/infra/terraform/staging-contract-template.json")"
 
+# Because CI deploys staging from that template instead of evaluating Terraform, the template has
+# to describe exactly what staging.tfvars does. Otherwise a new secret or setting committed to
+# staging.tfvars never reaches staging.
+OPERATOR_HEAD="$(git -C "$OPERATOR_ROOT" rev-parse HEAD)"
+TEMPLATE_CONTRACT="$(cd "$OPERATOR_ROOT" && CI=true "./$SCRIPT" --environment staging \
+    --release-sha "$OPERATOR_HEAD" 2>"$LOG_DIR/staging-template-render.err" | jq -S .)" ||
+    fail "staging contract could not be rendered from staging-contract-template.json"
+TERRAFORM_CONTRACT="$(cd "$OPERATOR_ROOT" && CI=false "./$SCRIPT" --environment staging \
+    --release-sha "$OPERATOR_HEAD" 2>"$LOG_DIR/staging-terraform-render.err" | jq -S .)" ||
+    fail "staging contract could not be rendered from staging.tfvars"
+assert_equals "$TERRAFORM_CONTRACT" "$TEMPLATE_CONTRACT"
+
 initialize_synthetic_repo "$SOURCE_REPO"
 cat >"$SOURCE_REPO/infra/terraform/staging.tfvars" <<'EOF'
 # committed-valid-staging
