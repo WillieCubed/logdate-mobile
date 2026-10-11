@@ -45,6 +45,8 @@ import app.logdate.wear.v2.navigation.WearRoute
 import app.logdate.wear.v2.navigation.toV2BackStack
 import app.logdate.wear.v2.permissions.rememberPermissionRequester
 import app.logdate.wear.v2.playback.MomentPlayer
+import app.logdate.wear.v2.playon.OutputPicker
+import app.logdate.wear.v2.playon.OutputPickerRoute
 import app.logdate.wear.v2.recorder.RecorderState
 import app.logdate.wear.v2.recorder.RecorderViewModel
 import app.logdate.wear.v2.recorder.TodayRecorder
@@ -232,6 +234,9 @@ private fun MomentEntry(
     val viewModel = koinViewModel<MomentViewModel>(parameters = { parametersOf(id) })
     val state by viewModel.uiState.collectAsState()
     val deleted by viewModel.deleted.collectAsState()
+    val picker = koinInject<OutputPicker>()
+    val canPick = remember(picker) { picker.route != OutputPickerRoute.NONE }
+    val playOn: (() -> Unit)? = if (canPick) ({ picker.open() }) else null
     LaunchedEffect(deleted) {
         if (deleted) onClose()
     }
@@ -244,6 +249,7 @@ private fun MomentEntry(
                 onCycleSpeed = viewModel::cycleSpeed,
                 onSkipSilenceChange = viewModel::setSkipSilence,
                 onDelete = viewModel::delete,
+                onPlayOn = playOn,
             ),
     )
 }

@@ -38,9 +38,18 @@
     <!-- Remove OpenGL ES requirement merged from Google Maps SDK -->
     <uses-feature android:glEsVersion="0x00020000" tools:node="remove" />
 
-    <!-- Remove Google Maps package query merged from client:location -->
+    <!--
+        Remove the Google Maps package query merged from client:location. Play on looks up the
+        system output switcher and, on watches without it, Bluetooth settings.
+    -->
     <queries>
         <package android:name="com.google.android.apps.maps" tools:node="remove" />
+        <intent>
+            <action android:name="com.android.settings.panel.action.MEDIA_OUTPUT" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.BLUETOOTH_SETTINGS" />
+        </intent>
     </queries>
 
     <application

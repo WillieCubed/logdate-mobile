@@ -27,6 +27,7 @@ import app.logdate.wear.v2.moments.MomentRowTags
 import app.logdate.wear.v2.moments.MomentScreen
 import app.logdate.wear.v2.moments.MomentTags
 import app.logdate.wear.v2.moments.MomentUiState
+import app.logdate.wear.v2.playback.PlaybackFailure
 import app.logdate.wear.v2.playback.PlaybackSpeed
 import app.logdate.wear.v2.playback.PlaybackState
 import app.logdate.wear.v2.theme.LogDateWearTheme
@@ -146,6 +147,42 @@ class MomentDetailTest {
         show(MomentUiState.Missing, MomentActions())
 
         composeRule.onNodeWithTag(MomentTags.MISSING).assertIsDisplayed()
+    }
+
+    @Test
+    fun play_on_is_offered_on_a_voice_note_when_a_picker_exists() {
+        var picks = 0
+        show(ready(voice), MomentActions(onPlayOn = { picks++ }))
+
+        composeRule.onNodeWithTag(MomentTags.SCREEN).performTouchInput { swipeUp() }
+        waitForTag(MomentTags.DETAILS)
+        composeRule.onNodeWithTag(MomentTags.DETAILS).performRotaryScrollInput { rotateToScrollVertically(CROWN_STEP) }
+        waitForTag(MomentTags.PLAY_ON)
+        composeRule.onNodeWithTag(MomentTags.PLAY_ON).performClick()
+
+        assertEquals(1, picks)
+    }
+
+    @Test
+    fun play_on_is_not_offered_without_a_picker() {
+        show(ready(voice), MomentActions(onDelete = {}))
+
+        composeRule.onNodeWithTag(MomentTags.SCREEN).performTouchInput { swipeUp() }
+        waitForTag(MomentTags.DETAILS)
+        composeRule.onNodeWithTag(MomentTags.DETAILS).performRotaryScrollInput { rotateToScrollVertically(LONG_SCROLL) }
+        waitForTag(MomentTags.DELETE)
+
+        assertTrue(composeRule.onAllNodesWithTag(MomentTags.PLAY_ON).fetchSemanticsNodes().isEmpty())
+    }
+
+    @Test
+    fun no_output_offers_the_picker_on_the_player() {
+        var picks = 0
+        show(ready(voice, PlaybackState.Failed(voice.uid, PlaybackFailure.NO_OUTPUT)), MomentActions(onPlayOn = { picks++ }))
+
+        composeRule.onNodeWithTag(MomentTags.CHOOSE_OUTPUT).performClick()
+
+        assertEquals(1, picks)
     }
 
     private fun ready(

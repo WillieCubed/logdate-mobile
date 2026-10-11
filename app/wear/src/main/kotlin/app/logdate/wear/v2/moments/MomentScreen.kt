@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -46,6 +47,7 @@ import androidx.wear.compose.material3.AlertDialog
 import androidx.wear.compose.material3.AlertDialogContent
 import androidx.wear.compose.material3.AlertDialogDefaults
 import androidx.wear.compose.material3.AnimatedPage
+import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.FilledIconButton
@@ -87,15 +89,18 @@ object MomentTags {
     const val DELETE = "moment_delete"
     const val CONFIRM_DELETE = "moment_confirm_delete"
     const val MISSING = "moment_missing"
+    const val PLAY_ON = "moment_play_on"
+    const val CHOOSE_OUTPUT = "moment_choose_output"
 }
 
-/** What the person can do on a moment's screen. Delete appears only with [onDelete]. */
+/** What the person can do on a moment's screen. Delete and Play on appear only with their handlers. */
 data class MomentActions(
     val onPlayPause: () -> Unit = {},
     val onCrown: (Float) -> Unit = {},
     val onCycleSpeed: () -> Unit = {},
     val onSkipSilenceChange: (Boolean) -> Unit = {},
     val onDelete: (() -> Unit)? = null,
+    val onPlayOn: (() -> Unit)? = null,
 )
 
 /**
@@ -119,11 +124,15 @@ fun MomentScreen(
     }
 }
 
-/** A moment's details: when, its words, its place, and Delete when [onDelete] is set. */
+/**
+ * A moment's details: when, its words, its place, Play on for a voice note when [onPlayOn] is set,
+ * and Delete when [onDelete] is set.
+ */
 @Composable
 fun MomentDetailsPage(
     state: MomentUiState.Ready,
     onDelete: (() -> Unit)?,
+    onPlayOn: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     timeSource: TimeSource = TimeTextDefaults.rememberTimeSource(TimeTextDefaults.timeFormat()),
 ) {
@@ -141,6 +150,9 @@ fun MomentDetailsPage(
             }
             if (body != null) item { DetailText(body) }
             if (place != null) item { PlaceLine(place) }
+            if (onPlayOn != null && note is JournalNote.Audio) {
+                item { PlayOnButton(onPlayOn, Modifier.transformedHeight(this, spec), SurfaceTransformation(spec)) }
+            }
             if (state.deleteFailed) {
                 item { DetailText(stringResource(R.string.wear_moment_delete_failed), MaterialTheme.colorScheme.error) }
             }
@@ -199,7 +211,7 @@ private fun VoiceMoment(
                 if (page == PLAYER_PAGE) {
                     MomentPlayerPage(note, state, actions)
                 } else {
-                    MomentDetailsPage(state, onDelete, timeSource = timeSource)
+                    MomentDetailsPage(state, onDelete, onPlayOn = actions.onPlayOn, timeSource = timeSource)
                 }
             }
         }
@@ -261,7 +273,7 @@ private fun MomentPlayerPage(
                     )
                 }
                 PlayerControls(state, actions)
-                PlayerLine(note, state.playback, positionMs)
+                PlayerLine(note, state.playback, positionMs, actions.onPlayOn)
             }
         }
     }
@@ -310,6 +322,7 @@ private fun PlayerLine(
     note: JournalNote.Audio,
     playback: PlaybackState,
     positionMs: Long,
+    onPlayOn: (() -> Unit)?,
 ) {
     val failed = playback is PlaybackState.Failed
     val text = if (playback is PlaybackState.Failed) failureMessage(playback.reason) else captionAt(note, positionMs)
@@ -322,6 +335,13 @@ private fun PlayerLine(
         maxLines = if (failed) FAILURE_LINES else CAPTION_LINES,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier.fillMaxWidth(if (failed) FAILURE_WIDTH_FRACTION else CAPTION_WIDTH_FRACTION).testTag(MomentTags.CAPTION),
+    )
+    val noOutput = playback is PlaybackState.Failed && playback.reason == PlaybackFailure.NO_OUTPUT
+    if (!noOutput || onPlayOn == null) return
+    CompactButton(
+        onClick = onPlayOn,
+        modifier = Modifier.testTag(MomentTags.CHOOSE_OUTPUT),
+        label = { Text(stringResource(R.string.wear_moment_choose_output)) },
     )
 }
 
@@ -395,6 +415,21 @@ private fun PlaceLine(place: String) {
             modifier = Modifier.padding(start = 4.dp),
         )
     }
+}
+
+@Composable
+private fun PlayOnButton(
+    onClick: () -> Unit,
+    modifier: Modifier,
+    transformation: SurfaceTransformation,
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth().testTag(MomentTags.PLAY_ON),
+        transformation = transformation,
+        icon = { Icon(imageVector = Icons.Filled.Headphones, contentDescription = null) },
+        label = { Text(stringResource(R.string.wear_moment_play_on)) },
+    )
 }
 
 @Composable

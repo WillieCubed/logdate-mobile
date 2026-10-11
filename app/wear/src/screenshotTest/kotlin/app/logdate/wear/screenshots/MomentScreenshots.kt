@@ -188,6 +188,30 @@ class MomentScreenshots {
     fun S18_Missing() {
         MomentScene(MomentUiState.Missing)
     }
+
+    @PreviewTest
+    @WearScreenshotPreviewMatrix
+    @WearLargeFontPreview
+    @Composable
+    fun S19_VoiceDetailsWithPlayOn() {
+        LogDateWearTheme(dynamicColor = false) {
+            AppScaffold(timeText = { TimeText(timeSource = MomentTimeSource) }) {
+                MomentDetailsPage(state = ready(voice.copy(transcript = null, location = null)), onDelete = {
+                }, onPlayOn = {}, timeSource = MomentTimeSource)
+            }
+        }
+    }
+
+    @PreviewTest
+    @WearScreenshotPreviewMatrix
+    @WearLargeFontPreview
+    @Composable
+    fun S20_VoiceNoOutputWithPicker() {
+        MomentScene(
+            ready(voice, playback = PlaybackState.Failed(voice.uid, PlaybackFailure.NO_OUTPUT)),
+            actions = MomentActions(onDelete = {}, onPlayOn = {}),
+        )
+    }
 }
 
 private val momentZone = TimeZone.currentSystemDefault()
@@ -270,11 +294,14 @@ private fun ready(
 
 /** The voice player leaves the time off so the progress ring stays clear; every other page shows it. */
 @Composable
-private fun MomentScene(state: MomentUiState) {
+private fun MomentScene(
+    state: MomentUiState,
+    actions: MomentActions = MomentActions(onDelete = {}),
+) {
     val onPlayer = state is MomentUiState.Ready && state.note is JournalNote.Audio
     LogDateWearTheme(dynamicColor = false) {
         AppScaffold(timeText = { if (!onPlayer) TimeText(timeSource = MomentTimeSource) }) {
-            MomentScreen(state = state, actions = MomentActions(onDelete = {}), timeSource = MomentTimeSource)
+            MomentScreen(state = state, actions = actions, timeSource = MomentTimeSource)
         }
     }
 }

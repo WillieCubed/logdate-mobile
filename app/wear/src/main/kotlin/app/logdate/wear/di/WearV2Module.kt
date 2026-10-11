@@ -47,6 +47,8 @@ import app.logdate.wear.v2.playback.MomentPlaybackEngine
 import app.logdate.wear.v2.playback.MomentPlayer
 import app.logdate.wear.v2.playback.PlaybackPreferencesStore
 import app.logdate.wear.v2.playback.SharedPreferencesPlaybackPreferencesStore
+import app.logdate.wear.v2.playon.OutputPicker
+import app.logdate.wear.v2.playon.SystemOutputPicker
 import app.logdate.wear.v2.recorder.RecorderViewModel
 import app.logdate.wear.v2.today.DayClock
 import app.logdate.wear.v2.today.TodayViewModel
@@ -220,4 +222,5 @@ val wearV2Module =
                 },
             )
         }
+        single<OutputPicker> { SystemOutputPicker(get()) }
     }
