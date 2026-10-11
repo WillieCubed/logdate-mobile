@@ -1,24 +1,34 @@
 package app.logdate.wear.di
 
 import android.content.Context
+import androidx.health.services.client.HealthServices
 import androidx.wear.phone.interactions.PhoneTypeHelper
 import androidx.wear.remote.interactions.RemoteActivityHelper
+import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.domain.streak.ObserveCampfireUseCase
 import app.logdate.ui.platform.LogDateHaptics
 import app.logdate.ui.platform.createAndroidPlatformHapticsController
 import app.logdate.ui.platform.isSystemHapticFeedbackOff
 import app.logdate.wear.capture.QuickNoteWriter
+import app.logdate.wear.health.HeartRateSampler
+import app.logdate.wear.health.MeasureClientHeartRateReadings
+import app.logdate.wear.health.MeasuredHeartRateSampler
+import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.recording.AudioMomentSaver
 import app.logdate.wear.v2.flow.FlowViewModel
 import app.logdate.wear.v2.haptics.HapticsPreferenceStore
 import app.logdate.wear.v2.haptics.SharedPreferencesHapticsPreferenceStore
 import app.logdate.wear.v2.haptics.watchHaptics
+import app.logdate.wear.v2.mark.BackgroundMarker
+import app.logdate.wear.v2.mark.MarkMomentUseCase
+import app.logdate.wear.v2.mark.MarkViewModel
 import app.logdate.wear.v2.mark.MarkedMomentStore
 import app.logdate.wear.v2.permissions.AndroidPermissionChecker
 import app.logdate.wear.v2.permissions.PermissionChecker
 import app.logdate.wear.v2.permissions.PermissionPromptStore
 import app.logdate.wear.v2.permissions.PermissionPrompts
 import app.logdate.wear.v2.permissions.SharedPreferencesPermissionPromptStore
+import app.logdate.wear.v2.permissions.WatchPermission
 import app.logdate.wear.v2.phone.PhoneHandoff
 import app.logdate.wear.v2.phone.PhoneLinkRepository
 import app.logdate.wear.v2.recorder.RecorderViewModel
@@ -28,6 +38,7 @@ import app.logdate.wear.v2.today.WatchDayBoundaryPreferences
 import app.logdate.wear.v2.today.WatchStreakSettings
 import app.logdate.wear.v2.today.timeChangeSignals
 import com.google.android.gms.wearable.Wearable
+import io.github.aakira.napier.Napier
 import kotlinx.coroutines.Dispatchers
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -59,6 +70,30 @@ val wearV2Module =
 
         single { QuickNoteWriter(notesRepository = get(), locationCaptureCoordinator = get()) }
         single { MarkedMomentStore(markedMomentDao = get(), peerDeliveryDao = get(), syncMetadataService = get()) }
+        single<HeartRateSampler> {
+            val checker = get<PermissionChecker>()
+            try {
+                MeasuredHeartRateSampler(
+                    readings = MeasureClientHeartRateReadings(HealthServices.getClient(get<Context>()).measureClient),
+                    hasPermission = { checker.isGranted(WatchPermission.HEART_RATE) },
+                )
+            } catch (e: Exception) {
+                Napier.w("Health Services is not available; marks have no heart rate on this watch", e)
+                HeartRateSampler.None
+            }
+        }
+        single {
+            val location = get<WearLocationCaptureCoordinator>()
+            val devices = get<DeviceIdProvider>()
+            MarkMomentUseCase(
+                store = get(),
+                deviceId = { devices.getDeviceId().value.toString() },
+                place = { location.captureForJournalEntry() },
+                heartRate = get(),
+            )
+        }
+        single { BackgroundMarker(featureFlags = get(), markMoment = get(), haptics = get()) }
+        viewModel { MarkViewModel(markMoment = get(), haptics = get(), permissions = get(), applicationScope = get()) }
         factory {
             AudioMomentSaver(
                 notesRepository = get(),

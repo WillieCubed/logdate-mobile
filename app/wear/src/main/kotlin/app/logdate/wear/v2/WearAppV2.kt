@@ -24,6 +24,8 @@ import app.logdate.wear.v2.ambient.WatchAmbientScope
 import app.logdate.wear.v2.flow.FlowPage
 import app.logdate.wear.v2.flow.FlowViewModel
 import app.logdate.wear.v2.home.HomeScreen
+import app.logdate.wear.v2.mark.MarkConfirmation
+import app.logdate.wear.v2.mark.MarkViewModel
 import app.logdate.wear.v2.navigation.WearRoute
 import app.logdate.wear.v2.navigation.toV2BackStack
 import app.logdate.wear.v2.permissions.rememberPermissionRequester
@@ -36,6 +38,7 @@ import app.logdate.wear.v2.today.TodayControls
 import app.logdate.wear.v2.today.TodayPage
 import app.logdate.wear.v2.today.TodayViewModel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.merge
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -49,8 +52,8 @@ object WearAppV2Tags {
  * [initialRequest] picks the first back stack; a recreated activity restores the one it saved
  * instead. Each item of [newRequests] replaces the back stack, as a cold launch from a tile does.
  * Swiping right dismisses the top screen. Each screen's view models live as long as its entry; the
- * recorder is resolved here, outside every entry, so it belongs to the activity, and the
- * permissions it asks for are requested here. While it records, the app stays on screen in ambient
+ * recorder and Mark are resolved here, outside every entry, so they belong to the activity, and the
+ * permissions they ask for are requested here. While recording, the app stays on screen in ambient
  * mode where the watch supports it.
  */
 @Composable
@@ -59,6 +62,7 @@ fun WearAppV2(
     newRequests: Flow<WearLaunchRequest>,
 ) {
     val recorder = koinViewModel<RecorderViewModel>()
+    val marker = koinViewModel<MarkViewModel>()
     val recorderState by recorder.state.collectAsState()
     val backStack = rememberNavBackStack(*initialRequest.toV2BackStack().toTypedArray())
     LaunchedEffect(newRequests) {
@@ -67,7 +71,7 @@ fun WearAppV2(
             backStack.addAll(request.toV2BackStack())
         }
     }
-    RecorderPermissionPrompts(recorder)
+    PermissionRequests(recorder, marker)
     WatchAmbientScope(enabled = recorderState is RecorderState.Live) {
         LogDateWearTheme {
             CompositionLocalProvider(LocalLogDateHaptics provides koinInject<LogDateHaptics>()) {
@@ -83,7 +87,7 @@ fun WearAppV2(
                         sceneStrategies = listOf(rememberSwipeDismissableSceneStrategy<NavKey>()),
                         entryProvider =
                             entryProvider {
-                                entry<WearRoute.Home> { HomeEntry(recorder) }
+                                entry<WearRoute.Home> { HomeEntry(recorder, marker) }
                             },
                     )
                 }
@@ -92,27 +96,42 @@ fun WearAppV2(
     }
 }
 
-/** Asks for the permissions the recorder needs at the moment it needs them, and gives it the answers. */
+/** Asks for the permissions the recorder and Mark need at the moment they need them, and gives them the answers. */
 @Composable
-private fun RecorderPermissionPrompts(recorder: RecorderViewModel) {
-    val requester = rememberPermissionRequester(onResult = recorder::onPermissionResult)
-    LaunchedEffect(recorder, requester) {
-        recorder.permissionRequests.collect { permission -> requester.request(permission) }
+private fun PermissionRequests(
+    recorder: RecorderViewModel,
+    marker: MarkViewModel,
+) {
+    val requester =
+        rememberPermissionRequester { permission, result ->
+            recorder.onPermissionResult(permission, result)
+            marker.onPermissionResult(permission)
+        }
+    LaunchedEffect(recorder, marker, requester) {
+        merge(recorder.permissionRequests, marker.permissionRequests).collect { permission -> requester.request(permission) }
     }
 }
 
 @Composable
-private fun HomeEntry(recorder: RecorderViewModel) {
+private fun HomeEntry(
+    recorder: RecorderViewModel,
+    marker: MarkViewModel,
+) {
     val recorderState by recorder.state.collectAsState()
+    val markFeedback by marker.feedback.collectAsState()
     val controls =
-        remember(recorderState, recorder) {
-            TodayControls(recorder = TodayRecorder(recorderState, gesture = recorder, actions = recorder))
+        remember(recorderState, recorder, marker) {
+            TodayControls(
+                recorder = TodayRecorder(recorderState, gesture = recorder, actions = recorder),
+                onMark = marker::mark,
+            )
         }
     HomeScreen(
         pagingLocked = recorderState.locksPaging,
         today = { listState -> TodayEntry(listState, controls) },
         flow = { listState -> FlowEntry(listState) },
     )
+    MarkConfirmation(feedback = markFeedback, onDismiss = marker::dismissFeedback)
 }
 
 @Composable

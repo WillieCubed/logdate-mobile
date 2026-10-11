@@ -14,6 +14,15 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!--
+        A mark's heart rate, read once when someone marks a moment. Wear OS 6 reads it under its own
+        health permission, earlier versions under body sensors.
+    -->
+    <uses-permission
+        android:name="android.permission.BODY_SENSORS"
+        android:maxSdkVersion="35" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+
+    <!--
         Wear inherits ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION from
         :client:location for on-demand geotagging at journal-entry save time.
         The watch flow does not run a foreground tracking service, register
@@ -231,6 +240,11 @@
         <meta-data
             android:name="com.google.android.wearable.standalone"
             android:value="true" />
+
+        <!-- Marks the moment from a complication, a tile or a notification action, without opening the app. -->
+        <receiver
+            android:name=".v2.mark.MarkMomentReceiver"
+            android:exported="false" />
 
         <activity
             android:name=".presentation.MainActivity"

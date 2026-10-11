@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mark the moment, in the new watch app. Both are drawn along the screen edge, so each is a few words at most. -->
+    <string name="wear_mark_saved">Moment marked</string>
+    <string name="wear_mark_failed">Couldn’t mark</string>
+</resources>
