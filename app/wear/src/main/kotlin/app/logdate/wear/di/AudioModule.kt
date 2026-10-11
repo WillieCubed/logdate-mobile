@@ -27,6 +27,8 @@ import app.logdate.wear.data.storage.StorageSpaceChecker
 import app.logdate.wear.haptic.WearHapticEngine
 import app.logdate.wear.playback.AndroidWearPlaybackEngine
 import app.logdate.wear.playback.PhoneSyncedAudioResolver
+import app.logdate.wear.playback.SyncedAudioWatchMediaCache
+import app.logdate.wear.playback.WatchMediaCache
 import app.logdate.wear.playback.WearAudioOutputMonitor
 import app.logdate.wear.playback.WearAudioOutputs
 import app.logdate.wear.playback.WearPlaybackEngine
@@ -134,10 +136,14 @@ val wearAudioModule =
             )
         }
         single { SyncedAudioCache(File(get<Context>().filesDir, SyncedAudioCache.DIRECTORY_NAME)) }
+        single<WatchMediaCache> {
+            val storage = get<StorageSpaceChecker>()
+            SyncedAudioWatchMediaCache(cache = get(), freeBytes = storage::getAvailableStorageSpace)
+        }
         single<WearSyncedAudioResolver> {
             PhoneSyncedAudioResolver(
                 context = get(),
-                syncedAudioCache = get(),
+                mediaCache = get(),
                 dataLayerClient = get(),
                 notesRepository = get(),
                 ioDispatcher = get(qualifier = wearIoDispatcherQualifier),

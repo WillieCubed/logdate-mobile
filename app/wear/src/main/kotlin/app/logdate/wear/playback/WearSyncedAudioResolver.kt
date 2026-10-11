@@ -6,7 +6,6 @@ import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
-import app.logdate.wear.sync.SyncedAudioCache
 import app.logdate.wear.sync.WearDataLayerClient
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineDispatcher
@@ -19,12 +18,15 @@ interface WearSyncedAudioResolver {
 
 /**
  * Finds a playable file for an audio note. When the watch has none, the audio is pulled from the phone
- * into [syncedAudioCache], or taken from an earlier pull, and the note is pointed at it so the next
- * play needs no transfer.
+ * into [mediaCache], or taken from an earlier pull, and the note is pointed at it so the next play
+ * needs no transfer.
+ *
+ * Fails with [AudioNotOnWatchException] when the audio is on an unreachable phone, and with
+ * [NoRoomForAudioException] when the watch is too full to store it.
  */
 class PhoneSyncedAudioResolver(
     private val context: Context,
-    private val syncedAudioCache: SyncedAudioCache,
+    private val mediaCache: WatchMediaCache,
     private val dataLayerClient: WearDataLayerClient,
     private val notesRepository: JournalNotesRepository,
     private val ioDispatcher: CoroutineDispatcher,
@@ -37,7 +39,7 @@ class PhoneSyncedAudioResolver(
                     if (isLocallyPlayable(note.mediaRef)) {
                         return@runCatching note.mediaRef
                     }
-                    val file = syncedAudioCache.cachedFile(note.uid) ?: pullFromPhone(note)
+                    val file = mediaCache.cachedFile(note.uid) ?: pullFromPhone(note)
                     (notesRepository as? SyncableJournalNotesRepository)?.updateMediaRef(note.uid, file.absolutePath)
                     file.absolutePath
                 }
@@ -49,11 +51,9 @@ class PhoneSyncedAudioResolver(
     }
 
     private suspend fun pullFromPhone(note: JournalNote.Audio): File {
-        check(dataLayerClient.isPhoneConnected()) {
-            "No connected phone available to download audio ${note.uid}"
-        }
+        if (!dataLayerClient.isPhoneConnected()) throw AudioNotOnWatchException(note.uid)
         val pulled =
-            syncedAudioCache.pull(note.uid, inferExtension(note.mediaRef)) { partPath ->
+            mediaCache.store(note.uid, inferExtension(note.mediaRef)) { partPath ->
                 dataLayerClient.downloadAudioFromPhone(note.uid, partPath)
             }
         return checkNotNull(pulled) { "Phone audio transfer failed for note ${note.uid}" }

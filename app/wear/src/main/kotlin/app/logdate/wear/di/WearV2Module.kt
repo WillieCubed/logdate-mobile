@@ -32,6 +32,11 @@ import app.logdate.wear.v2.permissions.SharedPreferencesPermissionPromptStore
 import app.logdate.wear.v2.permissions.WatchPermission
 import app.logdate.wear.v2.phone.PhoneHandoff
 import app.logdate.wear.v2.phone.PhoneLinkRepository
+import app.logdate.wear.v2.playback.AndroidMomentPlaybackEngine
+import app.logdate.wear.v2.playback.MomentPlaybackEngine
+import app.logdate.wear.v2.playback.MomentPlayer
+import app.logdate.wear.v2.playback.PlaybackPreferencesStore
+import app.logdate.wear.v2.playback.SharedPreferencesPlaybackPreferencesStore
 import app.logdate.wear.v2.recorder.RecorderViewModel
 import app.logdate.wear.v2.today.DayClock
 import app.logdate.wear.v2.today.TodayViewModel
@@ -40,7 +45,9 @@ import app.logdate.wear.v2.today.WatchStreakSettings
 import app.logdate.wear.v2.today.timeChangeSignals
 import com.google.android.gms.wearable.Wearable
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
@@ -157,4 +164,21 @@ val wearV2Module =
             )
         }
         viewModel { FlowViewModel(dayClock = get(), notesRepository = get()) }
+
+        single<PlaybackPreferencesStore> {
+            SharedPreferencesPlaybackPreferencesStore(
+                get<Context>().getSharedPreferences(SharedPreferencesPlaybackPreferencesStore.PREFERENCES_NAME, Context.MODE_PRIVATE),
+            )
+        }
+        single<MomentPlaybackEngine> { AndroidMomentPlaybackEngine(manager = get(), scope = get()) }
+        // One player for every screen, on the main thread the media controller needs.
+        single {
+            MomentPlayer(
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+                engine = get(),
+                outputs = get(),
+                resolver = get(),
+                preferences = get(),
+            )
+        }
     }

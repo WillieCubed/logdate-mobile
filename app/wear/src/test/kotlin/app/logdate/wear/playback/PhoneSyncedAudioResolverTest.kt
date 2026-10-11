@@ -20,6 +20,7 @@ import org.junit.Test
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -35,6 +36,7 @@ class PhoneSyncedAudioResolverTest {
     private val filesDir = Files.createTempDirectory("wear-files").toFile()
     private val cacheDirectory = File(filesDir, SyncedAudioCache.DIRECTORY_NAME).apply { mkdirs() }
     private val cache = SyncedAudioCache(cacheDirectory)
+    private var freeBytes = Long.MAX_VALUE
     private val mediaFiles = MediaFileResolver(AndroidMediaDirectories(filesDir))
 
     @Before
@@ -54,7 +56,7 @@ class PhoneSyncedAudioResolverTest {
     private fun buildResolver(dispatcher: CoroutineDispatcher = UnconfinedTestDispatcher()) =
         PhoneSyncedAudioResolver(
             context = context,
-            syncedAudioCache = cache,
+            mediaCache = SyncedAudioWatchMediaCache(cache, freeBytes = { freeBytes }),
             dataLayerClient = dataLayerClient,
             notesRepository = notesRepository,
             ioDispatcher = dispatcher,
@@ -184,16 +186,28 @@ class PhoneSyncedAudioResolverTest {
         }
 
     @Test
-    fun `fails when the phone is unreachable`() =
+    fun `fails as not on the watch when the phone is unreachable`() =
         runTest {
             val noteId = Uuid.random()
             coEvery { dataLayerClient.isPhoneConnected() } returns false
 
             val result = buildResolver().resolvePlayableUri(audioNote(noteId, "content://phone/audio/$noteId"))
 
-            assertTrue(result.isFailure)
+            assertIs<AudioNotOnWatchException>(result.exceptionOrNull())
             coVerify(exactly = 0) { dataLayerClient.downloadAudioFromPhone(any(), any()) }
             coVerify(exactly = 0) { notesRepository.updateMediaRef(any(), any()) }
+        }
+
+    @Test
+    fun `fails as out of room without asking the phone when the watch is full`() =
+        runTest {
+            val noteId = Uuid.random()
+            freeBytes = 1_024L
+
+            val result = buildResolver().resolvePlayableUri(audioNote(noteId, "content://phone/audio/$noteId"))
+
+            assertIs<NoRoomForAudioException>(result.exceptionOrNull())
+            coVerify(exactly = 0) { dataLayerClient.downloadAudioFromPhone(any(), any()) }
         }
 
     private fun audioNote(
