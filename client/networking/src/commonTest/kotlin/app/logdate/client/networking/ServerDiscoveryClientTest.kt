@@ -12,9 +12,11 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.IOException
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
@@ -25,6 +27,44 @@ import kotlin.test.assertTrue
  * a well-known discovery endpoint.
  */
 class ServerDiscoveryClientTest {
+    private fun clientAnswering(engine: MockEngine) =
+        DefaultServerDiscoveryClient(HttpClient(engine) { install(ContentNegotiation) { json() } })
+
+    private suspend fun problemFrom(engine: MockEngine): DiscoveryFailure {
+        val error = clientAnswering(engine).discoverServer("https://cloud.logdate.app").exceptionOrNull()
+        return assertIs<ServerDiscoveryException>(error).kind
+    }
+
+    @Test
+    fun `a gateway timeout means the server is not responding`() =
+        runTest {
+            val engine =
+                MockEngine {
+                    respond("upstream request timeout", HttpStatusCode.GatewayTimeout, headersOf(HttpHeaders.ContentType, "text/plain"))
+                }
+
+            assertEquals(DiscoveryFailure.NOT_RESPONDING, problemFrom(engine))
+        }
+
+    @Test
+    fun `a request that cannot connect means the server is unreachable`() =
+        runTest {
+            val engine = MockEngine { throw IOException("No route to host") }
+
+            assertEquals(DiscoveryFailure.UNREACHABLE, problemFrom(engine))
+        }
+
+    @Test
+    fun `an answer that is not server information is unreadable`() =
+        runTest {
+            val engine =
+                MockEngine {
+                    respond("<html>LogDate</html>", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/html"))
+                }
+
+            assertEquals(DiscoveryFailure.UNREADABLE, problemFrom(engine))
+        }
+
     @Test
     fun `discoverServer reads descriptor from selected origin`() =
         runTest {

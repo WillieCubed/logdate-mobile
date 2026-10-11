@@ -294,7 +294,7 @@ class CloudAccountOnboardingViewModel(
                     _uiState.value =
                         currentState.copy(
                             isCreatingAccount = false,
-                            errorMessage = mapErrorToMessage(result.error),
+                            errorMessage = accountCreationFailureMessage(result.error),
                         )
                 }
             }
@@ -408,7 +408,7 @@ class CloudAccountOnboardingViewModel(
                         _uiState.value.copy(
                             isSigningIn = false,
                             pendingLocalDataAdoption = username.takeIf { needsConsent } ?: "",
-                            errorMessage = if (needsConsent) null else mapAuthErrorToMessage(result.error),
+                            errorMessage = if (needsConsent) null else signInFailureMessage(result.error),
                         )
                     if (!needsConsent) {
                         _uiState.value = _uiState.value.copy(pendingLocalDataAdoption = null)
@@ -543,7 +543,7 @@ class CloudAccountOnboardingViewModel(
                 ServerPreset.PRODUCTION ->
                     persistServerSelection(
                         nextStep = nextStep,
-                        failureMessage = "Failed to configure LogDate Cloud",
+                        failureMessage = { error -> serverSelectionFailureMessage(error, ServerPreset.PRODUCTION) },
                     ) {
                         serverConfigurationCoordinator.saveLogDateCloudSelection()
                     }
@@ -565,7 +565,7 @@ class CloudAccountOnboardingViewModel(
 
                     persistServerSelection(
                         nextStep = nextStep,
-                        failureMessage = "Failed to connect to server",
+                        failureMessage = { error -> serverSelectionFailureMessage(error, ServerPreset.CUSTOM) },
                     ) {
                         serverConfigurationCoordinator.validateAndSaveCustomServer(customServerUrl)
                     }
@@ -576,7 +576,7 @@ class CloudAccountOnboardingViewModel(
 
     private suspend fun persistServerSelection(
         nextStep: OnboardingStep,
-        failureMessage: String,
+        failureMessage: (Throwable) -> String,
         save: suspend () -> Result<ServerConfigurationCoordinator.SaveResult>,
     ) {
         save()
@@ -593,9 +593,10 @@ class CloudAccountOnboardingViewModel(
                 )
             }.onFailure { error ->
                 Napier.w("Server validation failed", error)
+                val message = failureMessage(error)
                 updateServerSelectionState(
-                    validationState = ServerValidationState.Error(failureMessage),
-                    errorMessage = failureMessage,
+                    validationState = ServerValidationState.Error(message),
+                    errorMessage = message,
                 )
             }
     }
@@ -670,54 +671,6 @@ class CloudAccountOnboardingViewModel(
             }
         }
     }
-
-    private fun mapAuthErrorToMessage(error: AuthenticateWithPasskeyUseCase.AuthenticationError): String =
-        when (error) {
-            AuthenticateWithPasskeyUseCase.AuthenticationError.PasskeyNotSupported ->
-                "Passkeys are not supported on this device."
-            AuthenticateWithPasskeyUseCase.AuthenticationError.PasskeyCancelled ->
-                "Authentication was cancelled. Please try again."
-            AuthenticateWithPasskeyUseCase.AuthenticationError.PasskeyFailed ->
-                "Failed to authenticate with passkey. Please try again."
-            AuthenticateWithPasskeyUseCase.AuthenticationError.NoCredentialsFound ->
-                "No passkey found for this account. Please check your username or create a new account."
-            AuthenticateWithPasskeyUseCase.AuthenticationError.AccountNotFound ->
-                "Account not found. Please check your username or create a new account."
-            AuthenticateWithPasskeyUseCase.AuthenticationError.NetworkError ->
-                "Network error. Please check your connection and try again."
-            AuthenticateWithPasskeyUseCase.AuthenticationError.LocalDataNeedsAdoption ->
-                "This device has entries that aren't in an account yet."
-            is AuthenticateWithPasskeyUseCase.AuthenticationError.Unknown ->
-                // The exception text names servers, key hashes and file paths. It is already in
-                // the log; the user gets something they can act on.
-                "Something went wrong. Please try again."
-        }
-
-    private fun mapErrorToMessage(error: CreatePasskeyAccountUseCase.CreateAccountError): String =
-        when (error) {
-            CreatePasskeyAccountUseCase.CreateAccountError.UsernameTaken ->
-                "Username is already taken. Please choose a different one."
-            CreatePasskeyAccountUseCase.CreateAccountError.UsernameInvalid ->
-                "Username is invalid. Use only letters, numbers, and underscores."
-            CreatePasskeyAccountUseCase.CreateAccountError.DisplayNameInvalid ->
-                "Display name is invalid. Please enter a valid name."
-            CreatePasskeyAccountUseCase.CreateAccountError.PasskeyNotSupported ->
-                "Passkeys are not supported on this device."
-            CreatePasskeyAccountUseCase.CreateAccountError.PasskeyCancelled ->
-                "Passkey creation was cancelled. Please try again."
-            CreatePasskeyAccountUseCase.CreateAccountError.PasskeyFailed ->
-                "Failed to create passkey. Please check your device security settings."
-            CreatePasskeyAccountUseCase.CreateAccountError.NetworkError ->
-                "Network error. Please check your connection and try again."
-            CreatePasskeyAccountUseCase.CreateAccountError.RateLimited ->
-                "Too many attempts. Please wait a moment before trying again."
-            CreatePasskeyAccountUseCase.CreateAccountError.ServerError ->
-                "Something went wrong on our end. Please try again in a few minutes."
-            is CreatePasskeyAccountUseCase.CreateAccountError.Unknown ->
-                // The exception text names servers, key hashes and file paths. It is already in
-                // the log; the user gets something they can act on.
-                "Something went wrong. Please try again."
-        }
 
     fun onVerifyEmailClicked() {
         if (_uiState.value.isVerifyingEmail) return

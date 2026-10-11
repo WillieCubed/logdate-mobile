@@ -25,12 +25,14 @@ import app.logdate.shared.model.UsernameAvailabilityResponse
 import app.logdate.util.UuidSerializer
 import io.github.aakira.napier.Napier
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
@@ -192,9 +194,45 @@ class PasskeyApiClient(
 ) : PasskeyApiClientContract {
     companion object {
         private const val AUTH_PATH = "/auth"
+
+        /** How long a sign-in request may take before the person is told the server isn't responding. */
+        private const val SIGN_IN_TIMEOUT_MS = 30_000L
     }
 
     private suspend fun getBaseUrl(): String = configRepository.apiBaseUrl.first()
+
+    /**
+     * The failure a non-success response describes. The server's own `{code, message}` envelope
+     * wins; a server error without one (a gateway's timeout page, for instance) means the server is
+     * not responding, and anything else unreadable is reported as such rather than as a network
+     * problem.
+     */
+    private suspend fun HttpResponse.toPasskeyApiException(): PasskeyApiException {
+        val envelope = runCatching { json.decodeFromString<ApiErrorResponse>(bodyAsText()) }.getOrNull()
+        return when {
+            envelope != null -> PasskeyApiException(envelope.error.code, envelope.error.message)
+            status.value >= 500 -> PasskeyApiException(PasskeyApiErrorCodes.SERVER_UNAVAILABLE, "The server answered HTTP ${status.value}")
+            else ->
+                PasskeyApiException(
+                    PasskeyApiErrorCodes.UNEXPECTED_RESPONSE,
+                    "The server answered HTTP ${status.value} without an error",
+                )
+        }
+    }
+
+    /** A request that failed before any answer: a stalled server, or no connection at all. */
+    private fun requestFailure(
+        action: String,
+        error: Exception,
+    ): PasskeyApiException {
+        val code =
+            if (error.isTimeout()) {
+                PasskeyApiErrorCodes.SERVER_UNAVAILABLE
+            } else {
+                PasskeyApiErrorCodes.NETWORK_ERROR
+            }
+        return PasskeyApiException(code, action, error)
+    }
 
     override suspend fun checkUsernameAvailability(username: String): Result<UsernameAvailabilityData> =
         try {
@@ -205,12 +243,11 @@ class PasskeyApiClient(
                 val apiResponse = json.decodeFromString<UsernameAvailabilityResponse>(response.bodyAsText())
                 Result.success(apiResponse.data)
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to check username availability", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to check username availability", e))
+            Result.failure(requestFailure("Failed to check username availability", e))
         }
 
     override suspend fun beginAccountCreation(request: BeginAccountCreationRequest): Result<BeginAccountCreationData> =
@@ -239,12 +276,11 @@ class PasskeyApiClient(
                     ),
                 )
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to begin account creation", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to begin account creation", e))
+            Result.failure(requestFailure("Failed to begin account creation", e))
         }
 
     override suspend fun completeAccountCreation(request: CompleteAccountCreationRequest): Result<CompleteAccountCreationData> =
@@ -265,12 +301,11 @@ class PasskeyApiClient(
                     ),
                 )
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to complete account creation", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to complete account creation", e))
+            Result.failure(requestFailure("Failed to complete account creation", e))
         }
 
     override suspend fun beginAuthentication(request: BeginAuthenticationRequest): Result<BeginAuthenticationData> =
@@ -278,6 +313,7 @@ class PasskeyApiClient(
             val baseUrl = getBaseUrl()
             val response =
                 httpClient.post("$baseUrl$AUTH_PATH/signin/passkey/begin") {
+                    timeout { requestTimeoutMillis = SIGN_IN_TIMEOUT_MS }
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -294,12 +330,11 @@ class PasskeyApiClient(
                     ),
                 )
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to begin authentication", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to begin authentication", e))
+            Result.failure(requestFailure("Failed to begin authentication", e))
         }
 
     override suspend fun completeAuthentication(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData> =
@@ -307,6 +342,7 @@ class PasskeyApiClient(
             val baseUrl = getBaseUrl()
             val response =
                 httpClient.post("$baseUrl$AUTH_PATH/signin/passkey/complete") {
+                    timeout { requestTimeoutMillis = SIGN_IN_TIMEOUT_MS }
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -320,12 +356,11 @@ class PasskeyApiClient(
                     ),
                 )
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to complete authentication", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to complete authentication", e))
+            Result.failure(requestFailure("Failed to complete authentication", e))
         }
 
     override suspend fun getAccountInfo(accessToken: String): Result<LogDateAccount> =
@@ -340,12 +375,11 @@ class PasskeyApiClient(
                 val authResponse = json.decodeFromString<AuthResponseDto>(response.bodyAsText())
                 Result.success(authResponse.data.account.toLogDateAccount())
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to get account info", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to get account info", e))
+            Result.failure(requestFailure("Failed to get account info", e))
         }
 
     override suspend fun getEntitlement(accessToken: String): Result<EntitlementResponse> =
@@ -358,12 +392,11 @@ class PasskeyApiClient(
             if (response.status.value in 200..299) {
                 Result.success(json.decodeFromString<EntitlementResponse>(response.bodyAsText()))
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to get entitlement", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to get entitlement", e))
+            Result.failure(requestFailure("Failed to get entitlement", e))
         }
 
     override suspend fun updateAccountProfile(
@@ -401,12 +434,11 @@ class PasskeyApiClient(
                 val accountResponse = json.decodeFromString<AccountInfoResponse>(response.bodyAsText())
                 Result.success(accountResponse.data)
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to update account profile", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to update account profile", e))
+            Result.failure(requestFailure("Failed to update account profile", e))
         }
 
     override suspend fun refreshToken(refreshToken: String): Result<String> =
@@ -422,12 +454,11 @@ class PasskeyApiClient(
                 val tokenResponse = json.decodeFromString<RefreshTokenResponseV1Dto>(response.bodyAsText())
                 Result.success(tokenResponse.data.accessToken)
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to refresh token", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to refresh token", e))
+            Result.failure(requestFailure("Failed to refresh token", e))
         }
 
     override suspend fun logout(refreshToken: String): Result<Unit> =
@@ -442,12 +473,11 @@ class PasskeyApiClient(
             if (response.status.value in 200..299) {
                 Result.success(Unit)
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to revoke refresh token during logout", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to revoke refresh token", e))
+            Result.failure(requestFailure("Failed to revoke refresh token", e))
         }
 
     override suspend fun listPasskeys(accessToken: String): Result<List<PasskeyInfo>> =
@@ -461,12 +491,11 @@ class PasskeyApiClient(
             if (response.status.value in 200..299) {
                 Result.success(json.decodeFromString<PasskeyListApiResponse>(response.bodyAsText()).data)
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to list passkeys", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to list passkeys", e))
+            Result.failure(requestFailure("Failed to list passkeys", e))
         }
 
     override suspend fun beginAddPasskey(accessToken: String): Result<PasskeyRegistrationOptions> =
@@ -480,12 +509,11 @@ class PasskeyApiClient(
             if (response.status.value in 200..299) {
                 Result.success(json.decodeFromString<RestoreRegisterBeginResponseDto>(response.bodyAsText()).data)
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to begin adding a passkey", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to begin adding a passkey", e))
+            Result.failure(requestFailure("Failed to begin adding a passkey", e))
         }
 
     override suspend fun completeAddPasskey(
@@ -504,12 +532,11 @@ class PasskeyApiClient(
             if (response.status.value in 200..299) {
                 Result.success(json.decodeFromString<PasskeyApiResponse>(response.bodyAsText()).data)
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to complete adding a passkey", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to complete adding a passkey", e))
+            Result.failure(requestFailure("Failed to complete adding a passkey", e))
         }
 
     override suspend fun listSignInIdentities(accessToken: String): Result<List<AccountSignInIdentity>> =
@@ -523,12 +550,11 @@ class PasskeyApiClient(
             if (response.status.value in 200..299) {
                 Result.success(json.decodeFromString<SignInIdentityListApiResponse>(response.bodyAsText()).data)
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to list sign-in methods", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to list sign-in methods", e))
+            Result.failure(requestFailure("Failed to list sign-in methods", e))
         }
 
     override suspend fun deletePasskey(
@@ -545,12 +571,11 @@ class PasskeyApiClient(
             if (response.status.value in 200..299) {
                 Result.success(Unit)
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to delete passkey", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to delete passkey", e))
+            Result.failure(requestFailure("Failed to delete passkey", e))
         }
 
     override suspend fun deleteAccount(accessToken: String): Result<Unit> =
@@ -564,12 +589,11 @@ class PasskeyApiClient(
             if (response.status.value in 200..299) {
                 Result.success(Unit)
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to delete account", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to delete account", e))
+            Result.failure(requestFailure("Failed to delete account", e))
         }
 
     override suspend fun signUpWithGoogle(
@@ -604,12 +628,11 @@ class PasskeyApiClient(
                     ),
                 )
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to sign up with Google", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to sign up with Google", e))
+            Result.failure(requestFailure("Failed to sign up with Google", e))
         }
 
     override suspend fun signInWithGoogle(
@@ -633,12 +656,11 @@ class PasskeyApiClient(
                     ),
                 )
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to sign in with Google", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to sign in with Google", e))
+            Result.failure(requestFailure("Failed to sign in with Google", e))
         }
 
     override suspend fun beginRestoreKeyRegistration(accessToken: String): Result<PasskeyRegistrationOptions> =
@@ -654,12 +676,11 @@ class PasskeyApiClient(
                 val apiResponse = json.decodeFromString<RestoreRegisterBeginResponseDto>(response.bodyAsText())
                 Result.success(apiResponse.data)
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to begin restore key registration", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to begin restore key registration", e))
+            Result.failure(requestFailure("Failed to begin restore key registration", e))
         }
 
     override suspend fun completeRestoreKeyRegistration(
@@ -679,12 +700,11 @@ class PasskeyApiClient(
             if (response.status.value in 200..299) {
                 Result.success(Unit)
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.w("Failed to complete restore key registration", e)
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to complete restore key registration", e))
+            Result.failure(requestFailure("Failed to complete restore key registration", e))
         }
 
     override suspend fun beginRestoreSignIn(): Result<BeginAuthenticationData> =
@@ -707,12 +727,11 @@ class PasskeyApiClient(
                     ),
                 )
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.i("Failed to begin restore sign-in: ${e.message ?: "unknown error"}")
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to begin restore sign-in", e))
+            Result.failure(requestFailure("Failed to begin restore sign-in", e))
         }
 
     override suspend fun completeRestoreSignIn(request: CompleteAuthenticationRequest): Result<CompleteAuthenticationData> =
@@ -733,12 +752,11 @@ class PasskeyApiClient(
                     ),
                 )
             } else {
-                val errorResponse = json.decodeFromString<ApiErrorResponse>(response.bodyAsText())
-                Result.failure(PasskeyApiException(errorResponse.error.code, errorResponse.error.message))
+                Result.failure(response.toPasskeyApiException())
             }
         } catch (e: Exception) {
             Napier.i("Failed to complete restore sign-in: ${e.message ?: "unknown error"}")
-            Result.failure(PasskeyApiException("NETWORK_ERROR", "Failed to complete restore sign-in", e))
+            Result.failure(requestFailure("Failed to complete restore sign-in", e))
         }
 }
 
@@ -779,6 +797,14 @@ object PasskeyApiErrorCodes {
     const val LAST_SIGNIN_FACTOR = "LAST_SIGNIN_FACTOR"
     const val CANONICAL_OWNER_ID_TAKEN = "CANONICAL_OWNER_ID_TAKEN"
     const val SERVER_ERROR = "SERVER_ERROR"
+
+    // Codes this client assigns when the server's answer carries no code of its own.
+
+    /** The server did not answer in time, or answered with a server error and no explanation. */
+    const val SERVER_UNAVAILABLE = "SERVER_UNAVAILABLE"
+
+    /** The server answered with something that is not a LogDate API response. */
+    const val UNEXPECTED_RESPONSE = "UNEXPECTED_RESPONSE"
 }
 
 @Serializable

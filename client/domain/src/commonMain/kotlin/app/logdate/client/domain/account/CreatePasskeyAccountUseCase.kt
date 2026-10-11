@@ -133,7 +133,7 @@ class CreatePasskeyAccountUseCase(
                 PasskeyApiErrorCodes.PASSKEY_VERIFICATION_FAILED -> CreateAccountError.PasskeyFailed
                 PasskeyApiErrorCodes.RATE_LIMIT_EXCEEDED -> CreateAccountError.RateLimited
                 PasskeyApiErrorCodes.NETWORK_ERROR -> CreateAccountError.NetworkError
-                PasskeyApiErrorCodes.SERVER_ERROR -> CreateAccountError.ServerError
+                PasskeyApiErrorCodes.SERVER_ERROR, PasskeyApiErrorCodes.SERVER_UNAVAILABLE -> CreateAccountError.ServerError
                 else -> CreateAccountError.Unknown(exception.message ?: exception.errorCode)
             }
         }

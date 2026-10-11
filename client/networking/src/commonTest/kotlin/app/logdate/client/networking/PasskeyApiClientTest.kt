@@ -162,6 +162,64 @@ class PasskeyApiClientTest {
         }
 
     @Test
+    fun `beginAuthentication reports a server that answers with a gateway timeout page`() =
+        runTest {
+            // Cloud Run answers a request that ran past its limit with a plain-text 504, not JSON.
+            val apiClient =
+                createMockApiClient(
+                    MockEngine {
+                        respond(
+                            content = "upstream request timeout",
+                            status = HttpStatusCode.GatewayTimeout,
+                            headers = headersOf(HttpHeaders.ContentType, "text/plain"),
+                        )
+                    },
+                )
+
+            val error = apiClient.beginAuthentication(BeginAuthenticationRequest("testuser")).exceptionOrNull()
+
+            assertEquals(PasskeyApiErrorCodes.SERVER_UNAVAILABLE, (error as PasskeyApiException).errorCode)
+        }
+
+    @Test
+    fun `beginAuthentication reports an error response it cannot read`() =
+        runTest {
+            val apiClient =
+                createMockApiClient(
+                    MockEngine {
+                        respond(
+                            content = "<html>Not here</html>",
+                            status = HttpStatusCode.NotFound,
+                            headers = headersOf(HttpHeaders.ContentType, "text/html"),
+                        )
+                    },
+                )
+
+            val error = apiClient.beginAuthentication(BeginAuthenticationRequest("testuser")).exceptionOrNull()
+
+            assertEquals(PasskeyApiErrorCodes.UNEXPECTED_RESPONSE, (error as PasskeyApiException).errorCode)
+        }
+
+    @Test
+    fun `beginAuthentication keeps the server's own error code`() =
+        runTest {
+            val apiClient =
+                createMockApiClient(
+                    MockEngine {
+                        respond(
+                            content = """{"success": false, "error": {"code": "ACCOUNT_NOT_FOUND", "message": "No account"}}""",
+                            status = HttpStatusCode.NotFound,
+                            headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                        )
+                    },
+                )
+
+            val error = apiClient.beginAuthentication(BeginAuthenticationRequest("testuser")).exceptionOrNull()
+
+            assertEquals(PasskeyApiErrorCodes.ACCOUNT_NOT_FOUND, (error as PasskeyApiException).errorCode)
+        }
+
+    @Test
     fun `beginAuthentication uses auth v1 path`() =
         runTest {
             val mockEngine =

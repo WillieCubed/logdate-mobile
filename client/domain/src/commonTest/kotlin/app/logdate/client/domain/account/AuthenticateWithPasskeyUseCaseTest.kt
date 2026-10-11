@@ -1,5 +1,7 @@
 package app.logdate.client.domain.account
 
+import app.logdate.client.networking.PasskeyApiErrorCodes
+import app.logdate.client.networking.PasskeyApiException
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.shared.model.LogDateAccount
 import app.logdate.shared.model.PasskeyInfo
@@ -232,6 +234,73 @@ class AuthenticateWithPasskeyUseCaseTest {
             // Then
             assertTrue(result is AuthenticateWithPasskeyUseCase.Result.Error)
             assertEquals(AuthenticateWithPasskeyUseCase.AuthenticationError.PasskeyNotSupported, result.error)
+        }
+
+    /** A repository whose sign-in fails with [error], the way the API client reports failures. */
+    private fun repositoryFailingWith(error: Throwable): PasskeyAccountRepository =
+        object : PasskeyAccountRepository {
+            override val currentAccount = kotlinx.coroutines.flow.MutableStateFlow(null)
+            override val isAuthenticated = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+            override suspend fun createAccountWithPasskey(
+                request: app.logdate.client.repository.account.AccountCreationRequest,
+            ): kotlin.Result<LogDateAccount> = kotlin.Result.failure(NotImplementedError())
+
+            override suspend fun authenticateWithPasskey(
+                username: String?,
+                adoptLocalData: Boolean,
+            ): kotlin.Result<LogDateAccount> = kotlin.Result.failure(error)
+
+            override suspend fun checkUsernameAvailability(username: String): kotlin.Result<Boolean> =
+                kotlin.Result.failure(NotImplementedError())
+
+            override suspend fun signOut(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+            override suspend fun getCurrentAccount(): LogDateAccount? = null
+
+            override suspend fun getAccountInfo(): kotlin.Result<LogDateAccount> = kotlin.Result.failure(NotImplementedError())
+
+            override suspend fun refreshAuthentication(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+            override suspend fun listPasskeys(): Result<List<PasskeyInfo>> = Result.success(emptyList())
+
+            override suspend fun deletePasskey(credentialId: String): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+            override suspend fun createRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+
+            override suspend fun signInWithRestoreKey(): kotlin.Result<LogDateAccount> = kotlin.Result.failure(NotImplementedError())
+
+            override suspend fun deleteRestoreKey(): kotlin.Result<Unit> = kotlin.Result.failure(NotImplementedError())
+        }
+
+    private suspend fun signInError(error: Throwable): AuthenticateWithPasskeyUseCase.AuthenticationError {
+        val result = AuthenticateWithPasskeyUseCase(repositoryFailingWith(error))("testuser")
+        return assertIs<AuthenticateWithPasskeyUseCase.Result.Error>(result).error
+    }
+
+    @Test
+    fun `a sign-in request that never reached LogDate Cloud is a network error`() =
+        runTest {
+            val error =
+                PasskeyApiException(PasskeyApiErrorCodes.NETWORK_ERROR, "Failed to begin authentication", Exception("No route to host"))
+
+            assertEquals(AuthenticateWithPasskeyUseCase.AuthenticationError.NetworkError, signInError(error))
+        }
+
+    @Test
+    fun `LogDate Cloud not answering is reported as unavailable`() =
+        runTest {
+            val error = PasskeyApiException(PasskeyApiErrorCodes.SERVER_UNAVAILABLE, "LogDate Cloud answered HTTP 504")
+
+            assertEquals(AuthenticateWithPasskeyUseCase.AuthenticationError.ServerUnavailable, signInError(error))
+        }
+
+    @Test
+    fun `an account the server does not have is reported as not found`() =
+        runTest {
+            val error = PasskeyApiException(PasskeyApiErrorCodes.ACCOUNT_NOT_FOUND, "No account")
+
+            assertEquals(AuthenticateWithPasskeyUseCase.AuthenticationError.AccountNotFound, signInError(error))
         }
 
     @Test

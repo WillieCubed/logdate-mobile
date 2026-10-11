@@ -1,5 +1,7 @@
 package app.logdate.client.domain.account
 
+import app.logdate.client.networking.PasskeyApiErrorCodes
+import app.logdate.client.networking.PasskeyApiException
 import app.logdate.client.repository.account.LocalDataAdoptionRequiredException
 import app.logdate.client.repository.account.PasskeyAccountRepository
 import app.logdate.shared.model.LogDateAccount
@@ -34,6 +36,9 @@ class AuthenticateWithPasskeyUseCase(
 
         object NetworkError : AuthenticationError()
 
+        /** The server was reached but did not answer in time, or answered with a server error. */
+        object ServerUnavailable : AuthenticationError()
+
         /**
          * This device has entries that belong to no account yet. Signing in makes them part of the
          * account, so the caller has to confirm before retrying with [adoptLocalData].
@@ -67,8 +72,17 @@ class AuthenticateWithPasskeyUseCase(
             Result.Error(AuthenticationError.Unknown(e.message ?: "Unknown error"))
         }
 
-    private fun mapExceptionToError(exception: Throwable?): AuthenticationError =
-        when {
+    private fun mapExceptionToError(exception: Throwable?): AuthenticationError {
+        // The API client's structured code says what went wrong with the request; message matching
+        // below is only for the platform's credential errors, which have no code.
+        if (exception is PasskeyApiException) {
+            when (exception.errorCode) {
+                PasskeyApiErrorCodes.NETWORK_ERROR -> return AuthenticationError.NetworkError
+                PasskeyApiErrorCodes.SERVER_UNAVAILABLE -> return AuthenticationError.ServerUnavailable
+                PasskeyApiErrorCodes.ACCOUNT_NOT_FOUND -> return AuthenticationError.AccountNotFound
+            }
+        }
+        return when {
             exception is LocalDataAdoptionRequiredException ->
                 AuthenticationError.LocalDataNeedsAdoption
             exception?.message?.contains("USER_CANCELLED", ignoreCase = true) == true ->
@@ -85,4 +99,5 @@ class AuthenticateWithPasskeyUseCase(
                 AuthenticationError.PasskeyFailed
             else -> AuthenticationError.Unknown(exception?.message ?: "Unknown error")
         }
+    }
 }

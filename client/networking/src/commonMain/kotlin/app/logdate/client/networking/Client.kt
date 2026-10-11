@@ -4,6 +4,7 @@ import app.logdate.util.UuidSerializer
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngineConfig
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
@@ -23,6 +24,9 @@ expect val httpClient: HttpClient
  * Implementers should call this function in their platform-specific client implementations.
  */
 internal fun <T : HttpClientEngineConfig> HttpClientConfig<T>.configureClientDefaults() {
+    // No default limits, since uploads can run long; requests that need one (sign-in, server
+    // checks) set their own, so a stalled server gets a clear answer instead of a spinner.
+    install(HttpTimeout)
     install(ContentNegotiation) {
         json(
             Json {
