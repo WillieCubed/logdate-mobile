@@ -58,14 +58,14 @@ cloud_run_secret_env = {
   DATABASE_USER     = { secret_id = "logdate-db-user", version = "1" }
   DATABASE_PASSWORD = { secret_id = "logdate-db-password", version = "1" }
   JWT_SECRET        = { secret_id = "logdate-jwt-secret", version = "1" }
-  # Encrypts hosted AT Protocol signing keys. Version 1 must hold exactly the bytes of
-  # logdate-jwt-secret version 1, which encrypted every key stored before this secret existed
-  # (server/docs/environment-variables.md#atproto_signing_key_kek).
-  ATPROTO_SIGNING_KEY_KEK = { secret_id = "logdate-atproto-signing-key-kek", version = "1" }
-  # Moving to a fresh key-encryption key, step 1 of 2: every instance learns to read version 2
-  # before anything is encrypted with it
-  # (server/docs/environment-variables.md#atproto_signing_key_kek_decrypt_only).
-  ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY = { secret_id = "logdate-atproto-signing-key-kek", version = "2" }
+  # Encrypts hosted AT Protocol signing keys and the OAuth signing keys. Version 2 is an
+  # independent random value. Version 1 was a copy of logdate-jwt-secret version 1; keep it
+  # while any database backup still holds keys encrypted with it.
+  ATPROTO_SIGNING_KEY_KEK = { secret_id = "logdate-atproto-signing-key-kek", version = "2" }
+  # Moving to a fresh key-encryption key, step 2 of 2: version 2 encrypts, and every instance
+  # re-encrypts the stored keys still under version 1 at startup. Remove this once the logs
+  # report none left (server/docs/environment-variables.md#atproto_signing_key_kek_decrypt_only).
+  ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY = { secret_id = "logdate-atproto-signing-key-kek", version = "1" }
   # Signs hosted AT Protocol session tokens. A new value signs out every AT Protocol client
   # session; the LogDate apps are unaffected.
   ATPROTO_SESSION_SECRET   = { secret_id = "logdate-atproto-session-secret", version = "1" }
