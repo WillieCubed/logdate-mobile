@@ -61,4 +61,9 @@
     <string name="notification_channel_cloud_sync_description">Shows progress while your journal is backing up.</string>
     <string name="notification_channel_moment_reminders_name">Reminders</string>
     <string name="notification_channel_moment_reminders_description">A reminder to record a moment, at most once a day.</string>
+    <string name="notification_watch_paired_title">LogDate is set up on %1$s</string>
+    <string name="notification_watch_paired_body">Your watch and this phone now share your moments.</string>
+    <string name="notification_watch_linked_body">Your watch now backs up to your LogDate account on its own.</string>
+    <string name="notification_watch_other_account_title">%1$s is set up for another LogDate account</string>
+    <string name="notification_watch_other_account_body">Erase LogDate on the watch to set it up with this phone.</string>
 </resources>

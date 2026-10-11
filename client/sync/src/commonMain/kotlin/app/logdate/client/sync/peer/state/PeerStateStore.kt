@@ -46,6 +46,10 @@ class PeerStateStore {
             .map { all -> all.values.filter { it.role == role }.maxByOrNull { it.writtenAt } }
             .distinctUntilChanged()
 
+    /** The latest readable document of each node that writes as [role]. */
+    fun documents(role: PeerRole): Flow<Map<String, StateDocument>> =
+        documents.map { all -> all.filterValues { it.role == role } }.distinctUntilChanged()
+
     /** The features the latest [role] document lists; empty until one arrives. */
     fun features(role: PeerRole): Flow<Set<String>> =
         latest(role)

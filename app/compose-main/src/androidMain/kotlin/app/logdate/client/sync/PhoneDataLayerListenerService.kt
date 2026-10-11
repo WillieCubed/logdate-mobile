@@ -11,10 +11,13 @@ import app.logdate.client.sync.datalayer.JournalDataMapper
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import app.logdate.client.sync.datalayer.v2.WearPaths
+import app.logdate.client.sync.datalayer.v2.WearProtocol
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
 import app.logdate.client.sync.peer.state.StateDocumentCodec
+import app.logdate.client.sync.v2.link.PhoneLinkInitiator
 import app.logdate.feature.editor.ui.camera.CameraRemoteCommand
+import com.google.android.gms.wearable.CapabilityInfo
 import com.google.android.gms.wearable.ChannelClient
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -70,6 +73,19 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
         private const val CAMERA_SELECT_DEVICE_PREFIX = "device:"
         private const val MAX_KOIN_RETRIES = 3
         private const val KOIN_RETRY_DELAY_MS = 500L
+    }
+
+    /** A watch turning on its redesigned app is the moment to link it, even when LogDate was not running. */
+    override fun onCapabilityChanged(capabilityInfo: CapabilityInfo) {
+        if (capabilityInfo.name != WearProtocol.WATCH_CAPABILITY_V2 || capabilityInfo.nodes.isEmpty()) return
+        serviceScope.launch {
+            val initiator = resolveKoin()?.get<PhoneLinkInitiator>()
+            if (initiator == null) {
+                Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries; the watch is linked when LogDate next starts")
+                return@launch
+            }
+            initiator.reconcileNow()
+        }
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {

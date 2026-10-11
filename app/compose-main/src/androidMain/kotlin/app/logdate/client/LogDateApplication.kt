@@ -26,6 +26,7 @@ import app.logdate.client.rewind.RewindGenerationScheduler
 import app.logdate.client.shortcuts.DynamicShortcutRefreshObserver
 import app.logdate.client.shortcuts.DynamicShortcutScheduler
 import app.logdate.client.sync.v2.PhoneStatePublisher
+import app.logdate.client.sync.v2.link.PhoneLinkInitiator
 import app.logdate.client.tiles.RecordVoiceTileUpdater
 import app.logdate.client.tiles.RecordingWindowTracker
 import app.logdate.di.initializeKoin
@@ -151,6 +152,16 @@ class LogdateApplication :
             get<RecordingBubbleSwitch>()
         }
         startPhoneStatePublishing()
+        startWatchLinking()
+    }
+
+    /** Links this phone's watches while the redesigned watch app is on; a failure here must not stop startup. */
+    private fun startWatchLinking() {
+        runCatching {
+            get<PhoneLinkInitiator>().start(get())
+        }.onFailure { error ->
+            Napier.w("Failed to start linking this phone's watches", error)
+        }
     }
 
     /** Publishes this phone's Labs watch switch to its watches; a failure here must not stop startup. */

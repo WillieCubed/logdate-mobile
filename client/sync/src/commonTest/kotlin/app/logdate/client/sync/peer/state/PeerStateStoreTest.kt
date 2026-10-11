@@ -49,4 +49,15 @@ class PeerStateStoreTest {
 
             assertEquals(setOf("b"), store.features(PeerRole.PHONE).first())
         }
+
+    @Test
+    fun `documents lists the latest document of each node of a role`() =
+        runTest {
+            val watch = StateDocument(role = PeerRole.WATCH, writtenAt = 1, watch = WatchState())
+            val phone = StateDocument(role = PeerRole.PHONE, writtenAt = 1, phone = PhoneState())
+            store.accept("watch-node", Decoded.Supported(watch), PeerRole.WATCH)
+            store.accept("phone-node", Decoded.Supported(phone), PeerRole.PHONE)
+
+            assertEquals(mapOf("watch-node" to watch), store.documents(PeerRole.WATCH).first())
+        }
 }

@@ -146,6 +146,7 @@ actual val appModule: Module =
         includes(audioModule)
         includes(windowingModule)
         includes(widgetModule)
+        includes(phoneWatchSyncV2Module)
 
         single {
             val quickReply = FeatureFlagState(get(), FeatureFlag.NOTIFICATION_QUICK_REPLY, get())

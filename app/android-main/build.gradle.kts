@@ -203,7 +203,7 @@ extensions.configure<ApplicationExtension> {
             ":client:feature:speechrecognition",
         )
     if (recoveryAcceptanceAssetsDir != null) {
-        sourceSets.getByName("androidTest").assets.srcDir(recoveryAcceptanceAssetsDir)
+        sourceSets.getByName("androidTest").assets.directories += recoveryAcceptanceAssetsDir
     }
     defaultConfig {
         applicationId = baseApplicationId
@@ -286,6 +286,8 @@ extensions.configure<ApplicationExtension> {
                 isProfileable = true
             }
         }
+        // This benchmark intentionally disables code shrinking, which precludes resource shrinking.
+        @Suppress("NotShrinkingResources")
         create("benchmark") {
             initWith(getByName("release"))
             matchingFallbacks += listOf("release")
@@ -531,6 +533,8 @@ dependencies {
     testImplementation(projects.client.feature.editor)
     testImplementation(projects.client.repository)
     testImplementation(projects.client.sync)
+    testImplementation(projects.client.device)
+    testImplementation(projects.client.logdateDatastore)
     testImplementation(projects.shared.model)
 
     androidTestImplementation(projects.app.composeMain)
@@ -574,7 +578,7 @@ dependencies {
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.test.uiautomator)
-    androidTestImplementation("io.mockk:mockk-android:1.14.9")
+    androidTestImplementation(libs.mockk.android)
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestUtil(libs.androidx.test.orchestrator)
     // Emulator-only WebAuthn provider, installed alongside the app so instrumented tests can
