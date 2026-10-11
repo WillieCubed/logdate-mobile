@@ -42,4 +42,19 @@ object WatchReminderRules {
             now - endedAt <= WORKOUT_WINDOW &&
             isWaking(now, timeZone) &&
             !remindedToday(now, lastReminderAt, timeZone)
+
+    val EVENING_CHECK: LocalTime = LocalTime(20, 30)
+
+    fun eveningReminderDue(
+        now: Instant,
+        lastReminderAt: Instant?,
+        momentsToday: Int,
+        phoneReachable: Boolean,
+        timeZone: TimeZone,
+    ): Boolean =
+        !phoneReachable &&
+            momentsToday == 0 &&
+            now.toLocalDateTime(timeZone).time >= EVENING_CHECK &&
+            isWaking(now, timeZone) &&
+            !remindedToday(now, lastReminderAt, timeZone)
 }

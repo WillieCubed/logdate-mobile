@@ -211,7 +211,11 @@ private fun RemindersSwitch(
         secondaryLabel = {
             Text(
                 stringResource(
-                    if (setting.afterWorkouts) R.string.wear_settings_reminders_workouts else R.string.wear_settings_reminders_off,
+                    when {
+                        !setting.enabled -> R.string.wear_settings_reminders_off
+                        setting.afterWorkouts -> R.string.wear_settings_reminders_workouts
+                        else -> R.string.wear_settings_reminders_evening
+                    },
                 ),
                 maxLines = 4,
             )

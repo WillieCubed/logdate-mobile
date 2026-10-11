@@ -19,5 +19,6 @@
     <string name="wear_settings_more_on_phone_failed">Couldn’t reach your phone. Tap to try again.</string>
     <string name="wear_settings_reminders">Reminders</string>
     <string name="wear_settings_reminders_off">A nudge to record, at most once a day</string>
-    <string name="wear_settings_reminders_workouts">After workouts</string>
+    <string name="wear_settings_reminders_workouts">After workouts and in the evening</string>
+    <string name="wear_settings_reminders_evening">In the evening</string>
 </resources>

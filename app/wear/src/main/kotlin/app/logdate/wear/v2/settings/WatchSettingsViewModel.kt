@@ -125,7 +125,7 @@ class WatchSettingsViewModel(
     }
 
     /** Whether turning reminders on first needs notifications or physical activity access. */
-    fun remindersNeedPermissions(): Boolean = !canRemind()
+    fun remindersNeedPermissions(): Boolean = !canRemind() || !reminderPermissions.activityRecognitionGranted()
 
     /** After the permission request: reminders turn on once they can work, and stay off otherwise. */
     fun onReminderPermissionsResult() {
@@ -195,8 +195,8 @@ class WatchSettingsViewModel(
         handoff.value = HandoffState.IDLE
     }
 
-    /** Workouts are the only trigger, so reminders need both notifications and physical activity. */
-    private fun canRemind(): Boolean = reminderPermissions.notificationsGranted() && reminderPermissions.activityRecognitionGranted()
+    /** Evening reminders need notifications; workouts additionally need activity access. */
+    private fun canRemind(): Boolean = reminderPermissions.notificationsGranted()
 
     companion object {
         const val PHONE_WATCH_SETTINGS_LINK = "studio.hypertext.logdate://settings/watch"

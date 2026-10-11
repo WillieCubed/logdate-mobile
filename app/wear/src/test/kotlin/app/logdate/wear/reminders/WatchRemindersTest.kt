@@ -15,7 +15,9 @@ class WatchRemindersTest {
     private val preferences = FakeReminderPreferences(enabled = false)
     private val activity = FakeActivityRegistration()
     private val permissions = FakeReminderPermissions()
-    private val reminders = WatchReminders(preferences = preferences, activity = activity, permissions = permissions)
+    private val eveningWork = FakeEveningWork()
+    private val evening = EveningReminderScheduler(eveningWork, FixedClock(berlin(10, 18)), timeZone = { REMINDER_ZONE })
+    private val reminders = WatchReminders(preferences = preferences, activity = activity, permissions = permissions, evening = evening)
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -37,7 +39,7 @@ class WatchRemindersTest {
                         listening = false
                     }
                 }
-            val controller = WatchReminders(preferences, slowRegistration, permissions)
+            val controller = WatchReminders(preferences, slowRegistration, permissions, evening)
             val enable = launch { controller.setEnabled(true) }
             entered.await()
             val disable = launch { controller.setEnabled(false) }
@@ -46,16 +48,18 @@ class WatchRemindersTest {
             joinAll(enable, disable)
             assertFalse(listening)
             assertFalse(preferences.enabled.value)
+            assertTrue(eveningWork.cancels > 0)
         }
 
     @Test
     fun `the rollout gate stops a restored workout listener`() =
         runTest {
             preferences.setEnabled(true)
-            val controller = WatchReminders(preferences, activity, permissions, experienceEnabled = { false })
+            val controller = WatchReminders(preferences, activity, permissions, evening, experienceEnabled = { false })
             controller.restore()
             assertEquals(0, activity.registrations)
             assertEquals(1, activity.unregistrations)
+            assertTrue(eveningWork.delays.isEmpty())
             assertTrue(preferences.enabled.value)
         }
 
@@ -65,6 +69,7 @@ class WatchRemindersTest {
             permissions.notifications = false
             reminders.setEnabled(true)
             assertEquals(0, activity.registrations)
+            assertEquals(if (permissions.notifications) 1 else 0, eveningWork.delays.size)
         }
 
     @Test
@@ -83,6 +88,7 @@ class WatchRemindersTest {
 
             assertTrue(preferences.enabled.value)
             assertEquals(1, activity.registrations)
+            assertEquals(1, eveningWork.delays.size)
         }
 
     @Test
@@ -97,13 +103,14 @@ class WatchRemindersTest {
         }
 
     @Test
-    fun `without physical activity access nothing listens for workouts`() =
+    fun `without physical activity access the evening still comes`() =
         runTest {
             permissions.activityRecognition = false
 
             reminders.setEnabled(true)
 
             assertEquals(0, activity.registrations)
+            assertEquals(if (permissions.notifications) 1 else 0, eveningWork.delays.size)
         }
 
     @Test
@@ -116,5 +123,6 @@ class WatchRemindersTest {
             reminders.restore()
 
             assertEquals(1, activity.registrations)
+            assertEquals(1, eveningWork.delays.size)
         }
 }

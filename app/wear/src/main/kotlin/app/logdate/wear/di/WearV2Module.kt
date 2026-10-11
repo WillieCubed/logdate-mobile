@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.health.services.client.HealthServices
 import androidx.wear.phone.interactions.PhoneTypeHelper
 import androidx.wear.remote.interactions.RemoteActivityHelper
+import androidx.work.WorkManager
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
 import app.logdate.client.domain.streak.ObserveCampfireUseCase
@@ -23,6 +24,8 @@ import app.logdate.wear.recording.AudioMomentSaver
 import app.logdate.wear.reminders.ActivityRegistration
 import app.logdate.wear.reminders.ActivityTransitionStore
 import app.logdate.wear.reminders.AndroidReminderPermissions
+import app.logdate.wear.reminders.EveningReminderScheduler
+import app.logdate.wear.reminders.EveningReminderWork
 import app.logdate.wear.reminders.HealthServicesActivityRegistration
 import app.logdate.wear.reminders.NudgeNotifier
 import app.logdate.wear.reminders.ReminderPermissions
@@ -32,6 +35,7 @@ import app.logdate.wear.reminders.WatchNudgeNotifier
 import app.logdate.wear.reminders.WatchReminderDispatcher
 import app.logdate.wear.reminders.WatchReminderPreferences
 import app.logdate.wear.reminders.WatchReminders
+import app.logdate.wear.reminders.WorkManagerEveningReminderWork
 import app.logdate.wear.reminders.WorkoutWatcher
 import app.logdate.wear.sync.deleteLocalAudio
 import app.logdate.wear.v2.archive.ArchiveViewModel
@@ -281,6 +285,14 @@ val wearV2Module =
         }
         single {
             val experience = get<FeatureSwitch>()
-            WatchReminders(preferences = get(), activity = get(), permissions = get(), experienceEnabled = { experience.isOn })
+            WatchReminders(
+                preferences = get(),
+                activity = get(),
+                permissions = get(),
+                evening = get(),
+                experienceEnabled = { experience.isOn },
+            )
         }
+        single<EveningReminderWork> { WorkManagerEveningReminderWork(WorkManager.getInstance(get<Context>())) }
+        single { EveningReminderScheduler(work = get()) }
     }

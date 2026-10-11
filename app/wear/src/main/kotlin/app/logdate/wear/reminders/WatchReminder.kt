@@ -8,5 +8,6 @@ enum class WatchReminder(
     @param:StringRes val titleRes: Int,
     @param:StringRes val bodyRes: Int,
 ) {
+    EVENING(R.string.wear_reminder_evening_title, R.string.wear_reminder_evening_body),
     WORKOUT_ENDED(R.string.wear_reminder_workout_title, R.string.wear_reminder_workout_body),
 }

@@ -4,4 +4,6 @@
     <string name="wear_reminder_record">Record</string>
     <string name="wear_reminder_workout_title">Workout finished</string>
     <string name="wear_reminder_workout_body">Record how it went</string>
+    <string name="wear_reminder_evening_title">Nothing recorded today</string>
+    <string name="wear_reminder_evening_body">Record a moment before the day ends</string>
 </resources>

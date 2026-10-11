@@ -72,6 +72,14 @@ class WatchSettingsScreenshots {
     fun S07_SettingsRemindersOff() {
         SettingsScene(WatchSettingsUiState(), anchorItem = 4)
     }
+
+    @PreviewTest
+    @WearScreenshotPreviewMatrix
+    @WearLargeFontPreview
+    @Composable
+    fun S08_SettingsRemindersEveningOnly() {
+        SettingsScene(WatchSettingsUiState(reminders = RemindersSetting(enabled = true)), anchorItem = 4)
+    }
 }
 
 @Composable

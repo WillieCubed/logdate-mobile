@@ -10,7 +10,9 @@ import app.logdate.client.sync.SyncResult
 import app.logdate.client.sync.SyncStatus
 import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.datalayer.v2.WearProtocolGate
+import app.logdate.wear.reminders.EveningReminderScheduler
 import app.logdate.wear.reminders.FakeActivityRegistration
+import app.logdate.wear.reminders.FakeEveningWork
 import app.logdate.wear.reminders.FakeReminderPermissions
 import app.logdate.wear.reminders.FakeReminderPreferences
 import app.logdate.wear.reminders.WatchReminders
@@ -59,7 +61,8 @@ class WatchSettingsViewModelTest {
     private val reminderPreferences = FakeReminderPreferences(enabled = false)
     private val activityRegistration = FakeActivityRegistration()
     private val reminderPermissions = FakeReminderPermissions()
-    private val watchReminders = WatchReminders(reminderPreferences, activityRegistration, reminderPermissions)
+    private val watchReminders =
+        WatchReminders(reminderPreferences, activityRegistration, reminderPermissions, EveningReminderScheduler(FakeEveningWork()))
 
     @Before
     fun setUp() {
@@ -255,6 +258,20 @@ class WatchSettingsViewModelTest {
                 assertEquals(false, expectMostRecentItem().reminders.enabled)
                 assertTrue(reminderPreferences.enabled.value)
             }
+        }
+
+    @Test
+    fun `without physical activity reminders still come in the evening`() =
+        runTest {
+            reminderPermissions.activityRecognition = false
+            val viewModel = viewModel()
+
+            viewModel.uiState.test {
+                viewModel.onReminderPermissionsResult()
+
+                assertEquals(RemindersSetting(enabled = true, afterWorkouts = false), expectMostRecentItem().reminders)
+            }
+            assertEquals(0, activityRegistration.registrations)
         }
 
     private fun viewModel() =

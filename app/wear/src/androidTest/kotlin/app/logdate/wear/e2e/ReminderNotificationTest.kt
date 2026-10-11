@@ -61,6 +61,21 @@ class ReminderNotificationTest {
     }
 
     @Test
+    fun the_evening_reminder_has_its_own_copy_and_record_action() {
+        assertTrue(WatchNudgeNotifier(context).post(WatchReminder.EVENING))
+        val notification = posted().notification
+        assertEquals("Nothing recorded today", notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+        assertEquals("Record a moment before the day ends", notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
+        assertEquals(
+            "Record",
+            notification.actions
+                .single()
+                .title
+                .toString(),
+        )
+    }
+
+    @Test
     fun record_opens_the_app_on_the_recorder_route() {
         WatchNudgeNotifier(context).post(WatchReminder.WORKOUT_ENDED)
         val instrumentation = InstrumentationRegistry.getInstrumentation()

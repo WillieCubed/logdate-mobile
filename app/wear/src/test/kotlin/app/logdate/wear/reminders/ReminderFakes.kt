@@ -92,3 +92,19 @@ internal class FakeTransitions : ActivityTransitionStore {
         this.changedAt = changedAt
     }
 }
+
+internal class FakeEveningWork : EveningReminderWork {
+    val delays = mutableListOf<Long>()
+    var cancels = 0
+
+    override fun runAfter(
+        delayMs: Long,
+        replace: Boolean,
+    ) {
+        delays += delayMs
+    }
+
+    override fun cancel() {
+        cancels++
+    }
+}

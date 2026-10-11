@@ -12,11 +12,32 @@ class WatchReminderDispatcher(
     private val timeZone: () -> TimeZone = { TimeZone.currentSystemDefault() },
 ) {
     /** Reminds after a workout that ended at [endedAt]. @return true when a reminder was shown. */
+    @Synchronized
     fun onWorkoutEnded(endedAt: Instant): Boolean {
         if (!preferences.enabled.value) return false
         val now = clock.now()
         if (!WatchReminderRules.workoutReminderDue(now, endedAt, preferences.lastReminderAt(), timeZone())) return false
         return post(WatchReminder.WORKOUT_ENDED, now)
+    }
+
+    @Synchronized
+    fun onEveningCheck(
+        phoneReachable: Boolean,
+        momentsToday: Int,
+    ): Boolean {
+        if (!preferences.enabled.value) return false
+        val now = clock.now()
+        if (!WatchReminderRules.eveningReminderDue(
+                now,
+                preferences.lastReminderAt(),
+                momentsToday,
+                phoneReachable,
+                timeZone(),
+            )
+        ) {
+            return false
+        }
+        return post(WatchReminder.EVENING, now)
     }
 
     private fun post(
