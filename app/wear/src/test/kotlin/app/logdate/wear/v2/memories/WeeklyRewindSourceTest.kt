@@ -10,6 +10,7 @@ import app.logdate.wear.v2.today.TodayWindow
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
@@ -34,6 +35,27 @@ class WeeklyRewindSourceTest {
     private val notesRepository = mockk<JournalNotesRepository>()
     private val at = Instant.fromEpochMilliseconds(1_791_000_000_000)
     private val walk = JournalNote.Audio(mediaRef = "v.m4a", durationMs = 30_000L, creationTimestamp = at, lastUpdated = at)
+
+    init {
+        every { notesRepository.allNotesObserved } returns flowOf(emptyList())
+    }
+
+    @Test
+    fun `an existing rewind subscription follows edits and deletes of its lead`() =
+        runTest {
+            val notes = MutableStateFlow<List<JournalNote>>(listOf(walk))
+            every { notesRepository.allNotesObserved } returns notes
+            coEvery { notesRepository.getNoteById(any()) } answers { notes.value.firstOrNull { it.uid == firstArg() } }
+            every { rewinds.getAllRewinds() } returns flowOf(listOf(rewind("A quiet week", LocalDate(2026, 10, 4), walk.uid)))
+            WeeklyRewindSource(rewinds, notesRepository).observe(today).test {
+                assertEquals(walk, awaitItem()?.leadMoment)
+                val edited = walk.copy(transcription = "A changed memory")
+                notes.value = listOf(edited)
+                assertEquals(edited, awaitItem()?.leadMoment)
+                notes.value = emptyList()
+                assertNull(awaitItem())
+            }
+        }
 
     @Test
     fun `the newest Rewind of the past week opens its first moment on the watch`() =

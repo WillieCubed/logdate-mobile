@@ -8,7 +8,7 @@ import app.logdate.shared.model.RewindContent
 import app.logdate.wear.v2.library.LibraryWindow
 import app.logdate.wear.v2.today.TodayWindow
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.minus
@@ -29,7 +29,7 @@ class WeeklyRewindSource(
 ) {
     fun observe(today: TodayWindow): Flow<WeeklyRewind?> {
         val since = today.date.minus(REWIND_AGE_DAYS, DateTimeUnit.DAY).atStartOfDayIn(today.timeZone)
-        return rewinds.getAllRewinds().map { all ->
+        return combine(rewinds.getAllRewinds(), notesRepository.allNotesObserved) { all, _ ->
             all.filter { it.endDate >= since }.maxByOrNull(Rewind::endDate)?.let { rewind -> leadFor(rewind) }
         }
     }

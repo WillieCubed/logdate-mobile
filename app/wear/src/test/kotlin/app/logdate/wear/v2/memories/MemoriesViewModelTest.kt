@@ -9,6 +9,8 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -43,12 +45,41 @@ class MemoriesViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
+        every { finder.observe(any()) } answers { flow { emit(finder.find(firstArg())) } }
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
     }
+
+    @Test
+    fun `open cards follow edited deleted and newly arrived recalled moments`() =
+        runTest {
+            val notes = MutableStateFlow<List<JournalNote>>(listOf(note))
+            val repository = mockk<app.logdate.client.repository.journals.JournalNotesRepository>()
+            every { repository.allNotesObserved } returns notes
+            coEvery { repository.getNotesForDay(any()) } answers { notes.value }
+            val lastYear = LocalDate(2025, 10, 10)
+            val liveFinder =
+                OnThisDayFinder(recall = {
+                    notes.value.firstOrNull()?.let {
+                        app.logdate.client.domain.recommendation
+                            .MemoryRecallData(lastYear, (it as JournalNote.Text).content)
+                    }
+                }, notesRepository = repository)
+            every { rewindSource.observe(today) } returns flowOf(null)
+            MemoriesViewModel(dayClock, liveFinder, rewindSource).cards.test {
+                assertEquals(note, expectMostRecentItem().onThisDay?.leadMoment)
+                val edited = note.copy(content = "Edited beach day")
+                notes.value = listOf(edited)
+                assertEquals(edited, awaitItem().onThisDay?.leadMoment)
+                notes.value = emptyList()
+                assertEquals(null, awaitItem().onThisDay)
+                notes.value = listOf(note)
+                assertEquals(note, awaitItem().onThisDay?.leadMoment)
+            }
+        }
 
     @Test
     fun `both cards come from today's date`() =

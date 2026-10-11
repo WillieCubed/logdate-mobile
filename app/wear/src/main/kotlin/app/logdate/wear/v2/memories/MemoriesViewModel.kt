@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 
 /** The memory cards on the moment list. Either can be missing. */
@@ -19,7 +18,7 @@ data class MemoryCards(
     val rewind: WeeklyRewind? = null,
 )
 
-/** On this day and this week's Rewind, found again when the date changes. */
+/** Memory cards follow the local date and changes to the notes they recall. */
 class MemoriesViewModel(
     dayClock: DayClock,
     onThisDay: OnThisDayFinder,
@@ -30,7 +29,7 @@ class MemoriesViewModel(
         dayClock
             .observe()
             .flatMapLatest { today ->
-                combine(flow { emit(onThisDay.find(today.date)) }, weeklyRewind.observe(today)) { found, rewind ->
+                combine(onThisDay.observe(today.date), weeklyRewind.observe(today)) { found, rewind ->
                     MemoryCards(onThisDay = found, rewind = rewind)
                 }
             }.catch { error ->

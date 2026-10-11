@@ -6,6 +6,9 @@ import app.logdate.client.domain.today.MoodNoteTag
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.v2.library.LibraryWindow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.datetime.LocalDate
 
 /** What On this day on the watch recalls: words and voice, since photos stay on the phone. */
@@ -28,6 +31,9 @@ class OnThisDayFinder(
     private val recall: suspend () -> MemoryRecallData?,
     private val notesRepository: JournalNotesRepository,
 ) {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observe(today: LocalDate): Flow<OnThisDay?> = notesRepository.allNotesObserved.mapLatest { find(today) }
+
     suspend fun find(today: LocalDate): OnThisDay? {
         val memory = recall() ?: return null
         val moments =
