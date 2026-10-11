@@ -9,6 +9,7 @@ import app.logdate.client.media.audio.RecordingNotificationDecorator
 import app.logdate.client.notifications.LogDateNotificationChannelKey
 import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.wear.di.wearAudioModule
+import app.logdate.wear.di.wearCloudSyncModule
 import app.logdate.wear.di.wearDataModule
 import app.logdate.wear.di.wearExperienceModule
 import app.logdate.wear.di.wearIdentityModule
@@ -82,6 +83,7 @@ class LogDateWearApplication :
                 wearExperienceModule,
                 wearV2Module,
                 wearSyncV2Module,
+                wearCloudSyncModule,
             )
         }
 
