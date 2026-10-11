@@ -69,6 +69,7 @@ open class PhoneDataLayerListenerFixture {
     protected fun channel(path: String): ChannelClient.Channel =
         mockk {
             every { this@mockk.path } returns path
+            every { this@mockk.nodeId } returns "watch-node"
         }
 
     protected fun message(

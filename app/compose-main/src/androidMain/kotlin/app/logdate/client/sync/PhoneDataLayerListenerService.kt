@@ -222,7 +222,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
                 return@withContext
             }
             try {
-                openChannelInput(channel).use { input -> ingestor.onMedia(channel.path, input) }
+                openChannelInput(channel).use { input -> ingestor.onMedia(channel.nodeId, channel.path, input) }
             } catch (e: Exception) {
                 Napier.w("Failed to receive a recording from the watch", e)
             } finally {
@@ -305,10 +305,11 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
         dependencies: PhoneDataLayerSyncDependencies,
     ) = withContext(NonCancellable) {
         val path = event.path
+        val records = dependencies.recordIngestorV2
 
         try {
             when {
-                WearPaths.parseWatchRecord(path) != null -> if (receiptsActive()) dependencies.recordIngestorV2?.onRecord(path, event.data)
+                WearPaths.parseWatchRecord(path) != null -> if (receiptsActive()) records?.onRecord(event.sourceNodeId, path, event.data)
                 NoteDataMapper.isDeletePath(path) -> handleNoteDelete(path, dependencies.noteIngestor)
                 NoteDataMapper.isNotePath(path) -> handleNoteSync(event, path, dependencies.noteIngestor)
                 JournalDataMapper.isDeletePath(path) -> handleJournalDelete(path, dependencies.journalIngestor)

@@ -21,7 +21,9 @@ class WatchCaptureCollisionPolicy(
     ): CreateCollision {
         if (entityType != EntityType.NOTE) return CreateCollision.Unexpected
         val received =
-            ledger.get(PeerScopes.WATCHES, DeliveryDirection.FROM_WATCH, EntityType.NOTE, entityId) ?: return CreateCollision.Unexpected
+            ledger.get(WatchCaptureProvenance.SCOPE, DeliveryDirection.FROM_WATCH, EntityType.NOTE, entityId)
+                ?: ledger.get(PeerScopes.WATCHES, DeliveryDirection.FROM_WATCH, EntityType.NOTE, entityId)
+                ?: return CreateCollision.Unexpected
         return CreateCollision.CreatedElsewhere(received.contentVersion)
     }
 }

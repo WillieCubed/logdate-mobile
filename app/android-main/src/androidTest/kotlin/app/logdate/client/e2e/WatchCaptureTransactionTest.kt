@@ -17,12 +17,15 @@ import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.v2.receipts.StaleWatchCapture
 import app.logdate.client.sync.v2.receipts.WatchCaptureNotes
+import app.logdate.client.sync.v2.receipts.WatchCaptureProvenance
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -107,6 +110,7 @@ class WatchCaptureTransactionTest {
             assertFailsWith<StaleWatchCapture> { writer(interrupted).create(note) }
             assertEquals(null, repository.getNoteById(note.uid))
             assertTrue(database.syncMetadataDao().getAllPending().isEmpty())
+            assertTrue(database.peerDeliveryDao().all(WatchCaptureProvenance.SCOPE, "FROM_WATCH").isEmpty())
         }
 
     @Test
@@ -128,6 +132,7 @@ class WatchCaptureTransactionTest {
             assertFailsWith<StaleWatchCapture> { writer(metadata = interrupted).createFromSync(note) }
             assertEquals(original, repository.getNoteById(note.uid))
             assertTrue(database.syncMetadataDao().getAllPending().isEmpty())
+            assertTrue(database.peerDeliveryDao().all(WatchCaptureProvenance.SCOPE, "FROM_WATCH").isEmpty())
             assertEquals(0, backups)
         }
 
@@ -141,8 +146,25 @@ class WatchCaptureTransactionTest {
             assertEquals(1, backups)
         }
 
+    @Test
+    fun concurrentCaptureOriginsRetainTheNewestVersion() =
+        runBlocking {
+            val provenance = WatchCaptureProvenance(database.peerDeliveryDao())
+            coroutineScope {
+                listOf(9L, 3L, 7L, 1L, 5L).forEach { version ->
+                    launch(Dispatchers.Default) { provenance.remember(note.copy(lastUpdated = Instant.fromEpochMilliseconds(version))) }
+                }
+            }
+            assertEquals(
+                9L,
+                database.peerDeliveryDao().get(WatchCaptureProvenance.SCOPE, "FROM_WATCH", "NOTE", note.uid.toString())?.contentVersion,
+            )
+        }
+
     private fun writer(
         delegate: SyncableJournalNotesRepository = repository,
         metadata: SyncMetadataService = outbox,
-    ) = WatchCaptureNotes(delegate, RoomSyncTransactionManager(database), metadata, { current }, { backups++ })
+    ) = WatchCaptureNotes(delegate, RoomSyncTransactionManager(database), metadata, {
+        current
+    }, { backups++ }, WatchCaptureProvenance(database.peerDeliveryDao())::remember)
 }

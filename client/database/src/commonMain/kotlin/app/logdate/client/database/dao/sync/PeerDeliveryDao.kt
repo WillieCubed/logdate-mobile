@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import app.logdate.client.database.entities.sync.PeerDeliveryEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -11,6 +12,13 @@ import kotlinx.coroutines.flow.Flow
 interface PeerDeliveryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entry: PeerDeliveryEntity)
+
+    /** Joins a caller's capture transaction without acquiring a service-level mutex. */
+    @Transaction
+    suspend fun retainNewest(entry: PeerDeliveryEntity) {
+        val prior = get(entry.peerScope, entry.direction, entry.entityType, entry.entityId)
+        if (prior == null || prior.contentVersion < entry.contentVersion) upsert(entry)
+    }
 
     @Query(
         "SELECT * FROM peer_delivery WHERE peerScope = :peerScope AND direction = :direction " +

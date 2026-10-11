@@ -22,6 +22,7 @@ import kotlin.uuid.Uuid
 class WatchCaptureNotesTest {
     private val delegate = mockk<SyncableJournalNotesRepository>()
     private val outbox = mockk<SyncMetadataService>()
+    private var remembered = false
     private var backupRequests = 0
     private var current = true
     private var insideTransaction = false
@@ -31,12 +32,14 @@ class WatchCaptureNotesTest {
     private val transaction =
         object : SyncTransactionManager {
             override suspend fun <T> withTransaction(block: suspend () -> T): T {
+                val beforeOrigin = remembered
                 val before = stored
                 val beforePending = enqueued
                 insideTransaction = true
                 try {
                     return block()
                 } catch (e: Throwable) {
+                    remembered = beforeOrigin
                     stored = before
                     enqueued = beforePending
                     rolledBack = true
@@ -50,6 +53,9 @@ class WatchCaptureNotesTest {
         WatchCaptureNotes(delegate, transaction, outbox, { current }, {
             assertFalse(insideTransaction)
             backupRequests++
+        }, {
+            assertTrue(insideTransaction)
+            remembered = true
         })
     private val note =
         JournalNote.Text(
@@ -243,5 +249,25 @@ class WatchCaptureNotesTest {
             stored = note
             notes.createFromSync(note)
             assertEquals(0, backupRequests)
+        }
+
+    @Test
+    fun `capture origin is stored before create can start backup`() =
+        runTest {
+            coEvery { delegate.create(any()) } coAnswers {
+                assertTrue(remembered)
+                stored = firstArg()
+                note.uid
+            }
+            notes.create(note)
+            assertEquals(note, stored)
+        }
+
+    @Test
+    fun `a failed create does not retain capture provenance`() =
+        runTest {
+            coEvery { delegate.create(any()) } coAnswers { throw IllegalStateException("disk full") }
+            assertFailsWith<IllegalStateException> { notes.create(note) }
+            assertFalse(remembered)
         }
 }

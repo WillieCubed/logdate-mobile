@@ -31,7 +31,24 @@ class WatchRecordIngestorV2(
     private val rejection: RecordRejection,
     private val mapper: NoteDataMapper = NoteDataMapper(),
     private val receivedVersion: suspend (Uuid) -> Long? = { null },
+    private val scoped: ScopedCaptureIngestion? = null,
 ) {
+    suspend fun onRecord(
+        sourceNodeId: String?,
+        path: String,
+        data: Map<String, String>,
+    ) {
+        scoped?.onRecord(sourceNodeId, path, data)
+    }
+
+    suspend fun onMedia(
+        sourceNodeId: String?,
+        path: String,
+        input: InputStream,
+    ) {
+        scoped?.onMedia(sourceNodeId, path, input)
+    }
+
     suspend fun onRecord(
         path: String,
         data: Map<String, String>,

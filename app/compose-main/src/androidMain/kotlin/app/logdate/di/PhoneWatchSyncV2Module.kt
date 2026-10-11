@@ -1,18 +1,27 @@
 package app.logdate.di
 
+import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.datastore.UserSession
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.crypto.link.BouncyCastleLinkHandshake
 import app.logdate.client.domain.watch.StampedPreferenceStore
+import app.logdate.client.repository.journals.JournalNotesRepository
+import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.sync.CreateCollisionPolicy
+import app.logdate.client.sync.FileWatchAudioStore
+import app.logdate.client.sync.SyncManager
+import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.WatchNoteIngestor
+import app.logdate.client.sync.WatchNoteNotifier
+import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.sync.datalayer.v2.CloudPresence
 import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.datalayer.v2.WearProtocol
 import app.logdate.client.sync.datalayer.v2.WearProtocolGate
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.peer.delivery.DeliveryDirection
 import app.logdate.client.sync.peer.delivery.PeerDeliveryLedger
 import app.logdate.client.sync.peer.delivery.PeerScopes
@@ -43,7 +52,11 @@ import app.logdate.client.sync.v2.receipts.GoogleWatchPeerMessageSender
 import app.logdate.client.sync.v2.receipts.PhoneDeliveryPeers
 import app.logdate.client.sync.v2.receipts.PhoneReceiptBook
 import app.logdate.client.sync.v2.receipts.ReceiptAcknowledger
+import app.logdate.client.sync.v2.receipts.RecordRejection
+import app.logdate.client.sync.v2.receipts.ScopedCaptureIngestion
 import app.logdate.client.sync.v2.receipts.WatchCaptureCollisionPolicy
+import app.logdate.client.sync.v2.receipts.WatchCaptureNotes
+import app.logdate.client.sync.v2.receipts.WatchCaptureProvenance
 import app.logdate.client.sync.v2.receipts.WatchPeerMessageSender
 import app.logdate.client.sync.v2.receipts.WatchReceiptNotifier
 import app.logdate.client.sync.v2.receipts.WatchReceiptResponder
@@ -53,6 +66,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
+import java.io.File
 
 /** Koin module for the phone's side of the version 2 watch protocol. */
 val phoneWatchSyncV2Module =
@@ -128,6 +142,54 @@ val phoneWatchSyncV2Module =
                 peers = get(),
             )
         }
+        single { WatchCaptureProvenance(get<LogDateDatabase>().peerDeliveryDao()) }
+        single {
+            val peers = get<PhoneDeliveryPeers>()
+            val notes = get<JournalNotesRepository>() as SyncableJournalNotesRepository
+            val transactions = get<SyncTransactionManager>()
+            val outbox = get<SyncMetadataService>()
+            val ledger = get<PeerDeliveryLedger>()
+            val receipts = get<WatchReceiptNotifier>()
+            val provenance = get<WatchCaptureProvenance>()
+            val notifier = get<WatchNoteNotifier>()
+            val mapper = get<NoteDataMapper>()
+            val files = androidContext().filesDir
+            ScopedCaptureIngestion(peers) { peer ->
+                val guarded =
+                    WatchCaptureNotes(
+                        notes,
+                        transactions,
+                        outbox,
+                        { peers.isCurrent(peer) },
+                        { get<SyncManager>().sync() },
+                        provenance::remember,
+                    )
+                val acknowledger = ReceiptAcknowledger(ledger, receipts, peer)
+                val ingestor =
+                    WatchNoteIngestor(
+                        guarded,
+                        FileWatchAudioStore.scoped(File(files, "audio_notes"), File(files, "watch_incoming"), peer),
+                        acknowledger,
+                        notifier,
+                        mapper,
+                    )
+                WatchRecordIngestorV2(
+                    ingestMetadata = ingestor::onNoteMetadata,
+                    ingestAudio = { id, input -> ingestor.onAudioBytes(id, input) },
+                    notes = guarded,
+                    acknowledger = acknowledger,
+                    rejection =
+                        RecordRejection { kind, id ->
+                            receipts.reject(peer, kind, id)
+                            Unit
+                        },
+                    mapper = mapper,
+                    receivedVersion = { id ->
+                        ledger.get(peer.ledgerScope, DeliveryDirection.FROM_WATCH, EntityType.NOTE, id.toString())?.contentVersion
+                    },
+                )
+            }
+        }
         single { ReceiptAcknowledger(get(), get()) }
         single {
             val acknowledger = get<ReceiptAcknowledger>()
@@ -150,6 +212,7 @@ val phoneWatchSyncV2Module =
                     ledger.get(PeerScopes.WATCHES, DeliveryDirection.FROM_WATCH, EntityType.NOTE, id.toString())?.contentVersion
                 },
                 mapper = get(),
+                scoped = get(),
             )
         }
     }

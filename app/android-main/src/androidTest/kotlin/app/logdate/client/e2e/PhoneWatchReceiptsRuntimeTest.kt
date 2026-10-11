@@ -16,6 +16,7 @@ import app.logdate.client.sync.peer.link.LinkWire
 import app.logdate.client.sync.v2.receipts.PhoneDeliveryPeers
 import app.logdate.client.sync.v2.receipts.PhoneReceiptBook
 import app.logdate.client.sync.v2.receipts.ReceiptAcknowledger
+import app.logdate.client.sync.v2.receipts.ScopedCaptureIngestion
 import app.logdate.client.sync.v2.receipts.WatchCaptureCollisionPolicy
 import app.logdate.client.sync.v2.receipts.WatchReceiptNotifier
 import app.logdate.client.sync.v2.receipts.WatchReceiptResponder
@@ -60,6 +61,7 @@ class PhoneWatchReceiptsRuntimeTest {
         assertNotNull(koin.get<WatchReceiptResponder>())
         assertNotNull(koin.get<WatchReceiptNotifier>())
         assertNotNull(koin.get<WatchRecordIngestorV2>())
+        assertNotNull(koin.get<ScopedCaptureIngestion>())
     }
 
     private fun assertListener(

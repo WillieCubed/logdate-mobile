@@ -17,6 +17,7 @@ class WatchCaptureNotes(
     private val outbox: SyncMetadataService,
     private val isCurrent: suspend () -> Boolean,
     private val onUpdated: () -> Unit,
+    private val rememberCapture: suspend (JournalNote) -> Unit,
 ) : SyncableJournalNotesRepository by delegate {
     override suspend fun getNoteById(noteId: Uuid): JournalNote? {
         requireCurrent()
@@ -25,7 +26,13 @@ class WatchCaptureNotes(
         return note
     }
 
-    override suspend fun create(note: JournalNote): Uuid = guarded { delegate.create(note) }
+    override suspend fun create(note: JournalNote): Uuid = guarded { createCapture(note) }
+
+    private suspend fun createCapture(note: JournalNote): Uuid {
+        rememberCapture(note)
+        requireCurrent()
+        return delegate.create(note)
+    }
 
     override suspend fun createFromSync(note: JournalNote) {
         val updated =
@@ -33,7 +40,7 @@ class WatchCaptureNotes(
                 val existing = getNoteById(note.uid)
                 when {
                     existing == null -> {
-                        delegate.create(note)
+                        createCapture(note)
                         false
                     }
                     existing.lastUpdated < note.lastUpdated && !outbox.hasPending(EntityType.NOTE, note.uid.toString()) -> {

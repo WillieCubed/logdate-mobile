@@ -231,7 +231,7 @@ class PhoneDataLayerListenerServiceTest : PhoneDataLayerListenerFixture() {
                 )
             val disabled = TestPhoneDataLayerListenerService(this, syncDependencies = dependencies(recordIngestorV2 = ingestor))
             disabled.processEvents(event)
-            coVerify(exactly = 0) { ingestor.onRecord(any(), any()) }
+            coVerify(exactly = 0) { ingestor.onRecord(any(), any(), any()) }
             val enabled =
                 TestPhoneDataLayerListenerService(
                     this,
@@ -239,7 +239,7 @@ class PhoneDataLayerListenerServiceTest : PhoneDataLayerListenerFixture() {
                     receiptsEnabled = true,
                 )
             enabled.processEvents(event)
-            coVerify(exactly = 1) { ingestor.onRecord(event.path, event.data) }
+            coVerify(exactly = 1) { ingestor.onRecord("watch", event.path, event.data) }
         }
 
     @Test
@@ -251,7 +251,7 @@ class PhoneDataLayerListenerServiceTest : PhoneDataLayerListenerFixture() {
             val disabled = TestPhoneDataLayerListenerService(this, syncDependencies = dependencies(recordIngestorV2 = ingestor))
             disabled.onChannelOpened(transfer)
             advanceUntilIdle()
-            coVerify(exactly = 0) { ingestor.onMedia(any(), any()) }
+            coVerify(exactly = 0) { ingestor.onMedia(any(), any(), any()) }
             assertEquals(listOf(transfer), disabled.closedChannels)
             val enabled =
                 TestPhoneDataLayerListenerService(
@@ -261,7 +261,7 @@ class PhoneDataLayerListenerServiceTest : PhoneDataLayerListenerFixture() {
                 )
             enabled.onChannelOpened(transfer)
             advanceUntilIdle()
-            coVerify(exactly = 1) { ingestor.onMedia(expectedPath, any()) }
+            coVerify(exactly = 1) { ingestor.onMedia("watch-node", expectedPath, any()) }
             assertEquals(listOf(transfer), enabled.closedChannels)
         }
 }
