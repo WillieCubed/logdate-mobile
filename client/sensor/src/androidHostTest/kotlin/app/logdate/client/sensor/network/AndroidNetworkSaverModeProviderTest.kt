@@ -41,13 +41,60 @@ class AndroidNetworkSaverModeProviderTest {
     private fun stubActiveNetwork(
         notRestricted: Boolean,
         transport: Int = NetworkCapabilities.TRANSPORT_CELLULAR,
+        validated: Boolean = true,
     ) {
         every { connectivityManager.activeNetwork } returns activeNetwork
         every { connectivityManager.getNetworkCapabilities(activeNetwork) } returns capabilities
         every { capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED) } returns notRestricted
+        every { capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) } returns validated
         every { capabilities.hasTransport(any()) } returns false
         every { capabilities.hasTransport(transport) } returns true
     }
+
+    @Test
+    fun `Bluetooth proxy counts as metered even if Android reports it unmetered`() =
+        runTest {
+            stubBackgroundRestriction(enabled = false)
+            stubActiveNetwork(notRestricted = true, transport = NetworkCapabilities.TRANSPORT_BLUETOOTH)
+            every { connectivityManager.isActiveNetworkMetered } returns false
+            assertTrue(buildProvider().getCurrentDataSaverState().isMetered)
+        }
+
+    @Test
+    fun `Bluetooth proxy counts as metered when cost cannot be read`() =
+        runTest {
+            stubBackgroundRestriction(enabled = false)
+            stubActiveNetwork(notRestricted = true, transport = NetworkCapabilities.TRANSPORT_BLUETOOTH)
+            every { connectivityManager.isActiveNetworkMetered } throws SecurityException("unavailable")
+            assertTrue(buildProvider().getCurrentDataSaverState().isMetered)
+        }
+
+    @Test
+    fun `a validation capability that cannot be read is false`() =
+        runTest {
+            stubBackgroundRestriction(enabled = false)
+            stubActiveNetwork(notRestricted = true, transport = NetworkCapabilities.TRANSPORT_WIFI)
+            every { capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) } throws SecurityException("unavailable")
+            assertFalse(buildProvider().getCurrentDataSaverState().isValidated)
+        }
+
+    @Test
+    fun `a watch's Bluetooth link through its phone is reported as the proxy`() =
+        runTest {
+            stubBackgroundRestriction(enabled = false)
+            stubActiveNetwork(notRestricted = true, transport = NetworkCapabilities.TRANSPORT_BLUETOOTH)
+
+            assertEquals(NetworkConnectionType.BLUETOOTH_PROXY, buildProvider().getCurrentDataSaverState().connectionType)
+        }
+
+    @Test
+    fun `a network the system has not validated is reported as such`() =
+        runTest {
+            stubBackgroundRestriction(enabled = false)
+            stubActiveNetwork(notRestricted = true, transport = NetworkCapabilities.TRANSPORT_WIFI, validated = false)
+
+            assertFalse(buildProvider().getCurrentDataSaverState().isValidated)
+        }
 
     @Test
     fun `restricted network capability does not imply background data is disabled`() =
@@ -111,6 +158,7 @@ class AndroidNetworkSaverModeProviderTest {
 
             assertFalse(state.isDataSaverEnabled)
             assertEquals(NetworkConnectionType.NONE, state.connectionType)
+            assertFalse(state.isValidated)
         }
 
     @Test

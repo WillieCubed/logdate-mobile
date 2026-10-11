@@ -102,11 +102,15 @@ class AndroidNetworkSaverModeProvider(
             }
 
         val activeCapabilities = getActiveNetworkCapabilities()
+        val connectionType = activeCapabilities.toConnectionType()
 
         return NetworkSaverState(
             isDataSaverEnabled = isBackgroundDataRestricted,
-            connectionType = activeCapabilities.toConnectionType(),
-            isMetered = runCatching { connectivityManager.isActiveNetworkMetered }.getOrDefault(false),
+            connectionType = connectionType,
+            isMetered =
+                connectionType == NetworkConnectionType.BLUETOOTH_PROXY ||
+                    runCatching { connectivityManager.isActiveNetworkMetered }.getOrDefault(false),
+            isValidated = activeCapabilities.isValidated(),
         )
     }
 
@@ -125,10 +129,21 @@ class AndroidNetworkSaverModeProvider(
                 hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> NetworkConnectionType.WIFI
                 hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> NetworkConnectionType.CELLULAR
                 hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> NetworkConnectionType.ETHERNET
+                hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH) -> NetworkConnectionType.BLUETOOTH_PROXY
                 else -> NetworkConnectionType.OTHER
             }
         } catch (e: Exception) {
             NetworkConnectionType.OTHER
+        }
+    }
+
+    /** Unknown counts as not validated, so a network that cannot be checked is never trusted for uploads. */
+    private fun NetworkCapabilities?.isValidated(): Boolean {
+        if (this == null) return false
+        return try {
+            hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        } catch (e: Exception) {
+            false
         }
     }
 }

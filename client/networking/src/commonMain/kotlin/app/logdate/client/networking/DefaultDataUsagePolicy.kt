@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.map
  * The mapping is:
  * - No connection → [DataUsageMode.Restricted]
  * - Background data restricted on a metered network → [DataUsageMode.Restricted]
+ * - A watch's Bluetooth link through its phone → [DataUsageMode.Conservative], metered or not
  * - Metered network without a background restriction → [DataUsageMode.Conservative]
  * - Unmetered network → [DataUsageMode.Unrestricted]
  */
@@ -30,14 +31,16 @@ class DefaultDataUsagePolicy(
 internal fun NetworkSaverState.toDataRestriction(): DataRestriction =
     when {
         connectionType == NetworkConnectionType.NONE -> DataRestriction.OFFLINE
-        isDataSaverEnabled && isMetered -> DataRestriction.BACKGROUND_DATA_BLOCKED
+        isDataSaverEnabled && (isMetered || connectionType == NetworkConnectionType.BLUETOOTH_PROXY) ->
+            DataRestriction.BACKGROUND_DATA_BLOCKED
         else -> DataRestriction.NONE
     }
 
 internal fun NetworkSaverState.toDataUsageMode(): DataUsageMode =
     when {
         connectionType == NetworkConnectionType.NONE -> DataUsageMode.Restricted
-        isDataSaverEnabled && isMetered -> DataUsageMode.Restricted
+        isDataSaverEnabled && (isMetered || connectionType == NetworkConnectionType.BLUETOOTH_PROXY) -> DataUsageMode.Restricted
+        connectionType == NetworkConnectionType.BLUETOOTH_PROXY -> DataUsageMode.Conservative
         isMetered -> DataUsageMode.Conservative
         else -> DataUsageMode.Unrestricted
     }

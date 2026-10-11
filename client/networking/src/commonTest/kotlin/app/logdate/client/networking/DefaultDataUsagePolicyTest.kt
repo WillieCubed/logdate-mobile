@@ -6,6 +6,7 @@ import app.logdate.client.networking.saver.NetworkSaverState
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -22,6 +23,42 @@ import kotlin.test.assertTrue
 class DefaultDataUsagePolicyTest {
     private val networkSaverProvider = ConfigurableNetworkSaverModeProvider()
     private val policy = DefaultDataUsagePolicy(networkSaverProvider)
+
+    @Test
+    fun `Bluetooth proxy remains restricted by Data Saver when a provider calls it unmetered`() =
+        runTest {
+            networkSaverProvider.setNetworkSaverState(
+                NetworkSaverState(isDataSaverEnabled = true, connectionType = NetworkConnectionType.BLUETOOTH_PROXY, isMetered = false),
+            )
+            assertIs<DataUsageMode.Restricted>(policy.currentMode())
+            assertEquals(DataRestriction.BACKGROUND_DATA_BLOCKED, policy.currentRestriction())
+        }
+
+    @Test
+    fun `a watch's Bluetooth link through its phone is conservative`() =
+        runTest {
+            networkSaverProvider.setNetworkSaverState(
+                NetworkSaverState(isDataSaverEnabled = false, connectionType = NetworkConnectionType.BLUETOOTH_PROXY),
+            )
+
+            assertIs<DataUsageMode.Conservative>(policy.currentMode())
+        }
+
+    @Test
+    fun `the Bluetooth link with data saver on is restricted`() =
+        runTest {
+            networkSaverProvider.setNetworkSaverState(
+                NetworkSaverState(isDataSaverEnabled = true, connectionType = NetworkConnectionType.BLUETOOTH_PROXY),
+            )
+
+            assertIs<DataUsageMode.Restricted>(policy.currentMode())
+        }
+
+    @Test
+    fun `a network is validated unless there is none`() {
+        assertTrue(NetworkSaverState(isDataSaverEnabled = false, connectionType = NetworkConnectionType.WIFI).isValidated)
+        assertFalse(NetworkSaverState(isDataSaverEnabled = false, connectionType = NetworkConnectionType.NONE).isValidated)
+    }
 
     @Test
     fun `no connection returns restricted`() =
