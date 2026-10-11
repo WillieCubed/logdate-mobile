@@ -175,7 +175,25 @@ object AndroidLogDateNotificationCatalog {
             ),
         )
 
-    fun channel(key: LogDateNotificationChannelKey): AndroidLogDateNotificationChannelSpec = phoneChannels.first { it.key == key }
+    val watchChannels: List<AndroidLogDateNotificationChannelSpec> =
+        listOf(
+            AndroidLogDateNotificationChannelSpec(
+                key = LogDateNotificationChannelKey.MOMENT_REMINDERS,
+                nameResId = R.string.notification_channel_moment_reminders_name,
+                descriptionResId = R.string.notification_channel_moment_reminders_description,
+                importance = NotificationManager.IMPORTANCE_DEFAULT,
+                showBadge = false,
+                vibrationEnabled = true,
+                soundEnabled = false,
+                lockscreenVisibility = Notification.VISIBILITY_PRIVATE,
+            ),
+        )
+
+    fun channel(key: LogDateNotificationChannelKey): AndroidLogDateNotificationChannelSpec =
+        (phoneChannels + watchChannels).first {
+            it.key ==
+                key
+        }
 }
 
 class LogDateNotificationRegistrar(

@@ -14,7 +14,7 @@ enum class LogDateNotificationGroupKey(
 }
 
 /**
- * Stable Android notification channels exposed by the phone app.
+ * Stable Android notification channels exposed by LogDate.
  *
  * Channel IDs are part of Android's persisted user settings surface and should
  * be treated as durable API.
@@ -85,6 +85,11 @@ enum class LogDateNotificationChannelKey(
         groupKey = LogDateNotificationGroupKey.BACKGROUND_SERVICES,
         notificationId = 1004,
     ),
+    MOMENT_REMINDERS(
+        id = "moment_reminders",
+        groupKey = LogDateNotificationGroupKey.AMBIENT_INTELLIGENCE,
+        notificationId = 4005,
+    ),
 }
 
 object LogDateNotificationChannels {
@@ -104,8 +109,10 @@ object LogDateNotificationChannels {
             LogDateNotificationChannelKey.CLOUD_SYNC,
         )
 
+    val watchChannels: List<LogDateNotificationChannelKey> = listOf(LogDateNotificationChannelKey.MOMENT_REMINDERS)
+
     val legacyChannelIds: Set<String> =
-        phoneChannels
+        (phoneChannels + watchChannels)
             .flatMap { it.legacyChannelIds }
             .toSet()
 }

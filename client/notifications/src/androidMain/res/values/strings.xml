@@ -59,4 +59,6 @@
     <string name="ambient_prompt_event_nudge_all_day_body">All day on %1$s. Tap to capture something for it.</string>
     <string name="notification_channel_cloud_sync_name">Backup</string>
     <string name="notification_channel_cloud_sync_description">Shows progress while your journal is backing up.</string>
+    <string name="notification_channel_moment_reminders_name">Reminders</string>
+    <string name="notification_channel_moment_reminders_description">A reminder to record a moment, at most once a day.</string>
 </resources>

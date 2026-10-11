@@ -18,6 +18,11 @@ import app.logdate.wear.health.MeasuredHeartRateSampler
 import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.playback.WatchMediaCache
 import app.logdate.wear.recording.AudioMomentSaver
+import app.logdate.wear.reminders.NudgeNotifier
+import app.logdate.wear.reminders.SharedPreferencesWatchReminderPreferences
+import app.logdate.wear.reminders.WatchNudgeNotifier
+import app.logdate.wear.reminders.WatchReminderDispatcher
+import app.logdate.wear.reminders.WatchReminderPreferences
 import app.logdate.wear.sync.deleteLocalAudio
 import app.logdate.wear.v2.archive.ArchiveViewModel
 import app.logdate.wear.v2.capture.CaptureSheetViewModel
@@ -236,4 +241,11 @@ val wearV2Module =
                 phoneHandoff = get(),
             )
         }
+        single<WatchReminderPreferences> {
+            SharedPreferencesWatchReminderPreferences(
+                get<Context>().getSharedPreferences(SharedPreferencesWatchReminderPreferences.PREFERENCES_NAME, Context.MODE_PRIVATE),
+            )
+        }
+        single<NudgeNotifier> { WatchNudgeNotifier(get()) }
+        single { WatchReminderDispatcher(preferences = get(), notifier = get()) }
     }

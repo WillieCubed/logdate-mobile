@@ -35,4 +35,20 @@ class LogDateNotificationChannelsTest {
             LogDateNotificationChannels.legacyChannelIds.intersect(activeIds),
         )
     }
+
+    @Test
+    fun `the watch registers its own reminders channel`() {
+        assertEquals("moment_reminders", LogDateNotificationChannelKey.MOMENT_REMINDERS.id)
+        assertEquals(listOf(LogDateNotificationChannelKey.MOMENT_REMINDERS), LogDateNotificationChannels.watchChannels)
+    }
+
+    @Test
+    fun `notification ids remain unique across the phone and the watch`() {
+        val notificationIds =
+            (LogDateNotificationChannels.phoneChannels + LogDateNotificationChannels.watchChannels)
+                .distinct()
+                .mapNotNull { it.notificationId }
+
+        assertEquals(notificationIds.size, notificationIds.distinct().size)
+    }
 }

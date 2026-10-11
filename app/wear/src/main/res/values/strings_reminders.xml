@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Reminders on the watch, in the new watch app -->
+    <string name="wear_reminder_record">Record</string>
+    <string name="wear_reminder_workout_title">Workout finished</string>
+    <string name="wear_reminder_workout_body">Record how it went</string>
+</resources>

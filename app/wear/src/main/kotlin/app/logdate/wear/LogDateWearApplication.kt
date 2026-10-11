@@ -15,6 +15,7 @@ import app.logdate.wear.launch.FeatureSwitch
 import app.logdate.wear.recording.OngoingRecordingDecorator
 import app.logdate.wear.recording.WearRecordingRecovery
 import app.logdate.wear.reminders.LegacyPromptAlarms
+import app.logdate.wear.reminders.applyReminderBridging
 import app.logdate.wear.sync.WatchSyncScheduler
 import app.logdate.wear.sync.WearDeadLetterMigration
 import app.logdate.wear.sync.v2.WatchStateMirror
@@ -93,6 +94,7 @@ class LogDateWearApplication :
 
         runCatching { LegacyPromptAlarms.cancel(this) }
             .onFailure { error -> Napier.w("Failed to remove the legacy journal prompts", error) }
+        applyReminderBridging(this)
 
         // Trigger database initialization on a background thread.
         // The database singleton uses runBlocking for SQLCipher passphrase retrieval
