@@ -72,6 +72,7 @@ class AndroidAudioPlaybackManager(
     private var currentUri: String? = null
     private var currentMetadata: AudioPlaybackMetadata? = null
     private var skipSilenceEnabled = false
+    private var playbackRequest = 0L
 
     override fun startPlayback(
         uri: String,
@@ -93,14 +94,18 @@ class AndroidAudioPlaybackManager(
     ) {
         this.onProgressUpdated = onProgressUpdated
         this.onPlaybackCompleted = onPlaybackCompleted
-        currentUri = uri
-        currentMetadata = metadata
-        _playbackStatus.value = _playbackStatus.value.copy(errorMessage = null)
+        val request = ++playbackRequest
         // startService (not startForegroundService) ensures MediaSessionService.onStartCommand
         // fires so its MediaNotificationManager gets a valid startId. Without this, the service
         // is only bound via BIND_AUTO_CREATE and stops itself ~1s after the controller connects.
         serviceStarter.start(context)
         withController { player ->
+            if (request != playbackRequest) return@withController
+            currentUri = uri
+            currentMetadata = metadata
+            this.onProgressUpdated = onProgressUpdated
+            this.onPlaybackCompleted = onPlaybackCompleted
+            _playbackStatus.value = _playbackStatus.value.copy(errorMessage = null)
             val mediaItem = mediaItemFactory.create(mediaFiles.playableUri(uri), metadata)
             if (options.startPositionMs > 0L) {
                 player.setMediaItem(mediaItem, options.startPositionMs)
@@ -131,7 +136,9 @@ class AndroidAudioPlaybackManager(
     }
 
     override fun stopPlayback() {
+        val request = ++playbackRequest
         withController { player ->
+            if (request != playbackRequest) return@withController
             player.stop()
             currentUri = null
             currentMetadata = null
@@ -235,6 +242,13 @@ class AndroidAudioPlaybackManager(
                 controller?.let { updateStatus(it) }
             }
 
+            override fun onPlayWhenReadyChanged(
+                playWhenReady: Boolean,
+                reason: Int,
+            ) {
+                controller?.let { updateStatus(it) }
+            }
+
             override fun onPlaybackStateChanged(playbackState: Int) {
                 val player = controller ?: return
                 if (playbackState == Player.STATE_ENDED) {
@@ -318,6 +332,7 @@ class AndroidAudioPlaybackManager(
         _playbackStatus.value =
             AudioPlaybackStatus(
                 isPlaying = player.isPlaying,
+                playWhenReady = player.playWhenReady,
                 progress = progress,
                 duration = duration,
                 currentUri = currentUri,

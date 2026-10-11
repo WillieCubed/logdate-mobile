@@ -28,6 +28,38 @@ class MomentPlayerTest {
     private val other = voiceNote(durationMs = 10_000L)
 
     @Test
+    fun `external resume on an unsuitable output reports failure`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val player = player()
+            player.playOrPause(note)
+            engine.mutableStatus.value = EngineStatus(note.uid, 100L, 42_000L, false, playWhenReady = false)
+            engine.mutableStatus.value = EngineStatus(note.uid, 100L, 42_000L, true, playWhenReady = true)
+            assertEquals(PlaybackState.Failed(note.uid, PlaybackFailure.NO_OUTPUT), player.state.value)
+        }
+
+    @Test
+    fun `external pause does not become an output failure`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val player = player()
+            player.playOrPause(note)
+            engine.mutableStatus.value = EngineStatus(note.uid, 100L, 42_000L, true, playWhenReady = false)
+            assertEquals(true, (player.state.value as PlaybackState.Active).isPaused)
+        }
+
+    @Test
+    fun `system pause and resume reconcile the watch controls`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val player = player()
+            player.playOrPause(note)
+            engine.mutableStatus.value = EngineStatus(note.uid, 100L, 42_000L, false, playWhenReady = false)
+            assertEquals(true, (player.state.value as PlaybackState.Active).isPaused)
+            player.playOrPause(note)
+            assertEquals(1, engine.resumes)
+            engine.mutableStatus.value = EngineStatus(note.uid, 200L, 42_000L, false, playWhenReady = true)
+            assertEquals(false, (player.state.value as PlaybackState.Active).isPaused)
+        }
+
+    @Test
     fun `a voice note plays at the saved speed and skip silence`() =
         runTest(UnconfinedTestDispatcher()) {
             preferences.speed.value = PlaybackSpeed.FASTER

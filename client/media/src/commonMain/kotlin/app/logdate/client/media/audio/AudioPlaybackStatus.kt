@@ -24,6 +24,8 @@ data class AudioPlaybackStatus(
     val playbackSpeed: Float = 1f,
     /** Whether stretches of silence are skipped. Only the Android playback manager sets it. */
     val skipSilenceEnabled: Boolean = false,
+    /** Playback intent; remains true during buffering and transient suppression. */
+    val playWhenReady: Boolean = isPlaying,
 )
 
 interface AudioPlaybackStatusProvider {

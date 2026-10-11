@@ -132,7 +132,7 @@ class MomentPlayer(
     private fun onEngineStatus(status: EngineStatus) {
         val current = mutableState.value as? PlaybackState.Active ?: return
         if (status.noteId != current.noteId) return
-        if (status.suppressedForUnsuitableOutput && !current.isPaused) {
+        if (status.suppressedForUnsuitableOutput && status.playWhenReady) {
             engine.stop()
             mutableState.value = PlaybackState.Failed(current.noteId, PlaybackFailure.NO_OUTPUT)
             return
@@ -140,6 +140,7 @@ class MomentPlayer(
         mutableState.value =
             current.copy(
                 positionMs = status.positionMs,
+                isPaused = !status.playWhenReady,
                 durationMs = status.durationMs.takeIf { it > 0L } ?: current.durationMs,
             )
     }

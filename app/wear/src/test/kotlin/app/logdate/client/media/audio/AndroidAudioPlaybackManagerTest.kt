@@ -10,6 +10,7 @@ import androidx.media3.session.MediaController
 import app.logdate.client.media.storage.AndroidMediaDirectories
 import app.logdate.client.media.storage.MediaFileResolver
 import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.SettableFuture
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -501,6 +502,50 @@ class AndroidAudioPlaybackManagerTest {
             manager.release()
         }
 
+    @Test
+    fun `switching before connection plays only the latest track with its identity`() =
+        runTest {
+            val future = SettableFuture.create<MediaController>()
+            val itemFactory = RecordingAudioPlaybackItemFactory()
+            val manager =
+                createManager(
+                    this,
+                    currentPosition = PlaybackStateHolder(400L),
+                    itemFactory = itemFactory,
+                    controllerFutureFactory = MediaControllerFutureFactory { future },
+                )
+            val first = AudioPlaybackMetadata(noteId = Uuid.random())
+            val second = AudioPlaybackMetadata(noteId = Uuid.random())
+            var firstFinished = 0
+            var secondFinished = 0
+            manager.startPlayback("file:///first.m4a", first, {}, { firstFinished++ })
+            manager.stopPlayback()
+            manager.startPlayback("file:///second.m4a", second, {}, { secondFinished++ })
+
+            future.set(controller)
+
+            assertEquals(second, manager.playbackStatus.value.metadata)
+            assertEquals("file:///second.m4a", manager.playbackStatus.value.currentUri)
+            verify(exactly = 1) { controller.setMediaItem(any()) }
+            controllerListener.captured.onPlaybackStateChanged(Player.STATE_ENDED)
+            assertEquals(0, firstFinished)
+            assertEquals(1, secondFinished)
+            manager.release()
+        }
+
+    @Test
+    fun `system playback intent changes are reported even while buffering`() =
+        runTest {
+            val manager = createManager(this, currentPosition = PlaybackStateHolder(400L))
+            every { controller.playWhenReady } returns true
+            manager.startPlayback("file:///first.m4a", null, {}, {})
+            assertTrue(manager.playbackStatus.value.playWhenReady)
+            every { controller.playWhenReady } returns false
+            controllerListener.captured.onPlayWhenReadyChanged(false, Player.PLAY_WHEN_READY_CHANGE_REASON_REMOTE)
+            assertFalse(manager.playbackStatus.value.playWhenReady)
+            manager.release()
+        }
+
     private fun createManager(
         scope: TestScope,
         dispatcher: CoroutineDispatcher = StandardTestDispatcher(scope.testScheduler),
@@ -541,6 +586,7 @@ class AndroidAudioPlaybackManagerTest {
         every { controller.duration } returns 1_000L
         every { controller.currentPosition } answers { currentPosition.value }
         every { controller.isPlaying } returns false
+        every { controller.playWhenReady } returns false
         every { controller.playbackSuppressionReason } returns Player.PLAYBACK_SUPPRESSION_REASON_NONE
     }
 

@@ -9,6 +9,19 @@ import kotlin.uuid.Uuid
 
 class MomentPlaybackEngineTest {
     @Test
+    fun `a system pause is preserved independently of actual playback`() {
+        val noteId = Uuid.random()
+        val status = AudioPlaybackStatus(metadata = AudioPlaybackMetadata(noteId = noteId), playWhenReady = false)
+        assertEquals(false, status.toEngineStatus().playWhenReady)
+    }
+
+    @Test
+    fun `buffering with play requested is not paused`() {
+        val status = AudioPlaybackStatus(isPlaying = false, playWhenReady = true)
+        assertEquals(true, status.toEngineStatus().playWhenReady)
+    }
+
+    @Test
     fun `the manager's status names the note and its position`() {
         val noteId = Uuid.random()
         val status =

@@ -113,6 +113,16 @@ class PlaybackSessionCommandsTest {
         waitUntil("the position moved to 0:30") { playbackManager.playbackStatus.value.positionMs >= 30_000L }
     }
 
+    @Test
+    fun another_controller_pauses_and_resumes_the_reported_playback_intent() {
+        startTone(AudioPlaybackOptions())
+        val remote = mediaController()
+        runOnMainSync { remote.pause() }
+        waitUntil("the watch receives the external pause") { !playbackManager.playbackStatus.value.playWhenReady }
+        runOnMainSync { remote.play() }
+        waitUntil("the watch receives the external resume") { playbackManager.playbackStatus.value.playWhenReady }
+    }
+
     private fun startTone(options: AudioPlaybackOptions) {
         val audio = toneWavFile(durationSeconds = 60)
         runOnMainSync {
@@ -126,7 +136,8 @@ class PlaybackSessionCommandsTest {
         }
         waitUntil("playback starts or reports an unsuitable output") {
             val status = playbackManager.playbackStatus.value
-            status.isPlaying || status.isSuppressedForUnsuitableOutput
+            status.duration.inWholeMilliseconds > 0L &&
+                (status.isPlaying || status.isSuppressedForUnsuitableOutput)
         }
     }
 
