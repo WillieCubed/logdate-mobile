@@ -118,12 +118,18 @@
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:pathPrefix="/logdate/sync" />
+                <data android:scheme="wear" />
+                <data android:host="*" />
+                <data android:path="/logdate/v2/receipts/push" />
             </intent-filter>
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.CAPABILITY_CHANGED" />
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:path="/logdate_phone_app" />
+                <data android:scheme="wear" />
+                <data android:host="*" />
+                <data android:path="/logdate_phone_sync_v2" />
             </intent-filter>
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.REQUEST_RECEIVED" />

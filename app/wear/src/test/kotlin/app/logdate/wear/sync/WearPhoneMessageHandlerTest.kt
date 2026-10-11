@@ -3,13 +3,17 @@ package app.logdate.wear.sync
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.datalayer.NoteAckPayload
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
+import app.logdate.client.sync.datalayer.v2.WearPaths
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.confirmVerified
 import io.mockk.mockk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.uuid.Uuid
 
 /**
@@ -105,5 +109,58 @@ class WearPhoneMessageHandlerTest {
             handler.onPhoneReachable()
 
             coVerify(exactly = 1) { syncManager.fullSync() }
+        }
+
+    @Test
+    fun `a receipt push forwards its source and wakes sync after delivery advances`() =
+        runTest {
+            val received = mutableListOf<Pair<String?, List<Byte>>>()
+            val scoped =
+                WearPhoneMessageHandler(ackHandler, syncManager, { source, bytes ->
+                    received += source to bytes.toList()
+                    1
+                })
+            scoped.onMessage(WearPaths.RECEIPTS_PUSH, byteArrayOf(1, 2), "phone")
+            assertEquals(listOf<Pair<String?, List<Byte>>>("phone" to listOf<Byte>(1, 2)), received)
+            coVerify(exactly = 1) { syncManager.fullSync() }
+            confirmVerified(ackHandler)
+        }
+
+    @Test
+    fun `a receipt that changes nothing does not wake sync`() =
+        runTest {
+            val scoped = WearPhoneMessageHandler(ackHandler, syncManager, { _, _ -> 0 })
+            scoped.onMessage(WearPaths.RECEIPTS_PUSH, byteArrayOf(1), "phone")
+            confirmVerified(ackHandler, syncManager)
+        }
+
+    @Test
+    fun `cancellation while applying a receipt propagates`() =
+        runTest {
+            val scoped = WearPhoneMessageHandler(ackHandler, syncManager, { _, _ -> throw CancellationException("stopped") })
+            assertFailsWith<CancellationException> { scoped.onMessage(WearPaths.RECEIPTS_PUSH, byteArrayOf(1), "phone") }
+            confirmVerified(ackHandler, syncManager)
+        }
+
+    @Test
+    fun `legacy acknowledgements cannot settle notes while receipts own delivery`() =
+        runTest {
+            val scoped = WearPhoneMessageHandler(ackHandler, syncManager, legacyAcksAllowed = { false })
+            scoped.onMessage(WearAudioRequestPaths.noteAckPath(Uuid.random()))
+            confirmVerified(ackHandler, syncManager)
+        }
+
+    @Test
+    fun `cancellation while syncing propagates`() =
+        runTest {
+            coEvery { syncManager.fullSync() } throws CancellationException("stopped")
+            assertFailsWith<CancellationException> { handler.onPhoneReachable() }
+        }
+
+    @Test
+    fun `cancellation while storing a legacy ack propagates`() =
+        runTest {
+            coEvery { ackHandler.onNoteAcknowledged(any(), any()) } throws CancellationException("stopped")
+            assertFailsWith<CancellationException> { handler.onMessage(WearAudioRequestPaths.noteAckPath(Uuid.random())) }
         }
 }

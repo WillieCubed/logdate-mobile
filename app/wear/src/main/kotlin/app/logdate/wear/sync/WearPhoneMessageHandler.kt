@@ -3,7 +3,9 @@ package app.logdate.wear.sync
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.datalayer.NoteAckPayload
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
+import app.logdate.client.sync.datalayer.v2.WearPaths
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlin.uuid.Uuid
 
 /**
@@ -13,19 +15,36 @@ import kotlin.uuid.Uuid
 class WearPhoneMessageHandler(
     private val ackHandler: WearNoteAckHandler,
     private val syncManager: SyncManager,
+    private val receiptsPushed: suspend (String?, ByteArray) -> Int = { _, _ -> 0 },
+    private val legacyAcksAllowed: suspend () -> Boolean = { true },
 ) {
     suspend fun onMessage(
         path: String,
         data: ByteArray = ByteArray(0),
+        sourceNodeId: String? = null,
     ) {
         when {
-            WearAudioRequestPaths.isNoteAckPath(path) -> acknowledge(path, data)
+            path == WearPaths.RECEIPTS_PUSH -> applyReceipts(sourceNodeId, data)
+            WearAudioRequestPaths.isNoteAckPath(path) -> if (legacyAcksAllowed()) acknowledge(path, data)
             path == WearAudioRequestPaths.SYNC_REQUEST_PATH -> sendPendingChanges()
             else -> Napier.d("Unknown message path: $path")
         }
     }
 
     suspend fun onPhoneReachable() = sendPendingChanges()
+
+    private suspend fun applyReceipts(
+        sourceNodeId: String?,
+        data: ByteArray,
+    ) {
+        try {
+            if (receiptsPushed(sourceNodeId, data) > 0) sendPendingChanges()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.w("Could not apply the phone's delivery receipts", e)
+        }
+    }
 
     private suspend fun acknowledge(
         path: String,
@@ -40,6 +59,8 @@ class WearPhoneMessageHandler(
             }
         try {
             ackHandler.onNoteAcknowledged(noteId, readAck(noteId, data))
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.w("Failed to record the phone's acknowledgement of note $noteId", e)
         }
@@ -63,6 +84,8 @@ class WearPhoneMessageHandler(
     private suspend fun sendPendingChanges() {
         try {
             syncManager.fullSync()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.w("Failed to send pending changes to the phone", e)
         }

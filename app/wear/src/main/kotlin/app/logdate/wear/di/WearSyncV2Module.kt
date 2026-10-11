@@ -8,6 +8,7 @@ import app.logdate.client.device.crypto.link.BouncyCastleLinkHandshake
 import app.logdate.client.sync.datalayer.v2.LinkNonceLedger
 import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.datalayer.v2.WearFeatures
+import app.logdate.client.sync.peer.delivery.PeerDeliveryLedger
 import app.logdate.client.sync.peer.link.LinkInstaller
 import app.logdate.client.sync.peer.link.PairKeyVault
 import app.logdate.client.sync.peer.link.SecureStoragePairKeyVault
@@ -15,6 +16,7 @@ import app.logdate.client.sync.peer.link.WatchLinkExchange
 import app.logdate.wear.sync.v2.WatchOwnState
 import app.logdate.wear.sync.v2.delivery.LinkedDataLayerTransportV2
 import app.logdate.wear.sync.v2.delivery.WatchDeliveryPeer
+import app.logdate.wear.sync.v2.delivery.WatchReceiptApplier
 import app.logdate.wear.sync.v2.link.WatchLinkCoordinator
 import app.logdate.wear.sync.v2.link.WatchLinkStore
 import app.logdate.wear.sync.v2.localNodeIdOrNull
@@ -53,6 +55,8 @@ val wearSyncV2Module =
                 active = { flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) },
             )
         }
+        single { PeerDeliveryLedger(get()) }
+        single { WatchReceiptApplier(ledger = get(), peers = get()) }
         factory { parameters ->
             val context = get<Context>()
             LinkedDataLayerTransportV2(

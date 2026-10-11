@@ -13,6 +13,7 @@ import app.logdate.client.sync.peer.link.LinkedDeviceInstaller
 import app.logdate.wear.sync.v2.WatchOwnState
 import app.logdate.wear.sync.v2.delivery.LinkedDataLayerTransportV2
 import app.logdate.wear.sync.v2.delivery.WatchDeliveryPeer
+import app.logdate.wear.sync.v2.delivery.WatchReceiptApplier
 import app.logdate.wear.sync.v2.link.WatchLinkCoordinator
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -37,6 +38,7 @@ class WearIdentityRuntimeTest {
     @Test
     fun deliveryAudienceResolvesFromTheInstalledApp() {
         getKoin().get<WatchDeliveryPeer>()
+        getKoin().get<WatchReceiptApplier>()
         val peer = PeerDeliveryContext(LinkWire.encodeKey(ByteArray(32)), "phone", "watch", LinkMode.PAIR)
         getKoin().get<LinkedDataLayerTransportV2> { parametersOf(peer) }
     }

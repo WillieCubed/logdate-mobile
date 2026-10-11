@@ -30,6 +30,7 @@ import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.datalayer.AssociationDataMapper
 import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
 import app.logdate.client.sync.datalayer.JournalDataMapper
+import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.datalayer.v2.WearProtocol
 import app.logdate.client.sync.datalayer.v2.WearProtocolGate
 import app.logdate.client.sync.di.conflictResolverModule
@@ -66,8 +67,10 @@ import app.logdate.wear.sync.WorkManagerWatchSyncWork
 import app.logdate.wear.sync.v2.WatchOwnState
 import app.logdate.wear.sync.v2.WatchPeerLink
 import app.logdate.wear.sync.v2.WatchStateMirror
+import app.logdate.wear.sync.v2.delivery.WatchReceiptApplier
 import com.google.android.gms.wearable.Wearable
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import org.koin.dsl.binds
 import org.koin.dsl.module
@@ -126,7 +129,19 @@ val wearDataModule =
                 scope = get(),
             )
         } binds arrayOf(SyncManager::class, WearNoteAckHandler::class, WearNoteRemovalNotifier::class)
-        single { WearPhoneMessageHandler(ackHandler = get(), syncManager = get()) }
+        single {
+            val receipts = get<WatchReceiptApplier>()
+            val gate = get<WearProtocolGate>()
+            val ownState = get<WatchOwnState>()
+            WearPhoneMessageHandler(
+                ackHandler = get(),
+                syncManager = get(),
+                receiptsPushed = receipts::apply,
+                legacyAcksAllowed = {
+                    WearFeatures.RECEIPTS !in ownState.observe().first().features || !gate.isFeatureActive(WearFeatures.RECEIPTS).first()
+                },
+            )
+        }
         single { WearDeadLetterMigration(deadLetterStore = get(), syncMetadataService = get()) }
         single<WatchSyncWork> { WorkManagerWatchSyncWork(WorkManager.getInstance(get<Context>())) }
         single {

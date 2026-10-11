@@ -2,6 +2,8 @@ package app.logdate.wear.sync.v2.delivery
 
 import app.logdate.client.sync.datalayer.v2.CloudPresence
 import app.logdate.client.sync.datalayer.v2.Decoded
+import app.logdate.client.sync.datalayer.v2.LinkMode
+import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.datalayer.v2.Receipt
 import app.logdate.client.sync.datalayer.v2.ReceiptState
 import app.logdate.client.sync.datalayer.v2.ReceiptsResponse
@@ -12,21 +14,39 @@ import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.peer.delivery.DeliveryDirection
 import app.logdate.client.sync.peer.delivery.DeliveryState
 import app.logdate.client.sync.peer.delivery.PeerDeliveryLedger
-import app.logdate.client.sync.peer.delivery.PeerScopes
 import io.github.aakira.napier.Napier
+import java.util.concurrent.atomic.AtomicReference
 
 /** Applies the phone's receipts, pushed or answered, to the watch's ledger. A receipt only ever moves a note forward. */
 class WatchReceiptApplier(
     private val ledger: PeerDeliveryLedger,
+    private val peers: WatchDeliveryPeer,
 ) {
-    @Volatile
-    private var lastCloud: CloudPresence? = null
+    private data class VerifiedCloud(
+        val peer: PeerDeliveryContext,
+        val cloud: CloudPresence,
+    )
 
-    /** What the phone last said about its account in a receipt; null before the first. */
-    fun phoneCloud(): CloudPresence? = lastCloud
+    private val lastCloud = AtomicReference<VerifiedCloud?>(null)
 
-    /** Returns how many notes moved forward; receipts this build cannot read move none and are asked for again. */
-    suspend fun apply(payload: ByteArray): Int {
+    /** A current-link routing hint; settlement still requires a receipt for the captured version. */
+    suspend fun phoneCloud(): CloudPresence? {
+        val cached = lastCloud.get() ?: return null
+        if (!peers.isCurrent(cached.peer)) {
+            lastCloud.compareAndSet(cached, null)
+            return null
+        }
+        return lastCloud.get()?.takeIf { it.peer == cached.peer }?.cloud
+    }
+
+    /** Only the current source and exchange may advance their own delivery history. */
+    suspend fun apply(
+        sourceNodeId: String?,
+        payload: ByteArray,
+    ): Int {
+        val beforeCloud = lastCloud.get()
+        val peer = peers.current() ?: return 0
+        if (sourceNodeId != peer.phoneNode) return 0
         val response =
             when (val decoded = WearJson.decode(payload, WearProtocol.RECEIPTS_SCHEMA, ReceiptsResponse.serializer())) {
                 is Decoded.Supported -> decoded.value
@@ -39,11 +59,31 @@ class WatchReceiptApplier(
                     return 0
                 }
             }
-        lastCloud = response.cloud
-        return response.receipts.count { applyOne(it) }
+        if (response.context != peer || !validCloud(peer, response.cloud) || !peers.isCurrent(peer)) return 0
+        var applied = 0
+        for (receipt in response.receipts) {
+            if (!peers.isCurrent(peer)) return 0
+            if (applyOne(peer, receipt)) applied++
+        }
+        if (!peers.isCurrent(peer)) return 0
+        lastCloud.compareAndSet(beforeCloud, VerifiedCloud(peer, response.cloud))
+        return applied
     }
 
-    private suspend fun applyOne(receipt: Receipt): Boolean {
+    private fun validCloud(
+        peer: PeerDeliveryContext,
+        cloud: CloudPresence,
+    ): Boolean =
+        when (cloud) {
+            CloudPresence.UNKNOWN -> true
+            CloudPresence.NO_ACCOUNT -> peer.mode == LinkMode.PAIR
+            CloudPresence.SIGNED_IN -> peer.mode == LinkMode.CLOUD
+        }
+
+    private suspend fun applyOne(
+        peer: PeerDeliveryContext,
+        receipt: Receipt,
+    ): Boolean {
         if (receipt.kind != RecordKind.NOTE) {
             Napier.w("Ignoring a ${receipt.kind} receipt; this watch sends only notes this way")
             return false
@@ -54,7 +94,7 @@ class WatchReceiptApplier(
         }
         val moved =
             ledger.applyReceipt(
-                scope = PeerScopes.PHONE,
+                scope = peer.ledgerScope,
                 direction = DeliveryDirection.TO_PHONE,
                 entityType = EntityType.NOTE,
                 entityId = receipt.id,

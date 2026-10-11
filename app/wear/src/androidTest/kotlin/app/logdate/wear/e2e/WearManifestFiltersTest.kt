@@ -13,6 +13,7 @@ import app.logdate.client.sync.datalayer.RemoteCameraCaptureResultDataMapper
 import app.logdate.client.sync.datalayer.RemoteCameraDeviceDataMapper
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
 import app.logdate.client.sync.datalayer.v2.WearPaths
+import app.logdate.client.sync.datalayer.v2.WearProtocol
 import app.logdate.wear.sync.WearDataLayerClient
 import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.DataClient
@@ -57,12 +58,14 @@ class WearManifestFiltersTest {
         listOf(
             WearAudioRequestPaths.noteAckPath(noteId),
             WearAudioRequestPaths.SYNC_REQUEST_PATH,
+            WearPaths.RECEIPTS_PUSH,
         ).forEach { path -> assertResolvesToListener(MessageClient.ACTION_MESSAGE_RECEIVED, path) }
     }
 
     @Test
     fun `the phone coming into reach reaches the listener`() {
         assertResolvesToListener(CapabilityClient.ACTION_CAPABILITY_CHANGED, "/${WearDataLayerClient.PHONE_CAPABILITY}")
+        assertResolvesToListener(CapabilityClient.ACTION_CAPABILITY_CHANGED, "/${WearProtocol.PHONE_CAPABILITY_V2}")
     }
 
     @Test
