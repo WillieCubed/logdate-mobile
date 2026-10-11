@@ -33,6 +33,7 @@ data class ReceiptQuery(
 data class ReceiptsRequest(
     val schema: Int = WearProtocol.RECEIPTS_SCHEMA,
     val items: List<ReceiptQuery>,
+    val context: PeerDeliveryContext? = null,
 )
 
 @Serializable
@@ -52,4 +53,5 @@ data class ReceiptsResponse(
     val schema: Int = WearProtocol.RECEIPTS_SCHEMA,
     val cloud: CloudPresence,
     val receipts: List<Receipt>,
+    val context: PeerDeliveryContext? = null,
 )

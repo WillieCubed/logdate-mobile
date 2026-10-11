@@ -102,22 +102,22 @@ class WatchReceiptNotifierTest {
         }
 
     @Test
-    fun `the phone answers a receipts request with its account and what it has`() =
+    fun `an unbound request cannot learn account status or note receipts`() =
         runTest {
             stored(syncVersion = 0, pending = true)
             val query = ReceiptsRequest(items = listOf(ReceiptQuery(RecordKind.NOTE, id.toString(), 5)))
             val request = WearJson.encodeToBytes(ReceiptsRequest.serializer(), query)
 
-            val answer = decode(WatchReceiptResponder(book).answer(request))
+            val answer = decode(WatchReceiptResponder(book).answer("watch", request))
 
-            assertEquals(CloudPresence.SIGNED_IN, answer.cloud)
-            assertEquals(listOf(ReceiptState.ON_PHONE), answer.receipts.map { it.state })
+            assertEquals(CloudPresence.UNKNOWN, answer.cloud)
+            assertTrue(answer.receipts.isEmpty())
         }
 
     @Test
     fun `an unreadable request is answered with no receipts`() =
         runTest {
-            assertTrue(decode(WatchReceiptResponder(book).answer("nope".encodeToByteArray())).receipts.isEmpty())
+            assertTrue(decode(WatchReceiptResponder(book).answer("watch", "nope".encodeToByteArray())).receipts.isEmpty())
         }
 
     @Test

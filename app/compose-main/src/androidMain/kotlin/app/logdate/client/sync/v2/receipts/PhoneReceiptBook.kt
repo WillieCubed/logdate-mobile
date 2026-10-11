@@ -3,6 +3,8 @@ package app.logdate.client.sync.v2.receipts
 import app.logdate.client.datastore.SessionStorage
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.sync.datalayer.v2.CloudPresence
+import app.logdate.client.sync.datalayer.v2.LinkMode
+import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.datalayer.v2.Receipt
 import app.logdate.client.sync.datalayer.v2.ReceiptQuery
 import app.logdate.client.sync.datalayer.v2.ReceiptState
@@ -23,6 +25,7 @@ class PhoneReceiptBook(
     private val outbox: SyncMetadataService,
     private val sessions: SessionStorage,
     private val ledger: PeerDeliveryLedger,
+    private val peers: PhoneDeliveryPeers? = null,
 ) {
     fun cloudPresence(): CloudPresence = if (sessions.getSession() == null) CloudPresence.NO_ACCOUNT else CloudPresence.SIGNED_IN
 
@@ -52,6 +55,42 @@ class PhoneReceiptBook(
             state = if (backedUp) ReceiptState.BACKED_UP else ReceiptState.ON_PHONE,
             serverVersion = note.syncVersion.takeIf { backedUp },
         )
+    }
+
+    suspend fun isCurrent(context: PeerDeliveryContext): Boolean = peers?.isCurrent(context) == true
+
+    suspend fun receiptFor(
+        context: PeerDeliveryContext,
+        query: ReceiptQuery,
+    ): Receipt? {
+        if (!isCurrent(context)) return null
+        val session = sessions.getOriginBoundSession()
+        val id = Uuid.parseOrNull(query.id)
+        if (query.kind != RecordKind.NOTE || id == null) return rejected(query.kind, query.id)
+        val received =
+            ledger
+                .get(context.ledgerScope, DeliveryDirection.FROM_WATCH, EntityType.NOTE, query.id)
+                ?.takeIf { it.contentVersion >= query.contentVersion } ?: return null
+        val note = notes.getNoteById(id)
+        val receipt =
+            if (note == null) {
+                Receipt(RecordKind.NOTE, query.id, received.contentVersion, ReceiptState.DELETED_ON_PHONE)
+            } else {
+                val version = note.lastUpdated.toEpochMilliseconds()
+                if (version < query.contentVersion) return null
+                val backedUp =
+                    context.mode == LinkMode.CLOUD &&
+                        note.syncVersion > 0 &&
+                        !outbox.hasPending(EntityType.NOTE, query.id)
+                Receipt(
+                    kind = RecordKind.NOTE,
+                    id = query.id,
+                    contentVersion = version,
+                    state = if (backedUp) ReceiptState.BACKED_UP else ReceiptState.ON_PHONE,
+                    serverVersion = note.syncVersion.takeIf { backedUp },
+                )
+            }
+        return receipt.takeIf { sessions.getOriginBoundSession() == session && isCurrent(context) }
     }
 
     companion object {

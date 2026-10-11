@@ -248,7 +248,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
             Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries; the watch's $path request fails and is asked again")
             return null
         }
-        return koin.get<WatchReceiptResponder>().answer(request)
+        return koin.get<WatchReceiptResponder>().answer(nodeId, request)
     }
 
     override fun onDataChanged(dataEvents: DataEventBuffer) {

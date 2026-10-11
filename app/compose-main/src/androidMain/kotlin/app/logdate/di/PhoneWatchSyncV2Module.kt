@@ -39,6 +39,7 @@ import app.logdate.client.sync.v2.link.PhoneLinkInitiator
 import app.logdate.client.sync.v2.link.PhoneWatchLinkStore
 import app.logdate.client.sync.v2.link.WatchLinkNotifier
 import app.logdate.client.sync.v2.localNodeIdOrNull
+import app.logdate.client.sync.v2.receipts.PhoneDeliveryPeers
 import app.logdate.client.sync.v2.receipts.PhoneReceiptBook
 import app.logdate.client.sync.v2.receipts.ReceiptAcknowledger
 import app.logdate.client.sync.v2.receipts.WatchCaptureCollisionPolicy
@@ -101,7 +102,18 @@ val phoneWatchSyncV2Module =
         single { PeerDeliveryLedger(get()) }
         single<CreateCollisionPolicy> { WatchCaptureCollisionPolicy(get()) }
 
-        single { PhoneReceiptBook(notes = get(), outbox = get(), sessions = get(), ledger = get()) }
+        single {
+            val nodeClient = Wearable.getNodeClient(androidContext())
+            val gate = get<WearProtocolGate>()
+            PhoneDeliveryPeers(
+                links = get(),
+                sessions = get(),
+                config = get(),
+                localNodeId = { nodeClient.localNodeIdOrNull() },
+                active = { gate.isFeatureActive(WearFeatures.RECEIPTS).first() },
+            )
+        }
+        single { PhoneReceiptBook(notes = get(), outbox = get(), sessions = get(), ledger = get(), peers = get()) }
         single { WatchReceiptResponder(get()) }
         single {
             val gate = get<WearProtocolGate>()

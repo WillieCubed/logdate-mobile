@@ -1,6 +1,8 @@
 package app.logdate.client.sync.v2.receipts
 
+import app.logdate.client.sync.datalayer.v2.CloudPresence
 import app.logdate.client.sync.datalayer.v2.Decoded
+import app.logdate.client.sync.datalayer.v2.LinkMode
 import app.logdate.client.sync.datalayer.v2.ReceiptsRequest
 import app.logdate.client.sync.datalayer.v2.ReceiptsResponse
 import app.logdate.client.sync.datalayer.v2.WearJson
@@ -11,19 +13,39 @@ import io.github.aakira.napier.Napier
 class WatchReceiptResponder(
     private val book: PhoneReceiptBook,
 ) {
-    suspend fun answer(payload: ByteArray): ByteArray {
-        val receipts =
+    suspend fun answer(
+        sourceNodeId: String,
+        payload: ByteArray,
+    ): ByteArray {
+        val request =
             when (val decoded = WearJson.decode(payload, WearProtocol.RECEIPTS_SCHEMA, ReceiptsRequest.serializer())) {
-                is Decoded.Supported -> decoded.value.items.mapNotNull { book.receiptFor(it) }
+                is Decoded.Supported -> decoded.value
                 is Decoded.Unsupported -> {
                     Napier.w("A watch asked for receipts with schema ${decoded.schema}; it gets none until this phone updates")
-                    emptyList()
+                    return encodeUntrusted()
                 }
                 is Decoded.Malformed -> {
                     Napier.e("A watch's receipts request could not be read: ${decoded.reason}")
-                    emptyList()
+                    return encodeUntrusted()
                 }
             }
-        return WearJson.encodeToBytes(ReceiptsResponse.serializer(), ReceiptsResponse(cloud = book.cloudPresence(), receipts = receipts))
+        val context = request.context ?: return encodeUntrusted()
+        if (context.watchNode != sourceNodeId || !book.isCurrent(context)) return encodeUntrusted()
+        val receipts = request.items.mapNotNull { book.receiptFor(context, it) }
+        if (!book.isCurrent(context)) return encodeUntrusted()
+        return WearJson.encodeToBytes(
+            ReceiptsResponse.serializer(),
+            ReceiptsResponse(
+                cloud = if (context.mode == LinkMode.CLOUD) CloudPresence.SIGNED_IN else CloudPresence.NO_ACCOUNT,
+                receipts = receipts,
+                context = context,
+            ),
+        )
     }
+
+    private fun encodeUntrusted(): ByteArray =
+        WearJson.encodeToBytes(
+            ReceiptsResponse.serializer(),
+            ReceiptsResponse(cloud = CloudPresence.UNKNOWN, receipts = emptyList()),
+        )
 }

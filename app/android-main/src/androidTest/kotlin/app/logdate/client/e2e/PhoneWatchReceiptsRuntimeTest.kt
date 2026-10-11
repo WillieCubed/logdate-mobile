@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.sync.CreateCollisionPolicy
 import app.logdate.client.sync.datalayer.v2.WearPaths
 import app.logdate.client.sync.peer.delivery.PeerDeliveryLedger
+import app.logdate.client.sync.v2.receipts.PhoneDeliveryPeers
 import app.logdate.client.sync.v2.receipts.PhoneReceiptBook
 import app.logdate.client.sync.v2.receipts.ReceiptAcknowledger
 import app.logdate.client.sync.v2.receipts.WatchCaptureCollisionPolicy
@@ -47,6 +48,7 @@ class PhoneWatchReceiptsRuntimeTest {
         val koin = KoinJavaComponent.getKoin()
         assertNotNull(koin.get<PeerDeliveryLedger>())
         assertIs<WatchCaptureCollisionPolicy>(koin.get<CreateCollisionPolicy>())
+        assertNotNull(koin.get<PhoneDeliveryPeers>())
         assertNotNull(koin.get<PhoneReceiptBook>())
         assertNotNull(koin.get<ReceiptAcknowledger>())
         assertNotNull(koin.get<WatchReceiptResponder>())
