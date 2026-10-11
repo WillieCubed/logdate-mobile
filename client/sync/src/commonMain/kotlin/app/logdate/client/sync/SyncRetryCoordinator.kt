@@ -1,7 +1,5 @@
 package app.logdate.client.sync
 
-import app.logdate.client.sync.cloud.CloudApiException
-import app.logdate.client.sync.cloud.MediaTooLargeException
 import app.logdate.client.sync.diagnostics.DiagnosticSource
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.PendingUpload
@@ -297,37 +295,13 @@ internal class SyncRetryCoordinator(
         val entityId: String,
     )
 
-    /**
-     * Entities whose most recent upload attempt failed with [MissingMediaException]
-     * specifically -- as opposed to any other kind of failure (network, server, conflict, ...).
-     * Tracked generically across every [EntityType], matching every other piece of retry state in
-     * this class ([retryScheduleStore], [syncMetadataService]) -- even though [MissingMediaException]
-     * currently only ever originates from the note-upload path, hardcoding that assumption into the
-     * storage shape would make it awkward for a future entity type that grows the same kind of
-     * flaky-first-check failure to reuse this mechanism.
-     *
-     * [PendingUpload.retryCount] is a single counter shared across every failure reason for an
-     * entity, so it cannot answer "were the last two failures *both* missing-media misses" --
-     * using it directly means one unrelated hiccup (a transient server error, say) followed by
-     * the *first-ever* missing-media miss satisfies "retryCount >= 1" and dead-letters a file
-     * that may still be sitting right there on disk. This set tracks the one thing that
-     * actually matters for that decision: whether the immediately preceding failure was one too.
-     *
-     * In-memory only, not persisted: an app restart just means the next miss for that entity is
-     * treated as the first one again, which costs one extra retry rather than risking a
-     * wrongly-permanent dead-letter. Cleared alongside every [retryScheduleStore] clear so it
-     * cannot outlive the entity's own retry state.
-     */
-    private val entitiesLastFailedOnMissingMedia = mutableSetOf<PendingEntityKey>()
-
-    /** Attempts [beginUpload] started in this process that have not finished yet. */
+    private val missingMediaFailures = MissingMediaFailureHistory()
     private val attemptsInFlight = mutableMapOf<PendingEntityKey, UploadAttempt>()
 
-    /** Whether the failure immediately preceding this one for [entityId] was [MissingMediaException]. */
     fun previousFailureWasMissingMedia(
         entityType: EntityType,
         entityId: String,
-    ): Boolean = PendingEntityKey(entityType, entityId) in entitiesLastFailedOnMissingMedia
+    ): Boolean = missingMediaFailures.contains(entityType, entityId)
 
     fun previousFailureWasMissingMedia(
         entityType: EntityType,
@@ -338,22 +312,12 @@ internal class SyncRetryCoordinator(
         entityType: EntityType,
         entityId: String,
         error: Throwable,
-    ) {
-        val key = PendingEntityKey(entityType, entityId)
-        if (error is MissingMediaException) {
-            entitiesLastFailedOnMissingMedia.add(key)
-        } else {
-            entitiesLastFailedOnMissingMedia.remove(key)
-        }
-    }
+    ) = missingMediaFailures.record(entityType, entityId, error)
 
-    /** Forgets the tracked failure kind for an entity that has left the pending queue. */
     private fun clearFailureKind(
         entityType: EntityType,
         entityId: String,
-    ) {
-        entitiesLastFailedOnMissingMedia.remove(PendingEntityKey(entityType, entityId))
-    }
+    ) = missingMediaFailures.clear(entityType, entityId)
 
     private fun computeBackoffMs(retryCount: Int): Long = backoff.nextDelayMs(retryCount)
 
@@ -504,23 +468,3 @@ internal class SyncRetryCoordinator(
         const val DEAD_LETTER_RETRY_INTERVAL_MS = 24L * 60 * 60 * 1000
     }
 }
-
-internal fun classifySyncFailure(error: Throwable): SyncDeadLetterReason =
-    when (error) {
-        is MissingMediaException -> SyncDeadLetterReason.MISSING_FILE
-        is InterruptedUploadException -> SyncDeadLetterReason.APP_CLOSED
-        is MediaTooLargeException -> SyncDeadLetterReason.FILE_TOO_LARGE
-        is CloudApiException ->
-            when {
-                error.statusCode == 401 -> SyncDeadLetterReason.SIGN_IN_REQUIRED
-                error.statusCode in setOf(502, 503, 504) -> SyncDeadLetterReason.SERVER_UNAVAILABLE
-                error.errorCode == "NETWORK_ERROR" -> SyncDeadLetterReason.NETWORK_UNAVAILABLE
-                else -> SyncDeadLetterReason.UNKNOWN
-            }
-        else -> SyncDeadLetterReason.UNKNOWN
-    }
-
-/** Earlier upload attempts at an entry never finished, because the app closed during each one. */
-class InterruptedUploadException(
-    unfinishedAttempts: Int,
-) : Exception("LogDate closed while uploading this entry, $unfinishedAttempts times in a row")

@@ -5,7 +5,6 @@ import app.logdate.client.networking.DataUsagePolicy
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
-import app.logdate.client.repository.journals.SyncableJournalRepository
 import app.logdate.client.repository.journals.mediaRefOrNull
 import app.logdate.client.sync.cloud.CloudApiException
 import app.logdate.client.sync.cloud.CloudAssociationDataSource
@@ -87,6 +86,16 @@ internal class SyncUploader(
             draftRepairScope = draftRepairScope,
         )
 
+    private val journalUploader =
+        JournalUploader(
+            journalRepository,
+            cloudJournalDataSource,
+            syncMetadataService,
+            tokenRefresher,
+            retryCoordinator,
+            recordProgress,
+            profile,
+        )
     private val conditionalCreates = ConditionalCreateSettler(retryCoordinator, recordProgress)
 
     /**
@@ -109,187 +118,7 @@ internal class SyncUploader(
             }
         }
 
-    suspend fun uploadJournals(accessToken: String): SyncResult {
-        return uploadPass("Upload journals") {
-            var uploadedCount = 0
-            val errors = mutableListOf<SyncError>()
-            val pendingUploads = syncMetadataService.getPendingUploads(EntityType.JOURNAL).dueNow(EntityType.JOURNAL, retryCoordinator)
-            if (pendingUploads.isEmpty()) {
-                return SyncResult(success = true, uploadedItems = 0)
-            }
-
-            val syncableRepository = journalRepository as? SyncableJournalRepository
-            val journalsById =
-                journalRepository.allJournalsObserved
-                    .first()
-                    .associateBy { it.id.toString() }
-
-            for (pending in pendingUploads) {
-                val journalId = runCatching { Uuid.parse(pending.entityId) }.getOrNull()
-                if (journalId == null) {
-                    errors.add(retryCoordinator.recordUnparsableOutboxEntry(EntityType.JOURNAL, pending, "journal ID"))
-                    continue
-                }
-
-                if (journalRepository.resolveJournalId(journalId) != journalId) {
-                    retryCoordinator.markUploadSettled(EntityType.JOURNAL, pending, Clock.System.now(), 0L)
-                    continue
-                }
-
-                when (pending.operation) {
-                    PendingOperation.DELETE -> {
-                        if (!retryCoordinator.beginAttempt(EntityType.JOURNAL, pending, errors)) continue
-                        val result =
-                            tokenRefresher.withFreshToken(
-                                { token -> cloudJournalDataSource.deleteJournal(token, journalId) },
-                                "deleteJournal($journalId)",
-                                expectedScope = pending.scope,
-                            )
-                        if (result.isSuccess) {
-                            uploadedCount++
-                            recordProgress(1)
-                            retryCoordinator.markUploadSettled(EntityType.JOURNAL, pending, Clock.System.now(), 0L)
-                            Napier.d("Deleted journal")
-                        } else {
-                            val error = result.exceptionOrNull() ?: Exception("Unknown delete error")
-                            val movedToDeadLetter =
-                                retryCoordinator.handleRetryFailure(
-                                    entityType = EntityType.JOURNAL,
-                                    pending = pending,
-                                    error = error,
-                                )
-                            errors.add(
-                                SyncError(
-                                    SyncErrorType.SERVER_ERROR,
-                                    "Failed to delete journal $journalId: ${error.message}",
-                                    error,
-                                    retryable = !movedToDeadLetter,
-                                ),
-                            )
-                            Napier.w("Failed to delete journal")
-                            if (movedToDeadLetter) {
-                                continue
-                            }
-                        }
-                    }
-                    PendingOperation.CREATE,
-                    PendingOperation.UPDATE,
-                    -> {
-                        if (pending.operation == PendingOperation.UPDATE && !profile.uploadsUpdates) {
-                            Napier.d("Leaving a journal edit for the phone to relay")
-                            continue
-                        }
-                        val journal = journalsById[pending.entityId]
-                        if (journal == null) {
-                            errors.add(retryCoordinator.recordUnavailableOutboxEntry(EntityType.JOURNAL, pending))
-                            continue
-                        }
-
-                        if (!retryCoordinator.beginAttempt(EntityType.JOURNAL, pending, errors)) continue
-                        if (pending.operation == PendingOperation.CREATE && profile.createsConditionally) {
-                            val created =
-                                tokenRefresher.withFreshToken(
-                                    { token -> cloudJournalDataSource.createJournalIfAbsent(token, journal) },
-                                    "createJournalIfAbsent(${journal.id})",
-                                    expectedScope = pending.scope,
-                                )
-                            uploadedCount +=
-                                conditionalCreates.settle(
-                                    entityType = EntityType.JOURNAL,
-                                    pending = pending,
-                                    result = created,
-                                    errors = errors,
-                                    onCreated = { upload ->
-                                        syncableRepository?.updateSyncMetadata(journalId, upload.serverVersion, upload.syncedAt)
-                                    },
-                                    onDeleted = {
-                                        if (syncableRepository !=
-                                            null
-                                        ) {
-                                            syncableRepository.deleteFromSync(journalId)
-                                        } else {
-                                            journalRepository.delete(journalId)
-                                        }
-                                    },
-                                )
-                            continue
-                        }
-                        val result =
-                            if (pending.operation == PendingOperation.CREATE) {
-                                tokenRefresher.withFreshToken(
-                                    { token -> cloudJournalDataSource.uploadJournal(token, journal) },
-                                    "uploadJournal(${journal.id})",
-                                    expectedScope = pending.scope,
-                                )
-                            } else {
-                                tokenRefresher.withFreshToken(
-                                    { token ->
-                                        cloudJournalDataSource.updateJournal(
-                                            token,
-                                            journal.copy(
-                                                syncVersion =
-                                                    pending.expectedServerVersion ?: journal.syncVersion,
-                                            ),
-                                        )
-                                    },
-                                    "updateJournal(${journal.id})",
-                                    expectedScope = pending.scope,
-                                )
-                            }
-
-                        if (result.isSuccess) {
-                            val upload = result.getOrThrow()
-                            uploadedCount++
-                            recordProgress(1)
-                            syncableRepository?.updateSyncMetadata(journalId, upload.serverVersion, upload.syncedAt)
-                            retryCoordinator.markUploadSettled(EntityType.JOURNAL, pending, upload.syncedAt, upload.serverVersion)
-                            Napier.d("Uploaded journal")
-                        } else {
-                            val error = result.exceptionOrNull() ?: Exception("Unknown upload error")
-                            if ((error as? CloudApiException)?.statusCode == 409) {
-                                errors.add(
-                                    retryCoordinator.handleUploadConflict(
-                                        entityType = EntityType.JOURNAL,
-                                        pending = pending,
-                                        itemLabel = "journal ${journal.id}",
-                                        conflictLabel = "Journal",
-                                        error = error,
-                                        localVersion = journal.syncVersion,
-                                        localUpdatedAt = journal.lastUpdated,
-                                    ),
-                                )
-                                continue
-                            }
-                            val movedToDeadLetter =
-                                retryCoordinator.handleRetryFailure(
-                                    entityType = EntityType.JOURNAL,
-                                    pending = pending,
-                                    error = error,
-                                )
-                            errors.add(
-                                SyncError(
-                                    if ((error as? CloudApiException)?.statusCode == 409) {
-                                        SyncErrorType.CONFLICT_ERROR
-                                    } else {
-                                        SyncErrorType.SERVER_ERROR
-                                    },
-                                    "Failed to upload journal ${journal.id}: ${error.message}",
-                                    error,
-                                    retryable = !movedToDeadLetter,
-                                ),
-                            )
-                            Napier.w("Failed to upload journal")
-                            if (movedToDeadLetter) {
-                                continue
-                            }
-                        }
-                    }
-                }
-            }
-
-            SyncResult(success = errors.isEmpty(), uploadedItems = uploadedCount, errors = errors)
-        }
-    }
+    suspend fun uploadJournals(accessToken: String): SyncResult = uploadPass("Upload journals") { journalUploader.uploadPending() }
 
     suspend fun uploadContent(accessToken: String): SyncResult {
         return uploadPass("Upload content") {
