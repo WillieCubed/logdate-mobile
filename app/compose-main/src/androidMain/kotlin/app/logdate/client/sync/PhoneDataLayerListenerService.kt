@@ -1,7 +1,5 @@
 package app.logdate.client.sync
 
-import app.logdate.client.database.dao.HealthSnapshotDao
-import app.logdate.client.database.entities.HealthSnapshotEntity
 import app.logdate.client.media.device.MediaDeviceCategory
 import app.logdate.client.remote.RemoteCameraActivity
 import app.logdate.client.remote.RemoteCameraSessionController
@@ -10,18 +8,22 @@ import app.logdate.client.sync.datalayer.HealthSnapshotDataMapper
 import app.logdate.client.sync.datalayer.JournalDataMapper
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.sync.datalayer.WearAudioRequestPaths
+import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.datalayer.v2.WearPaths
 import app.logdate.client.sync.datalayer.v2.WearProtocol
+import app.logdate.client.sync.datalayer.v2.WearProtocolGate
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
 import app.logdate.client.sync.peer.state.StateDocumentCodec
 import app.logdate.client.sync.v2.link.PhoneLinkInitiator
+import app.logdate.client.sync.v2.receipts.WatchReceiptResponder
+import app.logdate.client.sync.v2.receipts.answerPhoneRequest
 import app.logdate.feature.editor.ui.camera.CameraRemoteCommand
+import com.google.android.gms.tasks.Task
 import com.google.android.gms.wearable.CapabilityInfo
 import com.google.android.gms.wearable.ChannelClient
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
-import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
@@ -33,6 +35,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -165,6 +168,10 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
     }
 
     override fun onChannelOpened(channel: ChannelClient.Channel) {
+        if (WearPaths.parseRecordMedia(channel.path) != null) {
+            serviceScope.launch { receiveRecordMedia(channel) }
+            return
+        }
         if (!WearAudioRequestPaths.isAudioTransferPath(channel.path)) {
             Napier.d("Ignoring channel at unknown path: ${channel.path}")
             return
@@ -201,13 +208,56 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
             }
         }
 
+    /** A version 2 recording from the watch; the watch sends it again when this fails. */
+    private suspend fun receiveRecordMedia(channel: ChannelClient.Channel) =
+        withContext(NonCancellable) {
+            if (!receiptsActive()) {
+                closeChannel(channel)
+                return@withContext
+            }
+            val ingestor = resolveSyncDependencies()?.recordIngestorV2
+            if (ingestor == null) {
+                Napier.e("Koin unavailable; the watch sends this recording again")
+                closeChannel(channel)
+                return@withContext
+            }
+            try {
+                openChannelInput(channel).use { input -> ingestor.onMedia(channel.path, input) }
+            } catch (e: Exception) {
+                Napier.w("Failed to receive a recording from the watch", e)
+            } finally {
+                closeChannel(channel)
+            }
+        }
+
+    /** Answers a watch's version 2 requests; when nothing can, the request fails and the watch asks again. */
+    override fun onRequest(
+        nodeId: String,
+        path: String,
+        request: ByteArray,
+    ): Task<ByteArray> = answerPhoneRequest(serviceScope) { answerRequest(nodeId, path, request) }
+
+    protected open suspend fun answerRequest(
+        nodeId: String,
+        path: String,
+        request: ByteArray,
+    ): ByteArray? {
+        if (path != WearPaths.RECEIPTS || !receiptsActive()) return null
+        val koin = resolveKoin()
+        if (koin == null) {
+            Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries; the watch's $path request fails and is asked again")
+            return null
+        }
+        return koin.get<WatchReceiptResponder>().answer(request)
+    }
+
     override fun onDataChanged(dataEvents: DataEventBuffer) {
         // Snapshot events before they are recycled by the system
         val events = mutableListOf<PhoneDataLayerSnapshotEvent>()
         for (event in dataEvents) {
             val uri = event.dataItem.uri
             val path = uri.path ?: continue
-            val data = if (event.type == DataEvent.TYPE_CHANGED) extractStringMap(event) else emptyMap()
+            val data = if (event.type == DataEvent.TYPE_CHANGED) event.stringPayload() else emptyMap()
             events.add(PhoneDataLayerSnapshotEvent(path, data, type = event.type, sourceNodeId = uri.host))
         }
 
@@ -232,6 +282,9 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
         }
     }
 
+    protected open suspend fun receiptsActive(): Boolean =
+        resolveKoin()?.get<WearProtocolGate>()?.isFeatureActive(WearFeatures.RECEIPTS)?.first() == true
+
     protected open suspend fun resolveSyncDependencies(): PhoneDataLayerSyncDependencies? {
         val koin = resolveKoin() ?: return null
         return PhoneDataLayerSyncDependencies(
@@ -239,6 +292,7 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
             journalIngestor = koin.get(),
             healthSnapshotDao = koin.get(),
             peerStates = koin.get(),
+            recordIngestorV2 = koin.get(),
         )
     }
 
@@ -254,13 +308,16 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
 
         try {
             when {
+                WearPaths.parseWatchRecord(path) != null -> if (receiptsActive()) dependencies.recordIngestorV2?.onRecord(path, event.data)
                 NoteDataMapper.isDeletePath(path) -> handleNoteDelete(path, dependencies.noteIngestor)
                 NoteDataMapper.isNotePath(path) -> handleNoteSync(event, path, dependencies.noteIngestor)
                 JournalDataMapper.isDeletePath(path) -> handleJournalDelete(path, dependencies.journalIngestor)
                 JournalDataMapper.isJournalPath(path) -> handleJournalSync(event, path, dependencies.journalIngestor)
                 AssociationDataMapper.isDeletePath(path) -> handleAssociationDelete(path, dependencies.journalIngestor)
                 AssociationDataMapper.isAssociationPath(path) -> handleAssociationSync(event, path, dependencies.journalIngestor)
-                HealthSnapshotDataMapper.isHealthPath(path) -> handleHealthSync(event, path, dependencies.healthSnapshotDao)
+                HealthSnapshotDataMapper.isHealthPath(
+                    path,
+                ) -> handleHealthSync(event, path, dependencies.healthSnapshotDao, healthSnapshotDataMapper)
                 path == WearPaths.STATE -> acceptWatchState(event, dependencies.peerStates)
             }
         } catch (e: Exception) {
@@ -368,32 +425,6 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
         }
     }
 
-    private suspend fun handleHealthSync(
-        event: PhoneDataLayerSnapshotEvent,
-        path: String,
-        healthSnapshotDao: HealthSnapshotDao,
-    ) {
-        try {
-            val syncData = healthSnapshotDataMapper.fromDataMap(event.data)
-            Napier.d("Received health snapshot from watch: ${syncData.id}")
-            healthSnapshotDao.insert(
-                HealthSnapshotEntity(
-                    id = syncData.id,
-                    noteId = syncData.noteId,
-                    heartRateBpm = syncData.heartRateBpm,
-                    heartRateVariabilityMs = syncData.heartRateVariabilityMs,
-                    stepCount = syncData.stepCount,
-                    stressLevel = syncData.stressLevel,
-                    cumulativeCalories = syncData.cumulativeCalories,
-                    timestamp = syncData.timestamp,
-                    source = syncData.source,
-                ),
-            )
-        } catch (e: Exception) {
-            Napier.w("Failed to process synced health snapshot from watch at path: $path", e)
-        }
-    }
-
     private fun acceptWatchState(
         event: PhoneDataLayerSnapshotEvent,
         peerStates: PeerStateStore,
@@ -461,45 +492,8 @@ open class PhoneDataLayerListenerService : WearableListenerService() {
 
     protected open fun sendCameraCommand(command: CameraRemoteCommand): Boolean = RemoteCameraSessionController.send(command)
 
-    private fun extractStringMap(event: DataEvent): Map<String, String> {
-        val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap
-        val stringMap = mutableMapOf<String, String>()
-        for (key in dataMap.keySet()) {
-            if (key.startsWith("_")) continue
-            dataMap.getString(key)?.let { stringMap[key] = it }
-        }
-        return stringMap
-    }
-
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
     }
 }
-
-/**
- * Snapshot of a data event's path, payload, type and writer.
- * Created before [DataEventBuffer] is recycled by the system.
- */
-data class PhoneDataLayerSnapshotEvent(
-    val path: String,
-    val data: Map<String, String>,
-    val type: Int = DataEvent.TYPE_CHANGED,
-    /** The node that wrote the data item: the host of its URI. */
-    val sourceNodeId: String? = null,
-) {
-    /**
-     * Whether the phone acts on this event: only a change another device made. The Data Layer
-     * reports the phone's own writes, such as the notes it publishes for the watch, back to the
-     * phone. A deletion has no payload; LogDate announces removals with explicit `/delete` items.
-     */
-    fun isChangeFromAnotherDevice(localNodeId: String?): Boolean =
-        type == DataEvent.TYPE_CHANGED && (localNodeId == null || sourceNodeId != localNodeId)
-}
-
-data class PhoneDataLayerSyncDependencies(
-    val noteIngestor: WatchNoteIngestor,
-    val journalIngestor: WatchJournalIngestor,
-    val healthSnapshotDao: HealthSnapshotDao,
-    val peerStates: PeerStateStore,
-)

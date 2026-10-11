@@ -25,8 +25,10 @@ import app.logdate.client.platform.PlatformComponentToggler
 import app.logdate.client.rewind.RewindGenerationScheduler
 import app.logdate.client.shortcuts.DynamicShortcutRefreshObserver
 import app.logdate.client.shortcuts.DynamicShortcutScheduler
+import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.v2.PhoneStatePublisher
 import app.logdate.client.sync.v2.link.PhoneLinkInitiator
+import app.logdate.client.sync.v2.receipts.WatchReceiptNotifier
 import app.logdate.client.tiles.RecordVoiceTileUpdater
 import app.logdate.client.tiles.RecordingWindowTracker
 import app.logdate.di.initializeKoin
@@ -153,6 +155,16 @@ class LogdateApplication :
         }
         startPhoneStatePublishing()
         startWatchLinking()
+        startWatchReceipts()
+    }
+
+    /** Tells watches when their notes are backed up; a failure here must not stop startup. */
+    private fun startWatchReceipts() {
+        runCatching {
+            get<WatchReceiptNotifier>().start(get(), get<SyncMetadataService>().observePendingCount())
+        }.onFailure { error ->
+            Napier.w("Failed to start telling watches which notes are backed up", error)
+        }
     }
 
     /** Links this phone's watches while the redesigned watch app is on; a failure here must not stop startup. */

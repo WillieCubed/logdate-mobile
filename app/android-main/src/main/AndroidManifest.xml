@@ -258,6 +258,7 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/logdate/v2/w2p/record" />
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:pathPrefix="/logdate/notes" />
@@ -288,6 +289,7 @@
             </intent-filter>
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.CHANNEL_EVENT" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/logdate/v2/w2p/media" />
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:pathPrefix="/logdate/notes" />
@@ -297,6 +299,10 @@
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:path="/logdate_watch_sync_v2" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.REQUEST_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:path="/logdate/v2/receipts" />
             </intent-filter>
         </service>
 
