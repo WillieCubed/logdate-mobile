@@ -15,6 +15,21 @@ class PhoneWatchLinkStoreTest {
     private val cloud = LinkPlan(LinkMode.CLOUD, "new-account")
 
     @Test
+    fun `another server for the same account starts its own confirmation and retry history`() =
+        runTest {
+            val first = cloud.copy(serverOrigin = "https://first.test")
+            val second = cloud.copy(serverOrigin = "https://second.test")
+            store.recordSuccess(target, first, ByteArray(32), 100, 100)
+            store.markConfirmed(target.nodeId, 100, 100)
+            val changed = store.recordFailure(target, second, PhoneLinkFailure.WATCH_UNREACHABLE, 200, 200)
+            assertNull(changed.confirmedAt)
+            assertNull(changed.linkedAt)
+            assertEquals(second.serverOrigin, changed.serverOrigin)
+            val linked = store.recordSuccess(target, second, ByteArray(32), 300, 300)
+            assertEquals(second.serverOrigin, linked.serverOrigin)
+        }
+
+    @Test
     fun `a failed new plan cannot inherit confirmation from the previous plan`() =
         runTest {
             store.recordSuccess(target, pair, ByteArray(32), 100, 100)

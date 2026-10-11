@@ -4,6 +4,9 @@ import app.logdate.client.device.storage.SecureStorage
 import app.logdate.client.device.storage.getBytes
 import app.logdate.client.device.storage.putBytes
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
@@ -31,6 +34,13 @@ class IdentityKeyManager(
             secureStorage.putString(KEY_RECOVERY_VERIFIED, "true")
             true
         }
+
+    /** Signals changes to identity material or ownership without publishing either value. */
+    fun observeIdentityChanges(): Flow<Unit> =
+        combine(
+            secureStorage.observeString(KEY_IDENTITY_KEY).distinctUntilChanged(),
+            secureStorage.observeString(KEY_ACCOUNT_ID).distinctUntilChanged(),
+        ) { _, _ -> Unit }
 
     /**
      * Checks if this device has already been set up with an identity key.

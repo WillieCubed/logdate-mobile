@@ -10,6 +10,59 @@ import kotlin.test.assertEquals
 
 /** Tests [PhoneLinkDecision], which says per watch whether the phone links it now, waits, or confirms. */
 class PhoneLinkDecisionTest {
+    @Test
+    fun `the same account on a different server needs a new exchange`() {
+        val record = linked.copy(mode = LinkMode.CLOUD, accountId = "account", serverOrigin = "https://first.test")
+        assertEquals(
+            PhoneLinkDecision.Exchange,
+            PhoneLinkDecision.decide(record, LinkPlan(LinkMode.CLOUD, "account", "https://second.test"), null, now = 1_000),
+        )
+    }
+
+    @Test
+    fun `a watch that could not install the link records why`() {
+        val cloud = linked.copy(mode = LinkMode.CLOUD, accountId = "account", confirmedAt = null)
+        val failed =
+            StateDocument(
+                role = PeerRole.WATCH,
+                writtenAt = 200,
+                watch = WatchState(link = PeerLinkState.NEEDS_RELINK, linkProblem = "DEVICE_LIMIT_REACHED"),
+            )
+
+        assertEquals(
+            PhoneLinkDecision.WatchProblem(PhoneLinkFailure.DEVICE_LIMIT_REACHED),
+            PhoneLinkDecision.decide(cloud, LinkPlan(LinkMode.CLOUD, "account"), failed, now = 1_000),
+        )
+    }
+
+    @Test
+    fun `a problem this phone does not know is an install failure`() {
+        val failed =
+            StateDocument(
+                role = PeerRole.WATCH,
+                writtenAt = 200,
+                watch = WatchState(link = PeerLinkState.NEEDS_RELINK, linkProblem = "SOMETHING_NEW"),
+            )
+
+        assertEquals(
+            PhoneLinkDecision.WatchProblem(PhoneLinkFailure.WATCH_INSTALL_FAILED),
+            PhoneLinkDecision.decide(linked, pair, failed, now = 1_000),
+        )
+    }
+
+    @Test
+    fun `a problem already recorded waits for its next attempt`() {
+        val recorded = linked.copy(failure = PhoneLinkFailure.DEVICE_LIMIT_REACHED, nextAttemptAt = 5_000, seenWatchDocAt = 200)
+        val failed =
+            StateDocument(
+                role = PeerRole.WATCH,
+                writtenAt = 200,
+                watch = WatchState(link = PeerLinkState.NEEDS_RELINK, linkProblem = "DEVICE_LIMIT_REACHED"),
+            )
+
+        assertEquals(PhoneLinkDecision.Wait, PhoneLinkDecision.decide(recorded, pair, failed, now = 1_000))
+    }
+
     private val pair = LinkPlan(LinkMode.PAIR)
     private val linked =
         PhoneWatchLink(

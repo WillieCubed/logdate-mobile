@@ -1,5 +1,6 @@
 package app.logdate.client.sync.v2
 
+import app.logdate.client.sync.datalayer.v2.CloudPresence
 import app.logdate.client.sync.datalayer.v2.Decoded
 import app.logdate.client.sync.peer.state.LocalCapabilities
 import app.logdate.client.sync.peer.state.PeerDocument
@@ -28,6 +29,62 @@ import kotlin.time.Instant
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PhoneStatePublisherTest {
+    @Test
+    fun `the phone lists the features it supports`() =
+        runTest {
+            val withFeatures =
+                PhoneStatePublisher(
+                    v2Enabled = enabled,
+                    channel = channel,
+                    capabilities = capabilities,
+                    peerStates = peerStates,
+                    clock = FixedClock(1_000),
+                    timeZone = { TimeZone.of("Europe/Paris") },
+                    features = setOf("link.cloud.v1"),
+                )
+
+            withFeatures.start(backgroundScope)
+            runCurrent()
+
+            assertEquals(
+                setOf("link.cloud.v1"),
+                channel.published
+                    .last()
+                    .phone
+                    ?.features,
+            )
+        }
+
+    @Test
+    fun `signing in publishes the account presence without advertising again`() =
+        runTest {
+            val parts = MutableStateFlow(PhoneStateParts(cloud = CloudPresence.NO_ACCOUNT))
+            val withParts =
+                PhoneStatePublisher(
+                    v2Enabled = enabled,
+                    channel = channel,
+                    capabilities = capabilities,
+                    peerStates = peerStates,
+                    clock = FixedClock(1_000),
+                    timeZone = { TimeZone.of("Europe/Paris") },
+                    parts = parts,
+                )
+            withParts.start(backgroundScope)
+            runCurrent()
+
+            parts.value = PhoneStateParts(cloud = CloudPresence.SIGNED_IN)
+            runCurrent()
+
+            assertEquals(
+                CloudPresence.SIGNED_IN,
+                channel.published
+                    .last()
+                    .phone
+                    ?.cloud,
+            )
+            assertEquals(listOf("remove $PHONE_V2"), capabilities.calls)
+        }
+
     private val enabled = MutableStateFlow(false)
     private val preferences = MutableStateFlow<Map<String, Stamped>>(emptyMap())
     private val adopted = mutableListOf<Map<String, Stamped>>()

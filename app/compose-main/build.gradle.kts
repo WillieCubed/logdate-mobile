@@ -93,6 +93,7 @@ kotlin {
             implementation(projects.client.notifications)
             implementation(projects.client.util)
             implementation(projects.shared.model)
+            implementation(projects.shared.config)
             // External dependencies
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)

@@ -28,6 +28,12 @@ enum class PhoneLinkFailure(
     CONFIRMATION_MISMATCH(false),
     WATCH_BOUND_TO_ANOTHER_ACCOUNT(true),
     BUNDLE_UNAVAILABLE(false),
+    SIGNED_OUT(false),
+    LINK_CODE_UNAVAILABLE(false),
+    KEYS_UNAVAILABLE(false),
+    DEVICE_LIMIT_REACHED(true),
+    WATCH_KEY_CONFLICT(true),
+    WATCH_INSTALL_FAILED(false),
 }
 
 /**
@@ -41,10 +47,13 @@ data class PhoneWatchLink(
     val displayName: String,
     val mode: LinkMode,
     val accountId: String? = null,
+    val serverOrigin: String? = null,
     val linkedAt: Long? = null,
     val confirmedAt: Long? = null,
     val failure: PhoneLinkFailure? = null,
     val attempts: Int = 0,
+    val lastFailure: PhoneLinkFailure? = null,
+    val attentionShown: Set<PhoneLinkFailure> = emptySet(),
     val lastAttemptAt: Long = 0,
     val nextAttemptAt: Long = 0,
     val seenWatchDocAt: Long = 0,
@@ -72,13 +81,23 @@ class PhoneWatchLinkStore(
     ): PhoneWatchLink {
         pairKeys.put(target.nodeId, pairKey)
         return update(target.nodeId) { previous ->
+            val samePlan = previous.matches(plan)
             PhoneWatchLink(
                 nodeId = target.nodeId,
                 displayName = target.displayName,
                 mode = plan.mode,
                 accountId = plan.accountId,
+                serverOrigin = plan.serverOrigin,
                 linkedAt = at,
-                confirmedAt = previous?.confirmedAt?.takeIf { previous.mode == plan.mode && previous.accountId == plan.accountId },
+                confirmedAt =
+                    previous?.confirmedAt?.takeIf {
+                        previous.mode == plan.mode &&
+                            previous.accountId == plan.accountId &&
+                            previous.serverOrigin == plan.serverOrigin
+                    },
+                attempts = if (samePlan) previous?.attempts ?: 0 else 0,
+                lastFailure = previous?.lastFailure?.takeIf { samePlan },
+                attentionShown = if (samePlan) previous?.attentionShown.orEmpty() else emptySet(),
                 lastAttemptAt = at,
                 seenWatchDocAt = seenWatchDocAt,
             )
@@ -93,16 +112,26 @@ class PhoneWatchLinkStore(
         seenWatchDocAt: Long,
     ): PhoneWatchLink =
         update(target.nodeId) { previous ->
-            val samePlan = previous?.mode == plan.mode && previous.accountId == plan.accountId
-            val attempts = if (samePlan && previous?.failure == failure) previous.attempts + 1 else 1
+            val samePlan = previous.matches(plan)
+            val attempts =
+                if (samePlan &&
+                    (previous?.failure ?: previous?.lastFailure) == failure
+                ) {
+                    checkNotNull(previous).attempts + 1
+                } else {
+                    1
+                }
             PhoneWatchLink(
                 nodeId = target.nodeId,
                 displayName = target.displayName,
                 mode = plan.mode,
                 accountId = plan.accountId,
+                serverOrigin = plan.serverOrigin,
                 linkedAt = previous?.linkedAt?.takeIf { samePlan },
                 confirmedAt = previous?.confirmedAt?.takeIf { samePlan },
                 failure = failure,
+                lastFailure = failure,
+                attentionShown = if (samePlan) previous?.attentionShown.orEmpty() else emptySet(),
                 attempts = attempts,
                 lastAttemptAt = at,
                 nextAttemptAt = at + backoffMs(attempts),
@@ -116,9 +145,31 @@ class PhoneWatchLinkStore(
         seenWatchDocAt: Long,
     ) {
         update(nodeId) { previous ->
-            checkNotNull(previous) { "Only a recorded link can be confirmed" }.copy(confirmedAt = at, seenWatchDocAt = seenWatchDocAt)
+            checkNotNull(previous) { "Only a recorded link can be confirmed" }.copy(
+                confirmedAt = at,
+                seenWatchDocAt = seenWatchDocAt,
+                attempts = 0,
+                lastFailure = null,
+                attentionShown = emptySet(),
+            )
         }
     }
+
+    suspend fun claimAttention(
+        nodeId: String,
+        failure: PhoneLinkFailure,
+    ): Boolean {
+        var claimed = false
+        update(nodeId) { previous ->
+            val record = checkNotNull(previous)
+            claimed = failure !in record.attentionShown
+            record.copy(attentionShown = record.attentionShown + failure)
+        }
+        return claimed
+    }
+
+    private fun PhoneWatchLink?.matches(plan: LinkPlan): Boolean =
+        this != null && mode == plan.mode && accountId == plan.accountId && serverOrigin == plan.serverOrigin
 
     private suspend fun update(
         nodeId: String,

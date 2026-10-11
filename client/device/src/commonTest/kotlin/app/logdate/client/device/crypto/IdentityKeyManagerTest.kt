@@ -1,9 +1,12 @@
 package app.logdate.client.device.crypto
 
 import app.logdate.client.device.storage.SecureStorage
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -23,6 +26,27 @@ class IdentityKeyManagerTest {
     private val cryptoManager = FakeCryptoManager()
     private val backupStore = InMemoryIdentityKeyBackupStore()
     private val manager = IdentityKeyManager(mockSecureStorage, cryptoManager, backupStore)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `identity changes signal installation binding and removal without exposing keys`() =
+        runTest {
+            var changes = 0
+            backgroundScope.launch { manager.observeIdentityChanges().collect { changes++ } }
+            runCurrent()
+            val initial = changes
+            manager.installLinkedIdentityKey(ByteArray(32) { 1 }, IdentityKeyFingerprint.of(ByteArray(32) { 1 }, cryptoManager))
+            runCurrent()
+            assertTrue(changes > initial)
+            val installed = changes
+            manager.bindToAccount("account")
+            runCurrent()
+            assertTrue(changes > installed)
+            val bound = changes
+            manager.clearIdentityKey()
+            runCurrent()
+            assertTrue(changes > bound)
+        }
 
     @Test
     fun `account key restore binds the identity to one account`() =

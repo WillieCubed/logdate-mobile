@@ -49,6 +49,79 @@ import kotlin.time.Instant
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PhoneLinkInitiatorTest {
+    private val cloud =
+        object : LinkBundleSource {
+            override fun changes() = kotlinx.coroutines.flow.flowOf(Unit)
+
+            override suspend fun plan(watchFeatures: Set<String>) = LinkPlan(LinkMode.CLOUD, ACCOUNT)
+
+            override suspend fun bundle(plan: LinkPlan) = LinkBundleResult.Ready(LinkBundle(mode = LinkMode.CLOUD, accountId = ACCOUNT))
+        }
+
+    @Test
+    fun `an account link is confirmed only once the watch reports it`() =
+        runTest {
+            val initiator = initiator(bundles = cloud)
+            initiator.reconcile(emptyMap())
+            assertTrue(notifier.events.isEmpty())
+
+            initiator.reconcile(mapOf(WATCH to watchDocument(PeerLinkState.LINKED, problem = null, at = clock.millis + 1)))
+
+            assertEquals(listOf("linked Pixel Watch 3 CLOUD"), notifier.events)
+        }
+
+    @Test
+    fun `a watch that could not install the link is recorded and shown once`() =
+        runTest {
+            val initiator = initiator(bundles = cloud)
+            initiator.reconcile(emptyMap())
+            val failed = mapOf(WATCH to watchDocument(PeerLinkState.NEEDS_RELINK, problem = "DEVICE_LIMIT_REACHED", at = clock.millis + 1))
+
+            initiator.reconcile(failed)
+            initiator.reconcile(failed)
+
+            assertEquals(PhoneLinkFailure.DEVICE_LIMIT_REACHED, store.get(WATCH)?.failure)
+            assertEquals(listOf("attention Pixel Watch 3 DEVICE_LIMIT_REACHED"), notifier.events)
+            assertEquals(2, watch.requests.size)
+        }
+
+    @Test
+    fun `repeated account install failures grow the wait without repeating attention`() =
+        runTest {
+            val initiator = initiator(bundles = cloud)
+            initiator.reconcile(emptyMap())
+            initiator.reconcile(mapOf(WATCH to watchDocument(PeerLinkState.NEEDS_RELINK, "DEVICE_LIMIT_REACHED", clock.millis + 1)))
+            val first = assertNotNull(store.get(WATCH))
+            clock.millis = first.nextAttemptAt
+            initiator.reconcile(emptyMap())
+            initiator.reconcile(mapOf(WATCH to watchDocument(PeerLinkState.NEEDS_RELINK, "DEVICE_LIMIT_REACHED", clock.millis + 1)))
+            val second = assertNotNull(store.get(WATCH))
+
+            assertEquals(2, second.attempts)
+            assertEquals(clock.millis + 120_000, second.nextAttemptAt)
+            assertEquals(listOf("attention Pixel Watch 3 DEVICE_LIMIT_REACHED"), notifier.events)
+        }
+
+    @Test
+    fun `a working account link clears the install retry history`() =
+        runTest {
+            val initiator = initiator(bundles = cloud)
+            initiator.reconcile(emptyMap())
+            initiator.reconcile(mapOf(WATCH to watchDocument(PeerLinkState.NEEDS_RELINK, "DEVICE_LIMIT_REACHED", clock.millis + 1)))
+            clock.millis = assertNotNull(store.get(WATCH)).nextAttemptAt
+            initiator.reconcile(emptyMap())
+            initiator.reconcile(mapOf(WATCH to watchDocument(PeerLinkState.LINKED, null, clock.millis + 1)))
+
+            assertEquals(0, store.get(WATCH)?.attempts)
+            assertEquals(listOf("attention Pixel Watch 3 DEVICE_LIMIT_REACHED", "linked Pixel Watch 3 CLOUD"), notifier.events)
+        }
+
+    private fun watchDocument(
+        link: PeerLinkState,
+        problem: String?,
+        at: Long,
+    ) = StateDocument(role = PeerRole.WATCH, writtenAt = at, watch = WatchState(link = link, linkProblem = problem))
+
     private val clock = MutableClock(1_000_000)
     private val handshake = BouncyCastleLinkHandshake()
     private val watch = FakeWatch(handshake, clock)
@@ -59,20 +132,22 @@ class PhoneLinkInitiatorTest {
     private val capableFlow = MutableStateFlow(true)
     private var bundleSource: LinkBundleSource = PairOnlyBundleSource
 
-    private fun initiator(enabled: Boolean = true) =
-        PhoneLinkInitiator(
-            v2Enabled = enabledFlow.also { it.value = enabled },
-            watchCapable = capableFlow,
-            watchDocuments = MutableStateFlow(emptyMap()),
-            targets = { listOf(LinkTarget(WATCH, "Pixel Watch 3")) },
-            requester = watch,
-            exchange = PhoneLinkExchange(handshake, clock),
-            store = store,
-            notifier = notifier,
-            localNodeId = { PHONE },
-            bundles = bundleSource,
-            clock = clock,
-        )
+    private fun initiator(
+        enabled: Boolean = true,
+        bundles: LinkBundleSource = bundleSource,
+    ) = PhoneLinkInitiator(
+        v2Enabled = enabledFlow.also { it.value = enabled },
+        watchCapable = capableFlow,
+        watchDocuments = MutableStateFlow(emptyMap()),
+        targets = { listOf(LinkTarget(WATCH, "Pixel Watch 3")) },
+        requester = watch,
+        exchange = PhoneLinkExchange(handshake, clock),
+        store = store,
+        notifier = notifier,
+        localNodeId = { PHONE },
+        bundles = bundles,
+        clock = clock,
+    )
 
     @Test
     fun `a watch that was never linked is paired once and the phone shows one confirmation`() =
@@ -391,6 +466,7 @@ class PhoneLinkInitiatorTest {
     }
 
     private companion object {
+        const val ACCOUNT = "5f0c3a52-0000-4000-8000-000000000001"
         const val PHONE = "phone-node"
         const val WATCH = "watch-node"
     }

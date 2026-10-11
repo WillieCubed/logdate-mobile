@@ -535,6 +535,12 @@ dependencies {
     testImplementation(projects.client.sync)
     testImplementation(projects.client.device)
     testImplementation(projects.client.logdateDatastore)
+    testImplementation(libs.ktor.client.core)
+    testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.ktor.client.content.negotiation)
+    testImplementation(libs.ktor.serialization.kotlinx.json)
+    testImplementation(projects.client.networking)
+    testImplementation(projects.shared.config)
     testImplementation(projects.shared.model)
 
     androidTestImplementation(projects.app.composeMain)

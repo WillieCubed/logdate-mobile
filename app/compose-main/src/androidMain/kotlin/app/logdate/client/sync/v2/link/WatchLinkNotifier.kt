@@ -61,6 +61,12 @@ class AndroidWatchLinkNotifier(
             PhoneLinkFailure.WATCH_BOUND_TO_ANOTHER_ACCOUNT ->
                 NotificationResources.string.notification_watch_other_account_title to
                     NotificationResources.string.notification_watch_other_account_body
+            PhoneLinkFailure.WATCH_KEY_CONFLICT ->
+                NotificationResources.string.notification_watch_key_conflict_title to
+                    NotificationResources.string.notification_watch_key_conflict_body
+            PhoneLinkFailure.DEVICE_LIMIT_REACHED ->
+                NotificationResources.string.notification_watch_device_limit_title to
+                    NotificationResources.string.notification_watch_device_limit_body
             else -> null
         }
 

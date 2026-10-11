@@ -1,8 +1,10 @@
 package app.logdate.client.sync.v2
 
 import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.sync.datalayer.v2.CloudPresence
 import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.datalayer.v2.WearProtocol
+import app.logdate.client.sync.peer.state.CampfireSnapshot
 import app.logdate.client.sync.peer.state.LocalCapabilities
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
@@ -23,13 +25,18 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlin.time.Clock
 
+data class PhoneStateParts(
+    val cloud: CloudPresence = CloudPresence.UNKNOWN,
+    val dayStartHour: Int = 0,
+    val campfire: CampfireSnapshot? = null,
+)
+
 /**
- * Publishes this phone's state document whenever the Labs watch switch or a shared preference
- * changes, and advertises [WearProtocol.PHONE_CAPABILITY_V2] only while the switch is on.
+ * Publishes this phone's state document whenever the Labs watch switch, account state or shared preferences
+ * change, and advertises [WearProtocol.PHONE_CAPABILITY_V2] only while the switch is on.
  *
  * The document goes out whatever the switch says, because the watch takes the switch from it. It lists
- * [WearFeatures.PREFS], the only version 2 feature the phone serves so far; each other feature
- * is added by the work that ships it. Preferences a watch wrote are handed to [adoptWatchPreferences],
+ * the supported [features]. Preferences a watch wrote are handed to [adoptWatchPreferences],
  * which takes the entries that are later than this phone's.
  */
 class PhoneStatePublisher(
@@ -40,6 +47,8 @@ class PhoneStatePublisher(
     private val clock: Clock = Clock.System,
     private val timeZone: () -> TimeZone = { TimeZone.currentSystemDefault() },
     private val sharedPreferences: Flow<Map<String, Stamped>> = flowOf(emptyMap()),
+    private val features: Set<String> = setOf(WearFeatures.PREFS),
+    private val parts: Flow<PhoneStateParts> = flowOf(PhoneStateParts()),
     private val adoptWatchPreferences: suspend (Map<String, Stamped>) -> Unit = {},
 ) {
     fun start(scope: CoroutineScope): Job =
@@ -47,13 +56,18 @@ class PhoneStatePublisher(
             catchUpWithWatches()
             launch { adoptPreferencesFromWatches() }
             var advertised: Boolean? = null
-            combine(v2Enabled.distinctUntilChanged(), sharedPreferences.distinctUntilChanged()) { enabled, shared -> enabled to shared }
-                .collect { (enabled, shared) ->
-                    publish(enabled, shared)
-                    if (enabled == advertised) return@collect
-                    updateCapability(enabled)
-                    advertised = enabled
-                }
+            combine(
+                v2Enabled.distinctUntilChanged(),
+                sharedPreferences.distinctUntilChanged(),
+                parts.distinctUntilChanged(),
+            ) { enabled, shared, current ->
+                Triple(enabled, shared, current)
+            }.collect { (enabled, shared, current) ->
+                publish(enabled, shared, current)
+                if (enabled == advertised) return@collect
+                updateCapability(enabled)
+                advertised = enabled
+            }
         }
 
     /** Reads the documents the watches published while this phone's app was not running. */
@@ -64,6 +78,7 @@ class PhoneStatePublisher(
     suspend fun publish(
         v2Enabled: Boolean,
         shared: Map<String, Stamped> = emptyMap(),
+        current: PhoneStateParts = PhoneStateParts(),
     ) {
         val document =
             StateDocument(
@@ -73,7 +88,10 @@ class PhoneStatePublisher(
                     PhoneState(
                         flags = mapOf(FeatureFlag.WATCH_EXPERIENCE_V2.key to v2Enabled),
                         zone = timeZone().id,
-                        features = setOf(WearFeatures.PREFS),
+                        features = features,
+                        cloud = current.cloud,
+                        dayStartHour = current.dayStartHour,
+                        campfire = current.campfire,
                     ),
                 shared = shared,
             )

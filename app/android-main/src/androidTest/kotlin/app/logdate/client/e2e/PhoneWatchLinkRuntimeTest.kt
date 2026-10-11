@@ -17,6 +17,9 @@ import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.client.sync.datalayer.v2.LinkMode
 import app.logdate.client.sync.datalayer.v2.WearProtocol
 import app.logdate.client.sync.v2.link.AndroidWatchLinkNotifier
+import app.logdate.client.sync.v2.link.CloudLinkBundleSource
+import app.logdate.client.sync.v2.link.LinkBundleSource
+import app.logdate.client.sync.v2.link.LinkCodeMinter
 import app.logdate.client.sync.v2.link.LinkTarget
 import app.logdate.client.sync.v2.link.PhoneLinkFailure
 import app.logdate.client.sync.v2.link.PhoneLinkInitiator
@@ -27,6 +30,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.java.KoinJavaComponent
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
@@ -88,6 +92,24 @@ class PhoneWatchLinkRuntimeTest {
     }
 
     @Test
+    fun device_limit_explains_where_to_make_room() {
+        notifier.needsAttention(first, PhoneLinkFailure.DEVICE_LIMIT_REACHED)
+        val posted = posted(first)
+        assertEquals("Backup is not set up on First watch", posted.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+        assertEquals(
+            "This account has the most linked devices it can have. Remove one in Settings, then Devices.",
+            posted.extras.getCharSequence(Notification.EXTRA_TEXT).toString(),
+        )
+        assertTrue(posted.flags and Notification.FLAG_LOCAL_ONLY != 0)
+    }
+
+    @Test
+    fun a_key_conflict_does_not_claim_another_account() {
+        notifier.needsAttention(first, PhoneLinkFailure.WATCH_KEY_CONFLICT)
+        assertEquals("First watch needs to be linked again", posted(first).extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+    }
+
+    @Test
     fun two_watches_with_colliding_node_hashes_keep_both_confirmations() {
         assertEquals(first.nodeId.hashCode(), second.nodeId.hashCode())
         notifier.linked(first, LinkMode.PAIR)
@@ -123,6 +145,8 @@ class PhoneWatchLinkRuntimeTest {
         val koin = KoinJavaComponent.getKoin()
         assertNotNull(koin.get<PhoneLinkInitiator>())
         assertNotNull(koin.get<PhoneWatchLinkStore>())
+        assertIs<CloudLinkBundleSource>(koin.get<LinkBundleSource>())
+        assertNotNull(koin.get<LinkCodeMinter>())
     }
 
     private fun posted(target: LinkTarget): Notification {

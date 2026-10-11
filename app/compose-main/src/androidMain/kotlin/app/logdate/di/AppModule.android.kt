@@ -24,7 +24,6 @@ import app.logdate.client.domain.events.EventInferenceLauncher
 import app.logdate.client.domain.journals.GetCurrentUserJournalsUseCase
 import app.logdate.client.domain.notes.drafts.FetchMostRecentDraftUseCase
 import app.logdate.client.domain.rewind.GetWeekRewindUseCase
-import app.logdate.client.domain.watch.StampedPreferenceStore
 import app.logdate.client.events.AndroidEventInferenceLauncher
 import app.logdate.client.events.EventInferenceScheduler
 import app.logdate.client.events.EventInferenceWorker
@@ -81,7 +80,6 @@ import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
 import app.logdate.client.sync.peer.state.StateDocumentChannel
 import app.logdate.client.sync.v2.PhonePeerLink
-import app.logdate.client.sync.v2.PhoneStatePublisher
 import app.logdate.client.tiles.RecordVoiceTileUpdater
 import app.logdate.client.tiles.RecordingWindowTracker
 import app.logdate.client.updates.PlayInAppUpdateController
@@ -278,17 +276,6 @@ actual val appModule: Module =
                 nodeClient = Wearable.getNodeClient(androidContext()),
             )
         } binds arrayOf(StateDocumentChannel::class, LocalCapabilities::class, PeerCapabilityPresence::class)
-        single {
-            val watchPreferences = get<StampedPreferenceStore>()
-            PhoneStatePublisher(
-                v2Enabled = get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),
-                channel = get(),
-                capabilities = get(),
-                peerStates = get(),
-                sharedPreferences = watchPreferences.observe(),
-                adoptWatchPreferences = { shared -> watchPreferences.adopt(shared) },
-            )
-        }
         single {
             WearProtocolGate(
                 flagEnabled = get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),

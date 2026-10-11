@@ -140,11 +140,24 @@ class PhoneLinkInitiator(
         val now = clock.now().toEpochMilliseconds()
         val record = store.get(target.nodeId)
         val plan = bundles.plan(document?.watch?.features.orEmpty())
-        when (PhoneLinkDecision.decide(record, plan, document, now)) {
+        when (val decision = PhoneLinkDecision.decide(record, plan, document, now)) {
             PhoneLinkDecision.Wait -> Unit
             PhoneLinkDecision.Exchange -> runExchange(target, plan, document, now)
             PhoneLinkDecision.Confirm -> confirm(target, checkNotNull(record).mode, checkNotNull(document), now)
+            is PhoneLinkDecision.WatchProblem -> recordWatchProblem(target, plan, decision.failure, checkNotNull(document), now)
         }
+    }
+
+    private suspend fun recordWatchProblem(
+        target: LinkTarget,
+        plan: LinkPlan,
+        failure: PhoneLinkFailure,
+        document: StateDocument,
+        now: Long,
+    ) {
+        val record = store.recordFailure(target, plan, failure, at = now, seenWatchDocAt = document.writtenAt)
+        Napier.w("${target.displayName} could not install the account link: $failure; it is tried again after ${record.nextAttemptAt}")
+        if (failure.needsAttention && store.claimAttention(target.nodeId, failure)) notifier.needsAttention(target, failure)
     }
 
     private suspend fun runExchange(
@@ -165,7 +178,11 @@ class PhoneLinkInitiator(
             is ExchangeOutcome.Failed -> {
                 val record = store.recordFailure(target, plan, outcome.failure, at = now, seenWatchDocAt = seen)
                 Napier.w("Linking ${target.displayName} failed with ${outcome.failure}; it is tried again after ${record.nextAttemptAt}")
-                if (outcome.failure.needsAttention && record.attempts == 1) notifier.needsAttention(target, outcome.failure)
+                if (outcome.failure.needsAttention &&
+                    store.claimAttention(target.nodeId, outcome.failure)
+                ) {
+                    notifier.needsAttention(target, outcome.failure)
+                }
             }
         }
     }
@@ -176,7 +193,7 @@ class PhoneLinkInitiator(
         document: StateDocument?,
         now: Long,
     ) {
-        notifier.linked(target, mode)
+        if (store.get(target.nodeId)?.confirmedAt == null) notifier.linked(target, mode)
         store.markConfirmed(target.nodeId, at = now, seenWatchDocAt = document?.writtenAt ?: 0L)
     }
 

@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.flowOf
 data class LinkPlan(
     val mode: LinkMode,
     val accountId: String? = null,
+    val serverOrigin: String? = null,
 )
 
 sealed interface LinkBundleResult {
