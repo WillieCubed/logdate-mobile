@@ -15,6 +15,13 @@ data class PeerDeliveryContext(
 ) {
     val ledgerScope: String get() = "link:$linkId"
 
+    /** A canonical URL-safe spelling of the public exchange identity, safe for a path component. */
+    val linkPathSegment: String
+        get() {
+            require(isValid()) { "A delivery path requires a valid link context" }
+            return linkId.replace('+', '-').replace('/', '_').removeSuffix("=")
+        }
+
     fun isValid(): Boolean {
         val hash = LinkWire.decodeKey(linkId) ?: return false
         if (hash.size != 32 || LinkWire.encodeKey(hash) != linkId) return false

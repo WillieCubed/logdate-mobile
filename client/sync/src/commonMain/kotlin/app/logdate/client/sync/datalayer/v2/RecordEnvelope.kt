@@ -81,6 +81,7 @@ data class RecordEnvelope(
     val body: JsonElement? = null,
     val bodyRef: BodyRef? = null,
     val media: List<MediaRef> = emptyList(),
+    val context: PeerDeliveryContext? = null,
 )
 
 /** Reads and writes [RecordEnvelope]s, enforcing the inline body limit. */

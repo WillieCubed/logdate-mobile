@@ -4,7 +4,9 @@ import android.content.Context
 import app.logdate.client.sync.datalayer.AudioFileDigest
 import app.logdate.client.sync.datalayer.audioDigest
 import app.logdate.client.sync.datalayer.copyToDigesting
+import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -68,6 +70,9 @@ class FileWatchAudioStore(
                 Files.move(staging.toPath(), audioFile(noteId).toPath(), StandardCopyOption.ATOMIC_MOVE)
                 recordDigest(noteId, digest)
                 true
+            } catch (e: CancellationException) {
+                staging.delete()
+                throw e
             } catch (e: Exception) {
                 Napier.w("Failed to store watch audio for note $noteId", e)
                 staging.delete()
@@ -177,15 +182,29 @@ class FileWatchAudioStore(
 
     private fun deletionMarker(noteId: Uuid): File = File(incomingDirectory, "$noteId.deleted")
 
-    private companion object {
-        const val STAGING_SUFFIX = ".m4a.part"
-        const val METADATA_SUFFIX = ".json"
-        const val DIGEST_SUFFIX = ".sha256"
+    companion object {
+        fun scoped(
+            audioDirectory: File,
+            incomingDirectory: File,
+            context: PeerDeliveryContext,
+            ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        ): FileWatchAudioStore {
+            val scope = context.linkPathSegment
+            return FileWatchAudioStore(
+                File(audioDirectory, "watch_links/$scope"),
+                File(incomingDirectory, "v2/$scope"),
+                ioDispatcher,
+            )
+        }
+
+        private const val STAGING_SUFFIX = ".m4a.part"
+        private const val METADATA_SUFFIX = ".json"
+        private const val DIGEST_SUFFIX = ".sha256"
 
         /** A transfer writes continuously, so a staging file untouched for an hour was abandoned. */
-        const val STAGING_MAX_AGE_MS = 60L * 60 * 1000
+        private const val STAGING_MAX_AGE_MS = 60L * 60 * 1000
 
         /** The watch gives up resending a note after minutes, so metadata a week old will never get its audio. */
-        const val STASHED_METADATA_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
+        private const val STASHED_METADATA_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
     }
 }

@@ -6,13 +6,16 @@ import app.logdate.client.sync.WatchNoteAcknowledger
 import app.logdate.client.sync.datalayer.AudioFileDigest
 import app.logdate.client.sync.datalayer.NoteDataMapper
 import app.logdate.client.sync.datalayer.v2.DeliveryPriority
+import app.logdate.client.sync.datalayer.v2.LinkMode
 import app.logdate.client.sync.datalayer.v2.MediaRef
+import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.datalayer.v2.RecordEnvelope
 import app.logdate.client.sync.datalayer.v2.RecordKind
 import app.logdate.client.sync.datalayer.v2.RecordOrigin
 import app.logdate.client.sync.datalayer.v2.WearPaths
 import app.logdate.client.sync.peer.delivery.EnvelopeDataMap
 import app.logdate.client.sync.peer.delivery.NoteEnvelopeBody
+import app.logdate.client.sync.peer.link.LinkWire
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -47,6 +50,28 @@ class WatchRecordIngestorV2Test {
             lastUpdated = Instant.fromEpochMilliseconds(5),
             content = "said on the watch",
         )
+
+    @Test
+    fun `the unbound ingestion API cannot consume a scoped envelope`() =
+        runTest {
+            coEvery { notes.getNoteById(text.uid) } returns text
+            val peer = PeerDeliveryContext(LinkWire.encodeKey(ByteArray(32)), "phone", "watch", LinkMode.PAIR)
+            val envelope = NoteEnvelopeBody.envelope(text, RecordOrigin.WATCH, DeliveryPriority.URGENT).copy(context = peer)
+            ingestor.onRecord(WearPaths.watchRecord(RecordKind.NOTE, text.uid), EnvelopeDataMap.toDataMap(envelope, sentAt = 1))
+            assertTrue(stored.isEmpty())
+            assertTrue(acknowledged.isEmpty())
+            assertTrue(rejected.isEmpty())
+        }
+
+    @Test
+    fun `the unbound ingestion API cannot adopt scoped audio`() =
+        runTest {
+            val peer = PeerDeliveryContext(LinkWire.encodeKey(ByteArray(32)), "phone", "watch", LinkMode.PAIR)
+            ingestor.onMedia(WearPaths.recordMedia(RecordKind.NOTE, text.uid, peer), ByteArrayInputStream(byteArrayOf(1)))
+            assertTrue(audio.isEmpty())
+            assertTrue(acknowledged.isEmpty())
+            assertTrue(rejected.isEmpty())
+        }
 
     @Test
     fun `a text note is stored and acknowledged once the phone has it`() =

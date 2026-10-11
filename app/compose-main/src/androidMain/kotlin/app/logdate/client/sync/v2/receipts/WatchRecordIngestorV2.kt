@@ -47,6 +47,10 @@ class WatchRecordIngestorV2(
                 is Decoded.Unsupported -> return refuse(recordPath, "it was written by a newer version")
                 is Decoded.Malformed -> return refuse(recordPath, decoded.reason)
             }
+        if (envelope.context != null) {
+            Napier.w("A scoped capture requires a source-validated ingestion path")
+            return
+        }
         if (envelope.kind != recordPath.kind) return refuse(recordPath, "its kind does not match its path")
         if (envelope.origin != RecordOrigin.WATCH) return refuse(recordPath, "it was not captured on a watch")
         if (envelope.kind != RecordKind.NOTE) return refuse(recordPath, "this phone takes only notes this way")
@@ -83,8 +87,8 @@ class WatchRecordIngestorV2(
         input: InputStream,
     ) {
         val recordPath = WearPaths.parseRecordMedia(path)
-        if (recordPath == null || recordPath.kind != RecordKind.NOTE) {
-            Napier.w("Ignoring a recording on a channel that is not a note's: $path")
+        if (recordPath == null || recordPath.kind != RecordKind.NOTE || recordPath.linkId != null) {
+            Napier.w("Ignoring a recording on an unsupported or unbound note channel: $path")
             return
         }
         ingestAudio(recordPath.id, input)

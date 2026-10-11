@@ -1,5 +1,6 @@
 package app.logdate.client.sync.datalayer.v2
 
+import app.logdate.client.sync.peer.link.LinkWire
 import kotlin.uuid.Uuid
 
 /**
@@ -36,6 +37,7 @@ object WearPaths {
     private const val MEDIA_PREFIX = "/logdate/v2/w2p/media/"
     private const val RECORD_PREFIX = "/logdate/v2/w2p/record/"
     private const val BODY_PREFIX = "/logdate/v2/body/"
+    private val LINK_PATH_SEGMENT = Regex("[A-Za-z0-9_-]{43}")
     private val SHA256_HEX = Regex("[0-9a-f]{64}")
 
     /** A record in the watch's library window, written by the phone. */
@@ -74,7 +76,23 @@ object WearPaths {
         id: Uuid,
     ): String = "$MEDIA_PREFIX${kind.pathSegment}/$id"
 
-    fun parseRecordMedia(path: String): RecordPath? = parse(path, MEDIA_PREFIX)
+    fun recordMedia(
+        kind: RecordKind,
+        id: Uuid,
+        context: PeerDeliveryContext,
+    ): String = "${recordMedia(kind, id)}/${context.linkPathSegment}"
+
+    fun parseRecordMedia(path: String): RecordPath? {
+        if (!path.startsWith(MEDIA_PREFIX)) return null
+        val parts = path.removePrefix(MEDIA_PREFIX).split('/')
+        if (parts.size == 2) return parse(path, MEDIA_PREFIX)
+        if (parts.size != 3 || !LINK_PATH_SEGMENT.matches(parts[2])) return null
+        val linkId = parts[2].replace('-', '+').replace('_', '/') + "="
+        val hash = LinkWire.decodeKey(linkId) ?: return null
+        if (hash.size != 32 || LinkWire.encodeKey(hash) != linkId) return null
+        val record = parse("$MEDIA_PREFIX${parts[0]}/${parts[1]}", MEDIA_PREFIX) ?: return null
+        return record.copy(linkId = linkId)
+    }
 
     private fun parse(
         path: String,
@@ -93,4 +111,5 @@ object WearPaths {
 data class RecordPath(
     val kind: RecordKind,
     val id: Uuid,
+    val linkId: String? = null,
 )
