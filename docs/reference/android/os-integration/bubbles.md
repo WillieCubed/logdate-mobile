@@ -117,6 +117,17 @@ The bubble shows the live transcript of the recording in progress, the same text
 while recording. It never shows other entries. A collapsed bubble shows only the recorder icon, and
 bubbles do not appear on the lock screen.
 
+## Telling a bubble from any other window
+
+Android 17 has one public way for an activity to learn it is in a bubble, `Activity.isLaunchedFromBubble()`, and it only covers bubbles the app opens itself. Measured on the Android 17 phone and tablet emulators:
+
+| Bubble | Phone | Tablet | `isLaunchedFromBubble()` |
+| --- | --- | --- | --- |
+| The recorder, opened by LogDate through a notification | 395 × 480 dp, multi-window | 412 × 668 dp, multi-window | true |
+| The whole app, bubbled by the person from the launcher | 395 × 718 dp, multi-window | 412 × 650 dp, multi-window | false |
+
+So a screen LogDate opens as a bubble can lay itself out for a bubble with certainty. A launcher bubble of the whole app looks to `MainActivity` like any compact multi-window window, split screen included, so Home can respond only to the window it is given. `OsSurfaceScreenshotsTest#appBubble` and `#recordingBubble` record these facts each run in `bubbles/app-bubble-window--*.txt` and `bubbles/recorder-window--*.txt`.
+
 ## How to test
 
 - `RecorderBubbleStatesTest` (editor, common) covers mapping the recorder's streams: neutral

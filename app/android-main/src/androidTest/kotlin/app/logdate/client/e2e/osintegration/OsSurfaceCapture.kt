@@ -529,6 +529,28 @@ object OsSurfaceCapture {
         return checkNotNull(result).getOrThrow()
     }
 
+    /**
+     * What each of LogDate's resumed activities reports about its window: whether Android says it
+     * was launched as a bubble, whether it is in multi-window, and its size in dp. Bubble layouts
+     * decide from these, so the captures record them next to the screenshots.
+     */
+    fun bubbleWindowReport(): String {
+        var report = ""
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            report =
+                ActivityLifecycleMonitorRegistry
+                    .getInstance()
+                    .getActivitiesInStage(Stage.RESUMED)
+                    .joinToString("\n") { activity ->
+                        val configuration = activity.resources.configuration
+                        "${activity.javaClass.simpleName}: isLaunchedFromBubble=${activity.isLaunchedFromBubble}, " +
+                            "isInMultiWindowMode=${activity.isInMultiWindowMode}, " +
+                            "window=${configuration.screenWidthDp}x${configuration.screenHeightDp}dp"
+                    }
+        }
+        return report
+    }
+
     /** Empties the clipboard, so the keyboard shows its tools instead of suggesting a copied item. */
     fun clearClipboard() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

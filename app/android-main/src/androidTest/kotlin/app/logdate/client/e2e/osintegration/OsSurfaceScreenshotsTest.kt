@@ -878,6 +878,7 @@ class OsSurfaceScreenshotsTest {
         Thread.sleep(3_000L)
         OsSurfaceCapture.device.wait(Until.findObject(By.text("Got it")), 2_000L)?.click()
         OsSurfaceCapture.capture(surface = "bubbles", state = "app-bubble")
+        OsSurfaceCapture.writeEvidence(surface = "bubbles", state = "app-bubble-window", text = OsSurfaceCapture.bubbleWindowReport())
     }
 
     @Test fun quickSettingsTilesAndLiveUpdate() {
@@ -995,6 +996,7 @@ class OsSurfaceScreenshotsTest {
         OsSurfaceCapture.device.wait(Until.findObject(By.text("Got it")), 3_000L)?.click()
         Thread.sleep(2_000L)
         OsSurfaceCapture.capture(surface = "bubbles", state = "recorder-expanded")
+        OsSurfaceCapture.writeEvidence(surface = "bubbles", state = "recorder-window", text = OsSurfaceCapture.bubbleWindowReport())
 
         OsSurfaceCapture.device.pressHome()
         Thread.sleep(1_500L)

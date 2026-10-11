@@ -1,0 +1,2 @@
+MainActivity: isLaunchedFromBubble=false, isInMultiWindowMode=false, window=427x952dp
+RecordingBubbleActivity: isLaunchedFromBubble=true, isInMultiWindowMode=true, window=395x480dp
