@@ -36,32 +36,36 @@ cpu_idle            = true
 startup_cpu_boost   = true
 
 cloud_run_env = {
-  LOGDATE_ENV                     = "production"
-  LOGDATE_EXPECT_FIRST_PARTY      = "true"
-  LOGDATE_DEPLOYMENT_KIND         = "first_party"
-  LOGDATE_SERVER_DISPLAY_NAME     = "LogDate Cloud (Staging)"
-  LOGDATE_PUBLIC_ORIGIN           = "https://cloud-staging.logdate.app"
-  ATPROTO_PDS_SERVICE_URL         = "https://cloud-staging.logdate.app"
-  ATPROTO_HANDLE_DOMAIN           = "cloud-staging.logdate.app"
-  BILLING_PROVIDER                = "play"
-  SERVER_ENCRYPTION_ENABLED       = "true"
-  SYNC_MEDIA_SIGNED_URLS          = "true"
-  SYNC_MEDIA_SIGNED_URL_TTL_HOURS = "1"
-  AUTO_MIGRATE                    = "false"
+  LOGDATE_ENV                            = "production"
+  LOGDATE_EXPECT_FIRST_PARTY             = "true"
+  LOGDATE_DEPLOYMENT_KIND                = "first_party"
+  LOGDATE_SERVER_DISPLAY_NAME            = "LogDate Cloud (Staging)"
+  LOGDATE_PUBLIC_ORIGIN                  = "https://cloud-staging.logdate.app"
+  ATPROTO_PDS_SERVICE_URL                = "https://cloud-staging.logdate.app"
+  ATPROTO_HANDLE_DOMAIN                  = "cloud-staging.logdate.app"
+  BILLING_PROVIDER                       = "play"
+  SERVER_ENCRYPTION_ENABLED              = "true"
+  SYNC_MEDIA_SIGNED_URLS                 = "true"
+  SYNC_MEDIA_SIGNED_URL_TTL_HOURS        = "1"
+  AUTO_MIGRATE                           = "false"
   LOGDATE_ENCRYPTED_ACCOUNT_KEYS_ENABLED = "true"
 }
 
 # Secret IDs are scoped to this project's Secret Manager namespace (separate
 # from the prod project's identically-named secrets, no collision).
 cloud_run_secret_env = {
-  DATABASE_URL             = { secret_id = "logdate-db-url", version = "1" }
-  DATABASE_USER            = { secret_id = "logdate-db-user", version = "1" }
-  DATABASE_PASSWORD        = { secret_id = "logdate-db-password", version = "1" }
-  JWT_SECRET               = { secret_id = "logdate-jwt-secret", version = "1" }
+  DATABASE_URL      = { secret_id = "logdate-db-url", version = "1" }
+  DATABASE_USER     = { secret_id = "logdate-db-user", version = "1" }
+  DATABASE_PASSWORD = { secret_id = "logdate-db-password", version = "1" }
+  JWT_SECRET        = { secret_id = "logdate-jwt-secret", version = "1" }
   # Encrypts hosted AT Protocol signing keys. Version 1 must hold exactly the bytes of
   # logdate-jwt-secret version 1, which encrypted every key stored before this secret existed
   # (server/docs/environment-variables.md#atproto_signing_key_kek).
-  ATPROTO_SIGNING_KEY_KEK  = { secret_id = "logdate-atproto-signing-key-kek", version = "1" }
+  ATPROTO_SIGNING_KEY_KEK = { secret_id = "logdate-atproto-signing-key-kek", version = "1" }
+  # Moving to a fresh key-encryption key, step 1 of 2: every instance learns to read version 2
+  # before anything is encrypted with it
+  # (server/docs/environment-variables.md#atproto_signing_key_kek_decrypt_only).
+  ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY = { secret_id = "logdate-atproto-signing-key-kek", version = "2" }
   # Signs hosted AT Protocol session tokens. A new value signs out every AT Protocol client
   # session; the LogDate apps are unaffected.
   ATPROTO_SESSION_SECRET   = { secret_id = "logdate-atproto-session-secret", version = "1" }

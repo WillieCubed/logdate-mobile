@@ -92,6 +92,10 @@ cloud_run_secret_env = {
   # logdate-jwt-secret version 1, which encrypted every key stored before this secret existed
   # (server/docs/environment-variables.md#atproto_signing_key_kek).
   ATPROTO_SIGNING_KEY_KEK = { secret_id = "logdate-atproto-signing-key-kek", version = "1" }
+  # Moving to a fresh key-encryption key, step 1 of 2: every instance learns to read version 2
+  # before anything is encrypted with it
+  # (server/docs/environment-variables.md#atproto_signing_key_kek_decrypt_only).
+  ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY = { secret_id = "logdate-atproto-signing-key-kek", version = "2" }
   # Signs hosted AT Protocol session tokens. A new value signs out every AT Protocol client
   # session; the LogDate apps are unaffected.
   ATPROTO_SESSION_SECRET = { secret_id = "logdate-atproto-session-secret", version = "1" }
