@@ -10,6 +10,7 @@ import app.logdate.server.identity.installStoredKeyRewrap
 import app.logdate.server.logging.initializeSentry
 import app.logdate.server.logging.installRequestDiagnostics
 import app.logdate.server.logging.installServerLogging
+import app.logdate.server.oauth.installOAuthKeyRotation
 import app.logdate.server.routes.accountApiRoutes
 import app.logdate.server.routes.atprotoRoutes
 import app.logdate.server.routes.contentApiRoutes
@@ -80,6 +81,7 @@ fun Application.module(
     installSyncMaintenance(isDatabaseAvailable)
     installDiagnosticReportMaintenance()
     installStoredKeyRewrap()
+    installOAuthKeyRotation()
     installJsonSerialization()
 
     routing {

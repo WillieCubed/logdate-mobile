@@ -239,6 +239,16 @@ These development/test-only variables provide the local PostgreSQL fallback when
   4. Keep the old version of the secret until no database backup still holds keys encrypted with it. Restoring such a backup without the old value loses every key in it.
 - **Security**: Store in a secret manager; never commit.
 
+### `OAUTH_SIGNING_KEY_MAX_AGE_DAYS`
+- **Description**: How many days a key signs OAuth access tokens for third-party AT Protocol apps before the server replaces it. Rotation never signs anyone out. Every five minutes each instance checks whether a step is due:
+  1. When the active key reaches this age, a new key is staged. It's published in the OAuth JWKS and accepted for verification, but nothing signs with it yet.
+  2. An hour later, once every instance has picked it up, the new key starts signing. The previous key keeps verifying the tokens it signed for another 65 minutes, longer than an access token lives.
+  3. Then the previous key is deleted.
+- **Type**: Integer, at least 1.
+- **Default**: `90`
+- **Required**: No.
+- **Rotating early**: to replace the key now, for example after a suspected leak, set a value lower than the key's current age. The rotation completes within about an hour. Restore the usual value afterwards.
+
 ### `ATPROTO_SESSION_SECRET`
 - **Description**: The secret that signs the access and refresh tokens the server issues to AT Protocol clients through `com.atproto.server.createSession` and `refreshSession`. The LogDate apps sign in with their own tokens and do not use these.
 - **Type**: String (minimum 32 characters in production).

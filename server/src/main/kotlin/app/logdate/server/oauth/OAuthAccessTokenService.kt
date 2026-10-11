@@ -43,17 +43,13 @@ class OAuthAccessTokenService(
                 clientId = clientId,
                 cnf = OAuthTokenConfirmation(jkt = keyThumbprint),
             )
-        val header =
-            OAuthJwtHeader(
-                alg = JWS_ALGORITHM,
-                typ = JWT_TYPE,
-                kid = keyService.currentJwk().kid,
-            )
-        val encodedHeader = base64UrlEncode(json.encodeToString(header).toByteArray(StandardCharsets.UTF_8))
-        val encodedPayload = base64UrlEncode(json.encodeToString(payload).toByteArray(StandardCharsets.UTF_8))
-        val signingInput = "$encodedHeader.$encodedPayload"
-        val signature = keyService.sign(signingInput.toByteArray(StandardCharsets.UTF_8))
-        val signedJwt = "$signingInput.${base64UrlEncode(signature)}"
+        val signedJwt =
+            keyService.signJwt { keyId ->
+                val header = OAuthJwtHeader(alg = JWS_ALGORITHM, typ = JWT_TYPE, kid = keyId)
+                val encodedHeader = base64UrlEncode(json.encodeToString(header).toByteArray(StandardCharsets.UTF_8))
+                val encodedPayload = base64UrlEncode(json.encodeToString(payload).toByteArray(StandardCharsets.UTF_8))
+                "$encodedHeader.$encodedPayload"
+            }
         return IssuedOAuthAccessToken(
             token = signedJwt,
             expiresInSeconds = ACCESS_TOKEN_TTL.inWholeSeconds,
@@ -73,12 +69,13 @@ class OAuthAccessTokenService(
 
             val header = json.decodeFromString<OAuthJwtHeader>(decodeJson(parts[0]))
             val claims = json.decodeFromString<OAuthAccessTokenClaims>(decodeJson(parts[1]))
-            if (header.alg != JWS_ALGORITHM || header.typ != JWT_TYPE || header.kid != keyService.currentJwk().kid) {
+            if (header.alg != JWS_ALGORITHM || header.typ != JWT_TYPE) {
                 return null
             }
+            val verificationKey = keyService.verificationKey(header.kid) ?: return null
 
             val verifier = Signature.getInstance(JWS_SIGNATURE_ALGORITHM)
-            verifier.initVerify(keyService.publicKey())
+            verifier.initVerify(verificationKey)
             verifier.update("${parts[0]}.${parts[1]}".toByteArray(StandardCharsets.UTF_8))
             if (!verifier.verify(base64UrlDecode(parts[2]))) {
                 return null

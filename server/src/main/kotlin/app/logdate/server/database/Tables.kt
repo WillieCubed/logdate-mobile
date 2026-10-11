@@ -121,6 +121,7 @@ object OAuthSigningKeysTable : Table("oauth_signing_keys") {
     val privateKeyEncrypted = text("private_key_encrypted")
     val publicKeySpki = text("public_key_spki")
     val createdAt = timestamp("created_at")
+    val retireAfter = timestamp("retire_after").nullable()
 
     override val primaryKey = PrimaryKey(slot)
 }

@@ -103,6 +103,7 @@ import app.logdate.server.oauth.OAuthAuthorizationService
 import app.logdate.server.oauth.OAuthClientMetadataResolver
 import app.logdate.server.oauth.OAuthConfig
 import app.logdate.server.oauth.OAuthDpopVerifier
+import app.logdate.server.oauth.OAuthKeyRotationPolicy
 import app.logdate.server.oauth.OAuthKeyService
 import app.logdate.server.oauth.OAuthNonceService
 import app.logdate.server.oauth.OAuthRuntimeStateRepository
@@ -229,6 +230,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
                 repository = get(),
                 encryptionKeySeed = AtprotoSigningKeyKek.resolve(),
                 decryptOnlyEncryptionKeySeeds = listOfNotNull(AtprotoSigningKeyKekDecryptOnly.resolve()),
+                rotationPolicy = OAuthKeyRotationPolicy.fromEnvironment(),
             )
         }
         single { OAuthNonceService() }
