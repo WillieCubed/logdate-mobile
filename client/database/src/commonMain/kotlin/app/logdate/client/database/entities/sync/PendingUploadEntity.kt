@@ -33,4 +33,15 @@ object PendingOperation {
     const val CREATE = "CREATE"
     const val UPDATE = "UPDATE"
     const val DELETE = "DELETE"
+
+    fun coalesce(
+        existing: String?,
+        incoming: String,
+    ): String =
+        when {
+            incoming == DELETE -> DELETE
+            incoming == CREATE -> CREATE
+            existing == CREATE || existing == DELETE -> CREATE
+            else -> UPDATE
+        }
 }

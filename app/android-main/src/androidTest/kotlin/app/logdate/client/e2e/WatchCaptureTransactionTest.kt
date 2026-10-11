@@ -5,6 +5,8 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.data.notes.OfflineFirstJournalNotesRepository
 import app.logdate.client.database.LogDateDatabase
+import app.logdate.client.database.dao.sync.SyncMetadataDao
+import app.logdate.client.database.entities.sync.PendingUploadEntity
 import app.logdate.client.database.getRoomDatabase
 import app.logdate.client.device.identity.CanonicalOwnerProvider
 import app.logdate.client.repository.journals.JournalNote
@@ -20,13 +22,16 @@ import app.logdate.client.sync.v2.receipts.WatchCaptureNotes
 import app.logdate.client.sync.v2.receipts.WatchCaptureProvenance
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -159,6 +164,49 @@ class WatchCaptureTransactionTest {
                 9L,
                 database.peerDeliveryDao().get(WatchCaptureProvenance.SCOPE, "FROM_WATCH", "NOTE", note.uid.toString())?.contentVersion,
             )
+        }
+
+    @Test
+    fun captureCanQueueBackupWhileSyncWaitsForItsDatabaseTransaction() =
+        runBlocking {
+            val started = CompletableDeferred<Unit>()
+            val realDao = database.syncMetadataDao()
+            val observedDao =
+                object : SyncMetadataDao by realDao {
+                    override suspend fun getPendingByType(
+                        ownerId: String,
+                        serverOrigin: String,
+                        entityType: String,
+                    ): List<PendingUploadEntity> {
+                        started.complete(Unit)
+                        return realDao.getPendingByType(ownerId, serverOrigin, entityType)
+                    }
+                }
+            val metadata =
+                DatabaseSyncMetadataService(
+                    observedDao,
+                    DefaultLogDateConfigRepository(initialBackendUrl = "https://capture-device.example"),
+                    object : CanonicalOwnerProvider {
+                        override suspend fun getCanonicalOwnerId() = "isolated-watch-capture-owner"
+
+                        override suspend fun hasBoundOwner() = false
+                    },
+                )
+            var read: kotlinx.coroutines.Deferred<*>? = null
+            try {
+                withTimeout(5_000) {
+                    RoomSyncTransactionManager(database).withTransaction {
+                        database.textNoteDao().getAll()
+                        read = scope.async { metadata.getPendingUploads(EntityType.NOTE) }
+                        started.await()
+                        metadata.enqueuePending(note.uid.toString(), EntityType.NOTE, PendingOperation.CREATE)
+                    }
+                    read?.await()
+                }
+                assertEquals(PendingOperation.CREATE, metadata.getPendingUploads(EntityType.NOTE).single().operation)
+            } finally {
+                read?.cancel()
+            }
         }
 
     private fun writer(

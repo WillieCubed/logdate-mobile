@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import app.logdate.client.database.entities.sync.PendingOperation
 import app.logdate.client.database.entities.sync.PendingUploadEntity
 import app.logdate.client.database.entities.sync.SyncCursorEntity
 import kotlinx.coroutines.flow.Flow
@@ -79,6 +80,34 @@ interface SyncMetadataDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPending(pending: PendingUploadEntity)
+
+    /** Serialize queue mutations with their note transaction, without a separate service lock. */
+    @Transaction
+    suspend fun enqueueMutation(pending: PendingUploadEntity) {
+        val owner = pending.ownerId
+        val origin = pending.serverOrigin
+        val type = pending.entityType
+        if (getPendingByType(owner, origin, type).isEmpty()) {
+            getLegacyPendingByType(origin, type).forEach { promotePendingIfAbsent(it.copy(ownerId = owner)) }
+        }
+        val existing = getPending(owner, origin, type, pending.entityId)
+        insertPending(
+            pending.copy(
+                operation = PendingOperation.coalesce(existing?.operation, pending.operation),
+                createdAt = existing?.createdAt ?: pending.createdAt,
+            ),
+        )
+    }
+
+    /** A legacy snapshot cannot replace a mutation queued after it was read. */
+    @Transaction
+    suspend fun promotePendingIfAbsent(pending: PendingUploadEntity) {
+        val legacy = getPending("", pending.serverOrigin, pending.entityType, pending.entityId)
+        if (legacy?.copy(ownerId = pending.ownerId) != pending) return
+        if (getPending(pending.ownerId, pending.serverOrigin, pending.entityType, pending.entityId) == null) {
+            insertPending(pending)
+        }
+    }
 
     /** Joins transcript persistence without taking a service mutex while Room owns the writer. */
     @Transaction

@@ -136,29 +136,19 @@ class DatabaseSyncMetadataService(
         entityType: EntityType,
         operation: PendingOperation,
     ) {
-        metadataMutex.withLock {
-            val serverOrigin = currentOrigin()
-            val ownerId = currentOwnerId()
-            promoteLegacyPendingIfNeeded(ownerId, serverOrigin, entityType)
-            val existing = dao.getPending(ownerId, serverOrigin, entityType.name, entityId)
-            val existingOp = existing?.operation?.let { PendingOperation.fromStorage(it) }
-            val resolvedOperation = PendingOperation.coalesce(existingOp, operation)
-            if (resolvedOperation == null) {
-                dao.deletePending(ownerId, serverOrigin, entityType.name, entityId)
-                return@withLock
-            }
-            dao.insertPending(
-                PendingUploadEntity(
-                    ownerId = ownerId,
-                    serverOrigin = serverOrigin,
-                    entityType = entityType.name,
-                    entityId = entityId,
-                    operation = resolvedOperation.name,
-                    createdAt = existing?.createdAt ?: Clock.System.now().toEpochMilliseconds(),
-                    retryCount = 0,
-                ),
-            )
-        }
+        val serverOrigin = currentOrigin()
+        val ownerId = currentOwnerId()
+        dao.enqueueMutation(
+            PendingUploadEntity(
+                ownerId = ownerId,
+                serverOrigin = serverOrigin,
+                entityType = entityType.name,
+                entityId = entityId,
+                operation = operation.name,
+                createdAt = Clock.System.now().toEpochMilliseconds(),
+                retryCount = 0,
+            ),
+        )
     }
 
     override suspend fun enqueueCreateIfAbsent(
@@ -381,7 +371,7 @@ class DatabaseSyncMetadataService(
         }
 
         legacyPending.forEach { pending ->
-            dao.insertPending(pending.copy(ownerId = ownerId))
+            dao.promotePendingIfAbsent(pending.copy(ownerId = ownerId))
         }
     }
 

@@ -56,25 +56,10 @@ enum class PendingOperation {
             existing: PendingOperation?,
             incoming: PendingOperation,
         ): PendingOperation? =
-            when (existing) {
-                null -> incoming
-                CREATE ->
-                    when (incoming) {
-                        CREATE, UPDATE -> CREATE
-                        DELETE -> DELETE
-                    }
-                UPDATE ->
-                    when (incoming) {
-                        CREATE -> CREATE
-                        UPDATE -> UPDATE
-                        DELETE -> DELETE
-                    }
-                DELETE ->
-                    when (incoming) {
-                        CREATE, UPDATE -> CREATE
-                        DELETE -> DELETE
-                    }
-            }
+            fromStorage(
+                app.logdate.client.database.entities.sync.PendingOperation
+                    .coalesce(existing?.name, incoming.name),
+            )
     }
 }
 

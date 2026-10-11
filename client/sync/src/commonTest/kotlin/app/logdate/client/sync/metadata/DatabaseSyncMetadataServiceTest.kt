@@ -225,6 +225,29 @@ class DatabaseSyncMetadataServiceTest {
             assertEquals(PendingOperation.CREATE, metadata.getPendingUploads(EntityType.MOMENT).single().operation)
         }
 
+    @Test
+    fun `a retired legacy snapshot cannot refill the upload queue`() =
+        runTest {
+            val dao = InMemorySyncMetadataDao()
+            val legacy = PendingUploadEntity("", "https://first.example", "NOTE", "note", "CREATE", 1)
+            dao.insertPending(legacy)
+            dao.deletePending("", legacy.serverOrigin, legacy.entityType, legacy.entityId)
+            dao.promotePendingIfAbsent(legacy.copy(ownerId = "owner"))
+            assertTrue(dao.getAllPending().isEmpty())
+        }
+
+    @Test
+    fun `a legacy snapshot cannot overwrite a newer queued edit`() =
+        runTest {
+            val dao = InMemorySyncMetadataDao()
+            val legacy = PendingUploadEntity("", "https://first.example", "NOTE", "note", "CREATE", 1)
+            dao.insertPending(legacy)
+            val newer = legacy.copy(ownerId = "owner", operation = "UPDATE", operationId = "newer-operation")
+            dao.insertPending(newer)
+            dao.promotePendingIfAbsent(legacy.copy(ownerId = "owner"))
+            assertEquals(newer, dao.getPending("owner", legacy.serverOrigin, "NOTE", "note"))
+        }
+
     private fun service(
         dao: SyncMetadataDao,
         ownerId: String,
