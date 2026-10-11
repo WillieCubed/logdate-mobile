@@ -65,7 +65,10 @@ class AudioPlaybackService : MediaSessionService() {
                 .build()
 
         val sessionActivity = createSessionActivity()
-        val sessionBuilder = MediaSession.Builder(this, player)
+        val sessionBuilder =
+            MediaSession
+                .Builder(this, player)
+                .setCallback(PlaybackSessionCallback { enabled -> player.skipSilenceEnabled = enabled })
         if (sessionActivity != null) {
             sessionBuilder.setSessionActivity(sessionActivity)
         }

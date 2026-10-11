@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.SystemClock
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import app.logdate.client.media.storage.AndroidMediaDirectories
@@ -17,6 +18,7 @@ import io.mockk.runs
 import io.mockk.slot
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import io.mockk.verifyOrder
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -52,6 +54,8 @@ class AndroidAudioPlaybackManagerTest {
     private val controller = mockk<MediaController>()
     private val controllerListener = slot<Player.Listener>()
     private val directExecutor = Executor { runnable -> runnable.run() }
+    private val skipSilenceRecorder = RecordingSkipSilence()
+    private var speed = 1f
 
     @BeforeTest
     fun mockSystemClock() {
@@ -392,6 +396,111 @@ class AndroidAudioPlaybackManagerTest {
             assertEquals(1, completedCount)
         }
 
+    @Test
+    fun `playback starts at the position and speed asked for`() =
+        runTest {
+            val itemFactory = RecordingAudioPlaybackItemFactory()
+            val manager = createManager(this, currentPosition = PlaybackStateHolder(250L), itemFactory = itemFactory)
+
+            manager.startPlayback(
+                uri = "file:///tmp/voice-note.m4a",
+                metadata = null,
+                options = AudioPlaybackOptions(startPositionMs = 250L, speed = 1.5f, skipSilence = true),
+                onProgressUpdated = {},
+                onPlaybackCompleted = {},
+            )
+
+            verify(exactly = 1) { controller.setMediaItem(itemFactory.mediaItem, 250L) }
+            verify(exactly = 1) { controller.setPlaybackSpeed(1.5f) }
+            assertEquals(listOf(true), skipSilenceRecorder.requests)
+            val status = manager.playbackStatus.value
+            assertEquals(250L, status.positionMs)
+            assertEquals(1.5f, status.playbackSpeed)
+            assertTrue(status.skipSilenceEnabled)
+            manager.release()
+        }
+
+    @Test
+    fun `plain playback starts at the beginning at normal speed and plays silence`() =
+        runTest {
+            val itemFactory = RecordingAudioPlaybackItemFactory()
+            val manager = createManager(this, currentPosition = PlaybackStateHolder(0L), itemFactory = itemFactory)
+
+            manager.startPlayback(uri = "file:///tmp/voice-note.m4a", onProgressUpdated = {}, onPlaybackCompleted = {})
+
+            verify(exactly = 1) { controller.setMediaItem(itemFactory.mediaItem) }
+            verify(exactly = 0) { controller.setMediaItem(any(), any<Long>()) }
+            verify(exactly = 1) { controller.setPlaybackSpeed(1f) }
+            assertEquals(listOf(false), skipSilenceRecorder.requests)
+            assertFalse(manager.playbackStatus.value.skipSilenceEnabled)
+            manager.release()
+        }
+
+    @Test
+    fun `seeking to a position stays inside the recording`() =
+        runTest {
+            val manager = createManager(this, currentPosition = PlaybackStateHolder(0L))
+            manager.startPlayback(uri = "file:///tmp/voice-note.m4a", onProgressUpdated = {}, onPlaybackCompleted = {})
+
+            manager.seekToPosition(5_000L)
+            manager.seekToPosition(-20L)
+            manager.seekToPosition(400L)
+
+            verifyOrder {
+                controller.seekTo(1_000L)
+                controller.seekTo(0L)
+                controller.seekTo(400L)
+            }
+            manager.release()
+        }
+
+    @Test
+    fun `a new speed applies at once and is reported`() =
+        runTest {
+            val manager = createManager(this, currentPosition = PlaybackStateHolder(0L))
+            manager.startPlayback(uri = "file:///tmp/voice-note.m4a", onProgressUpdated = {}, onPlaybackCompleted = {})
+
+            manager.setPlaybackSpeed(2f)
+
+            verify(exactly = 1) { controller.setPlaybackSpeed(2f) }
+            assertEquals(2f, manager.playbackStatus.value.playbackSpeed)
+            manager.release()
+        }
+
+    @Test
+    fun `skip silence the session refuses stays off`() =
+        runTest {
+            skipSilenceRecorder.applies = false
+            val manager = createManager(this, currentPosition = PlaybackStateHolder(0L))
+            manager.startPlayback(uri = "file:///tmp/voice-note.m4a", onProgressUpdated = {}, onPlaybackCompleted = {})
+
+            manager.setSkipSilenceEnabled(true)
+
+            assertEquals(listOf(false, true), skipSilenceRecorder.requests)
+            assertFalse(manager.playbackStatus.value.skipSilenceEnabled)
+            manager.release()
+        }
+
+    @Test
+    fun `progress tracking reports the position in milliseconds`() =
+        runTest {
+            val currentPosition = PlaybackStateHolder(200L)
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val manager = createManager(this, dispatcher = dispatcher, currentPosition = currentPosition)
+            every { controller.isPlaying } returns true
+            manager.startPlayback(uri = "file:///tmp/voice-note.m4a", onProgressUpdated = {}, onPlaybackCompleted = {})
+
+            controllerListener.captured.onIsPlayingChanged(true)
+            runCurrent()
+            currentPosition.value = 640L
+            advanceTimeBy(100)
+            runCurrent()
+
+            assertEquals(640L, manager.playbackStatus.value.positionMs)
+            controllerListener.captured.onIsPlayingChanged(false)
+            manager.release()
+        }
+
     private fun createManager(
         scope: TestScope,
         dispatcher: CoroutineDispatcher = StandardTestDispatcher(scope.testScheduler),
@@ -412,6 +521,7 @@ class AndroidAudioPlaybackManagerTest {
             mediaItemFactory = itemFactory,
             serviceStarter = serviceStarter,
             mediaFiles = mediaFiles,
+            skipSilenceCommand = skipSilenceRecorder,
         )
     }
 
@@ -419,12 +529,15 @@ class AndroidAudioPlaybackManagerTest {
         every { controller.addListener(capture(controllerListener)) } just runs
         every { controller.removeListener(any<Player.Listener>()) } just runs
         every { controller.setMediaItem(any()) } just runs
+        every { controller.setMediaItem(any(), any<Long>()) } just runs
         every { controller.prepare() } just runs
         every { controller.play() } just runs
         every { controller.pause() } just runs
         every { controller.stop() } just runs
         every { controller.release() } just runs
         every { controller.seekTo(any<Long>()) } just runs
+        every { controller.setPlaybackSpeed(any()) } answers { speed = firstArg() }
+        every { controller.playbackParameters } answers { PlaybackParameters(speed) }
         every { controller.duration } returns 1_000L
         every { controller.currentPosition } answers { currentPosition.value }
         every { controller.isPlaying } returns false
@@ -434,6 +547,21 @@ class AndroidAudioPlaybackManagerTest {
     private class PlaybackStateHolder(
         var value: Long,
     )
+
+    private class RecordingSkipSilence(
+        var applies: Boolean = true,
+    ) : SkipSilenceCommand {
+        val requests = mutableListOf<Boolean>()
+
+        override fun send(
+            controller: MediaController,
+            enabled: Boolean,
+            onResult: (Boolean) -> Unit,
+        ) {
+            requests += enabled
+            onResult(applies)
+        }
+    }
 
     private class RecordingAudioPlaybackItemFactory : AudioPlaybackItemFactory {
         val mediaItem: MediaItem = mockk(relaxed = true)

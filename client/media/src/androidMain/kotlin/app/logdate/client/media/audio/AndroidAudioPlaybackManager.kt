@@ -9,6 +9,7 @@ import android.os.Looper
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -54,6 +55,7 @@ class AndroidAudioPlaybackManager(
     private val mediaItemFactory: AudioPlaybackItemFactory = defaultMediaItemFactory,
     private val serviceStarter: AudioPlaybackServiceStarter = defaultAudioPlaybackServiceStarter,
     private val mediaFiles: MediaFileResolver = androidMediaFileResolver(context),
+    private val skipSilenceCommand: SkipSilenceCommand = SkipSilenceCommand.Session,
 ) : AudioPlaybackManager,
     AudioPlaybackStatusProvider {
     override val playbackStatus: StateFlow<AudioPlaybackStatus>
@@ -69,10 +71,23 @@ class AndroidAudioPlaybackManager(
     private var onPlaybackCompleted: (() -> Unit)? = null
     private var currentUri: String? = null
     private var currentMetadata: AudioPlaybackMetadata? = null
+    private var skipSilenceEnabled = false
 
     override fun startPlayback(
         uri: String,
         metadata: AudioPlaybackMetadata?,
+        onProgressUpdated: (Float) -> Unit,
+        onPlaybackCompleted: () -> Unit,
+    ) = startPlayback(uri, metadata, AudioPlaybackOptions(), onProgressUpdated, onPlaybackCompleted)
+
+    /**
+     * Starts [uri] at [options]' position and speed, skipping silence when [options] asks. Speed and
+     * skip silence are set for every recording, so one never inherits another's.
+     */
+    fun startPlayback(
+        uri: String,
+        metadata: AudioPlaybackMetadata?,
+        options: AudioPlaybackOptions,
         onProgressUpdated: (Float) -> Unit,
         onPlaybackCompleted: () -> Unit,
     ) {
@@ -87,9 +102,15 @@ class AndroidAudioPlaybackManager(
         serviceStarter.start(context)
         withController { player ->
             val mediaItem = mediaItemFactory.create(mediaFiles.playableUri(uri), metadata)
-            player.setMediaItem(mediaItem)
+            if (options.startPositionMs > 0L) {
+                player.setMediaItem(mediaItem, options.startPositionMs)
+            } else {
+                player.setMediaItem(mediaItem)
+            }
+            player.setPlaybackSpeed(options.speed)
             player.prepare()
             player.play()
+            applySkipSilence(player, options.skipSilence)
             updateStatus(player)
         }
     }
@@ -123,6 +144,43 @@ class AndroidAudioPlaybackManager(
             val duration = player.duration
             if (duration > 0) {
                 player.seekTo((position * duration).toLong())
+            }
+        }
+    }
+
+    /** Moves playback to [positionMs], inside the recording once its length is known. */
+    fun seekToPosition(positionMs: Long) {
+        withController { player ->
+            val duration = player.duration
+            val target = if (duration > 0) positionMs.coerceIn(0L, duration) else positionMs.coerceAtLeast(0L)
+            player.seekTo(target)
+            updateStatus(player)
+        }
+    }
+
+    /** Plays at [speed], where 1 is normal. */
+    fun setPlaybackSpeed(speed: Float) {
+        withController { player ->
+            player.setPlaybackSpeed(speed)
+            updateStatus(player)
+        }
+    }
+
+    /** Skips stretches of silence while [enabled]. */
+    fun setSkipSilenceEnabled(enabled: Boolean) {
+        withController { player -> applySkipSilence(player, enabled) }
+    }
+
+    private fun applySkipSilence(
+        player: MediaController,
+        enabled: Boolean,
+    ) {
+        skipSilenceCommand.send(player, enabled) { applied ->
+            if (applied) {
+                skipSilenceEnabled = enabled
+                _playbackStatus.value = _playbackStatus.value.copy(skipSilenceEnabled = enabled)
+            } else {
+                Napier.w { "The playback session did not turn skip silence ${if (enabled) "on" else "off"}" }
             }
         }
     }
@@ -193,6 +251,10 @@ class AndroidAudioPlaybackManager(
                 controller?.let { updateStatus(it) }
             }
 
+            override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
+                controller?.let { updateStatus(it) }
+            }
+
             override fun onPlayerError(error: PlaybackException) {
                 Napier.e(error) { "Playback failed for $currentUri" }
                 stopProgressTracking()
@@ -216,7 +278,11 @@ class AndroidAudioPlaybackManager(
                             val progress = player.currentPosition.toFloat() / durationMs.toFloat()
                             val normalized = progress.coerceIn(0f, 1f)
                             onProgressUpdated?.invoke(normalized)
-                            _playbackStatus.value = _playbackStatus.value.copy(progress = normalized)
+                            _playbackStatus.value =
+                                _playbackStatus.value.copy(
+                                    progress = normalized,
+                                    positionMs = player.currentPosition.coerceAtLeast(0L),
+                                )
                         }
                     }
                     delay(100)
@@ -243,6 +309,12 @@ class AndroidAudioPlaybackManager(
                 durationMs > 0 -> (player.currentPosition.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
                 else -> 0f
             }
+        val positionMs =
+            when {
+                resetProgress -> 0L
+                completed && durationMs > 0 -> durationMs
+                else -> player.currentPosition.coerceAtLeast(0L)
+            }
         _playbackStatus.value =
             AudioPlaybackStatus(
                 isPlaying = player.isPlaying,
@@ -257,6 +329,9 @@ class AndroidAudioPlaybackManager(
                 // transition, which would otherwise clobber the error before anything observes it.
                 // startPlayback is the only place that explicitly clears it, for a fresh attempt.
                 errorMessage = _playbackStatus.value.errorMessage,
+                positionMs = positionMs,
+                playbackSpeed = player.playbackParameters.speed,
+                skipSilenceEnabled = skipSilenceEnabled,
             )
     }
 

@@ -18,6 +18,12 @@ data class AudioPlaybackStatus(
      * platforms even when their own playback fails.
      */
     val errorMessage: String? = null,
+    /** Where playback is, in milliseconds from the beginning. */
+    val positionMs: Long = 0L,
+    /** The speed playback runs at; 1 is normal. */
+    val playbackSpeed: Float = 1f,
+    /** Whether stretches of silence are skipped. Only the Android playback manager sets it. */
+    val skipSilenceEnabled: Boolean = false,
 )
 
 interface AudioPlaybackStatusProvider {
