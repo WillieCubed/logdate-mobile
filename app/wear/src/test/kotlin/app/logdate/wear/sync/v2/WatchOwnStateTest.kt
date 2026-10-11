@@ -13,6 +13,17 @@ import kotlin.test.assertEquals
 /** Tests [WatchOwnState]: the watch reports its link, counts and features as one section. */
 class WatchOwnStateTest {
     @Test
+    fun `a failed account link is reported with its problem`() =
+        runTest {
+            val record = WatchLinkRecord(LinkMode.CLOUD, "phone", 1, problem = "DEVICE_LIMIT_REACHED")
+
+            val state = WatchOwnState(links = flowOf(record)).observe().first()
+
+            assertEquals(PeerLinkState.NEEDS_RELINK, state.link)
+            assertEquals("DEVICE_LIMIT_REACHED", state.linkProblem)
+        }
+
+    @Test
     fun `no link record is reported as unlinked`() =
         runTest {
             assertEquals(WatchState(), WatchOwnState(links = flowOf(null)).observe().first())

@@ -67,7 +67,12 @@ data class Presence(
     val observedAt: Long = 0,
 )
 
-/** Fields only the watch writes. */
+/**
+ * Fields only the watch writes.
+ *
+ * @property linkProblem Why the last account link failed, as a `LinkProblem` name. It is a string so a
+ *   value a newer watch adds never makes the document unreadable.
+ */
 @Serializable
 data class WatchState(
     val outboxCount: Int = 0,
@@ -76,6 +81,7 @@ data class WatchState(
     val link: PeerLinkState = PeerLinkState.UNLINKED,
     val presence: Presence = Presence(),
     val features: Set<String> = emptySet(),
+    val linkProblem: String? = null,
 )
 
 /**

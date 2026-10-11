@@ -28,6 +28,21 @@ class LogDateConfigDataSource(
         private val SERVER_DESCRIPTOR_KEY = stringPreferencesKey("server_descriptor")
     }
 
+    /** Saves a complete configuration before setup is allowed to discard its recovery journal. */
+    suspend fun persistCurrentConfiguration() {
+        configurationLoaded.await()
+        dataStore.edit { preferences ->
+            preferences[BACKEND_URL_KEY] = configRepository.backendUrl.value
+            preferences[API_VERSION_KEY] = configRepository.apiVersion.value
+            val descriptor = configRepository.serverDescriptor.value
+            if (descriptor == null) {
+                preferences.remove(SERVER_DESCRIPTOR_KEY)
+            } else {
+                preferences[SERVER_DESCRIPTOR_KEY] = json.encodeToString(descriptor)
+            }
+        }
+    }
+
     private val json = Json { ignoreUnknownKeys = true }
     private val configurationLoaded = CompletableDeferred<Unit>()
 
@@ -90,7 +105,7 @@ class LogDateConfigDataSource(
      */
     private suspend fun saveBackendUrl(url: String) {
         dataStore.edit { preferences ->
-            preferences[BACKEND_URL_KEY] = url
+            if (url == configRepository.backendUrl.value) preferences[BACKEND_URL_KEY] = url
         }
     }
 
@@ -99,7 +114,7 @@ class LogDateConfigDataSource(
      */
     private suspend fun saveApiVersion(version: String) {
         dataStore.edit { preferences ->
-            preferences[API_VERSION_KEY] = version
+            if (version == configRepository.apiVersion.value) preferences[API_VERSION_KEY] = version
         }
     }
 
@@ -108,6 +123,7 @@ class LogDateConfigDataSource(
      */
     private suspend fun saveServerDescriptor(descriptor: ServerDescriptor?) {
         dataStore.edit { preferences ->
+            if (descriptor != configRepository.serverDescriptor.value) return@edit
             if (descriptor == null) {
                 preferences.remove(SERVER_DESCRIPTOR_KEY)
             } else {

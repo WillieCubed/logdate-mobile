@@ -10,11 +10,19 @@ import app.logdate.client.sync.datalayer.v2.SealedLinkBundle
 import app.logdate.client.sync.datalayer.v2.WearJson
 import app.logdate.client.sync.datalayer.v2.WearPaths
 import app.logdate.client.sync.datalayer.v2.WearProtocol
+import app.logdate.client.sync.peer.link.InstallOutcome
 import app.logdate.client.sync.peer.link.LinkExchangeFailure
+import app.logdate.client.sync.peer.link.LinkInstaller
+import app.logdate.client.sync.peer.link.LinkProblem
 import app.logdate.client.sync.peer.link.LinkStep
 import app.logdate.client.sync.peer.link.LinkWire
 import app.logdate.client.sync.peer.link.WatchLinkExchange
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -30,9 +38,34 @@ class WatchLinkCoordinator(
     private val store: WatchLinkStore,
     private val v2Enabled: suspend () -> Boolean,
     private val localNodeId: suspend () -> String?,
+    private val installer: LinkInstaller? = null,
+    private val installScope: CoroutineScope? = null,
+    private val beforeInstall: suspend () -> Unit = {},
 ) {
+    /** Finishes an account link a stopped process left after the code was spent. */
+    suspend fun resumeInstall() {
+        mutex.withLock {
+            val phoneNode = store.current()?.phoneNode
+            val outcome =
+                try {
+                    installer?.resume()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Napier.e("Resuming account setup failed", e)
+                    InstallOutcome.Failed(LinkProblem.INTERRUPTED)
+                }
+            if (outcome != null) {
+                record(phoneNode, outcome)
+            } else if (store.current()?.installing == true) {
+                record(phoneNode, InstallOutcome.Failed(LinkProblem.INTERRUPTED))
+            }
+        }
+    }
+
     private val mutex = Mutex()
     private var pending: Pending? = null
+    private var installation: Job? = null
 
     private class Pending(
         val phoneNode: String,
@@ -65,6 +98,9 @@ class WatchLinkCoordinator(
         payload: ByteArray,
     ): ByteArray {
         if (!v2Enabled()) return refuse(LinkRefusal.UNSUPPORTED, "the redesigned watch app is off")
+        if (installation?.isActive == true || store.current()?.installing == true) {
+            return refuse(LinkRefusal.UNSUPPORTED, "account setup is still finishing")
+        }
         val offer =
             when (val decoded = WearJson.decode(payload, WearProtocol.LINK_SCHEMA, LinkOffer.serializer())) {
                 is Decoded.Supported -> decoded.value
@@ -111,11 +147,73 @@ class WatchLinkCoordinator(
                 Napier.i("This watch is paired with its phone")
                 LinkWire.write(LinkConfirm.serializer(), opened.confirm)
             }
-            LinkMode.CLOUD -> refuse(LinkRefusal.UNSUPPORTED, "this watch build cannot link to an account")
+            LinkMode.CLOUD -> linkAccount(sourceNodeId, opened)
         }
     }
 
-    private fun acceptsMode(mode: LinkMode): Boolean = mode == LinkMode.PAIR
+    private suspend fun linkAccount(
+        phoneNode: String,
+        opened: WatchLinkExchange.Opened,
+    ): ByteArray {
+        val installer = installer
+        val scope = installScope
+        if (installer == null || scope == null) return refuse(LinkRefusal.UNSUPPORTED, "this watch build cannot link to an account")
+        installer.bindingProblem(opened.bundle)?.let { problem ->
+            return refuse(problem.toRefusal(), "the account bundle cannot be installed: $problem")
+        }
+        if (!v2Enabled() || !scope.isActive) return refuse(LinkRefusal.UNSUPPORTED, "account setup is no longer active")
+        store.beginCloudInstall(phoneNode, opened.pairKey, opened.bundle.accountId)
+        installation = scope.launch { install(installer, phoneNode, opened) }
+        Napier.i("Confirmed the phone's account link; installing it now")
+        return LinkWire.write(LinkConfirm.serializer(), opened.confirm)
+    }
+
+    private suspend fun install(
+        installer: LinkInstaller,
+        phoneNode: String,
+        opened: WatchLinkExchange.Opened,
+    ) {
+        val outcome =
+            try {
+                beforeInstall()
+                installer.install(opened.bundle)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Napier.e("Installing the phone's account link failed part way; the phone links this watch again", e)
+                InstallOutcome.Failed(LinkProblem.INTERRUPTED)
+            }
+        mutex.withLock { record(phoneNode, outcome) }
+    }
+
+    private suspend fun record(
+        phoneNode: String?,
+        outcome: InstallOutcome,
+    ) {
+        val current = store.current()
+        if (current?.stale == true || (phoneNode != null && current != null && current.phoneNode != phoneNode)) return
+        when (outcome) {
+            is InstallOutcome.Installed -> {
+                store.saveCloudLink(phoneNode.orEmpty(), outcome.accountId)
+                Napier.i("This watch now syncs with its phone's account")
+            }
+            is InstallOutcome.Failed -> {
+                store.recordProblem(phoneNode, outcome.problem)
+                Napier.w(
+                    "Linking this watch to its phone's account failed with ${outcome.problem}; the phone sees it in this watch's state",
+                )
+            }
+        }
+    }
+
+    private fun LinkProblem.toRefusal(): LinkRefusal =
+        when (this) {
+            LinkProblem.BOUND_TO_ANOTHER_ACCOUNT, LinkProblem.KEY_CONFLICT -> LinkRefusal.BOUND_TO_ANOTHER_ACCOUNT
+            LinkProblem.LINK_CODE_EXPIRED -> LinkRefusal.EXPIRED_OFFER
+            else -> LinkRefusal.UNSUPPORTED
+        }
+
+    private fun acceptsMode(mode: LinkMode): Boolean = mode == LinkMode.PAIR || (installer != null && installScope != null)
 
     private fun refuse(
         reason: LinkRefusal,

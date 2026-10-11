@@ -139,6 +139,7 @@ dependencies {
     implementation(projects.client.device)
     implementation(projects.client.location)
     implementation(projects.client.logdateDatastore)
+    implementation(projects.client.networking)
     implementation(projects.client.notifications)
     implementation(projects.client.permissions)
     implementation(projects.client.sync)

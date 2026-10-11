@@ -2,6 +2,7 @@ package app.logdate.wear.sync.v2.link
 
 import app.logdate.client.datastore.KeyValueStorage
 import app.logdate.client.sync.datalayer.v2.LinkMode
+import app.logdate.client.sync.peer.link.LinkProblem
 import app.logdate.client.sync.peer.link.PairKeyVault
 import app.logdate.client.sync.peer.state.PeerLinkState
 import io.github.aakira.napier.Napier
@@ -17,6 +18,8 @@ import kotlin.time.Clock
  * The phone this watch is linked with and how.
  *
  * @property stale The watch moved to another phone since; it waits for that phone to link it again.
+ * @property problem Why the last account link failed, as a [LinkProblem] name.
+ * @property installing The pair is confirmed, but account installation is still pending.
  */
 @Serializable
 data class WatchLinkRecord(
@@ -25,12 +28,15 @@ data class WatchLinkRecord(
     val linkedAt: Long,
     val stale: Boolean = false,
     val accountId: String? = null,
+    val problem: String? = null,
+    val installing: Boolean = false,
 )
 
 /** What the watch publishes about its link in its state document. */
 fun WatchLinkRecord?.peerLinkState(): PeerLinkState {
     if (this == null) return PeerLinkState.UNLINKED
-    if (stale) return PeerLinkState.NEEDS_RELINK
+    if (stale || problem != null) return PeerLinkState.NEEDS_RELINK
+    if (installing) return PeerLinkState.PAIRED
     return when (mode) {
         LinkMode.PAIR -> PeerLinkState.PAIRED
         LinkMode.CLOUD -> PeerLinkState.LINKED
@@ -57,11 +63,54 @@ class WatchLinkStore(
         write(WatchLinkRecord(mode = LinkMode.PAIR, phoneNode = phoneNode, linkedAt = clock.now().toEpochMilliseconds()))
     }
 
+    /** Persists the exchange's phone before confirming; account setup has not finished yet. */
+    suspend fun beginCloudInstall(
+        phoneNode: String,
+        pairKey: ByteArray,
+        accountId: String?,
+    ) {
+        savePairKey(phoneNode, pairKey)
+        write(WatchLinkRecord(LinkMode.CLOUD, phoneNode, linkedAt = 0, accountId = accountId, installing = true))
+    }
+
+    /** Keeps the pair key from an account link before its install finishes. */
+    suspend fun savePairKey(
+        phoneNode: String,
+        pairKey: ByteArray,
+    ) = pairKeys.put(phoneNode, pairKey)
+
+    suspend fun saveCloudLink(
+        phoneNode: String,
+        accountId: String,
+    ) {
+        write(
+            WatchLinkRecord(
+                mode = LinkMode.CLOUD,
+                phoneNode = phoneNode,
+                linkedAt = clock.now().toEpochMilliseconds(),
+                accountId = accountId,
+            ),
+        )
+    }
+
+    /** Records why an account link failed; the watch then asks its phone to link it again. */
+    suspend fun recordProblem(
+        phoneNode: String?,
+        problem: LinkProblem,
+    ) {
+        val previous = current()
+        val node = phoneNode ?: previous?.phoneNode.orEmpty()
+        val record =
+            previous?.copy(phoneNode = node, problem = problem.name, installing = false)
+                ?: WatchLinkRecord(mode = LinkMode.CLOUD, phoneNode = node, linkedAt = 0, problem = problem.name)
+        write(record)
+    }
+
     /** Marks the link with [phoneNode] stale; false when the watch is not linked with that phone. */
     suspend fun markStale(phoneNode: String): Boolean {
         val record = current() ?: return false
         if (record.phoneNode != phoneNode || record.stale) return false
-        write(record.copy(stale = true))
+        write(record.copy(stale = true, installing = false))
         return true
     }
 

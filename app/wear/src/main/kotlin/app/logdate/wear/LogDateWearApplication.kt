@@ -3,6 +3,7 @@ package app.logdate.wear
 import android.app.Application
 import app.logdate.client.data.notes.StoredMediaReferenceMigrationLauncher
 import app.logdate.client.database.LogDateDatabase
+import app.logdate.client.datastore.LogDateConfigDataSource
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.media.audio.RecordingNotificationDecorator
 import app.logdate.client.notifications.LogDateNotificationChannelKey
@@ -10,6 +11,7 @@ import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.wear.di.wearAudioModule
 import app.logdate.wear.di.wearDataModule
 import app.logdate.wear.di.wearExperienceModule
+import app.logdate.wear.di.wearIdentityModule
 import app.logdate.wear.di.wearSyncV2Module
 import app.logdate.wear.di.wearV2Module
 import app.logdate.wear.launch.FeatureSwitch
@@ -21,6 +23,7 @@ import app.logdate.wear.reminders.applyReminderBridging
 import app.logdate.wear.sync.WatchSyncScheduler
 import app.logdate.wear.sync.WearDeadLetterMigration
 import app.logdate.wear.sync.v2.WatchStateMirror
+import app.logdate.wear.sync.v2.link.WatchLinkCoordinator
 import app.logdate.wear.v2.surfaces.SurfaceCoordinator
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
@@ -74,6 +77,7 @@ class LogDateWearApplication :
             androidContext(this@LogDateWearApplication)
             modules(
                 wearDataModule,
+                wearIdentityModule,
                 wearAudioModule,
                 wearExperienceModule,
                 wearV2Module,
@@ -139,12 +143,25 @@ class LogDateWearApplication :
                 .getKoin()
         val scope = koin.get<CoroutineScope>()
         koin.get<WatchStateMirror>().start(scope)
+        scope.launch { resumeAccountLink(koin) }
         scope.launch {
             newWatchApp.state.collect { restoreReminders(koin.get()) }
         }
         scope.launch {
             requeueSetAsideCaptures(koin.get())
             koin.get<WatchSyncScheduler>().start(this)
+        }
+    }
+
+    /** Loads the saved server first, so a link finished now is not undone by the saved one arriving later. */
+    private suspend fun resumeAccountLink(koin: org.koin.core.Koin) {
+        try {
+            koin.get<LogDateConfigDataSource>().awaitConfigurationLoaded()
+            koin.get<WatchLinkCoordinator>().resumeInstall()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.e("Finishing the phone's account link failed; the phone links this watch again", e)
         }
     }
 

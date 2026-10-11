@@ -32,6 +32,7 @@ class WatchOwnState(
                 freeBytes = count.freeBytes,
                 link = link.peerLinkState(),
                 features = features,
+                linkProblem = link?.problem,
             )
         }.distinctUntilChanged()
 }

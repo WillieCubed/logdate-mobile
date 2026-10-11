@@ -44,6 +44,8 @@ class LinkedDeviceInstallerTest {
     private val journal = InMemoryKeyValueStorage()
     private val moves = mutableListOf<Triple<OwnerScope, OwnerScope, String>>()
     private var moveFails = false
+    private var persistenceFails = false
+    private var persistenceCalls = 0
     private var redeemCalls = 0
     private var redeemResult: Result<DeviceLinkRedeemResponse> =
         Result.success(DeviceLinkRedeemResponse(ACCOUNT, "session", AccountTokens("access", "refresh")))
@@ -76,6 +78,10 @@ class LinkedDeviceInstallerTest {
             deviceId = { "device" },
             deviceName = { "Pixel Watch 3" },
             clock = clock,
+            persistConfiguration = {
+                persistenceCalls++
+                check(!persistenceFails) { "configuration was not saved" }
+            },
         )
 
     @Test
@@ -318,6 +324,19 @@ class LinkedDeviceInstallerTest {
             )
             assertEquals(ACCOUNT, owner.id)
             assertEquals(1, redeemCalls)
+        }
+
+    @Test
+    fun `setup keeps its journal until configuration reaches durable storage`() =
+        runTest {
+            persistenceFails = true
+            assertFailsWith<IllegalStateException> { installer.install(bundle()) }
+            assertTrue(journal.values.isNotEmpty())
+            persistenceFails = false
+            assertEquals(InstallOutcome.Installed(ACCOUNT, LINKED_ORIGIN, 0), installer.resume())
+            assertEquals(2, persistenceCalls)
+            assertEquals(1, moves.size)
+            assertTrue(journal.values.isEmpty())
         }
 
     private fun bundle() =

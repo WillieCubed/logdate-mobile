@@ -12,6 +12,15 @@ import kotlin.test.assertIs
  * Tests [StateDocumentCodec], the per-device document at `/logdate/state`.
  */
 class StateDocumentCodecTest {
+    @Test
+    fun `a watch's link problem reads back and is left out when there is none`() {
+        val failed =
+            watchDocument.copy(watch = watchDocument.watch?.copy(link = PeerLinkState.NEEDS_RELINK, linkProblem = "DEVICE_LIMIT_REACHED"))
+
+        assertEquals(Decoded.Supported(failed), StateDocumentCodec.decode(StateDocumentCodec.encode(failed)))
+        assertEquals(false, StateDocumentCodec.encode(watchDocument).contains("linkProblem"))
+    }
+
     private val phoneDocument =
         StateDocument(
             role = PeerRole.PHONE,

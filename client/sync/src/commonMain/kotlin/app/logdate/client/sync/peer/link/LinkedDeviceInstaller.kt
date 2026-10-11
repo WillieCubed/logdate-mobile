@@ -101,6 +101,7 @@ class LinkedDeviceInstaller(
     private val deviceId: suspend () -> String,
     private val deviceName: () -> String,
     private val clock: Clock = Clock.System,
+    private val persistConfiguration: suspend () -> Unit,
 ) : LinkInstaller {
     private val mutex = Mutex()
 
@@ -194,6 +195,7 @@ class LinkedDeviceInstaller(
         }
         config.updateBackendUrl(moved.origin)
         config.updateServerDescriptor(moved.descriptor?.let(::descriptorFromText))
+        persistConfiguration()
         journal.remove(KEY)
         Napier.i("This device is linked to its phone's account; ${moved.leftBehind} queued change(s) stayed with its earlier owner")
         return InstallOutcome.Installed(moved.accountId, moved.origin, moved.leftBehind)
