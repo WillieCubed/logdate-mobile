@@ -1,5 +1,6 @@
 package app.logdate.server.database
 
+import app.logdate.server.identity.EncryptedPrivateKey
 import app.logdate.server.identity.SigningKeyRepository
 import app.logdate.server.identity.StoredSigningKey
 import org.jetbrains.exposed.v1.core.ResultRow
@@ -7,6 +8,7 @@ import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
@@ -52,6 +54,32 @@ class PostgreSQLSigningKeyRepository : SigningKeyRepository {
                     kotlin.time.Clock.System
                         .now()
             }
+        }
+
+    override suspend fun encryptedPrivateKeys(): List<EncryptedPrivateKey> =
+        transaction {
+            SigningKeysTable
+                .select(SigningKeysTable.id, SigningKeysTable.privateKeyEncrypted)
+                .map {
+                    EncryptedPrivateKey(
+                        id = it[SigningKeysTable.id].toString(),
+                        privateKeyEncrypted = it[SigningKeysTable.privateKeyEncrypted],
+                    )
+                }
+        }
+
+    override suspend fun replaceEncryptedPrivateKey(
+        id: String,
+        expected: String,
+        replacement: String,
+    ): Boolean =
+        transaction {
+            SigningKeysTable.update({
+                (SigningKeysTable.id eq Uuid.parse(id).toJavaUUID()) and
+                    (SigningKeysTable.privateKeyEncrypted eq expected)
+            }) {
+                it[privateKeyEncrypted] = replacement
+            } == 1
         }
 
     private fun ResultRow.toStoredSigningKey(): StoredSigningKey =

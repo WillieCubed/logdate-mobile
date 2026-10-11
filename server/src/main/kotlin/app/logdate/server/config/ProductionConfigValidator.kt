@@ -58,6 +58,7 @@ object ProductionConfigValidator {
             readEnv,
             failures,
         )
+        validateDecryptOnlySigningKeyKek(readEnv, failures)
         validateDedicatedSecret(
             AtprotoSessionSecret,
             "It signs hosted AT Protocol session tokens (see server/docs/environment-variables.md).",
@@ -117,6 +118,21 @@ object ProductionConfigValidator {
             value.length < MIN_DEDICATED_SECRET_LENGTH ->
                 failures += "$name must be at least $MIN_DEDICATED_SECRET_LENGTH characters (got ${value.length})."
             value.lowercase() in INSECURE_JWT_SECRETS -> failures += "$name is set to a known placeholder value."
+        }
+    }
+
+    private fun validateDecryptOnlySigningKeyKek(
+        readEnv: (String) -> String?,
+        failures: MutableList<String>,
+    ) {
+        val name = AtprotoSigningKeyKekDecryptOnly.ENV_VAR
+        val value = readEnv(name)?.trim().orEmpty()
+        if (value.isEmpty()) return
+        when {
+            value.length < MIN_DEDICATED_SECRET_LENGTH ->
+                failures += "$name must be at least $MIN_DEDICATED_SECRET_LENGTH characters (got ${value.length})."
+            value == readEnv(AtprotoSigningKeyKek.envVar)?.trim() ->
+                failures += "$name must differ from ${AtprotoSigningKeyKek.envVar}; it only exists while moving to a new one."
         }
     }
 

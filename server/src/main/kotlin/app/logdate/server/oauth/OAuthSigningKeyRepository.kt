@@ -1,5 +1,7 @@
 package app.logdate.server.oauth
 
+import app.logdate.server.identity.EncryptedPrivateKey
+import app.logdate.server.identity.EncryptedPrivateKeyStore
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.Instant
 
@@ -9,7 +11,7 @@ import kotlin.time.Instant
  * Every server instance must sign with the same key, and the key must outlive restarts; otherwise
  * tokens issued by one instance fail on another, or after a deploy.
  */
-interface OAuthSigningKeyRepository {
+interface OAuthSigningKeyRepository : EncryptedPrivateKeyStore {
     /**
      * Returns the stored key. When none exists yet, stores the key from [candidate] first. When
      * several instances race, exactly one candidate is stored and all of them receive it.
@@ -34,4 +36,16 @@ class InMemoryOAuthSigningKeyRepository : OAuthSigningKeyRepository {
 
     override fun getOrCreate(candidate: () -> StoredOAuthSigningKey): StoredOAuthSigningKey =
         stored.get() ?: stored.updateAndGet { current -> current ?: candidate() }!!
+
+    override suspend fun encryptedPrivateKeys(): List<EncryptedPrivateKey> =
+        listOfNotNull(stored.get()?.let { EncryptedPrivateKey(id = it.keyId, privateKeyEncrypted = it.privateKeyEncrypted) })
+
+    override suspend fun replaceEncryptedPrivateKey(
+        id: String,
+        expected: String,
+        replacement: String,
+    ): Boolean {
+        val current = stored.get()?.takeIf { it.keyId == id && it.privateKeyEncrypted == expected } ?: return false
+        return stored.compareAndSet(current, current.copy(privateKeyEncrypted = replacement))
+    }
 }

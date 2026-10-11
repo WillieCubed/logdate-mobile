@@ -34,6 +34,7 @@ import app.logdate.server.auth.SessionManager
 import app.logdate.server.auth.TokenService
 import app.logdate.server.config.AtprotoSessionSecret
 import app.logdate.server.config.AtprotoSigningKeyKek
+import app.logdate.server.config.AtprotoSigningKeyKekDecryptOnly
 import app.logdate.server.database.PostgreSQLAccountIdentityRepository
 import app.logdate.server.database.PostgreSQLAccountKeyEnvelopeRepository
 import app.logdate.server.database.PostgreSQLAccountRepository
@@ -227,6 +228,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             OAuthKeyService(
                 repository = get(),
                 encryptionKeySeed = AtprotoSigningKeyKek.resolve(),
+                decryptOnlyEncryptionKeySeeds = listOfNotNull(AtprotoSigningKeyKekDecryptOnly.resolve()),
             )
         }
         single { OAuthNonceService() }
@@ -255,6 +257,7 @@ fun serverModule(isDatabaseAvailable: Boolean) =
             SigningKeyService(
                 repository = get(),
                 encryptionKeySeed = AtprotoSigningKeyKek.resolve(),
+                decryptOnlyEncryptionKeySeeds = listOfNotNull(AtprotoSigningKeyKekDecryptOnly.resolve()),
             )
         }
         single {

@@ -1,9 +1,13 @@
 package app.logdate.server.database
 
 import app.logdate.server.database.support.withH2Database
+import app.logdate.server.identity.EncryptedPrivateKey
 import app.logdate.server.oauth.StoredOAuthSigningKey
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -34,6 +38,20 @@ class PostgreSQLOAuthSigningKeyRepositoryTest {
             val restarted = PostgreSQLOAuthSigningKeyRepository()
 
             assertEquals(existing, restarted.getOrCreate { error("must not create a second key") })
+        }
+
+    @Test
+    fun `the encrypted private key is replaced only while it still holds the expected value`() =
+        withH2Database(OAuthSigningKeysTable) {
+            val repository = PostgreSQLOAuthSigningKeyRepository()
+            val stored = repository.getOrCreate { key("kid-rewrap") }
+
+            runBlocking {
+                assertEquals(listOf(EncryptedPrivateKey("kid-rewrap", stored.privateKeyEncrypted)), repository.encryptedPrivateKeys())
+                assertFalse(repository.replaceEncryptedPrivateKey("kid-rewrap", "stale", "ciphertext-new"))
+                assertTrue(repository.replaceEncryptedPrivateKey("kid-rewrap", stored.privateKeyEncrypted, "ciphertext-new"))
+            }
+            assertEquals("ciphertext-new", repository.getOrCreate { error("must not create a key") }.privateKeyEncrypted)
         }
 
     private fun key(keyId: String) =

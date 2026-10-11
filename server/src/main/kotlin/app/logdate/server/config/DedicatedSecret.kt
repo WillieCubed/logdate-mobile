@@ -31,6 +31,18 @@ object AtprotoSigningKeyKek : DedicatedSecret(
     developmentValue = "logdate-atproto-dev-signing-key",
 )
 
+/**
+ * An additional key-encryption key the server can decrypt stored signing keys with, but never
+ * encrypts with. It exists only while a deployment moves from one [AtprotoSigningKeyKek] to
+ * another; while it's set, the server re-encrypts stored keys under [AtprotoSigningKeyKek] at
+ * startup. Unset, it has no development value.
+ */
+object AtprotoSigningKeyKekDecryptOnly {
+    const val ENV_VAR = "ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY"
+
+    fun resolve(readEnv: (String) -> String? = System::getenv): String? = readEnv(ENV_VAR)?.takeIf(String::isNotBlank)
+}
+
 /** Signs hosted AT Protocol session tokens. A different value signs out every AT Protocol session. */
 object AtprotoSessionSecret : DedicatedSecret(
     envVar = "ATPROTO_SESSION_SECRET",

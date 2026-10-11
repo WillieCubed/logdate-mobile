@@ -9,6 +9,7 @@ import app.logdate.server.auth.SessionType
 import app.logdate.server.auth.TemporarySession
 import app.logdate.server.database.support.withH2Database
 import app.logdate.server.entitlements.AccountEntitlementsTable
+import app.logdate.server.identity.EncryptedPrivateKey
 import app.logdate.server.identity.StoredSigningKey
 import app.logdate.shared.model.PasskeyInfo
 import kotlinx.coroutines.runBlocking
@@ -206,6 +207,35 @@ class PostgreSqlRepositoriesTest {
                 assertEquals(stored.publicKeyMultibase, repository.findActiveByAccountId(accountId)?.publicKeyMultibase)
                 assertEquals(1, repository.revokeActiveKeys(accountId))
                 assertNull(repository.findActiveByAccountId(accountId))
+            }
+        }
+    }
+
+    @Test
+    fun `signing key repository lists and replaces encrypted private keys only while unchanged`() {
+        withH2Database(AccountsTable, SigningKeysTable) {
+            val accountId = Uuid.random()
+            val repository = PostgreSQLSigningKeyRepository()
+            val stored =
+                StoredSigningKey(
+                    id = Uuid.random(),
+                    accountId = accountId,
+                    publicKeyMultibase = "zSigningKey",
+                    privateKeyEncrypted = "encrypted-old",
+                    createdAt = Clock.System.now(),
+                )
+
+            runBlocking {
+                PostgreSQLAccountRepository().save(sampleAccount(accountId, username = "rewrap-owner"))
+                repository.save(stored)
+
+                assertEquals(
+                    listOf(EncryptedPrivateKey(stored.id.toString(), "encrypted-old")),
+                    repository.encryptedPrivateKeys(),
+                )
+                assertFalse(repository.replaceEncryptedPrivateKey(stored.id.toString(), "stale", "encrypted-new"))
+                assertTrue(repository.replaceEncryptedPrivateKey(stored.id.toString(), "encrypted-old", "encrypted-new"))
+                assertEquals("encrypted-new", repository.findActiveByAccountId(accountId)?.privateKeyEncrypted)
             }
         }
     }

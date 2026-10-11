@@ -652,6 +652,7 @@ try:
         "STRIPE_SECRET_KEY",
         "STRIPE_WEBHOOK_SECRET",
         "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON",
+        "ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY",
     }
     if set(secret_env) - required_secret_keys - optional_secret_keys:
         fail("secret contract contains unexpected keys")

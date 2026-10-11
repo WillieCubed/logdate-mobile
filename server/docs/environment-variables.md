@@ -222,10 +222,22 @@ These development/test-only variables provide the local PostgreSQL fallback when
 - **Example**: `ATPROTO_SIGNING_KEY_KEK=$(openssl rand -base64 48)`
 - **Required**: **Yes, in production.** `LOGDATE_ENV=production` refuses to start without it. The server never falls back to `JWT_SECRET`.
 - **Security**:
-  - A different value leaves every stored signing key unreadable: commits, PLC operations and key exports fail, and so does every OAuth access token for third-party apps. Never change it in place. Moving to a new value means re-encrypting every stored key first.
+  - A different value leaves every stored signing key unreadable: commits, PLC operations and key exports fail, and so does every OAuth access token for third-party apps. Never change it in place; move to a new value with `ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY`, below.
   - Before this variable existed, deployed servers encrypted signing keys with `JWT_SECRET`. An existing deployment must therefore start this secret from the **exact bytes** of the `JWT_SECRET` version it has been running with. Copy the version byte for byte, then compare SHA-256 digests of the two versions before deploying.
   - A new deployment with no stored keys uses a fresh random value, independent of `JWT_SECRET`.
   - Store in a secret manager; never commit.
+
+### `ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY`
+- **Description**: A second key-encryption key the server can decrypt stored private keys with, but never encrypts with. It exists only while a deployment moves from one `ATPROTO_SIGNING_KEY_KEK` to another. While it's set, every instance re-encrypts the stored keys under `ATPROTO_SIGNING_KEY_KEK` once at startup, and logs how many keys it re-encrypted. Keys neither value can read are left untouched and logged as an error.
+- **Type**: String (minimum 32 characters in production, and different from `ATPROTO_SIGNING_KEY_KEK`).
+- **Default**: Unset.
+- **Required**: No.
+- **Moving to a new key-encryption key**: running instances keep serving during a deploy, so the new value has to be readable everywhere before anything is encrypted with it. Use two deploys:
+  1. Create the new value as a new version of the secret. Deploy with `ATPROTO_SIGNING_KEY_KEK` unchanged and `ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY` set to the **new** value. Nothing is re-encrypted yet, but every instance can now read keys encrypted with the new value.
+  2. Deploy with `ATPROTO_SIGNING_KEY_KEK` set to the new value and `ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY` set to the **old** value. Instances re-encrypt every stored key under the new value at startup, and instances still running the first deploy can read the result.
+  3. Once the logs report every key re-encrypted and none unreadable, unset `ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY` in a later deploy.
+  4. Keep the old version of the secret until no database backup still holds keys encrypted with it. Restoring such a backup without the old value loses every key in it.
+- **Security**: Store in a secret manager; never commit.
 
 ### `ATPROTO_SESSION_SECRET`
 - **Description**: The secret that signs the access and refresh tokens the server issues to AT Protocol clients through `com.atproto.server.createSession` and `refreshSession`. The LogDate apps sign in with their own tokens and do not use these.
@@ -646,7 +658,7 @@ ALLOW_PASSTHROUGH_CLIENT_CIPHERTEXT=true
 
 2. **Rotate secrets periodically**
    - `JWT_SECRET`: Rotate quarterly
-   - `ATPROTO_SIGNING_KEY_KEK`: Never change in place; stored signing keys must be re-encrypted under the new value first
+   - `ATPROTO_SIGNING_KEY_KEK`: Never change in place; follow the two-deploy move under `ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY`
    - `ATPROTO_SESSION_SECRET`: Rotate as needed; rotating signs out every AT Protocol client session
    - `SERVER_ENCRYPTION_KEY`: Support multiple keys via key rotation (increment `SERVER_ENCRYPTION_KEY_ID`)
    - Database passwords: Rotate annually or after security incidents

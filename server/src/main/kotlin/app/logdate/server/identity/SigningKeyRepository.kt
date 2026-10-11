@@ -18,7 +18,7 @@ data class StoredSigningKey(
 )
 
 @OptIn(ExperimentalUuidApi::class)
-interface SigningKeyRepository {
+interface SigningKeyRepository : EncryptedPrivateKeyStore {
     suspend fun save(signingKey: StoredSigningKey): StoredSigningKey
 
     suspend fun findActiveByAccountId(accountId: Uuid): StoredSigningKey?
@@ -47,5 +47,18 @@ class InMemorySigningKeyRepository : SigningKeyRepository {
             keysById[key.id] = key.copy(revokedAt = revokedAt)
         }
         return activeKeys.size
+    }
+
+    override suspend fun encryptedPrivateKeys(): List<EncryptedPrivateKey> =
+        keysById.values.map { EncryptedPrivateKey(id = it.id.toString(), privateKeyEncrypted = it.privateKeyEncrypted) }
+
+    override suspend fun replaceEncryptedPrivateKey(
+        id: String,
+        expected: String,
+        replacement: String,
+    ): Boolean {
+        val key = keysById[Uuid.parse(id)]?.takeIf { it.privateKeyEncrypted == expected } ?: return false
+        keysById[key.id] = key.copy(privateKeyEncrypted = replacement)
+        return true
     }
 }

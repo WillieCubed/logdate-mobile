@@ -1,6 +1,7 @@
 package app.logdate.server.oauth
 
 import app.logdate.server.config.AtprotoSigningKeyKek
+import app.logdate.server.config.AtprotoSigningKeyKekDecryptOnly
 import app.logdate.server.identity.AtRestKeyCipher
 import kotlinx.serialization.Serializable
 import java.math.BigInteger
@@ -31,10 +32,11 @@ import kotlin.time.Clock
 class OAuthKeyService(
     private val repository: OAuthSigningKeyRepository = InMemoryOAuthSigningKeyRepository(),
     encryptionKeySeed: String = AtprotoSigningKeyKek.developmentValue,
+    decryptOnlyEncryptionKeySeeds: List<String> = emptyList(),
     private val secureRandom: SecureRandom = SecureRandom(),
     private val clock: Clock = Clock.System,
 ) {
-    private val cipher = AtRestKeyCipher(encryptionKeySeed, secureRandom)
+    private val cipher = AtRestKeyCipher(encryptionKeySeed, decryptOnlyEncryptionKeySeeds, secureRandom)
     private val keyPair: KeyPair by lazy(::loadOrCreateKeyPair)
     private val currentJwk: JsonWebKey by lazy(::buildCurrentJwk)
 
@@ -70,8 +72,8 @@ class OAuthKeyService(
                 cipher.decrypt(stored.privateKeyEncrypted)
             } catch (e: GeneralSecurityException) {
                 throw IllegalStateException(
-                    "The stored OAuth signing key can't be decrypted. ${AtprotoSigningKeyKek.envVar} must keep the " +
-                        "value that encrypted it.",
+                    "The stored OAuth signing key can't be decrypted. ${AtprotoSigningKeyKek.envVar} or " +
+                        "${AtprotoSigningKeyKekDecryptOnly.ENV_VAR} must hold the value that encrypted it.",
                     e,
                 )
             }

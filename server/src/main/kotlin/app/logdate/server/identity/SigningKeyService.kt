@@ -23,9 +23,10 @@ import kotlin.uuid.Uuid
 class SigningKeyService(
     private val repository: SigningKeyRepository,
     encryptionKeySeed: String,
+    decryptOnlyEncryptionKeySeeds: List<String> = emptyList(),
 ) {
     private val secureRandom = SecureRandom()
-    private val atRestCipher = AtRestKeyCipher(encryptionKeySeed, secureRandom)
+    private val atRestCipher = AtRestKeyCipher(encryptionKeySeed, decryptOnlyEncryptionKeySeeds, secureRandom)
 
     fun generateKeyPair(curve: EcCurve = DEFAULT_SIGNING_CURVE): GeneratedSigningKey {
         val keyPair = EcKeySupport.generateKeyPair(curve = curve, secureRandom = secureRandom)

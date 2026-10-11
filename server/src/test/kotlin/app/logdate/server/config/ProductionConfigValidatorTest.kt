@@ -129,6 +129,38 @@ class ProductionConfigValidatorTest {
     }
 
     @Test
+    fun `production accepts a separate decrypt-only signing-key KEK`() {
+        ProductionConfigValidator.validate(
+            profile = RuntimeProfile.PRODUCTION,
+            readEnv = productionEnv(AtprotoSigningKeyKekDecryptOnly.ENV_VAR to "PrEvIoUsKeK0123456789abcdefghijklmnop+/="),
+        )
+    }
+
+    @Test
+    fun `production rejects a short decrypt-only signing-key KEK`() {
+        val failure =
+            assertFailsWith<InsecureProductionConfigException> {
+                ProductionConfigValidator.validate(
+                    profile = RuntimeProfile.PRODUCTION,
+                    readEnv = productionEnv(AtprotoSigningKeyKekDecryptOnly.ENV_VAR to "too-short"),
+                )
+            }
+        assertTrue(failure.message!!.contains("${AtprotoSigningKeyKekDecryptOnly.ENV_VAR} must be at least 32"))
+    }
+
+    @Test
+    fun `production rejects a decrypt-only signing-key KEK equal to the encrypting one`() {
+        val failure =
+            assertFailsWith<InsecureProductionConfigException> {
+                ProductionConfigValidator.validate(
+                    profile = RuntimeProfile.PRODUCTION,
+                    readEnv = productionEnv(AtprotoSigningKeyKekDecryptOnly.ENV_VAR to VALID_SIGNING_KEY_KEK),
+                )
+            }
+        assertTrue(failure.message!!.contains("${AtprotoSigningKeyKekDecryptOnly.ENV_VAR} must differ"))
+    }
+
+    @Test
     fun `production rejects short JWT_SECRET`() {
         val failure =
             assertFailsWith<InsecureProductionConfigException> {

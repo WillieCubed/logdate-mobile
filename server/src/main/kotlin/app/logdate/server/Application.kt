@@ -6,6 +6,7 @@ import app.logdate.server.config.RuntimeProfile
 import app.logdate.server.di.initializeDatabase
 import app.logdate.server.di.installServerKoin
 import app.logdate.server.diagnostics.installDiagnosticReportMaintenance
+import app.logdate.server.identity.installStoredKeyRewrap
 import app.logdate.server.logging.initializeSentry
 import app.logdate.server.logging.installRequestDiagnostics
 import app.logdate.server.logging.installServerLogging
@@ -78,6 +79,7 @@ fun Application.module(
     installServerKoin(isDatabaseAvailable)
     installSyncMaintenance(isDatabaseAvailable)
     installDiagnosticReportMaintenance()
+    installStoredKeyRewrap()
     installJsonSerialization()
 
     routing {
