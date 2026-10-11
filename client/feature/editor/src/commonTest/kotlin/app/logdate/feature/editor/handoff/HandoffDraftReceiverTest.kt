@@ -23,7 +23,7 @@ class HandoffDraftReceiverTest {
         }
 
     @Test
-    fun `the editor waits while drafts are fetched, then opens the one that arrived`() =
+    fun `the editor waits while drafts are fetched and then opens the one that arrived`() =
         runTest {
             var fetches = 0
             val receiver =
@@ -43,7 +43,7 @@ class HandoffDraftReceiverTest {
         }
 
     @Test
-    fun `without backup on this device the draft can never arrive, so the editor says so at once`() =
+    fun `without backup on this device the draft can never arrive and the editor says so at once`() =
         runTest {
             var fetches = 0
             val receiver =

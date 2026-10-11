@@ -49,7 +49,7 @@ class RecorderBubbleStatesTest {
         }
 
     @Test
-    fun `elapsed time, pause, and transcript follow the recorder`() =
+    fun `elapsed time and pause and transcript follow the recorder`() =
         runTest {
             val elapsed = MutableStateFlow(42.seconds)
             val paused = MutableStateFlow(true)

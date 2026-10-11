@@ -68,7 +68,7 @@ class CaptureLaunchTest {
     }
 
     @Test
-    fun `a capture can start the entry with text, such as an unsaved notification reply`() {
+    fun `a capture can start the entry with text such as an unsaved notification reply`() {
         assertEquals(
             EntryEditorRoute(initialText = "Dinner on the steps"),
             captureRoute(mode = "text", journalId = null, text = "Dinner on the steps"),

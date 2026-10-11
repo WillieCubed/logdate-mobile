@@ -25,7 +25,7 @@ class QuickReplyTest {
     }
 
     @Test
-    fun `the confirmation shows the reply on one line, shortened when long`() {
+    fun `the confirmation shows the reply on one line and shortens it when long`() {
         assertEquals("Long walk. Quiet light.", quickReplyPreview("Long walk.\n Quiet light."))
 
         val long = "a".repeat(200)

@@ -22,14 +22,14 @@ class AssistantAccessTest {
     }
 
     @Test
-    fun `with the app lock on, LogDate counts as locked until the person unlocks it`() {
+    fun `with the app lock on LogDate counts as locked until the person unlocks it`() {
         // A process started only for an assistant has never shown the unlock prompt.
         assertEquals(false, assistantUnlocked(appLockOn = true, authenticated = false))
         assertEquals(true, assistantUnlocked(appLockOn = true, authenticated = true))
     }
 
     @Test
-    fun `without the app lock, LogDate is always unlocked`() {
+    fun `without the app lock LogDate is always unlocked`() {
         assertEquals(true, assistantUnlocked(appLockOn = false, authenticated = false))
     }
 

@@ -44,7 +44,7 @@ class AppKeyboardShortcutsTest {
     }
 
     @Test
-    fun `primary plus a digit opens that Home tab, only on Home`() {
+    fun `primary plus a digit opens that Home tab only on Home`() {
         val tabs =
             listOf(Key.One, Key.Two, Key.Three, Key.Four, Key.Five).map { key ->
                 AppKeyboardShortcut.match(KeyChord(key, primary = true), AppShortcutScope.Home)?.homeTabIndex

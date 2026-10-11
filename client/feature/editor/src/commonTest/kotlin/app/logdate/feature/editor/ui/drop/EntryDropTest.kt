@@ -7,7 +7,7 @@ import kotlin.test.assertTrue
 
 class EntryDropTest {
     @Test
-    fun `the editor accepts text, photos, videos, and audio`() {
+    fun `the editor accepts text and photos and videos and audio`() {
         listOf("text/plain", "text/html", "image/jpeg", "image/*", "video/mp4", "audio/mpeg").forEach { mime ->
             assertTrue(acceptsDroppedMimeType(mime), "$mime should be accepted")
         }
@@ -43,7 +43,7 @@ class EntryDropTest {
     }
 
     @Test
-    fun `the text menu offers Paste for a copied photo, video, or recording`() {
+    fun `the text menu offers Paste for a copied photo or video or recording`() {
         listOf("image/jpeg", "video/mp4", "audio/mpeg").forEach { mime ->
             assertEquals(MediaPasteItem.Paste, mediaPasteItem(listOf(mime)), "$mime should paste as media")
         }
@@ -55,13 +55,13 @@ class EntryDropTest {
     }
 
     @Test
-    fun `a file copied as a link may be media, so it can be pasted as an attachment`() {
+    fun `a file copied as a link may be media so it can be pasted as an attachment`() {
         // Apps that copy with ClipData.newRawUri describe the clip only as a URI list.
         assertEquals(MediaPasteItem.PasteAsAttachment, mediaPasteItem(listOf("text/uri-list")))
     }
 
     @Test
-    fun `keyboards may insert GIFs, stickers, and other images`() {
+    fun `keyboards may insert GIFs and stickers and other images`() {
         listOf("image/gif", "image/png", "image/webp", "video/mp4").forEach { mime ->
             assertTrue(acceptsKeyboardContent(mime), "$mime should be accepted")
         }
