@@ -41,7 +41,7 @@ sealed interface PhoneLinkDecision {
             val fresh = document != null && document.writtenAt > record.seenWatchDocAt
             val belongsToExchange = watch?.linkId == record.linkId
             val problem = watch?.linkProblem
-            if (fresh && belongsToExchange && watch != null && watch.link == PeerLinkState.NEEDS_RELINK && problem != null) {
+            if (fresh && belongsToExchange && watch.link == PeerLinkState.NEEDS_RELINK && problem != null) {
                 return WatchProblem(failureFor(problem))
             }
             val watchAsks = fresh && watch != null && watch.link in RELINK_STATES && now - record.lastAttemptAt >= RELINK_GRACE_MS
@@ -49,7 +49,7 @@ sealed interface PhoneLinkDecision {
             if (fresh &&
                 belongsToExchange &&
                 (record.confirmedAt == null || record.attempts > 0) &&
-                watch?.link == linkedState(record.mode)
+                watch.link == linkedState(record.mode)
             ) {
                 return Confirm
             }
