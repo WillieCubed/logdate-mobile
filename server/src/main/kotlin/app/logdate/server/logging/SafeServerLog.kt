@@ -40,7 +40,30 @@ private val approvedNotices =
         "Database repositories initialized successfully" to "SERVER_DATABASE_READY",
         "Production database unavailable; refusing to start with in-memory fallback" to "SERVER_DATABASE_REQUIRED",
         "Database unavailable; refusing to start somewhere nothing would persist" to "SERVER_DATABASE_REQUIRED",
+        KeyCustodyNotices.SIGNING_KEYS_REWRAPPED to "SERVER_SIGNING_KEYS_REWRAPPED",
+        KeyCustodyNotices.SIGNING_KEYS_CURRENT to "SERVER_SIGNING_KEYS_CURRENT",
+        KeyCustodyNotices.SIGNING_KEYS_UNREADABLE to "SERVER_SIGNING_KEYS_UNREADABLE",
+        KeyCustodyNotices.SIGNING_KEYS_REWRAP_FAILED to "SERVER_SIGNING_KEYS_REWRAP_FAILED",
+        KeyCustodyNotices.OAUTH_KEY_STAGED to "SERVER_OAUTH_KEY_STAGED",
+        KeyCustodyNotices.OAUTH_KEY_PROMOTED to "SERVER_OAUTH_KEY_PROMOTED",
+        KeyCustodyNotices.OAUTH_KEY_RETIRED to "SERVER_OAUTH_KEY_RETIRED",
+        KeyCustodyNotices.OAUTH_KEY_ROTATION_FAILED to "SERVER_OAUTH_KEY_ROTATION_FAILED",
     )
+
+/**
+ * Fixed log messages for signing-key custody. Production logs keep only approved messages, so these
+ * outcomes stay visible there as SERVER_SIGNING_KEYS_* and SERVER_OAUTH_KEY_* codes.
+ */
+internal object KeyCustodyNotices {
+    const val SIGNING_KEYS_REWRAPPED = "Re-encrypted stored signing keys under the current key-encryption key"
+    const val SIGNING_KEYS_CURRENT = "Every stored signing key already uses the current key-encryption key"
+    const val SIGNING_KEYS_UNREADABLE = "Some stored signing keys can't be decrypted with either key-encryption key"
+    const val SIGNING_KEYS_REWRAP_FAILED = "Re-encrypting stored signing keys failed"
+    const val OAUTH_KEY_STAGED = "Staged the next OAuth signing key"
+    const val OAUTH_KEY_PROMOTED = "Promoted the next OAuth signing key"
+    const val OAUTH_KEY_RETIRED = "Deleted the retired OAuth signing key"
+    const val OAUTH_KEY_ROTATION_FAILED = "OAuth signing key rotation check failed"
+}
 
 internal fun safeServerMessage(
     priority: LogLevel,

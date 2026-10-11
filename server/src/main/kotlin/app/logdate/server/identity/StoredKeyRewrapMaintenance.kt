@@ -2,6 +2,7 @@ package app.logdate.server.identity
 
 import app.logdate.server.config.AtprotoSigningKeyKek
 import app.logdate.server.config.AtprotoSigningKeyKekDecryptOnly
+import app.logdate.server.logging.KeyCustodyNotices
 import app.logdate.server.oauth.OAuthSigningKeyRepository
 import io.github.aakira.napier.Napier
 import io.ktor.server.application.Application
@@ -15,8 +16,9 @@ import org.koin.ktor.ext.inject
 
 /**
  * While [AtprotoSigningKeyKekDecryptOnly] is set, re-encrypts every stored signing key under
- * [AtprotoSigningKeyKek] once at startup. See server/docs/environment-variables.md for the order
- * in which a deployment changes the two secrets.
+ * [AtprotoSigningKeyKek] once at startup, and logs the outcome as one of the [KeyCustodyNotices].
+ * See server/docs/environment-variables.md for the order in which a deployment changes the two
+ * secrets.
  */
 internal fun Application.installStoredKeyRewrap() {
     val decryptOnlySeed = AtprotoSigningKeyKekDecryptOnly.resolve() ?: return
@@ -31,21 +33,15 @@ internal fun Application.installStoredKeyRewrap() {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 val report = rewrap.run()
-                Napier.i(
-                    "Stored signing keys re-encrypted under ${AtprotoSigningKeyKek.envVar}: " +
-                        "${report.rewrapped} re-encrypted, ${report.alreadyCurrent} already current.",
-                )
-                if (report.unreadable.isNotEmpty()) {
-                    Napier.e(
-                        "${report.unreadable.size} stored signing key(s) can't be decrypted with " +
-                            "${AtprotoSigningKeyKek.envVar} or ${AtprotoSigningKeyKekDecryptOnly.ENV_VAR} and were left " +
-                            "unchanged: ${report.unreadable.joinToString()}",
-                    )
+                when {
+                    report.unreadable.isNotEmpty() -> Napier.e(KeyCustodyNotices.SIGNING_KEYS_UNREADABLE)
+                    report.rewrapped > 0 -> Napier.i(KeyCustodyNotices.SIGNING_KEYS_REWRAPPED)
+                    else -> Napier.i(KeyCustodyNotices.SIGNING_KEYS_CURRENT)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (exception: Exception) {
-                Napier.e("Re-encrypting stored signing keys failed", exception)
+                Napier.e(KeyCustodyNotices.SIGNING_KEYS_REWRAP_FAILED, exception)
             }
         }
     monitor.subscribe(ApplicationStopped) { job.cancel() }

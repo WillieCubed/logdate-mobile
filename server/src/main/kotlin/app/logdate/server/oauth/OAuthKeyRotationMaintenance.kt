@@ -1,5 +1,6 @@
 package app.logdate.server.oauth
 
+import app.logdate.server.logging.KeyCustodyNotices
 import io.github.aakira.napier.Napier
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
@@ -24,15 +25,15 @@ internal fun Application.installOAuthKeyRotation() {
                 delay(ROTATION_CHECK_INTERVAL)
                 try {
                     when (keyService.rotateIfDue()) {
-                        OAuthKeyRotationStep.STAGED -> Napier.i("Staged the next OAuth signing key")
-                        OAuthKeyRotationStep.PROMOTED -> Napier.i("Promoted the next OAuth signing key; the previous key now only verifies")
-                        OAuthKeyRotationStep.RETIRED -> Napier.i("Deleted the retired OAuth signing key")
+                        OAuthKeyRotationStep.STAGED -> Napier.i(KeyCustodyNotices.OAUTH_KEY_STAGED)
+                        OAuthKeyRotationStep.PROMOTED -> Napier.i(KeyCustodyNotices.OAUTH_KEY_PROMOTED)
+                        OAuthKeyRotationStep.RETIRED -> Napier.i(KeyCustodyNotices.OAUTH_KEY_RETIRED)
                         OAuthKeyRotationStep.NONE -> Unit
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (exception: Exception) {
-                    Napier.e("OAuth signing key rotation check failed", exception)
+                    Napier.e(KeyCustodyNotices.OAUTH_KEY_ROTATION_FAILED, exception)
                 }
             }
         }

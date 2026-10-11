@@ -228,14 +228,14 @@ These development/test-only variables provide the local PostgreSQL fallback when
   - Store in a secret manager; never commit.
 
 ### `ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY`
-- **Description**: A second key-encryption key the server can decrypt stored private keys with, but never encrypts with. It exists only while a deployment moves from one `ATPROTO_SIGNING_KEY_KEK` to another. While it's set, every instance re-encrypts the stored keys under `ATPROTO_SIGNING_KEY_KEK` once at startup, and logs how many keys it re-encrypted. Keys neither value can read are left untouched and logged as an error.
+- **Description**: A second key-encryption key the server can decrypt stored private keys with, but never encrypts with. It exists only while a deployment moves from one `ATPROTO_SIGNING_KEY_KEK` to another. While it's set, every instance re-encrypts the stored keys under `ATPROTO_SIGNING_KEY_KEK` once at startup and logs the outcome: `SERVER_SIGNING_KEYS_REWRAPPED`, `SERVER_SIGNING_KEYS_CURRENT` when nothing needed re-encrypting, or the errors `SERVER_SIGNING_KEYS_UNREADABLE` (keys neither value can read, which are left untouched) and `SERVER_SIGNING_KEYS_REWRAP_FAILED`.
 - **Type**: String (minimum 32 characters in production, and different from `ATPROTO_SIGNING_KEY_KEK`).
 - **Default**: Unset.
 - **Required**: No.
 - **Moving to a new key-encryption key**: running instances keep serving during a deploy, so the new value has to be readable everywhere before anything is encrypted with it. Use two deploys:
   1. Create the new value as a new version of the secret. Deploy with `ATPROTO_SIGNING_KEY_KEK` unchanged and `ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY` set to the **new** value. Nothing is re-encrypted yet, but every instance can now read keys encrypted with the new value.
   2. Deploy with `ATPROTO_SIGNING_KEY_KEK` set to the new value and `ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY` set to the **old** value. Instances re-encrypt every stored key under the new value at startup, and instances still running the first deploy can read the result.
-  3. Once the logs report every key re-encrypted and none unreadable, unset `ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY` in a later deploy.
+  3. Once every instance logs `SERVER_SIGNING_KEYS_REWRAPPED` or `SERVER_SIGNING_KEYS_CURRENT`, and none logs an error, unset `ATPROTO_SIGNING_KEY_KEK_DECRYPT_ONLY` in a later deploy.
   4. Keep the old version of the secret until no database backup still holds keys encrypted with it. Restoring such a backup without the old value loses every key in it.
 - **Security**: Store in a secret manager; never commit.
 
@@ -247,6 +247,7 @@ These development/test-only variables provide the local PostgreSQL fallback when
 - **Type**: Integer, at least 1.
 - **Default**: `90`
 - **Required**: No.
+- **Logs**: each step logs `SERVER_OAUTH_KEY_STAGED`, `SERVER_OAUTH_KEY_PROMOTED` or `SERVER_OAUTH_KEY_RETIRED`, and a failed check logs the error `SERVER_OAUTH_KEY_ROTATION_FAILED`.
 - **Rotating early**: to replace the key now, for example after a suspected leak, set a value lower than the key's current age. The rotation completes within about an hour. Restore the usual value afterwards.
 
 ### `ATPROTO_SESSION_SECRET`
