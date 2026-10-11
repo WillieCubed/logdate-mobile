@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import app.logdate.client.database.entities.sync.PeerDeliveryEntity
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PeerDeliveryDao {
@@ -43,4 +44,23 @@ interface PeerDeliveryDao {
         entityType: String,
         entityId: String,
     )
+
+    @Query("SELECT * FROM peer_delivery WHERE peerScope = :peerScope AND direction = :direction")
+    suspend fun all(
+        peerScope: String,
+        direction: String,
+    ): List<PeerDeliveryEntity>
+
+    @Query("SELECT * FROM peer_delivery WHERE peerScope = :peerScope AND direction = :direction")
+    fun observeAll(
+        peerScope: String,
+        direction: String,
+    ): Flow<List<PeerDeliveryEntity>>
+
+    /** The soonest time anything for this peer and direction is due; rows with no time are not counted. */
+    @Query("SELECT MIN(nextAttemptAt) FROM peer_delivery WHERE peerScope = :peerScope AND direction = :direction")
+    suspend fun earliestNextAttempt(
+        peerScope: String,
+        direction: String,
+    ): Long?
 }

@@ -33,6 +33,7 @@ object WearPaths {
 
     private const val WINDOW_PREFIX = "/logdate/v2/p2w/window/"
     private const val TOMBSTONE_PREFIX = "/logdate/v2/p2w/tombstone/"
+    private const val MEDIA_PREFIX = "/logdate/v2/w2p/media/"
     private const val RECORD_PREFIX = "/logdate/v2/w2p/record/"
     private const val BODY_PREFIX = "/logdate/v2/body/"
     private val SHA256_HEX = Regex("[0-9a-f]{64}")
@@ -66,6 +67,14 @@ object WearPaths {
     fun parseWindowTombstone(path: String): RecordPath? = parse(path, TOMBSTONE_PREFIX)
 
     fun parseWatchRecord(path: String): RecordPath? = parse(path, RECORD_PREFIX)
+
+    /** The channel the media file of a record made on the watch travels on. */
+    fun recordMedia(
+        kind: RecordKind,
+        id: Uuid,
+    ): String = "$MEDIA_PREFIX${kind.pathSegment}/$id"
+
+    fun parseRecordMedia(path: String): RecordPath? = parse(path, MEDIA_PREFIX)
 
     private fun parse(
         path: String,

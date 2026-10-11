@@ -14,6 +14,15 @@ class WearPathsTest {
     private val id = Uuid.parse("550e8400-e29b-41d4-a716-446655440000")
 
     @Test
+    fun `a record's media channel reads back and is not a record path`() {
+        val path = WearPaths.recordMedia(RecordKind.NOTE, id)
+
+        assertEquals("/logdate/v2/w2p/media/note/$id", path)
+        assertEquals(RecordPath(RecordKind.NOTE, id), WearPaths.parseRecordMedia(path))
+        assertNull(WearPaths.parseWatchRecord(path))
+    }
+
+    @Test
     fun `a window item path names its kind and id`() {
         assertEquals(
             "/logdate/v2/p2w/window/note/550e8400-e29b-41d4-a716-446655440000",
@@ -45,6 +54,7 @@ class WearPathsTest {
         val v2Paths =
             listOf(
                 WearPaths.STATE,
+                WearPaths.recordMedia(RecordKind.NOTE, id),
                 WearPaths.RECEIPTS,
                 WearPaths.RECEIPTS_PUSH,
                 WearPaths.WINDOW_RESYNC,
