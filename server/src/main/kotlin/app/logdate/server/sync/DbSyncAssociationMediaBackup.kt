@@ -106,7 +106,7 @@ internal fun dbAssociationChanges(
                         (AssociationSyncTable.deleted eq false) and
                         (AssociationSyncTable.serverVersion greater since)
                 }.orderBy(AssociationSyncTable.serverVersion to SortOrder.ASC)
-                .limit(limit + 1)
+                .limit(changePageReadSize(limit))
                 .toList()
         val hasMoreChanges = changeRows.size > limit
         val changes = changeRows.take(limit).map { it.toAssociationRecord() }
@@ -120,7 +120,7 @@ internal fun dbAssociationChanges(
                         (AssociationSyncTable.deleted eq true) and
                         (AssociationSyncTable.serverVersion greater since)
                 }.orderBy(AssociationSyncTable.serverVersion to SortOrder.ASC)
-                .limit(limit + 1)
+                .limit(changePageReadSize(limit))
                 .toList()
         val hasMoreDeletions = deletionRows.size > limit
         val deletions =

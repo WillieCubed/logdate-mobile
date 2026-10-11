@@ -57,7 +57,7 @@ class InMemoryLocationHistoryRepository : LocationHistoryRepository {
                 .values
                 .filter { it.serverVersion > since }
                 .sortedBy { it.serverVersion }
-                .take(limit + 1)
+                .take(changePageReadSize(limit))
         return locationHistoryPage(records, since, limit)
     }
 }

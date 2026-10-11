@@ -111,7 +111,7 @@ class DbLocationHistoryRepository : LocationHistoryRepository {
                 .where {
                     (LocationHistoryTable.userId eq userId) and (LocationHistoryTable.serverVersion greater since)
                 }.orderBy(LocationHistoryTable.serverVersion to SortOrder.ASC)
-                .limit(limit + 1)
+                .limit(changePageReadSize(limit))
                 .map { it.toLocationHistoryRecord() }
         locationHistoryPage(records, since, limit)
     }

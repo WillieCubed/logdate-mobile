@@ -61,6 +61,26 @@ class PostgreSQLLogDateCollectionsMetadataStoreTest {
     }
 
     @Test
+    fun `a whole-feed read returns every change and deletion with no next page`() {
+        withH2Database(LogDateCollectionStatesTable, LogDateCollectionRecordsTable) {
+            runBlocking {
+                val store = PostgreSQLLogDateCollectionsMetadataStore()
+                val userId = UUID.randomUUID()
+                val repoDid = AtprotoDid.require("did:plc:ewvi7nxzyoun6zhxrhs64oiz")
+                store.upsert(userId, repoDid, LogDateCollectionKind.ASSOCIATION, "kept-link")
+                store.upsert(userId, repoDid, LogDateCollectionKind.ASSOCIATION, "removed-link")
+                store.delete(userId, repoDid, LogDateCollectionKind.ASSOCIATION, "removed-link", System.currentTimeMillis())
+
+                val feed = store.changes(userId, LogDateCollectionKind.ASSOCIATION, since = 0L, limit = Int.MAX_VALUE)
+
+                assertEquals(listOf("kept-link"), feed.changes.map { it.recordKey })
+                assertEquals(listOf("removed-link"), feed.deletions.map { it.recordKey })
+                assertTrue(!feed.hasMore)
+            }
+        }
+    }
+
+    @Test
     fun `metadata store tracks versions changes and purge counts by collection`() {
         withH2Database(
             LogDateCollectionStatesTable,

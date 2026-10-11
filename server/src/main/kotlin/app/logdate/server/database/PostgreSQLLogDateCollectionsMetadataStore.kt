@@ -7,6 +7,7 @@ import app.logdate.server.logdate.LogDateCollectionsMetadataStore
 import app.logdate.server.logdate.LogDateCollectionsPurgeResult
 import app.logdate.server.logdate.LogDateCollectionsState
 import app.logdate.server.logdate.LogDateCollectionsStatus
+import app.logdate.server.sync.changePageReadSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.v1.core.ResultRow
@@ -127,7 +128,7 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
                                 (LogDateCollectionRecordsTable.deleted eq false) and
                                 (LogDateCollectionRecordsTable.serverVersion greater since)
                         }.orderBy(LogDateCollectionRecordsTable.serverVersion to SortOrder.ASC)
-                        .limit(limit + 1)
+                        .limit(changePageReadSize(limit))
                         .toList()
                 val deletionRows =
                     LogDateCollectionRecordsTable
@@ -138,7 +139,7 @@ internal class PostgreSQLLogDateCollectionsMetadataStore : LogDateCollectionsMet
                                 (LogDateCollectionRecordsTable.deleted eq true) and
                                 (LogDateCollectionRecordsTable.serverVersion greater since)
                         }.orderBy(LogDateCollectionRecordsTable.serverVersion to SortOrder.ASC)
-                        .limit(limit + 1)
+                        .limit(changePageReadSize(limit))
                         .toList()
                 val page =
                     (changeRows + deletionRows)

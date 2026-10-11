@@ -155,7 +155,7 @@ class DbSyncRepository : SyncRepository {
                             (ContentSyncTable.deleted eq false) and
                             (ContentSyncTable.serverVersion greater since)
                     }.orderBy(ContentSyncTable.serverVersion to SortOrder.ASC)
-                    .limit(limit + 1)
+                    .limit(changePageReadSize(limit))
                     .toList()
             val hasMoreChanges = changeRows.size > limit
             val changes = changeRows.take(limit).map { it.toContentRecord() }
@@ -169,7 +169,7 @@ class DbSyncRepository : SyncRepository {
                             (ContentSyncTable.deleted eq true) and
                             (ContentSyncTable.serverVersion greater since)
                     }.orderBy(ContentSyncTable.serverVersion to SortOrder.ASC)
-                    .limit(limit + 1)
+                    .limit(changePageReadSize(limit))
                     .toList()
             val hasMoreDeletions = deletionRows.size > limit
             val deletions =
@@ -295,7 +295,7 @@ class DbSyncRepository : SyncRepository {
                             (JournalSyncTable.deleted eq false) and
                             (JournalSyncTable.serverVersion greater since)
                     }.orderBy(JournalSyncTable.serverVersion to SortOrder.ASC)
-                    .limit(limit + 1)
+                    .limit(changePageReadSize(limit))
                     .toList()
             val hasMoreChanges = changeRows.size > limit
             val changes = changeRows.take(limit).map { it.toJournalRecord() }
@@ -309,7 +309,7 @@ class DbSyncRepository : SyncRepository {
                             (JournalSyncTable.deleted eq true) and
                             (JournalSyncTable.serverVersion greater since)
                     }.orderBy(JournalSyncTable.serverVersion to SortOrder.ASC)
-                    .limit(limit + 1)
+                    .limit(changePageReadSize(limit))
                     .toList()
             val hasMoreDeletions = deletionRows.size > limit
             val deletions =
