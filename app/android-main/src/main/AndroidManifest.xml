@@ -367,12 +367,15 @@
             Assistant actions (Android 16+). The AppFunctions compiler generates this service and its
             schema asset; it is declared disabled and enabled while APP_FUNCTIONS is on.
             See docs/reference/android/os-integration/app-functions.md.
+            Instantiatable is ignored because release lint cannot follow the generated class, which
+            lives in app/compose-main, through LogDateAppFunctions and AppFunctionService to Service.
         -->
         <service
             android:name="app.logdate.client.appfunctions.LogDateAppFunctionService"
             android:enabled="false"
             android:exported="true"
             android:permission="android.permission.BIND_APP_FUNCTION_SERVICE"
+            tools:ignore="Instantiatable"
             tools:targetApi="36">
             <property
                 android:name="android.app.appfunctions.v2"
