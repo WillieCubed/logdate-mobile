@@ -51,6 +51,7 @@ internal suspend fun DefaultSyncManager.runFullSyncPhase(
             }
             body(accessToken)
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             statusPublisher.handleSyncException(e, exceptionLabel)
         } finally {
             syncStateFlow.value = SyncState.Idle

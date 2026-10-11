@@ -49,6 +49,12 @@ interface CloudContentDataSource {
     ): Result<ConditionalCreateResult> =
         Result.failure(UnsupportedOperationException("Create-if-absent is not supported by this data source"))
 
+    /** Reads whether the server has this note, and at which version, without downloading it. */
+    suspend fun contentState(
+        accessToken: String,
+        noteId: Uuid,
+    ): Result<ContentState> = Result.failure(UnsupportedOperationException("Content state is not supported by this data source"))
+
     /**
      * Downloads all note changes since the specified timestamp.
      */
@@ -110,6 +116,11 @@ class DefaultCloudContentDataSource(
             }
         return cloudApiClient.createContentIfAbsent(accessToken, request)
     }
+
+    override suspend fun contentState(
+        accessToken: String,
+        noteId: Uuid,
+    ): Result<ContentState> = cloudApiClient.contentState(accessToken, noteId.toString())
 
     override suspend fun updateNote(
         accessToken: String,

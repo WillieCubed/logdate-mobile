@@ -115,6 +115,7 @@ class DefaultSyncManager(
     private val deviceSessionRevocationListener: DeviceSessionRevocationListener = DeviceSessionRevocationListener.None,
     /** How this device syncs; a linked watch uses [SyncProfile.LinkedWatch]. */
     internal val profile: SyncProfile = SyncProfile.Standard,
+    private val createCollisionPolicy: CreateCollisionPolicy = CreateCollisionPolicy.None,
 ) : SyncManager {
     // Thread-safe state management using StateFlow and Mutex
     internal val syncStateFlow = MutableStateFlow<SyncState>(SyncState.Idle)
@@ -483,5 +484,7 @@ class DefaultSyncManager(
             recordProgress = statusPublisher::recordProgress,
             setMediaDeferredForNetwork = statusPublisher::setMediaDeferredForNetwork,
             profile = profile,
+            createCollisionPolicy = createCollisionPolicy,
+            transactionManager = transactionManager,
         )
 }

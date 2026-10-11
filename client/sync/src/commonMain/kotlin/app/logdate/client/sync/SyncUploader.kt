@@ -11,6 +11,7 @@ import app.logdate.client.sync.cloud.CloudAssociationDataSource
 import app.logdate.client.sync.cloud.CloudContentDataSource
 import app.logdate.client.sync.cloud.CloudDraftDataSource
 import app.logdate.client.sync.cloud.CloudJournalDataSource
+import app.logdate.client.sync.cloud.ContentState
 import app.logdate.client.sync.cloud.MediaTooLargeException
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.FirstSyncEnqueueStore
@@ -59,6 +60,8 @@ internal class SyncUploader(
     supportsRichDrafts: () -> Boolean = { false },
     draftRepairScope: () -> DownloadScope? = { null },
     private val profile: SyncProfile = SyncProfile.Standard,
+    createCollisionPolicy: CreateCollisionPolicy = CreateCollisionPolicy.None,
+    private val transactionManager: SyncTransactionManager,
 ) {
     private val associationUploader =
         AssociationUploader(
@@ -96,6 +99,8 @@ internal class SyncUploader(
             recordProgress,
             profile,
         )
+    private val collisions =
+        CreateCollisionSettler(createCollisionPolicy, retryCoordinator, syncMetadataService, recordProgress, transactionManager)
     private val conditionalCreates = ConditionalCreateSettler(retryCoordinator, recordProgress)
 
     /**
@@ -306,11 +311,20 @@ internal class SyncUploader(
 
                         val result =
                             if (pending.operation == PendingOperation.CREATE && note.syncVersion == 0L) {
-                                tokenRefresher.withFreshToken(
-                                    { token -> cloudContentDataSource.uploadNote(token, uploadReadyNote) },
-                                    "uploadNote(${note.uid})",
-                                    expectedScope = pending.scope,
-                                )
+                                if (collisions.isKnownCapture(EntityType.NOTE, pending.entityId)) {
+                                    tokenRefresher
+                                        .withFreshToken(
+                                            { token -> cloudContentDataSource.createNoteIfAbsent(token, uploadReadyNote) },
+                                            "createWatchCaptureIfAbsent(${note.uid})",
+                                            expectedScope = pending.scope,
+                                        ).asUploadResult()
+                                } else {
+                                    tokenRefresher.withFreshToken(
+                                        { token -> cloudContentDataSource.uploadNote(token, uploadReadyNote) },
+                                        "uploadNote(${note.uid})",
+                                        expectedScope = pending.scope,
+                                    )
+                                }
                             } else {
                                 tokenRefresher.withFreshToken(
                                     { token ->
@@ -335,6 +349,38 @@ internal class SyncUploader(
                             Napier.d("Uploaded content")
                         } else {
                             val error = result.exceptionOrNull() ?: Exception("Unknown upload error")
+                            val serverCopy: suspend () -> Result<ContentState> = {
+                                tokenRefresher.withFreshToken(
+                                    { token -> cloudContentDataSource.contentState(token, noteId) },
+                                    "contentState($noteId)",
+                                    expectedScope = pending.scope,
+                                )
+                            }
+                            val resolved =
+                                collisions.settle(
+                                    entityType = EntityType.NOTE,
+                                    pending = pending,
+                                    localContentVersion = note.lastUpdated.toEpochMilliseconds(),
+                                    error = error,
+                                    serverCopy = serverCopy,
+                                    currentContentVersion = {
+                                        journalNotesRepository
+                                            .getNoteById(
+                                                noteId,
+                                            )?.lastUpdated
+                                            ?.toEpochMilliseconds()
+                                    },
+                                    onDeleted = {
+                                        if (syncableRepository != null) {
+                                            syncableRepository.deleteFromSync(noteId)
+                                        } else {
+                                            journalNotesRepository.removeById(noteId)
+                                        }
+                                        mediaSyncRefStore.deleteScoped(noteId, pending.scope)
+                                    },
+                                )
+                            if (resolved) continue
+
                             if ((error as? CloudApiException)?.statusCode == 409) {
                                 errors.add(
                                     retryCoordinator.handleUploadConflict(

@@ -4,6 +4,7 @@ import app.logdate.client.database.LogDateDatabase
 import app.logdate.client.device.di.deviceInstanceModule
 import app.logdate.client.networking.NetworkAvailabilityMonitor
 import app.logdate.client.sync.AndroidSyncManager
+import app.logdate.client.sync.CreateCollisionPolicy
 import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.RecoverIdentityUseCase
 import app.logdate.client.sync.RoomSyncTransactionManager
@@ -94,6 +95,7 @@ actual val syncModule: Module =
                 identityRecoveryNeededStore = KeyValueIdentityRecoveryNeededStore(get()),
                 unreadableCloudRecordStore = KeyValueUnreadableCloudRecordStore(get()),
                 locationHistorySyncEngine = get(),
+                createCollisionPolicy = getOrNull<CreateCollisionPolicy>() ?: CreateCollisionPolicy.None,
             )
         }
         single<SyncManager> {

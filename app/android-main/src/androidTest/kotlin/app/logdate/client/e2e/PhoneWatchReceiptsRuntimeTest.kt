@@ -6,10 +6,12 @@ import android.content.pm.PackageManager
 import androidx.core.net.toUri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.logdate.client.sync.CreateCollisionPolicy
 import app.logdate.client.sync.datalayer.v2.WearPaths
 import app.logdate.client.sync.peer.delivery.PeerDeliveryLedger
 import app.logdate.client.sync.v2.receipts.PhoneReceiptBook
 import app.logdate.client.sync.v2.receipts.ReceiptAcknowledger
+import app.logdate.client.sync.v2.receipts.WatchCaptureCollisionPolicy
 import app.logdate.client.sync.v2.receipts.WatchReceiptNotifier
 import app.logdate.client.sync.v2.receipts.WatchReceiptResponder
 import app.logdate.client.sync.v2.receipts.WatchRecordIngestorV2
@@ -17,6 +19,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.java.KoinJavaComponent
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.uuid.Uuid
 
@@ -43,6 +46,7 @@ class PhoneWatchReceiptsRuntimeTest {
     fun installedApplicationResolvesTheReceiptAndIngestionGraph() {
         val koin = KoinJavaComponent.getKoin()
         assertNotNull(koin.get<PeerDeliveryLedger>())
+        assertIs<WatchCaptureCollisionPolicy>(koin.get<CreateCollisionPolicy>())
         assertNotNull(koin.get<PhoneReceiptBook>())
         assertNotNull(koin.get<ReceiptAcknowledger>())
         assertNotNull(koin.get<WatchReceiptResponder>())

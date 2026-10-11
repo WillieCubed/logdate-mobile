@@ -13,6 +13,7 @@ import app.logdate.client.sync.cloud.CheckUsernameAvailabilityResponse
 import app.logdate.client.sync.cloud.CloudApiClient
 import app.logdate.client.sync.cloud.ConditionalCreateResult
 import app.logdate.client.sync.cloud.ContentChangesResponse
+import app.logdate.client.sync.cloud.ContentState
 import app.logdate.client.sync.cloud.ContentUpdateRequest
 import app.logdate.client.sync.cloud.ContentUpdateResponse
 import app.logdate.client.sync.cloud.ContentUploadRequest
@@ -81,6 +82,9 @@ open class FakeCloudApiClient : CloudApiClient {
         Result.success(AssociationUploadResponse(0, Clock.System.now().toEpochMilliseconds()))
 
     val createContentIfAbsentCalls = mutableListOf<ContentUploadRequest>()
+    var contentStateResponse: Result<ContentState> = Result.success(ContentState.Absent)
+
+    val contentStateCalls = mutableListOf<String>()
 
     var uploadMediaResponse: Result<MediaUploadResponse> =
         Result.success(MediaUploadResponse("content-id", "media-id", "https://example.com/media", Clock.System.now().toEpochMilliseconds()))
@@ -250,6 +254,15 @@ open class FakeCloudApiClient : CloudApiClient {
         methodCalls.add("createContentIfAbsent")
         createContentIfAbsentCalls.add(content)
         return createContentIfAbsentResponse
+    }
+
+    override suspend fun contentState(
+        accessToken: String,
+        contentId: String,
+    ): Result<ContentState> {
+        methodCalls.add("contentState")
+        contentStateCalls.add(contentId)
+        return contentStateResponse
     }
 
     override suspend fun createJournalIfAbsent(

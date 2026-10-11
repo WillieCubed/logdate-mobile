@@ -164,6 +164,16 @@ internal class SyncRetryCoordinator(
         return attemptsInFlight.remove(PendingEntityKey(entityType, entityId))
     }
 
+    /** Ends the attempt for [pending] without settling or counting it: its operation was changed in place and goes up next. */
+    suspend fun releaseAttempt(
+        entityType: EntityType,
+        pending: PendingUpload,
+    ) {
+        endAttempt(entityType, pending.retryKey())
+        retryScheduleStore.clear(entityType, pending.retryKey())
+        clearFailureKind(entityType, pending.retryKey())
+    }
+
     suspend fun handleRetryFailure(
         entityType: EntityType,
         pending: PendingUpload,
@@ -333,7 +343,7 @@ internal class SyncRetryCoordinator(
         syncedAt: Instant,
         version: Long,
         outcome: DiagnosticOutcome = DiagnosticOutcome.SUCCEEDED,
-    ) {
+    ): Boolean {
         val settled = syncMetadataService.settleIfCurrent(entityType, pending, syncedAt, version)
         retryScheduleStore.clear(entityType, pending.retryKey())
         deadLetterStore.remove(pending.operationId ?: "${entityType.name}:${pending.entityId}")
@@ -356,6 +366,7 @@ internal class SyncRetryCoordinator(
                 )
             }
         }
+        return settled
     }
 
     /** Compatibility for local callers that have not started any asynchronous operation. */

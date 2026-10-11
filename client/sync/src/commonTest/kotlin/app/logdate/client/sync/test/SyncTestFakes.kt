@@ -12,6 +12,7 @@ import app.logdate.client.repository.journals.JournalContentRepository
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
+import app.logdate.client.sync.CreateCollisionPolicy
 import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.SyncMediaTransfer
 import app.logdate.client.sync.SyncProfile
@@ -172,6 +173,7 @@ fun testDefaultSyncManager(
     diagnostics: app.logdate.client.sync.diagnostics.SyncDiagnosticRecorder? = null,
     deviceSessionRevocationListener: DeviceSessionRevocationListener = DeviceSessionRevocationListener.None,
     profile: SyncProfile = SyncProfile.Standard,
+    createCollisionPolicy: CreateCollisionPolicy = CreateCollisionPolicy.None,
 ): DefaultSyncManager =
     if (syncScope == null) {
         DefaultSyncManager(
@@ -209,6 +211,7 @@ fun testDefaultSyncManager(
             diagnostics = diagnostics,
             deviceSessionRevocationListener = deviceSessionRevocationListener,
             profile = profile,
+            createCollisionPolicy = createCollisionPolicy,
         )
     } else {
         DefaultSyncManager(
@@ -246,6 +249,7 @@ fun testDefaultSyncManager(
             diagnostics = diagnostics,
             deviceSessionRevocationListener = deviceSessionRevocationListener,
             profile = profile,
+            createCollisionPolicy = createCollisionPolicy,
             syncScope = syncScope,
         )
     }
@@ -282,6 +286,7 @@ internal fun testSyncUploader(
     val tokenRefresher = SyncTokenRefresher(fakeSessionStorage(), fakeAccountRepository())
 
     return SyncUploader(
+        transactionManager = testSyncTransactionManager(),
         journalRepository = journalRepository,
         journalNotesRepository = journalNotesRepository,
         cloudJournalDataSource = DefaultCloudJournalDataSource(cloudApiClient),

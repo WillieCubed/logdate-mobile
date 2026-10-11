@@ -6,6 +6,7 @@ import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.crypto.link.BouncyCastleLinkHandshake
 import app.logdate.client.domain.watch.StampedPreferenceStore
+import app.logdate.client.sync.CreateCollisionPolicy
 import app.logdate.client.sync.WatchNoteIngestor
 import app.logdate.client.sync.datalayer.v2.CloudPresence
 import app.logdate.client.sync.datalayer.v2.WearFeatures
@@ -40,6 +41,7 @@ import app.logdate.client.sync.v2.link.WatchLinkNotifier
 import app.logdate.client.sync.v2.localNodeIdOrNull
 import app.logdate.client.sync.v2.receipts.PhoneReceiptBook
 import app.logdate.client.sync.v2.receipts.ReceiptAcknowledger
+import app.logdate.client.sync.v2.receipts.WatchCaptureCollisionPolicy
 import app.logdate.client.sync.v2.receipts.WatchReceiptNotifier
 import app.logdate.client.sync.v2.receipts.WatchReceiptResponder
 import app.logdate.client.sync.v2.receipts.WatchRecordIngestorV2
@@ -97,6 +99,8 @@ val phoneWatchSyncV2Module =
             )
         }
         single { PeerDeliveryLedger(get()) }
+        single<CreateCollisionPolicy> { WatchCaptureCollisionPolicy(get()) }
+
         single { PhoneReceiptBook(notes = get(), outbox = get(), sessions = get(), ledger = get()) }
         single { WatchReceiptResponder(get()) }
         single {
