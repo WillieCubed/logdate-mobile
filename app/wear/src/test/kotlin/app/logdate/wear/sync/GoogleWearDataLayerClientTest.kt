@@ -319,6 +319,52 @@ class GoogleWearDataLayerClientTest {
         }
 
     @Test
+    fun `downloadAudioFromPhone enforces the write guard and deletes rejected audio`() =
+        runTest {
+            val noteId = Uuid.random()
+            val transferPath = WearAudioRequestPaths.audioTransferPath(noteId)
+            val requestPath = WearAudioRequestPaths.audioRequestPath(noteId)
+            val payload = "phone-synced-audio".encodeToByteArray()
+            val callback = slot<ChannelClient.ChannelCallback>()
+            val phoneNode =
+                mockk<Node>(relaxed = true) {
+                    every { id } returns "phone-node"
+                }
+            val unrelatedChannel =
+                mockk<ChannelClient.Channel> {
+                    every { path } returns "/logdate/notes/other/audio"
+                }
+            val matchingChannel =
+                mockk<ChannelClient.Channel> {
+                    every { path } returns transferPath
+                }
+
+            every { nodeClient.connectedNodes } returns Tasks.forResult(listOf(phoneNode))
+            every { channelClient.registerChannelCallback(capture(callback)) } returns Tasks.forResult<Void>(null)
+            every { channelClient.unregisterChannelCallback(any<ChannelClient.ChannelCallback>()) } returns Tasks.forResult(true)
+            every { messageClient.sendMessage("phone-node", requestPath, any()) } answers {
+                callback.captured.onChannelOpened(unrelatedChannel)
+                callback.captured.onChannelOpened(matchingChannel)
+                Tasks.forResult(1)
+            }
+            every { channelClient.getInputStream(matchingChannel) } returns Tasks.forResult(ByteArrayInputStream(payload))
+            every { channelClient.close(matchingChannel) } returns Tasks.forResult<Void>(null)
+
+            val tempDir = createTempDirectory()
+            val destination = tempDir.resolve("downloaded-note.m4a").toFile()
+            val client = createClient(this)
+
+            val success =
+                client.downloadAudioFromPhone(noteId = noteId, destinationPath = destination.path, beforeWrite = {
+                    throw app.logdate.wear.playback
+                        .NoRoomForAudioException(1L, 2L)
+                })
+
+            assertFalse(success)
+            assertFalse(destination.exists())
+        }
+
+    @Test
     fun `downloadAudioFromPhone ignores unrelated channels before matching transfer arrives`() =
         runTest {
             val noteId = Uuid.random()

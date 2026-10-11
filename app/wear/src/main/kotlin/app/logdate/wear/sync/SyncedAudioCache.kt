@@ -39,14 +39,14 @@ class SyncedAudioCache(
         directory.mkdirs()
         clearAbandonedParts()
         val part = File(directory, "$noteId.$extension.$PART_EXTENSION")
-        val complete = download(part.absolutePath) && part.length() > 0L
-        if (!complete) {
+        return try {
+            if (!download(part.absolutePath) || part.length() <= 0L) return null
+            val target = File(directory, "$noteId.$extension")
+            Files.move(part.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
+            target
+        } finally {
             part.delete()
-            return null
         }
-        val target = File(directory, "$noteId.$extension")
-        Files.move(part.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE)
-        return target
     }
 
     /** Removes the audio pulled for [noteId]. @return true when a file was deleted. */

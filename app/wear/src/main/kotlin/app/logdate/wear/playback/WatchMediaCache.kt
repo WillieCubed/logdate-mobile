@@ -1,6 +1,10 @@
 package app.logdate.wear.playback
 
 import app.logdate.wear.sync.SyncedAudioCache
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.io.IOException
 import kotlin.uuid.Uuid
@@ -16,7 +20,7 @@ interface WatchMediaCache {
     fun cachedFile(noteId: Uuid): File?
 
     /**
-     * Stores [noteId]'s audio, written by [download] to the path it is given.
+     * Stores [noteId]'s audio; [download] must call its write guard before every chunk.
      *
      * @return the complete file, or null when [download] failed.
      * @throws NoRoomForAudioException when the watch is short of space.
@@ -24,7 +28,7 @@ interface WatchMediaCache {
     suspend fun store(
         noteId: Uuid,
         extension: String,
-        download: suspend (partPath: String) -> Boolean,
+        download: suspend (partPath: String, beforeWrite: suspend (Int) -> Unit) -> Boolean,
     ): File?
 
     /** Removes [noteId]'s stored audio. @return true when a file was deleted. */
@@ -51,16 +55,46 @@ class SyncedAudioWatchMediaCache(
     private val freeBytes: suspend () -> Long,
     private val reserveBytes: Long = DEFAULT_RESERVE_BYTES,
 ) : WatchMediaCache {
+    private val downloads = Mutex()
+
     override fun cachedFile(noteId: Uuid): File? = cache.cachedFile(noteId)
 
     override suspend fun store(
         noteId: Uuid,
         extension: String,
-        download: suspend (partPath: String) -> Boolean,
-    ): File? {
+        download: suspend (partPath: String, beforeWrite: suspend (Int) -> Unit) -> Boolean,
+    ): File? =
+        downloads.withLock {
+            val free = freeBytes()
+            if (free <= reserveBytes) throw NoRoomForAudioException(free, reserveBytes)
+            val budget = free - reserveBytes
+            cache.pull(noteId, extension) { path ->
+                downloadWithinBudget(path, budget, download)
+            }
+        }
+
+    private suspend fun downloadWithinBudget(
+        path: String,
+        budget: Long,
+        download: suspend (String, suspend (Int) -> Unit) -> Boolean,
+    ): Boolean {
+        var written = 0L
+        var violation: NoRoomForAudioException? = null
+        val complete =
+            download(path) { bytes ->
+                currentCoroutineContext().ensureActive()
+                require(bytes >= 0)
+                val free = freeBytes()
+                if (bytes.toLong() > budget - written || free - reserveBytes < bytes) {
+                    throw NoRoomForAudioException(free, reserveBytes).also { violation = it }
+                }
+                written += bytes
+            }
+        currentCoroutineContext().ensureActive()
+        violation?.let { throw it }
         val free = freeBytes()
-        if (free < reserveBytes) throw NoRoomForAudioException(free, reserveBytes)
-        return cache.pull(noteId, extension, download)
+        if (File(path).length() > budget || free < reserveBytes) throw NoRoomForAudioException(free, reserveBytes)
+        return complete
     }
 
     override fun evict(noteId: Uuid): Boolean = cache.delete(noteId)

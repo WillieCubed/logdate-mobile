@@ -171,6 +171,7 @@ class GoogleWearDataLayerClient(
     override suspend fun downloadAudioFromPhone(
         noteId: Uuid,
         destinationPath: String,
+        beforeWrite: suspend (Int) -> Unit,
     ): Boolean {
         val transferPath = WearAudioRequestPaths.audioTransferPath(noteId)
         val requestPath = WearAudioRequestPaths.audioRequestPath(noteId)
@@ -208,7 +209,7 @@ class GoogleWearDataLayerClient(
                                         val inputStream = channelClient.getInputStream(channel).await()
                                         inputStream.use { input ->
                                             FileOutputStream(destinationFile).use { output ->
-                                                input.copyTo(output)
+                                                copyAudioWithinBudget(input, output, beforeWrite)
                                             }
                                         }
                                     }.onFailure { error ->

@@ -66,6 +66,7 @@ interface WearDataLayerClient {
     suspend fun downloadAudioFromPhone(
         noteId: Uuid,
         destinationPath: String,
+        beforeWrite: suspend (Int) -> Unit = {},
     ): Boolean
 
     companion object {

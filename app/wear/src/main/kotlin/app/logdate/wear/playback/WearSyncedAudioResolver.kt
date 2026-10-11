@@ -1,13 +1,14 @@
 package app.logdate.wear.playback
 
 import android.content.Context
-import android.net.Uri
+import androidx.core.net.toUri
 import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.wear.sync.WearDataLayerClient
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -45,6 +46,7 @@ class PhoneSyncedAudioResolver(
                 }
             }
         result.onFailure { error ->
+            if (error is CancellationException) throw error
             Napier.w("Failed to resolve synced audio for note ${note.uid}", error)
         }
         return result
@@ -53,8 +55,8 @@ class PhoneSyncedAudioResolver(
     private suspend fun pullFromPhone(note: JournalNote.Audio): File {
         if (!dataLayerClient.isPhoneConnected()) throw AudioNotOnWatchException(note.uid)
         val pulled =
-            mediaCache.store(note.uid, inferExtension(note.mediaRef)) { partPath ->
-                dataLayerClient.downloadAudioFromPhone(note.uid, partPath)
+            mediaCache.store(note.uid, inferExtension(note.mediaRef)) { partPath, beforeWrite ->
+                dataLayerClient.downloadAudioFromPhone(note.uid, partPath, beforeWrite)
             }
         return checkNotNull(pulled) { "Phone audio transfer failed for note ${note.uid}" }
     }
@@ -62,7 +64,7 @@ class PhoneSyncedAudioResolver(
     private fun isLocallyPlayable(mediaRef: String): Boolean {
         if (mediaRef.startsWith("content://")) {
             return runCatching {
-                context.contentResolver.openAssetFileDescriptor(Uri.parse(mediaRef), "r")?.use { true } ?: false
+                context.contentResolver.openAssetFileDescriptor(mediaRef.toUri(), "r")?.use { true } ?: false
             }.getOrDefault(false)
         }
 
