@@ -32,6 +32,16 @@ class EveningReminderWorkerTest {
     }
 
     @Test
+    fun startup_preserves_the_existing_evening_check() {
+        val work = WorkManagerEveningReminderWork(manager)
+        work.runAfter(TimeUnit.HOURS.toMillis(1))
+        val tonight = waiting().single().id
+        work.ensureAfter(TimeUnit.HOURS.toMillis(24))
+        assertEquals(tonight, waiting().single().id)
+        assertTrue(manager.getWorkInfoById(tonight).get()?.state != WorkInfo.State.CANCELLED)
+    }
+
+    @Test
     fun a_new_schedule_replaces_the_old_waiting_check() {
         val work = WorkManagerEveningReminderWork(manager)
         work.runAfter(TimeUnit.HOURS.toMillis(1))

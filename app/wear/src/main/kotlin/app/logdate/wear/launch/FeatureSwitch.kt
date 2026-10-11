@@ -3,6 +3,7 @@ package app.logdate.wear.launch
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,10 +20,14 @@ class FeatureSwitch(
     private val flag: FeatureFlag,
 ) {
     private val current = MutableStateFlow(false)
+    private val ready = CompletableDeferred<Unit>()
 
     val state: StateFlow<Boolean> = current.asStateFlow()
 
     val isOn: Boolean get() = current.value
+
+    /** Waits for the first persisted value (or a failed read resolving off). */
+    suspend fun awaitReady() = ready.await()
 
     /** Follows the flag in [scope] for the life of the app. */
     fun start(scope: CoroutineScope) {
@@ -32,7 +37,10 @@ class FeatureSwitch(
                 .catch { error ->
                     Napier.e("Couldn't read ${flag.name}; treating it as off", error)
                     emit(false)
-                }.collect { enabled -> current.value = enabled }
+                }.collect { enabled ->
+                    current.value = enabled
+                    ready.complete(Unit)
+                }
         }
     }
 }

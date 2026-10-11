@@ -4,7 +4,9 @@ import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runCurrent
@@ -17,6 +19,26 @@ import kotlin.test.assertTrue
 class FeatureSwitchTest {
     private val flag = MutableStateFlow(true)
     private val featureFlags = mockk<FeatureFlagStore> { every { observe(FeatureFlag.WATCH_EXPERIENCE_V2) } returns flag }
+
+    @Test
+    fun `readiness waits for the saved flag rather than the initial false placeholder`() =
+        runTest {
+            val read = CompletableDeferred<Unit>()
+            every { featureFlags.observe(FeatureFlag.WATCH_EXPERIENCE_V2) } returns
+                flow {
+                    read.await()
+                    emit(true)
+                }
+            val switch = FeatureSwitch(featureFlags, FeatureFlag.WATCH_EXPERIENCE_V2)
+            switch.start(backgroundScope)
+            val ready = async { switch.awaitReady() }
+            runCurrent()
+            assertFalse(ready.isCompleted)
+            read.complete(Unit)
+            runCurrent()
+            assertTrue(ready.isCompleted)
+            assertTrue(switch.isOn)
+        }
 
     @Test
     fun `the switch is off until the flag has been read`() =

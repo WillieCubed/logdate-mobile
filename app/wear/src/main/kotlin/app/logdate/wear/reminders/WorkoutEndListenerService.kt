@@ -6,6 +6,11 @@ import androidx.health.services.client.PassiveListenerService
 import androidx.health.services.client.data.UserActivityInfo
 import androidx.health.services.client.data.UserActivityState
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import kotlin.time.Instant
@@ -88,7 +93,20 @@ class WorkoutWatcher(
     private val transitions: ActivityTransitionStore,
     private val dispatcher: WatchReminderDispatcher,
     private val experienceEnabled: () -> Boolean = { true },
+    private val awaitExperience: suspend () -> Unit = {},
 ) {
+    private val activation = Mutex()
+
+    /** Serializes callbacks while the persisted rollout state loads on a cold process start. */
+    suspend fun onActivityWhenReady(
+        kind: ActivityKind,
+        changedAt: Instant,
+    ): Boolean =
+        activation.withLock {
+            awaitExperience()
+            onActivity(kind, changedAt)
+        }
+
     /** @return true when [kind] ended a workout and a reminder was shown. */
     @Synchronized
     fun onActivity(
@@ -108,11 +126,14 @@ class WorkoutEndListenerService :
     PassiveListenerService(),
     KoinComponent {
     private val watcher: WorkoutWatcher by inject()
+    private val applicationScope: CoroutineScope by inject()
 
     override fun onUserActivityInfoReceived(info: UserActivityInfo) {
         val changedAt = Instant.fromEpochMilliseconds(info.stateChangeTime.toEpochMilli())
-        if (watcher.onActivity(info.userActivityState.toActivityKind(), changedAt)) {
-            Napier.i("A workout ended at $changedAt; a reminder was shown")
+        applicationScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            if (watcher.onActivityWhenReady(info.userActivityState.toActivityKind(), changedAt)) {
+                Napier.i("A workout ended at $changedAt; a reminder was shown")
+            }
         }
     }
 }

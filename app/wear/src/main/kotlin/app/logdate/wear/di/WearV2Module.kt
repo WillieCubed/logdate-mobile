@@ -290,7 +290,7 @@ val wearV2Module =
                     preferences.enabled.value &&
                     permissions.notificationsGranted() &&
                     permissions.activityRecognitionGranted()
-            })
+            }, awaitExperience = experience::awaitReady)
         }
         single {
             val experience = get<FeatureSwitch>()
@@ -300,6 +300,7 @@ val wearV2Module =
                 permissions = get(),
                 evening = get(),
                 experienceEnabled = { experience.isOn },
+                awaitExperience = experience::awaitReady,
             )
         }
         single<EveningReminderWork> { WorkManagerEveningReminderWork(WorkManager.getInstance(get<Context>())) }

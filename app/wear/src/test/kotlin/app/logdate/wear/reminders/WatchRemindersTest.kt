@@ -2,6 +2,7 @@ package app.logdate.wear.reminders
 
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
@@ -18,6 +19,45 @@ class WatchRemindersTest {
     private val eveningWork = FakeEveningWork()
     private val evening = EveningReminderScheduler(eveningWork, FixedClock(berlin(10, 18)), timeZone = { REMINDER_ZONE })
     private val reminders = WatchReminders(preferences = preferences, activity = activity, permissions = permissions, evening = evening)
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun `cold startup waits before canceling tonight or skipping the due worker`() =
+        runTest {
+            preferences.setEnabled(true)
+            var resolvedFlag = false
+            val read = CompletableDeferred<Unit>()
+            val controller =
+                WatchReminders(
+                    preferences,
+                    activity,
+                    permissions,
+                    evening,
+                    experienceEnabled = { resolvedFlag },
+                    awaitExperience = { read.await() },
+                )
+            val restoring = launch { controller.restore() }
+            val workerActive = async { controller.awaitActive() }
+            runCurrent()
+            assertEquals(0, eveningWork.cancels)
+            assertFalse(workerActive.isCompleted)
+            resolvedFlag = true
+            read.complete(Unit)
+            restoring.join()
+            assertTrue(workerActive.await())
+            assertEquals(0, eveningWork.cancels)
+            assertEquals(1, eveningWork.ensures)
+        }
+
+    @Test
+    fun `restoration preserves waiting or running evening work`() =
+        runTest {
+            preferences.setEnabled(true)
+            reminders.restore()
+            reminders.restore()
+            assertEquals(2, eveningWork.ensures)
+            assertEquals(0, eveningWork.replacements)
+        }
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)

@@ -1,6 +1,10 @@
 package app.logdate.wear.reminders
 
 import androidx.health.services.client.data.UserActivityState
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -18,6 +22,24 @@ class WorkoutWatcherTest {
             timeZone = { REMINDER_ZONE },
         )
     private val watcher = WorkoutWatcher(transitions, dispatcher)
+
+    @Test
+    fun `cold workout callbacks wait for the saved flag and retain their order`() =
+        runTest {
+            var enabled = false
+            val read = CompletableDeferred<Unit>()
+            val waking = WorkoutWatcher(transitions, dispatcher, experienceEnabled = { enabled }, awaitExperience = { read.await() })
+            val exercise = async(start = CoroutineStart.UNDISPATCHED) { waking.onActivityWhenReady(ActivityKind.EXERCISE, berlin(10, 17)) }
+            val ended = async(start = CoroutineStart.UNDISPATCHED) { waking.onActivityWhenReady(ActivityKind.PASSIVE, berlin(10, 17, 50)) }
+            assertFalse(exercise.isCompleted)
+            assertFalse(ended.isCompleted)
+            assertNull(transitions.last())
+            enabled = true
+            read.complete(Unit)
+            assertFalse(exercise.await())
+            assertTrue(ended.await())
+            assertEquals(listOf(WatchReminder.WORKOUT_ENDED), notifier.posted)
+        }
 
     @Test
     fun `an older passive event cannot finish a newer workout`() {

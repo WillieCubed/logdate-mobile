@@ -13,6 +13,7 @@ class WatchReminders(
     private val permissions: ReminderPermissions,
     private val evening: EveningReminderScheduler,
     private val experienceEnabled: () -> Boolean = { true },
+    private val awaitExperience: suspend () -> Unit = {},
 ) {
     private val registration = Mutex()
     private val currentWorkouts = MutableStateFlow(false)
@@ -22,6 +23,11 @@ class WatchReminders(
     val isActive: Boolean
         get() = preferences.enabled.value && experienceEnabled() && permissions.notificationsGranted()
 
+    suspend fun awaitActive(): Boolean {
+        awaitExperience()
+        return isActive
+    }
+
     suspend fun setEnabled(enabled: Boolean) {
         preferences.setEnabled(enabled)
         restore()
@@ -29,9 +35,10 @@ class WatchReminders(
 
     /** Reconciles boot, permission and rollout changes with the latest saved choice. */
     suspend fun restore() {
+        awaitExperience()
         registration.withLock {
             if (isActive) {
-                evening.scheduleNext()
+                evening.ensureScheduled()
             } else {
                 evening.cancel()
             }

@@ -48,6 +48,9 @@ interface EveningReminderWork {
         replace: Boolean = true,
     )
 
+    /** Preserves pending and running work during ordinary restoration. */
+    fun ensureAfter(delayMs: Long)
+
     fun cancel()
 }
 
@@ -58,11 +61,19 @@ class WorkManagerEveningReminderWork(
         delayMs: Long,
         replace: Boolean,
     ) {
+        enqueue(delayMs, if (replace) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.APPEND_OR_REPLACE)
+    }
+
+    override fun ensureAfter(delayMs: Long) = enqueue(delayMs, ExistingWorkPolicy.KEEP)
+
+    private fun enqueue(
+        delayMs: Long,
+        policy: ExistingWorkPolicy,
+    ) {
         val request =
             OneTimeWorkRequestBuilder<EveningReminderWorker>()
                 .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
                 .build()
-        val policy = if (replace) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.APPEND_OR_REPLACE
         workManager.enqueueUniqueWork(EveningReminderWorker.UNIQUE_WORK_NAME, policy, request)
     }
 
@@ -79,6 +90,11 @@ class EveningReminderScheduler(
     fun scheduleNext(replace: Boolean = true) {
         val now = clock.now()
         work.runAfter((nextEveningCheck(now, timeZone()) - now).inWholeMilliseconds, replace)
+    }
+
+    fun ensureScheduled() {
+        val now = clock.now()
+        work.ensureAfter((nextEveningCheck(now, timeZone()) - now).inWholeMilliseconds)
     }
 
     fun cancel() = work.cancel()
@@ -114,7 +130,7 @@ class EveningReminderWorker(
     private val notesRepository: JournalNotesRepository by inject()
 
     override suspend fun doWork(): Result {
-        if (!reminders.isActive) return Result.success()
+        if (!reminders.awaitActive()) return Result.success()
         return try {
             EveningReminderCheck(
                 active = { reminders.isActive },
