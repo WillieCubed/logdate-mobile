@@ -6,6 +6,7 @@ import app.logdate.client.repository.journals.NoteCoordinates
 import app.logdate.client.repository.journals.NoteLocation
 import app.logdate.wear.location.WearLocationCaptureCoordinator
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.test.runTest
@@ -57,6 +58,22 @@ class QuickNoteWriterTest {
             coEvery { notesRepository.create(any<JournalNote>()) } throws IllegalStateException("database closed")
 
             assertFalse(writer().save(Feeling.SAD))
+        }
+
+    @Test
+    fun `written text is saved as a text note without its outer spaces`() =
+        runTest {
+            assertTrue(writer().save("  Coffee with Sam "))
+
+            assertEquals("Coffee with Sam", (created.captured as JournalNote.Text).content)
+        }
+
+    @Test
+    fun `blank text is not saved`() =
+        runTest {
+            assertFalse(writer().save("   "))
+
+            coVerify(exactly = 0) { notesRepository.create(any<JournalNote>()) }
         }
 
     private fun writer() =

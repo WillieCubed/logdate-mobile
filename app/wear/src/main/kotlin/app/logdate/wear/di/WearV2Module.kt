@@ -15,6 +15,7 @@ import app.logdate.wear.health.MeasureClientHeartRateReadings
 import app.logdate.wear.health.MeasuredHeartRateSampler
 import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.recording.AudioMomentSaver
+import app.logdate.wear.v2.capture.CaptureSheetViewModel
 import app.logdate.wear.v2.flow.FlowViewModel
 import app.logdate.wear.v2.haptics.HapticsPreferenceStore
 import app.logdate.wear.v2.haptics.SharedPreferencesHapticsPreferenceStore
@@ -94,6 +95,10 @@ val wearV2Module =
         }
         single { BackgroundMarker(featureFlags = get(), markMoment = get(), haptics = get()) }
         viewModel { MarkViewModel(markMoment = get(), haptics = get(), permissions = get(), applicationScope = get()) }
+        viewModel {
+            val notes = get<QuickNoteWriter>()
+            CaptureSheetViewModel(textSaver = notes, feelingSaver = notes, phoneReachability = get(), haptics = get())
+        }
         factory {
             AudioMomentSaver(
                 notesRepository = get(),

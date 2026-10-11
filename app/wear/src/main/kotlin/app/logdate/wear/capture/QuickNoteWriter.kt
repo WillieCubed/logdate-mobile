@@ -21,17 +21,30 @@ fun interface FeelingSaver {
     }
 }
 
+/** Saves a line of text, written by voice or on the keyboard, as a note. */
+fun interface TextNoteSaver {
+    /** Returns false when there was nothing to save or the note could not be stored. */
+    suspend fun save(text: String): Boolean
+}
+
 /**
  * Saves the short notes the watch captures in a tap or two: a feeling, as a mood check-in in the
- * same `#mood:` form the check-in screen writes. Each note has the place when it can be read
- * within [LOCATION_TIMEOUT_MS].
+ * same `#mood:` form the check-in screen writes, and a line of written text. Each note has the
+ * place when it can be read within [LOCATION_TIMEOUT_MS].
  */
 class QuickNoteWriter(
     private val notesRepository: JournalNotesRepository,
     private val locationCaptureCoordinator: WearLocationCaptureCoordinator,
     private val clock: Clock = Clock.System,
-) : FeelingSaver {
+) : FeelingSaver,
+    TextNoteSaver {
     override suspend fun save(feeling: Feeling): Boolean = write(MomentNoteCodec.encode(feeling)) != null
+
+    override suspend fun save(text: String): Boolean {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return false
+        return write(trimmed) != null
+    }
 
     private suspend fun write(content: String): Uuid? =
         try {

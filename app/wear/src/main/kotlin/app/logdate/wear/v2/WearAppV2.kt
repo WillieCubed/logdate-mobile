@@ -20,7 +20,13 @@ import androidx.wear.compose.navigation3.rememberSwipeDismissableSceneStrategy
 import app.logdate.ui.platform.LocalLogDateHaptics
 import app.logdate.ui.platform.LogDateHaptics
 import app.logdate.wear.launch.WearLaunchRequest
+import app.logdate.wear.presentation.camera.WearRemoteCameraScreen
+import app.logdate.wear.presentation.camera.WearRemoteCameraViewModel
 import app.logdate.wear.v2.ambient.WatchAmbientScope
+import app.logdate.wear.v2.capture.CaptureConfirmation
+import app.logdate.wear.v2.capture.CaptureSheet
+import app.logdate.wear.v2.capture.CaptureSheetViewModel
+import app.logdate.wear.v2.capture.rememberRemoteTextInput
 import app.logdate.wear.v2.flow.FlowPage
 import app.logdate.wear.v2.flow.FlowViewModel
 import app.logdate.wear.v2.home.HomeScreen
@@ -71,6 +77,7 @@ fun WearAppV2(
             backStack.addAll(request.toV2BackStack())
         }
     }
+    val open: (WearRoute) -> Unit = { route -> if (backStack.lastOrNull() != route) backStack.add(route) }
     PermissionRequests(recorder, marker)
     WatchAmbientScope(enabled = recorderState is RecorderState.Live) {
         LogDateWearTheme {
@@ -87,7 +94,16 @@ fun WearAppV2(
                         sceneStrategies = listOf(rememberSwipeDismissableSceneStrategy<NavKey>()),
                         entryProvider =
                             entryProvider {
-                                entry<WearRoute.Home> { HomeEntry(recorder, marker) }
+                                entry<WearRoute.Home> {
+                                    HomeEntry(recorder, marker, onAdd = { open(WearRoute.CaptureSheet) })
+                                }
+                                entry<WearRoute.CaptureSheet> {
+                                    CaptureSheetEntry(
+                                        onOpenPhoneCamera = { open(WearRoute.PhoneCamera) },
+                                        onDone = { backStack.removeLastOrNull() },
+                                    )
+                                }
+                                entry<WearRoute.PhoneCamera> { PhoneCameraEntry(onDone = { backStack.removeLastOrNull() }) }
                             },
                     )
                 }
@@ -116,6 +132,7 @@ private fun PermissionRequests(
 private fun HomeEntry(
     recorder: RecorderViewModel,
     marker: MarkViewModel,
+    onAdd: () -> Unit,
 ) {
     val recorderState by recorder.state.collectAsState()
     val markFeedback by marker.feedback.collectAsState()
@@ -124,6 +141,7 @@ private fun HomeEntry(
             TodayControls(
                 recorder = TodayRecorder(recorderState, gesture = recorder, actions = recorder),
                 onMark = marker::mark,
+                onAdd = onAdd,
             )
         }
     HomeScreen(
@@ -157,4 +175,37 @@ private fun FlowEntry(listState: TransformingLazyColumnState) {
     val viewModel = koinViewModel<FlowViewModel>()
     val state by viewModel.uiState.collectAsState()
     FlowPage(state = state, listState = listState)
+}
+
+@Composable
+private fun CaptureSheetEntry(
+    onOpenPhoneCamera: () -> Unit,
+    onDone: () -> Unit,
+) {
+    val viewModel = koinViewModel<CaptureSheetViewModel>()
+    val state by viewModel.uiState.collectAsState()
+    val write = rememberRemoteTextInput(onText = viewModel::saveText)
+    CaptureSheet(
+        state = state,
+        onWrite = write,
+        onToggleFeelings = viewModel::toggleFeelings,
+        onFeeling = viewModel::saveFeeling,
+        onPhoneCamera = onOpenPhoneCamera,
+    )
+    CaptureConfirmation(result = state.result, onSavedDismissed = onDone, onFailedDismissed = viewModel::dismissResult)
+}
+
+/**
+ * The existing remote camera screen. It asks to leave by setting its state rather than calling back
+ * after composition, so it leaves from an effect here instead of during composition.
+ */
+@Composable
+private fun PhoneCameraEntry(onDone: () -> Unit) {
+    val viewModel = koinViewModel<WearRemoteCameraViewModel>()
+    val state by viewModel.uiState.collectAsState()
+    LaunchedEffect(state.navigateBack) {
+        if (state.navigateBack) onDone()
+    }
+    if (state.navigateBack) return
+    WearRemoteCameraScreen(viewModel = viewModel, onNavigateBack = {})
 }
