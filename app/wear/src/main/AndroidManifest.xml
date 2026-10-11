@@ -282,6 +282,25 @@
                 android:value="3600" />
         </service>
 
+        <!-- Mark complication: marks the moment without opening the app; only while the new watch app is on -->
+        <service
+            android:name=".complication.MarkComplicationService"
+            android:enabled="false"
+            android:exported="true"
+            android:label="@string/wear_surface_mark"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT,MONOCHROMATIC_IMAGE,SMALL_IMAGE" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="0" />
+        </service>
+
         <!--
                Set to true if your app is Standalone, that is, it does not require the handheld
                app to run.

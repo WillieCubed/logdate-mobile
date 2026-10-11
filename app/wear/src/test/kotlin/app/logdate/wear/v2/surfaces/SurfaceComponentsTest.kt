@@ -35,11 +35,12 @@ class SurfaceComponentsTest {
     }
 
     @Test
-    fun `the new app offers the On this day tile and complication`() {
+    fun `the new app offers On this day and Mark`() {
         assertEquals(
             listOf(
                 "app.logdate.wear.tile.OnThisDayTileService",
                 "app.logdate.wear.complication.OnThisDayComplicationService",
+                "app.logdate.wear.complication.MarkComplicationService",
             ),
             SurfaceCatalog.NEW_APP_ONLY,
         )

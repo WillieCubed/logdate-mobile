@@ -34,6 +34,7 @@ object SurfaceCatalog {
         listOf(
             "app.logdate.wear.tile.OnThisDayTileService",
             "app.logdate.wear.complication.OnThisDayComplicationService",
+            "app.logdate.wear.complication.MarkComplicationService",
         )
 
     /** Surfaces the new watch app retires; off while it is on. */

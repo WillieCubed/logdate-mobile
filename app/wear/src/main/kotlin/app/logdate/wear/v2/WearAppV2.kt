@@ -5,7 +5,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
@@ -50,6 +53,8 @@ import app.logdate.wear.v2.playon.OutputPickerRoute
 import app.logdate.wear.v2.recorder.RecorderState
 import app.logdate.wear.v2.recorder.RecorderViewModel
 import app.logdate.wear.v2.recorder.TodayRecorder
+import app.logdate.wear.v2.recorder.canStartRecording
+import app.logdate.wear.v2.recorder.gesture.startLocked
 import app.logdate.wear.v2.recorder.locksPaging
 import app.logdate.wear.v2.settings.PhoneSettingsHandoffDialog
 import app.logdate.wear.v2.settings.WatchSettingsViewModel
@@ -88,10 +93,19 @@ fun WearAppV2(
     val marker = koinViewModel<MarkViewModel>()
     val recorderState by recorder.state.collectAsState()
     val backStack = rememberNavBackStack(*initialRequest.toV2BackStack().toTypedArray())
+    var recordLaunchHandled by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (recordLaunchHandled || initialRequest != WearLaunchRequest.Record) return@LaunchedEffect
+        recordLaunchHandled = true
+        recorder.startForLaunch()
+    }
     LaunchedEffect(newRequests) {
         newRequests.collect { request ->
             backStack.clear()
             backStack.addAll(request.toV2BackStack())
+            if (request != WearLaunchRequest.Record) return@collect
+            recordLaunchHandled = true
+            recorder.startForLaunch()
         }
     }
     val open: (WearRoute) -> Unit = { route -> if (backStack.lastOrNull() != route) backStack.add(route) }
@@ -129,6 +143,12 @@ fun WearAppV2(
             }
         }
     }
+}
+
+/** Starts a locked recording for an external Record action, leaving active recording or saving alone. */
+private fun RecorderViewModel.startForLaunch() {
+    if (!state.value.canStartRecording) return
+    startLocked()
 }
 
 /** Asks for the permissions the recorder and Mark need at the moment they need them, and gives them the answers. */

@@ -11,4 +11,6 @@
     <string name="wear_surface_on_this_day_empty">Nothing from this day in past years</string>
     <!-- Read aloud for the On this day complication: how long ago, then the day's summary or first moment -->
     <string name="wear_surface_on_this_day_description">On this day, %1$s: %2$s</string>
+    <string name="wear_surface_mark">Mark</string>
+    <string name="wear_surface_mark_description">Mark this moment</string>
 </resources>
