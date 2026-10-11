@@ -46,6 +46,21 @@ class TodaySummaryTest {
         assertNull(summary.latestEntry)
     }
 
+    @Test
+    fun `the redesigned tile counts moments without counting feeling check ins`() {
+        val lunch = text("Lunch by the water", minute = 0)
+        val summary = summarizeMomentsToday(listOf(lunch, text("#mood:good Feeling good", minute = 20)))
+        assertEquals(1, summary.entryCount)
+        assertEquals(lunch, summary.latestEntry)
+    }
+
+    @Test
+    fun `a redesigned day of feelings alone has no moments`() {
+        val summary = summarizeMomentsToday(listOf(text("#mood:good Feeling good", minute = 20)))
+        assertEquals(0, summary.entryCount)
+        assertNull(summary.latestEntry)
+    }
+
     private fun text(
         content: String,
         minute: Int,

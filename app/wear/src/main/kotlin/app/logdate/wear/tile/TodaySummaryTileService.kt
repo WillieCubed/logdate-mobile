@@ -14,59 +14,91 @@ import androidx.wear.protolayout.material.Colors
 import androidx.wear.protolayout.material.Text
 import androidx.wear.protolayout.material.Typography
 import androidx.wear.protolayout.material.layouts.PrimaryLayout
+import androidx.wear.protolayout.material3.MaterialScope
+import androidx.wear.tiles.Material3TileService
 import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
+import androidx.wear.tiles.tile
 import androidx.wear.tiles.tooling.preview.Preview
 import androidx.wear.tiles.tooling.preview.TilePreviewData
 import androidx.wear.tooling.preview.devices.WearDevices
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
+import app.logdate.client.domain.today.TodaySummaryCalculator
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.wear.R
 import app.logdate.wear.capture.Feeling
 import app.logdate.wear.capture.MomentNoteCodec
 import app.logdate.wear.capture.MomentNoteKind
-import com.google.android.horologist.annotations.ExperimentalHorologistApi
-import com.google.android.horologist.tiles.SuspendingTileService
+import app.logdate.wear.v2.surfaces.todayTileLayout
+import app.logdate.wear.v2.today.DayClock
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 private const val RESOURCES_VERSION = "1"
 private const val MAX_PREVIEW_LENGTH = 30
+private const val FRESHNESS_MINUTES = 15
 
 /**
- * Today's Summary tile showing entry count, current mood, and latest entry preview.
- *
- * Tapping opens the app to the timeline view.
+ * The Today tile. With the new watch app on it is the Material 3 Today tile ([todayTileLayout]);
+ * otherwise it is the current app's summary: entry count, current mood and latest entry, where
+ * tapping opens the timeline.
  */
-@OptIn(ExperimentalHorologistApi::class)
-class TodaySummaryTileService : SuspendingTileService() {
-    override suspend fun resourcesRequest(requestParams: RequestBuilders.ResourcesRequest): ResourceBuilders.Resources =
-        ResourceBuilders.Resources
-            .Builder()
-            .setVersion(RESOURCES_VERSION)
-            .build()
-
-    override suspend fun tileRequest(requestParams: RequestBuilders.TileRequest): TileBuilders.Tile {
-        val summary = fetchTodaySummary()
-        return todaySummaryTile(requestParams, this, summary)
+class TodaySummaryTileService : Material3TileService() {
+    override suspend fun MaterialScope.tileResponse(requestParams: RequestBuilders.TileRequest): TileBuilders.Tile {
+        val newApp = isNewAppEnabled()
+        val summary = fetchTodaySummary(newApp)
+        if (!newApp) return todaySummaryTile(requestParams, this@TodaySummaryTileService, summary)
+        return tile(
+            timeline = TimelineBuilders.Timeline.fromLayoutElement(todayTileLayout(summary)),
+            freshness = FRESHNESS_MINUTES.minutes,
+        )
     }
 
-    private suspend fun fetchTodaySummary(): TodaySummary =
+    private suspend fun isNewAppEnabled(): Boolean =
+        try {
+            org.koin.java.KoinJavaComponent
+                .getKoin()
+                .get<FeatureFlagStore>()
+                .isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.e("Couldn't read the new watch app's flag for the Today tile", e)
+            false
+        }
+
+    private suspend fun fetchTodaySummary(newApp: Boolean): TodaySummary =
         try {
             val repository =
                 org.koin.java.KoinJavaComponent
                     .getKoin()
                     .get<JournalNotesRepository>()
-            val today =
-                Clock.System
-                    .now()
-                    .toLocalDateTime(TimeZone.currentSystemDefault())
-                    .date
-            summarizeToday(repository.observeNotesForDay(today).first())
+            if (newApp) {
+                val day =
+                    org.koin.java.KoinJavaComponent
+                        .getKoin()
+                        .get<DayClock>()
+                        .current()
+                val notes = repository.observeNotesInRange(day.start, day.end).first().filter { it.creationTimestamp in day }
+                summarizeMomentsToday(notes)
+            } else {
+                val today =
+                    Clock.System
+                        .now()
+                        .toLocalDateTime(TimeZone.currentSystemDefault())
+                        .date
+                summarizeToday(repository.observeNotesForDay(today).first())
+            }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Napier.e("Failed to read today's notes for the Wear summary tile", e)
             TodaySummary(entryCount = 0, feeling = null, latestEntry = null)
@@ -116,9 +148,21 @@ internal fun todaySummaryTile(
         .Builder()
         .setResourcesVersion(RESOURCES_VERSION)
         .setTileTimeline(timeline)
-        .setFreshnessIntervalMillis(15 * 60 * 1000L)
+        .setFreshnessIntervalMillis(FRESHNESS_MINUTES.minutes.inWholeMilliseconds)
         .build()
 }
+
+/** A short line for [note]: the start of its text, or what kind of moment it is. */
+internal fun latestEntryPreview(
+    context: Context,
+    note: JournalNote,
+): String =
+    when (note) {
+        is JournalNote.Text -> note.content.take(MAX_PREVIEW_LENGTH)
+        is JournalNote.Audio -> context.getString(R.string.wear_tile_summary_voice_note)
+        is JournalNote.Image -> context.getString(R.string.wear_tile_summary_photo)
+        is JournalNote.Video -> context.getString(R.string.wear_tile_summary_video)
+    }
 
 private fun todaySummaryLayout(
     requestParams: RequestBuilders.TileRequest,
@@ -167,17 +211,6 @@ private fun todaySummaryLayout(
                 ).build(),
         ).build()
 }
-
-private fun latestEntryPreview(
-    context: Context,
-    note: JournalNote,
-): String =
-    when (note) {
-        is JournalNote.Text -> note.content.take(MAX_PREVIEW_LENGTH)
-        is JournalNote.Audio -> context.getString(R.string.wear_tile_summary_voice_note)
-        is JournalNote.Image -> context.getString(R.string.wear_tile_summary_photo)
-        is JournalNote.Video -> context.getString(R.string.wear_tile_summary_video)
-    }
 
 private fun summaryContent(
     context: Context,
@@ -279,3 +312,9 @@ fun todaySummaryTilePreview(context: Context) =
             ),
         )
     }
+
+/** The redesigned tile shares Today's moment count and latest moment, excluding feeling check-ins. */
+internal fun summarizeMomentsToday(notes: List<JournalNote>): TodaySummary {
+    val summary = TodaySummaryCalculator.calculate(notes)
+    return TodaySummary(summary.momentCount, MomentNoteCodec.latestFeeling(notes), summary.latestMoment)
+}

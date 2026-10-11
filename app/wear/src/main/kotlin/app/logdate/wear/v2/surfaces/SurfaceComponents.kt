@@ -5,7 +5,9 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.wear.tiles.TileService
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceService
+import app.logdate.wear.complication.OnThisDayComplicationService
 import app.logdate.wear.complication.StreakComplicationService
+import app.logdate.wear.tile.OnThisDayTileService
 import app.logdate.wear.tile.TodaySummaryTileService
 
 /**
@@ -14,13 +16,25 @@ import app.logdate.wear.tile.TodaySummaryTileService
  */
 object SurfaceCatalog {
     /** Tiles to redraw when moments change. */
-    val TILES: List<Class<out TileService>> = listOf(TodaySummaryTileService::class.java)
+    val TILES: List<Class<out TileService>> =
+        listOf(
+            TodaySummaryTileService::class.java,
+            OnThisDayTileService::class.java,
+        )
 
     /** Complications to redraw when moments change. */
-    val COMPLICATIONS: List<Class<out ComplicationDataSourceService>> = listOf(StreakComplicationService::class.java)
+    val COMPLICATIONS: List<Class<out ComplicationDataSourceService>> =
+        listOf(
+            StreakComplicationService::class.java,
+            OnThisDayComplicationService::class.java,
+        )
 
     /** Surfaces only the new watch app offers; off while it is off. */
-    val NEW_APP_ONLY: List<String> = emptyList()
+    val NEW_APP_ONLY: List<String> =
+        listOf(
+            "app.logdate.wear.tile.OnThisDayTileService",
+            "app.logdate.wear.complication.OnThisDayComplicationService",
+        )
 
     /** Surfaces the new watch app retires; off while it is on. */
     val CURRENT_APP_ONLY: List<String> =

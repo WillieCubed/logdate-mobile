@@ -33,4 +33,15 @@ class SurfaceComponentsTest {
             SurfaceCatalog.CURRENT_APP_ONLY,
         )
     }
+
+    @Test
+    fun `the new app offers the On this day tile and complication`() {
+        assertEquals(
+            listOf(
+                "app.logdate.wear.tile.OnThisDayTileService",
+                "app.logdate.wear.complication.OnThisDayComplicationService",
+            ),
+            SurfaceCatalog.NEW_APP_ONLY,
+        )
+    }
 }

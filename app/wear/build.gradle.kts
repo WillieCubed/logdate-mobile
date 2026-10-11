@@ -114,7 +114,7 @@ play {
 
 dependencies {
     // Core library desugaring for health-connect
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.androidx.profileinstaller)
     baselineProfile(project(":benchmark:wear-baselineprofile"))
 
@@ -184,8 +184,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.splashscreen)
 
-    // Both tiles extend horologist-tiles' SuspendingTileService and draw with protolayout-material;
-    // both go when the tiles move to Material3TileService.
+    // Material 3 tiles follow the watch theme. Legacy layouts remain for the flag-off experience.
     implementation(libs.androidx.tiles)
     implementation(libs.androidx.tiles.tooling.preview)
     implementation(libs.androidx.protolayout)
@@ -221,6 +220,8 @@ dependencies {
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.kotlin.test.junit)
     androidTestImplementation(libs.androidx.work.testing)
+    androidTestImplementation(libs.androidx.protolayout.testing)
+    androidTestImplementation(libs.androidx.tiles.renderer)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
     debugImplementation(libs.androidx.tiles.tooling)

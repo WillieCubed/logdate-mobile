@@ -247,6 +247,41 @@
                 android:resource="@drawable/tile_preview" />
         </service>
 
+        <!-- On this day tile: only while the new watch app is on (SurfaceComponents enables it) -->
+        <service
+            android:name=".tile.OnThisDayTileService"
+            android:enabled="false"
+            android:exported="true"
+            android:label="@string/wear_memory_on_this_day"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@drawable/tile_preview" />
+        </service>
+
+        <!-- On this day complication: only while the new watch app is on (SurfaceComponents enables it) -->
+        <service
+            android:name=".complication.OnThisDayComplicationService"
+            android:enabled="false"
+            android:exported="true"
+            android:label="@string/wear_memory_on_this_day"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="LONG_TEXT" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="3600" />
+        </service>
+
         <!--
                Set to true if your app is Standalone, that is, it does not require the handheld
                app to run.
