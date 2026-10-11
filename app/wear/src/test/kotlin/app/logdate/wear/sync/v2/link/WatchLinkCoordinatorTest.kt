@@ -65,6 +65,7 @@ class WatchLinkCoordinatorTest {
             assertTrue(answer is LinkAnswer.Answered)
             assertEquals(PeerLinkState.LINKED, store.current().peerLinkState())
             assertEquals(ACCOUNT, store.current()?.accountId)
+            assertEquals("https://linked.test", store.current()?.serverOrigin)
             assertEquals(1, installer.installs)
         }
 
@@ -112,6 +113,7 @@ class WatchLinkCoordinatorTest {
             accountCoordinator(backgroundScope).resumeInstall()
 
             assertEquals(PeerLinkState.LINKED, store.current().peerLinkState())
+            assertEquals("https://linked.test", store.current()?.serverOrigin)
         }
 
     @Test
@@ -123,6 +125,7 @@ class WatchLinkCoordinatorTest {
             runCurrent()
             assertEquals(PHONE, store.current()?.phoneNode)
             assertEquals(PeerLinkState.PAIRED, store.current().peerLinkState())
+            assertEquals("https://linked.test", store.current()?.serverOrigin)
             installer.resumeOutcome = installer.outcome
             accountCoordinator(backgroundScope).resumeInstall()
             assertEquals(PHONE, store.current()?.phoneNode)
@@ -264,7 +267,7 @@ class WatchLinkCoordinatorTest {
     private suspend fun linkAccount(coordinator: WatchLinkCoordinator): LinkAnswer<LinkConfirm> {
         val started = phone.start(LinkMode.CLOUD, PHONE)
         val accept = answered(coordinator.answer(PHONE, WearPaths.LINK_OFFER, offerBytes(started)), LinkAccept.serializer())
-        val bundle = LinkBundle(mode = LinkMode.CLOUD, accountId = ACCOUNT)
+        val bundle = LinkBundle(mode = LinkMode.CLOUD, accountId = ACCOUNT, serverOrigin = "https://linked.test")
         val sealed = assertNotNull(phone.seal(started, accept, WATCH, bundle).valueOrNull())
         return LinkWire.read(assertNotNull(coordinator.answer(PHONE, WearPaths.LINK_BUNDLE, bundleBytes(sealed))), LinkConfirm.serializer())
     }

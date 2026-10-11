@@ -20,6 +20,7 @@ import kotlin.time.Clock
  * @property stale The watch moved to another phone since; it waits for that phone to link it again.
  * @property problem Why the last account link failed, as a [LinkProblem] name.
  * @property installing The pair is confirmed, but account installation is still pending.
+ * @property serverOrigin The server supplied by account setup; older records require relinking.
  */
 @Serializable
 data class WatchLinkRecord(
@@ -30,6 +31,7 @@ data class WatchLinkRecord(
     val accountId: String? = null,
     val problem: String? = null,
     val installing: Boolean = false,
+    val serverOrigin: String? = null,
 )
 
 /** What the watch publishes about its link in its state document. */
@@ -68,9 +70,19 @@ class WatchLinkStore(
         phoneNode: String,
         pairKey: ByteArray,
         accountId: String?,
+        serverOrigin: String? = null,
     ) {
         savePairKey(phoneNode, pairKey)
-        write(WatchLinkRecord(LinkMode.CLOUD, phoneNode, linkedAt = 0, accountId = accountId, installing = true))
+        write(
+            WatchLinkRecord(
+                LinkMode.CLOUD,
+                phoneNode,
+                linkedAt = 0,
+                accountId = accountId,
+                installing = true,
+                serverOrigin = serverOrigin,
+            ),
+        )
     }
 
     /** Keeps the pair key from an account link before its install finishes. */
@@ -82,6 +94,7 @@ class WatchLinkStore(
     suspend fun saveCloudLink(
         phoneNode: String,
         accountId: String,
+        serverOrigin: String? = null,
     ) {
         write(
             WatchLinkRecord(
@@ -89,6 +102,7 @@ class WatchLinkStore(
                 phoneNode = phoneNode,
                 linkedAt = clock.now().toEpochMilliseconds(),
                 accountId = accountId,
+                serverOrigin = serverOrigin,
             ),
         )
     }
