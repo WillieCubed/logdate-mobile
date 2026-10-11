@@ -51,6 +51,10 @@ import app.logdate.wear.v2.recorder.RecorderState
 import app.logdate.wear.v2.recorder.RecorderViewModel
 import app.logdate.wear.v2.recorder.TodayRecorder
 import app.logdate.wear.v2.recorder.locksPaging
+import app.logdate.wear.v2.settings.PhoneSettingsHandoffDialog
+import app.logdate.wear.v2.settings.WatchSettingsViewModel
+import app.logdate.wear.v2.settings.rememberWatchSettingsActions
+import app.logdate.wear.v2.settings.watchSettingsItems
 import app.logdate.wear.v2.theme.LogDateWearTheme
 import app.logdate.wear.v2.today.TodayControls
 import app.logdate.wear.v2.today.TodayPage
@@ -193,10 +197,13 @@ private fun FlowEntry(
 ) {
     val viewModel = koinViewModel<FlowViewModel>()
     val memories = koinViewModel<MemoriesViewModel>()
+    val settings = koinViewModel<WatchSettingsViewModel>()
     val player = koinInject<MomentPlayer>()
     val state by viewModel.uiState.collectAsState()
     val memoryCards by memories.cards.collectAsState()
+    val settingsState by settings.uiState.collectAsState()
     val playback by player.state.collectAsState()
+    val settingsActions = rememberWatchSettingsActions(settings)
     val openMoment: (JournalNote) -> Unit = { note -> navigate(WearRoute.Moment(note.uid.toString())) }
     FlowPage(
         state = state,
@@ -209,7 +216,9 @@ private fun FlowEntry(
                 onOpenArchive = { navigate(WearRoute.Archive) },
             ),
         cards = { spec -> memoryCardItems(memoryCards, spec, openMoment) },
+        footer = { spec -> watchSettingsItems(settingsState, settingsActions, spec) },
     )
+    PhoneSettingsHandoffDialog(settingsState.handoff, settings::dismissHandoff)
 }
 
 @Composable

@@ -50,6 +50,7 @@ import app.logdate.wear.v2.playback.SharedPreferencesPlaybackPreferencesStore
 import app.logdate.wear.v2.playon.OutputPicker
 import app.logdate.wear.v2.playon.SystemOutputPicker
 import app.logdate.wear.v2.recorder.RecorderViewModel
+import app.logdate.wear.v2.settings.WatchSettingsViewModel
 import app.logdate.wear.v2.today.DayClock
 import app.logdate.wear.v2.today.TodayViewModel
 import app.logdate.wear.v2.today.WatchDayBoundaryPreferences
@@ -223,4 +224,16 @@ val wearV2Module =
             )
         }
         single<OutputPicker> { SystemOutputPicker(get()) }
+        viewModel {
+            WatchSettingsViewModel(
+                syncManager = get(),
+                phoneReachability = get(),
+                haptics = get(),
+                locationSettings = get(),
+                permissionManager = get(),
+                phoneLinks = get(),
+                protocolGate = get(),
+                phoneHandoff = get(),
+            )
+        }
     }

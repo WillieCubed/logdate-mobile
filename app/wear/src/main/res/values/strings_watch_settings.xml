@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings at the end of the moment list, in the new watch app -->
+    <plurals name="wear_settings_waiting_for_phone">
+        <item quantity="one">%1$d moment waiting for your phone</item>
+        <item quantity="other">%1$d moments waiting for your phone</item>
+    </plurals>
+    <string name="wear_settings_waiting_for_phone_body">They’re sent when your phone is nearby</string>
+    <string name="wear_settings_send_failing">Some moments couldn’t reach your phone</string>
+    <string name="wear_settings_send_retry">Tap to try again</string>
+    <string name="wear_settings_send_retrying">Trying again…</string>
+    <string name="wear_settings_haptics_all">All haptics</string>
+    <string name="wear_settings_haptics_all_body">Crown ticks and saves too</string>
+    <string name="wear_settings_haptics_essential">Essential haptics</string>
+    <string name="wear_settings_haptics_essential_body">Recording, marks and errors only</string>
+    <string name="wear_settings_places">Places</string>
+    <string name="wear_settings_places_body">Save where you are with each moment</string>
+    <string name="wear_settings_more_on_phone">More on your phone</string>
+    <string name="wear_settings_more_on_phone_failed">Couldn’t reach your phone. Tap to try again.</string>
+</resources>
