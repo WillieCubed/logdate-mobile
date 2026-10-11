@@ -1,0 +1,87 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.people.inference",
+  "description": "Someone LogDate thinks might be in the owner's life, based on their memories, waiting for the owner to confirm or dismiss.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "Someone LogDate thinks might be in the owner's life, based on their memories, waiting for the owner to confirm or dismiss.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "displayName",
+          "normalizedName",
+          "status",
+          "createdAt"
+        ],
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "maxLength": 2000,
+            "maxGraphemes": 200
+          },
+          "normalizedName": {
+            "type": "string",
+            "maxLength": 2000,
+            "maxGraphemes": 200
+          },
+          "status": {
+            "type": "string",
+            "knownValues": [
+              "pending",
+              "confirmed",
+              "dismissed"
+            ]
+          },
+          "person": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef",
+            "description": "The person this became, once confirmed."
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "#evidence"
+            },
+            "maxLength": 500
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "description": "One place the name was found.",
+      "required": [
+        "source"
+      ],
+      "properties": {
+        "source": {
+          "type": "ref",
+          "ref": "app.logdate.defs#recordRef",
+          "description": "The entry, transcript or other record the name came from."
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 2000,
+          "maxGraphemes": 200
+        },
+        "confidence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "In thousandths."
+        }
+      }
+    }
+  }
+}

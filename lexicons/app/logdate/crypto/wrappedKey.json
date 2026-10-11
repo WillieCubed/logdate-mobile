@@ -1,0 +1,51 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.crypto.wrappedKey",
+  "description": "A shared item's content key, encrypted to one recipient device. Whether other recipients can see these records is decided by the threat-model spike.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A shared item's content key, encrypted to one recipient device. Whether other recipients can see these records is decided by the threat-model spike.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "item",
+          "recipient",
+          "recipientKey",
+          "algorithm",
+          "wrapped",
+          "createdAt"
+        ],
+        "properties": {
+          "item": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "The shared item the key unlocks."
+          },
+          "recipient": {
+            "type": "string",
+            "format": "did"
+          },
+          "recipientKey": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "The key declaration it was encrypted to."
+          },
+          "algorithm": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "wrapped": {
+            "type": "bytes",
+            "maxLength": 512
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.graph.circle",
+  "description": "A named group of the owner's connections, such as Family. Only the owner can see it.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A named group of the owner's connections, such as Family. Only the owner can see it.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "name",
+          "createdAt"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 640,
+            "maxGraphemes": 64
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

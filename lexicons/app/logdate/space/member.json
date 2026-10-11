@@ -1,0 +1,41 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.space.member",
+  "description": "Someone in a group. Members can see each other.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "Someone in a group. Members can see each other.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "subject",
+          "role",
+          "joinedAt"
+        ],
+        "properties": {
+          "subject": {
+            "type": "string",
+            "format": "did"
+          },
+          "role": {
+            "type": "string",
+            "knownValues": [
+              "owner",
+              "member"
+            ]
+          },
+          "invitedBy": {
+            "type": "string",
+            "format": "did"
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

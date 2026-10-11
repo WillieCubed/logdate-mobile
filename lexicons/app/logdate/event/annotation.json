@@ -1,0 +1,81 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.event.annotation",
+  "description": "LogDate's own details about a calendar event. The event itself is a community.lexicon.calendar.event record in the same space.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "LogDate's own details about a calendar event. The event itself is a community.lexicon.calendar.event record in the same space.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "event",
+          "createdAt"
+        ],
+        "properties": {
+          "event": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef",
+            "description": "The community.lexicon.calendar.event record this annotates."
+          },
+          "allDay": {
+            "type": "boolean"
+          },
+          "place": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef"
+          },
+          "cover": {
+            "type": "ref",
+            "ref": "app.logdate.defs#media"
+          },
+          "external": {
+            "type": "ref",
+            "ref": "#externalCalendar"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "app.logdate.defs#recordRef"
+            },
+            "maxLength": 1000,
+            "description": "Entries the person linked to the event."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    },
+    "externalCalendar": {
+      "type": "object",
+      "description": "The calendar an event was imported from.",
+      "required": [
+        "source",
+        "id"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "knownValues": [
+            "deviceCalendar",
+            "googleCalendar",
+            "ics"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "maxLength": 1024,
+          "description": "The event's identifier in that calendar, so every device recognizes the same event."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.actor.settings",
+  "description": "Private account details that sync between the person's devices.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "Private account details that sync between the person's devices.",
+      "key": "literal:self",
+      "record": {
+        "type": "object",
+        "properties": {
+          "birthday": {
+            "type": "string",
+            "maxLength": 10,
+            "description": "Date of birth, as YYYY-MM-DD."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

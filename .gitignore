@@ -61,3 +61,6 @@ tmp/
 
 # Turnkey deployment state
 .logdate/
+
+# Node tooling
+node_modules/

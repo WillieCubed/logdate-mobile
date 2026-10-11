@@ -1,0 +1,66 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.share.item",
+  "description": "Something shared, as its recipients receive it. The shared records are copies stored next to this item in the same space, using their usual types, such as app.logdate.journal.entry. The item never lists the other recipients.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "Something shared, as its recipients receive it. The shared records are copies stored next to this item in the same space, using their usual types, such as app.logdate.journal.entry. The item never lists the other recipients.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "author",
+          "kind",
+          "subjects",
+          "sharedAt"
+        ],
+        "properties": {
+          "author": {
+            "type": "string",
+            "format": "did"
+          },
+          "kind": {
+            "type": "string",
+            "knownValues": [
+              "entry",
+              "day",
+              "journal",
+              "rewind",
+              "postcard",
+              "sticker"
+            ]
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "app.logdate.defs#recordRef"
+            },
+            "maxLength": 500,
+            "description": "The copied records that make up the shared item, in display order."
+          },
+          "date": {
+            "type": "string",
+            "maxLength": 10,
+            "description": "For a shared day, the local calendar date, as YYYY-MM-DD."
+          },
+          "partOf": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "For an entry added to a shared journal, the shared journal it belongs to."
+          },
+          "includeLocation": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether the copies include where things happened."
+          },
+          "sharedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

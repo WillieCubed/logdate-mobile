@@ -1,0 +1,117 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.rewind.rewind",
+  "description": "A Rewind: a story LogDate made from a stretch of the person's days.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A Rewind: a story LogDate made from a stretch of the person's days.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "title",
+          "startsAt",
+          "endsAt",
+          "generatedAt",
+          "panels"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 2000,
+            "maxGraphemes": 200
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 1000,
+            "maxGraphemes": 100,
+            "description": "A short label for the period, such as This week."
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "panels": {
+            "type": "array",
+            "items": {
+              "type": "union",
+              "refs": [
+                "#textPanel",
+                "#imagePanel",
+                "#videoPanel"
+              ]
+            },
+            "maxLength": 100
+          },
+          "firstViewedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    },
+    "textPanel": {
+      "type": "object",
+      "description": "A panel of text.",
+      "required": [
+        "text"
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "maxLength": 100000,
+          "maxGraphemes": 10000
+        }
+      }
+    },
+    "imagePanel": {
+      "type": "object",
+      "description": "A photo panel.",
+      "required": [
+        "media"
+      ],
+      "properties": {
+        "media": {
+          "type": "ref",
+          "ref": "app.logdate.defs#media"
+        },
+        "caption": {
+          "type": "string",
+          "maxLength": 20000,
+          "maxGraphemes": 2000
+        }
+      }
+    },
+    "videoPanel": {
+      "type": "object",
+      "description": "A video panel.",
+      "required": [
+        "media"
+      ],
+      "properties": {
+        "media": {
+          "type": "ref",
+          "ref": "app.logdate.defs#media"
+        },
+        "caption": {
+          "type": "string",
+          "maxLength": 20000,
+          "maxGraphemes": 2000
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

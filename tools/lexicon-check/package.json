@@ -1,0 +1,9 @@
+{
+  "name": "logdate-lexicon-check",
+  "private": true,
+  "type": "module",
+  "description": "Validates LogDate's lexicon files with the AT Protocol reference implementation.",
+  "dependencies": {
+    "@atproto/lexicon": "0.7.14"
+  }
+}

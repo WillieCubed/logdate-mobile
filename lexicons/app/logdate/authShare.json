@@ -1,0 +1,24 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.authShare",
+  "description": "Sharing without access to the journal.",
+  "defs": {
+    "main": {
+      "type": "permission-set",
+      "title": "Share with your people",
+      "detail": "Send, receive and respond to things shared with you. This doesn't give access to your journal.",
+      "permissions": [
+        {
+          "type": "permission",
+          "resource": "repo",
+          "collection": [
+            "app.logdate.share.item",
+            "app.logdate.share.reaction",
+            "app.logdate.share.reply",
+            "app.logdate.crypto.wrappedKey"
+          ]
+        }
+      ]
+    }
+  }
+}

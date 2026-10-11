@@ -1,0 +1,12 @@
+{
+  "collection": "app.logdate.people.person",
+  "record": {
+    "$type": "app.logdate.people.person",
+    "name": "Sam Rivera",
+    "aliases": ["Sammy"],
+    "relationship": "College roommate",
+    "origin": "inference",
+    "connection": "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
+    "createdAt": "2026-09-02T18:00:00.000Z"
+  }
+}

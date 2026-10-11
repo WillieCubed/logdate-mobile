@@ -1,0 +1,165 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.journal.entry",
+  "description": "A journal entry: one moment, made of ordered blocks of text, photos, video and audio.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A journal entry: one moment, made of ordered blocks of text, photos, video and audio.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "blocks",
+          "createdAt"
+        ],
+        "properties": {
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "union",
+              "refs": [
+                "#textBlock",
+                "#imageBlock",
+                "#videoBlock",
+                "#audioBlock"
+              ]
+            },
+            "maxLength": 200,
+            "description": "The entry's content, in reading order."
+          },
+          "location": {
+            "type": "ref",
+            "ref": "app.logdate.defs#location"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime",
+            "description": "When the moment happened or was first written down."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    },
+    "textBlock": {
+      "type": "object",
+      "description": "Written text.",
+      "required": [
+        "id",
+        "text"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Identifier of the block, unique within its entry. Transcripts and other records refer to a block by this value."
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 1000000,
+          "maxGraphemes": 100000
+        },
+        "format": {
+          "type": "string",
+          "knownValues": [
+            "markdown",
+            "plain"
+          ],
+          "description": "How to interpret the text. Defaults to markdown."
+        }
+      }
+    },
+    "imageBlock": {
+      "type": "object",
+      "description": "A photo.",
+      "required": [
+        "id",
+        "media"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Identifier of the block, unique within its entry. Transcripts and other records refer to a block by this value."
+        },
+        "media": {
+          "type": "ref",
+          "ref": "app.logdate.defs#media"
+        },
+        "caption": {
+          "type": "string",
+          "maxLength": 20000,
+          "maxGraphemes": 2000
+        },
+        "presentation": {
+          "type": "string",
+          "knownValues": [
+            "edgeToEdge",
+            "framed"
+          ],
+          "description": "How the photo is framed when the entry is shown."
+        }
+      }
+    },
+    "videoBlock": {
+      "type": "object",
+      "description": "A video.",
+      "required": [
+        "id",
+        "media"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Identifier of the block, unique within its entry. Transcripts and other records refer to a block by this value."
+        },
+        "media": {
+          "type": "ref",
+          "ref": "app.logdate.defs#media"
+        },
+        "caption": {
+          "type": "string",
+          "maxLength": 20000,
+          "maxGraphemes": 2000
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "audioBlock": {
+      "type": "object",
+      "description": "An audio recording.",
+      "required": [
+        "id",
+        "media",
+        "durationMs"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Identifier of the block, unique within its entry. Transcripts and other records refer to a block by this value."
+        },
+        "media": {
+          "type": "ref",
+          "ref": "app.logdate.defs#media"
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "transcript": {
+          "type": "ref",
+          "ref": "app.logdate.defs#recordRef",
+          "description": "The transcript of this recording, when one exists."
+        }
+      }
+    }
+  }
+}

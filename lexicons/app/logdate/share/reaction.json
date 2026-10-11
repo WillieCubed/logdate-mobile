@@ -1,0 +1,36 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.share.reaction",
+  "description": "A reaction to a shared item. Only its author sees who reacted with what.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A reaction to a shared item. Only its author sees who reacted with what.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "item",
+          "reaction",
+          "createdAt"
+        ],
+        "properties": {
+          "item": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "The shared item."
+          },
+          "reaction": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "One of a small fixed set. The set is still an open question in the social model."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.space.group",
+  "description": "A group: a shared space for one occasion, such as a wedding or a class trip.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A group: a shared space for one occasion, such as a wedding or a class trip.",
+      "key": "literal:self",
+      "record": {
+        "type": "object",
+        "required": [
+          "name",
+          "owner",
+          "sharing",
+          "createdAt"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 1000,
+            "maxGraphemes": 100
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 10000,
+            "maxGraphemes": 1000
+          },
+          "owner": {
+            "type": "string",
+            "format": "did",
+            "description": "The person who started the group."
+          },
+          "sharing": {
+            "type": "string",
+            "knownValues": [
+              "everyone",
+              "ownerOnly"
+            ],
+            "description": "Who can share into the group."
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "datetime",
+            "description": "After this time nothing new can be shared into the group."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

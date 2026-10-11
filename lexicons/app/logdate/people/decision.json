@@ -1,0 +1,49 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.people.decision",
+  "description": "The owner's answer about a name LogDate found, such as \"this is the same person as Sam\" or \"ignore this name\". Decisions stick, so LogDate never asks the same question again.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "The owner's answer about a name LogDate found, such as \"this is the same person as Sam\" or \"ignore this name\". Decisions stick, so LogDate never asks the same question again.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "name",
+          "action",
+          "createdAt"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 2000,
+            "maxGraphemes": 200,
+            "description": "The normalized name the decision is about."
+          },
+          "action": {
+            "type": "string",
+            "knownValues": [
+              "sameAs",
+              "notSameAs",
+              "ignore"
+            ]
+          },
+          "person": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef",
+            "description": "The person the decision refers to, for sameAs and notSameAs."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

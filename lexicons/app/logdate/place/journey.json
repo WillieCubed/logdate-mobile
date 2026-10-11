@@ -1,0 +1,59 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.place.journey",
+  "description": "Travel between two visits.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "Travel between two visits.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "startsAt",
+          "createdAt"
+        ],
+        "properties": {
+          "from": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef",
+            "description": "The visit the journey started from."
+          },
+          "to": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef",
+            "description": "The visit the journey ended at."
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "mode": {
+            "type": "string",
+            "knownValues": [
+              "walking",
+              "running",
+              "cycling",
+              "driving",
+              "transit",
+              "flying",
+              "unknown"
+            ]
+          },
+          "distanceMeters": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

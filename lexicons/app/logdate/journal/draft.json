@@ -1,0 +1,51 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.journal.draft",
+  "description": "An unfinished entry. Drafts sync between the owner's devices and are never shared or published.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "An unfinished entry. Drafts sync between the owner's devices and are never shared or published.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "blocks",
+          "createdAt"
+        ],
+        "properties": {
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "union",
+              "refs": [
+                "app.logdate.journal.entry#textBlock",
+                "app.logdate.journal.entry#imageBlock",
+                "app.logdate.journal.entry#videoBlock",
+                "app.logdate.journal.entry#audioBlock"
+              ]
+            },
+            "maxLength": 200
+          },
+          "journal": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef",
+            "description": "The journal the entry will be added to, if the person chose one."
+          },
+          "location": {
+            "type": "ref",
+            "ref": "app.logdate.defs#location"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

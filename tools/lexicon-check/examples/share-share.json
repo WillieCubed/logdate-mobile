@@ -1,0 +1,13 @@
+{
+  "collection": "app.logdate.share.share",
+  "record": {
+    "$type": "app.logdate.share.share",
+    "item": { "collection": "app.logdate.journal.entry", "rkey": "3a1c2b4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d" },
+    "audience": [
+      { "$type": "app.logdate.share.share#circleAudience", "circle": { "collection": "app.logdate.graph.circle", "rkey": "family" } },
+      { "$type": "app.logdate.share.share#personAudience", "subject": "did:plc:ewvi7nxzyoun6zhxrhs64oiz" }
+    ],
+    "includeLocation": false,
+    "createdAt": "2026-10-10T20:15:00.000Z"
+  }
+}

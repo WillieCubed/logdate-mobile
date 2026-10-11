@@ -1,0 +1,37 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.graph.block",
+  "description": "A blocked account. Blocking ends sharing in both directions. They aren't told.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A blocked account. Blocking ends sharing in both directions. They aren't told.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "subject",
+          "createdAt"
+        ],
+        "properties": {
+          "subject": {
+            "type": "string",
+            "format": "did"
+          },
+          "source": {
+            "type": "string",
+            "knownValues": [
+              "logdate",
+              "bluesky"
+            ],
+            "description": "Where the block came from. Blocks imported from Bluesky stay in step with it."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

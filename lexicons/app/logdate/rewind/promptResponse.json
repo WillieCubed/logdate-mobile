@@ -1,0 +1,56 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.rewind.promptResponse",
+  "description": "The person's answer to a reflection prompt in a Rewind.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "The person's answer to a reflection prompt in a Rewind.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "rewind",
+          "promptKey",
+          "response",
+          "createdAt"
+        ],
+        "properties": {
+          "rewind": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef"
+          },
+          "promptKey": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "observation": {
+            "type": "string",
+            "maxLength": 20000,
+            "maxGraphemes": 2000,
+            "description": "What the Rewind noticed."
+          },
+          "invitation": {
+            "type": "string",
+            "maxLength": 20000,
+            "maxGraphemes": 2000,
+            "description": "The question it asked."
+          },
+          "response": {
+            "type": "string",
+            "maxLength": 100000,
+            "maxGraphemes": 10000
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

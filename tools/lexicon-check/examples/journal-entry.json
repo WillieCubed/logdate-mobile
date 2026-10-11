@@ -1,0 +1,38 @@
+{
+  "collection": "app.logdate.journal.entry",
+  "record": {
+    "$type": "app.logdate.journal.entry",
+    "blocks": [
+      { "$type": "app.logdate.journal.entry#textBlock", "id": "b1", "text": "Pancakes at the lake house with **everyone**." },
+      {
+        "$type": "app.logdate.journal.entry#imageBlock",
+        "id": "b2",
+        "media": {
+          "blob": { "$type": "blob", "ref": { "$link": "bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy" }, "mimeType": "application/octet-stream", "size": 482113 },
+          "mimeType": "image/jpeg",
+          "size": 481990,
+          "alt": "Four people around a table on a porch",
+          "aspectRatio": { "width": 4, "height": 3 }
+        },
+        "presentation": "edgeToEdge"
+      },
+      {
+        "$type": "app.logdate.journal.entry#audioBlock",
+        "id": "b3",
+        "media": {
+          "blob": { "$type": "blob", "ref": { "$link": "bafkreibme22gw2h7y2h7tg2fhqotaqjucnbc24deqo72b6mkl2egezxhvy" }, "mimeType": "application/octet-stream", "size": 90210 },
+          "mimeType": "audio/mp4"
+        },
+        "durationMs": 41000,
+        "transcript": { "collection": "app.logdate.journal.transcript", "rkey": "0f8b8a2e-4b8e-4f7e-9d7a-2c1b5d6e7f80" }
+      }
+    ],
+    "location": {
+      "geo": { "latitude": "44.9778", "longitude": "-93.2650", "name": "Lake house" },
+      "accuracyMeters": 12,
+      "place": { "collection": "app.logdate.place.place", "rkey": "lake-house" },
+      "timeZone": "America/Chicago"
+    },
+    "createdAt": "2026-10-10T14:03:21.000Z"
+  }
+}

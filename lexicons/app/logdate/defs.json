@@ -1,0 +1,108 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.defs",
+  "description": "Definitions shared by every LogDate lexicon.",
+  "defs": {
+    "recordRef": {
+      "type": "object",
+      "description": "A reference to another LogDate record in the same space. Records in personal, circle and group spaces aren't publicly addressable, so they point at each other by type and key instead of by AT URI and CID.",
+      "required": [
+        "collection",
+        "rkey"
+      ],
+      "properties": {
+        "collection": {
+          "type": "string",
+          "format": "nsid",
+          "description": "The referenced record's type, such as app.logdate.journal.entry."
+        },
+        "rkey": {
+          "type": "string",
+          "format": "record-key",
+          "description": "The referenced record's key."
+        }
+      }
+    },
+    "media": {
+      "type": "object",
+      "description": "A photo, video or audio file attached to a record.",
+      "required": [
+        "blob",
+        "mimeType"
+      ],
+      "properties": {
+        "blob": {
+          "type": "blob",
+          "maxSize": 2000000000,
+          "description": "The stored file. In a personal, circle or group space this is ciphertext, encrypted with the same content key as the record that refers to it."
+        },
+        "mimeType": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "The media type of the decrypted file, such as image/jpeg. The blob's own type describes the stored bytes, which may be ciphertext."
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Size of the decrypted file in bytes."
+        },
+        "alt": {
+          "type": "string",
+          "maxLength": 20000,
+          "maxGraphemes": 2000,
+          "description": "Text alternative for people who can't see or hear the media."
+        },
+        "aspectRatio": {
+          "type": "ref",
+          "ref": "#aspectRatio"
+        }
+      }
+    },
+    "aspectRatio": {
+      "type": "object",
+      "description": "Width and height of visual media, as a ratio. Used to lay out media before it loads.",
+      "required": [
+        "width",
+        "height"
+      ],
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "location": {
+      "type": "object",
+      "description": "Where something happened. Coordinates use the community location schema.",
+      "required": [
+        "geo"
+      ],
+      "properties": {
+        "geo": {
+          "type": "ref",
+          "ref": "community.lexicon.location.geo"
+        },
+        "accuracyMeters": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Horizontal accuracy of the coordinate, in meters."
+        },
+        "place": {
+          "type": "ref",
+          "ref": "app.logdate.defs#recordRef",
+          "description": "The saved place this location belongs to, when there is one."
+        },
+        "timeZone": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "IANA time zone where the moment happened, such as America/Chicago."
+        }
+      }
+    }
+  }
+}

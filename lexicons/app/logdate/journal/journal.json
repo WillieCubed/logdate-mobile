@@ -1,0 +1,43 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.journal.journal",
+  "description": "A journal: a named collection of entries.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A journal: a named collection of entries.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "title",
+          "createdAt"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 2000,
+            "maxGraphemes": 200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 30000,
+            "maxGraphemes": 3000
+          },
+          "cover": {
+            "type": "ref",
+            "ref": "app.logdate.defs#media"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

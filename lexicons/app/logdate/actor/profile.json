@@ -1,0 +1,41 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.actor.profile",
+  "description": "The person's public LogDate profile. This is the only LogDate record about a person that anyone else can read.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "The person's public LogDate profile. This is the only LogDate record about a person that anyone else can read.",
+      "key": "literal:self",
+      "record": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "maxLength": 640,
+            "maxGraphemes": 64
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2560,
+            "maxGraphemes": 256
+          },
+          "avatar": {
+            "type": "blob",
+            "accept": [
+              "image/png",
+              "image/jpeg",
+              "image/webp"
+            ],
+            "maxSize": 1000000,
+            "description": "Small image shown next to the person's name."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

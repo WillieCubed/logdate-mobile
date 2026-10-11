@@ -1,0 +1,161 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.journal.transcript",
+  "description": "The transcript of an audio block, with timed segments and detected sounds.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "The transcript of an audio block, with timed segments and detected sounds.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "entry",
+          "blockId",
+          "status",
+          "createdAt"
+        ],
+        "properties": {
+          "entry": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef",
+            "description": "The entry that holds the audio."
+          },
+          "blockId": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "The audio block's id within the entry."
+          },
+          "language": {
+            "type": "string",
+            "format": "language"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 1000000,
+            "description": "The full transcript text."
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "#segment"
+            },
+            "maxLength": 20000
+          },
+          "soundTags": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "#soundTag"
+            },
+            "maxLength": 5000
+          },
+          "source": {
+            "type": "string",
+            "knownValues": [
+              "onDevice",
+              "cloud"
+            ],
+            "description": "Where the transcript was produced."
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 256,
+            "description": "The speech model that produced the transcript."
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Increases each time the transcript is regenerated or corrected."
+          },
+          "status": {
+            "type": "string",
+            "knownValues": [
+              "pending",
+              "inProgress",
+              "complete",
+              "failed"
+            ]
+          },
+          "speakerCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    },
+    "segment": {
+      "type": "object",
+      "description": "One timed stretch of speech.",
+      "required": [
+        "startMs",
+        "endMs",
+        "text"
+      ],
+      "properties": {
+        "startMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "endMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "speaker": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "confidence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Recognition confidence, in thousandths."
+        },
+        "final": {
+          "type": "boolean"
+        }
+      }
+    },
+    "soundTag": {
+      "type": "object",
+      "description": "A non-speech sound detected in the recording, such as laughter or rain.",
+      "required": [
+        "name",
+        "startMs"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "startMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "confidence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "Detection confidence, in thousandths."
+        }
+      }
+    }
+  }
+}

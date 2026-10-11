@@ -1,0 +1,12 @@
+{
+  "collection": "app.logdate.place.sample",
+  "record": {
+    "$type": "app.logdate.place.sample",
+    "date": "2026-10-10",
+    "timeZone": "America/Chicago",
+    "samples": [
+      { "at": "2026-10-10T13:58:00.000Z", "latitude": "44.97781", "longitude": "-93.26502", "accuracyMeters": 9, "activity": "still", "source": "fused", "mock": false },
+      { "at": "2026-10-10T14:06:30.000Z", "latitude": "44.97802", "longitude": "-93.26411", "accuracyMeters": 14, "speedCentimetersPerSecond": 130, "bearingDegrees": 72, "activity": "walking" }
+    ]
+  }
+}

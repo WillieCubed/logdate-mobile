@@ -1,0 +1,57 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.health.snapshot",
+  "description": "Health readings captured at one moment, such as heart rate during a recording. Always private.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "Health readings captured at one moment, such as heart rate during a recording. Always private.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "measuredAt"
+        ],
+        "properties": {
+          "measuredAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "entry": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef",
+            "description": "The entry the readings were captured with."
+          },
+          "heartRateBpm": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 400
+          },
+          "heartRateVariabilityMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "stepCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "stressPercent": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "activeCalories": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Kilocalories."
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 128,
+            "description": "The device or service that provided the readings."
+          }
+        }
+      }
+    }
+  }
+}

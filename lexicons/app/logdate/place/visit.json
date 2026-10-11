@@ -1,0 +1,58 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.place.visit",
+  "description": "Time spent at one place.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "Time spent at one place.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "location",
+          "startsAt",
+          "createdAt"
+        ],
+        "properties": {
+          "place": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef",
+            "description": "The saved place, when the visit matched one."
+          },
+          "location": {
+            "type": "ref",
+            "ref": "community.lexicon.location.geo"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "source": {
+            "type": "string",
+            "knownValues": [
+              "inferred",
+              "manual"
+            ],
+            "description": "Whether LogDate worked out the visit from location history or the person added it."
+          },
+          "status": {
+            "type": "string",
+            "knownValues": [
+              "suggested",
+              "confirmed"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

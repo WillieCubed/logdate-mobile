@@ -8,9 +8,11 @@ for that move. The reasoning behind it is in
 and the sharing rules the schemas must support are in the
 [social model](../feature-design/social-model.md).
 
-The schemas themselves don't exist yet. Today's `studio.hypertext.logdate.*` lexicons cover only
-part of the data and don't follow the Lexicon specification. This document records which data
-becomes which record, and where each record is allowed to live.
+The schemas are drafted in the [`lexicons/`](../../lexicons) folder and haven't been published.
+Nothing reads or writes them yet: today's sync still uses the older `studio.hypertext.logdate.*`
+lexicons, which cover only part of the data and don't follow the Lexicon specification. This
+document records which data becomes which record, and where each record is allowed to live. How to
+write and change a schema is in [Writing LogDate lexicons](./lexicon-style.md).
 
 ## How to read the classification
 
@@ -59,7 +61,7 @@ Classified from the latest Room schema. When the schema changes,
 | `journal_content_links` | `app.logdate.journal.membership` | Follows the journal | Authored | Personal space |
 | `journal_merges` | Not a record | — | Bookkeeping | Device only |
 | `user_places` | `app.logdate.place.place` | Private only | Authored | Personal space |
-| `history_records` | `app.logdate.place.visit`, `app.logdate.place.journey`, plus corrections | Private only | Derived from sensors, with authored corrections | Personal space |
+| `history_records` | `app.logdate.place.visit`, `app.logdate.place.journey`, and `app.logdate.place.correction` for the person's corrections | Private only | Derived from sensors, with authored corrections | Personal space |
 | `location_logs` | `app.logdate.place.sample`, one record per day | Private only | Derived from sensors | Personal space |
 | `location_activity` | Part of the visit or journey it explains | Private only | Derived | Personal space |
 | `history_cursors` | Not a record | — | Bookkeeping | Device only |
@@ -68,7 +70,7 @@ Classified from the latest Room schema. When the schema changes,
 | `event_note_links` | Part of `app.logdate.event.annotation` | Follows the event | Authored | Personal space |
 | `people` | `app.logdate.people.person` | Private only | Authored or confirmed | Personal space |
 | `person_links` | `app.logdate.people.mention` | Private only | Authored or confirmed | Personal space |
-| `person_resolution_decisions` | Part of `app.logdate.people.person` | Private only | Authored | Personal space |
+| `person_resolution_decisions` | `app.logdate.people.decision` | Private only | Authored | Personal space |
 | `inferred_person_clusters`, `inferred_person_evidence` | `app.logdate.people.inference`, with its evidence | Private only | Derived | Personal space |
 | `rewinds`, `rewind_text_content`, `rewind_image_content`, `rewind_video_content` | `app.logdate.rewind.rewind`, with its panels | Publishable | Derived, costly | Personal space |
 | `rewind_prompt_responses` | `app.logdate.rewind.promptResponse` | Shareable | Authored | Personal space |
@@ -87,7 +89,7 @@ Some data lives outside Room and also becomes records:
 | Data | Becomes | Who can see it | Origin | Lives in |
 |---|---|---|---|---|
 | Profile (display name, photo, bio) | `app.logdate.actor.profile` | Public | Authored | Public repository |
-| Birthday | Part of a private settings record, not the profile | Private only | Authored | Personal space |
+| Birthday | `app.logdate.actor.settings`, not the profile | Private only | Authored | Personal space |
 | Editor drafts | `app.logdate.journal.draft` | Private only | Authored, unfinished | Personal space |
 
 ## Data the sharing features add
@@ -100,9 +102,11 @@ These don't exist yet. They come from the [social model](../feature-design/socia
 | Mutes | `app.logdate.graph.mute` | Only the owner | Personal space |
 | Blocks | `app.logdate.graph.block` | Only the owner | Personal space |
 | Circles and their members | `app.logdate.graph.circle`, `app.logdate.graph.circleMember` | Only the owner | Personal space |
-| Groups | `app.logdate.space.group` space, with its members | The group's members | Group space |
-| A shared item | `app.logdate.share.share`, with an encrypted copy of what was shared | The people it was shared with | Circle or group space |
-| Reactions and replies | Records attached to a share | The author and the person responding | Circle or group space |
+| Groups | `app.logdate.space.group`, with an `app.logdate.space.member` record per member | The group's members | Group space |
+| A shared item | `app.logdate.share.share`, the author's record of what they shared and with whom | Only the author | Personal space |
+| What recipients receive | `app.logdate.share.item`, plus copies of the shared records under their usual types | The people it was shared with | Circle or group space |
+| Reactions and replies | `app.logdate.share.reaction`, `app.logdate.share.reply` | The author and the person responding | Circle or group space |
+| Content keys for recipients | `app.logdate.crypto.wrappedKey` | The recipient | Circle or group space |
 | Sharing keys | `app.logdate.crypto.keyDeclaration` | Public, so others can encrypt to you | Public repository |
 
 The social graph is deliberately stored as private records. On most AT Protocol apps follows are
@@ -121,17 +125,18 @@ All new schemas use the `app.logdate.*` namespace. Each group below is its own a
 
 | Group | Records |
 |---|---|
+| `app.logdate.defs` | `recordRef`, `media`, `aspectRatio`, `location` (shared definitions, not records) |
 | `app.logdate.journal` | `entry`, `transcript`, `journal`, `membership`, `draft` |
-| `app.logdate.place` | `place`, `visit`, `journey`, `sample` |
-| `app.logdate.people` | `person`, `mention`, `inference` |
+| `app.logdate.place` | `place`, `visit`, `journey`, `correction`, `sample` |
+| `app.logdate.people` | `person`, `mention`, `decision`, `inference` |
 | `app.logdate.event` | `annotation` |
 | `app.logdate.rewind` | `rewind`, `promptResponse` |
 | `app.logdate.craft` | `postcard`, `sticker` |
 | `app.logdate.health` | `snapshot` |
-| `app.logdate.actor` | `profile` |
+| `app.logdate.actor` | `profile`, `settings` |
 | `app.logdate.graph` | `connection`, `mute`, `block`, `circle`, `circleMember` |
-| `app.logdate.share` | `share`, reactions, replies |
-| `app.logdate.space` | `personal`, `circle`, `group` (space-type declarations) |
+| `app.logdate.share` | `share`, `item`, `reaction`, `reply` |
+| `app.logdate.space` | `defs` (the `personal`, `circle` and `group` space kinds), `group`, `member` |
 | `app.logdate.crypto` | `keyDeclaration`, `sealed` (the envelope every private record is stored in), `wrappedKey` |
 | Permission sets | `app.logdate.authFull`, `app.logdate.authShare` |
 
@@ -178,9 +183,11 @@ yet.
 | `place.place` | `Place`, with `name`, `latitude`, `longitude`, `radius` and `units` |
 | `place.visit` | `Arrive`, with the `Place` as `location` and the visit's start as `published`; the end time uses a LogDate term |
 | `place.journey` | `Travel`, with `origin` and `target` places |
+| `place.correction` | `Update` of the visit or journey it corrects |
 | `place.sample` | None; daily location records use the lexicon form (and GeoJSON in exports) |
 | `people.person` | `Person` as an object, not an actor: `name`, `summary`, `icon`. It describes someone; it doesn't make them an account. |
 | `people.mention` | A `Mention` in the entry's `tag` |
+| `people.decision` | None; it records an answer to a question LogDate asked, not content |
 | `people.inference` | None; an unconfirmed guess is not something to show outside LogDate |
 | Reused `calendar.event` and `event.annotation` | `Event`, with `name`, `startTime`, `endTime` and `location`; linked entries in `context` |
 | `rewind.rewind` | `OrderedCollection` of its panels; an `Article` when published |
@@ -189,19 +196,26 @@ yet.
 | `craft.sticker` | `Image` |
 | `health.snapshot` | LogDate terms only; Activity Streams has no health vocabulary |
 | `actor.profile` | `Person` as the actor, with `name`, `summary`, `icon` and `preferredUsername` |
+| `actor.settings` | None; private account details |
 | `graph.connection` | `Relationship` (`subject`, `object`, `relationship`) |
 | `graph.mute` | `Ignore` |
 | `graph.block` | `Block` |
-| `graph.circle`, `graph.circleMember` | `Collection` of actors; always private |
-| `space.group` | `Group`; joining and leaving are `Join` and `Leave`, invitations are `Invite` |
-| `share.share` | `Create` of the shared object, with recipients in `to` (circle members never appear in another recipient's copy) |
-| Reactions, replies | `Like` (the reaction in `content`), and `Note` with `inReplyTo` |
+| `graph.circle` | `Collection` of actors; always private |
+| `graph.circleMember` | `Add` of the actor to the circle's collection; always private |
+| `space.group` | `Group`; invitations are `Invite` |
+| `space.member` | `Join` (and `Leave` when removed) |
+| `share.share` | `Create` of the shared object, with recipients in `to`; only the author has this form |
+| `share.item` | `Create` of the shared object as a recipient sees it, with no other recipients listed |
+| `share.reaction` | `Like`, with the reaction in `content` |
+| `share.reply` | `Note` with `inReplyTo` pointing at the shared item |
 | Unsharing, removing | `Delete` with a `Tombstone`, and `Undo` of the `Relationship` |
-| `crypto.keyDeclaration` | LogDate terms on the actor; Activity Streams has no end-to-end encryption vocabulary yet |
+| `crypto.keyDeclaration` | None yet; Activity Streams has no end-to-end encryption vocabulary. Exports use LogDate terms on the actor |
+| `crypto.sealed`, `crypto.wrappedKey` | None; they're encryption envelopes, not content |
 | Published stories (`site.standard.document`) | `Article` |
 
-When the schema files are drafted, each one carries its Activity Streams mapping, and the
-toolchain checks that no record type is left without one (or without an explicit "none").
+The machine-readable version of this table is `lexicons/activity-streams.json`. `./run
+lint:lexicons` fails if a record type is missing from it; `null` means a record has no Activity
+Streams form.
 
 ## Decisions
 
@@ -211,3 +225,7 @@ toolchain checks that no record type is left without one (or without an explicit
 | 2026-10-10 | **One sealed collection.** Every private record is stored inside a single `app.logdate.crypto.sealed` collection, so the server can't tell which kinds of records someone has. |
 | 2026-10-10 | **Daily location records.** Raw location samples are batched into one `place.sample` record per day instead of one record per sample. |
 | 2026-10-10 | **Inferred people sync as regular records.** Unconfirmed inferences are `people.inference` records in the personal space, synced like any other content, so every device shows the same suggestions and works from the same underlying data. They stay private and never become shareable until confirmed. |
+| 2026-10-10 | **Shared copies are ordinary records.** A shared entry, journal, Rewind, postcard or sticker is copied into the circle or group space under its usual type, and an `app.logdate.share.item` lists the copies. The AT Protocol reference implementation doesn't allow one record type to be embedded inside another, and keeping one type per kind of content means apps read shared and private entries the same way. |
+| 2026-10-10 | **References inside private spaces use `recordRef`.** Records in personal, circle and group spaces point at each other by type and key (`app.logdate.defs#recordRef`), because they have no public AT URI or CID. |
+| 2026-10-10 | **Encrypted media keeps its real type separately.** `app.logdate.defs#media` stores the blob, which is ciphertext in private spaces, next to the decrypted file's `mimeType`. |
+| 2026-10-10 | **No floats.** Measurements are integers with the unit in the field name, confidences are in thousandths, and coordinates are decimal strings, matching the AT Protocol data model and the community location schema. |

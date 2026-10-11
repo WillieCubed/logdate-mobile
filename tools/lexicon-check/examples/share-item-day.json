@@ -1,0 +1,15 @@
+{
+  "collection": "app.logdate.share.item",
+  "record": {
+    "$type": "app.logdate.share.item",
+    "author": "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
+    "kind": "day",
+    "subjects": [
+      { "collection": "app.logdate.journal.entry", "rkey": "3a1c2b4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d" },
+      { "collection": "app.logdate.journal.entry", "rkey": "5b2d3c4e-6f70-4b8c-9dae-1f203a4b5c6d" }
+    ],
+    "date": "2026-10-10",
+    "includeLocation": false,
+    "sharedAt": "2026-10-10T20:15:00.000Z"
+  }
+}

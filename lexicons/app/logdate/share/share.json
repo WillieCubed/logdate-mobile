@@ -1,0 +1,93 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.share.share",
+  "description": "The author's own record of something they shared and who they shared it with. Stored in the author's personal space, so only they see the audience.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "The author's own record of something they shared and who they shared it with. Stored in the author's personal space, so only they see the audience.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "item",
+          "audience",
+          "createdAt"
+        ],
+        "properties": {
+          "item": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef",
+            "description": "What was shared."
+          },
+          "audience": {
+            "type": "array",
+            "items": {
+              "type": "union",
+              "refs": [
+                "#circleAudience",
+                "#personAudience",
+                "#groupAudience"
+              ]
+            },
+            "maxLength": 200
+          },
+          "includeLocation": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether the shared copy includes where it happened."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "revokedAt": {
+            "type": "string",
+            "format": "datetime",
+            "description": "When the author unshared it."
+          }
+        }
+      }
+    },
+    "circleAudience": {
+      "type": "object",
+      "description": "Everyone in one of the author's circles when the item was shared.",
+      "required": [
+        "circle"
+      ],
+      "properties": {
+        "circle": {
+          "type": "ref",
+          "ref": "app.logdate.defs#recordRef"
+        }
+      }
+    },
+    "personAudience": {
+      "type": "object",
+      "description": "One connection.",
+      "required": [
+        "subject"
+      ],
+      "properties": {
+        "subject": {
+          "type": "string",
+          "format": "did"
+        }
+      }
+    },
+    "groupAudience": {
+      "type": "object",
+      "description": "Everyone in a group.",
+      "required": [
+        "space"
+      ],
+      "properties": {
+        "space": {
+          "type": "string",
+          "maxLength": 512,
+          "description": "The group's space. Its address format is decided with the storage layout."
+        }
+      }
+    }
+  }
+}

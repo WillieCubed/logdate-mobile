@@ -1,0 +1,10 @@
+{
+  "collection": "app.logdate.crypto.sealed",
+  "record": {
+    "$type": "app.logdate.crypto.sealed",
+    "version": 1,
+    "keyId": "content-1",
+    "nonce": { "$bytes": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYX" },
+    "ciphertext": { "$bytes": "c2VhbGVkIHBheWxvYWQgZ29lcyBoZXJl" }
+  }
+}

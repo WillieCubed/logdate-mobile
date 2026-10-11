@@ -1,0 +1,36 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.share.reply",
+  "description": "A reply to a shared item, as a private conversation with its author.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A reply to a shared item, as a private conversation with its author.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "item",
+          "text",
+          "createdAt"
+        ],
+        "properties": {
+          "item": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "The shared item."
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 30000,
+            "maxGraphemes": 3000
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

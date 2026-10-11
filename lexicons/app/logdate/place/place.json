@@ -1,0 +1,51 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.place.place",
+  "description": "A place the person saved and named, such as Home or Grandma's house.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A place the person saved and named, such as Home or Grandma's house.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "name",
+          "location",
+          "radiusMeters",
+          "createdAt"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 1000,
+            "maxGraphemes": 100
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 10000,
+            "maxGraphemes": 1000
+          },
+          "location": {
+            "type": "ref",
+            "ref": "community.lexicon.location.geo"
+          },
+          "radiusMeters": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000,
+            "description": "How far from the center still counts as being at the place."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

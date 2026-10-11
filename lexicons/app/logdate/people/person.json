@@ -1,0 +1,73 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.people.person",
+  "description": "Someone in the person's life, as LogDate understands them from their memories. Always private: the person described never sees it.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "Someone in the person's life, as LogDate understands them from their memories. Always private: the person described never sees it.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "name",
+          "createdAt"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 2000,
+            "maxGraphemes": 200
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 2000,
+              "maxGraphemes": 200
+            },
+            "maxLength": 50,
+            "description": "Other names the person goes by."
+          },
+          "relationship": {
+            "type": "string",
+            "maxLength": 1000,
+            "maxGraphemes": 100,
+            "description": "How the owner knows them, in the owner's words."
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 100000,
+            "maxGraphemes": 10000
+          },
+          "photo": {
+            "type": "ref",
+            "ref": "app.logdate.defs#media"
+          },
+          "origin": {
+            "type": "string",
+            "knownValues": [
+              "manual",
+              "contact",
+              "inference"
+            ],
+            "description": "How the person was first added."
+          },
+          "connection": {
+            "type": "string",
+            "format": "did",
+            "description": "The LogDate account the owner linked to this person. The link is private and changes nothing for that account."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

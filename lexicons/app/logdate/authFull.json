@@ -1,0 +1,27 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.authFull",
+  "description": "Everything a LogDate app needs.",
+  "defs": {
+    "main": {
+      "type": "permission-set",
+      "title": "Use LogDate",
+      "detail": "Read and write your LogDate journal, profile and sharing. Your journal stays encrypted; the app needs your devices' keys to read it.",
+      "permissions": [
+        {
+          "type": "permission",
+          "resource": "repo",
+          "collection": [
+            "app.logdate.actor.profile",
+            "app.logdate.crypto.keyDeclaration",
+            "app.logdate.crypto.sealed",
+            "app.logdate.share.item",
+            "app.logdate.share.reaction",
+            "app.logdate.share.reply",
+            "app.logdate.crypto.wrappedKey"
+          ]
+        }
+      ]
+    }
+  }
+}

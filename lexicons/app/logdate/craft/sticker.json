@@ -1,0 +1,45 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.craft.sticker",
+  "description": "A sticker cut out from one of the person's photos.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A sticker cut out from one of the person's photos.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "image",
+          "createdAt"
+        ],
+        "properties": {
+          "image": {
+            "type": "ref",
+            "ref": "app.logdate.defs#media",
+            "description": "The sticker, with a transparent background."
+          },
+          "source": {
+            "type": "ref",
+            "ref": "app.logdate.defs#media",
+            "description": "The photo it was cut from."
+          },
+          "sourceMoment": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef",
+            "description": "The entry the photo came from."
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 1000,
+            "maxGraphemes": 100
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

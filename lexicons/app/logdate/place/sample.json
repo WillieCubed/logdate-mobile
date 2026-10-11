@@ -1,0 +1,102 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.place.sample",
+  "description": "One day of raw location samples. The record key is the local date, such as 2026-10-10, so each day has exactly one record.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "One day of raw location samples. The record key is the local date, such as 2026-10-10, so each day has exactly one record.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "date",
+          "samples"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "maxLength": 10,
+            "description": "The local calendar date, as YYYY-MM-DD."
+          },
+          "timeZone": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "IANA time zone the date is in."
+          },
+          "samples": {
+            "type": "array",
+            "items": {
+              "type": "ref",
+              "ref": "#point"
+            },
+            "maxLength": 50000
+          }
+        }
+      }
+    },
+    "point": {
+      "type": "object",
+      "description": "One location sample.",
+      "required": [
+        "at",
+        "latitude",
+        "longitude"
+      ],
+      "properties": {
+        "at": {
+          "type": "string",
+          "format": "datetime"
+        },
+        "latitude": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Decimal degrees, WGS84."
+        },
+        "longitude": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Decimal degrees, WGS84."
+        },
+        "altitudeMeters": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "Decimal meters above the WGS84 ellipsoid."
+        },
+        "accuracyMeters": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "speedCentimetersPerSecond": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "bearingDegrees": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 359
+        },
+        "activity": {
+          "type": "string",
+          "knownValues": [
+            "still",
+            "walking",
+            "running",
+            "cycling",
+            "inVehicle",
+            "unknown"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Which sensor pipeline produced the sample."
+        },
+        "mock": {
+          "type": "boolean",
+          "description": "True when the device reported a simulated location."
+        }
+      }
+    }
+  }
+}

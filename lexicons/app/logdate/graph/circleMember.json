@@ -1,0 +1,34 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.graph.circleMember",
+  "description": "Puts a connection in a circle. Being added isn't announced.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "Puts a connection in a circle. Being added isn't announced.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "circle",
+          "subject",
+          "createdAt"
+        ],
+        "properties": {
+          "circle": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef"
+          },
+          "subject": {
+            "type": "string",
+            "format": "did"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

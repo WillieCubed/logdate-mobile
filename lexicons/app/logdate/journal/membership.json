@@ -1,0 +1,34 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.journal.membership",
+  "description": "Places an entry in a journal. An entry can belong to several journals.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "Places an entry in a journal. An entry can belong to several journals.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "journal",
+          "entry",
+          "createdAt"
+        ],
+        "properties": {
+          "journal": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef"
+          },
+          "entry": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.people.mention",
+  "description": "Links a person to something they appear in, such as an entry or an event.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "Links a person to something they appear in, such as an entry or an event.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "person",
+          "subject",
+          "status",
+          "createdAt"
+        ],
+        "properties": {
+          "person": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef"
+          },
+          "subject": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef",
+            "description": "The entry, event or other record the person appears in."
+          },
+          "provenance": {
+            "type": "string",
+            "knownValues": [
+              "manual",
+              "inferred",
+              "contact"
+            ]
+          },
+          "confidence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000,
+            "description": "How confident LogDate is in an inferred mention, in thousandths."
+          },
+          "status": {
+            "type": "string",
+            "knownValues": [
+              "suggested",
+              "confirmed",
+              "rejected"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

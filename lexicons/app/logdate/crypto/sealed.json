@@ -1,0 +1,67 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.crypto.sealed",
+  "description": "An encrypted record. Every record in a personal space is stored this way, so the server can't tell what kind of record it is, when it was written, or how big it is.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "An encrypted record. Every record in a personal space is stored this way, so the server can't tell what kind of record it is, when it was written, or how big it is.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "version",
+          "keyId",
+          "nonce",
+          "ciphertext"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Envelope format version."
+          },
+          "keyId": {
+            "type": "string",
+            "maxLength": 128,
+            "description": "Which of the owner's content keys encrypted it."
+          },
+          "nonce": {
+            "type": "bytes",
+            "maxLength": 64
+          },
+          "ciphertext": {
+            "type": "bytes",
+            "maxLength": 4000000,
+            "description": "The encrypted #payload, padded to a fixed size bucket."
+          }
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "description": "What a sealed record contains once decrypted.",
+      "required": [
+        "collection",
+        "rkey",
+        "record"
+      ],
+      "properties": {
+        "collection": {
+          "type": "string",
+          "format": "nsid",
+          "description": "The inner record's type."
+        },
+        "rkey": {
+          "type": "string",
+          "format": "record-key",
+          "description": "The inner record's key. The sealed record's own key is random and unrelated."
+        },
+        "record": {
+          "type": "unknown",
+          "description": "The inner record, such as an app.logdate.journal.entry."
+        }
+      }
+    }
+  }
+}

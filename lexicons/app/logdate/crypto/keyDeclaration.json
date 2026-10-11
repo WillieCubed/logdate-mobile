@@ -1,0 +1,47 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.crypto.keyDeclaration",
+  "description": "A public key one of the person's devices uses to receive shared items. Published in the public repository so others can encrypt to it.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A public key one of the person's devices uses to receive shared items. Published in the public repository so others can encrypt to it.",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": [
+          "publicKey",
+          "algorithm",
+          "signature",
+          "createdAt"
+        ],
+        "properties": {
+          "publicKey": {
+            "type": "bytes",
+            "maxLength": 256
+          },
+          "algorithm": {
+            "type": "string",
+            "maxLength": 64,
+            "knownValues": [
+              "x25519"
+            ]
+          },
+          "signature": {
+            "type": "bytes",
+            "maxLength": 512,
+            "description": "Signature by the account's identity key over the account DID, the public key and createdAt, so the server can't substitute its own key. The exact construction is decided by the threat-model spike."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "collection": "app.logdate.journal.transcript",
+  "record": {
+    "$type": "app.logdate.journal.transcript",
+    "entry": { "collection": "app.logdate.journal.entry", "rkey": "3a1c2b4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d" },
+    "blockId": "b3",
+    "language": "en-US",
+    "text": "Okay, everyone say hi to future us.",
+    "segments": [{ "startMs": 0, "endMs": 2400, "text": "Okay, everyone say hi to future us.", "speaker": "1", "confidence": 942, "final": true }],
+    "soundTags": [{ "name": "laughter", "startMs": 2500, "durationMs": 1800, "confidence": 811 }],
+    "source": "onDevice",
+    "revision": 1,
+    "status": "complete",
+    "speakerCount": 1,
+    "createdAt": "2026-10-10T14:04:02.000Z"
+  }
+}

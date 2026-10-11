@@ -1,0 +1,55 @@
+{
+  "lexicon": 1,
+  "id": "app.logdate.craft.postcard",
+  "description": "A postcard the person designed.",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A postcard the person designed.",
+      "key": "any",
+      "record": {
+        "type": "object",
+        "required": [
+          "document",
+          "documentVersion",
+          "createdAt"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 2000,
+            "maxGraphemes": 200
+          },
+          "document": {
+            "type": "string",
+            "maxLength": 1000000,
+            "description": "The postcard's layout document, serialized as JSON. Its structure moves into this lexicon once the postcard format is stable."
+          },
+          "documentVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Version of the layout document format."
+          },
+          "rendered": {
+            "type": "ref",
+            "ref": "app.logdate.defs#media",
+            "description": "The finished postcard as an image."
+          },
+          "sourceMoment": {
+            "type": "ref",
+            "ref": "app.logdate.defs#recordRef",
+            "description": "The entry the postcard was made from."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}
