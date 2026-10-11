@@ -10,6 +10,10 @@ import app.logdate.client.sync.SyncResult
 import app.logdate.client.sync.SyncStatus
 import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.datalayer.v2.WearProtocolGate
+import app.logdate.wear.reminders.FakeActivityRegistration
+import app.logdate.wear.reminders.FakeReminderPermissions
+import app.logdate.wear.reminders.FakeReminderPreferences
+import app.logdate.wear.reminders.WatchReminders
 import app.logdate.wear.sync.ReachablePhone
 import app.logdate.wear.v2.haptics.HapticsPreference
 import app.logdate.wear.v2.haptics.HapticsPreferenceStore
@@ -52,6 +56,10 @@ class WatchSettingsViewModelTest {
     private val phoneLinks = mockk<PhoneLinkRepository> { every { observe() } returns phoneLink }
     private val phoneFeatures = MutableStateFlow(emptySet<String>())
     private val phoneHandoff = mockk<PhoneHandoff>()
+    private val reminderPreferences = FakeReminderPreferences(enabled = false)
+    private val activityRegistration = FakeActivityRegistration()
+    private val reminderPermissions = FakeReminderPermissions()
+    private val watchReminders = WatchReminders(reminderPreferences, activityRegistration, reminderPermissions)
 
     @Before
     fun setUp() {
@@ -174,6 +182,81 @@ class WatchSettingsViewModelTest {
             }
         }
 
+    @Test
+    fun `reminders show their switch and what they cover`() =
+        runTest {
+            reminderPreferences.setEnabled(true)
+            watchReminders.restore()
+
+            viewModel().uiState.test {
+                assertEquals(RemindersSetting(enabled = true, afterWorkouts = true), expectMostRecentItem().reminders)
+            }
+        }
+
+    @Test
+    fun `turning reminders on asks for permissions first when they are missing`() =
+        runTest {
+            reminderPermissions.notifications = false
+            reminderPermissions.activityRecognition = false
+            val viewModel = viewModel()
+
+            assertTrue(viewModel.remindersNeedPermissions())
+            reminderPermissions.notifications = true
+            reminderPermissions.activityRecognition = true
+            viewModel.onReminderPermissionsResult()
+
+            assertEquals(true, reminderPreferences.enabled.value)
+            assertEquals(1, activityRegistration.registrations)
+        }
+
+    @Test
+    fun `refused permissions leave reminders off`() =
+        runTest {
+            reminderPermissions.notifications = false
+            val viewModel = viewModel()
+
+            viewModel.onReminderPermissionsResult()
+
+            assertEquals(false, reminderPreferences.enabled.value)
+        }
+
+    @Test
+    fun `turning reminders off saves it and stops listening`() =
+        runTest {
+            reminderPreferences.setEnabled(true)
+
+            viewModel().setReminders(false)
+
+            assertEquals(false, reminderPreferences.enabled.value)
+            assertEquals(1, activityRegistration.unregistrations)
+        }
+
+    @Test
+    fun `unsupported workout monitoring is not advertised as active`() =
+        runTest {
+            activityRegistration.supported = false
+            reminderPreferences.setEnabled(true)
+            watchReminders.restore()
+            viewModel().uiState.test {
+                assertEquals(RemindersSetting(enabled = true, afterWorkouts = false), expectMostRecentItem().reminders)
+            }
+        }
+
+    @Test
+    fun `revoked notifications are reflected when settings resume`() =
+        runTest {
+            reminderPreferences.setEnabled(true)
+            watchReminders.restore()
+            val model = viewModel()
+            model.uiState.test {
+                assertTrue(expectMostRecentItem().reminders.enabled)
+                reminderPermissions.notifications = false
+                model.onResume()
+                assertEquals(false, expectMostRecentItem().reminders.enabled)
+                assertTrue(reminderPreferences.enabled.value)
+            }
+        }
+
     private fun viewModel() =
         WatchSettingsViewModel(
             syncManager = syncManager,
@@ -184,6 +267,8 @@ class WatchSettingsViewModelTest {
             phoneLinks = phoneLinks,
             protocolGate = WearProtocolGate(flowOf(true), flowOf(true), phoneFeatures),
             phoneHandoff = phoneHandoff,
+            reminders = watchReminders,
+            reminderPermissions = reminderPermissions,
         )
 
     private class FakeHapticsStore : HapticsPreferenceStore {

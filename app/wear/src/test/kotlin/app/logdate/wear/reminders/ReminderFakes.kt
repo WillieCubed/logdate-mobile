@@ -49,3 +49,46 @@ internal class FakeReminderPreferences(
         last = at
     }
 }
+
+internal class FakeActivityRegistration(
+    var supported: Boolean = true,
+) : ActivityRegistration {
+    var registrations = 0
+    var unregistrations = 0
+
+    override suspend fun register(): Boolean {
+        if (!supported) return false
+        registrations++
+        return true
+    }
+
+    override suspend fun unregister() {
+        unregistrations++
+    }
+}
+
+internal class FakeReminderPermissions(
+    var notifications: Boolean = true,
+    var activityRecognition: Boolean = true,
+) : ReminderPermissions {
+    override fun notificationsGranted(): Boolean = notifications
+
+    override fun activityRecognitionGranted(): Boolean = activityRecognition
+}
+
+internal class FakeTransitions : ActivityTransitionStore {
+    var lastKind: ActivityKind? = null
+    private var changedAt: Instant? = null
+
+    override fun last(): ActivityKind? = lastKind
+
+    override fun lastChangeAt(): Instant? = changedAt
+
+    override fun record(
+        kind: ActivityKind,
+        changedAt: Instant,
+    ) {
+        lastKind = kind
+        this.changedAt = changedAt
+    }
+}

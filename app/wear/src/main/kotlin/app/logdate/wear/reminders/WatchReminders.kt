@@ -1,0 +1,49 @@
+package app.logdate.wear.reminders
+
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+/** Saved reminder choice and the listener actually registered on this watch. */
+class WatchReminders(
+    private val preferences: WatchReminderPreferences,
+    private val activity: ActivityRegistration,
+    private val permissions: ReminderPermissions,
+    private val experienceEnabled: () -> Boolean = { true },
+) {
+    private val registration = Mutex()
+    private val currentWorkouts = MutableStateFlow(false)
+    val enabled: StateFlow<Boolean> = preferences.enabled
+    val workoutsActive: StateFlow<Boolean> = currentWorkouts.asStateFlow()
+
+    suspend fun setEnabled(enabled: Boolean) {
+        preferences.setEnabled(enabled)
+        restore()
+    }
+
+    /** Reconciles boot, permission and rollout changes with the latest saved choice. */
+    suspend fun restore() {
+        registration.withLock {
+            if (canListen()) {
+                currentWorkouts.value = false
+                val registered = activity.register()
+                if (canListen()) currentWorkouts.value = registered else stop()
+            } else {
+                stop()
+            }
+        }
+    }
+
+    private fun canListen(): Boolean =
+        preferences.enabled.value &&
+            experienceEnabled() &&
+            permissions.notificationsGranted() &&
+            permissions.activityRecognitionGranted()
+
+    private suspend fun stop() {
+        currentWorkouts.value = false
+        activity.unregister()
+    }
+}

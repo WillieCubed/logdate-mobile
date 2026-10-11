@@ -34,6 +34,7 @@ object WatchSettingsTags {
     const val HAPTICS_ALL = "settings_haptics_all"
     const val HAPTICS_ESSENTIAL = "settings_haptics_essential"
     const val PLACES = "settings_places"
+    const val REMINDERS = "settings_reminders"
     const val MORE_ON_PHONE = "settings_more_on_phone"
 }
 
@@ -41,6 +42,7 @@ object WatchSettingsTags {
 data class WatchSettingsActions(
     val onHaptics: (HapticsPreference) -> Unit = {},
     val onPlaces: (Boolean) -> Unit = {},
+    val onReminders: (Boolean) -> Unit = {},
     val onRetrySync: () -> Unit = {},
     val onOpenPhoneSettings: () -> Unit = {},
 )
@@ -76,6 +78,7 @@ fun TransformingLazyColumnScope.watchSettingsItems(
         )
     }
     item { PlacesSwitch(state.places, actions.onPlaces, Modifier.transformedHeight(this, spec), SurfaceTransformation(spec)) }
+    item { RemindersSwitch(state.reminders, actions.onReminders, Modifier.transformedHeight(this, spec), SurfaceTransformation(spec)) }
     if (state.phoneSettingsNodeId != null) {
         item {
             MoreOnPhoneButton(
@@ -190,6 +193,30 @@ private fun PlacesSwitch(
         transformation = transformation,
         secondaryLabel = { Text(stringResource(R.string.wear_settings_places_body), maxLines = 4) },
         label = { Text(stringResource(R.string.wear_settings_places)) },
+    )
+}
+
+@Composable
+private fun RemindersSwitch(
+    setting: RemindersSetting,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier,
+    transformation: SurfaceTransformation,
+) {
+    SwitchButton(
+        checked = setting.enabled,
+        onCheckedChange = onCheckedChange,
+        modifier = modifier.fillMaxWidth().testTag(WatchSettingsTags.REMINDERS),
+        transformation = transformation,
+        secondaryLabel = {
+            Text(
+                stringResource(
+                    if (setting.afterWorkouts) R.string.wear_settings_reminders_workouts else R.string.wear_settings_reminders_off,
+                ),
+                maxLines = 4,
+            )
+        },
+        label = { Text(stringResource(R.string.wear_settings_reminders)) },
     )
 }
 

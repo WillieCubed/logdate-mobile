@@ -8,6 +8,8 @@ import app.logdate.client.permissions.PermissionType
 import app.logdate.client.sync.SyncManager
 import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.datalayer.v2.WearProtocolGate
+import app.logdate.wear.reminders.ReminderPermissions
+import app.logdate.wear.reminders.WatchReminders
 import app.logdate.wear.sync.PhoneReachability
 import app.logdate.wear.v2.haptics.HapticsPreference
 import app.logdate.wear.v2.haptics.HapticsPreferenceStore
@@ -38,11 +40,19 @@ data class WatchSettingsUiState(
     val phoneSettingsNodeId: String? = null,
     val handoff: HandoffState = HandoffState.IDLE,
     val retrying: Boolean = false,
+    val reminders: RemindersSetting = RemindersSetting(),
+)
+
+/** The reminders switch, and whether workout monitoring actually registered. */
+data class RemindersSetting(
+    val enabled: Boolean = false,
+    val afterWorkouts: Boolean = false,
 )
 
 /**
- * The settings at the end of the moment list. Every input is followed as it changes; only location
- * access is read again on resume, since it can change in system settings without an event.
+ * The settings at the end of the moment list. Every input is followed as it changes; location and
+ * physical activity access are read again on resume, since they change in system settings without an
+ * event.
  */
 class WatchSettingsViewModel(
     private val syncManager: SyncManager,
@@ -53,8 +63,11 @@ class WatchSettingsViewModel(
     phoneLinks: PhoneLinkRepository,
     protocolGate: WearProtocolGate,
     private val phoneHandoff: PhoneHandoff,
+    private val reminders: WatchReminders,
+    private val reminderPermissions: ReminderPermissions,
 ) : ViewModel() {
     private val locationGranted = MutableStateFlow(permissionManager.isPermissionGranted(PermissionType.LOCATION))
+    private val notificationsGranted = MutableStateFlow(reminderPermissions.notificationsGranted())
     private val handoff = MutableStateFlow(HandoffState.IDLE)
     private val retrying = MutableStateFlow(false)
 
@@ -65,6 +78,10 @@ class WatchSettingsViewModel(
         combine(protocolGate.isFeatureActive(WearFeatures.PHONE_SETTINGS_LINK), phoneLinks.observe()) { active, link ->
             (link as? PhoneLink.Connected)?.nodeId?.takeIf { active }
         }
+    private val remindersSetting =
+        combine(reminders.enabled, reminders.workoutsActive, notificationsGranted) { on, workouts, notifications ->
+            RemindersSetting(enabled = on && notifications, afterWorkouts = on && notifications && workouts)
+        }
 
     val uiState: StateFlow<WatchSettingsUiState> =
         combine(
@@ -72,8 +89,8 @@ class WatchSettingsViewModel(
             haptics.preference,
             places,
             phoneSettingsNode,
-            combine(handoff, retrying, ::Pair),
-        ) { syncStatus, hapticsChoice, placesOn, node, (handoffState, isRetrying) ->
+            combine(handoff, retrying, remindersSetting, ::Triple),
+        ) { syncStatus, hapticsChoice, placesOn, node, (handoffState, isRetrying, remindersState) ->
             WatchSettingsUiState(
                 status = syncStatus,
                 haptics = hapticsChoice,
@@ -81,6 +98,7 @@ class WatchSettingsViewModel(
                 phoneSettingsNodeId = node,
                 handoff = handoffState,
                 retrying = isRetrying,
+                reminders = remindersState,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), WatchSettingsUiState())
 
@@ -106,9 +124,40 @@ class WatchSettingsViewModel(
         if (granted) setPlaces(true)
     }
 
-    /** Reads location access again; it may have changed in system settings. */
+    /** Whether turning reminders on first needs notifications or physical activity access. */
+    fun remindersNeedPermissions(): Boolean = !canRemind()
+
+    /** After the permission request: reminders turn on once they can work, and stay off otherwise. */
+    fun onReminderPermissionsResult() {
+        notificationsGranted.value = reminderPermissions.notificationsGranted()
+        if (canRemind()) setReminders(true)
+    }
+
+    fun setReminders(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                reminders.setEnabled(enabled)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Napier.e("Couldn't turn reminders ${if (enabled) "on" else "off"} on the watch", e)
+            }
+        }
+    }
+
+    /** Reads location and physical activity access again; either may have changed in system settings. */
     fun onResume() {
         locationGranted.value = permissionManager.isPermissionGranted(PermissionType.LOCATION)
+        notificationsGranted.value = reminderPermissions.notificationsGranted()
+        viewModelScope.launch {
+            try {
+                reminders.restore()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Napier.w("Could not refresh watch reminders after permissions changed", e)
+            }
+        }
     }
 
     /** Sends what is waiting again, once at a time. */
@@ -145,6 +194,9 @@ class WatchSettingsViewModel(
     fun dismissHandoff() {
         handoff.value = HandoffState.IDLE
     }
+
+    /** Workouts are the only trigger, so reminders need both notifications and physical activity. */
+    private fun canRemind(): Boolean = reminderPermissions.notificationsGranted() && reminderPermissions.activityRecognitionGranted()
 
     companion object {
         const val PHONE_WATCH_SETTINGS_LINK = "studio.hypertext.logdate://settings/watch"

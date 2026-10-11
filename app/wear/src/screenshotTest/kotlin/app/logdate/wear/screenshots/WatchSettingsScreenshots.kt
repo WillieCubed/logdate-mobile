@@ -7,6 +7,7 @@ import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import app.logdate.wear.v2.haptics.HapticsPreference
+import app.logdate.wear.v2.settings.RemindersSetting
 import app.logdate.wear.v2.settings.WatchSettingsActions
 import app.logdate.wear.v2.settings.WatchSettingsUiState
 import app.logdate.wear.v2.settings.WatchStatus
@@ -45,7 +46,7 @@ class WatchSettingsScreenshots {
     @WearLargeFontPreview
     @Composable
     fun S04_SettingsMoreOnPhone() {
-        SettingsScene(WatchSettingsUiState(places = true, phoneSettingsNodeId = "phone-node"), anchorItem = 4)
+        SettingsScene(WatchSettingsUiState(places = true, phoneSettingsNodeId = "phone-node"), anchorItem = 5)
     }
 
     @PreviewTest
@@ -54,6 +55,22 @@ class WatchSettingsScreenshots {
     @Composable
     fun S05_SettingsEssentialAndPlaces() {
         SettingsScene(WatchSettingsUiState(places = true, haptics = HapticsPreference.ESSENTIAL), anchorItem = 2)
+    }
+
+    @PreviewTest
+    @WearScreenshotPreviewMatrix
+    @WearLargeFontPreview
+    @Composable
+    fun S06_SettingsRemindersOn() {
+        SettingsScene(WatchSettingsUiState(reminders = RemindersSetting(enabled = true, afterWorkouts = true)), anchorItem = 4)
+    }
+
+    @PreviewTest
+    @WearScreenshotPreviewMatrix
+    @WearLargeFontPreview
+    @Composable
+    fun S07_SettingsRemindersOff() {
+        SettingsScene(WatchSettingsUiState(), anchorItem = 4)
     }
 }
 

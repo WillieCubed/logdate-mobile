@@ -12,6 +12,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.wear.compose.material3.OpenOnPhoneDialog
 import androidx.wear.compose.material3.OpenOnPhoneDialogDefaults
 import androidx.wear.compose.material3.openOnPhoneDialogCurvedText
+import app.logdate.wear.reminders.REMINDER_PERMISSIONS
 import app.logdate.wear.v2.today.HandoffState
 
 /**
@@ -24,13 +25,17 @@ fun rememberWatchSettingsActions(viewModel: WatchSettingsViewModel): WatchSettin
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
             viewModel.onLocationPermissionResult(results.values.any { it })
         }
+    val reminderRequest =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            viewModel.onReminderPermissionsResult()
+        }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) viewModel.onResume() }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    return remember(viewModel, locationRequest) {
+    return remember(viewModel, locationRequest, reminderRequest) {
         WatchSettingsActions(
             onHaptics = viewModel::setHaptics,
             onPlaces = { enabled ->
@@ -40,6 +45,15 @@ fun rememberWatchSettingsActions(viewModel: WatchSettingsViewModel): WatchSettin
                     locationRequest.launch(LOCATION_PERMISSIONS)
                 } else {
                     viewModel.setPlaces(enabled)
+                }
+            },
+            onReminders = { enabled ->
+                if (enabled &&
+                    viewModel.remindersNeedPermissions()
+                ) {
+                    reminderRequest.launch(REMINDER_PERMISSIONS)
+                } else {
+                    viewModel.setReminders(enabled)
                 }
             },
             onRetrySync = viewModel::retrySync,

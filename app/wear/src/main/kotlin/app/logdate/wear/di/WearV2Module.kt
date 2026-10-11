@@ -11,18 +11,28 @@ import app.logdate.client.media.storage.MediaFileResolver
 import app.logdate.ui.platform.LogDateHaptics
 import app.logdate.ui.platform.createAndroidPlatformHapticsController
 import app.logdate.ui.platform.isSystemHapticFeedbackOff
+import app.logdate.wear.LogDateWearApplication
 import app.logdate.wear.capture.QuickNoteWriter
 import app.logdate.wear.health.HeartRateSampler
 import app.logdate.wear.health.MeasureClientHeartRateReadings
 import app.logdate.wear.health.MeasuredHeartRateSampler
+import app.logdate.wear.launch.FeatureSwitch
 import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.playback.WatchMediaCache
 import app.logdate.wear.recording.AudioMomentSaver
+import app.logdate.wear.reminders.ActivityRegistration
+import app.logdate.wear.reminders.ActivityTransitionStore
+import app.logdate.wear.reminders.AndroidReminderPermissions
+import app.logdate.wear.reminders.HealthServicesActivityRegistration
 import app.logdate.wear.reminders.NudgeNotifier
+import app.logdate.wear.reminders.ReminderPermissions
+import app.logdate.wear.reminders.SharedPreferencesActivityTransitionStore
 import app.logdate.wear.reminders.SharedPreferencesWatchReminderPreferences
 import app.logdate.wear.reminders.WatchNudgeNotifier
 import app.logdate.wear.reminders.WatchReminderDispatcher
 import app.logdate.wear.reminders.WatchReminderPreferences
+import app.logdate.wear.reminders.WatchReminders
+import app.logdate.wear.reminders.WorkoutWatcher
 import app.logdate.wear.sync.deleteLocalAudio
 import app.logdate.wear.v2.archive.ArchiveViewModel
 import app.logdate.wear.v2.capture.CaptureSheetViewModel
@@ -239,6 +249,8 @@ val wearV2Module =
                 phoneLinks = get(),
                 protocolGate = get(),
                 phoneHandoff = get(),
+                reminders = get(),
+                reminderPermissions = get(),
             )
         }
         single<WatchReminderPreferences> {
@@ -248,4 +260,27 @@ val wearV2Module =
         }
         single<NudgeNotifier> { WatchNudgeNotifier(get()) }
         single { WatchReminderDispatcher(preferences = get(), notifier = get()) }
+        single<ReminderPermissions> { AndroidReminderPermissions(get()) }
+        single<ActivityRegistration> { HealthServicesActivityRegistration(get()) }
+        single<ActivityTransitionStore> {
+            SharedPreferencesActivityTransitionStore(
+                get<Context>().getSharedPreferences(SharedPreferencesActivityTransitionStore.PREFERENCES_NAME, Context.MODE_PRIVATE),
+            )
+        }
+        single { (get<Context>().applicationContext as LogDateWearApplication).newWatchApp }
+        single {
+            val experience = get<FeatureSwitch>()
+            val preferences = get<WatchReminderPreferences>()
+            val permissions = get<ReminderPermissions>()
+            WorkoutWatcher(transitions = get(), dispatcher = get(), experienceEnabled = {
+                experience.isOn &&
+                    preferences.enabled.value &&
+                    permissions.notificationsGranted() &&
+                    permissions.activityRecognitionGranted()
+            })
+        }
+        single {
+            val experience = get<FeatureSwitch>()
+            WatchReminders(preferences = get(), activity = get(), permissions = get(), experienceEnabled = { experience.isOn })
+        }
     }

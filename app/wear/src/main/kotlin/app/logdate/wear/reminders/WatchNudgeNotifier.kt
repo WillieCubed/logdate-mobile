@@ -32,12 +32,7 @@ class WatchNudgeNotifier(
             Napier.w("Notifications are off for LogDate on this watch, so the ${reminder.name} reminder was not shown")
             return false
         }
-        return try {
-            postGranted(reminder)
-        } catch (e: SecurityException) {
-            Napier.w("Notification permission changed before the watch reminder could be shown", e)
-            false
-        }
+        return postGranted(reminder)
     }
 
     private fun postGranted(reminder: WatchReminder): Boolean {
@@ -56,8 +51,13 @@ class WatchNudgeNotifier(
                 .setContentIntent(WearLaunchIntents.home(context))
                 .addAction(R.drawable.ic_glyph_record, context.getString(R.string.wear_reminder_record), WearLaunchIntents.record(context))
                 .build()
-        manager.notify(TAG, NOTIFICATION_ID, notification)
-        return true
+        return try {
+            manager.notify(TAG, NOTIFICATION_ID, notification)
+            true
+        } catch (e: SecurityException) {
+            Napier.w("Notification permission changed before the watch reminder could be shown", e)
+            false
+        }
     }
 
     companion object {

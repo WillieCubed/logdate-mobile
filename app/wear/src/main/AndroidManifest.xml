@@ -22,18 +22,11 @@
         android:maxSdkVersion="35" />
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
 
-    <!--
-        Wear inherits ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION from
-        :client:location for on-demand geotagging at journal-entry save time.
-        The watch flow does not run a foreground tracking service, register
-        boot or activity-transition receivers, or sample location in the
-        background, so opt out of those merged permissions to keep the Play
-        Store sensitive-permissions surface aligned with the actual feature.
-    -->
+    <!-- Places are captured on demand. Workouts use activity recognition only when reminders are enabled. -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" tools:node="remove" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" tools:node="remove" />
-    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" tools:node="remove" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- Remove OpenGL ES requirement merged from Google Maps SDK -->
     <uses-feature android:glEsVersion="0x00020000" tools:node="remove" />
@@ -54,6 +47,7 @@
 
     <application
         android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
@@ -79,11 +73,12 @@
                 tools:node="remove" />
         </provider>
 
-        <!-- Audio Playback Service — reused from client:media for voice note playback -->
+        <!-- MediaSessionService must be exported for system media controllers. -->
         <service
             android:name="app.logdate.client.media.audio.AudioPlaybackService"
             android:exported="true"
-            android:foregroundServiceType="mediaPlayback">
+            android:foregroundServiceType="mediaPlayback"
+            tools:ignore="ExportedService">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
@@ -99,47 +94,57 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
-                <data
-                    android:scheme="wear"
-                    android:host="*"
-                    android:pathPrefix="/logdate/notes" />
-                <data
-                    android:scheme="wear"
-                    android:host="*"
-                    android:pathPrefix="/logdate/journals" />
-                <data
-                    android:scheme="wear"
-                    android:host="*"
-                    android:pathPrefix="/logdate/associations" />
-                <data
-                    android:scheme="wear"
-                    android:host="*"
-                    android:pathPrefix="/logdate/camera" />
-                <data
-                    android:scheme="wear"
-                    android:host="*"
-                    android:path="/logdate/state" />
+                <data android:scheme="wear" />
+                <data android:host="*" />
+                <data android:pathPrefix="/logdate/notes" />
+                <data android:scheme="wear" />
+                <data android:host="*" />
+                <data android:pathPrefix="/logdate/journals" />
+                <data android:scheme="wear" />
+                <data android:host="*" />
+                <data android:pathPrefix="/logdate/associations" />
+                <data android:scheme="wear" />
+                <data android:host="*" />
+                <data android:pathPrefix="/logdate/camera" />
+                <data android:scheme="wear" />
+                <data android:host="*" />
+                <data android:path="/logdate/state" />
             </intent-filter>
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
-                <data
-                    android:scheme="wear"
-                    android:host="*"
-                    android:pathPrefix="/logdate/notes" />
-                <data
-                    android:scheme="wear"
-                    android:host="*"
-                    android:pathPrefix="/logdate/sync" />
+                <data android:scheme="wear" />
+                <data android:host="*" />
+                <data android:pathPrefix="/logdate/notes" />
+                <data android:scheme="wear" />
+                <data android:host="*" />
+                <data android:pathPrefix="/logdate/sync" />
             </intent-filter>
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.CAPABILITY_CHANGED" />
-                <data
-                    android:scheme="wear"
-                    android:host="*"
-                    android:path="/logdate_phone_app" />
+                <data android:scheme="wear" />
+                <data android:host="*" />
+                <data android:path="/logdate_phone_app" />
             </intent-filter>
         </service>
-            
+
+        <!-- The shared phone receiver must not start background location on the watch. -->
+        <receiver
+            android:name="app.logdate.client.location.tracking.LocationTrackingBootReceiver"
+            tools:node="remove" />
+
+        <service
+            android:name=".reminders.WorkoutEndListenerService"
+            android:exported="true"
+            android:permission="com.google.android.wearable.healthservices.permission.PASSIVE_DATA_BINDING" />
+        <receiver
+            android:name=".reminders.ReminderRestoreReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <!-- Entry Count complication: shows today's journal entry count -->
         <service
             android:name=".complication.EntryCountComplicationService"

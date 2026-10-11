@@ -99,6 +99,16 @@ class WatchSettingsTest {
         assertEquals(1, opens)
     }
 
+    @Test
+    fun the_reminders_switch_reports_the_new_value() {
+        val values = mutableListOf<Boolean>()
+        show(WatchSettingsUiState(), WatchSettingsActions(onReminders = { values += it }))
+
+        clickWhenShown(WatchSettingsTags.REMINDERS)
+
+        assertEquals(listOf(true), values)
+    }
+
     private fun show(
         state: WatchSettingsUiState,
         actions: WatchSettingsActions = WatchSettingsActions(),

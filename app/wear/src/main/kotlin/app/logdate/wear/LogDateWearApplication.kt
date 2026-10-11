@@ -15,12 +15,14 @@ import app.logdate.wear.launch.FeatureSwitch
 import app.logdate.wear.recording.OngoingRecordingDecorator
 import app.logdate.wear.recording.WearRecordingRecovery
 import app.logdate.wear.reminders.LegacyPromptAlarms
+import app.logdate.wear.reminders.WatchReminders
 import app.logdate.wear.reminders.applyReminderBridging
 import app.logdate.wear.sync.WatchSyncScheduler
 import app.logdate.wear.sync.WearDeadLetterMigration
 import app.logdate.wear.sync.v2.WatchStateMirror
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -85,12 +87,12 @@ class LogDateWearApplication :
         }
 
         recoverInterruptedRecordings(launchedAtMs)
-        startSync()
         newWatchApp.start(
             org.koin.java.KoinJavaComponent
                 .getKoin()
                 .get<CoroutineScope>(),
         )
+        startSync()
 
         runCatching { LegacyPromptAlarms.cancel(this) }
             .onFailure { error -> Napier.w("Failed to remove the legacy journal prompts", error) }
@@ -134,6 +136,9 @@ class LogDateWearApplication :
         val scope = koin.get<CoroutineScope>()
         koin.get<WatchStateMirror>().start(scope)
         scope.launch {
+            newWatchApp.state.collect { restoreReminders(koin.get()) }
+        }
+        scope.launch {
             requeueSetAsideCaptures(koin.get())
             koin.get<WatchSyncScheduler>().start(this)
         }
@@ -145,6 +150,17 @@ class LogDateWearApplication :
             if (requeued > 0) Napier.i("Queued $requeued capture(s) again that an older version set aside")
         } catch (e: Exception) {
             Napier.e("Queueing set-aside captures again failed", e)
+        }
+    }
+
+    /** Listens for workouts again after an update or a cleared Health Services registration, while reminders are on. */
+    private suspend fun restoreReminders(reminders: WatchReminders) {
+        try {
+            reminders.restore()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Napier.e("Restoring reminders at start failed", e)
         }
     }
 

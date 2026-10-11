@@ -31,8 +31,7 @@ fun interface WatchSyncWork {
  * waiting work and would stop a run in progress. With no phone in reach nothing is set: the phone's
  * return starts a sync by itself.
  *
- * The watch build removes RECEIVE_BOOT_COMPLETED, so after a reboot WorkManager reschedules this
- * work when the app process next starts, through any Data Layer event, tile, complication or launch.
+ * After a reboot WorkManager reschedules this work through the boot permission declared for reminders.
  */
 class WatchSyncScheduler(
     private val work: WatchSyncWork,
