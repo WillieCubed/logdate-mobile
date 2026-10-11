@@ -175,7 +175,7 @@ class PeerDeliveryLedger(
     ): PeerDelivery? =
         mutationMutex.withLock {
             val entry = get(scope, direction, entityType, entityId) ?: return@withLock null
-            if (receiptVersion < entry.contentVersion || !entry.state.canBecome(state)) return@withLock null
+            if (receiptVersion < entry.contentVersion || entry.state == state || !entry.state.canBecome(state)) return@withLock null
             writeMove(entry, state)
         }
 

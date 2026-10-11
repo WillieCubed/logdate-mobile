@@ -211,6 +211,19 @@ class PeerDeliveryLedgerTest {
             assertNull(get("a"))
         }
 
+    @Test
+    fun `concurrent repeated rejections report only one forward transition`() =
+        runTest {
+            track("a", version = 5)
+            val applied =
+                (1..20)
+                    .map {
+                        async { receipt("a", Long.MAX_VALUE, DeliveryState.REJECTED) }
+                    }.awaitAll()
+            assertEquals(1, applied.count { it != null })
+            assertEquals(DeliveryState.REJECTED, get("a")?.state)
+        }
+
     private suspend fun track(
         id: String,
         version: Long,

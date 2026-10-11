@@ -3,7 +3,6 @@ package app.logdate.wear.v2.mark
 import app.logdate.client.database.dao.moments.MarkedMomentDao
 import app.logdate.client.database.dao.sync.PeerDeliveryDao
 import app.logdate.client.database.entities.moments.MarkedMomentEntity
-import app.logdate.client.database.entities.sync.PeerDeliveryEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -42,38 +41,7 @@ class FakeMarkedMomentDao : MarkedMomentDao {
     }
 }
 
-/** [PeerDeliveryDao] in memory. */
-class FakePeerDeliveryDao : PeerDeliveryDao {
-    private val rows = mutableMapOf<List<String>, PeerDeliveryEntity>()
-
-    override suspend fun upsert(entry: PeerDeliveryEntity) {
-        rows[listOf(entry.peerScope, entry.direction, entry.entityType, entry.entityId)] = entry
-    }
-
-    override suspend fun get(
-        peerScope: String,
-        direction: String,
-        entityType: String,
-        entityId: String,
-    ): PeerDeliveryEntity? = rows[listOf(peerScope, direction, entityType, entityId)]
-
-    override suspend fun due(
-        peerScope: String,
-        direction: String,
-        now: Long,
-        limit: Int,
-    ): List<PeerDeliveryEntity> =
-        rows.values
-            .filter { it.peerScope == peerScope && it.direction == direction && it.nextAttemptAt?.let { next -> next <= now } == true }
-            .sortedBy { it.nextAttemptAt }
-            .take(limit)
-
-    override suspend fun delete(
-        peerScope: String,
-        direction: String,
-        entityType: String,
-        entityId: String,
-    ) {
-        rows.remove(listOf(peerScope, direction, entityType, entityId))
-    }
-}
+/** [PeerDeliveryDao] in memory, shared with the delivery tests so query contracts stay consistent. */
+class FakePeerDeliveryDao :
+    PeerDeliveryDao by app.logdate.wear.sync.v2.delivery
+        .MemoryPeerDeliveryDao()
