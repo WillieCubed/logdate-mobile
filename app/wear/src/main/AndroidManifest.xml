@@ -86,7 +86,7 @@
 
         <!--
             Data Layer listener: receives notes, journals, associations, remote camera updates and the
-            phone's state document from the paired phone. Play services delivers only events whose
+            phone's state document and link requests. Play services delivers only events whose
             path is listed here.
         -->
         <service
@@ -124,6 +124,19 @@
                 <data android:scheme="wear" />
                 <data android:host="*" />
                 <data android:path="/logdate_phone_app" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.REQUEST_RECEIVED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/logdate/link" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.NODE_MIGRATED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*" />
             </intent-filter>
         </service>
 

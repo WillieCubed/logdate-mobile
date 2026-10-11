@@ -63,6 +63,7 @@ import app.logdate.wear.sync.WearNoteAckHandler
 import app.logdate.wear.sync.WearNoteRemovalNotifier
 import app.logdate.wear.sync.WearPhoneMessageHandler
 import app.logdate.wear.sync.WorkManagerWatchSyncWork
+import app.logdate.wear.sync.v2.WatchOwnState
 import app.logdate.wear.sync.v2.WatchPeerLink
 import app.logdate.wear.sync.v2.WatchStateMirror
 import com.google.android.gms.wearable.Wearable
@@ -154,6 +155,7 @@ val wearDataModule =
                 capabilities = get(),
                 peerStates = get(),
                 merger = get(),
+                ownState = get<WatchOwnState>().observe(),
             )
         }
         single {

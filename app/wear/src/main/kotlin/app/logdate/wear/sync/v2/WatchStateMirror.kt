@@ -14,7 +14,10 @@ import app.logdate.client.sync.peer.state.WatchState
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 
@@ -31,12 +34,15 @@ class WatchStateMirror(
     private val capabilities: LocalCapabilities,
     private val peerStates: PeerStateStore,
     private val merger: StateMerger,
+    private val ownState: Flow<WatchState> = flowOf(WatchState()),
     private val clock: Clock = Clock.System,
 ) {
     fun start(scope: CoroutineScope): Job =
         scope.launch {
             catchUpWithPhone()
-            featureFlags.observe(FeatureFlag.WATCH_EXPERIENCE_V2).distinctUntilChanged().collect { enabled -> publish(enabled) }
+            combine(featureFlags.observe(FeatureFlag.WATCH_EXPERIENCE_V2), ownState) { enabled, state -> enabled to state }
+                .distinctUntilChanged()
+                .collect { (enabled, state) -> publish(enabled, state) }
         }
 
     /** Reads the phone's document, for a change made while this watch's app was not running. */
@@ -58,8 +64,11 @@ class WatchStateMirror(
         Napier.i("The redesigned watch app is now ${if (enabled) "on" else "off"}, as set in Labs on the phone")
     }
 
-    private suspend fun publish(enabled: Boolean) {
-        val document = StateDocument(role = PeerRole.WATCH, writtenAt = clock.now().toEpochMilliseconds(), watch = WatchState())
+    private suspend fun publish(
+        enabled: Boolean,
+        state: WatchState,
+    ) {
+        val document = StateDocument(role = PeerRole.WATCH, writtenAt = clock.now().toEpochMilliseconds(), watch = state)
         if (!channel.publish(document)) {
             Napier.e("Could not publish this watch's state; the phone sees the old one until the next change or restart")
         }

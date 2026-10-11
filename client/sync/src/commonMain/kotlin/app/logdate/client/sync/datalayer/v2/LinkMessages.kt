@@ -28,7 +28,8 @@ data class LinkOffer(
     val expiresAt: Long,
 ) {
     /** False outside the offer's own window, and always false for an offer claiming more than a minute. */
-    fun isValidAt(nowMs: Long): Boolean = expiresAt - issuedAt <= WearProtocol.LINK_OFFER_TTL_MS && nowMs >= issuedAt && nowMs < expiresAt
+    fun isValidAt(nowMs: Long): Boolean =
+        expiresAt > issuedAt && expiresAt - issuedAt in 1..WearProtocol.LINK_OFFER_TTL_MS && nowMs >= issuedAt && nowMs < expiresAt
 }
 
 /** The watch's answer to a [LinkOffer]. */

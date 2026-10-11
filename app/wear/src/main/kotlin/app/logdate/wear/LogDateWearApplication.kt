@@ -10,6 +10,7 @@ import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.wear.di.wearAudioModule
 import app.logdate.wear.di.wearDataModule
 import app.logdate.wear.di.wearExperienceModule
+import app.logdate.wear.di.wearSyncV2Module
 import app.logdate.wear.di.wearV2Module
 import app.logdate.wear.launch.FeatureSwitch
 import app.logdate.wear.recording.OngoingRecordingDecorator
@@ -76,6 +77,7 @@ class LogDateWearApplication :
                 wearAudioModule,
                 wearExperienceModule,
                 wearV2Module,
+                wearSyncV2Module,
             )
         }
 

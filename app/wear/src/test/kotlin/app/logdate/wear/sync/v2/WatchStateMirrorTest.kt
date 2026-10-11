@@ -5,6 +5,7 @@ import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.sync.datalayer.v2.Decoded
 import app.logdate.client.sync.peer.state.LocalCapabilities
 import app.logdate.client.sync.peer.state.PeerDocument
+import app.logdate.client.sync.peer.state.PeerLinkState
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
 import app.logdate.client.sync.peer.state.PhoneState
@@ -137,6 +138,24 @@ class WatchStateMirrorTest {
 
             assertEquals(listOf("remove $WATCH_V2", "add $WATCH_V2"), capabilities.calls)
             assertEquals(2, channel.published.size)
+        }
+
+    @Test
+    fun `a link change publishes the watch state without toggling the flag`() =
+        runTest {
+            val own = MutableStateFlow(WatchState())
+            val mirror = WatchStateMirror(flags, channel, capabilities, PeerStateStore(), StateMerger(FixedClock(1_000)), ownState = own)
+            mirror.start(backgroundScope)
+            runCurrent()
+            own.value = WatchState(link = PeerLinkState.PAIRED)
+            runCurrent()
+            assertEquals(
+                PeerLinkState.PAIRED,
+                channel.published
+                    .last()
+                    .watch
+                    ?.link,
+            )
         }
 
     private fun phoneDocument(switchOn: Boolean) =

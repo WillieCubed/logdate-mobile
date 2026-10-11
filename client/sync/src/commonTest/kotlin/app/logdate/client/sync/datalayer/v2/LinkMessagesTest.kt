@@ -104,6 +104,12 @@ class LinkMessagesTest {
         assertIs<Decoded.Unsupported>(WearJson.decode(wire, WearProtocol.LINK_SCHEMA, LinkOffer.serializer()))
     }
 
+    @Test
+    fun `an overflowing offer lifetime is invalid`() {
+        assertFalse(offer.copy(issuedAt = Long.MIN_VALUE, expiresAt = Long.MAX_VALUE).isValidAt(1_000))
+        assertFalse(offer.copy(issuedAt = 1_000, expiresAt = 1_000).isValidAt(1_000))
+    }
+
     private class FixedClock(
         var millis: Long,
     ) : Clock {

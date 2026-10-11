@@ -3,7 +3,7 @@ package app.logdate.wear.e2e
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
+import androidx.core.net.toUri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.sync.datalayer.AssociationDataMapper
@@ -17,6 +17,7 @@ import app.logdate.wear.sync.WearDataLayerClient
 import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.MessageClient
+import com.google.android.gms.wearable.NodeClient
 import org.junit.Test
 import org.junit.runner.RunWith
 import kotlin.test.assertEquals
@@ -64,11 +65,23 @@ class WearManifestFiltersTest {
         assertResolvesToListener(CapabilityClient.ACTION_CAPABILITY_CHANGED, "/${WearDataLayerClient.PHONE_CAPABILITY}")
     }
 
+    @Test
+    fun `every request the phone sends reaches the listener`() {
+        listOf(WearPaths.LINK_OFFER, WearPaths.LINK_BUNDLE).forEach { path ->
+            assertResolvesToListener(MessageClient.ACTION_REQUEST_RECEIVED, path)
+        }
+    }
+
+    @Test
+    fun `moving the watch to another phone reaches the listener`() {
+        assertResolvesToListener(NodeClient.ACTION_NODE_MIGRATED, "")
+    }
+
     private fun assertResolvesToListener(
         action: String,
         path: String,
     ) {
-        val intent = Intent(action, Uri.parse("wear://$PHONE_NODE$path")).setPackage(context.packageName)
+        val intent = Intent(action, "wear://$PHONE_NODE$path".toUri()).setPackage(context.packageName)
         val services = context.packageManager.queryIntentServices(intent, PackageManager.ResolveInfoFlags.of(0L))
 
         assertEquals(listOf(LISTENER_SERVICE), services.map { it.serviceInfo.name }, "$action $path")

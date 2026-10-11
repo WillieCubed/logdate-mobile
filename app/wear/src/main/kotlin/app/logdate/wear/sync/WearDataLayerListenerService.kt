@@ -18,10 +18,14 @@ import app.logdate.client.sync.peer.state.StateDocumentCodec
 import app.logdate.wear.presentation.camera.WearRemoteCameraCaptureResultStore
 import app.logdate.wear.presentation.camera.WearRemoteCameraDeviceStore
 import app.logdate.wear.sync.v2.WatchStateMirror
+import app.logdate.wear.sync.v2.link.WatchLinkCoordinator
+import app.logdate.wear.sync.v2.link.answerWearRequest
 import app.logdate.wear.v2.surfaces.SurfaceUpdater
+import com.google.android.gms.tasks.Task
 import com.google.android.gms.wearable.CapabilityInfo
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
+import com.google.android.gms.wearable.DataItemBuffer
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
@@ -75,6 +79,47 @@ class WearDataLayerListenerService : WearableListenerService() {
         if (capabilityInfo.nodes.isEmpty()) return
         serviceScope.launch {
             withContext(NonCancellable) { resolvePhoneMessageHandler()?.onPhoneReachable() }
+        }
+    }
+
+    override fun onRequest(
+        nodeId: String,
+        path: String,
+        request: ByteArray,
+    ): Task<ByteArray> = answerWearRequest(serviceScope) { answerRequest(nodeId, path, request) }
+
+    private suspend fun answerRequest(
+        nodeId: String,
+        path: String,
+        request: ByteArray,
+    ): ByteArray? {
+        if (!WatchLinkCoordinator.handles(path)) {
+            Napier.w("The phone sent a request this watch does not answer: $path")
+            return null
+        }
+        val koin = resolveKoin()
+        if (koin == null) {
+            Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries; the phone's link request fails and is tried again")
+            return null
+        }
+        return koin.get<WatchLinkCoordinator>().answer(nodeId, path, request)
+    }
+
+    /** The watch now belongs to another phone, so the link with [nodeId] is stale. */
+    override fun onNodeMigrated(
+        nodeId: String,
+        dataItems: DataItemBuffer,
+    ) {
+        dataItems.release()
+        serviceScope.launch {
+            withContext(NonCancellable) {
+                val koin = resolveKoin()
+                if (koin == null) {
+                    Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries; the move to another phone is noticed when it links")
+                    return@withContext
+                }
+                koin.get<WatchLinkCoordinator>().onNodeMigrated(nodeId)
+            }
         }
     }
 
