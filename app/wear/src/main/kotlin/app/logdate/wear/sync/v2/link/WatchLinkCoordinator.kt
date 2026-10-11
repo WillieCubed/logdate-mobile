@@ -107,6 +107,7 @@ class WatchLinkCoordinator(
                 is Decoded.Unsupported -> return refuse(LinkRefusal.UNSUPPORTED, "the offer uses schema ${decoded.schema}")
                 is Decoded.Malformed -> return refuse(LinkRefusal.UNSUPPORTED, decoded.reason)
             }
+        refusePairDowngrade(offer.mode)?.let { return it }
         if (!acceptsMode(offer.mode)) return refuse(LinkRefusal.UNSUPPORTED, "this watch build cannot link to an account")
         val watchNode = localNodeId() ?: return refuse(LinkRefusal.UNSUPPORTED, "this watch's node is unknown")
         return when (val step = exchange.accept(offer, watchNode = watchNode, phoneNode = sourceNodeId)) {
@@ -141,6 +142,7 @@ class WatchLinkCoordinator(
                 is LinkStep.Ok -> step.value
                 is LinkStep.Failed -> return refuse(step.failure.toRefusal(), "the bundle failed its ${step.failure} check")
             }
+        refusePairDowngrade(opened.bundle.mode)?.let { return it }
         return when (opened.bundle.mode) {
             LinkMode.PAIR -> {
                 store.savePairing(sourceNodeId, opened.pairKey)
@@ -212,6 +214,13 @@ class WatchLinkCoordinator(
             LinkProblem.LINK_CODE_EXPIRED -> LinkRefusal.EXPIRED_OFFER
             else -> LinkRefusal.UNSUPPORTED
         }
+
+    private suspend fun refusePairDowngrade(mode: LinkMode): ByteArray? {
+        if (mode != LinkMode.PAIR) return null
+        val current = store.current() ?: return null
+        if (current.mode != LinkMode.CLOUD && current.accountId == null) return null
+        return refuse(LinkRefusal.BOUND_TO_ANOTHER_ACCOUNT, "erase the existing account setup before pairing without an account")
+    }
 
     private fun acceptsMode(mode: LinkMode): Boolean = mode == LinkMode.PAIR || (installer != null && installScope != null)
 

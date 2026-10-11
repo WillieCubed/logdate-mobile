@@ -164,7 +164,7 @@ class WatchLinkCoordinatorTest {
             assertEquals(LinkAnswer.Refused(LinkRefusal.UNSUPPORTED), LinkWire.read(assertNotNull(answer), LinkAccept.serializer()))
             wait.complete(Unit)
             runCurrent()
-            val next = linking.answer(PHONE, WearPaths.LINK_OFFER, offerBytes(phone.start(LinkMode.PAIR, PHONE)))
+            val next = linking.answer(PHONE, WearPaths.LINK_OFFER, offerBytes(phone.start(LinkMode.CLOUD, PHONE)))
             assertTrue(LinkWire.read(assertNotNull(next), LinkAccept.serializer()) is LinkAnswer.Answered)
         }
 
@@ -215,6 +215,50 @@ class WatchLinkCoordinatorTest {
             assertEquals("INTERRUPTED", store.current()?.problem)
             assertEquals(PHONE, store.current()?.phoneNode)
             assertEquals(PeerLinkState.NEEDS_RELINK, store.current().peerLinkState())
+        }
+
+    @Test
+    fun `an account linked watch refuses pair only offers without changing its binding`() =
+        runTest {
+            store.savePairKey(PHONE, byteArrayOf(1, 2, 3))
+            store.saveCloudLink(PHONE, ACCOUNT)
+            val original = store.current()
+            for (node in listOf(PHONE, "another-phone")) {
+                val response = coordinator.answer(node, WearPaths.LINK_OFFER, offerBytes(phone.start(LinkMode.PAIR, node)))
+                assertEquals(
+                    LinkAnswer.Refused(LinkRefusal.BOUND_TO_ANOTHER_ACCOUNT),
+                    LinkWire.read(assertNotNull(response), LinkAccept.serializer()),
+                )
+                assertEquals(original, store.current())
+                assertContentEquals(byteArrayOf(1, 2, 3), pairKeys.keys[PHONE])
+                assertNull(pairKeys.keys["another-phone"])
+            }
+            coordinator.onNodeMigrated(PHONE)
+            val response = coordinator.answer(PHONE, WearPaths.LINK_OFFER, offerBytes(phone.start(LinkMode.PAIR, PHONE)))
+            assertEquals(
+                LinkAnswer.Refused(LinkRefusal.BOUND_TO_ANOTHER_ACCOUNT),
+                LinkWire.read(assertNotNull(response), LinkAccept.serializer()),
+            )
+            assertEquals(ACCOUNT, store.current()?.accountId)
+            assertEquals(true, store.current()?.stale)
+        }
+
+    @Test
+    fun `a cloud binding established after a pair offer refuses its bundle`() =
+        runTest {
+            val started = phone.start(LinkMode.PAIR, PHONE)
+            val accept = answered(coordinator.answer(PHONE, WearPaths.LINK_OFFER, offerBytes(started)), LinkAccept.serializer())
+            val sealed = assertNotNull(phone.seal(started, accept, WATCH, LinkBundle(mode = LinkMode.PAIR)).valueOrNull())
+            store.savePairKey(PHONE, byteArrayOf(1, 2, 3))
+            store.saveCloudLink(PHONE, ACCOUNT)
+            val original = store.current()
+            val response = coordinator.answer(PHONE, WearPaths.LINK_BUNDLE, bundleBytes(sealed))
+            assertEquals(
+                LinkAnswer.Refused(LinkRefusal.BOUND_TO_ANOTHER_ACCOUNT),
+                LinkWire.read(assertNotNull(response), LinkConfirm.serializer()),
+            )
+            assertEquals(original, store.current())
+            assertContentEquals(byteArrayOf(1, 2, 3), pairKeys.keys[PHONE])
         }
 
     private suspend fun linkAccount(coordinator: WatchLinkCoordinator): LinkAnswer<LinkConfirm> {
