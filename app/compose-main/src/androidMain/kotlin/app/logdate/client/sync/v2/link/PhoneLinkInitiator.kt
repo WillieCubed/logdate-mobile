@@ -60,6 +60,7 @@ class PhoneLinkInitiator(
     private sealed interface ExchangeOutcome {
         class Linked(
             val pairKey: ByteArray,
+            val linkId: String,
         ) : ExchangeOutcome
 
         data class Failed(
@@ -171,7 +172,7 @@ class PhoneLinkInitiator(
         if (!isActive()) return
         when (outcome) {
             is ExchangeOutcome.Linked -> {
-                store.recordSuccess(target, plan, outcome.pairKey, at = now, seenWatchDocAt = seen)
+                store.recordSuccess(target, plan, outcome.pairKey, at = now, seenWatchDocAt = seen, linkId = outcome.linkId)
                 Napier.i("Linked ${target.displayName} in ${plan.mode} mode")
                 if (plan.mode == LinkMode.PAIR) confirm(target, plan.mode, document, now)
             }
@@ -243,7 +244,7 @@ class PhoneLinkInitiator(
                 is LinkAnswer.Unreadable -> return ExchangeOutcome.Failed(PhoneLinkFailure.ANSWER_UNREADABLE)
             }
         if (!exchange.verify(sealed, confirm)) return ExchangeOutcome.Failed(PhoneLinkFailure.CONFIRMATION_MISMATCH)
-        return ExchangeOutcome.Linked(sealed.pairKey)
+        return ExchangeOutcome.Linked(sealed.pairKey, sealed.linkId)
     }
 
     private fun unreachable(

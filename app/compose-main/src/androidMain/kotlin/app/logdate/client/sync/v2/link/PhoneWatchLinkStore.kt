@@ -57,6 +57,7 @@ data class PhoneWatchLink(
     val lastAttemptAt: Long = 0,
     val nextAttemptAt: Long = 0,
     val seenWatchDocAt: Long = 0,
+    val linkId: String? = null,
 )
 
 /** One record per watch, as one JSON value, and each watch's pair key in secure storage. */
@@ -78,6 +79,7 @@ class PhoneWatchLinkStore(
         pairKey: ByteArray,
         at: Long,
         seenWatchDocAt: Long,
+        linkId: String? = null,
     ): PhoneWatchLink {
         pairKeys.put(target.nodeId, pairKey)
         return update(target.nodeId) { previous ->
@@ -93,13 +95,15 @@ class PhoneWatchLinkStore(
                     previous?.confirmedAt?.takeIf {
                         previous.mode == plan.mode &&
                             previous.accountId == plan.accountId &&
-                            previous.serverOrigin == plan.serverOrigin
+                            previous.serverOrigin == plan.serverOrigin &&
+                            previous.linkId == linkId
                     },
                 attempts = if (samePlan) previous?.attempts ?: 0 else 0,
                 lastFailure = previous?.lastFailure?.takeIf { samePlan },
                 attentionShown = if (samePlan) previous?.attentionShown.orEmpty() else emptySet(),
                 lastAttemptAt = at,
                 seenWatchDocAt = seenWatchDocAt,
+                linkId = linkId,
             )
         }
     }
@@ -136,6 +140,7 @@ class PhoneWatchLinkStore(
                 lastAttemptAt = at,
                 nextAttemptAt = at + backoffMs(attempts),
                 seenWatchDocAt = maxOf(seenWatchDocAt, previous?.seenWatchDocAt ?: 0),
+                linkId = previous?.linkId?.takeIf { samePlan },
             )
         }
 

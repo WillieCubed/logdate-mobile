@@ -21,6 +21,7 @@ import kotlin.time.Clock
  * @property problem Why the last account link failed, as a [LinkProblem] name.
  * @property installing The pair is confirmed, but account installation is still pending.
  * @property serverOrigin The server supplied by account setup; older records require relinking.
+ * @property linkId Identifies the verified exchange, so redelivery cannot cross a relink.
  */
 @Serializable
 data class WatchLinkRecord(
@@ -32,6 +33,7 @@ data class WatchLinkRecord(
     val problem: String? = null,
     val installing: Boolean = false,
     val serverOrigin: String? = null,
+    val linkId: String? = null,
 )
 
 /** What the watch publishes about its link in its state document. */
@@ -60,9 +62,17 @@ class WatchLinkStore(
     suspend fun savePairing(
         phoneNode: String,
         pairKey: ByteArray,
+        linkId: String? = null,
     ) {
         pairKeys.put(phoneNode, pairKey)
-        write(WatchLinkRecord(mode = LinkMode.PAIR, phoneNode = phoneNode, linkedAt = clock.now().toEpochMilliseconds()))
+        write(
+            WatchLinkRecord(
+                mode = LinkMode.PAIR,
+                phoneNode = phoneNode,
+                linkedAt = clock.now().toEpochMilliseconds(),
+                linkId = linkId,
+            ),
+        )
     }
 
     /** Persists the exchange's phone before confirming; account setup has not finished yet. */
@@ -71,6 +81,7 @@ class WatchLinkStore(
         pairKey: ByteArray,
         accountId: String?,
         serverOrigin: String? = null,
+        linkId: String? = null,
     ) {
         savePairKey(phoneNode, pairKey)
         write(
@@ -81,6 +92,7 @@ class WatchLinkStore(
                 accountId = accountId,
                 installing = true,
                 serverOrigin = serverOrigin,
+                linkId = linkId,
             ),
         )
     }
@@ -95,6 +107,7 @@ class WatchLinkStore(
         phoneNode: String,
         accountId: String,
         serverOrigin: String? = null,
+        linkId: String? = null,
     ) {
         write(
             WatchLinkRecord(
@@ -103,6 +116,7 @@ class WatchLinkStore(
                 linkedAt = clock.now().toEpochMilliseconds(),
                 accountId = accountId,
                 serverOrigin = serverOrigin,
+                linkId = linkId,
             ),
         )
     }

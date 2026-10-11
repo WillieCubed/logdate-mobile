@@ -34,7 +34,10 @@ class PhoneLinkExchange(
         val pairKey: ByteArray,
         internal val confirmKey: ByteArray,
         internal val transcriptHash: ByteArray,
-    )
+    ) {
+        /** Public identity of this exchange; it contains no private key material. */
+        val linkId: String get() = LinkWire.encodeKey(transcriptHash)
+    }
 
     fun start(
         mode: LinkMode,

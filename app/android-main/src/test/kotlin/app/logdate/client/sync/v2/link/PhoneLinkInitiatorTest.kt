@@ -59,6 +59,15 @@ class PhoneLinkInitiatorTest {
         }
 
     @Test
+    fun `the phone stores the same link identity as the watch`() =
+        runTest {
+            initiator().reconcile(emptyMap())
+            val linkId = assertNotNull(store.get(WATCH)?.linkId)
+            assertEquals(32, LinkWire.decodeKey(linkId)?.size)
+            assertEquals(watch.linkId, linkId)
+        }
+
+    @Test
     fun `an account link is confirmed only once the watch reports it`() =
         runTest {
             val initiator = initiator(bundles = cloud)
@@ -403,6 +412,7 @@ class PhoneLinkInitiatorTest {
         var refuseOffersWith: LinkRefusal? = null
         var corruptConfirmation = false
         var pairKey: ByteArray? = null
+        var linkId: String? = null
         var afterOffer: suspend () -> Unit = {}
 
         override suspend fun request(
@@ -436,6 +446,7 @@ class PhoneLinkInitiatorTest {
             val sealed = (WearJson.decode(payload, WearProtocol.LINK_SCHEMA, SealedLinkBundle.serializer()) as Decoded.Supported).value
             val opened = checkNotNull(exchange.open(checkNotNull(accepted), sealed).valueOrNull())
             pairKey = opened.pairKey
+            linkId = opened.linkId
             val confirm = if (corruptConfirmation) LinkConfirm(mac = LinkWire.encodeKey(ByteArray(32))) else opened.confirm
             return LinkWire.write(LinkConfirm.serializer(), confirm)
         }

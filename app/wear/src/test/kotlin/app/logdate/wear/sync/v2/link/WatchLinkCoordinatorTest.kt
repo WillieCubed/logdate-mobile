@@ -66,6 +66,7 @@ class WatchLinkCoordinatorTest {
             assertEquals(PeerLinkState.LINKED, store.current().peerLinkState())
             assertEquals(ACCOUNT, store.current()?.accountId)
             assertEquals("https://linked.test", store.current()?.serverOrigin)
+            assertEquals(32, LinkWire.decodeKey(assertNotNull(store.current()?.linkId))?.size)
             assertEquals(1, installer.installs)
         }
 
@@ -326,6 +327,8 @@ class WatchLinkCoordinatorTest {
             assertTrue(phone.verify(sealed, confirm))
             assertEquals(PeerLinkState.PAIRED, store.current().peerLinkState())
             assertContentEquals(sealed.pairKey, pairKeys.keys[PHONE])
+            assertEquals(sealed.linkId, store.current()?.linkId)
+            assertEquals(32, LinkWire.decodeKey(assertNotNull(store.current()?.linkId))?.size)
         }
 
     @Test

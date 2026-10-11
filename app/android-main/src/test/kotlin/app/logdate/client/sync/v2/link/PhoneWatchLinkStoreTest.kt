@@ -15,6 +15,26 @@ class PhoneWatchLinkStoreTest {
     private val cloud = LinkPlan(LinkMode.CLOUD, "new-account")
 
     @Test
+    fun `a fresh exchange replaces link identity and a failed changed plan cannot retain it`() =
+        runTest {
+            store.recordSuccess(target, pair, ByteArray(32), 100, 100, linkId = "first")
+            assertEquals("first", store.get(target.nodeId)?.linkId)
+            store.recordSuccess(target, pair, ByteArray(32), 200, 200, linkId = "second")
+            assertEquals("second", store.get(target.nodeId)?.linkId)
+            store.recordFailure(target, cloud, PhoneLinkFailure.SIGNED_OUT, 300, 300)
+            assertNull(store.get(target.nodeId)?.linkId)
+        }
+
+    @Test
+    fun `a fresh exchange requires a new cloud installation confirmation`() =
+        runTest {
+            store.recordSuccess(target, cloud, ByteArray(32), 100, 100, linkId = "first")
+            store.markConfirmed(target.nodeId, 100, 100)
+            val renewed = store.recordSuccess(target, cloud, ByteArray(32), 200, 200, linkId = "second")
+            assertNull(renewed.confirmedAt)
+        }
+
+    @Test
     fun `another server for the same account starts its own confirmation and retry history`() =
         runTest {
             val first = cloud.copy(serverOrigin = "https://first.test")

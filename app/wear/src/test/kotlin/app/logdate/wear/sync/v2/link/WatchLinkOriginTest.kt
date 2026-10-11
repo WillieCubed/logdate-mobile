@@ -16,9 +16,10 @@ class WatchLinkOriginTest {
     @Test
     fun `a completed account link retains its origin after restart and migration`() =
         runTest {
-            store.saveCloudLink("phone", "account", "https://linked.test")
+            store.saveCloudLink("phone", "account", "https://linked.test", linkId = "exchange")
             val restarted = WatchLinkStore(storage, keys)
             assertEquals("https://linked.test", restarted.current()?.serverOrigin)
+            assertEquals("exchange", restarted.current()?.linkId)
             restarted.markStale("phone")
             assertEquals("https://linked.test", restarted.current()?.serverOrigin)
         }
@@ -26,9 +27,11 @@ class WatchLinkOriginTest {
     @Test
     fun `an interrupted install retains the origin it was setting up`() =
         runTest {
-            store.beginCloudInstall("phone", ByteArray(32), "account", "https://linked.test")
+            store.beginCloudInstall("phone", ByteArray(32), "account", "https://linked.test", linkId = "exchange")
             assertEquals("https://linked.test", WatchLinkStore(storage, keys).current()?.serverOrigin)
+            assertEquals("exchange", store.current()?.linkId)
             store.recordProblem("phone", LinkProblem.INTERRUPTED)
+            assertEquals("exchange", store.current()?.linkId)
             assertEquals("https://linked.test", store.current()?.serverOrigin)
         }
 

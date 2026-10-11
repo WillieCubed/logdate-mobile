@@ -37,6 +37,7 @@ class WatchLinkExchange(
         val bundle: LinkBundle,
         val confirm: LinkConfirm,
         val pairKey: ByteArray,
+        val linkId: String,
     )
 
     /** [phoneNode] is the node the offer came from; the transcript binds it instead of the offer's own claim. */
@@ -109,6 +110,8 @@ class WatchLinkExchange(
             }
         if (bundle.mode != accepted.offer.mode) return LinkStep.Failed(LinkExchangeFailure.MALFORMED)
         val mac = handshake.confirmation(accepted.keys.confirmKey, accepted.transcriptHash)
-        return LinkStep.Ok(Opened(bundle, LinkConfirm(mac = LinkWire.encodeKey(mac)), accepted.keys.pairKey))
+        return LinkStep.Ok(
+            Opened(bundle, LinkConfirm(mac = LinkWire.encodeKey(mac)), accepted.keys.pairKey, LinkWire.encodeKey(accepted.transcriptHash)),
+        )
     }
 }

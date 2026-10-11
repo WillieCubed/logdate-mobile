@@ -145,7 +145,7 @@ class WatchLinkCoordinator(
         refusePairDowngrade(opened.bundle.mode)?.let { return it }
         return when (opened.bundle.mode) {
             LinkMode.PAIR -> {
-                store.savePairing(sourceNodeId, opened.pairKey)
+                store.savePairing(sourceNodeId, opened.pairKey, opened.linkId)
                 Napier.i("This watch is paired with its phone")
                 LinkWire.write(LinkConfirm.serializer(), opened.confirm)
             }
@@ -164,7 +164,7 @@ class WatchLinkCoordinator(
             return refuse(problem.toRefusal(), "the account bundle cannot be installed: $problem")
         }
         if (!v2Enabled() || !scope.isActive) return refuse(LinkRefusal.UNSUPPORTED, "account setup is no longer active")
-        store.beginCloudInstall(phoneNode, opened.pairKey, opened.bundle.accountId, opened.bundle.serverOrigin)
+        store.beginCloudInstall(phoneNode, opened.pairKey, opened.bundle.accountId, opened.bundle.serverOrigin, opened.linkId)
         installation = scope.launch { install(installer, phoneNode, opened) }
         Napier.i("Confirmed the phone's account link; installing it now")
         return LinkWire.write(LinkConfirm.serializer(), opened.confirm)
@@ -196,7 +196,7 @@ class WatchLinkCoordinator(
         if (current?.stale == true || (phoneNode != null && current != null && current.phoneNode != phoneNode)) return
         when (outcome) {
             is InstallOutcome.Installed -> {
-                store.saveCloudLink(phoneNode.orEmpty(), outcome.accountId, outcome.origin)
+                store.saveCloudLink(phoneNode.orEmpty(), outcome.accountId, outcome.origin, current?.linkId)
                 Napier.i("This watch now syncs with its phone's account")
             }
             is InstallOutcome.Failed -> {
