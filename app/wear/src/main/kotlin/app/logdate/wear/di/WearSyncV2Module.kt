@@ -6,12 +6,15 @@ import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.crypto.link.BouncyCastleLinkHandshake
 import app.logdate.client.sync.datalayer.v2.LinkNonceLedger
+import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.peer.link.LinkInstaller
 import app.logdate.client.sync.peer.link.PairKeyVault
 import app.logdate.client.sync.peer.link.SecureStoragePairKeyVault
 import app.logdate.client.sync.peer.link.WatchLinkExchange
 import app.logdate.wear.sync.v2.WatchOwnState
+import app.logdate.wear.sync.v2.delivery.LinkedDataLayerTransportV2
+import app.logdate.wear.sync.v2.delivery.WatchDeliveryPeer
 import app.logdate.wear.sync.v2.link.WatchLinkCoordinator
 import app.logdate.wear.sync.v2.link.WatchLinkStore
 import app.logdate.wear.sync.v2.localNodeIdOrNull
@@ -37,6 +40,28 @@ val wearSyncV2Module =
                 installer = get<LinkInstaller>(),
                 installScope = get<CoroutineScope>(),
                 beforeInstall = { config.awaitConfigurationLoaded() },
+            )
+        }
+        single {
+            val nodeClient = Wearable.getNodeClient(get<Context>())
+            val flags = get<FeatureFlagStore>()
+            WatchDeliveryPeer(
+                links = get(),
+                sessions = get(),
+                config = get(),
+                localNodeId = { nodeClient.localNodeIdOrNull() },
+                active = { flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) },
+            )
+        }
+        factory { parameters ->
+            val context = get<Context>()
+            LinkedDataLayerTransportV2(
+                peer = parameters.get<PeerDeliveryContext>(),
+                peers = get(),
+                dataLayer = get(),
+                capabilities = Wearable.getCapabilityClient(context),
+                channels = Wearable.getChannelClient(context),
+                messages = Wearable.getMessageClient(context),
             )
         }
         single { WatchOwnState(links = get<WatchLinkStore>().observe(), features = setOf(WearFeatures.LINK_CLOUD)) }

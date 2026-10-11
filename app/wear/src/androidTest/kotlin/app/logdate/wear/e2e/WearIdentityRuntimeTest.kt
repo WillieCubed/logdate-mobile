@@ -4,16 +4,22 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.logdate.client.datastore.LogDateConfigDataSource
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.IdentityMintingNotAllowedException
+import app.logdate.client.sync.datalayer.v2.LinkMode
+import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.datalayer.v2.WearFeatures
 import app.logdate.client.sync.peer.link.LinkInstaller
+import app.logdate.client.sync.peer.link.LinkWire
 import app.logdate.client.sync.peer.link.LinkedDeviceInstaller
 import app.logdate.wear.sync.v2.WatchOwnState
+import app.logdate.wear.sync.v2.delivery.LinkedDataLayerTransportV2
+import app.logdate.wear.sync.v2.delivery.WatchDeliveryPeer
 import app.logdate.wear.sync.v2.link.WatchLinkCoordinator
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.koin.core.parameter.parametersOf
 import org.koin.java.KoinJavaComponent.getKoin
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -26,6 +32,13 @@ class WearIdentityRuntimeTest {
     fun accountInstallerAndCoordinatorResolveFromTheInstalledApp() {
         assertTrue(getKoin().get<LinkInstaller>() is LinkedDeviceInstaller)
         getKoin().get<WatchLinkCoordinator>()
+    }
+
+    @Test
+    fun deliveryAudienceResolvesFromTheInstalledApp() {
+        getKoin().get<WatchDeliveryPeer>()
+        val peer = PeerDeliveryContext(LinkWire.encodeKey(ByteArray(32)), "phone", "watch", LinkMode.PAIR)
+        getKoin().get<LinkedDataLayerTransportV2> { parametersOf(peer) }
     }
 
     @Test
