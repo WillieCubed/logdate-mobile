@@ -71,6 +71,16 @@ class IdentityKeyManager(
         }
     }
 
+    /** Checks a linked identity without changing the installed key or its recovery material. */
+    suspend fun canInstallLinkedIdentityKey(
+        key: ByteArray,
+        expectedFingerprint: String,
+    ): Boolean {
+        if (key.size != 32 || IdentityKeyFingerprint.of(key, cryptoManager) != expectedFingerprint) return false
+        val existing = secureStorage.getBytes(KEY_IDENTITY_KEY)
+        return existing == null || existing.contentEquals(key)
+    }
+
     /**
      * Installs the identity key a phone sent while linking this device, after checking it against the
      * fingerprint sent with it. A device that already has a different key refuses: it has to be wiped

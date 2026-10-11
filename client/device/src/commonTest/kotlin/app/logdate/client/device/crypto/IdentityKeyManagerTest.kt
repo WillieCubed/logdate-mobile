@@ -50,6 +50,22 @@ class IdentityKeyManagerTest {
         }
 
     @Test
+    fun `linked key preflight validates length fingerprint and existing key without mutation`() =
+        runTest {
+            val key = ByteArray(32) { 0x31 }
+            val fingerprint = IdentityKeyFingerprint.of(key, cryptoManager)
+            assertTrue(manager.canInstallLinkedIdentityKey(key, fingerprint))
+            assertFalse(manager.hasIdentityKey())
+            assertFalse(manager.canInstallLinkedIdentityKey(ByteArray(1), fingerprint))
+            assertFalse(manager.canInstallLinkedIdentityKey(key, "wrong"))
+            manager.installLinkedIdentityKey(key, fingerprint)
+            val other = ByteArray(32) { 0x42 }
+            assertFalse(manager.canInstallLinkedIdentityKey(other, IdentityKeyFingerprint.of(other, cryptoManager)))
+            assertTrue(manager.canInstallLinkedIdentityKey(key, fingerprint))
+            assertTrue(manager.getIdentityKey().contentEquals(key))
+        }
+
+    @Test
     fun `a linked key is installed when it matches its fingerprint`() =
         runTest {
             val linked = linkedManager()
