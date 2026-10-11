@@ -1,7 +1,6 @@
 package app.logdate.wear.e2e
 
 import android.graphics.Bitmap
-import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -32,8 +31,6 @@ import app.logdate.wear.v2.settings.WatchSettingsUiState
 import app.logdate.wear.v2.settings.WatchStatus
 import app.logdate.wear.v2.settings.watchSettingsItems
 import app.logdate.wear.v2.theme.LogDateWearTheme
-import org.junit.AfterClass
-import org.junit.BeforeClass
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -143,28 +140,6 @@ class WatchSettingsTest {
     }
 
     companion object {
-        // The emulator starts plugged in; Wear's charging activity otherwise covers the first test.
-        @BeforeClass
-        @JvmStatic
-        fun disconnectManagedEmulatorCharger() {
-            check(Build.HARDWARE == "ranchu" || Build.HARDWARE == "goldfish") { "This fixture requires an Android emulator" }
-            batteryCommand("unplug")
-        }
-
-        @AfterClass
-        @JvmStatic
-        fun restoreManagedEmulatorBattery() {
-            batteryCommand("reset")
-        }
-
-        private fun batteryCommand(action: String) {
-            InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("cmd battery $action").use { descriptor ->
-                android.os.ParcelFileDescriptor
-                    .AutoCloseInputStream(descriptor)
-                    .use { it.readBytes() }
-            }
-        }
-
         private const val VISIBLE_MARGIN = 0.15f
         private const val MAX_SCROLLS = 20
         private const val SCROLL_STEP = 48f

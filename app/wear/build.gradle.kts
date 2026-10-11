@@ -36,7 +36,7 @@ extensions.configure<ApplicationExtension> {
         targetSdk = 37
         versionCode = release.versionCode
         versionName = release.versionName
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "app.logdate.wear.e2e.WearEmulatorTestRunner"
     }
 
     release.signing?.let { key ->
