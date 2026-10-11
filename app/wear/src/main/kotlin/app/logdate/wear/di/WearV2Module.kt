@@ -5,10 +5,13 @@ import androidx.health.services.client.HealthServices
 import androidx.wear.phone.interactions.PhoneTypeHelper
 import androidx.wear.remote.interactions.RemoteActivityHelper
 import androidx.work.WorkManager
+import app.logdate.client.datastore.featureflags.FeatureFlag
+import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.domain.recommendation.GetMemoryRecallUseCase
 import app.logdate.client.domain.streak.ObserveCampfireUseCase
 import app.logdate.client.media.storage.MediaFileResolver
+import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.ui.platform.LogDateHaptics
 import app.logdate.ui.platform.createAndroidPlatformHapticsController
 import app.logdate.ui.platform.isSystemHapticFeedbackOff
@@ -70,6 +73,11 @@ import app.logdate.wear.v2.playon.OutputPicker
 import app.logdate.wear.v2.playon.SystemOutputPicker
 import app.logdate.wear.v2.recorder.RecorderViewModel
 import app.logdate.wear.v2.settings.WatchSettingsViewModel
+import app.logdate.wear.v2.surfaces.AndroidSurfaceRefresher
+import app.logdate.wear.v2.surfaces.PackageManagerComponentSwitch
+import app.logdate.wear.v2.surfaces.SurfaceComponents
+import app.logdate.wear.v2.surfaces.SurfaceCoordinator
+import app.logdate.wear.v2.surfaces.SurfaceUpdater
 import app.logdate.wear.v2.today.DayClock
 import app.logdate.wear.v2.today.TodayViewModel
 import app.logdate.wear.v2.today.WatchDayBoundaryPreferences
@@ -81,6 +89,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -295,4 +304,19 @@ val wearV2Module =
         }
         single<EveningReminderWork> { WorkManagerEveningReminderWork(WorkManager.getInstance(get<Context>())) }
         single { EveningReminderScheduler(work = get()) }
+
+        single { SurfaceUpdater(refresher = AndroidSurfaceRefresher(get()), scope = get()) }
+        single { SurfaceComponents(PackageManagerComponentSwitch(get())) }
+        single {
+            SurfaceCoordinator(
+                newAppEnabled = get<FeatureFlagStore>().observe(FeatureFlag.WATCH_EXPERIENCE_V2),
+                components = get(),
+                updater = get(),
+                pendingUploads =
+                    get<SyncMetadataService>().observePendingUploads().map { uploads ->
+                        uploads.map { it.operationId ?: "${it.entityType}:${it.entityId}:${it.operation}" }.toSet()
+                    },
+                days = get<DayClock>().observe(),
+            )
+        }
     }

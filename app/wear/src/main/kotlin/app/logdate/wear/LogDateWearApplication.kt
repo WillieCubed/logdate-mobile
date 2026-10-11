@@ -20,6 +20,7 @@ import app.logdate.wear.reminders.applyReminderBridging
 import app.logdate.wear.sync.WatchSyncScheduler
 import app.logdate.wear.sync.WearDeadLetterMigration
 import app.logdate.wear.sync.v2.WatchStateMirror
+import app.logdate.wear.v2.surfaces.SurfaceCoordinator
 import io.github.aakira.napier.DebugAntilog
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
@@ -93,6 +94,7 @@ class LogDateWearApplication :
                 .get<CoroutineScope>(),
         )
         startSync()
+        startSurfaces()
 
         runCatching { LegacyPromptAlarms.cancel(this) }
             .onFailure { error -> Napier.w("Failed to remove the legacy journal prompts", error) }
@@ -162,6 +164,13 @@ class LogDateWearApplication :
         } catch (e: Exception) {
             Napier.e("Restoring reminders at start failed", e)
         }
+    }
+
+    private fun startSurfaces() {
+        val koin =
+            org.koin.java.KoinJavaComponent
+                .getKoin()
+        koin.get<SurfaceCoordinator>().start(koin.get<CoroutineScope>())
     }
 
     private fun warmUpDatabase() {

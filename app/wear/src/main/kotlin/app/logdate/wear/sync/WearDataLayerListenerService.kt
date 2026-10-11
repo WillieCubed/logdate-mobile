@@ -18,6 +18,7 @@ import app.logdate.client.sync.peer.state.StateDocumentCodec
 import app.logdate.wear.presentation.camera.WearRemoteCameraCaptureResultStore
 import app.logdate.wear.presentation.camera.WearRemoteCameraDeviceStore
 import app.logdate.wear.sync.v2.WatchStateMirror
+import app.logdate.wear.v2.surfaces.SurfaceUpdater
 import com.google.android.gms.wearable.CapabilityInfo
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -126,6 +127,7 @@ class WearDataLayerListenerService : WearableListenerService() {
             for (event in syncEvents) {
                 processEvent(event, koin, notesRepository, journalRepository)
             }
+            koin.getOrNull<SurfaceUpdater>()?.refreshForSync()
         }
     }
 
