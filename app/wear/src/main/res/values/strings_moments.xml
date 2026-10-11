@@ -18,4 +18,14 @@
     <string name="wear_moment_delete_title">Delete this moment?</string>
     <string name="wear_moment_delete_body">It’s deleted from your phone too.</string>
     <string name="wear_moment_delete_failed">Couldn’t delete this moment</string>
+
+    <!-- The moment list and the Archive, in the new watch app -->
+    <string name="wear_flow_earlier">Earlier</string>
+    <plurals name="wear_flow_earlier_count">
+        <item quantity="one">%1$d more moment</item>
+        <item quantity="other">%1$d more moments</item>
+    </plurals>
+    <string name="wear_archive_title">Earlier</string>
+    <string name="wear_archive_empty">No earlier moments in the last 14 days</string>
+    <string name="wear_archive_failed">Couldn’t load earlier moments</string>
 </resources>

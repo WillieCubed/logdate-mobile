@@ -326,7 +326,7 @@ private fun PlayerLine(
 }
 
 @Composable
-private fun failureMessage(reason: PlaybackFailure): String =
+internal fun failureMessage(reason: PlaybackFailure): String =
     stringResource(
         when (reason) {
             PlaybackFailure.NO_OUTPUT -> R.string.wear_moment_failed_no_output

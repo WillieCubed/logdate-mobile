@@ -18,6 +18,7 @@ import app.logdate.wear.location.WearLocationCaptureCoordinator
 import app.logdate.wear.playback.WatchMediaCache
 import app.logdate.wear.recording.AudioMomentSaver
 import app.logdate.wear.sync.deleteLocalAudio
+import app.logdate.wear.v2.archive.ArchiveViewModel
 import app.logdate.wear.v2.capture.CaptureSheetViewModel
 import app.logdate.wear.v2.flow.FlowViewModel
 import app.logdate.wear.v2.haptics.HapticsPreferenceStore
@@ -170,6 +171,7 @@ val wearV2Module =
             )
         }
         viewModel { FlowViewModel(dayClock = get(), notesRepository = get()) }
+        viewModel { ArchiveViewModel(dayClock = get(), notesRepository = get()) }
 
         single<PlaybackPreferencesStore> {
             SharedPreferencesPlaybackPreferencesStore(

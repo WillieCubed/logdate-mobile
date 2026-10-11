@@ -25,7 +25,6 @@ import org.junit.Before
 import org.junit.Test
 import java.io.IOException
 import kotlin.test.assertEquals
-import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -38,7 +37,7 @@ class FlowViewModelTest {
             start = LocalDate(2026, 10, 3).atStartOfDayIn(zone),
             end = LocalDate(2026, 10, 4).atStartOfDayIn(zone),
         )
-    private val weekStart = LocalDate(2026, 9, 27).atStartOfDayIn(zone)
+    private val windowStart = LocalDate(2026, 9, 20).atStartOfDayIn(zone)
     private val dayClock = mockk<DayClock> { every { observe() } returns flowOf(saturday) }
     private val notesRepository = mockk<JournalNotesRepository>()
 
@@ -53,37 +52,41 @@ class FlowViewModelTest {
     }
 
     @Test
-    fun `the list covers today and the 6 days before it`() =
+    fun `the list shows the last 7 days and counts the rest of the 14`() =
         runTest {
-            every { notesRepository.observeNotesInRange(weekStart, saturday.end) } returns flowOf(emptyList())
-
-            FlowViewModel(dayClock, notesRepository).uiState.test {
-                assertEquals(FlowUiState.Ready(timeZone = zone, moments = emptyList()), expectMostRecentItem())
-            }
-        }
-
-    @Test
-    fun `moments are newest first and check-ins are left out`() =
-        runTest {
+            val older = text("Lake walk", at(LocalDateTime(2026, 9, 21, 9, 0)))
             val monday = text("Monday walk", at(LocalDateTime(2026, 9, 28, 9, 0)))
-            val friday = text("Friday dinner", at(LocalDateTime(2026, 10, 2, 20, 0)))
-            val checkIn = text("#mood:ok Feeling ok", at(LocalDateTime(2026, 10, 3, 8, 0)))
-            every { notesRepository.observeNotesInRange(weekStart, saturday.end) } returns flowOf(listOf(monday, checkIn, friday))
+            val friday = voice(at(LocalDateTime(2026, 10, 2, 20, 0)))
+            stubWindow(older, monday, friday)
 
             FlowViewModel(dayClock, notesRepository).uiState.test {
-                assertEquals(listOf<JournalNote>(friday, monday), (expectMostRecentItem() as FlowUiState.Ready).moments)
+                assertEquals(FlowUiState.Ready(timeZone = zone, moments = listOf(friday, monday), earlierCount = 1), expectMostRecentItem())
             }
         }
 
     @Test
-    fun `notes from before the 7 days are left out`() =
+    fun `check-ins and photos are left out of both`() =
         runTest {
-            val older = text("Last week", weekStart - 1.hours)
-            val sunday = text("Sunday", at(LocalDateTime(2026, 9, 27, 10, 0)))
-            every { notesRepository.observeNotesInRange(weekStart, saturday.end) } returns flowOf(listOf(older, sunday))
+            val checkIn = text("#mood:ok Feeling ok", at(LocalDateTime(2026, 10, 3, 8, 0)))
+            val photoTime = at(LocalDateTime(2026, 9, 22, 8, 0))
+            val photo = JournalNote.Image(mediaRef = "p.jpg", creationTimestamp = photoTime, lastUpdated = photoTime)
+            val lunch = text("Lunch", at(LocalDateTime(2026, 10, 3, 12, 0)))
+            stubWindow(checkIn, photo, lunch)
 
             FlowViewModel(dayClock, notesRepository).uiState.test {
-                assertEquals(listOf<JournalNote>(sunday), (expectMostRecentItem() as FlowUiState.Ready).moments)
+                assertEquals(FlowUiState.Ready(timeZone = zone, moments = listOf(lunch), earlierCount = 0), expectMostRecentItem())
+            }
+        }
+
+    @Test
+    fun `notes outside the window are left out`() =
+        runTest {
+            val tooOld = text("Too old", at(LocalDateTime(2026, 9, 19, 23, 0)))
+            val sunday = text("Sunday", at(LocalDateTime(2026, 9, 27, 10, 0)))
+            stubWindow(tooOld, sunday)
+
+            FlowViewModel(dayClock, notesRepository).uiState.test {
+                assertEquals(FlowUiState.Ready(timeZone = zone, moments = listOf(sunday), earlierCount = 0), expectMostRecentItem())
             }
         }
 
@@ -97,10 +100,16 @@ class FlowViewModelTest {
             }
         }
 
+    private fun stubWindow(vararg notes: JournalNote) {
+        every { notesRepository.observeNotesInRange(windowStart, saturday.end) } returns flowOf(notes.toList())
+    }
+
     private fun at(local: LocalDateTime): Instant = local.toInstant(zone)
 
     private fun text(
         content: String,
         at: Instant,
     ) = JournalNote.Text(creationTimestamp = at, lastUpdated = at, content = content)
+
+    private fun voice(at: Instant) = JournalNote.Audio(mediaRef = "v.m4a", durationMs = 30_000L, creationTimestamp = at, lastUpdated = at)
 }

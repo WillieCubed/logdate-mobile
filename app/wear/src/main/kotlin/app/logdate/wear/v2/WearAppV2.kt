@@ -23,6 +23,8 @@ import app.logdate.wear.launch.WearLaunchRequest
 import app.logdate.wear.presentation.camera.WearRemoteCameraScreen
 import app.logdate.wear.presentation.camera.WearRemoteCameraViewModel
 import app.logdate.wear.v2.ambient.WatchAmbientScope
+import app.logdate.wear.v2.archive.ArchiveScreen
+import app.logdate.wear.v2.archive.ArchiveViewModel
 import app.logdate.wear.v2.capture.CaptureConfirmation
 import app.logdate.wear.v2.capture.CaptureSheet
 import app.logdate.wear.v2.capture.CaptureSheetViewModel
@@ -39,6 +41,7 @@ import app.logdate.wear.v2.moments.MomentViewModel
 import app.logdate.wear.v2.navigation.WearRoute
 import app.logdate.wear.v2.navigation.toV2BackStack
 import app.logdate.wear.v2.permissions.rememberPermissionRequester
+import app.logdate.wear.v2.playback.MomentPlayer
 import app.logdate.wear.v2.recorder.RecorderState
 import app.logdate.wear.v2.recorder.RecorderViewModel
 import app.logdate.wear.v2.recorder.TodayRecorder
@@ -103,6 +106,7 @@ fun WearAppV2(
                                     HomeEntry(recorder, marker, onAdd = { open(WearRoute.CaptureSheet) }, navigate = open)
                                 }
                                 entry<WearRoute.Moment> { route -> MomentEntry(route.id, onClose = { backStack.removeLastOrNull() }) }
+                                entry<WearRoute.Archive> { ArchiveEntry(navigate = open) }
                                 entry<WearRoute.CaptureSheet> {
                                     CaptureSheetEntry(
                                         onOpenPhoneCamera = { open(WearRoute.PhoneCamera) },
@@ -183,11 +187,33 @@ private fun FlowEntry(
     navigate: (WearRoute) -> Unit,
 ) {
     val viewModel = koinViewModel<FlowViewModel>()
+    val player = koinInject<MomentPlayer>()
     val state by viewModel.uiState.collectAsState()
+    val playback by player.state.collectAsState()
     FlowPage(
         state = state,
         listState = listState,
-        actions = FlowActions(onOpenMoment = { note -> navigate(WearRoute.Moment(note.uid.toString())) }),
+        playback = playback,
+        actions =
+            FlowActions(
+                onOpenMoment = { note -> navigate(WearRoute.Moment(note.uid.toString())) },
+                onPlayPause = player::playOrPause,
+                onOpenArchive = { navigate(WearRoute.Archive) },
+            ),
+    )
+}
+
+@Composable
+private fun ArchiveEntry(navigate: (WearRoute) -> Unit) {
+    val viewModel = koinViewModel<ArchiveViewModel>()
+    val player = koinInject<MomentPlayer>()
+    val state by viewModel.uiState.collectAsState()
+    val playback by player.state.collectAsState()
+    ArchiveScreen(
+        state = state,
+        playback = playback,
+        onOpenMoment = { note -> navigate(WearRoute.Moment(note.uid.toString())) },
+        onPlayPause = player::playOrPause,
     )
 }
 

@@ -1,12 +1,16 @@
 package app.logdate.wear.screenshots
 
 import androidx.compose.runtime.Composable
+import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.TimeSource
 import androidx.wear.compose.material3.TimeText
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.wear.v2.flow.FlowActions
 import app.logdate.wear.v2.flow.FlowPage
 import app.logdate.wear.v2.flow.FlowUiState
+import app.logdate.wear.v2.playback.PlaybackFailure
+import app.logdate.wear.v2.playback.PlaybackState
 import app.logdate.wear.v2.theme.LogDateWearTheme
 import com.android.tools.screenshot.PreviewTest
 import kotlinx.datetime.LocalDateTime
@@ -43,6 +47,41 @@ class FlowPageScreenshots {
     fun S04_FlowFailed() {
         FlowScene(FlowUiState.Failed)
     }
+
+    @PreviewTest
+    @WearScreenshotPreviewMatrix
+    @WearLargeFontPreview
+    @Composable
+    fun S05_FlowPlayingWithEarlier() {
+        val playing = recentMoments.first() as JournalNote.Audio
+        FlowScene(
+            FlowUiState.Ready(timeZone = flowZone, moments = recentMoments, earlierCount = 5),
+            playback = PlaybackState.Active(playing.uid, positionMs = 21_000L, durationMs = 42_000L, isPaused = false),
+            actions = allFlowActions,
+        )
+    }
+
+    @PreviewTest
+    @WearScreenshotPreviewMatrix
+    @WearLargeFontPreview
+    @Composable
+    fun S06_FlowEarlierOnly() {
+        FlowScene(FlowUiState.Ready(timeZone = flowZone, moments = emptyList(), earlierCount = 2), actions = allFlowActions)
+    }
+
+    @PreviewTest
+    @WearScreenshotPreviewMatrix
+    @WearLargeFontPreview
+    @Composable
+    fun S07_FlowRowPlayFailed() {
+        val failed = recentMoments.first() as JournalNote.Audio
+        FlowScene(
+            FlowUiState.Ready(timeZone = flowZone, moments = recentMoments, earlierCount = 0),
+            playback = PlaybackState.Failed(failed.uid, PlaybackFailure.NOT_ON_WATCH),
+            actions = allFlowActions,
+            firstItem = FIRST_MOMENT_ITEM,
+        )
+    }
 }
 
 private val flowZone = TimeZone.currentSystemDefault()
@@ -61,13 +100,30 @@ private val recentMoments =
     )
 
 @Composable
-private fun FlowScene(state: FlowUiState) {
+private fun FlowScene(
+    state: FlowUiState,
+    playback: PlaybackState = PlaybackState.Idle,
+    actions: FlowActions = FlowActions(),
+    firstItem: Int = 0,
+) {
     LogDateWearTheme(dynamicColor = false) {
         AppScaffold(timeText = { TimeText(timeSource = FlowTimeSource) }) {
-            FlowPage(state = state, timeSource = FlowTimeSource)
+            FlowPage(
+                state = state,
+                listState = rememberTransformingLazyColumnState(initialAnchorItemIndex = firstItem),
+                timeSource = FlowTimeSource,
+                actions = actions,
+                playback = playback,
+            )
         }
     }
 }
+
+/** The first moment's row, after the list's header. */
+private const val FIRST_MOMENT_ITEM = 1
+
+/** Every list action set, so the scenes that need them show play buttons and Earlier. */
+private val allFlowActions = FlowActions(onOpenMoment = {}, onPlayPause = {}, onOpenArchive = {})
 
 /** A fixed clock reading, so the time text renders the same on every run. */
 private object FlowTimeSource : TimeSource {
