@@ -132,19 +132,20 @@ internal class MergeAwareLogDateCollectionsRepository(
     override suspend fun createAssociationsIfAbsent(
         userId: UUID,
         associations: List<LogDateAssociation>,
-    ): AssociationCreateResults {
-        val operations = store.operations(userId)
-        val redirected =
-            associations
-                .map { association ->
-                    val destination = resolveMergeDestination(association.journalId, operations)
-                    if (destination != association.journalId && delegate.getJournal(userId, destination) == null) {
-                        throw JournalMergeDestinationMissingException()
-                    }
-                    association.copy(journalId = destination)
-                }.distinctBy { it.journalId to it.entryId }
-        return super<LogDateCollectionsRepository>.createAssociationsIfAbsent(userId, redirected)
-    }
+    ): AssociationCreateResults =
+        store.withAccountLock(userId) {
+            val operations = store.operations(userId)
+            val redirected =
+                associations
+                    .map { association ->
+                        val destination = resolveMergeDestination(association.journalId, operations)
+                        if (destination != association.journalId && delegate.getJournal(userId, destination) == null) {
+                            throw JournalMergeDestinationMissingException()
+                        }
+                        association.copy(journalId = destination)
+                    }.distinctBy { it.journalId to it.entryId }
+            delegate.createAssociationsIfAbsent(userId, redirected)
+        }
 
     private suspend fun retainPendingMemberships(
         userId: UUID,
