@@ -33,6 +33,16 @@ inline fun <reified T : NavKey> EntryProviderScope<NavKey>.taggedEntry(
     )
 }
 
+inline fun <reified T : NavKey> EntryProviderScope<NavKey>.taggedEntry(
+    noinline metadata: (T) -> Map<String, Any>,
+    noinline content: @Composable (T) -> Unit,
+) {
+    entry<T>(
+        metadata = { route -> metadata(route) + (ROUTE_CLASS_METADATA_KEY to T::class) },
+        content = content,
+    )
+}
+
 /** Returns the registered `NavKey` subtype for this entry, or `null` if the entry was untagged. */
 fun NavEntry<*>.routeClass(): KClass<out NavKey>? {
     @Suppress("UNCHECKED_CAST")

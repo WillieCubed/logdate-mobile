@@ -18,9 +18,16 @@ internal data class WorkspaceSearchBinding(
     val onQuery: (String) -> Unit,
 )
 
+internal data class WorkspaceSearchActionBinding(
+    val title: String,
+    val onSearch: () -> Unit,
+)
+
 internal class WorkspaceSearchController {
     private var owner: Any? = null
     var binding: WorkspaceSearchBinding? by mutableStateOf(null)
+        private set
+    var actionBinding: WorkspaceSearchActionBinding? by mutableStateOf(null)
         private set
 
     fun bind(
@@ -29,12 +36,23 @@ internal class WorkspaceSearchController {
     ) {
         this.owner = owner
         binding = value
+        actionBinding = null
+    }
+
+    fun bindAction(
+        owner: Any,
+        value: WorkspaceSearchActionBinding,
+    ) {
+        this.owner = owner
+        actionBinding = value
+        binding = null
     }
 
     fun release(owner: Any) {
         if (this.owner === owner) {
             this.owner = null
             binding = null
+            actionBinding = null
         }
     }
 }
@@ -59,6 +77,20 @@ fun WorkspaceSearchScope(
     val owner = remember { Any() }
     SideEffect {
         if (enabled) controller.bind(owner, WorkspaceSearchBinding(query, hint, onQuery)) else controller.release(owner)
+    }
+    DisposableEffect(controller) { onDispose { controller.release(owner) } }
+}
+
+@Composable
+fun WorkspaceSearchActionScope(
+    title: String,
+    onSearch: () -> Unit,
+    enabled: Boolean = true,
+) {
+    val controller = LocalWorkspaceSearchController.current ?: return
+    val owner = remember { Any() }
+    SideEffect {
+        if (enabled) controller.bindAction(owner, WorkspaceSearchActionBinding(title, onSearch)) else controller.release(owner)
     }
     DisposableEffect(controller) { onDispose { controller.release(owner) } }
 }

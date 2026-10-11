@@ -5,6 +5,8 @@ import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.library.ui.LibraryScreen
 import app.logdate.feature.library.ui.detail.MediaDetailScreen
+import app.logdate.ui.navigation.ActivityPresentation
+import app.logdate.ui.navigation.asMetadata
 import app.logdate.ui.navigation.taggedEntry
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
@@ -31,14 +33,14 @@ fun NavBackStack<NavKey>.navigateToMediaDetail(mediaId: Uuid) {
 
 /** Registers the Library overview entry. */
 fun EntryProviderScope<NavKey>.libraryOverviewEntry(onOpenMediaDetail: (Uuid) -> Unit) {
-    taggedEntry<LibraryOverviewRoute> {
+    taggedEntry<LibraryOverviewRoute>(metadata = ActivityPresentation.Collection("library").asMetadata()) {
         LibraryScreen(onOpenMediaDetail = onOpenMediaDetail)
     }
 }
 
 /** Registers the Media detail entry. */
 fun EntryProviderScope<NavKey>.mediaDetailEntry(onBack: () -> Unit) {
-    taggedEntry<MediaDetailRoute> { route ->
+    taggedEntry<MediaDetailRoute>(metadata = ActivityPresentation.Detail("library").asMetadata()) { route ->
         MediaDetailScreen(
             mediaId = Uuid.parse(route.id),
             onBack = onBack,

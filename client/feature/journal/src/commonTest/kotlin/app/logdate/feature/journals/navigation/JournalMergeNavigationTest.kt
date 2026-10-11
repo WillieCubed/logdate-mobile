@@ -43,4 +43,31 @@ class JournalMergeNavigationTest {
             stack,
         )
     }
+
+    @Test
+    fun `completion closes current merge activity after choosing a different source`() {
+        val original = Uuid.random()
+        val source = Uuid.random()
+        val destination = Uuid.random()
+        val operation =
+            JournalMergeOperation(
+                Uuid.random(),
+                source,
+                destination,
+                emptySet(),
+                JournalMergeScope("owner", "server"),
+                "From",
+                "Into",
+            )
+        val stack = mutableListOf<NavKey>(JournalsOverviewRoute, JournalDetailsRoute(original), JournalMergeRoute(original.toString()))
+        stack.completeJournalMerge(operation)
+        assertEquals(
+            listOf(
+                JournalsOverviewRoute,
+                JournalDetailsRoute(original),
+                JournalDetailsRoute(destination.toString(), mergedSourceTitle = "From"),
+            ),
+            stack,
+        )
+    }
 }

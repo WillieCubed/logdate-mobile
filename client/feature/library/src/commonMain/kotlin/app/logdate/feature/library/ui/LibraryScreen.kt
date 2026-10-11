@@ -29,8 +29,14 @@ import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOW
 import app.logdate.ui.platform.PlatformIcons
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
+import app.logdate.ui.workspace.LocalWorkspaceHosted
+import app.logdate.ui.workspace.LocalWorkspaceSearchAction
 import app.logdate.ui.workspace.PanelContainment
 import app.logdate.ui.workspace.WorkspacePanel
+import app.logdate.ui.workspace.WorkspaceSearchActionScope
+import logdate.client.feature.library.generated.resources.Res
+import logdate.client.feature.library.generated.resources.search_library
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.uuid.Uuid
 
@@ -89,7 +95,11 @@ fun LibraryScreenContent(
     onRetry: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val openSearch = LocalWorkspaceSearchAction.current ?: onOpenSearch
     if (LocalWorkspaceEnabled.current) {
+        if (!LocalWorkspaceHosted.current) {
+            WorkspaceSearchActionScope(stringResource(Res.string.search_library), openSearch)
+        }
         WorkspacePanel(modifier, containment = PanelContainment.Collection) {
             Column(Modifier.fillMaxSize()) {
                 if (onOpenPostcards != null) {
@@ -110,7 +120,7 @@ fun LibraryScreenContent(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             LibraryTopBar(
-                onOpenSearch = onOpenSearch,
+                onOpenSearch = openSearch,
                 modifier = Modifier.fillMaxWidth().statusBarsPadding(),
             )
         },

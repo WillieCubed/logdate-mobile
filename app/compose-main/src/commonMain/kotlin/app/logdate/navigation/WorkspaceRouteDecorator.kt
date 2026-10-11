@@ -5,40 +5,20 @@ package app.logdate.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.navigation3.runtime.NavEntryDecorator
-import app.logdate.navigation.scenes.isAlwaysFullscreen
-import app.logdate.ui.navigation.routeClass
+import app.logdate.ui.adaptive.ActivityRouteFrame
+import app.logdate.ui.navigation.ActivityPresentation
+import app.logdate.ui.navigation.activityPresentation
 
-/** Applies Home framing to routes that participate in the workspace. */
+/** Frames registered reading content without enrolling its activity in Home. */
 @Composable
 fun <T : Any> rememberWorkspaceRouteDecorator(): NavEntryDecorator<T> =
     remember {
         NavEntryDecorator { entry ->
-            val route = entry.routeClass()
-            val workspaceRoute =
-                route in
-                    setOf(
-                        app.logdate.feature.journals.navigation.JournalsOverviewRoute::class,
-                        app.logdate.feature.journals.navigation.JournalDetailsRoute::class,
-                        app.logdate.feature.journals.navigation.JournalContentPickerRoute::class,
-                        app.logdate.feature.journals.navigation.JournalMergeRoute::class,
-                        app.logdate.feature.journals.navigation.NoteDetailRoute::class,
-                        app.logdate.feature.library.navigation.LibraryOverviewRoute::class,
-                        app.logdate.feature.library.navigation.MediaDetailRoute::class,
-                        TimelineDetailRoute::class,
-                        app.logdate.feature.rewind.navigation.RewindDetailRoute::class,
-                    )
-            if (workspaceRoute && !isAlwaysFullscreen(route)) {
-                app.logdate.ui.workspace
-                    .WorkspaceRouteFrame(
-                        focusConstraints =
-                            if (route == app.logdate.feature.journals.navigation.JournalMergeRoute::class) {
-                                app.logdate.ui.workspace.PanelConstraints.ReadingCollection
-                            } else {
-                                app.logdate.ui.workspace.PanelConstraints.Reading
-                            },
-                    ) { entry.Content() }
-            } else {
-                entry.Content()
+            when (entry.activityPresentation()) {
+                is ActivityPresentation.Collection,
+                is ActivityPresentation.Detail,
+                -> ActivityRouteFrame { entry.Content() }
+                else -> entry.Content()
             }
         }
     }

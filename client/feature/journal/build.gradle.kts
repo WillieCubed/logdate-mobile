@@ -88,6 +88,7 @@ kotlin {
         }
 
         commonTest.dependencies {
+            implementation(libs.kotlinx.serialization.json)
             implementation(projects.client.sync)
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)

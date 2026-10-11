@@ -16,6 +16,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -77,16 +78,47 @@ class JournalMergeReviewFeedbackTest {
                 }
             }
             onNodeWithText("Merge journals").performScrollTo().performClick()
-            onNodeWithText("3 items after merging").assertIsDisplayed()
+            onNodeWithContentDescription("3 items after merging").assertIsDisplayed()
             save("changed-count-large-text", onRoot().captureToImage())
             assertEquals(1, confirmed)
             onNodeWithText("These journals changed. Review the updated details and confirm again.")
-                .performScrollTo()
                 .assertIsDisplayed()
                 .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
             save("changed-notice-large-text", onRoot().captureToImage())
             onNodeWithText("Merge journals").performScrollTo().performClick()
             assertEquals(2, confirmed)
+        }
+
+    @Test
+    fun `stale confirmation immediately shows the whole updated count and announced explanation at large text`() =
+        runDesktopComposeUiTest(width = 411, height = 891) {
+            val changed = preview.copy(sourceContentIds = preview.sourceContentIds + Uuid.random())
+            var state by mutableStateOf(JournalMergeUiState(loading = false, stage = JournalMergeStage.Review(preview)))
+            setContent {
+                LogDateTheme {
+                    CompositionLocalProvider(LocalDensity provides Density(1f, 2f)) {
+                        JournalMergeScreenContent(state, onConfirm = {
+                            state = state.copy(stage = JournalMergeStage.Review(changed), error = JournalMergeError.Changed)
+                        })
+                    }
+                }
+            }
+            onNodeWithText("Merge journals").performScrollTo().performClick()
+            val count = onNodeWithContentDescription("3 items after merging")
+            val explanation = onNodeWithText("These journals changed. Review the updated details and confirm again.")
+            count.assertIsDisplayed()
+            explanation
+                .assertIsDisplayed()
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+            val viewport = onRoot().getUnclippedBoundsInRoot()
+            listOf(count, explanation).forEach { node ->
+                val bounds = node.getUnclippedBoundsInRoot()
+                assertTrue(
+                    bounds.top >= viewport.top && bounds.bottom <= viewport.bottom,
+                    "Updated outcome and explanation must both fit immediately",
+                )
+            }
+            save("changed-outcome-and-notice-large-text", onRoot().captureToImage())
         }
 
     private fun save(

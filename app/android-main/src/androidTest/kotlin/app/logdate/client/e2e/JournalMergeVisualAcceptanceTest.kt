@@ -23,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
@@ -35,8 +36,6 @@ import app.logdate.shared.model.Journal
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.ui.workspace.LocalWorkspaceSearchAction
-import app.logdate.ui.workspace.PanelConstraints
-import app.logdate.ui.workspace.WorkspaceRouteFrame
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -85,6 +84,7 @@ class JournalMergeVisualAcceptanceTest {
         val picker =
             JournalMergeUiState(
                 sourceTitle = source.title,
+                source = JournalMergeCandidate(source, 12),
                 loading = false,
                 candidates =
                     listOf(
@@ -103,7 +103,14 @@ class JournalMergeVisualAcceptanceTest {
                 key(scene.value) {
                     LogDateTheme(dynamicColor = true, darkTheme = scene.value.dark) {
                         val resolvedPrimary = MaterialTheme.colorScheme.primary
-                        SideEffect { primary.value = resolvedPrimary }
+                        SideEffect {
+                            primary.value = resolvedPrimary
+                            val window = compose.activity.window
+                            WindowInsetsControllerCompat(window, window.decorView).apply {
+                                isAppearanceLightStatusBars = !scene.value.dark
+                                isAppearanceLightNavigationBars = !scene.value.dark
+                            }
+                        }
                         LaunchedEffect(Unit) {
                             val scale = coroutineContext[MotionDurationScale]
                             snapshotFlow { scale?.scaleFactor }.collect { motionScale.value = it }
@@ -114,11 +121,9 @@ class JournalMergeVisualAcceptanceTest {
                             LocalWorkspaceSearchAction provides {},
                             LocalDensity provides Density(density.density, scene.value.fontScale),
                         ) {
-                            WorkspaceRouteFrame(focusConstraints = PanelConstraints.ReadingCollection) {
-                                JournalMergeScreenContent(
-                                    if (scene.value.review) picker.copy(stage = JournalMergeStage.Review(preview)) else picker,
-                                )
-                            }
+                            JournalMergeScreenContent(
+                                if (scene.value.review) picker.copy(stage = JournalMergeStage.Review(preview)) else picker,
+                            )
                         }
                     }
                 }
@@ -171,16 +176,18 @@ class JournalMergeVisualAcceptanceTest {
         output: File,
         scene: Scene,
     ) {
-        compose.onAllNodesWithTag("workspace_search").assertCountEquals(1)
-        compose.onNodeWithTag("journal_merge_panel").assertIsDisplayed()
+        compose.onAllNodesWithTag("workspace_search").assertCountEquals(0)
+        compose.onNodeWithTag("journal_merge_activity").assertIsDisplayed()
         compose.waitForIdle()
         device.waitForIdle(1000)
         assertNoAnr(device)
         val name = "${scene.name}-${device.displayWidth}x${device.displayHeight}"
         assertTrue("Native screenshot failed", device.takeScreenshot(File(output, "$name.png")))
         if (scene.review) {
-            compose.onNodeWithText("Merge journals").performScrollTo().assertIsDisplayed()
-            compose.onNodeWithText("Cancel").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("Merge journals").performScrollTo()
+            compose.onNodeWithText("Merge journals").assertIsDisplayed()
+            compose.onNodeWithText("Cancel").performScrollTo()
+            compose.onNodeWithText("Cancel").assertIsDisplayed()
             assertNoAnr(device)
             assertTrue("Native action screenshot failed", device.takeScreenshot(File(output, "$name-actions.png")))
         } else {

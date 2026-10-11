@@ -1,7 +1,5 @@
 package app.logdate.feature.journals.ui.merge
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Book
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toArgb
@@ -13,6 +11,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -35,15 +34,10 @@ import app.logdate.ui.foldable.provideFoldableLayoutInfo
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.ui.workspace.LocalWorkspaceSearchAction
-import app.logdate.ui.workspace.PanelConstraints
-import app.logdate.ui.workspace.WorkspaceDestination
-import app.logdate.ui.workspace.WorkspaceRouteFrame
-import app.logdate.ui.workspace.WorkspaceScaffold
 import java.awt.image.BufferedImage
 import java.io.File
 import javax.imageio.ImageIO
 import kotlin.test.Test
-import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalTestApi::class)
@@ -54,6 +48,7 @@ class JournalMergeRenderTest {
     private val picker =
         JournalMergeUiState(
             sourceTitle = source.title,
+            source = JournalMergeCandidate(source, 12),
             loading = false,
             candidates =
                 listOf(
@@ -74,19 +69,44 @@ class JournalMergeRenderTest {
     @Test
     fun compactLandscapeDarkRtlLargeTextAndHingesStayUsable() {
         render("compact", 320, 640, false)
+        render("compact-review", 320, 891, true)
         render("landscape", 891, 411, true)
         render("dark", 411, 891, false, dark = true)
         render("rtl", 411, 891, true, rtl = true)
         render("large-text", 411, 891, true, fontScale = 2f)
+        render("tablet-portrait", 800, 1280, true)
+        render("tablet-rtl", 1280, 800, true, rtl = true)
+        render("tablet-dark", 1280, 800, true, dark = true)
         render("book", 1440, 900, true, foldable = book)
         render("tabletop", 1440, 900, true, foldable = tabletop)
     }
 
     @Test
-    fun hostedWorkspaceKeepsOneSearchAndBoundsItsMergePanel() {
-        render("hosted-tablet-picker", 1280, 800, false, hosted = true)
-        render("hosted-tablet-review", 1280, 800, true, hosted = true)
+    fun activityRemainsIndependentOfWorkspaceFlag() {
+        render("flag-off-tablet-picker", 1280, 800, false, workspaceEnabled = false)
+        render("flag-off-tablet-review", 1280, 800, true, workspaceEnabled = false)
     }
+
+    @Test
+    fun sourcePickerShowsTheDestinationAndKeepsTheSourceChoicesSearchable() =
+        runDesktopComposeUiTest(width = 411, height = 891) {
+            setContent {
+                LogDateTheme {
+                    JournalMergeScreenContent(
+                        picker.copy(
+                            pickerTarget = JournalMergePickerTarget.Source,
+                            editingSelection = true,
+                            destinationTitle = destination.title,
+                            candidates = listOf(JournalMergeCandidate(source, 12)) + picker.candidates.drop(1),
+                        ),
+                    )
+                }
+            }
+            onNodeWithText("Move contents from…").assertIsDisplayed()
+            onNodeWithText("Into ‘${destination.title}’").assertIsDisplayed()
+            onNodeWithText(source.title).assertIsDisplayed()
+            save("source-picker", onRoot().captureToImage())
+        }
 
     private fun render(
         name: String,
@@ -97,44 +117,30 @@ class JournalMergeRenderTest {
         rtl: Boolean = false,
         fontScale: Float = 1f,
         foldable: FoldableLayoutInfo? = null,
-        hosted: Boolean = false,
+        workspaceEnabled: Boolean = true,
     ) = runDesktopComposeUiTest(width = width, height = height) {
         setContent {
             LogDateTheme(darkTheme = dark) {
                 CompositionLocalProvider(
-                    LocalWorkspaceEnabled provides true,
+                    LocalWorkspaceEnabled provides workspaceEnabled,
                     LocalWorkspaceSearchAction provides {},
                     LocalDensity provides Density(1f, fontScale),
                     LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                 ) {
                     provideFoldableLayoutInfo(foldable ?: FoldableLayoutInfo()) {
-                        val content: @androidx.compose.runtime.Composable () -> Unit = {
-                            WorkspaceRouteFrame(focusConstraints = PanelConstraints.ReadingCollection) {
-                                JournalMergeScreenContent(if (review) picker.copy(stage = JournalMergeStage.Review(preview)) else picker)
-                            }
-                        }
-                        if (hosted) {
-                            WorkspaceScaffold(
-                                listOf(WorkspaceDestination("journals", "Journals", Icons.Default.Book)),
-                                "journals",
-                                {},
-                                onSearch = {},
-                                content = content,
-                            )
-                        } else {
-                            content()
-                        }
+                        JournalMergeScreenContent(if (review) picker.copy(stage = JournalMergeStage.Review(preview)) else picker)
                     }
                 }
             }
         }
-        onAllNodesWithTag("workspace_search").assertCountEquals(1)
-        assertTrue(onNodeWithTag("journal_merge_panel").fetchSemanticsNode().boundsInRoot.width <= 560f)
+        onAllNodesWithTag("workspace_search").assertCountEquals(0)
+        onNodeWithTag("journal_merge_activity").assertIsDisplayed()
         save(name, onRoot().captureToImage())
         if (review) {
             onNodeWithText("Merge journals").performScrollTo()
-            onNodeWithText("Change destination").assertExists()
-            onNodeWithText("Cancel").performScrollTo().assertIsDisplayed()
+            onNodeWithContentDescription("Change destination").assertExists()
+            onNodeWithText("Cancel").performScrollTo()
+            onNodeWithText("Cancel").assertIsDisplayed()
         } else {
             onNodeWithText(destination.title).assertExists()
         }

@@ -11,6 +11,8 @@ import androidx.navigation3.ui.NavDisplay
 import app.logdate.feature.rewind.ui.RewindOpenCallback
 import app.logdate.feature.rewind.ui.RewindOverviewScreen
 import app.logdate.feature.rewind.ui.detail.RewindDetailScreen
+import app.logdate.ui.navigation.ActivityPresentation
+import app.logdate.ui.navigation.asMetadata
 import app.logdate.ui.navigation.taggedEntry
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
@@ -61,11 +63,12 @@ fun EntryProviderScope<NavKey>.rewindDetailEntry(onExitRewind: () -> Unit) {
         // *entire* screen at the same time, so the whole thing looks like it's moving
         // instead of just the card.
         metadata =
-            metadata {
-                put(NavDisplay.PredictivePopTransitionKey) {
-                    EnterTransition.None togetherWith ExitTransition.None
-                }
-            },
+            ActivityPresentation.Replacement.asMetadata() +
+                metadata {
+                    put(NavDisplay.PredictivePopTransitionKey) {
+                        EnterTransition.None togetherWith ExitTransition.None
+                    }
+                },
     ) { route ->
         RewindDetailScreen(
             rewindId = Uuid.parse(route.id),

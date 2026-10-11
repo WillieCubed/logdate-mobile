@@ -16,8 +16,6 @@ import app.logdate.screenshots.common.ScreenshotTheme
 import app.logdate.shared.model.Journal
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import app.logdate.ui.workspace.LocalWorkspaceSearchAction
-import app.logdate.ui.workspace.PanelConstraints
-import app.logdate.ui.workspace.WorkspaceRouteFrame
 import com.android.tools.screenshot.PreviewTest
 import kotlin.time.Duration.Companion.days
 import kotlin.uuid.Uuid
@@ -38,6 +36,7 @@ private val mergeDestination =
 private val mergePicker =
     JournalMergeUiState(
         sourceTitle = mergeSource.title,
+        source = JournalMergeCandidate(mergeSource, 12),
         loading = false,
         candidates =
             listOf(
@@ -78,6 +77,7 @@ fun S19_JournalMergePicker() {
 
 @PreviewTest
 @ScreenshotPreviewMatrix
+@Preview(name = "Compact review", widthDp = 320, heightDp = 891)
 @Preview(name = "Phone 200% text", device = ScreenshotTestData.PHONE, fontScale = 2f)
 @Preview(name = "Phone RTL", device = ScreenshotTestData.PHONE, locale = "ar")
 @Composable
@@ -91,7 +91,7 @@ fun S20_JournalMergeReview() {
 fun S21_JournalMergeWorkspace() {
     ScreenshotTheme {
         CompositionLocalProvider(LocalWorkspaceEnabled provides true, LocalWorkspaceSearchAction provides {}) {
-            WorkspaceRouteFrame(focusConstraints = PanelConstraints.ReadingCollection) { JournalMergeScreenContent(mergePicker) }
+            JournalMergeScreenContent(mergePicker)
         }
     }
 }

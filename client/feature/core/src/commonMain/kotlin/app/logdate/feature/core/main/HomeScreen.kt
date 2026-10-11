@@ -63,8 +63,6 @@ import app.logdate.ui.streak.CampfireChip
 import app.logdate.ui.timeline.TimelinePane
 import app.logdate.ui.timeline.TimelineUiState
 import app.logdate.ui.workspace.AdaptiveWorkspaceLayout
-import app.logdate.ui.workspace.LocalWorkspaceDetail
-import app.logdate.ui.workspace.LocalWorkspaceDismissDetail
 import app.logdate.ui.workspace.WorkspaceDestination
 import app.logdate.ui.workspace.WorkspaceScaffold
 import kotlinx.coroutines.flow.map
@@ -155,14 +153,11 @@ fun HomeScreen(
     val workspaceEnabled by remember(flags) { flags.observe(FeatureFlag.HOME_WORKSPACE_V2) }
         .collectAsStateWithLifecycle(initialValue = FeatureFlag.HOME_WORKSPACE_V2.defaultEnabled)
     if (workspaceEnabled) {
-        val detail = LocalWorkspaceDetail.current
-        val dismissDetail = LocalWorkspaceDismissDetail.current
         val sourceState = rememberSaveableStateHolder()
         WorkspaceScaffold(
             destinations = visibleDestinations.map { WorkspaceDestination(it.name, it.label, it.selectedIcon) },
             selectedKey = currentDestination.name,
             onSelect = {
-                if (detail != null) dismissDetail()
                 currentDestination = HomeRouteDestination.valueOf(it)
             },
             onCreate =
@@ -228,14 +223,14 @@ fun HomeScreen(
                     }
                 }
             }
-            if (detail == null && currentDestination == HomeRouteDestination.LocationHistory) {
+            if (currentDestination == HomeRouteDestination.LocationHistory) {
                 destinationContent()
             } else {
                 AdaptiveWorkspaceLayout(
                     modifier = Modifier.fillMaxSize(),
                     browseOnStart = true,
                     focusConstraints =
-                        if (detail == null && currentDestination == HomeRouteDestination.Timeline) {
+                        if (currentDestination == HomeRouteDestination.Timeline) {
                             app.logdate.ui.workspace.PanelConstraints.ReadingCollection
                         } else if (currentDestination ==
                             HomeRouteDestination.Library
@@ -244,8 +239,7 @@ fun HomeScreen(
                         } else {
                             app.logdate.ui.workspace.PanelConstraints.Reading
                         },
-                    browse = destinationContent.takeIf { detail != null },
-                    focus = detail ?: destinationContent,
+                    focus = destinationContent,
                 )
             }
         }

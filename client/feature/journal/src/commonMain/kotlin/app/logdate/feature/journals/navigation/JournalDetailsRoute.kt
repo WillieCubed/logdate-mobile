@@ -8,6 +8,8 @@ import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.feature.journals.ui.detail.JournalDetailScreen
+import app.logdate.ui.navigation.ActivityPresentation
+import app.logdate.ui.navigation.asMetadata
 import app.logdate.ui.navigation.taggedEntry
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -33,7 +35,7 @@ fun NavBackStack<NavKey>.navigateToJournal(journalId: Uuid) {
 fun EntryProviderScope<NavKey>.journalDetailsEntry(
     onBack: () -> Unit,
     onJournalDeleted: () -> Unit,
-    onOpenNote: (Uuid) -> Unit,
+    onOpenNote: (noteId: Uuid, journalId: Uuid) -> Unit,
     onOpenEditor: (Uuid) -> Unit = {},
     onOpenContentPicker: (Uuid) -> Unit = {},
     onOpenSettings: (Uuid) -> Unit = {},
@@ -41,7 +43,9 @@ fun EntryProviderScope<NavKey>.journalDetailsEntry(
     onMergeJournal: (Uuid) -> Unit = {},
     onJournalRedirected: (sourceId: Uuid, destinationId: Uuid) -> Unit = { _, _ -> },
 ) {
-    taggedEntry<JournalDetailsRoute> { route ->
+    taggedEntry<JournalDetailsRoute>(metadata = { route ->
+        ActivityPresentation.Detail("journals", childContext = "journal:${route.journalId}").asMetadata()
+    }) { route ->
         val journalRepository: JournalRepository = koinInject()
         val requestedId = Uuid.parse(route.journalId)
         val resolvedId by produceState<Uuid?>(null, requestedId, journalRepository) {
@@ -57,7 +61,7 @@ fun EntryProviderScope<NavKey>.journalDetailsEntry(
             onNavigateToMerge = onMergeJournal,
             onGoBack = onBack,
             onJournalDeleted = onJournalDeleted,
-            onNavigateToNoteDetail = onOpenNote,
+            onNavigateToNoteDetail = { onOpenNote(it, requestedId) },
             onOpenEditor = onOpenEditor,
             onOpenContentPicker = onOpenContentPicker,
             onNavigateToSettings = onOpenSettings,

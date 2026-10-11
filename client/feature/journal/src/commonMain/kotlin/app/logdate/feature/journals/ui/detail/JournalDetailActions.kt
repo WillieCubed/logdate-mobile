@@ -10,7 +10,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddToHomeScreen
@@ -35,11 +36,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.logdate.ui.common.LocalHomeScreenPins
 import app.logdate.ui.platform.rememberLogDateHaptics
 import app.logdate.ui.theme.Spacing
+import app.logdate.util.toReadableDateShort
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.action_delete
 import logdate.client.feature.journal.generated.resources.action_remove
@@ -100,20 +103,29 @@ internal fun JournalDetailBookSummaryPane(
     Column(
         modifier =
             modifier
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = Spacing.lg, vertical = Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Text(
             text = uiState.title,
             style = MaterialTheme.typography.headlineMedium,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
         )
         Text(
-            text = "${uiState.entries.size} entries",
+            text = "${uiState.entries.size} ${if (uiState.entries.size == 1) "item" else "items"}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (uiState.entries.isNotEmpty()) {
+            val dates = uiState.entries.map { it.timestamp.toLocalDateTime(TimeZone.currentSystemDefault()).date }
+            val first = dates.min().toReadableDateShort()
+            val last = dates.max().toReadableDateShort()
+            Text(
+                text = if (first == last) first else "$first – $last",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Text(
             text =
                 if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
@@ -191,8 +203,6 @@ private fun JournalDetailPaneAction(
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
         }
     }

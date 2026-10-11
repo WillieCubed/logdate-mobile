@@ -229,6 +229,98 @@ class JournalMergeViewModelTest {
             assertIs<JournalMergeStage.Complete>(vm.uiState.value.stage)
         }
 
+    @Test
+    fun `source card changes the source without changing the destination and survives restart`() =
+        runTest(dispatcher) {
+            val handle = SavedStateHandle()
+            val vm = viewModel(handle)
+            vm.open(source.id)
+            advanceUntilIdle()
+            vm.choose(destination.id)
+            advanceUntilIdle()
+            vm.changeSource()
+            assertEquals(JournalMergePickerTarget.Source, vm.uiState.value.pickerTarget)
+            assertEquals(
+                setOf(source.id, older.id),
+                vm.uiState.value.candidates
+                    .map { it.journal.id }
+                    .toSet(),
+            )
+            vm.choose(older.id)
+            advanceUntilIdle()
+            val review = assertIs<JournalMergeStage.Review>(vm.uiState.value.stage)
+            assertEquals(older.id, review.preview.source.id)
+            assertEquals(destination.id, review.preview.destination.id)
+            assertEquals(0, repository.mergeCalls)
+            val restored = viewModel(handle)
+            restored.open(source.id)
+            advanceUntilIdle()
+            assertEquals(older.id, assertIs<JournalMergeStage.Review>(restored.uiState.value.stage).preview.source.id)
+            restored.confirm()
+            advanceUntilIdle()
+            val completed = assertIs<JournalMergeStage.Complete>(restored.uiState.value.stage)
+            assertEquals(older.id, completed.operation.sourceId)
+            assertEquals(destination.id, completed.operation.destinationId)
+        }
+
+    @Test
+    fun `back from either journal picker restores the unchanged review and its destination search`() =
+        runTest(dispatcher) {
+            val vm = viewModel()
+            vm.open(source.id)
+            advanceUntilIdle()
+            vm.updateQuery("archive")
+            vm.choose(destination.id)
+            advanceUntilIdle()
+            vm.changeSource()
+            vm.updateQuery("home")
+            vm.restoreReview()
+            advanceUntilIdle()
+            assertEquals(preview, assertIs<JournalMergeStage.Review>(vm.uiState.value.stage).preview)
+            vm.changeDestination()
+            assertEquals("archive", vm.uiState.value.query)
+            vm.restoreReview()
+            advanceUntilIdle()
+            assertEquals(preview, assertIs<JournalMergeStage.Review>(vm.uiState.value.stage).preview)
+            assertEquals(0, repository.mergeCalls)
+        }
+
+    @Test
+    fun `source picker restores its query destination and back behavior after restart`() =
+        runTest(dispatcher) {
+            val handle = SavedStateHandle()
+            val first = viewModel(handle)
+            first.open(source.id)
+            advanceUntilIdle()
+            first.choose(destination.id)
+            advanceUntilIdle()
+            first.changeSource()
+            first.updateQuery("home")
+            val restored = viewModel(handle)
+            restored.open(source.id)
+            advanceUntilIdle()
+            assertEquals(JournalMergePickerTarget.Source, restored.uiState.value.pickerTarget)
+            assertEquals("home", restored.uiState.value.query)
+            assertEquals(destination.title, restored.uiState.value.destinationTitle)
+            restored.restoreReview()
+            advanceUntilIdle()
+            assertEquals(preview, assertIs<JournalMergeStage.Review>(restored.uiState.value.stage).preview)
+        }
+
+    @Test
+    fun `pending merge recovery cannot change its already committed source`() =
+        runTest(dispatcher) {
+            repository.durable = repository.operation.copy(needsDestination = true)
+            val vm = viewModel()
+            vm.open(source.id, repository.operation.operationId)
+            advanceUntilIdle()
+            vm.choose(destination.id)
+            advanceUntilIdle()
+            vm.changeSource()
+            assertIs<JournalMergeStage.Review>(vm.uiState.value.stage)
+            assertEquals(JournalMergePickerTarget.Destination, vm.uiState.value.pickerTarget)
+        }
+
     private class MergeRepositoryFake(
         private val previewValue: JournalMergePreview,
     ) : JournalRepository by FakeDetailJournalRepository() {
@@ -253,7 +345,10 @@ class JournalMergeViewModelTest {
         override suspend fun previewMerge(
             sourceId: Uuid,
             destinationId: Uuid,
-        ) = previewValue
+        ): JournalMergePreview? {
+            val journals = candidates.value.map { it.journal }.associateBy { it.id }
+            return previewValue.copy(source = journals[sourceId] ?: return null, destination = journals[destinationId] ?: return null)
+        }
 
         override suspend fun previewPendingMerge(
             operationId: Uuid,
@@ -268,7 +363,16 @@ class JournalMergeViewModelTest {
         ): JournalMergeResult {
             mergeCalls++
             if (result is JournalMergeResult.Merged) {
-                operation = operation.copy(operationId = operationId)
+                operation =
+                    operation.copy(
+                        operationId = operationId,
+                        sourceId = preview.source.id,
+                        destinationId = preview.destination.id,
+                        sourceTitle = preview.source.title,
+                        destinationTitle = preview.destination.title,
+                        contentIds = preview.sourceContentIds,
+                        source = preview.source,
+                    )
                 return JournalMergeResult.Merged(operation)
             }
             return result

@@ -3,6 +3,7 @@ package app.logdate.feature.core.settings.navigation
 import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
+import app.logdate.feature.core.settings.ui.SettingsCategoryNavigationScreen
 import app.logdate.feature.core.settings.ui.watch.WatchNotificationSettingsScreen
 import app.logdate.feature.core.settings.ui.watch.WatchSettingsScreen
 import app.logdate.feature.core.settings.ui.watch.WatchSettingsViewModel
@@ -25,22 +26,34 @@ fun EntryProviderScope<NavKey>.watchEntries(
     onBack: () -> Unit,
     onNavigateToNotifications: () -> Unit,
     onNavigateToTroubleshooting: () -> Unit,
+    onNavigateToCategory: (NavKey) -> Unit = {},
+    onNavigateToProfile: () -> Unit = {},
 ) {
-    taggedEntry<WatchSettingsRoute> {
+    val categories =
+        SettingsActivityCategories { section ->
+            SettingsCategoryNavigationScreen(
+                selectedSection = section,
+                onNavigateTo = onNavigateToCategory,
+                onBack = onBack,
+                onNavigateToProfile = onNavigateToProfile,
+                onNavigateToWatch = {},
+            )
+        }
+    taggedEntry<WatchSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Watch, categories)) {
         WatchSettingsScreen(
             onBack = onBack,
             onNavigateToNotifications = onNavigateToNotifications,
             onNavigateToTroubleshooting = onNavigateToTroubleshooting,
         )
     }
-    taggedEntry<WatchNotificationSettingsRoute> {
+    taggedEntry<WatchNotificationSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Watch, categories)) {
         val viewModel: WatchSettingsViewModel = koinViewModel()
         WatchNotificationSettingsScreen(
             onBack = onBack,
             viewModel = viewModel,
         )
     }
-    taggedEntry<WatchTroubleshootingRoute> {
+    taggedEntry<WatchTroubleshootingRoute>(metadata = settingsDetailMetadata(SettingsCategory.Watch, categories)) {
         val viewModel: WatchSettingsViewModel = koinViewModel()
         WatchTroubleshootingScreen(
             onBack = onBack,

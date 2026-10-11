@@ -35,6 +35,7 @@ import app.logdate.feature.core.settings.ui.RecommendationSettingsScreen
 import app.logdate.feature.core.settings.ui.RecoveryPhraseEntrySettingsScreen
 import app.logdate.feature.core.settings.ui.ResetAppSettingsScreen
 import app.logdate.feature.core.settings.ui.ResetSettingsScreen
+import app.logdate.feature.core.settings.ui.SettingsCategoryNavigationScreen
 import app.logdate.feature.core.settings.ui.SettingsOverviewScreen
 import app.logdate.feature.core.settings.ui.StreakSettingsScreen
 import app.logdate.feature.core.settings.ui.SyncSettingsScreen
@@ -49,7 +50,9 @@ import app.logdate.feature.events.ui.calendarsync.CalendarSyncSettingsScreen
 import app.logdate.feature.events.ui.settings.EventsSettingsScreen
 import app.logdate.feature.journals.navigation.JournalMergeRoute
 import app.logdate.feature.rewind.ui.settings.RewindSettingsScreen
+import app.logdate.ui.navigation.ActivityPresentation
 import app.logdate.ui.navigation.ViewModelsPerVisit
+import app.logdate.ui.navigation.asMetadata
 import app.logdate.ui.navigation.taggedEntry
 import kotlin.uuid.Uuid
 
@@ -86,8 +89,19 @@ fun EntryProviderScope<NavKey>.settingsEntries(
     onNavigateToWatch: (() -> Unit)? = null,
     onNavigateToNotifications: (() -> Unit)? = null,
     onNavigateTo: (NavKey) -> Unit,
+    onNavigateToCategory: (NavKey) -> Unit = onNavigateTo,
 ) {
-    taggedEntry<SettingsRoute> {
+    val categories =
+        SettingsActivityCategories { section ->
+            SettingsCategoryNavigationScreen(
+                selectedSection = section,
+                onNavigateTo = onNavigateToCategory,
+                onBack = onBack,
+                onNavigateToProfile = onNavigateToProfile,
+                onNavigateToWatch = onNavigateToWatch,
+            )
+        }
+    taggedEntry<SettingsRoute>(metadata = ActivityPresentation.SettingsRoot.asMetadata()) {
         SettingsOverviewScreen(
             onBack = onBack,
             onNavigateToProfile = onNavigateToProfile,
@@ -113,7 +127,7 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             onNavigateToSignIn = onNavigateToSignIn,
         )
     }
-    taggedEntry<AccountSettingsRoute>(metadata = ViewModelsPerVisit) {
+    taggedEntry<AccountSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Account, categories) + ViewModelsPerVisit) {
         AccountScreen(
             destinations =
                 AccountDestinations(
@@ -128,50 +142,50 @@ fun EntryProviderScope<NavKey>.settingsEntries(
                 ),
         )
     }
-    taggedEntry<SignInMethodsRoute>(metadata = ViewModelsPerVisit) {
+    taggedEntry<SignInMethodsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Account, categories) + ViewModelsPerVisit) {
         SignInMethodsScreen(onBack = onBack)
     }
-    taggedEntry<RecoveryPhraseRoute>(metadata = ViewModelsPerVisit) {
+    taggedEntry<RecoveryPhraseRoute>(metadata = settingsDetailMetadata(SettingsCategory.Account, categories) + ViewModelsPerVisit) {
         RecoveryPhraseScreen(
             onBack = onBack,
             onEnterPhrase = { onNavigateTo(RecoveryPhraseEntrySettingsRoute) },
         )
     }
-    taggedEntry<HostingRoute>(metadata = ViewModelsPerVisit) {
+    taggedEntry<HostingRoute>(metadata = settingsDetailMetadata(SettingsCategory.Account, categories) + ViewModelsPerVisit) {
         HostingScreen(onBack = onBack, onMoveAccount = { onNavigateTo(MoveServerRoute) })
     }
-    taggedEntry<MoveServerRoute>(metadata = ViewModelsPerVisit) {
+    taggedEntry<MoveServerRoute>(metadata = settingsDetailMetadata(SettingsCategory.Account, categories) + ViewModelsPerVisit) {
         MoveServerScreen(onClose = onBack)
     }
-    taggedEntry<DeleteAccountRoute>(metadata = ViewModelsPerVisit) {
+    taggedEntry<DeleteAccountRoute>(metadata = settingsDetailMetadata(SettingsCategory.Account, categories) + ViewModelsPerVisit) {
         DeleteAccountScreen(onBack = onBack, onDeviceErased = onResetApp)
     }
-    taggedEntry<PrivacySettingsRoute> {
+    taggedEntry<PrivacySettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Privacy, categories)) {
         PrivacySettingsScreen(
             onBack = onBack,
             onNavigateToLocationSettings = { onNavigateTo(LocationSettingsRoute) },
         )
     }
-    taggedEntry<DataSettingsRoute> {
+    taggedEntry<DataSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Backup, categories)) {
         DataSettingsScreen(
             onBack = onBack,
             onNavigateToRecoveryPhrase = { onNavigateTo(RecoveryPhraseRoute) },
         )
     }
-    taggedEntry<AdvancedSettingsRoute> {
+    taggedEntry<AdvancedSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.About, categories)) {
         AdvancedSettingsScreen(
             onBack = onBack,
             onNavigateToDeveloperTools = { onNavigateTo(DeveloperToolsRoute) },
             onNavigateToLabs = { onNavigateTo(LabsSettingsRoute) },
         )
     }
-    taggedEntry<DeveloperToolsRoute> {
+    taggedEntry<DeveloperToolsRoute>(metadata = settingsDetailMetadata(SettingsCategory.About, categories)) {
         DeveloperToolsScreen(onBack = onBack)
     }
-    taggedEntry<LabsSettingsRoute> {
+    taggedEntry<LabsSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.About, categories)) {
         LabsSettingsScreen(onBack = onBack)
     }
-    taggedEntry<LocationSettingsRoute> {
+    taggedEntry<LocationSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Location, categories)) {
         LocationSettingsScreen(
             onBack = onBack,
             onOpenLocationTimeline = {},
@@ -179,37 +193,37 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             onNavigateToInterval = { onNavigateTo(LocationIntervalRoute) },
         )
     }
-    taggedEntry<LocationTrackingOptionsRoute> {
+    taggedEntry<LocationTrackingOptionsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Location, categories)) {
         LocationTrackingOptionsScreen(onBack = onBack)
     }
-    taggedEntry<LocationIntervalRoute> {
+    taggedEntry<LocationIntervalRoute>(metadata = settingsDetailMetadata(SettingsCategory.Location, categories)) {
         LocationIntervalScreen(onBack = onBack)
     }
-    taggedEntry<LocationAdvancedRoute> {
+    taggedEntry<LocationAdvancedRoute>(metadata = settingsDetailMetadata(SettingsCategory.Location, categories)) {
         DeveloperToolsScreen(onBack = onBack)
     }
-    taggedEntry<MemoriesSettingsRoute> {
+    taggedEntry<MemoriesSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Memories, categories)) {
         MemoriesSettingsScreen(
             onBack = onBack,
             onNavigateToRecommendations = { onNavigateTo(RecommendationSettingsRoute) },
         )
     }
-    taggedEntry<VoiceNotesSettingsRoute> {
+    taggedEntry<VoiceNotesSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.VoiceNotes, categories)) {
         VoiceNotesSettingsScreen(onBack = onBack)
     }
-    taggedEntry<StreakSettingsRoute> {
+    taggedEntry<StreakSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Streaks, categories)) {
         StreakSettingsScreen(onBack = onBack)
     }
-    taggedEntry<TimelineSettingsRoute> {
+    taggedEntry<TimelineSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Timeline, categories)) {
         TimelineSettingsScreen(
             onBack = onBack,
             onNavigateToDayBoundary = { onNavigateTo(DayBoundarySettingsRoute) },
         )
     }
-    taggedEntry<DayBoundarySettingsRoute> {
+    taggedEntry<DayBoundarySettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Timeline, categories)) {
         DayBoundarySettingsScreen(onBack = onBack)
     }
-    taggedEntry<SyncSettingsRoute> {
+    taggedEntry<SyncSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Backup, categories)) {
         SyncSettingsScreen(
             onBack = onBack,
             onNavigateToCloudAccountCreation = onNavigateToCloudAccountCreation,
@@ -220,47 +234,47 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             },
         )
     }
-    taggedEntry<RecoveryPhraseEntrySettingsRoute> {
+    taggedEntry<RecoveryPhraseEntrySettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Account, categories)) {
         RecoveryPhraseEntrySettingsScreen(
             onBack = onBack,
             onRecovered = onBack,
         )
     }
-    taggedEntry<ExportSettingsRoute> {
+    taggedEntry<ExportSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Export, categories)) {
         ExportSettingsScreen(onBack = onBack)
     }
-    taggedEntry<LibrarySettingsRoute> {
+    taggedEntry<LibrarySettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Library, categories)) {
         LibrarySettingsScreen(onBack = onBack)
     }
-    taggedEntry<ResetSettingsRoute> {
+    taggedEntry<ResetSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Reset, categories)) {
         ResetSettingsScreen(
             onBack = onBack,
             onNavigateToClearData = { onNavigateTo(ClearDataSettingsRoute) },
             onNavigateToResetApp = { onNavigateTo(ResetAppSettingsRoute) },
         )
     }
-    taggedEntry<ClearDataSettingsRoute> {
+    taggedEntry<ClearDataSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Reset, categories)) {
         ClearDataSettingsScreen(onBack = onBack)
     }
-    taggedEntry<ResetAppSettingsRoute> {
+    taggedEntry<ResetAppSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Reset, categories)) {
         ResetAppSettingsScreen(
             onBack = onBack,
             onAppReset = onResetApp,
         )
     }
-    taggedEntry<BirthdaySettingsRoute> {
+    taggedEntry<BirthdaySettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Account, categories)) {
         BirthdaySettingsScreen(onBack = onBack)
     }
-    taggedEntry<RecommendationSettingsRoute> {
+    taggedEntry<RecommendationSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Memories, categories)) {
         RecommendationSettingsScreen(onBack = onBack)
     }
-    taggedEntry<DevicesRoute> {
+    taggedEntry<DevicesRoute>(metadata = settingsDetailMetadata(SettingsCategory.Devices, categories)) {
         DevicesScreen(onBackClick = onBack)
     }
-    taggedEntry<RewindSettingsRoute> {
+    taggedEntry<RewindSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Rewind, categories)) {
         RewindSettingsScreen(onBack = onBack)
     }
-    taggedEntry<EventsSettingsRoute> {
+    taggedEntry<EventsSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Events, categories)) {
         if (FeatureFlag.EVENTS.availableForLaunch) {
             EventsSettingsScreen(
                 onBack = onBack,
@@ -271,7 +285,7 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             ExitDeferredRoute(onBack)
         }
     }
-    taggedEntry<EventsCalendarRoute> {
+    taggedEntry<EventsCalendarRoute>(metadata = settingsDetailMetadata(SettingsCategory.Events, categories)) {
         if (FeatureFlag.EVENTS.availableForLaunch) {
             EventsCalendarScreen(
                 onBack = onBack,
@@ -281,7 +295,7 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             ExitDeferredRoute(onBack)
         }
     }
-    taggedEntry<CalendarSyncSettingsRoute> {
+    taggedEntry<CalendarSyncSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Events, categories)) {
         if (FeatureFlag.EVENTS.availableForLaunch) {
             CalendarSyncSettingsScreen(
                 onBack = onBack,
@@ -292,14 +306,14 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             ExitDeferredRoute(onBack)
         }
     }
-    taggedEntry<CalendarSyncCalendarsRoute> {
+    taggedEntry<CalendarSyncCalendarsRoute>(metadata = settingsDetailMetadata(SettingsCategory.Events, categories)) {
         if (FeatureFlag.EVENTS.availableForLaunch) {
             CalendarSyncCalendarsScreen(onBack = onBack)
         } else {
             ExitDeferredRoute(onBack)
         }
     }
-    taggedEntry<CalendarSyncActivityRoute> {
+    taggedEntry<CalendarSyncActivityRoute>(metadata = settingsDetailMetadata(SettingsCategory.Events, categories)) {
         if (FeatureFlag.EVENTS.availableForLaunch) {
             CalendarSyncActivityScreen(
                 onBack = onBack,
@@ -309,7 +323,7 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             ExitDeferredRoute(onBack)
         }
     }
-    taggedEntry<PeopleSettingsRoute> {
+    taggedEntry<PeopleSettingsRoute>(metadata = settingsDetailMetadata(SettingsCategory.People, categories)) {
         if (FeatureFlag.PEOPLE.availableForLaunch) {
             val contactsPermissionState = rememberContactsPermissionState()
             PeopleSettingsScreen(
@@ -323,7 +337,7 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             ExitDeferredRoute(onBack)
         }
     }
-    taggedEntry<PeopleDirectoryRoute> {
+    taggedEntry<PeopleDirectoryRoute>(metadata = settingsDetailMetadata(SettingsCategory.People, categories)) {
         if (FeatureFlag.PEOPLE.availableForLaunch) {
             PeopleDirectoryScreen(
                 onBack = onBack,
@@ -333,14 +347,14 @@ fun EntryProviderScope<NavKey>.settingsEntries(
             ExitDeferredRoute(onBack)
         }
     }
-    taggedEntry<PeopleInboxRoute> {
+    taggedEntry<PeopleInboxRoute>(metadata = settingsDetailMetadata(SettingsCategory.People, categories)) {
         if (FeatureFlag.PEOPLE.availableForLaunch) {
             PeopleInboxScreen(onBack = onBack)
         } else {
             ExitDeferredRoute(onBack)
         }
     }
-    taggedEntry<PersonDetailRoute> { route ->
+    taggedEntry<PersonDetailRoute>(metadata = settingsDetailMetadata(SettingsCategory.People, categories)) { route ->
         if (FeatureFlag.PEOPLE.availableForLaunch) {
             PersonDetailScreen(
                 personId = Uuid.parse(route.personId),

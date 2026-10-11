@@ -43,7 +43,7 @@ import app.logdate.feature.rewind.ui.RewindDetailUiState
 import app.logdate.feature.rewind.ui.SubtitledRewindPanelUiState
 import app.logdate.feature.rewind.ui.detail.RewindDetailScreenContent
 import app.logdate.navigation.rememberWorkspaceRouteDecorator
-import app.logdate.navigation.scenes.HomeSceneStrategy
+import app.logdate.navigation.scenes.RelatedContentSceneStrategy
 import app.logdate.ui.foldable.FoldableHingeBounds
 import app.logdate.ui.foldable.FoldableHingeInfo
 import app.logdate.ui.foldable.FoldableHingeOrientation
@@ -184,7 +184,7 @@ class RewindImmersiveE2ETest {
                     NavDisplay(
                         backStack = backStack,
                         onBack = { if (backStack.size > 1) backStack.removeLastOrNull() },
-                        sceneStrategies = listOf(HomeSceneStrategy<NavKey>(supportsDualPane = { true })),
+                        sceneStrategies = listOf(RelatedContentSceneStrategy<NavKey>(supportsDualPane = { true })),
                         entryDecorators = listOf(rememberWorkspaceRouteDecorator()),
                         entryProvider =
                             entryProvider {

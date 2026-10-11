@@ -24,7 +24,6 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
 import app.logdate.ui.theme.Spacing
 
 /**
@@ -79,8 +78,6 @@ fun SimpleSettingsItem(
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
             )
         },
         overlineContent = overline?.let { { Text(it) } },
@@ -170,8 +167,6 @@ fun LinkedToggleSettingsItem(
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -262,8 +257,6 @@ fun SettingsNavigationItem(
             Text(
                 text = description,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
             )
         },
         leadingContent = icon,

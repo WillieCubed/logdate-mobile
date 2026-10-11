@@ -4,7 +4,10 @@
 
 package app.logdate.feature.journals.ui
 
+import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,7 +44,7 @@ import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.common.AspectRatios
 import app.logdate.ui.common.ContextMenuArea
 import app.logdate.ui.common.ContextMenuItem
-import app.logdate.ui.common.focusableWithRing
+import app.logdate.ui.common.focusRing
 import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.theme.Spacing
@@ -49,6 +53,13 @@ import app.logdate.util.toReadableDateShort
 import coil3.compose.AsyncImage
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
+
+internal data class JournalCoverTransition(
+    val visible: Boolean,
+    val durationMillis: Int,
+)
+
+internal val LocalJournalCoverTransition = compositionLocalOf<JournalCoverTransition?> { null }
 
 /**
  * Shape for individual journal cover items (rounded right edges, flat left like a book spine).
@@ -74,8 +85,10 @@ fun JournalCover(
     contextMenuItems: List<ContextMenuItem> = emptyList(),
     enabled: Boolean = true,
     elevation: Dp = 0.dp,
+    showLastUpdated: Boolean = true,
+    fitContent: Boolean = false,
 ) {
-    if (LocalWorkspaceEnabled.current) {
+    if (LocalWorkspaceEnabled.current || fitContent) {
         BoxWithConstraints(modifier) {
             JournalCoverFace(
                 journal,
@@ -85,10 +98,11 @@ fun JournalCover(
                 enabled,
                 elevation,
                 responsive = true,
+                showLastUpdated = showLastUpdated,
             )
         }
     } else {
-        JournalCoverFace(journal, modifier, onClick, contextMenuItems, enabled, elevation)
+        JournalCoverFace(journal, modifier, onClick, contextMenuItems, enabled, elevation, showLastUpdated = showLastUpdated)
     }
 }
 
@@ -101,7 +115,9 @@ private fun JournalCoverFace(
     enabled: Boolean,
     elevation: Dp,
     responsive: Boolean = false,
+    showLastUpdated: Boolean = true,
 ) {
+    val callerTransition = LocalJournalCoverTransition.current
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
     val sharedTransitionScope = LocalSharedTransitionScope.current
 
@@ -118,7 +134,7 @@ private fun JournalCoverFace(
                 shape = JournalShape,
             ).let { mod ->
                 if (onClick != null) {
-                    mod.focusableWithRing().clickable(enabled) { onClick(journal.id) }
+                    mod.focusRing().clickable(enabled) { onClick(journal.id) }
                 } else {
                     mod
                 }
@@ -139,24 +155,35 @@ private fun JournalCoverFace(
         }
 
     ContextMenuArea(items = contextMenuItems) {
-        if (animatedVisibilityScope != null && sharedTransitionScope != null) {
+        if (sharedTransitionScope != null && (animatedVisibilityScope != null || callerTransition != null)) {
             with(sharedTransitionScope) {
                 Box(
                     modifier =
-                        baseModifier
-                            .sharedElement(
-                                sharedTransitionScope.rememberSharedContentState(
-                                    TransitionKeys.journalContainerTransition(journal.id),
-                                ),
-                                animatedVisibilityScope,
-                            ),
+                        if (callerTransition != null) {
+                            baseModifier.sharedElementWithCallerManagedVisibility(
+                                rememberSharedContentState(TransitionKeys.journalContainerTransition(journal.id)),
+                                visible = callerTransition.visible,
+                                boundsTransform =
+                                    BoundsTransform {
+                                        _,
+                                        _,
+                                        ->
+                                        tween(callerTransition.durationMillis, easing = FastOutSlowInEasing)
+                                    },
+                            )
+                        } else {
+                            baseModifier.sharedElement(
+                                rememberSharedContentState(TransitionKeys.journalContainerTransition(journal.id)),
+                                requireNotNull(animatedVisibilityScope),
+                            )
+                        },
                 ) {
-                    JournalCoverContent(journal, textColor)
+                    JournalCoverContent(journal, textColor, showLastUpdated)
                 }
             }
         } else {
             Box(modifier = baseModifier) {
-                JournalCoverContent(journal, textColor)
+                JournalCoverContent(journal, textColor, showLastUpdated)
             }
         }
     }
@@ -166,6 +193,7 @@ private fun JournalCoverFace(
 private fun BoxScope.JournalCoverContent(
     journal: Journal,
     textColor: Color,
+    showLastUpdated: Boolean,
 ) {
     // Cover image with scrim when available
     journal.coverImageUri?.let { uri ->
@@ -212,12 +240,14 @@ private fun BoxScope.JournalCoverContent(
             style = MaterialTheme.typography.titleMedium,
             color = textColor,
         )
-        Text(
-            "Last updated ${journal.lastUpdated.toReadableDateShort()}",
-            modifier = Modifier.fillMaxWidth(),
-            style = MaterialTheme.typography.labelSmall,
-            color = textColor.copy(alpha = textColor.alpha * 0.7f),
-        )
+        if (showLastUpdated) {
+            Text(
+                "Last updated ${journal.lastUpdated.toReadableDateShort()}",
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.labelSmall,
+                color = textColor.copy(alpha = textColor.alpha * 0.7f),
+            )
+        }
     }
 }
 

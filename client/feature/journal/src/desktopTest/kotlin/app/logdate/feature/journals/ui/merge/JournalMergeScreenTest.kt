@@ -83,7 +83,7 @@ class JournalMergeScreenTest {
         }
 
     @Test
-    fun `review shows unique count overlap and explicit action`() =
+    fun `review shows useful counts directly before explicit confirmation`() =
         runDesktopComposeUiTest(width = 411, height = 891) {
             var confirmed = 0
             setContent {
@@ -94,10 +94,24 @@ class JournalMergeScreenTest {
                     )
                 }
             }
-            onNodeWithText("2 items after merging").performScrollTo().assertIsDisplayed()
-            onNodeWithText("1 item already in both journals").assertIsDisplayed()
-            onNodeWithText("Merge journals").performScrollTo().performClick()
+            onNodeWithText("Details").assertDoesNotExist()
+            onNodeWithContentDescription("2 items after merging").performScrollTo().assertIsDisplayed()
+            onNodeWithContentDescription("1 item in both journals").assertIsDisplayed()
+            onNodeWithText("Merge journals").assertIsDisplayed().performClick()
             assertEquals(1, confirmed)
+        }
+
+    @Test
+    fun `fully overlapping journals keep the resulting count unchanged`() =
+        runDesktopComposeUiTest(width = 411, height = 891) {
+            val overlapping = preview.copy(sourceContentIds = preview.destinationContentIds)
+            setContent {
+                LogDateTheme {
+                    JournalMergeScreenContent(JournalMergeUiState(loading = false, stage = JournalMergeStage.Review(overlapping)))
+                }
+            }
+            onNodeWithContentDescription("2 items in source journal").performScrollTo().assertIsDisplayed()
+            onNodeWithContentDescription("2 items after merging").assertIsDisplayed()
         }
 
     @Test
@@ -134,7 +148,7 @@ class JournalMergeScreenTest {
                     )
                 }
             }
-            onNodeWithText("Merging…").performScrollTo().performClick()
+            onNodeWithText("Merging…").assertIsDisplayed().performClick()
             assertEquals(0, confirmed)
         }
 }

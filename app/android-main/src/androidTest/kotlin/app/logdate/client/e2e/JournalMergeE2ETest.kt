@@ -2,13 +2,19 @@ package app.logdate.client.e2e
 
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.key
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDisplayed
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -20,6 +26,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.ui.NavDisplay
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -52,19 +61,24 @@ import app.logdate.feature.journals.navigation.JournalsOverviewRoute
 import app.logdate.feature.journals.navigation.completeJournalMerge
 import app.logdate.feature.journals.ui.detail.JournalDetailScreen
 import app.logdate.feature.journals.ui.detail.JournalDetailViewModel
+import app.logdate.feature.journals.ui.list.JournalsList
 import app.logdate.feature.journals.ui.merge.JournalMergeScreen
 import app.logdate.feature.journals.ui.merge.JournalMergeStage
 import app.logdate.feature.journals.ui.merge.JournalMergeViewModel
+import app.logdate.navigation.rememberWorkspaceRouteDecorator
+import app.logdate.navigation.scenes.RelatedContentSceneStrategy
 import app.logdate.shared.config.DefaultLogDateConfigRepository
 import app.logdate.shared.model.DeploymentKind
 import app.logdate.shared.model.Journal
 import app.logdate.shared.model.ServerDescriptor
 import app.logdate.shared.model.ServerProtocolFeature
+import app.logdate.ui.navigation.ActivityPresentation
+import app.logdate.ui.navigation.asMetadata
+import app.logdate.ui.navigation.taggedEntry
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
+import app.logdate.ui.workspace.LocalWorkspaceHosted
 import app.logdate.ui.workspace.LocalWorkspaceSearchAction
-import app.logdate.ui.workspace.PanelConstraints
-import app.logdate.ui.workspace.WorkspaceRouteFrame
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -193,30 +207,48 @@ class JournalMergeE2ETest {
                         )
                     }
             }
-            merge =
-                ownedViewModel("merge") {
-                    JournalMergeViewModel(MergeJournalsUseCase(repository, memberships, NoOpSyncManager), SavedStateHandle())
-                }
         }
         composeRule.setContent {
             LogDateTheme {
                 CompositionLocalProvider(LocalWorkspaceEnabled provides true, LocalWorkspaceSearchAction provides {}) {
-                    WorkspaceRouteFrame(focusConstraints = PanelConstraints.ReadingCollection) {
-                        val route = stack.last()
-                        key(route) {
-                            when (route) {
-                                is JournalDetailsRoute ->
+                    NavDisplay(
+                        backStack = stack,
+                        onBack = { if (stack.size > 1) stack.removeAt(stack.lastIndex) },
+                        sceneStrategies = listOf(RelatedContentSceneStrategy<NavKey>({ true })),
+                        entryDecorators =
+                            listOf(
+                                rememberSaveableStateHolderNavEntryDecorator(),
+                                rememberWorkspaceRouteDecorator(),
+                            ),
+                        entryProvider =
+                            entryProvider {
+                                taggedEntry<JournalsOverviewRoute>(ActivityPresentation.Collection("journals").asMetadata()) {
+                                    val journals by repository.allJournalsObserved.collectAsState(emptyList())
+                                    JournalsList(journals, onJournalClick = { stack.add(JournalDetailsRoute(it.id.toString())) })
+                                }
+                                taggedEntry<JournalDetailsRoute>(ActivityPresentation.Detail("journals", "journal").asMetadata()) { route ->
                                     JournalDetailScreen(
                                         Uuid.parse(route.journalId),
                                         onGoBack = { stack.removeAt(stack.lastIndex) },
                                         onJournalDeleted = {},
-                                        onNavigateToMerge = { stack.add(JournalMergeRoute(it.toString())) },
+                                        onNavigateToMerge = { id ->
+                                            merge =
+                                                ownedViewModel("merge-${Uuid.random()}") {
+                                                    JournalMergeViewModel(
+                                                        MergeJournalsUseCase(repository, memberships, NoOpSyncManager),
+                                                        SavedStateHandle(),
+                                                    )
+                                                }
+                                            stack.add(JournalMergeRoute(id.toString()))
+                                        },
                                         mergedSourceTitle = route.mergedSourceTitle,
                                         flags = flags,
                                         config = config,
                                         viewModel = details.getValue(Uuid.parse(route.journalId)),
                                     )
-                                is JournalMergeRoute ->
+                                }
+                                taggedEntry<JournalMergeRoute>(ActivityPresentation.Replacement.asMetadata()) { route ->
+                                    check(!LocalWorkspaceHosted.current) { "Merge must not inherit a Home host" }
                                     JournalMergeScreen(
                                         Uuid.parse(route.sourceId),
                                         onBack = { stack.removeAt(stack.lastIndex) },
@@ -225,29 +257,58 @@ class JournalMergeE2ETest {
                                         config = config,
                                         viewModel = merge,
                                     )
-                            }
-                        }
-                    }
+                                }
+                            },
+                    )
                 }
             }
         }
         composeRule.waitUntil(10_000) { composeRule.onAllNodes(hasText(source.title)).fetchSemanticsNodes().isNotEmpty() }
         composeRule.onNodeWithContentDescription("Journal options").performClick()
-        composeRule.onNodeWithText("Merge into…").performClick()
+        composeRule.onNode(hasText("Merge into…") and hasAnyAncestor(isPopup())).performClick()
         composeRule.waitUntil(10_000) { composeRule.onAllNodes(hasText(destination.title)).fetchSemanticsNodes().isNotEmpty() }
-        composeRule.onNodeWithTag("workspace_search").performTextInput("Life")
+        composeRule.onAllNodesWithTag("workspace_search").assertCountEquals(0)
+        composeRule.onNodeWithTag("journal_merge_activity").assertIsDisplayed()
+        composeRule.onNodeWithTag("journal_merge_search").performTextInput("Life")
         composeRule.onNodeWithText(destination.title).performClick()
         awaitReview(merge)
-        composeRule.onNodeWithText("3 items after merging").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Change source journal").performScrollTo().performClick()
+        composeRule.onNodeWithText("Move contents from…").assertIsDisplayed()
+        composeRule.onNodeWithText(source.title).performScrollTo().performClick()
+        awaitReview(merge)
+        composeRule.onNodeWithContentDescription("Change destination").performScrollTo().performClick()
+        composeRule.onNodeWithTag("journal_merge_search").assertTextContains("Life")
+        composeRule.runOnUiThread { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
+        awaitReview(merge)
+        composeRule.onNodeWithText("Details").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("3 items after merging").performScrollTo().assertIsDisplayed()
         val output = File(InstrumentationRegistry.getArguments().getString("additionalTestOutputDir") ?: composeRule.activity.filesDir.path)
         output.mkdirs()
         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(File(output, "merge-e2e-count-review.png"))
-        composeRule.onNodeWithText("1 item already in both journals").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Change destination").performScrollTo().performClick()
-        composeRule.onNodeWithTag("workspace_search").assertTextContains("Life")
+        composeRule.onNodeWithContentDescription("1 item in both journals").performScrollTo().assertIsDisplayed()
+        composeRule.runOnUiThread { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
+        composeRule.onNodeWithTag("journal_merge_search").assertTextContains("Life")
+        composeRule.onAllNodesWithTag("workspace_search").assertCountEquals(0)
         composeRule.onNodeWithText(destination.title).performClick()
         awaitReview(merge)
-        composeRule.onNode(hasText("Merge journals") and hasClickAction()).performScrollTo().performClick()
+        if (!composeRule.onNodeWithText("Cancel").isDisplayed()) composeRule.onNodeWithText("Cancel").performScrollTo()
+        composeRule.onNodeWithText("Cancel").performClick()
+        composeRule.runOnIdle { assertEquals(JournalDetailsRoute(source.id.toString()), stack.last()) }
+        runBlocking {
+            assertEquals(source, database.journalDao().getJournalById(source.id))
+            assertTrue(repository.pendingJournalMerges().isEmpty())
+        }
+        composeRule.onNodeWithContentDescription("Journal options").performClick()
+        composeRule.onNode(hasText("Merge into…") and hasAnyAncestor(isPopup())).performClick()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag("journal_merge_search").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("journal_merge_search").performTextInput("Life")
+        composeRule.onNodeWithText(destination.title).performClick()
+        awaitReview(merge)
+        val confirm = composeRule.onNode(hasText("Merge journals") and hasClickAction())
+        if (!confirm.isDisplayed()) confirm.performScrollTo()
+        confirm.performClick()
         composeRule.waitUntil(10_000) {
             stack.last() is JournalDetailsRoute &&
                 (stack.last() as JournalDetailsRoute).journalId == destination.id.toString()

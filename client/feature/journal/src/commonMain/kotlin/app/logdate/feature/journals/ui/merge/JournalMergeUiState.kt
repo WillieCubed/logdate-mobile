@@ -20,16 +20,22 @@ sealed interface JournalMergeStage {
     ) : JournalMergeStage
 }
 
+enum class JournalMergePickerTarget { Source, Destination }
+
 enum class JournalMergeError { Failed, Changed, Unavailable }
 
 data class JournalMergeUiState(
+    val pickerTarget: JournalMergePickerTarget = JournalMergePickerTarget.Destination,
+    val editingSelection: Boolean = false,
     val sourceTitle: String = "",
+    val destinationTitle: String = "",
     val query: String = "",
     val candidates: List<JournalMergeCandidate> = emptyList(),
     val stage: JournalMergeStage = JournalMergeStage.Picker,
     val loading: Boolean = true,
     val recovery: Boolean = false,
     val error: JournalMergeError? = null,
+    val source: JournalMergeCandidate? = null,
 ) {
     val visibleCandidates: List<JournalMergeCandidate>
         get() = candidates.filter { it.journal.title.contains(query.trim(), ignoreCase = true) }

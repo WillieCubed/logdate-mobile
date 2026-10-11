@@ -29,10 +29,13 @@ import app.logdate.client.repository.search.SearchResult
 import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
+import app.logdate.ui.workspace.LocalWorkspaceHosted
 import app.logdate.ui.workspace.PanelContainment
 import app.logdate.ui.workspace.WorkspacePanel
+import app.logdate.ui.workspace.WorkspaceSearchScope
 import kotlinx.datetime.LocalDate
 import logdate.client.feature.journal.generated.resources.Res
+import logdate.client.feature.journal.generated.resources.search_journals
 import logdate.client.feature.journal.generated.resources.suggestion_create_journal
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -105,6 +108,9 @@ fun JournalsOverviewScreenContent(
     modifier: Modifier = Modifier,
 ) {
     if (LocalWorkspaceEnabled.current) {
+        if (!LocalWorkspaceHosted.current) {
+            WorkspaceSearchScope(searchQuery, stringResource(Res.string.search_journals), onQueryChange)
+        }
         WorkspacePanel(modifier, containment = PanelContainment.Collection) {
             Column(Modifier.fillMaxSize()) {
                 if (suggestions.isNotEmpty()) SuggestionRow(suggestions, onCreateJournal)

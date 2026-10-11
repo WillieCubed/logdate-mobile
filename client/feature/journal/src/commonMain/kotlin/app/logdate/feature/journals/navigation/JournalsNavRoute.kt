@@ -5,6 +5,8 @@ import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import app.logdate.client.repository.journals.JournalMergeOperation
 import app.logdate.feature.journals.ui.JournalsOverviewScreen
+import app.logdate.ui.navigation.ActivityPresentation
+import app.logdate.ui.navigation.asMetadata
 import app.logdate.ui.navigation.taggedEntry
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
@@ -23,7 +25,7 @@ fun EntryProviderScope<NavKey>.journalsOverviewEntry(
     onCreateJournal: () -> Unit,
     onBrowseJournals: () -> Unit = {},
 ) {
-    taggedEntry<JournalsOverviewRoute> {
+    taggedEntry<JournalsOverviewRoute>(metadata = ActivityPresentation.Collection("journals").asMetadata()) {
         JournalsOverviewScreen(
             onOpenJournal = onOpenJournal,
             onBrowseJournals = onBrowseJournals,
@@ -42,7 +44,7 @@ fun EntryProviderScope<NavKey>.journalEntries(
     onCreateJournal: () -> Unit,
     onBack: () -> Unit,
     onJournalDeleted: () -> Unit,
-    onOpenNote: (Uuid) -> Unit,
+    onOpenNote: (noteId: Uuid, journalId: Uuid) -> Unit,
     onOpenEditorForJournal: (Uuid) -> Unit,
     onOpenContentPickerForJournal: (Uuid) -> Unit,
     onOpenJournalSettings: (Uuid) -> Unit,
@@ -50,6 +52,7 @@ fun EntryProviderScope<NavKey>.journalEntries(
     onMergeJournal: (Uuid) -> Unit = {},
     onJournalMerged: (JournalMergeOperation) -> Unit = {},
     onJournalRedirected: (sourceId: Uuid, destinationId: Uuid) -> Unit = { _, _ -> },
+    onNavigateToNote: (noteId: Uuid, journalId: Uuid?) -> Unit = { _, _ -> },
 ) {
     journalsOverviewEntry(
         onOpenJournal = onOpenJournal,
@@ -77,5 +80,5 @@ fun EntryProviderScope<NavKey>.journalEntries(
     journalContentPickerEntry(onBack = onBack)
     journalMergeEntry(onBack = onBack, onJournalMerged = onJournalMerged)
     shareJournalEntry(onBack = onBack)
-    noteDetailEntry(onBack = onBack)
+    noteDetailEntry(onBack = onBack, onNavigateToNote = onNavigateToNote)
 }

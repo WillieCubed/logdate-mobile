@@ -4,6 +4,10 @@ import androidx.navigation3.runtime.EntryProviderScope
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
 import app.logdate.feature.journals.ui.detail.NoteViewerScreen
+import app.logdate.ui.adaptive.ActivityRouteFrame
+import app.logdate.ui.navigation.ActivityPresentation
+import app.logdate.ui.navigation.ViewModelsPerVisit
+import app.logdate.ui.navigation.asMetadata
 import app.logdate.ui.navigation.taggedEntry
 import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
@@ -11,6 +15,7 @@ import kotlin.uuid.Uuid
 @Serializable
 data class NoteDetailRoute(
     val noteId: String,
+    val journalId: String? = null,
 ) : NavKey {
     constructor(noteId: Uuid) : this(noteId.toString())
 }
@@ -21,11 +26,29 @@ fun NavBackStack<NavKey>.navigateToNoteDetail(noteId: Uuid) {
 }
 
 /** Registers the note viewer entry. */
-fun EntryProviderScope<NavKey>.noteDetailEntry(onBack: () -> Unit) {
-    taggedEntry<NoteDetailRoute> { route ->
-        NoteViewerScreen(
-            noteId = Uuid.parse(route.noteId),
-            onGoBack = onBack,
-        )
+fun EntryProviderScope<NavKey>.noteDetailEntry(
+    onBack: () -> Unit,
+    onNavigateToNote: (noteId: Uuid, journalId: Uuid?) -> Unit = { _, _ -> },
+) {
+    taggedEntry<NoteDetailRoute>(metadata = { route ->
+        (route.journalId?.let { ActivityPresentation.Detail("journal:$it") } ?: ActivityPresentation.Replacement).asMetadata() +
+            ViewModelsPerVisit
+    }) { route ->
+        val journalId = route.journalId?.let(Uuid::parse)
+        ActivityRouteFrame {
+            NoteViewerScreen(
+                noteId = Uuid.parse(route.noteId),
+                journalId = journalId,
+                onGoBack = onBack,
+                onNavigateToNote = { onNavigateToNote(it, journalId) },
+            )
+        }
     }
+}
+
+fun MutableList<NavKey>.replaceNoteDetail(
+    noteId: Uuid,
+    journalId: Uuid?,
+) {
+    if (lastOrNull() is NoteDetailRoute) this[lastIndex] = NoteDetailRoute(noteId.toString(), journalId?.toString())
 }

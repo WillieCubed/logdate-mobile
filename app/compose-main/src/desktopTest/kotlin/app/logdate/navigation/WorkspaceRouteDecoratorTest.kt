@@ -15,7 +15,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import app.logdate.feature.core.main.HomeRoute
 import app.logdate.feature.rewind.navigation.RewindDetailRoute
-import app.logdate.navigation.scenes.HomeSceneStrategy
+import app.logdate.navigation.scenes.RelatedContentSceneStrategy
 import app.logdate.ui.navigation.taggedEntry
 import app.logdate.ui.theme.LogDateTheme
 import app.logdate.ui.workspace.LocalPanelLayoutInfo
@@ -48,7 +48,7 @@ class WorkspaceRouteDecoratorTest {
                 ) {
                     NavDisplay(
                         backStack = listOfNotNull(source, RewindDetailRoute("00000000-0000-0000-0000-000000000001")),
-                        sceneStrategies = listOf(HomeSceneStrategy<NavKey>(supportsDualPane = { true })),
+                        sceneStrategies = listOf(RelatedContentSceneStrategy<NavKey>(supportsDualPane = { true })),
                         onBack = {},
                         entryDecorators = listOf(rememberWorkspaceRouteDecorator()),
                         entryProvider =

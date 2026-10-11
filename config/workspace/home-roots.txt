@@ -13,7 +13,6 @@ client/feature/journal/src/commonMain/kotlin/app/logdate/feature/journals/ui/pic
 client/feature/journal/src/commonMain/kotlin/app/logdate/feature/journals/ui/detail/NoteViewerScreen.kt|NoteViewerScaffoldContent
 client/feature/library/src/commonMain/kotlin/app/logdate/feature/library/ui/detail/MediaDetailScreen.kt|MediaDetailScreen,MediaDetailContent,MediaDetailLayout,WorkspaceMediaViewer
 client/feature/rewind/src/commonMain/kotlin/app/logdate/feature/rewind/ui/detail/RewindStoryView.kt|RewindStoryView
-app/compose-main/src/commonMain/kotlin/app/logdate/navigation/scenes/ListDetailHomeScene.kt|HomeWorkspaceSceneContent
 client/feature/library/src/commonMain/kotlin/app/logdate/feature/library/ui/components/MediaThumbnailGrid.kt|MediaThumbnailGrid
 app/compose-main/src/commonMain/kotlin/app/logdate/navigation/WorkspaceRouteDecorator.kt|rememberWorkspaceRouteDecorator
 client/feature/journal/src/commonMain/kotlin/app/logdate/feature/journals/ui/JournalFilterBar.kt|JournalFilterBar

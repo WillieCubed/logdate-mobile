@@ -50,6 +50,7 @@ import app.logdate.feature.core.settings.navigation.SyncSettingsRoute
 import app.logdate.feature.core.settings.navigation.WatchNotificationSettingsRoute
 import app.logdate.feature.core.settings.navigation.WatchSettingsRoute
 import app.logdate.feature.core.settings.navigation.WatchTroubleshootingRoute
+import app.logdate.feature.core.settings.navigation.navigateToSettingsCategory
 import app.logdate.feature.core.settings.navigation.settingsEntries
 import app.logdate.feature.core.settings.navigation.watchEntries
 import app.logdate.feature.core.sync.navigation.syncIssuesEntry
@@ -68,6 +69,9 @@ import app.logdate.feature.journals.navigation.ShareJournalRoute
 import app.logdate.feature.journals.navigation.completeJournalMerge
 import app.logdate.feature.journals.navigation.journalEntries
 import app.logdate.feature.journals.navigation.redirectJournalDetail
+import app.logdate.feature.journals.navigation.replaceNoteDetail
+import app.logdate.feature.journals.navigation.selectJournal
+import app.logdate.feature.journals.navigation.selectJournalNote
 import app.logdate.feature.library.navigation.MediaDetailRoute
 import app.logdate.feature.library.navigation.libraryEntries
 import app.logdate.feature.library.ui.LibraryScreen
@@ -82,12 +86,14 @@ import app.logdate.feature.postcards.navigation.postcardsEntries
 import app.logdate.feature.rewind.navigation.RewindDetailRoute
 import app.logdate.feature.rewind.navigation.rewindDetailEntry
 import app.logdate.feature.search.ui.SearchScreen
-import app.logdate.navigation.scenes.HomeSceneStrategy
+import app.logdate.navigation.scenes.RelatedContentSceneStrategy
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
 import app.logdate.ui.audio.AudioPlaybackProvider
 import app.logdate.ui.keyboard.AppKeyboardShortcut
 import app.logdate.ui.keyboard.AppShortcutScope
+import app.logdate.ui.navigation.ActivityPresentation
+import app.logdate.ui.navigation.asMetadata
 import app.logdate.ui.navigation.taggedEntry
 import app.logdate.ui.platform.DefaultLogDateHaptics
 import app.logdate.ui.platform.LocalLogDateHaptics
@@ -97,12 +103,10 @@ import app.logdate.ui.platform.rememberPlatformHapticsController
 import app.logdate.ui.platform.rememberSystemReduceMotion
 import app.logdate.ui.provenance.LocalWatchProvenanceVisible
 import app.logdate.ui.theme.LogDateTheme
-import app.logdate.ui.workspace.LocalWorkspaceDismissDetail
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
 import io.github.aakira.napier.Napier
 import kotlinx.datetime.LocalDate
 import org.koin.compose.koinInject
-import kotlin.uuid.Uuid
 
 /**
  * Multiplatform Navigation 3 root for the LogDate app.
@@ -110,8 +114,8 @@ import kotlin.uuid.Uuid
  * Each feature module exposes its own `xEntry()` extensions on `EntryProviderScope<NavKey>`
  * so this root never imports a screen composable directly — the modular navigation contract
  * lives in the feature modules themselves. Routes that don't yet have a per-module helper
- * are registered inline via [taggedEntry]; tagging is required so [HomeSceneStrategy] can
- * recover the route type from `NavEntry.metadata`.
+ * are registered inline via [taggedEntry]. Registrations declare presentation and related content
+ * context for [RelatedContentSceneStrategy] in `NavEntry.metadata`.
  *
  * Every concrete `NavKey` subtype must be registered in [appNavSavedStateConfiguration] for
  * save-state to round-trip on iOS / web.
@@ -126,7 +130,7 @@ fun LogDateNavDisplay(
     onCurrentNavKeyChanged: (NavKey?) -> Unit = {},
     onShareSearchResult: ((SearchResult) -> Unit)? = null,
     onCloudSignIn: () -> Unit = {},
-    sceneStrategy: SceneStrategy<NavKey> = rememberHomeSceneStrategy(),
+    sceneStrategy: SceneStrategy<NavKey> = rememberRelatedContentSceneStrategy(),
     shortcutRequests: AppShortcutRequests? = null,
 ) {
     val workspaceFlags: FeatureFlagStore = koinInject()
@@ -214,7 +218,6 @@ fun LogDateNavDisplay(
                 LocalWorkspaceEnabled provides workspaceEnabled,
                 LocalWatchProvenanceVisible provides watchExperienceEnabled,
                 app.logdate.ui.workspace.LocalWorkspaceSearchAction provides { backStack.add(SearchRoute()) },
-                LocalWorkspaceDismissDetail provides { if (backStack.lastOrNull() != HomeRoute) backStack.removeLastOrNull() },
                 LocalPlatformHaptics provides haptics,
                 LocalLogDateHaptics provides logDateHaptics,
             ) {
@@ -227,7 +230,7 @@ fun LogDateNavDisplay(
                         NavDisplay(
                             backStack = backStack,
                             onBack = { backStack.removeLastOrNull() },
-                            sceneStrategies = listOf(sceneStrategy),
+                            sceneStrategies = listOf(rememberSettingsActivitySceneStrategy(), sceneStrategy),
                             modifier =
                                 Modifier
                                     .iosEdgeSwipeBack(
@@ -246,7 +249,7 @@ fun LogDateNavDisplay(
                             entryProvider =
                                 entryProvider {
                                     taggedEntry<BaseRoute> { /* loading placeholder */ }
-                                    taggedEntry<HomeRoute> {
+                                    taggedEntry<HomeRoute>(metadata = ActivityPresentation.Home.asMetadata()) {
                                         HomeScreen(
                                             onNewEntry = { backStack.add(EntryEditorRoute()) },
                                             onOpenJournal = { backStack.add(JournalDetailsRoute(it)) },
@@ -292,14 +295,15 @@ fun LogDateNavDisplay(
                                     }
                                     syncIssuesEntry(onBack = { backStack.removeLastOrNull() })
                                     journalEntries(
-                                        onOpenJournal = { backStack.add(JournalDetailsRoute(it)) },
+                                        onOpenJournal = { backStack.selectJournal(it) },
                                         onCreateJournal = { backStack.add(JournalCreationRoute()) },
                                         onBack = { backStack.removeLastOrNull() },
                                         onJournalDeleted = {
                                             backStack.clear()
                                             backStack.add(JournalsOverviewRoute)
                                         },
-                                        onOpenNote = { backStack.add(NoteDetailRoute(it)) },
+                                        onOpenNote = { noteId, journalId -> backStack.selectJournalNote(noteId, journalId) },
+                                        onNavigateToNote = { noteId, journalId -> backStack.replaceNoteDetail(noteId, journalId) },
                                         onOpenEditorForJournal = { journalId ->
                                             backStack.add(EntryEditorRoute(journalIds = listOf(journalId.toString())))
                                         },
@@ -361,9 +365,12 @@ fun LogDateNavDisplay(
                                                 null
                                             },
                                         onNavigateTo = { route -> backStack.add(route) },
+                                        onNavigateToCategory = { backStack.navigateToSettingsCategory(it) },
                                     )
                                     if (isWatchSupported) {
                                         watchEntries(
+                                            onNavigateToCategory = { backStack.navigateToSettingsCategory(it) },
+                                            onNavigateToProfile = { backStack.add(ProfileRoute) },
                                             onBack = { backStack.removeLastOrNull() },
                                             onNavigateToNotifications = { backStack.add(WatchNotificationSettingsRoute) },
                                             onNavigateToTroubleshooting = { backStack.add(WatchTroubleshootingRoute) },
@@ -419,7 +426,9 @@ fun LogDateNavDisplay(
                                         )
                                     }
                                     // Timeline per-day detail
-                                    taggedEntry<TimelineDetailRoute> { route ->
+                                    taggedEntry<TimelineDetailRoute>(
+                                        metadata = ActivityPresentation.Detail("timeline").asMetadata(),
+                                    ) { route ->
                                         TimelineDetailEntry(
                                             date = LocalDate.parse(route.dateIso),
                                             scrollToEntryId = route.entryId,
@@ -449,46 +458,3 @@ private fun <T : Any> rememberNavAnimatedVisibilityScopeEntryDecorator(): NavEnt
             }
         }
     }
-
-/**
- * Wraps the existing `TimelineDayDetailPanel` (which lives in client/feature/timeline) so the
- * NavDisplay entry stays small. Mirrors the legacy `TimelineDetailScreen` from the
- * androidx.navigation.compose graph.
- */
-@Composable
-private fun TimelineDetailEntry(
-    date: LocalDate,
-    scrollToEntryId: String?,
-    onClose: () -> Unit,
-    onOpenLocations: () -> Unit,
-    onOpenEvent: (eventId: String) -> Unit,
-    onOpenNote: (Uuid) -> Unit,
-) {
-    val viewModel: app.logdate.feature.core.main.HomeViewModel =
-        org.koin.compose.viewmodel
-            .koinViewModel()
-    LaunchedEffect(date) { viewModel.selectDay(date) }
-    val uiState by viewModel.uiState.collectAsState()
-    val transcriptionState by viewModel.transcriptionState.collectAsState()
-    uiState.selectedDay?.let { selected ->
-        LaunchedEffect(selected) {
-            viewModel.updateVisibleAudioNoteIds(
-                selected.notes
-                    .filterIsInstance<app.logdate.ui.timeline.AudioNoteUiState>()
-                    .map { note -> note.noteId }
-                    .toSet(),
-            )
-        }
-        app.logdate.ui.audio.TranscriptionProvider(transcriptionState) {
-            app.logdate.feature.timeline.ui.details.TimelineDayDetailPanel(
-                uiState = selected,
-                scrollToEntryId = scrollToEntryId,
-                onExit = onClose,
-                onOpenEvent = onOpenEvent,
-                onAttachNoteToEvent = viewModel::attachNoteToEvent,
-                onOpenLocations = onOpenLocations,
-                onNoteClick = onOpenNote,
-            )
-        }
-    }
-}

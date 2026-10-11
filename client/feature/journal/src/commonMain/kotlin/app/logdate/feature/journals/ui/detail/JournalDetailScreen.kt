@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
@@ -24,17 +23,13 @@ import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -44,18 +39,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.feature.journals.ui.merge.journalMergeAvailability
 import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.ui.LocalNavAnimatedVisibilityScope
 import app.logdate.ui.LocalSharedTransitionScope
-import app.logdate.ui.adaptive.FoldableBookLayout
 import app.logdate.ui.common.LocalHomeScreenPins
 import app.logdate.ui.common.transitions.TransitionKeys
 import app.logdate.ui.theme.Spacing
 import app.logdate.ui.workspace.LocalWorkspaceEnabled
-import app.logdate.ui.workspace.PanelHeader
 import app.logdate.ui.workspace.WorkspacePanel
 import logdate.client.feature.journal.generated.resources.Res
 import logdate.client.feature.journal.generated.resources.journal_add_to_home_screen
@@ -161,7 +153,6 @@ fun JournalDetailScreenContent(
 ) {
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
     when (uiState) {
         is JournalDetailUiState.Loading -> {
@@ -189,232 +180,201 @@ fun JournalDetailScreenContent(
                 }
             val hasMedia = mediaEntries.isNotEmpty()
 
-            if (LocalWorkspaceEnabled.current) {
-                WorkspacePanel(modifier) {
-                    Column(Modifier.fillMaxSize()) {
-                        PanelHeader(uiState.title, actions = {
-                            IconButton(onClick = onGoBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back to journals") }
-                            Box {
-                                IconButton(onClick = { showAddMenu = true }) { Icon(Icons.Rounded.Add, "Add to journal") }
-                                JournalAddMenu(
-                                    expanded = showAddMenu,
-                                    onDismiss = { showAddMenu = false },
-                                    onCreateEntry = onOpenEditor,
-                                    onAddExistingContent = onOpenContentPicker,
-                                )
-                            }
-                            Box {
-                                IconButton(onClick = { showOverflowMenu = true }) { Icon(Icons.Rounded.MoreVert, "Journal options") }
-                                DropdownMenu(showOverflowMenu, { showOverflowMenu = false }) {
-                                    DropdownMenuItem(text = { Text("Change order") }, onClick = {
-                                        showOverflowMenu = false
-                                        onToggleSortOrder()
-                                    })
-                                    DropdownMenuItem(text = { Text("Share journal") }, onClick = {
-                                        showOverflowMenu = false
-                                        onNavigateToShare(uiState.journalId)
-                                    })
-                                    DropdownMenuItem(text = { Text("Journal settings") }, onClick = {
-                                        showOverflowMenu = false
-                                        onNavigateToSettings(uiState.journalId)
-                                    })
-                                    AddToHomeScreenItem(uiState) { showOverflowMenu = false }
-                                    if (mergeEnabled) {
-                                        DropdownMenuItem(text = { Text(stringResource(Res.string.journal_merge_action)) }, onClick = {
+            JournalReadingFrame(modifier) { contextVisible ->
+                if (LocalWorkspaceEnabled.current) {
+                    WorkspacePanel(Modifier.fillMaxSize()) {
+                        Column(Modifier.fillMaxSize()) {
+                            JournalReadingHeader(if (contextVisible) "Journal" else uiState.title, onGoBack, actions = {
+                                Box {
+                                    IconButton(onClick = { showAddMenu = true }) { Icon(Icons.Rounded.Add, "Add to journal") }
+                                    JournalAddMenu(
+                                        expanded = showAddMenu,
+                                        onDismiss = { showAddMenu = false },
+                                        onCreateEntry = onOpenEditor,
+                                        onAddExistingContent = onOpenContentPicker,
+                                    )
+                                }
+                                Box {
+                                    IconButton(onClick = { showOverflowMenu = true }) { Icon(Icons.Rounded.MoreVert, "Journal options") }
+                                    DropdownMenu(showOverflowMenu, { showOverflowMenu = false }) {
+                                        DropdownMenuItem(text = { Text("Change order") }, onClick = {
                                             showOverflowMenu = false
-                                            onNavigateToMerge(uiState.journalId)
+                                            onToggleSortOrder()
+                                        })
+                                        DropdownMenuItem(text = { Text("Share journal") }, onClick = {
+                                            showOverflowMenu = false
+                                            onNavigateToShare(uiState.journalId)
+                                        })
+                                        DropdownMenuItem(text = { Text("Journal settings") }, onClick = {
+                                            showOverflowMenu = false
+                                            onNavigateToSettings(uiState.journalId)
+                                        })
+                                        AddToHomeScreenItem(uiState) { showOverflowMenu = false }
+                                        if (mergeEnabled) {
+                                            DropdownMenuItem(text = { Text(stringResource(Res.string.journal_merge_action)) }, onClick = {
+                                                showOverflowMenu = false
+                                                onNavigateToMerge(uiState.journalId)
+                                            })
+                                        }
+                                        DropdownMenuItem(text = { Text("Delete journal") }, onClick = {
+                                            showOverflowMenu = false
+                                            onRequestDelete()
                                         })
                                     }
-                                    DropdownMenuItem(text = { Text("Delete journal") }, onClick = {
-                                        showOverflowMenu = false
-                                        onRequestDelete()
-                                    })
                                 }
-                            }
-                        })
-                        JournalDetailEntriesPane(
-                            uiState,
-                            mediaEntries,
-                            hasMedia,
-                            selectedTab,
-                            { selectedTab = it },
-                            onNavigateToNoteDetail,
-                            onRemoveNoteFromJournal,
-                            true,
-                            Modifier.weight(1f).fillMaxWidth(),
-                        )
-                        SnackbarHost(snackbarHostState)
-                    }
-                }
-            } else {
-                Scaffold(
-                    modifier =
-                        modifier
-                            .nestedScroll(scrollBehavior.nestedScrollConnection)
-                            .let { baseModifier ->
-                                if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                                    with(sharedTransitionScope) {
-                                        baseModifier.sharedElement(
-                                            rememberSharedContentState(
-                                                TransitionKeys.journalContainerTransition(uiState.journalId),
-                                            ),
-                                            animatedVisibilityScope,
-                                        )
-                                    }
-                                } else {
-                                    baseModifier
-                                }
-                            },
-                    contentWindowInsets = WindowInsets.navigationBars,
-                    snackbarHost = { SnackbarHost(snackbarHostState) },
-                    floatingActionButton = {
-                        Box {
-                            FloatingActionButton(onClick = { showAddMenu = true }) {
-                                Icon(Icons.Rounded.Add, contentDescription = "Add to journal")
-                            }
-                            JournalAddMenu(
-                                expanded = showAddMenu,
-                                onDismiss = { showAddMenu = false },
-                                onCreateEntry = onOpenEditor,
-                                onAddExistingContent = onOpenContentPicker,
-                            )
-                        }
-                    },
-                    topBar = {
-                        LargeTopAppBar(
-                            title = { Text(uiState.title) },
-                            navigationIcon = {
-                                IconButton(onClick = onGoBack) {
-                                    Icon(
-                                        Icons.AutoMirrored.Rounded.ArrowBack,
-                                        contentDescription = stringResource(UiRes.string.common_back),
-                                    )
-                                }
-                            },
-                            scrollBehavior = scrollBehavior,
-                            actions = {
-                                IconButton(onClick = onToggleSortOrder) {
-                                    val sortIcon =
-                                        if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
-                                            Icons.Rounded.ArrowDownward
-                                        } else {
-                                            Icons.Rounded.ArrowUpward
-                                        }
-
-                                    val description =
-                                        if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
-                                            "Sorted: Newest first (click to show oldest first)"
-                                        } else {
-                                            "Sorted: Oldest first (click to show newest first)"
-                                        }
-
-                                    Icon(
-                                        sortIcon,
-                                        contentDescription = description,
-                                    )
-                                }
-
-                                Box {
-                                    IconButton(onClick = { showOverflowMenu = true }) {
-                                        Icon(
-                                            Icons.Rounded.MoreVert,
-                                            contentDescription = stringResource(Res.string.journal_settings_label),
-                                        )
-                                    }
-                                    DropdownMenu(
-                                        expanded = showOverflowMenu,
-                                        onDismissRequest = { showOverflowMenu = false },
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text(stringResource(Res.string.journal_share_label)) },
-                                            onClick = {
-                                                showOverflowMenu = false
-                                                onNavigateToShare(uiState.journalId)
-                                            },
-                                            leadingIcon = {
-                                                Icon(Icons.Rounded.Share, contentDescription = null)
-                                            },
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text(stringResource(Res.string.journal_settings_label)) },
-                                            onClick = {
-                                                showOverflowMenu = false
-                                                onNavigateToSettings(uiState.journalId)
-                                            },
-                                            leadingIcon = {
-                                                Icon(Icons.Rounded.Settings, contentDescription = null)
-                                            },
-                                        )
-                                        if (mergeEnabled) {
-                                            DropdownMenuItem(
-                                                text = { Text(stringResource(Res.string.journal_merge_action)) },
-                                                onClick = {
-                                                    showOverflowMenu = false
-                                                    onNavigateToMerge(uiState.journalId)
-                                                },
-                                                leadingIcon = { Icon(Icons.Rounded.Merge, contentDescription = null) },
-                                            )
-                                        }
-                                        DropdownMenuItem(
-                                            text = { Text(stringResource(Res.string.journal_delete_label)) },
-                                            onClick = {
-                                                showOverflowMenu = false
-                                                onRequestDelete()
-                                            },
-                                            leadingIcon = {
-                                                Icon(Icons.Rounded.DeleteOutline, contentDescription = null)
-                                            },
-                                        )
-                                    }
-                                }
-                            },
-                        )
-                    },
-                ) { paddingValues ->
-                    FoldableBookLayout(
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .padding(paddingValues),
-                        startPane = {
-                            JournalDetailBookSummaryPane(
+                            })
+                            JournalReadingContent(
                                 uiState = uiState,
+                                mediaEntries = mediaEntries,
+                                hasMedia = hasMedia,
+                                selectedTab = selectedTab,
+                                onSelectTab = { selectedTab = it },
+                                onNavigateToNoteDetail = onNavigateToNoteDetail,
+                                onRemoveNoteFromJournal = onRemoveNoteFromJournal,
                                 onToggleSortOrder = onToggleSortOrder,
                                 onNavigateToShare = onNavigateToShare,
                                 onNavigateToSettings = onNavigateToSettings,
                                 onRequestDelete = onRequestDelete,
                                 mergeEnabled = mergeEnabled,
                                 onNavigateToMerge = onNavigateToMerge,
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                                contextVisible = contextVisible,
+                            )
+                            SnackbarHost(snackbarHostState)
+                        }
+                    }
+                } else {
+                    Scaffold(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .let { baseModifier ->
+                                    if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                                        with(sharedTransitionScope) {
+                                            baseModifier.sharedElement(
+                                                rememberSharedContentState(
+                                                    TransitionKeys.journalContainerTransition(uiState.journalId),
+                                                ),
+                                                animatedVisibilityScope,
+                                            )
+                                        }
+                                    } else {
+                                        baseModifier
+                                    }
+                                },
+                        contentWindowInsets = WindowInsets.navigationBars,
+                        snackbarHost = { SnackbarHost(snackbarHostState) },
+                        topBar = {
+                            JournalReadingHeader(
+                                title = if (contextVisible) "Journal" else uiState.title,
+                                onGoBack = onGoBack,
+                                backDescription = stringResource(UiRes.string.common_back),
+                                actions = {
+                                    Box {
+                                        IconButton(onClick = { showAddMenu = true }) { Icon(Icons.Rounded.Add, "Add to journal") }
+                                        JournalAddMenu(
+                                            expanded = showAddMenu,
+                                            onDismiss = { showAddMenu = false },
+                                            onCreateEntry = onOpenEditor,
+                                            onAddExistingContent = onOpenContentPicker,
+                                        )
+                                    }
+                                    IconButton(onClick = onToggleSortOrder) {
+                                        val sortIcon =
+                                            if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
+                                                Icons.Rounded.ArrowDownward
+                                            } else {
+                                                Icons.Rounded.ArrowUpward
+                                            }
+
+                                        val description =
+                                            if (uiState.sortOrder == SortOrder.NEWEST_FIRST) {
+                                                "Sorted: Newest first (click to show oldest first)"
+                                            } else {
+                                                "Sorted: Oldest first (click to show newest first)"
+                                            }
+
+                                        Icon(
+                                            sortIcon,
+                                            contentDescription = description,
+                                        )
+                                    }
+
+                                    Box {
+                                        IconButton(onClick = { showOverflowMenu = true }) {
+                                            Icon(
+                                                Icons.Rounded.MoreVert,
+                                                contentDescription = stringResource(Res.string.journal_settings_label),
+                                            )
+                                        }
+                                        DropdownMenu(
+                                            expanded = showOverflowMenu,
+                                            onDismissRequest = { showOverflowMenu = false },
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text(stringResource(Res.string.journal_share_label)) },
+                                                onClick = {
+                                                    showOverflowMenu = false
+                                                    onNavigateToShare(uiState.journalId)
+                                                },
+                                                leadingIcon = {
+                                                    Icon(Icons.Rounded.Share, contentDescription = null)
+                                                },
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text(stringResource(Res.string.journal_settings_label)) },
+                                                onClick = {
+                                                    showOverflowMenu = false
+                                                    onNavigateToSettings(uiState.journalId)
+                                                },
+                                                leadingIcon = {
+                                                    Icon(Icons.Rounded.Settings, contentDescription = null)
+                                                },
+                                            )
+                                            if (mergeEnabled) {
+                                                DropdownMenuItem(
+                                                    text = { Text(stringResource(Res.string.journal_merge_action)) },
+                                                    onClick = {
+                                                        showOverflowMenu = false
+                                                        onNavigateToMerge(uiState.journalId)
+                                                    },
+                                                    leadingIcon = { Icon(Icons.Rounded.Merge, contentDescription = null) },
+                                                )
+                                            }
+                                            DropdownMenuItem(
+                                                text = { Text(stringResource(Res.string.journal_delete_label)) },
+                                                onClick = {
+                                                    showOverflowMenu = false
+                                                    onRequestDelete()
+                                                },
+                                                leadingIcon = {
+                                                    Icon(Icons.Rounded.DeleteOutline, contentDescription = null)
+                                                },
+                                            )
+                                        }
+                                    }
+                                },
                             )
                         },
-                        endPane = {
-                            JournalDetailEntriesPane(
-                                uiState = uiState,
-                                mediaEntries = mediaEntries,
-                                hasMedia = hasMedia,
-                                selectedTab = selectedTab,
-                                onSelectTab = { selectedTab = it },
-                                onNavigateToNoteDetail = onNavigateToNoteDetail,
-                                onRemoveNoteFromJournal = onRemoveNoteFromJournal,
-                                constrainContentWidth = false,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        },
-                        standardContent = {
-                            JournalDetailEntriesPane(
-                                uiState = uiState,
-                                mediaEntries = mediaEntries,
-                                hasMedia = hasMedia,
-                                selectedTab = selectedTab,
-                                onSelectTab = { selectedTab = it },
-                                onNavigateToNoteDetail = onNavigateToNoteDetail,
-                                onRemoveNoteFromJournal = onRemoveNoteFromJournal,
-                                constrainContentWidth = true,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        },
-                    )
+                    ) { paddingValues ->
+                        JournalReadingContent(
+                            uiState = uiState,
+                            mediaEntries = mediaEntries,
+                            hasMedia = hasMedia,
+                            selectedTab = selectedTab,
+                            onSelectTab = { selectedTab = it },
+                            onNavigateToNoteDetail = onNavigateToNoteDetail,
+                            onRemoveNoteFromJournal = onRemoveNoteFromJournal,
+                            onToggleSortOrder = onToggleSortOrder,
+                            onNavigateToShare = onNavigateToShare,
+                            onNavigateToSettings = onNavigateToSettings,
+                            onRequestDelete = onRequestDelete,
+                            mergeEnabled = mergeEnabled,
+                            onNavigateToMerge = onNavigateToMerge,
+                            modifier = Modifier.fillMaxSize().padding(paddingValues),
+                            contextVisible = contextVisible,
+                        )
+                    }
                 }
             }
 

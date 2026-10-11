@@ -37,20 +37,26 @@ fun JournalMergeScreen(
         if (enabled == false) onBack()
     }
     val state by viewModel.uiState.collectAsState()
-    LaunchedEffect(state.stage) {
-        (state.stage as? JournalMergeStage.Complete)?.let { onJournalMerged(it.operation) }
+    val back: () -> Unit = {
+        when {
+            state.stage == JournalMergeStage.Picker && state.editingSelection -> viewModel.restoreReview()
+            state.stage is JournalMergeStage.Review -> viewModel.changeDestination(returnToReview = false)
+            state.stage == JournalMergeStage.Picker -> onBack()
+        }
     }
-    PlatformBackHandler(enabled = state.stage is JournalMergeStage.Review || state.stage is JournalMergeStage.Merging) {
-        viewModel.changeDestination()
-    }
+    PlatformBackHandler(enabled = state.stage != JournalMergeStage.Picker || state.editingSelection, onBack = back)
     if (enabled != true) return
-    JournalMergeScreenContent(
-        state = state,
-        onBack = { if (state.stage is JournalMergeStage.Review) viewModel.changeDestination() else onBack() },
-        onQueryChange = viewModel::updateQuery,
-        onChoose = viewModel::choose,
-        onChangeDestination = viewModel::changeDestination,
-        onConfirm = viewModel::confirm,
-        onCancel = onBack,
-    )
+    JournalMergePresentation(state, onJournalMerged) { presented, onSettled ->
+        JournalMergeScreenContent(
+            state = presented,
+            onBack = back,
+            onQueryChange = viewModel::updateQuery,
+            onChoose = viewModel::choose,
+            onChangeDestination = { viewModel.changeDestination() },
+            onChangeSource = viewModel::changeSource,
+            onConfirm = viewModel::confirm,
+            onCancel = onBack,
+            onMergeAnimationFinished = onSettled,
+        )
+    }
 }

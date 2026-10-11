@@ -35,8 +35,6 @@ enum class PanelContainment { Working, Collection }
 val LocalWorkspaceHosted = staticCompositionLocalOf { false }
 val LocalWorkspaceEnabled = staticCompositionLocalOf { false }
 val LocalPanelLayoutInfo = staticCompositionLocalOf<PanelLayoutInfo?> { null }
-val LocalWorkspaceDismissDetail = staticCompositionLocalOf<() -> Unit> { {} }
-val LocalWorkspaceDetail = staticCompositionLocalOf<(@Composable () -> Unit)?> { null }
 
 /** Contained controls inherit the canvas; only an overlapping sticky bar needs a backdrop. */
 @Composable
