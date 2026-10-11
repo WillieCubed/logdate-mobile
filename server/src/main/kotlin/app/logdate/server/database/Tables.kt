@@ -391,7 +391,7 @@ object LogDateAtprotoBlobsTable : Table("logdate_atproto_blobs") {
     }
 }
 
-/** Mirrors V34: one row per linked device session. */
+/** Mirrors V39: one row per linked device session. */
 object DeviceSessionsTable : Table("device_sessions") {
     val id = javaUUID("id")
     val accountId = javaUUID("account_id").references(AccountsTable.id, onDelete = ReferenceOption.CASCADE)
@@ -409,7 +409,7 @@ object DeviceSessionsTable : Table("device_sessions") {
     }
 }
 
-/** Mirrors V34: one row per minted link code, keyed by the SHA-256 hash of the code's bytes. */
+/** Mirrors V39: one row per minted link code, keyed by the SHA-256 hash of the code's bytes. */
 object DeviceLinkCodesTable : Table("device_link_codes") {
     val codeHash = varchar("code_hash", 64)
     val accountId = javaUUID("account_id").references(AccountsTable.id, onDelete = ReferenceOption.CASCADE)
