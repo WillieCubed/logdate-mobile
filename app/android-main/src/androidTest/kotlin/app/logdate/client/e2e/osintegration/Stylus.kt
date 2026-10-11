@@ -128,8 +128,18 @@ class Stylus {
             val hump = listOf(at(0f, 0.6f), at(0.2f, 0.9f), at(0.5f, 1f), at(0.75f, 0.8f), at(0.8f, 0.5f), at(0.8f, 0f))
             val e =
                 listOf(
-                    at(1.2f, 0.5f), at(1.6f, 0.5f), at(1.95f, 0.5f), at(1.92f, 0.75f), at(1.75f, 0.96f), at(1.55f, 1f),
-                    at(1.35f, 0.88f), at(1.22f, 0.45f), at(1.27f, 0.12f), at(1.47f, 0f), at(1.72f, -0.02f), at(1.97f, 0.12f),
+                    at(1.2f, 0.5f),
+                    at(1.6f, 0.5f),
+                    at(1.95f, 0.5f),
+                    at(1.92f, 0.75f),
+                    at(1.75f, 0.96f),
+                    at(1.55f, 1f),
+                    at(1.35f, 0.88f),
+                    at(1.22f, 0.45f),
+                    at(1.27f, 0.12f),
+                    at(1.47f, 0f),
+                    at(1.72f, -0.02f),
+                    at(1.97f, 0.12f),
                 )
             val o =
                 (0..13).map { step ->

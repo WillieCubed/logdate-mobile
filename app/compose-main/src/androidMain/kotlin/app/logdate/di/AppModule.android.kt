@@ -73,8 +73,6 @@ import app.logdate.client.sync.WatchNoteArrivalNotifier
 import app.logdate.client.sync.WatchNoteIngestor
 import app.logdate.client.sync.WatchNoteNotifier
 import app.logdate.client.sync.datalayer.NoteDataMapper
-import app.logdate.client.tiles.RecordVoiceTileUpdater
-import app.logdate.client.tiles.RecordingWindowTracker
 import app.logdate.client.sync.datalayer.v2.WearProtocol
 import app.logdate.client.sync.datalayer.v2.WearProtocolGate
 import app.logdate.client.sync.peer.state.LocalCapabilities
@@ -84,6 +82,8 @@ import app.logdate.client.sync.peer.state.PeerStateStore
 import app.logdate.client.sync.peer.state.StateDocumentChannel
 import app.logdate.client.sync.v2.PhonePeerLink
 import app.logdate.client.sync.v2.PhoneStatePublisher
+import app.logdate.client.tiles.RecordVoiceTileUpdater
+import app.logdate.client.tiles.RecordingWindowTracker
 import app.logdate.client.updates.PlayInAppUpdateController
 import app.logdate.client.watch.AndroidCompanionDeviceClient
 import app.logdate.client.watch.AndroidWatchConnectionManager

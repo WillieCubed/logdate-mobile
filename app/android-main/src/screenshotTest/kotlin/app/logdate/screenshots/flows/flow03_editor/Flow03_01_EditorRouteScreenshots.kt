@@ -5,7 +5,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import app.logdate.client.repository.journals.EntryDraft
 import app.logdate.client.repository.journals.JournalNote
-import app.logdate.ui.audio.model.AudioPalette
 import app.logdate.feature.editor.ui.MainEditorContent
 import app.logdate.feature.editor.ui.common.NoteEditorToolbar
 import app.logdate.feature.editor.ui.content.EditorBottomContent
@@ -18,11 +17,12 @@ import app.logdate.feature.editor.ui.editor.TextBlockUiState
 import app.logdate.feature.editor.ui.editor.VideoBlockUiState
 import app.logdate.feature.editor.ui.layout.ImmersiveEditorLayout
 import app.logdate.feature.editor.ui.state.BlocksUiState
-import app.logdate.ui.audio.expansion.SpatialExpandedAudioBlock
 import app.logdate.screenshots.common.BubbleWindowPreview
 import app.logdate.screenshots.common.ScreenshotPreviewMatrix
 import app.logdate.screenshots.common.ScreenshotTestData
 import app.logdate.screenshots.common.ScreenshotTheme
+import app.logdate.ui.audio.expansion.SpatialExpandedAudioBlock
+import app.logdate.ui.audio.model.AudioPalette
 import com.android.tools.screenshot.PreviewTest
 import kotlin.time.Instant
 import kotlin.uuid.Uuid

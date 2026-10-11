@@ -11,7 +11,8 @@ import kotlin.math.PI
 import kotlin.math.sin
 import kotlin.time.Duration.Companion.seconds
 
-private val speechLevels = List(64) { index -> (0.35f + 0.3f * sin(index * PI / 5).toFloat() + 0.2f * sin(index * PI / 13).toFloat()).coerceIn(0.05f, 1f) }
+private val speechLevels =
+    List(64) { index -> (0.35f + 0.3f * sin(index * PI / 5).toFloat() + 0.2f * sin(index * PI / 13).toFloat()).coerceIn(0.05f, 1f) }
 
 private val recording =
     RecorderBubbleState(

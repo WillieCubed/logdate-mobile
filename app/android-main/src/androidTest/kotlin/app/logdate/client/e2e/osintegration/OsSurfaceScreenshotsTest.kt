@@ -1,12 +1,14 @@
 package app.logdate.client.e2e.osintegration
 
 import android.app.HandoffActivityDataRequestInfo
+import android.content.Intent
 import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.Rect
 import android.os.Build
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityWindowInfo
+import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -18,6 +20,8 @@ import app.logdate.client.feature.widgets.FixedMemoryWidget
 import app.logdate.client.feature.widgets.NewEntryWidget
 import app.logdate.client.feature.widgets.OnThisDayWidget
 import app.logdate.client.feature.widgets.OnThisDayWidgetState
+import app.logdate.client.feature.widgets.shortcuts.DynamicShortcutDescriptor
+import app.logdate.client.shortcuts.DynamicShortcutScheduler
 import app.logdate.client.sync.SyncForegroundNotification
 import app.logdate.feature.core.export.ExportNotificationHelper
 import app.logdate.feature.core.restore.RestoreNotificationHelper
@@ -27,14 +31,10 @@ import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.koin.core.context.GlobalContext
 import java.util.regex.Pattern
 import kotlin.uuid.Uuid
 import app.logdate.client.sync.R as SyncR
-import org.koin.core.context.GlobalContext
-import app.logdate.client.shortcuts.DynamicShortcutScheduler
-import app.logdate.client.feature.widgets.shortcuts.DynamicShortcutDescriptor
-import androidx.core.content.pm.ShortcutManagerCompat
-import android.content.Intent
 
 /**
  * Real system UI captures for the Android OS integration surfaces.
@@ -78,6 +78,7 @@ class OsSurfaceScreenshotsTest {
 
         val pkg = OsSurfaceCapture.packageName
         val functions = "app.logdate.client.appfunctions.LogDateAppFunctions"
+
         // A settings change re-indexes LogDate's search schema, and the function registry can briefly
         // report a function as missing (code 1003) while that settles, so that answer is retried.
         fun execute(
@@ -276,7 +277,11 @@ class OsSurfaceScreenshotsTest {
         OsSurfaceCapture.capture(surface = "large-screens-and-desktop-windowing", state = "desktop-windows")
         // The labels Android holds for each window, which the caption bar and Recents may show.
         val labels = OsSurfaceCapture.shell("dumpsys activity activities").lines().filter { "taskDescription: label" in it }
-        OsSurfaceCapture.writeEvidence("large-screens-and-desktop-windowing", "desktop-window-labels", labels.joinToString("\n") { it.trim() })
+        OsSurfaceCapture.writeEvidence(
+            "large-screens-and-desktop-windowing",
+            "desktop-window-labels",
+            labels.joinToString("\n") { it.trim() },
+        )
 
         // Writing names the new window after the entry's first line. Android 17's Alt+Tab switcher
         // reads each window out by that name, which tells two editor windows apart.
@@ -286,12 +291,16 @@ class OsSurfaceScreenshotsTest {
         Thread.sleep(1_500L)
         // The switcher keeps the names it last read and reads them again when the window order
         // changes, so the Journals window comes forward first.
-        OsSurfaceCapture.shell("am start --windowingMode $WINDOWING_MODE_FREEFORM -n ${OsSurfaceCapture.packageName}/app.logdate.client.MainActivity")
+        OsSurfaceCapture.shell(
+            "am start --windowingMode $WINDOWING_MODE_FREEFORM -n ${OsSurfaceCapture.packageName}/app.logdate.client.MainActivity",
+        )
         Thread.sleep(1_500L)
         HardwareKeyboard().use { keyboard ->
             keyboard.hold(HardwareKeyboard.KEY_LEFTALT, HardwareKeyboard.KEY_TAB)
             keyboard.release(HardwareKeyboard.KEY_TAB)
-            checkNotNull(OsSurfaceCapture.device.wait(Until.findObject(By.desc(SWITCHER_ITEM)), 5_000L)) { "Alt+Tab did not open the switcher" }
+            checkNotNull(
+                OsSurfaceCapture.device.wait(Until.findObject(By.desc(SWITCHER_ITEM)), 5_000L),
+            ) { "Alt+Tab did not open the switcher" }
             Thread.sleep(1_000L)
             val names = OsSurfaceCapture.device.findObjects(By.desc(SWITCHER_ITEM)).map { it.contentDescription }
             OsSurfaceCapture.capture(surface = "large-screens-and-desktop-windowing", state = "alt-tab-switcher")
@@ -566,14 +575,18 @@ class OsSurfaceScreenshotsTest {
         )
         OsSurfaceCapture.onResumedActivity { it.finish() }
 
-        OsSurfaceCapture.shell("am start -n ${OsSurfaceCapture.packageName}/$EDITOR_ACTIVITY -f 0x10000000 --es $EXTRA_HANDOFF_DRAFT_ID $draftId")
+        OsSurfaceCapture.shell(
+            "am start -n ${OsSurfaceCapture.packageName}/$EDITOR_ACTIVITY -f 0x10000000 --es $EXTRA_HANDOFF_DRAFT_ID $draftId",
+        )
         OsSurfaceCapture.waitForText(HANDOFF_ENTRY)
         Thread.sleep(1_000L)
         OsSurfaceCapture.capture(surface = "large-screens-and-desktop-windowing", state = "editor-handoff-arrived")
         OsSurfaceCapture.onResumedActivity { it.finish() }
 
         // Backup is off on the managed device, so a draft that is not here can never arrive.
-        OsSurfaceCapture.shell("am start -n ${OsSurfaceCapture.packageName}/$EDITOR_ACTIVITY -f 0x10000000 --es $EXTRA_HANDOFF_DRAFT_ID ${Uuid.random()}")
+        OsSurfaceCapture.shell(
+            "am start -n ${OsSurfaceCapture.packageName}/$EDITOR_ACTIVITY -f 0x10000000 --es $EXTRA_HANDOFF_DRAFT_ID ${Uuid.random()}",
+        )
         OsSurfaceCapture.waitForText("Your entry hasn’t arrived")
         Thread.sleep(500L)
         OsSurfaceCapture.capture(surface = "large-screens-and-desktop-windowing", state = "editor-handoff-missing")
@@ -597,7 +610,10 @@ class OsSurfaceScreenshotsTest {
         awaitHandwritingModel(stylus, field)
         dismissStylusTutorial()
         hideOnScreenKeyboard()
-        val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+        val density =
+            InstrumentationRegistry
+                .getInstrumentation()
+                .targetContext.resources.displayMetrics.density
         val baseline = PointF(field.left + HANDWRITING_INSET_DP * density, field.top + HANDWRITING_BASELINE_DP * density)
         stylus.write(Stylus.hello(origin = baseline, unit = HANDWRITING_X_HEIGHT_DP * density)) {
             OsSurfaceCapture.capture(surface = "keyboard-pointer-drag-and-drop", state = "stylus-handwriting")
@@ -618,7 +634,10 @@ class OsSurfaceScreenshotsTest {
         // Something for the handwritten search to find.
         OsSurfaceCapture.createTextEntry("Said hello to the new neighbors on the walk home.")
         val stylus = Stylus()
-        val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+        val density =
+            InstrumentationRegistry
+                .getInstrumentation()
+                .targetContext.resources.displayMetrics.density
 
         // Gboard's handwriting model is fetched in the search field, which leaves the editor's
         // "Write something" card untouched for the capture.
@@ -705,8 +724,7 @@ class OsSurfaceScreenshotsTest {
         stylus: Stylus,
         field: Rect,
     ) {
-        fun ready() =
-            OsSurfaceCapture.shell("dumpsys input_method").lines().any { "handwriting_recognition" in it && "_reco_" in it }
+        fun ready() = OsSurfaceCapture.shell("dumpsys input_method").lines().any { "handwriting_recognition" in it && "_reco_" in it }
         if (ready()) return
         val y = field.centerY().toFloat()
         stylus.write(listOf(listOf(PointF(field.left + 100f, y), PointF(field.left + 160f, y))))

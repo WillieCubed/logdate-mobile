@@ -21,6 +21,8 @@ import android.view.MotionEvent
 import android.view.WindowManager
 import androidx.core.content.FileProvider
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
@@ -35,28 +37,26 @@ import app.logdate.client.domain.recommendation.AmbientCaptureNudgeStyle
 import app.logdate.client.domain.recommendation.AmbientPromptCandidate
 import app.logdate.client.domain.recommendation.AmbientPromptFamily
 import app.logdate.client.domain.recommendation.AmbientPromptPayload
+import app.logdate.client.media.AndroidManagedMediaDiscarder
+import app.logdate.client.media.AndroidManagedMediaImportSource
+import app.logdate.client.media.ManagedMediaImporter
+import app.logdate.client.media.MediaManager
 import app.logdate.client.media.audio.AudioRecordingManager
+import app.logdate.client.repository.journals.EntryDraftRepository
 import app.logdate.client.repository.journals.JournalNote
+import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.JournalRepository
 import app.logdate.client.repository.user.UserStateRepository
 import app.logdate.shared.model.Journal
-import app.logdate.client.repository.journals.JournalNotesRepository
-import app.logdate.client.media.MediaManager
-import app.logdate.client.media.ManagedMediaImporter
-import app.logdate.client.media.AndroidManagedMediaImportSource
-import app.logdate.client.media.AndroidManagedMediaDiscarder
-import app.logdate.client.repository.journals.EntryDraftRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
-import androidx.test.runner.lifecycle.Stage
-import kotlin.uuid.Uuid
 import kotlinx.datetime.TimeZone
 import org.koin.core.context.GlobalContext
 import java.io.File
 import java.util.regex.Pattern
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 /**
  * Captures real Android system UI (launcher, shade, notifications, bubbles) for the OS integration

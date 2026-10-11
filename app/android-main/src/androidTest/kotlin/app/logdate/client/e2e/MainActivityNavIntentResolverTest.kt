@@ -13,37 +13,37 @@ import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_EVENT_ID
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_RECALL_DATE
 import app.logdate.client.ambient.EXTRA_AMBIENT_PROMPT_TARGET
 import app.logdate.client.feature.widgets.EXTRA_WIDGET_NOTE_ID
-import app.logdate.client.feature.widgets.EXTRA_NAV_SOURCE as EXTRA_WIDGET_NAV_SOURCE
 import app.logdate.client.feature.widgets.NAV_SOURCE_FIXED_MEMORY_WIDGET
 import app.logdate.client.feature.widgets.NAV_SOURCE_NEW_ENTRY_WIDGET
-import app.logdate.client.location.tracking.EXTRA_NAV_SOURCE as EXTRA_LOCATION_NAV_SOURCE
 import app.logdate.client.location.tracking.NAV_SOURCE_LOCATION_HISTORY
-import app.logdate.client.media.audio.EXTRA_NAV_SOURCE as EXTRA_AUDIO_NAV_SOURCE
 import app.logdate.client.media.audio.EXTRA_NOTE_ID
 import app.logdate.client.media.audio.NAV_SOURCE_AUDIO_PLAYBACK
+import app.logdate.client.resolveMainActivityNavKey
 import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_ID
 import app.logdate.client.rewind.EXTRA_REWIND_NOTIFICATION_TARGET
 import app.logdate.client.rewind.REWIND_NOTIFICATION_TARGET_DETAIL
-import app.logdate.client.resolveMainActivityNavKey
-import app.logdate.feature.core.notifications.EXTRA_NAV_SOURCE as EXTRA_DATA_TRANSFER_NAV_SOURCE
-import app.logdate.feature.core.notifications.NAV_SOURCE_DATA_TRANSFER
-import app.logdate.feature.core.export.ExportNotificationHelper
-import app.logdate.feature.core.settings.navigation.ExportSettingsRoute
-import app.logdate.feature.core.restore.RestoreNotificationHelper
-import app.logdate.feature.core.restore.RestoreStage
 import app.logdate.client.ui.navigation.LocationTimelineRoute
 import app.logdate.client.ui.navigation.SearchRoute
+import app.logdate.feature.core.export.ExportNotificationHelper
+import app.logdate.feature.core.notifications.NAV_SOURCE_DATA_TRANSFER
+import app.logdate.feature.core.restore.RestoreNotificationHelper
+import app.logdate.feature.core.restore.RestoreStage
+import app.logdate.feature.core.settings.navigation.ExportSettingsRoute
 import app.logdate.feature.events.navigation.EventDetailRoute
 import app.logdate.feature.journals.navigation.JournalDetailsRoute
 import app.logdate.feature.journals.navigation.NoteDetailRoute
 import app.logdate.feature.rewind.navigation.RewindDetailRoute
 import app.logdate.navigation.TimelineDetailRoute
+import org.junit.runner.RunWith
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.uuid.Uuid
-import org.junit.runner.RunWith
+import app.logdate.client.feature.widgets.EXTRA_NAV_SOURCE as EXTRA_WIDGET_NAV_SOURCE
+import app.logdate.client.location.tracking.EXTRA_NAV_SOURCE as EXTRA_LOCATION_NAV_SOURCE
+import app.logdate.client.media.audio.EXTRA_NAV_SOURCE as EXTRA_AUDIO_NAV_SOURCE
+import app.logdate.feature.core.notifications.EXTRA_NAV_SOURCE as EXTRA_DATA_TRANSFER_NAV_SOURCE
 
 @RunWith(AndroidJUnit4::class)
 class MainActivityNavIntentResolverTest {
@@ -52,10 +52,12 @@ class MainActivityNavIntentResolverTest {
         val noteId = Uuid.random()
         assertEquals(
             NoteDetailRoute(noteId),
-            resolveMainActivityNavKey(Intent().apply {
-                putExtra(EXTRA_WIDGET_NAV_SOURCE, NAV_SOURCE_FIXED_MEMORY_WIDGET)
-                putExtra(EXTRA_WIDGET_NOTE_ID, noteId.toString())
-            }),
+            resolveMainActivityNavKey(
+                Intent().apply {
+                    putExtra(EXTRA_WIDGET_NAV_SOURCE, NAV_SOURCE_FIXED_MEMORY_WIDGET)
+                    putExtra(EXTRA_WIDGET_NOTE_ID, noteId.toString())
+                },
+            ),
         )
     }
 
@@ -63,22 +65,27 @@ class MainActivityNavIntentResolverTest {
     fun `new entry widget opens photo first with the selected input`() {
         val photoUri = "content://media/external/images/media/42"
         assertEquals(
-            app.logdate.feature.editor.navigation.EntryEditorRoute(promptPhotoUri = photoUri),
-            resolveMainActivityNavKey(Intent().apply {
-                putExtra(EXTRA_WIDGET_NAV_SOURCE, NAV_SOURCE_NEW_ENTRY_WIDGET)
-                putExtra(app.logdate.client.feature.widgets.EXTRA_WIDGET_PHOTO_URI, photoUri)
-            }),
+            app.logdate.feature.editor.navigation
+                .EntryEditorRoute(promptPhotoUri = photoUri),
+            resolveMainActivityNavKey(
+                Intent().apply {
+                    putExtra(EXTRA_WIDGET_NAV_SOURCE, NAV_SOURCE_NEW_ENTRY_WIDGET)
+                    putExtra(app.logdate.client.feature.widgets.EXTRA_WIDGET_PHOTO_URI, photoUri)
+                },
+            ),
         )
         assertEquals(
             app.logdate.feature.editor.navigation.EntryEditorRoute(
                 launchMode = app.logdate.feature.editor.navigation.EditorLaunchMode.Voice,
                 promptPhotoUri = photoUri,
             ),
-            resolveMainActivityNavKey(Intent().apply {
-                putExtra(EXTRA_WIDGET_NAV_SOURCE, NAV_SOURCE_NEW_ENTRY_WIDGET)
-                putExtra(app.logdate.client.feature.widgets.EXTRA_WIDGET_PHOTO_URI, photoUri)
-                putExtra(app.logdate.client.feature.widgets.EXTRA_WIDGET_RECORD, true)
-            }),
+            resolveMainActivityNavKey(
+                Intent().apply {
+                    putExtra(EXTRA_WIDGET_NAV_SOURCE, NAV_SOURCE_NEW_ENTRY_WIDGET)
+                    putExtra(app.logdate.client.feature.widgets.EXTRA_WIDGET_PHOTO_URI, photoUri)
+                    putExtra(app.logdate.client.feature.widgets.EXTRA_WIDGET_RECORD, true)
+                },
+            ),
         )
     }
 
@@ -88,12 +95,15 @@ class MainActivityNavIntentResolverTest {
             app.logdate.feature.editor.navigation.EntryEditorRoute(
                 launchMode = app.logdate.feature.editor.navigation.EditorLaunchMode.Camera,
             ),
-            resolveMainActivityNavKey(Intent().apply {
-                putExtra(EXTRA_WIDGET_NAV_SOURCE, NAV_SOURCE_NEW_ENTRY_WIDGET)
-                putExtra(app.logdate.client.feature.widgets.EXTRA_WIDGET_CAMERA, true)
-            }),
+            resolveMainActivityNavKey(
+                Intent().apply {
+                    putExtra(EXTRA_WIDGET_NAV_SOURCE, NAV_SOURCE_NEW_ENTRY_WIDGET)
+                    putExtra(app.logdate.client.feature.widgets.EXTRA_WIDGET_CAMERA, true)
+                },
+            ),
         )
     }
+
     @Test
     fun `capture action opens the editor in the requested mode with the journal selected`() {
         val journalId = Uuid.random()
@@ -102,10 +112,12 @@ class MainActivityNavIntentResolverTest {
                 launchMode = app.logdate.feature.editor.navigation.EditorLaunchMode.Voice,
                 journalIds = listOf(journalId.toString()),
             ),
-            resolveMainActivityNavKey(Intent(app.logdate.client.capture.ACTION_CAPTURE).apply {
-                putExtra(app.logdate.client.capture.EXTRA_CAPTURE_MODE, "voice")
-                putExtra(app.logdate.client.capture.EXTRA_CAPTURE_JOURNAL_ID, journalId.toString())
-            }),
+            resolveMainActivityNavKey(
+                Intent(app.logdate.client.capture.ACTION_CAPTURE).apply {
+                    putExtra(app.logdate.client.capture.EXTRA_CAPTURE_MODE, "voice")
+                    putExtra(app.logdate.client.capture.EXTRA_CAPTURE_JOURNAL_ID, journalId.toString())
+                },
+            ),
         )
     }
 
@@ -170,7 +182,8 @@ class MainActivityNavIntentResolverTest {
     @Test
     fun `ambient prompt new entry intent resolves entry editor route`() {
         assertEquals(
-            app.logdate.feature.editor.navigation.EntryEditorRoute(),
+            app.logdate.feature.editor.navigation
+                .EntryEditorRoute(),
             resolveMainActivityNavKey(
                 Intent().apply {
                     putExtra(EXTRA_AMBIENT_PROMPT_TARGET, AMBIENT_PROMPT_TARGET_NEW_ENTRY)
@@ -184,7 +197,8 @@ class MainActivityNavIntentResolverTest {
         val draftId = Uuid.random().toString()
 
         assertEquals(
-            app.logdate.feature.editor.navigation.EntryEditorRoute(draftId = draftId),
+            app.logdate.feature.editor.navigation
+                .EntryEditorRoute(draftId = draftId),
             resolveMainActivityNavKey(
                 Intent().apply {
                     putExtra(EXTRA_AMBIENT_PROMPT_TARGET, AMBIENT_PROMPT_TARGET_DRAFT)

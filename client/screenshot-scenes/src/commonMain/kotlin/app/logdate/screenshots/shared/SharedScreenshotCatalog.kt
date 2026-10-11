@@ -84,10 +84,10 @@ import app.logdate.feature.core.settings.ui.VoiceNotesSettingsViewModel
 import app.logdate.feature.core.settings.ui.devices.DeviceInfoUiState
 import app.logdate.feature.core.settings.ui.devices.DevicesScreenContent
 import app.logdate.feature.core.settings.ui.devices.DevicesUiState
-import app.logdate.feature.core.settings.ui.osIntegrationPreviewFlags
 import app.logdate.feature.core.settings.ui.labs.LabsFlag
 import app.logdate.feature.core.settings.ui.labs.LabsSettingsContent
 import app.logdate.feature.core.settings.ui.labs.LabsUiState
+import app.logdate.feature.core.settings.ui.osIntegrationPreviewFlags
 import app.logdate.feature.core.settings.updates.AppUpdateStatus
 import app.logdate.feature.core.settings.updates.AppUpdateUiState
 import app.logdate.feature.events.ui.calendarsync.CalendarSyncOverviewUiState
