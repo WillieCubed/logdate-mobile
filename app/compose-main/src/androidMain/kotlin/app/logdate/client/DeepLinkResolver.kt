@@ -202,7 +202,7 @@ private inline fun <T : NavKey> String.parseUuidTo(create: (Uuid) -> T): T? = ru
 
 private inline fun <T : NavKey> String.parseDateString(create: (String) -> T): T? =
     runCatching {
-        kotlinx.datetime.LocalDate.parse(this)
+        LocalDate.parse(this)
         create(this)
     }.getOrNull()
 
@@ -215,6 +215,10 @@ private inline fun <T : NavKey> String.parseDateString(create: (String) -> T): T
 fun resolveMainActivityNavKey(intent: Intent?): NavKey? {
     if (intent == null) return null
     intent.readNavigationTestDestination()?.let { return it }
+    val navSource = intent.getStringExtra(EXTRA_NAV_SOURCE)
+    val ambientTarget = intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET)
+    // The first family the intent belongs to decides; a malformed one resolves to nothing rather
+    // than to another family's destination.
     return when {
         intent.action == ACTION_CAPTURE -> {
             captureRoute(
@@ -224,57 +228,13 @@ fun resolveMainActivityNavKey(intent: Intent?): NavKey? {
             )
         }
 
-        intent.getStringExtra(EXTRA_NAV_SOURCE) == NAV_SOURCE_AUDIO_PLAYBACK -> {
-            val noteId = intent.getStringExtra(EXTRA_NOTE_ID) ?: return null
-            runCatching { NoteDetailRoute(Uuid.parse(noteId)) }.getOrNull()
-        }
-
-        intent.getStringExtra(EXTRA_NAV_SOURCE) == NAV_SOURCE_ON_THIS_DAY_WIDGET -> {
-            val dateStr = intent.getStringExtra(EXTRA_WIDGET_TARGET_DATE) ?: return null
-            runCatching {
-                LocalDate.parse(dateStr)
-                TimelineDetailRoute(dateStr)
-            }.getOrNull()
-        }
-
-        intent.getStringExtra(EXTRA_NAV_SOURCE) == NAV_SOURCE_FIXED_MEMORY_WIDGET -> {
-            val noteId = intent.getStringExtra(EXTRA_WIDGET_NOTE_ID) ?: return null
-            noteId.parseUuidTo(::NoteDetailRoute)
-        }
-
-        intent.getStringExtra(EXTRA_NAV_SOURCE) == NAV_SOURCE_NEW_ENTRY_WIDGET -> {
-            widgetCaptureRoute(
-                photoUri = intent.getStringExtra(EXTRA_WIDGET_PHOTO_URI),
-                record = intent.getBooleanExtra(EXTRA_WIDGET_RECORD, false),
-                camera = intent.getBooleanExtra(EXTRA_WIDGET_CAMERA, false),
-            )
-        }
+        navSource in WIDGET_AND_PLAYBACK_SOURCES -> resolveNavSourceRoute(intent, navSource)
 
         intent.getStringExtra(EXTRA_LOCATION_NAV_SOURCE) == NAV_SOURCE_LOCATION_HISTORY -> {
             LocationTimelineRoute
         }
 
-        intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_NEW_ENTRY -> {
-            EntryEditorRoute()
-        }
-
-        intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_DRAFT -> {
-            val draftId = intent.getStringExtra(EXTRA_AMBIENT_PROMPT_DRAFT_ID) ?: return null
-            runCatching { EntryEditorRoute(draftId = Uuid.parse(draftId).toString()) }.getOrNull()
-        }
-
-        intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_MEMORY_RECALL -> {
-            val dateStr = intent.getStringExtra(EXTRA_AMBIENT_PROMPT_RECALL_DATE) ?: return null
-            runCatching {
-                LocalDate.parse(dateStr)
-                TimelineDetailRoute(dateStr)
-            }.getOrNull()
-        }
-
-        intent.getStringExtra(EXTRA_AMBIENT_PROMPT_TARGET) == AMBIENT_PROMPT_TARGET_EVENT_DETAIL -> {
-            val eventId = intent.getStringExtra(EXTRA_AMBIENT_PROMPT_EVENT_ID) ?: return null
-            runCatching { EventDetailRoute(eventId) }.getOrNull()
-        }
+        ambientTarget in AMBIENT_PROMPT_TARGETS -> resolveAmbientPromptRoute(intent, ambientTarget)
 
         intent.getStringExtra(EXTRA_REWIND_NOTIFICATION_TARGET) == REWIND_NOTIFICATION_TARGET_DETAIL -> {
             val rewindId = intent.getStringExtra(EXTRA_REWIND_NOTIFICATION_ID) ?: return null
@@ -291,3 +251,57 @@ fun resolveMainActivityNavKey(intent: Intent?): NavKey? {
         else -> null
     }
 }
+
+private val WIDGET_AND_PLAYBACK_SOURCES =
+    setOf(
+        NAV_SOURCE_AUDIO_PLAYBACK,
+        NAV_SOURCE_ON_THIS_DAY_WIDGET,
+        NAV_SOURCE_FIXED_MEMORY_WIDGET,
+        NAV_SOURCE_NEW_ENTRY_WIDGET,
+    )
+
+private val AMBIENT_PROMPT_TARGETS =
+    setOf(
+        AMBIENT_PROMPT_TARGET_NEW_ENTRY,
+        AMBIENT_PROMPT_TARGET_DRAFT,
+        AMBIENT_PROMPT_TARGET_MEMORY_RECALL,
+        AMBIENT_PROMPT_TARGET_EVENT_DETAIL,
+    )
+
+/** Where a widget or audio playback launch opens, or null when its extras are missing or invalid. */
+private fun resolveNavSourceRoute(
+    intent: Intent,
+    navSource: String?,
+): NavKey? =
+    when (navSource) {
+        NAV_SOURCE_AUDIO_PLAYBACK -> intent.getStringExtra(EXTRA_NOTE_ID)?.parseUuidTo(::NoteDetailRoute)
+        NAV_SOURCE_ON_THIS_DAY_WIDGET -> intent.getStringExtra(EXTRA_WIDGET_TARGET_DATE)?.parseDateString(::TimelineDetailRoute)
+        NAV_SOURCE_FIXED_MEMORY_WIDGET -> intent.getStringExtra(EXTRA_WIDGET_NOTE_ID)?.parseUuidTo(::NoteDetailRoute)
+        NAV_SOURCE_NEW_ENTRY_WIDGET -> {
+            widgetCaptureRoute(
+                photoUri = intent.getStringExtra(EXTRA_WIDGET_PHOTO_URI),
+                record = intent.getBooleanExtra(EXTRA_WIDGET_RECORD, false),
+                camera = intent.getBooleanExtra(EXTRA_WIDGET_CAMERA, false),
+            )
+        }
+        else -> null
+    }
+
+/** Where a capture nudge or memory prompt opens, or null when its extras are missing or invalid. */
+private fun resolveAmbientPromptRoute(
+    intent: Intent,
+    target: String?,
+): NavKey? =
+    when (target) {
+        AMBIENT_PROMPT_TARGET_NEW_ENTRY -> EntryEditorRoute()
+        AMBIENT_PROMPT_TARGET_DRAFT -> {
+            intent.getStringExtra(EXTRA_AMBIENT_PROMPT_DRAFT_ID)?.parseUuidTo { EntryEditorRoute(draftId = it.toString()) }
+        }
+        AMBIENT_PROMPT_TARGET_MEMORY_RECALL -> {
+            intent.getStringExtra(EXTRA_AMBIENT_PROMPT_RECALL_DATE)?.parseDateString(::TimelineDetailRoute)
+        }
+        AMBIENT_PROMPT_TARGET_EVENT_DETAIL -> {
+            intent.getStringExtra(EXTRA_AMBIENT_PROMPT_EVENT_ID)?.let { runCatching { EventDetailRoute(it) }.getOrNull() }
+        }
+        else -> null
+    }

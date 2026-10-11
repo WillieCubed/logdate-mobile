@@ -1,6 +1,7 @@
 package app.logdate.client.bubble
 
 import android.annotation.SuppressLint
+import android.app.Notification
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -170,6 +171,18 @@ class RecordingBubbleNotifier(
                 .setKey(SHORTCUT_ID)
                 .setImportant(true)
                 .build()
+        publishRecorderShortcut(title, icon, recorderPerson)
+        val notification = bubbleNotification(title, icon, recorderPerson)
+        runCatching { notifications.notify(NOTIFICATION_ID, notification) }
+            .onFailure { error -> Napier.e("Recorder bubble could not be posted", error) }
+    }
+
+    /** The long-lived shortcut a bubble needs; opening it from the launcher starts a voice entry. */
+    private fun publishRecorderShortcut(
+        title: String,
+        icon: IconCompat,
+        recorderPerson: Person,
+    ) {
         ShortcutManagerCompat.pushDynamicShortcut(
             context,
             ShortcutInfoCompat
@@ -185,7 +198,14 @@ class RecordingBubbleNotifier(
                         .putExtra(EXTRA_CAPTURE_MODE, "voice"),
                 ).build(),
         )
+    }
 
+    /** The conversation-style notification Android turns into the expanded recorder bubble. */
+    private fun bubbleNotification(
+        title: String,
+        icon: IconCompat,
+        recorderPerson: Person,
+    ): Notification {
         val bubbleIntent =
             PendingIntent.getActivity(
                 context,
@@ -204,22 +224,19 @@ class RecordingBubbleNotifier(
             NotificationCompat
                 .MessagingStyle(recorderPerson)
                 .addMessage(context.getString(R.string.recorder_bubble_message), System.currentTimeMillis(), recorderPerson)
-        val notification =
-            NotificationCompat
-                .Builder(context, LogDateNotificationChannelKey.FLOATING_RECORDER.id)
-                .setSmallIcon(R.drawable.ic_tile_record_voice)
-                .setContentTitle(title)
-                .setContentIntent(bubbleIntent)
-                .setShortcutId(SHORTCUT_ID)
-                .setLocusId(LocusIdCompat(SHORTCUT_ID))
-                .addPerson(recorderPerson)
-                .setStyle(style)
-                .setBubbleMetadata(bubble)
-                .setCategory(NotificationCompat.CATEGORY_STATUS)
-                .setSilent(true)
-                .build()
-        runCatching { notifications.notify(NOTIFICATION_ID, notification) }
-            .onFailure { error -> Napier.e("Recorder bubble could not be posted", error) }
+        return NotificationCompat
+            .Builder(context, LogDateNotificationChannelKey.FLOATING_RECORDER.id)
+            .setSmallIcon(R.drawable.ic_tile_record_voice)
+            .setContentTitle(title)
+            .setContentIntent(bubbleIntent)
+            .setShortcutId(SHORTCUT_ID)
+            .setLocusId(LocusIdCompat(SHORTCUT_ID))
+            .addPerson(recorderPerson)
+            .setStyle(style)
+            .setBubbleMetadata(bubble)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setSilent(true)
+            .build()
     }
 
     /** Removes the bubble and its shortcut. */

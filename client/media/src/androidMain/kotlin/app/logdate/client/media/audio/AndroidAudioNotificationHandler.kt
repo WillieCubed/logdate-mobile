@@ -115,38 +115,48 @@ class AndroidAudioNotificationHandler(
                 .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
                 .setSilent(true)
 
-        val liveUpdate = recordingLiveUpdate(enabled = liveUpdates.enabled, isRecording = isRecording)
-        if (liveUpdate.promoted) {
-            builder.setRequestPromotedOngoing(true)
-            liveUpdate.chipText?.let { chip ->
-                builder.setShortCriticalText(
-                    when (chip) {
-                        LiveUpdateChip.Paused -> context.getString(R.string.audio_recording_chip_paused)
-                    },
-                )
-            }
-        }
+        applyLiveUpdate(builder, isRecording)
+        addRecordingActions(builder, isRecording)
+        return builder.build()
+    }
 
-        // Add action buttons based on current state
+    /** Promotes the notification to a Live Update when the flag allows, with a chip while paused. */
+    private fun applyLiveUpdate(
+        builder: NotificationCompat.Builder,
+        isRecording: Boolean,
+    ) {
+        val liveUpdate = recordingLiveUpdate(enabled = liveUpdates.enabled, isRecording = isRecording)
+        if (!liveUpdate.promoted) return
+        builder.setRequestPromotedOngoing(true)
+        liveUpdate.chipText?.let { chip ->
+            builder.setShortCriticalText(
+                when (chip) {
+                    LiveUpdateChip.Paused -> context.getString(R.string.audio_recording_chip_paused)
+                },
+            )
+        }
+    }
+
+    /** Pause or Resume for the current state, Float while the bubble flag is on, and Stop. */
+    private fun addRecordingActions(
+        builder: NotificationCompat.Builder,
+        isRecording: Boolean,
+    ) {
         if (isRecording) {
-            // Add pause button when recording
             builder.addAction(
                 android.R.drawable.ic_media_pause,
                 context.getString(R.string.audio_recording_action_pause),
                 createActionIntent(ACTION_PAUSE),
             )
         } else {
-            // Add resume button when paused
             builder.addAction(
                 android.R.drawable.ic_media_play,
                 context.getString(R.string.audio_recording_action_resume),
                 createActionIntent(ACTION_RESUME),
             )
         }
-
         if (recordingBubble.enabled) {
-            val float =
-                Intent(ACTION_FLOAT_RECORDER).setClassName(context, FLOAT_RECORDER_RECEIVER_CLASS)
+            val float = Intent(ACTION_FLOAT_RECORDER).setClassName(context, FLOAT_RECORDER_RECEIVER_CLASS)
             builder.addAction(
                 R.drawable.ic_notification_recording,
                 context.getString(R.string.audio_recording_action_float),
@@ -158,15 +168,11 @@ class AndroidAudioNotificationHandler(
                 ),
             )
         }
-
-        // Always add stop button
         builder.addAction(
-            android.R.drawable.ic_delete, // Using an alternative icon as a fallback
+            android.R.drawable.ic_delete,
             context.getString(R.string.audio_recording_action_stop),
             createActionIntent(ACTION_STOP),
         )
-
-        return builder.build()
     }
 
     /**

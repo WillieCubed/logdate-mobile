@@ -106,56 +106,40 @@ class LogdateApplication :
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             publishWidgetPreviews(this@LogdateApplication)
         }
-        runCatching {
+        isolated("Failed to register notification channels on app startup") {
             LogDateNotificationRegistrar(this).registerAllPhoneChannels()
-        }.onFailure { error ->
-            Napier.w("Failed to register notification channels on app startup", error)
         }
-        runCatching {
+        isolated("Failed to start the media reference migration") {
             get<StoredMediaReferenceMigrationLauncher>().start()
-        }.onFailure { error ->
-            Napier.w("Failed to start the media reference migration", error)
         }
-        runCatching {
+        isolated("Failed to initialize ambient prompt scheduling") {
             get<AmbientPromptSchedulingObserver>().start()
             get<AmbientPromptScheduler>().enqueueImmediateEvaluation(AmbientPromptTriggerContext.PERIODIC)
-        }.onFailure { error ->
-            Napier.w("Failed to initialize ambient prompt scheduling", error)
         }
-        runCatching {
+        isolated("Failed to start location tracking manager on app startup") {
             get<LocationTrackingManager>().startTracking()
-        }.onFailure { error ->
-            Napier.w("Failed to start location tracking manager on app startup", error)
         }
-        runCatching {
+        isolated("Failed to initialize rewind generation scheduling") {
             val rewindScheduler = RewindGenerationScheduler(this)
             rewindScheduler.schedulePeriodicGeneration()
             rewindScheduler.disableAnnualGeneration()
             rewindScheduler.enqueueImmediateCheck()
-        }.onFailure { error ->
-            Napier.w("Failed to initialize rewind generation scheduling", error)
         }
-        runCatching {
+        isolated("Failed to initialize event inference scheduling") {
             val scheduler = EventInferenceScheduler(this)
             if (FeatureFlag.EVENTS.availableForLaunch) scheduler.schedulePeriodicInference() else scheduler.disableForLaunch()
-        }.onFailure { error ->
-            Napier.w("Failed to initialize event inference scheduling", error)
         }
-        runCatching {
+        isolated("Failed to initialize calendar import scheduling") {
             val scheduler = CalendarImportScheduler(this)
             if (FeatureFlag.EVENTS.availableForLaunch) scheduler.schedulePeriodicImport() else scheduler.disableForLaunch()
-        }.onFailure { error ->
-            Napier.w("Failed to initialize calendar import scheduling", error)
         }
-        runCatching {
+        isolated("Failed to initialize dynamic shortcut scheduling") {
             val shortcutScheduler = get<DynamicShortcutScheduler>()
             shortcutScheduler.schedulePeriodicRefresh()
             shortcutScheduler.enqueueImmediateRefresh()
             get<DynamicShortcutRefreshObserver>().start()
-        }.onFailure { error ->
-            Napier.w("Failed to initialize dynamic shortcut scheduling", error)
         }
-        runCatching {
+        isolated("Failed to start syncing flag-gated components") {
             get<PlatformComponentToggler>().start(get<CoroutineScope>())
             get<RecordVoiceTileUpdater>().start(get<CoroutineScope>())
             get<RecordingWindowTracker>().start(this, get<CoroutineScope>())
@@ -164,9 +148,15 @@ class LogdateApplication :
             // their flag reads, so the first recording after launch already sees the flags.
             get<LiveUpdatesSwitch>()
             get<RecordingBubbleSwitch>()
-        }.onFailure { error ->
-            Napier.w("Failed to start syncing flag-gated components", error)
         }
+    }
+
+    /** Runs one part of startup, logging [failure] instead of letting it stop the parts after it. */
+    private inline fun isolated(
+        failure: String,
+        start: () -> Unit,
+    ) {
+        runCatching(start).onFailure { error -> Napier.w(failure, error) }
     }
 
     /**
