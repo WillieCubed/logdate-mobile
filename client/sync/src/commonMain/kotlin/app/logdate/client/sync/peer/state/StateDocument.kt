@@ -72,6 +72,7 @@ data class Presence(
  *
  * @property linkProblem Why the last account link failed, as a `LinkProblem` name. It is a string so a
  *   value a newer watch adds never makes the document unreadable.
+ * @property linkId The verified exchange this installation report belongs to.
  */
 @Serializable
 data class WatchState(
@@ -82,6 +83,7 @@ data class WatchState(
     val presence: Presence = Presence(),
     val features: Set<String> = emptySet(),
     val linkProblem: String? = null,
+    val linkId: String? = null,
 )
 
 /**

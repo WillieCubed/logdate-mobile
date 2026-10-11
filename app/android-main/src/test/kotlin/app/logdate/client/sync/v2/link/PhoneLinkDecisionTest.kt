@@ -1,6 +1,7 @@
 package app.logdate.client.sync.v2.link
 
 import app.logdate.client.sync.datalayer.v2.LinkMode
+import app.logdate.client.sync.peer.link.LinkWire
 import app.logdate.client.sync.peer.state.PeerLinkState
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.StateDocument
@@ -26,7 +27,7 @@ class PhoneLinkDecisionTest {
             StateDocument(
                 role = PeerRole.WATCH,
                 writtenAt = 200,
-                watch = WatchState(link = PeerLinkState.NEEDS_RELINK, linkProblem = "DEVICE_LIMIT_REACHED"),
+                watch = WatchState(link = PeerLinkState.NEEDS_RELINK, linkProblem = "DEVICE_LIMIT_REACHED", linkId = linked.linkId),
             )
 
         assertEquals(
@@ -41,7 +42,7 @@ class PhoneLinkDecisionTest {
             StateDocument(
                 role = PeerRole.WATCH,
                 writtenAt = 200,
-                watch = WatchState(link = PeerLinkState.NEEDS_RELINK, linkProblem = "SOMETHING_NEW"),
+                watch = WatchState(link = PeerLinkState.NEEDS_RELINK, linkProblem = "SOMETHING_NEW", linkId = linked.linkId),
             )
 
         assertEquals(
@@ -57,7 +58,7 @@ class PhoneLinkDecisionTest {
             StateDocument(
                 role = PeerRole.WATCH,
                 writtenAt = 200,
-                watch = WatchState(link = PeerLinkState.NEEDS_RELINK, linkProblem = "DEVICE_LIMIT_REACHED"),
+                watch = WatchState(link = PeerLinkState.NEEDS_RELINK, linkProblem = "DEVICE_LIMIT_REACHED", linkId = linked.linkId),
             )
 
         assertEquals(PhoneLinkDecision.Wait, PhoneLinkDecision.decide(recorded, pair, failed, now = 1_000))
@@ -73,6 +74,7 @@ class PhoneLinkDecisionTest {
             confirmedAt = 100,
             lastAttemptAt = 100,
             seenWatchDocAt = 100,
+            linkId = LinkWire.encodeKey(ByteArray(32) { 1 }),
         )
 
     @Test
@@ -146,8 +148,46 @@ class PhoneLinkDecisionTest {
         )
     }
 
+    @Test
+    fun `older links renew before they can authorize scoped delivery`() {
+        val old = linked.copy(linkId = null)
+        assertEquals(PhoneLinkDecision.Exchange, PhoneLinkDecision.decide(old, pair, document(PeerLinkState.PAIRED, 200), 1_000))
+    }
+
+    @Test
+    fun `invalid delivery identities request a fresh exchange`() {
+        for (id in listOf("", "not-base64", LinkWire.encodeKey(ByteArray(31)))) {
+            assertEquals(PhoneLinkDecision.Exchange, PhoneLinkDecision.decide(linked.copy(linkId = id), pair, null, 1_000))
+        }
+    }
+
+    @Test
+    fun `renewing an older link still respects a recorded failure wait`() {
+        val old = linked.copy(linkId = null, failure = PhoneLinkFailure.WATCH_UNREACHABLE, nextAttemptAt = 2_000)
+        assertEquals(PhoneLinkDecision.Wait, PhoneLinkDecision.decide(old, pair, null, 1_999))
+        assertEquals(PhoneLinkDecision.Exchange, PhoneLinkDecision.decide(old, pair, null, 2_000))
+    }
+
+    @Test
+    fun `a report from an earlier exchange cannot confirm the new installation`() {
+        val cloud = linked.copy(mode = LinkMode.CLOUD, accountId = "account", confirmedAt = null)
+        for (id in listOf(null, LinkWire.encodeKey(ByteArray(32) { 2 }))) {
+            val report = document(PeerLinkState.LINKED, 300).copy(watch = WatchState(link = PeerLinkState.LINKED, linkId = id))
+            assertEquals(PhoneLinkDecision.Wait, PhoneLinkDecision.decide(cloud, LinkPlan(LinkMode.CLOUD, "account"), report, 1_000))
+        }
+    }
+
+    @Test
+    fun `an earlier installation failure cannot fail the current exchange`() {
+        val report =
+            document(PeerLinkState.NEEDS_RELINK, 300).copy(
+                watch = WatchState(link = PeerLinkState.NEEDS_RELINK, linkProblem = "DEVICE_LIMIT_REACHED", linkId = "earlier"),
+            )
+        assertEquals(PhoneLinkDecision.Wait, PhoneLinkDecision.decide(linked, pair, report, 1_000))
+    }
+
     private fun document(
         link: PeerLinkState,
         at: Long,
-    ) = StateDocument(role = PeerRole.WATCH, writtenAt = at, watch = WatchState(link = link))
+    ) = StateDocument(role = PeerRole.WATCH, writtenAt = at, watch = WatchState(link = link, linkId = linked.linkId))
 }

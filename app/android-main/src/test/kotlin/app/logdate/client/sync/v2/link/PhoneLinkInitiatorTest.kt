@@ -129,7 +129,7 @@ class PhoneLinkInitiatorTest {
         link: PeerLinkState,
         problem: String?,
         at: Long,
-    ) = StateDocument(role = PeerRole.WATCH, writtenAt = at, watch = WatchState(link = link, linkProblem = problem))
+    ) = StateDocument(role = PeerRole.WATCH, writtenAt = at, watch = WatchState(link = link, linkProblem = problem, linkId = watch.linkId))
 
     private val clock = MutableClock(1_000_000)
     private val handshake = BouncyCastleLinkHandshake()
@@ -360,7 +360,12 @@ class PhoneLinkInitiatorTest {
             assertTrue(notifier.events.isEmpty())
             initiator.reconcile(
                 mapOf(
-                    WATCH to StateDocument(role = PeerRole.WATCH, writtenAt = 501, watch = WatchState(link = PeerLinkState.LINKED)),
+                    WATCH to
+                        StateDocument(
+                            role = PeerRole.WATCH,
+                            writtenAt = 501,
+                            watch = WatchState(link = PeerLinkState.LINKED, linkId = watch.linkId),
+                        ),
                 ),
             )
             assertEquals(listOf("linked Pixel Watch 3 CLOUD"), notifier.events)

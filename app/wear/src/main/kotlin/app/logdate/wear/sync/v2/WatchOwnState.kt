@@ -33,6 +33,7 @@ class WatchOwnState(
                 link = link.peerLinkState(),
                 features = features,
                 linkProblem = link?.problem,
+                linkId = link?.linkId,
             )
         }.distinctUntilChanged()
 }

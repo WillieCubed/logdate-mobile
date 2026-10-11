@@ -4,8 +4,14 @@ import app.logdate.client.sync.datalayer.v2.LinkMode
 import app.logdate.client.sync.peer.state.PeerLinkState
 import app.logdate.client.sync.peer.state.WatchState
 import app.logdate.wear.sync.v2.link.WatchLinkRecord
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,6 +27,22 @@ class WatchOwnStateTest {
 
             assertEquals(PeerLinkState.NEEDS_RELINK, state.link)
             assertEquals("DEVICE_LIMIT_REACHED", state.linkProblem)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `a fresh linked exchange publishes even when the visible link state stays linked`() =
+        runTest {
+            val record = WatchLinkRecord(LinkMode.CLOUD, "phone", 1, accountId = "account", linkId = "first")
+            val records = MutableStateFlow<WatchLinkRecord?>(record)
+            val emitted = mutableListOf<WatchState>()
+            val job = backgroundScope.launch { WatchOwnState(records).observe().take(2).toList(emitted) }
+            runCurrent()
+            records.value = record.copy(linkId = "second")
+            runCurrent()
+            assertEquals(listOf("first", "second"), emitted.map { it.linkId })
+            assertEquals(listOf(PeerLinkState.LINKED, PeerLinkState.LINKED), emitted.map { it.link })
+            job.cancel()
         }
 
     @Test
