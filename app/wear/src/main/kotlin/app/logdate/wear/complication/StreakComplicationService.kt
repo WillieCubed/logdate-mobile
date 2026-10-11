@@ -2,11 +2,9 @@ package app.logdate.wear.complication
 
 import android.app.PendingIntent
 import android.content.Intent
-import android.graphics.drawable.Icon
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationType
 import androidx.wear.watchface.complications.data.LongTextComplicationData
-import androidx.wear.watchface.complications.data.MonochromaticImage
 import androidx.wear.watchface.complications.data.NoDataComplicationData
 import androidx.wear.watchface.complications.data.PlainComplicationText
 import androidx.wear.watchface.complications.data.ShortTextComplicationData
@@ -27,10 +25,10 @@ import kotlinx.datetime.TimeZone
 import kotlin.time.Clock
 
 /**
- * Complication showing the user's current journaling streak.
+ * Complication showing the user's campfire, or their journaling streak with campfire streaks off.
  *
- * Displays the count of consecutive days with at least one journal entry.
- * Supports SHORT_TEXT ("7d") and LONG_TEXT ("7 day streak") formats.
+ * The campfire fills SHORT_TEXT, LONG_TEXT and RANGED_VALUE slots. The streak is a day count, with no
+ * range to fill, so it fills SHORT_TEXT ("7d") and LONG_TEXT ("7 day streak") only.
  */
 class StreakComplicationService : SuspendingComplicationDataSourceService() {
     override fun getPreviewData(type: ComplicationType): ComplicationData? =
@@ -45,18 +43,21 @@ class StreakComplicationService : SuspendingComplicationDataSourceService() {
                     streak = 7,
                     contentDescription = getString(R.string.wear_complication_streak_description),
                 )
+            ComplicationType.RANGED_VALUE -> campfireComplicationData(this, PREVIEW_CAMPFIRE, type, createOpenAppIntent())
             else -> null
         }
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData {
         if (isCampfireEnabled()) {
             val campfire = calculateCampfire() ?: return NoDataComplicationData()
-            return createCampfireData(
+            return campfireComplicationData(
+                context = this,
                 content = campfire.toComplicationContent(),
                 type = request.complicationType,
-                tapIntent = createOpenAppIntent(),
+                tapAction = createOpenAppIntent(),
             )
         }
+        if (request.complicationType == ComplicationType.RANGED_VALUE) return NoDataComplicationData()
 
         val streak = calculateStreak() ?: return NoDataComplicationData()
         val description =
@@ -116,43 +117,6 @@ class StreakComplicationService : SuspendingComplicationDataSourceService() {
             null
         }
 
-    private fun createCampfireData(
-        content: CampfireComplicationContent,
-        type: ComplicationType,
-        tapIntent: PendingIntent,
-    ): ComplicationData {
-        val description = campfireDescription(content)
-        val icon = MonochromaticImage.Builder(Icon.createWithResource(this, content.iconRes)).build()
-        return when (type) {
-            ComplicationType.LONG_TEXT ->
-                LongTextComplicationData
-                    .Builder(
-                        text = PlainComplicationText.Builder(description).build(),
-                        contentDescription = PlainComplicationText.Builder(description).build(),
-                    ).setMonochromaticImage(icon)
-                    .setTapAction(tapIntent)
-                    .build()
-            else ->
-                ShortTextComplicationData
-                    .Builder(
-                        text = PlainComplicationText.Builder(content.runDays?.toString() ?: NO_FIRE_TEXT).build(),
-                        contentDescription = PlainComplicationText.Builder(description).build(),
-                    ).setMonochromaticImage(icon)
-                    .setTapAction(tapIntent)
-                    .build()
-        }
-    }
-
-    private fun campfireDescription(content: CampfireComplicationContent): String {
-        val runDays = content.runDays ?: 0
-        return when (content.phase) {
-            FirePhase.BURNING -> resources.getQuantityString(R.plurals.wear_complication_campfire_burning, runDays, runDays)
-            FirePhase.EMBERS -> getString(R.string.wear_complication_campfire_embers, runDays)
-            FirePhase.OUT -> getString(R.string.wear_complication_campfire_out)
-            FirePhase.UNLIT -> getString(R.string.wear_complication_campfire_unlit)
-        }
-    }
-
     private fun createOpenAppIntent(): PendingIntent {
         val intent =
             packageManager.getLaunchIntentForPackage(packageName)
@@ -206,6 +170,7 @@ class StreakComplicationService : SuspendingComplicationDataSourceService() {
 
     companion object {
         private const val STREAK_REQUEST_CODE = 1002
-        private const val NO_FIRE_TEXT = "–"
+        private val PREVIEW_CAMPFIRE =
+            CampfireComplicationContent(iconRes = R.drawable.ic_campfire_flame, runDays = 7, phase = FirePhase.BURNING)
     }
 }

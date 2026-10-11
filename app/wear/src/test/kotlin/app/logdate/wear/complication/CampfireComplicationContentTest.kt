@@ -51,4 +51,21 @@ class CampfireComplicationContentTest {
         assertEquals(R.drawable.ic_campfire_logs, content.iconRes)
         assertNull(content.runDays)
     }
+
+    @Test
+    fun `a ranged slot is full for a burning fire and half full for embers`() {
+        assertEquals(CAMPFIRE_RANGE_MAX, fire.toComplicationContent().rangedValue)
+        assertEquals(1f, fire.copy(phase = FirePhase.EMBERS, loggedToday = false).toComplicationContent().rangedValue)
+    }
+
+    @Test
+    fun `a ranged slot is empty without a fire`() {
+        assertEquals(CAMPFIRE_RANGE_MIN, fire.copy(phase = FirePhase.OUT, runDays = 0, size = null).toComplicationContent().rangedValue)
+        assertEquals(CAMPFIRE_RANGE_MIN, fire.copy(phase = FirePhase.UNLIT, runDays = 0, size = null).toComplicationContent().rangedValue)
+    }
+
+    @Test
+    fun `the ranged colors step from charred logs to the outer and inner flame`() {
+        assertEquals(listOf(0xFFA8A29C.toInt(), 0xFFFF8A3D.toInt(), 0xFFFFD166.toInt()), CAMPFIRE_COLOR_RAMP.toList())
+    }
 }

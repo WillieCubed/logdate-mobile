@@ -181,7 +181,7 @@
                 android:value="900" />
         </service>
 
-        <!-- Streak complication: shows consecutive journaling day count -->
+        <!-- Streak complication: the campfire (also as a ranged value), or the journaling streak -->
         <service
             android:name=".complication.StreakComplicationService"
             android:exported="true"
@@ -193,7 +193,7 @@
 
             <meta-data
                 android:name="android.support.wearable.complications.SUPPORTED_TYPES"
-                android:value="SHORT_TEXT,LONG_TEXT" />
+                android:value="SHORT_TEXT,LONG_TEXT,RANGED_VALUE" />
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
                 android:value="21600" />
