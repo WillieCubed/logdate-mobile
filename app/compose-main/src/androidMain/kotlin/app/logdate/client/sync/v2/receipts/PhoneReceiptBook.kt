@@ -28,6 +28,7 @@ class PhoneReceiptBook(
     private val sessions: SessionStorage,
     private val ledger: PeerDeliveryLedger,
     private val peers: PhoneDeliveryPeers? = null,
+    private val momentReceipts: MomentReceiptBook? = null,
 ) {
     fun cloudPresence(): CloudPresence = if (sessions.getSession() == null) CloudPresence.NO_ACCOUNT else CloudPresence.SIGNED_IN
 
@@ -67,6 +68,10 @@ class PhoneReceiptBook(
         query: ReceiptQuery,
     ): Receipt? {
         if (!isCurrent(context)) return null
+        if (query.kind == RecordKind.MOMENT) {
+            return momentReceipts?.receiptFor(context, query)
+                ?: if (momentReceipts == null) rejected(query.kind, query.id, query.operationId) else null
+        }
         val session = sessions.getOriginBoundSession()
         val id = Uuid.parseOrNull(query.id)
         if (query.kind != RecordKind.NOTE || id == null) return rejected(query.kind, query.id, query.operationId)

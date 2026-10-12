@@ -11,6 +11,7 @@ import app.logdate.client.sync.datalayer.v2.ReceiptsResponse
 import app.logdate.client.sync.datalayer.v2.RecordKind
 import app.logdate.client.sync.datalayer.v2.WearJson
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.peer.delivery.CaptureIdentity
 import app.logdate.client.sync.peer.delivery.DeliveryDirection
 import app.logdate.client.sync.peer.delivery.DeliveryState
 import app.logdate.client.sync.peer.delivery.PeerDeliveryLedger
@@ -334,6 +335,23 @@ class WatchReceiptApplierTest {
         }
 
     private fun encode(response: ReceiptsResponse) = WearJson.encodeToBytes(ReceiptsResponse.serializer(), response)
+
+    @Test fun momentReceiptMovesOnlyItsExactTypedOperation() =
+        runTest {
+            val key = CaptureIdentity.of(id, "mark-operation")!!.ledgerKey
+            ledger.track(context.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.MOMENT, key, 5)
+            ledger.track(context.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, key, 5)
+            assertEquals(
+                0,
+                applier.apply("phone", bytes(Receipt(RecordKind.MOMENT, id, 5, ReceiptState.ON_PHONE, operationId = "other-operation"))),
+            )
+            assertEquals(
+                1,
+                applier.apply("phone", bytes(Receipt(RecordKind.MOMENT, id, 5, ReceiptState.ON_PHONE, operationId = "mark-operation"))),
+            )
+            assertEquals(DeliveryState.ON_PHONE, ledger.get(context.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.MOMENT, key)?.state)
+            assertEquals(DeliveryState.NEW, ledger.get(context.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, key)?.state)
+        }
 
     private suspend fun track(version: Long) = ledger.track(context.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, id, version)
 

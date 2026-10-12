@@ -13,11 +13,13 @@ import app.logdate.client.sync.datalayer.v2.RecordKind
 import app.logdate.client.sync.datalayer.v2.WearPaths
 import app.logdate.client.sync.peer.delivery.PeerDeliveryLedger
 import app.logdate.client.sync.peer.link.LinkWire
+import app.logdate.client.sync.v2.receipts.MomentReceiptBook
 import app.logdate.client.sync.v2.receipts.PhoneDeliveryPeers
 import app.logdate.client.sync.v2.receipts.PhoneReceiptBook
 import app.logdate.client.sync.v2.receipts.ReceiptAcknowledger
 import app.logdate.client.sync.v2.receipts.ScopedCaptureIngestion
 import app.logdate.client.sync.v2.receipts.WatchCaptureCollisionPolicy
+import app.logdate.client.sync.v2.receipts.WatchMomentIngestor
 import app.logdate.client.sync.v2.receipts.WatchReceiptNotifier
 import app.logdate.client.sync.v2.receipts.WatchReceiptResponder
 import app.logdate.client.sync.v2.receipts.WatchRecordIngestorV2
@@ -37,6 +39,8 @@ class PhoneWatchReceiptsRuntimeTest {
     fun recordChangesReachThePhoneListener() {
         assertListener("DATA_CHANGED", "/logdate/v2/w2p/record/note/${Uuid.random()}")
         assertListener("DATA_CHANGED", WearPaths.watchRecord(RecordKind.NOTE, Uuid.random(), "operation"))
+        val peer = PeerDeliveryContext(LinkWire.encodeKey(ByteArray(32) { 1 }), "phone", "watch", LinkMode.PAIR)
+        assertListener("DATA_CHANGED", WearPaths.watchRecord(RecordKind.MOMENT, Uuid.random(), peer, "operation"))
     }
 
     @Test
@@ -64,6 +68,8 @@ class PhoneWatchReceiptsRuntimeTest {
         assertNotNull(koin.get<WatchReceiptNotifier>())
         assertNotNull(koin.get<WatchRecordIngestorV2>())
         assertNotNull(koin.get<ScopedCaptureIngestion>())
+        assertNotNull(koin.get<WatchMomentIngestor>())
+        assertNotNull(koin.get<MomentReceiptBook>())
     }
 
     private fun assertListener(

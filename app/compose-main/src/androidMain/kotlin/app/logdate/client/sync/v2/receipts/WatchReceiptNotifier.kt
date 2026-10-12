@@ -51,9 +51,10 @@ class WatchReceiptNotifier(
         contentVersion: Long,
         operationId: String? = null,
         removed: Boolean = false,
+        kind: RecordKind = RecordKind.NOTE,
     ): Boolean {
         if (!isCurrent(context)) return false
-        val receipt = book.receiptFor(context, ReceiptQuery(RecordKind.NOTE, noteId, contentVersion, operationId, removed)) ?: return false
+        val receipt = book.receiptFor(context, ReceiptQuery(kind, noteId, contentVersion, operationId, removed)) ?: return false
         return send(context, listOf(receipt))
     }
 
@@ -80,11 +81,16 @@ class WatchReceiptNotifier(
             val backedUp =
                 ledger
                     .inState(context.ledgerScope, DeliveryDirection.FROM_WATCH, DeliveryState.ON_PHONE)
-                    .filter { it.entityType == EntityType.NOTE }
+                    .filter { it.entityType == EntityType.NOTE || it.entityType == EntityType.MOMENT }
                     .mapNotNull { entry ->
                         val identity = CaptureIdentity.fromLedgerKey(entry.entityId)
                         val query =
-                            ReceiptQuery(RecordKind.NOTE, identity?.recordId ?: entry.entityId, entry.contentVersion, identity?.operationId)
+                            ReceiptQuery(
+                                if (entry.entityType == EntityType.MOMENT) RecordKind.MOMENT else RecordKind.NOTE,
+                                identity?.recordId ?: entry.entityId,
+                                entry.contentVersion,
+                                identity?.operationId,
+                            )
                         val receipt = book.receiptFor(context, query)
                         if (receipt?.state == ReceiptState.BACKED_UP) entry to receipt else null
                     }

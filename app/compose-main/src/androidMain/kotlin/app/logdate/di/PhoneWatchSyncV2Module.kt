@@ -64,6 +64,7 @@ import app.logdate.client.sync.v2.receipts.WatchCaptureCollisionPolicy
 import app.logdate.client.sync.v2.receipts.WatchCaptureNotes
 import app.logdate.client.sync.v2.receipts.WatchCaptureProvenance
 import app.logdate.client.sync.v2.receipts.WatchCaptureRemovals
+import app.logdate.client.sync.v2.receipts.WatchMomentIngestor
 import app.logdate.client.sync.v2.receipts.WatchPeerMessageSender
 import app.logdate.client.sync.v2.receipts.WatchReceiptNotifier
 import app.logdate.client.sync.v2.receipts.WatchReceiptResponder
@@ -80,6 +81,7 @@ import kotlin.time.Clock
 /** Koin module for the phone's side of the version 2 watch protocol. */
 val phoneWatchSyncV2Module =
     module {
+        includes(phoneMomentSyncModule)
         includes(phoneWatchWindowModule)
         single {
             val clients = PhoneLinkClientFactory(get(), get())
@@ -156,7 +158,7 @@ val phoneWatchSyncV2Module =
                 active = { gate.isFeatureActive(WearFeatures.RECEIPTS).first() },
             )
         }
-        single { PhoneReceiptBook(notes = get(), outbox = get(), sessions = get(), ledger = get(), peers = get()) }
+        single { PhoneReceiptBook(notes = get(), outbox = get(), sessions = get(), ledger = get(), peers = get(), momentReceipts = get()) }
         single { WatchReceiptResponder(get()) }
         single<WatchPeerMessageSender> { GoogleWatchPeerMessageSender(Wearable.getMessageClient(androidContext()), get()) }
         single {
@@ -193,7 +195,7 @@ val phoneWatchSyncV2Module =
                     outbox,
                     onUpdated = { get<SyncManager>().sync() },
                 )
-            ScopedCaptureIngestion(peers, removals) { peer, operation ->
+            ScopedCaptureIngestion(peers, removals, get<WatchMomentIngestor>()) { peer, operation ->
                 val guarded =
                     WatchCaptureNotes(
                         notes,

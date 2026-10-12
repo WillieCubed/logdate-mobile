@@ -19,7 +19,7 @@ import io.github.aakira.napier.Napier
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.uuid.Uuid
 
-/** Applies the phone's receipts, pushed or answered, to the watch's ledger. A receipt only ever moves a note forward. */
+/** Applies the phone's receipts, pushed or answered, to the watch's ledger. Receipts advance only their typed operation. */
 class WatchReceiptApplier(
     private val ledger: PeerDeliveryLedger,
     private val peers: WatchDeliveryPeer,
@@ -86,10 +86,12 @@ class WatchReceiptApplier(
         peer: PeerDeliveryContext,
         receipt: Receipt,
     ): Boolean {
-        if (receipt.kind != RecordKind.NOTE) {
-            Napier.w("Ignoring a ${receipt.kind} receipt; this watch sends only notes this way")
-            return false
-        }
+        val type =
+            when (receipt.kind) {
+                RecordKind.NOTE -> EntityType.NOTE
+                RecordKind.MOMENT -> if (receipt.operationId != null) EntityType.MOMENT else return false
+                else -> return false
+            }
         if (receipt.state == ReceiptState.BACKED_UP && (receipt.serverVersion ?: 0L) <= 0L) {
             Napier.w("Ignoring a backup receipt with no positive server version")
             return false
@@ -107,7 +109,7 @@ class WatchReceiptApplier(
             ledger.applyReceipt(
                 scope = peer.ledgerScope,
                 direction = DeliveryDirection.TO_PHONE,
-                entityType = EntityType.NOTE,
+                entityType = type,
                 entityId = key,
                 receiptVersion = receipt.contentVersion,
                 state = DeliveryState.of(receipt.state),

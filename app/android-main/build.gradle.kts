@@ -525,6 +525,7 @@ dependencies {
     testImplementation(libs.play.services.wearable)
     testImplementation(libs.wear.remote.interactions)
     testImplementation(projects.client.feature.core)
+    testImplementation(projects.client.data)
     testImplementation(projects.client.database)
     testImplementation(projects.client.domain)
     testImplementation(projects.client.healthConnect)

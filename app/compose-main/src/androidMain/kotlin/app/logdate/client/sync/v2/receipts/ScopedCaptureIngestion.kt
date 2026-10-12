@@ -3,6 +3,7 @@ package app.logdate.client.sync.v2.receipts
 import app.logdate.client.sync.datalayer.v2.Decoded
 import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.datalayer.v2.RecordEnvelopeCodec
+import app.logdate.client.sync.datalayer.v2.RecordKind
 import app.logdate.client.sync.datalayer.v2.WearPaths
 import app.logdate.client.sync.peer.delivery.CaptureIdentity
 import app.logdate.client.sync.peer.delivery.EnvelopeDataMap
@@ -12,6 +13,7 @@ import java.io.InputStream
 class ScopedCaptureIngestion(
     private val peers: PhoneDeliveryPeers,
     private val removals: WatchCaptureRemovals? = null,
+    private val moments: WatchMomentIngestor? = null,
     private val create: (PeerDeliveryContext, String?) -> WatchRecordIngestorV2,
 ) {
     private class Lease(
@@ -40,6 +42,10 @@ class ScopedCaptureIngestion(
             return
         }
         if (envelope.operationId != null && CaptureIdentity.of(envelope.id, envelope.operationId) == null) return
+        if (envelope.kind == RecordKind.MOMENT) {
+            moments?.onRecord(source, path, data)
+            return
+        }
         if (envelope.removed) {
             removals?.remove(peer, envelope)
             return
