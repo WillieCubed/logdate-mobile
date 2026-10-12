@@ -59,6 +59,15 @@ object WearPaths {
         id: Uuid,
     ): String = "$RECORD_PREFIX${kind.pathSegment}/$id"
 
+    fun watchRecord(
+        kind: RecordKind,
+        id: Uuid,
+        operationId: String,
+    ): String {
+        require(CaptureIdentity.of(id.toString(), operationId) != null) { "A record needs a valid operation identity" }
+        return "${watchRecord(kind, id)}/op/$operationId"
+    }
+
     /** The channel a body too large for a data item travels on. */
     fun bodyChannel(sha256Hex: String): String {
         require(SHA256_HEX.matches(sha256Hex)) { "A body channel is named by a lowercase hex SHA-256" }
@@ -69,7 +78,15 @@ object WearPaths {
 
     fun parseWindowTombstone(path: String): RecordPath? = parse(path, TOMBSTONE_PREFIX)
 
-    fun parseWatchRecord(path: String): RecordPath? = parse(path, RECORD_PREFIX)
+    fun parseWatchRecord(path: String): RecordPath? {
+        if (!path.startsWith(RECORD_PREFIX)) return null
+        val parts = path.removePrefix(RECORD_PREFIX).split('/')
+        if (parts.size == 2) return parse(path, RECORD_PREFIX)
+        if (parts.size != 4 || parts[2] != "op") return null
+        val record = parse(RECORD_PREFIX + parts.take(2).joinToString("/"), RECORD_PREFIX) ?: return null
+        val identity = CaptureIdentity.of(record.id.toString(), parts[3]) ?: return null
+        return record.copy(operationId = identity.operationId)
+    }
 
     /** The channel the media file of a record made on the watch travels on. */
     fun recordMedia(

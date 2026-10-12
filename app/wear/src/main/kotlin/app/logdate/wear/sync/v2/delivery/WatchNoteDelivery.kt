@@ -15,6 +15,7 @@ import app.logdate.client.sync.datalayer.v2.ReceiptQuery
 import app.logdate.client.sync.datalayer.v2.ReceiptState
 import app.logdate.client.sync.datalayer.v2.ReceiptsRequest
 import app.logdate.client.sync.datalayer.v2.ReceiptsResponse
+import app.logdate.client.sync.datalayer.v2.RecordEnvelope
 import app.logdate.client.sync.datalayer.v2.RecordKind
 import app.logdate.client.sync.datalayer.v2.RecordOrigin
 import app.logdate.client.sync.datalayer.v2.WearJson
@@ -69,9 +70,14 @@ class WatchNoteDelivery(
 ) : WatchNotesV2 {
     private data class Capture(
         val pending: PendingUpload,
-        val note: JournalNote,
+        val note: JournalNote?,
         val identity: CaptureIdentity,
-    )
+    ) {
+        val removed: Boolean get() = pending.operation == PendingOperation.DELETE
+        val version: Long get() = note?.lastUpdated?.toEpochMilliseconds() ?: 0
+        val ledgerKey: String get() = if (removed) identity.removalLedgerKey else identity.ledgerKey
+        val id: Uuid get() = Uuid.parse(pending.entityId)
+    }
 
     private data class Step(
         val settled: Int = 0,
@@ -118,19 +124,20 @@ class WatchNoteDelivery(
         val captures = mutableListOf<Capture>()
         for (operation in pending) {
             if (!isCurrent(peer)) break
-            if (operation.operation == PendingOperation.DELETE || operation.scope == null || operation.operationId.isNullOrBlank()) continue
+            if (operation.scope == null || operation.operationId.isNullOrBlank()) continue
             val identity = CaptureIdentity.of(operation.entityId, operation.operationId) ?: continue
             val id = Uuid.parseOrNull(operation.entityId) ?: continue
-            val note = notes.getNoteById(id) ?: continue
+            val note = if (operation.operation == PendingOperation.DELETE) null else notes.getNoteById(id) ?: continue
+            val capture = Capture(operation, note, identity)
             if (!isCurrent(peer) || !outbox.isCurrentOperation(EntityType.NOTE, operation)) continue
             ledger.track(
                 peer.ledgerScope,
                 DeliveryDirection.TO_PHONE,
                 EntityType.NOTE,
-                identity.ledgerKey,
-                note.lastUpdated.toEpochMilliseconds(),
+                capture.ledgerKey,
+                capture.version,
             )
-            captures += Capture(operation, note, identity)
+            captures += capture
         }
         return captures
     }
@@ -142,13 +149,14 @@ class WatchNoteDelivery(
         conditions: RouteConditions,
         proof: ReceiptsResponse?,
     ): Step {
-        val entry = ledger.get(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, capture.identity.ledgerKey) ?: return Step()
+        val entry = ledger.get(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, capture.ledgerKey) ?: return Step()
         if (entry.holdReason == HoldReason.SEND_FAILED && (entry.nextAttemptAt ?: 0L) > now()) return Step()
         val freshLocalProof =
             proof?.receipts?.any {
                 it.kind == RecordKind.NOTE &&
                     it.id == capture.pending.entityId &&
                     it.operationId == capture.identity.operationId &&
+                    it.removed == capture.removed &&
                     it.covers(entry.contentVersion) &&
                     it.state == ReceiptState.ON_PHONE
             } == true
@@ -192,8 +200,20 @@ class WatchNoteDelivery(
         entry: PeerDelivery,
     ): Step {
         if (!isCurrent(peer)) return Step()
-        if (!outbox.settleIfCurrent(EntityType.NOTE, capture.pending, clock.now(), capture.note.syncVersion)) return Step()
-        if (isCurrent(peer) && transport.deleteOwn(WearPaths.watchRecord(RecordKind.NOTE, capture.note.uid))) {
+        if (!outbox.settleIfCurrent(
+                EntityType.NOTE,
+                capture.pending,
+                clock.now(),
+                (
+                    capture.note?.syncVersion
+                        ?: capture.pending.expectedServerVersion
+                        ?: 0
+                ),
+            )
+        ) {
+            return Step()
+        }
+        if (isCurrent(peer) && transport.deleteOwn(WearPaths.watchRecord(RecordKind.NOTE, capture.id, capture.identity.operationId))) {
             ledger.forget(entry.scope, entry.direction, entry.entityType, entry.entityId)
         }
         return Step(settled = 1)
@@ -215,14 +235,7 @@ class WatchNoteDelivery(
                     listOf(MediaRef(sha256 = digest.sha256Hex, sizeBytes = digest.sizeBytes, mimeType = "audio/mp4"))
                 }
             if (!isCurrent(peer) || !outbox.isCurrentOperation(EntityType.NOTE, capture.pending)) return Step()
-            val envelope =
-                NoteEnvelopeBody
-                    .envelope(
-                        capture.note,
-                        RecordOrigin.WATCH,
-                        DeliveryPriority.URGENT,
-                        media = media,
-                    ).copy(context = peer, operationId = capture.identity.operationId)
+            val envelope = captureEnvelope(peer, capture, media)
             val data =
                 try {
                     EnvelopeDataMap.toDataMap(envelope, sentAt = now())
@@ -232,7 +245,7 @@ class WatchNoteDelivery(
                     return Step()
                 }
             if (!transport.put(
-                    WearPaths.watchRecord(RecordKind.NOTE, capture.note.uid),
+                    WearPaths.watchRecord(RecordKind.NOTE, capture.id, capture.identity.operationId),
                     data,
                 )
             ) {
@@ -257,6 +270,29 @@ class WatchNoteDelivery(
         }
     }
 
+    private fun captureEnvelope(
+        peer: PeerDeliveryContext,
+        capture: Capture,
+        media: List<MediaRef>,
+    ): RecordEnvelope =
+        if (capture.removed) {
+            RecordEnvelope(
+                kind = RecordKind.NOTE,
+                id = capture.pending.entityId,
+                contentVersion = 0,
+                syncVersion = capture.pending.expectedServerVersion ?: 0,
+                origin = RecordOrigin.WATCH,
+                priority = DeliveryPriority.URGENT,
+                context = peer,
+                operationId = capture.identity.operationId,
+                removed = true,
+            )
+        } else {
+            NoteEnvelopeBody
+                .envelope(checkNotNull(capture.note), RecordOrigin.WATCH, DeliveryPriority.URGENT, media = media)
+                .copy(context = peer, operationId = capture.identity.operationId)
+        }
+
     private suspend fun failed(
         entry: PeerDelivery,
         why: String,
@@ -279,8 +315,9 @@ class WatchNoteDelivery(
                             ReceiptQuery(
                                 RecordKind.NOTE,
                                 it.pending.entityId,
-                                it.note.lastUpdated.toEpochMilliseconds(),
+                                it.version,
                                 it.identity.operationId,
+                                removed = it.removed,
                             )
                         },
                     context = peer,

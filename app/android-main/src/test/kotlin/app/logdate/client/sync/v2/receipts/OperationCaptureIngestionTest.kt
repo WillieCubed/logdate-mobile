@@ -3,6 +3,7 @@ package app.logdate.client.sync.v2.receipts
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
 import app.logdate.client.sync.FileWatchAudioStore
+import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.WatchCaptureReceipt
 import app.logdate.client.sync.WatchNoteIngestor
 import app.logdate.client.sync.datalayer.NoteDataMapper
@@ -15,6 +16,7 @@ import app.logdate.client.sync.datalayer.v2.PeerDeliveryContext
 import app.logdate.client.sync.datalayer.v2.ReceiptQuery
 import app.logdate.client.sync.datalayer.v2.ReceiptState
 import app.logdate.client.sync.datalayer.v2.ReceiptsResponse
+import app.logdate.client.sync.datalayer.v2.RecordEnvelope
 import app.logdate.client.sync.datalayer.v2.RecordKind
 import app.logdate.client.sync.datalayer.v2.RecordOrigin
 import app.logdate.client.sync.datalayer.v2.WearJson
@@ -38,6 +40,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -49,7 +52,8 @@ class OperationCaptureIngestionTest {
     private val peers = mockk<PhoneDeliveryPeers>()
     private val notes = mockk<SyncableJournalNotesRepository>()
     private val outbox = mockk<SyncMetadataService>()
-    private val ledger = PeerDeliveryLedger(MemoryPeerDeliveryDao())
+    private val dao = MemoryPeerDeliveryDao()
+    private val ledger = PeerDeliveryLedger(dao)
     private val book = PhoneReceiptBook(notes, outbox, FakeSessions(null), ledger, peers)
     private val sent = mutableListOf<ReceiptsResponse>()
     private val notifier =
@@ -72,13 +76,28 @@ class OperationCaptureIngestionTest {
     private val stored = mutableMapOf(text.uid to (text as JournalNote))
     private val mapper = NoteDataMapper()
     private var resolveFile: (String) -> String? = { it }
+    private val transactions =
+        object : SyncTransactionManager {
+            override suspend fun <T> withTransaction(block: suspend () -> T): T = block()
+        }
+    private val removals = WatchCaptureRemovals(notes, transactions, dao, peers, notifier, mockk(relaxed = true), outbox)
     private val ingestion =
-        ScopedCaptureIngestion(peers) { context, operation ->
+        ScopedCaptureIngestion(peers, removals) { context, operation ->
+            val guarded =
+                WatchCaptureNotes(
+                    notes,
+                    transactions,
+                    outbox,
+                    { peers.isCurrent(context) },
+                    { },
+                    { },
+                    canStore = { !removals.isRemoved(context, it) },
+                )
             val store = store(operation)
             val acknowledger = ReceiptAcknowledger(ledger, notifier, context, operation)
             val ingestor =
                 WatchNoteIngestor(
-                    notes,
+                    guarded,
                     store,
                     acknowledger,
                     { },
@@ -90,7 +109,7 @@ class OperationCaptureIngestionTest {
             WatchRecordIngestorV2(
                 ingestor::onNoteMetadata,
                 { id, input -> ingestor.onAudioBytes(id, input) },
-                notes,
+                guarded,
                 acknowledger,
                 RecordRejection { _, _ -> },
                 operationId = operation,
@@ -102,6 +121,10 @@ class OperationCaptureIngestionTest {
         coEvery { peers.isCurrent(peer) } returns true
         coEvery { peers.all() } returns listOf(peer)
         coEvery { notes.getNoteById(any()) } answers { stored[firstArg()] }
+        coEvery { notes.deleteFromSync(any()) } answers {
+            stored.remove(firstArg())
+            Unit
+        }
         coEvery { notes.create(any<JournalNote>()) } answers {
             val note = firstArg<JournalNote>()
             stored[note.uid] = note
@@ -113,6 +136,7 @@ class OperationCaptureIngestionTest {
             if (previous == null || previous.lastUpdated < note.lastUpdated) stored[note.uid] = note
         }
         coEvery { outbox.hasPending(any(), any()) } returns false
+        coEvery { outbox.enqueuePending(any(), any(), any()) } returns Unit
     }
 
     @AfterTest
@@ -247,6 +271,56 @@ class OperationCaptureIngestionTest {
             assertFailsWith<CancellationException> { send(audio("/watch/recording.m4a"), "owned-audio", media(phone)) }
             assertTrue(sent.isEmpty())
             assertNull(receipt("owned-audio"))
+        }
+
+    @Test
+    fun `a scoped removal prevents later text and recording events from restoring a note`() =
+        runTest {
+            val removal =
+                RecordEnvelope(
+                    kind = RecordKind.NOTE,
+                    id = text.uid.toString(),
+                    contentVersion = 0,
+                    origin = RecordOrigin.WATCH,
+                    context = peer,
+                    operationId = "remove-operation",
+                    removed = true,
+                )
+            ingestion.onRecord("watch", WearPaths.watchRecord(RecordKind.NOTE, text.uid), EnvelopeDataMap.toDataMap(removal, 1))
+            assertNull(stored[text.uid])
+            send(text, "late-operation")
+            val source = File(root, "late.m4a").apply { writeBytes(byteArrayOf(7, 8)) }
+            val note = audio(source.absolutePath)
+            ingestion.onMedia("watch", WearPaths.recordMedia(RecordKind.NOTE, note.uid, peer, "late-audio"), source.inputStream())
+            send(note, "late-audio", media(source))
+            assertNull(stored[text.uid])
+            assertEquals(
+                ReceiptState.DELETED_ON_PHONE,
+                book.receiptFor(peer, ReceiptQuery(RecordKind.NOTE, text.uid.toString(), 0, "remove-operation", removed = true))?.state,
+            )
+            assertFalse(File(root, "incoming/v2/${peer.linkPathSegment}/operations/late-audio").walkTopDown().any { it.isFile })
+        }
+
+    @Test
+    fun `a removal on another note path cannot delete the envelope note`() =
+        runTest {
+            val removal =
+                RecordEnvelope(
+                    kind = RecordKind.NOTE,
+                    id = text.uid.toString(),
+                    contentVersion = 0,
+                    origin = RecordOrigin.WATCH,
+                    context = peer,
+                    operationId = "remove-operation",
+                    removed = true,
+                )
+            ingestion.onRecord(
+                "watch",
+                WearPaths.watchRecord(RecordKind.NOTE, kotlin.uuid.Uuid.random()),
+                EnvelopeDataMap.toDataMap(removal, 1),
+            )
+            assertEquals(text, stored[text.uid])
+            assertFalse(removals.isRemoved(peer, text.uid))
         }
 
     private fun store(operation: String?) =

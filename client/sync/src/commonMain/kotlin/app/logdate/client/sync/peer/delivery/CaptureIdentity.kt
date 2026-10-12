@@ -7,6 +7,8 @@ class CaptureIdentity private constructor(
 ) {
     val ledgerKey: String get() = "$recordId@$operationId"
 
+    val removalLedgerKey: String get() = "$ledgerKey:remove"
+
     companion object {
         fun fromLedgerKey(key: String): CaptureIdentity? {
             val split = key.indexOf('@')

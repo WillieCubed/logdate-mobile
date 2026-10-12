@@ -1,5 +1,7 @@
 package app.logdate.client.sync.datalayer.v2
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
@@ -67,6 +69,7 @@ data class MediaRef(
  * @property enc Reserved for end-to-end encrypted envelopes. Schema 1 never sets it, and a schema 1
  *   reader refuses an envelope that does.
  */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class RecordEnvelope(
     val schema: Int = WearProtocol.ENVELOPE_SCHEMA,
@@ -83,6 +86,8 @@ data class RecordEnvelope(
     val media: List<MediaRef> = emptyList(),
     val context: PeerDeliveryContext? = null,
     val operationId: String? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val removed: Boolean = false,
 )
 
 /** Reads and writes [RecordEnvelope]s, enforcing the inline body limit. */

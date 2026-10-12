@@ -18,6 +18,7 @@ class WatchCaptureNotes(
     private val isCurrent: suspend () -> Boolean,
     private val onUpdated: () -> Unit,
     private val rememberCapture: suspend (JournalNote) -> Unit,
+    private val canStore: suspend (Uuid) -> Boolean = { true },
 ) : SyncableJournalNotesRepository by delegate {
     override suspend fun getNoteById(noteId: Uuid): JournalNote? {
         requireCurrent()
@@ -29,6 +30,7 @@ class WatchCaptureNotes(
     override suspend fun create(note: JournalNote): Uuid = guarded { createCapture(note) }
 
     private suspend fun createCapture(note: JournalNote): Uuid {
+        if (!canStore(note.uid)) return note.uid
         rememberCapture(note)
         requireCurrent()
         return delegate.create(note)
@@ -37,6 +39,7 @@ class WatchCaptureNotes(
     override suspend fun createFromSync(note: JournalNote) {
         val updated =
             guarded {
+                if (!canStore(note.uid)) return@guarded false
                 val existing = getNoteById(note.uid)
                 when {
                     existing == null -> {

@@ -11,6 +11,7 @@ import java.io.InputStream
 /** Binds each event to its current source and keeps overlapping work on the same per-link ingestor. */
 class ScopedCaptureIngestion(
     private val peers: PhoneDeliveryPeers,
+    private val removals: WatchCaptureRemovals? = null,
     private val create: (PeerDeliveryContext, String?) -> WatchRecordIngestorV2,
 ) {
     private class Lease(
@@ -29,10 +30,23 @@ class ScopedCaptureIngestion(
         val peer = peers.current(source) ?: return
         val envelope = (EnvelopeDataMap.fromDataMap(data) as? Decoded.Supported)?.value ?: return
         if (envelope.context != peer) return
+        val record = WearPaths.parseWatchRecord(path) ?: return
+        if (record.kind != envelope.kind ||
+            record.id.toString() != envelope.id ||
+            record.operationId != null &&
+            record.operationId != envelope.operationId
+        ) {
+            return
+        }
         if (envelope.operationId != null && CaptureIdentity.of(envelope.id, envelope.operationId) == null) return
+        if (envelope.removed) {
+            removals?.remove(peer, envelope)
+            return
+        }
+        if (removals?.isRemoved(peer, record.id) == true) return
         using(peer, envelope.operationId) { ingestor ->
             val unbound = data + (EnvelopeDataMap.KEY_ENVELOPE to RecordEnvelopeCodec.encode(envelope.copy(context = null)))
-            ingestor.onRecord(path, unbound)
+            ingestor.onRecord(WearPaths.watchRecord(record.kind, record.id), unbound)
         }
     }
 
@@ -44,7 +58,7 @@ class ScopedCaptureIngestion(
         val source = sourceNodeId ?: return
         val peer = peers.current(source) ?: return
         val record = WearPaths.parseRecordMedia(path) ?: return
-        if (record.linkId != peer.linkId) return
+        if (record.linkId != peer.linkId || removals?.isRemoved(peer, record.id) == true) return
         using(peer, record.operationId) { it.onMedia(WearPaths.recordMedia(record.kind, record.id), input) }
     }
 

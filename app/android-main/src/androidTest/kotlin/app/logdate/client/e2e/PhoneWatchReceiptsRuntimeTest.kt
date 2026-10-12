@@ -36,6 +36,7 @@ class PhoneWatchReceiptsRuntimeTest {
     @Test
     fun recordChangesReachThePhoneListener() {
         assertListener("DATA_CHANGED", "/logdate/v2/w2p/record/note/${Uuid.random()}")
+        assertListener("DATA_CHANGED", WearPaths.watchRecord(RecordKind.NOTE, Uuid.random(), "operation"))
     }
 
     @Test

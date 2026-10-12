@@ -96,7 +96,13 @@ class WatchReceiptApplier(
         }
         if (Uuid.parseOrNull(receipt.id)?.toString() != receipt.id) return false
         val operation = receipt.operationId
-        val key = if (operation == null) receipt.id else CaptureIdentity.of(receipt.id, operation)?.ledgerKey ?: return false
+        if (receipt.removed &&
+            (receipt.state != ReceiptState.DELETED_ON_PHONE || receipt.contentVersion != 0L || operation == null)
+        ) {
+            return false
+        }
+        val identity = operation?.let { CaptureIdentity.of(receipt.id, it) ?: return false }
+        val key = if (receipt.removed) identity!!.removalLedgerKey else identity?.ledgerKey ?: receipt.id
         val moved =
             ledger.applyReceipt(
                 scope = peer.ledgerScope,

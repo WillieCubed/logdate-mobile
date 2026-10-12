@@ -15,6 +15,22 @@ class ScopedCaptureWireTest {
     private val context = PeerDeliveryContext(LinkWire.encodeKey(ByteArray(32) { -1 }), "phone", "watch", LinkMode.PAIR)
 
     @Test
+    fun `operation record paths keep cleanup separate from a later mutation`() {
+        val path = WearPaths.watchRecord(RecordKind.NOTE, id, "operation")
+        assertEquals("/logdate/v2/w2p/record/note/$id/op/operation", path)
+        assertEquals(RecordPath(RecordKind.NOTE, id, operationId = "operation"), WearPaths.parseWatchRecord(path))
+        assertNotEquals(path, WearPaths.watchRecord(RecordKind.NOTE, id, "later-operation"))
+    }
+
+    @Test
+    fun `malformed operation record paths stay rejected`() {
+        for (operation in listOf("", "../escape", "a".repeat(129), "%2Fescape")) {
+            assertFailsWith<IllegalArgumentException> { WearPaths.watchRecord(RecordKind.NOTE, id, operation) }
+            assertNull(WearPaths.parseWatchRecord("/logdate/v2/w2p/record/note/$id/op/$operation"))
+        }
+    }
+
+    @Test
     fun `an envelope carries its verified delivery context through the data map`() {
         val envelope =
             RecordEnvelope(

@@ -92,9 +92,9 @@ class ReleasedToCloudTest {
     @Test
     fun `a deletion can be released without admitting other entity types`() =
         runTest {
-            markReleased()
+            markReleased("note@operation:remove", 0)
             val deletion = pending.copy(operation = PendingOperation.DELETE)
-            released.withCaptures(peer, listOf(CloudCapture(deletion, 5))) {
+            released.withCaptures(peer, listOf(CloudCapture(deletion, 0))) {
                 assertTrue(released.isEligible(EntityType.NOTE, deletion))
                 assertFalse(released.isEligible(EntityType.JOURNAL, deletion))
             }
@@ -174,8 +174,11 @@ class ReleasedToCloudTest {
             assertFalse(released.isEligible(EntityType.NOTE, pending))
         }
 
-    private suspend fun markReleased() {
-        val row = ledger.track(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, "note@operation", 5)
+    private suspend fun markReleased(
+        key: String = "note@operation",
+        version: Long = 5,
+    ) {
+        val row = ledger.track(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, key, version)
         ledger.moveTo(row, DeliveryState.CLOUD_PENDING)
     }
 }

@@ -60,6 +60,7 @@ import app.logdate.client.sync.v2.receipts.ScopedCaptureIngestion
 import app.logdate.client.sync.v2.receipts.WatchCaptureCollisionPolicy
 import app.logdate.client.sync.v2.receipts.WatchCaptureNotes
 import app.logdate.client.sync.v2.receipts.WatchCaptureProvenance
+import app.logdate.client.sync.v2.receipts.WatchCaptureRemovals
 import app.logdate.client.sync.v2.receipts.WatchPeerMessageSender
 import app.logdate.client.sync.v2.receipts.WatchReceiptNotifier
 import app.logdate.client.sync.v2.receipts.WatchReceiptResponder
@@ -158,7 +159,18 @@ val phoneWatchSyncV2Module =
             val mapper = get<NoteDataMapper>()
             val files = androidContext().filesDir
             val mediaFiles = get<MediaFileResolver>()
-            ScopedCaptureIngestion(peers) { peer, operation ->
+            val removals =
+                WatchCaptureRemovals(
+                    notes,
+                    transactions,
+                    get<LogDateDatabase>().peerDeliveryDao(),
+                    peers,
+                    receipts,
+                    get(),
+                    outbox,
+                    onUpdated = { get<SyncManager>().sync() },
+                )
+            ScopedCaptureIngestion(peers, removals) { peer, operation ->
                 val guarded =
                     WatchCaptureNotes(
                         notes,
@@ -167,6 +179,7 @@ val phoneWatchSyncV2Module =
                         { peers.isCurrent(peer) },
                         { get<SyncManager>().sync() },
                         provenance::remember,
+                        canStore = { !removals.isRemoved(peer, it) },
                     )
                 val acknowledger = ReceiptAcknowledger(ledger, receipts, peer, operation)
                 val ingestor =

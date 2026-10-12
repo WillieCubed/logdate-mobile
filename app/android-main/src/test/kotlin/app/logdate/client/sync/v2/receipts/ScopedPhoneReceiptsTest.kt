@@ -266,6 +266,14 @@ class ScopedPhoneReceiptsTest {
             assertEquals(ReceiptState.BACKED_UP, receipt?.state)
         }
 
+    @Test
+    fun `capture history cannot certify a removal even with the same operation identity`() =
+        runTest {
+            link()
+            ledger.track(context.ledgerScope, DeliveryDirection.FROM_WATCH, EntityType.NOTE, "$id@operation", 5)
+            assertNull(book.receiptFor(context, query.copy(operationId = "operation", removed = true)))
+        }
+
     private suspend fun link(peer: PeerDeliveryContext = context) {
         links.recordSuccess(
             LinkTarget(peer.watchNode, "Watch"),

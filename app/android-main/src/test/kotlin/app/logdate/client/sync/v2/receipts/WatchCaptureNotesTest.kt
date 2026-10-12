@@ -15,6 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -86,6 +87,16 @@ class WatchCaptureNotesTest {
             enqueued = thirdArg()
         }
     }
+
+    @Test
+    fun `a durable removal barrier prevents a late capture from being created`() =
+        runTest {
+            val guarded = WatchCaptureNotes(delegate, transaction, outbox, { true }, { }, { }, canStore = { false })
+            guarded.createFromSync(note)
+            assertNull(stored)
+            assertNull(enqueued)
+            assertFalse(remembered)
+        }
 
     @Test
     fun `a current capture is created within the guarded transaction`() =

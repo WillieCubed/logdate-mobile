@@ -50,9 +50,10 @@ class WatchReceiptNotifier(
         noteId: String,
         contentVersion: Long,
         operationId: String? = null,
+        removed: Boolean = false,
     ): Boolean {
         if (!isCurrent(context)) return false
-        val receipt = book.receiptFor(context, ReceiptQuery(RecordKind.NOTE, noteId, contentVersion, operationId)) ?: return false
+        val receipt = book.receiptFor(context, ReceiptQuery(RecordKind.NOTE, noteId, contentVersion, operationId, removed)) ?: return false
         return send(context, listOf(receipt))
     }
 

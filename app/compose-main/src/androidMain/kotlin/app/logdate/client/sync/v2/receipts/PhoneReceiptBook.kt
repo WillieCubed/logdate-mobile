@@ -13,6 +13,7 @@ import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.peer.delivery.CaptureIdentity
 import app.logdate.client.sync.peer.delivery.DeliveryDirection
+import app.logdate.client.sync.peer.delivery.DeliveryState
 import app.logdate.client.sync.peer.delivery.PeerDeliveryLedger
 import app.logdate.client.sync.peer.delivery.PeerScopes
 import kotlin.uuid.Uuid
@@ -34,7 +35,7 @@ class PhoneReceiptBook(
 
     /** Null when the phone has no copy of that version yet, so the watch sends it again. */
     suspend fun receiptFor(query: ReceiptQuery): Receipt? {
-        if (query.operationId != null) return null
+        if (query.operationId != null || query.removed) return null
         val session = sessions.getOriginBoundSession()
         val id = Uuid.parseOrNull(query.id)
         if (query.kind != RecordKind.NOTE || id == null) return rejected(query.kind, query.id, query.operationId)
@@ -69,12 +70,19 @@ class PhoneReceiptBook(
         val session = sessions.getOriginBoundSession()
         val id = Uuid.parseOrNull(query.id)
         if (query.kind != RecordKind.NOTE || id == null) return rejected(query.kind, query.id, query.operationId)
-        val key = query.operationId?.let { CaptureIdentity.of(query.id, it)?.ledgerKey ?: return null } ?: query.id
+        val identity = query.operationId?.let { CaptureIdentity.of(query.id, it) ?: return null }
+        if (query.removed && (identity == null || query.contentVersion != 0L)) return null
+        val key = if (query.removed) identity!!.removalLedgerKey else identity?.ledgerKey ?: query.id
         val received =
             ledger
                 .get(context.ledgerScope, DeliveryDirection.FROM_WATCH, EntityType.NOTE, key)
                 ?.takeIf { it.contentVersion >= query.contentVersion } ?: return null
         val note = notes.getNoteById(id)
+        if (query.removed) {
+            if (note != null || received.state != DeliveryState.DELETED_ON_PHONE) return null
+            return Receipt(RecordKind.NOTE, query.id, 0, ReceiptState.DELETED_ON_PHONE, operationId = query.operationId, removed = true)
+                .takeIf { sessions.getOriginBoundSession() == session && isCurrent(context) }
+        }
         val receipt =
             if (note == null) {
                 Receipt(RecordKind.NOTE, query.id, received.contentVersion, ReceiptState.DELETED_ON_PHONE)

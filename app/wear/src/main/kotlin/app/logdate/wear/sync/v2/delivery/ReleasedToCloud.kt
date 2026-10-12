@@ -61,7 +61,8 @@ class ReleasedToCloud(
         if (scope.ownerId != peer.accountId || scope.serverOrigin != peer.serverOrigin || pending.operationId.isNullOrBlank()) return false
         val capture = run.captures.firstOrNull { sameOperation(it.pending, pending) } ?: return false
         val identity = CaptureIdentity.of(pending.entityId, pending.operationId) ?: return false
-        val entry = ledger.get(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, identity.ledgerKey) ?: return false
+        val key = if (pending.operation == PendingOperation.DELETE) identity.removalLedgerKey else identity.ledgerKey
+        val entry = ledger.get(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, key) ?: return false
         if (entry.state != DeliveryState.CLOUD_PENDING ||
             entry.holdReason != null ||
             entry.contentVersion != capture.contentVersion

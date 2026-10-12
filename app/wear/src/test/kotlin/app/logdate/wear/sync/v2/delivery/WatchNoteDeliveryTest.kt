@@ -196,7 +196,7 @@ class WatchNoteDeliveryTest {
             assertEquals(1, assertNotNull(delivery.deliverIfActive()).uploadedItems)
             assertTrue(queue.isEmpty())
             assertTrue(transport.puts.isEmpty())
-            assertEquals(listOf(WearPaths.watchRecord(RecordKind.NOTE, note.uid)), transport.deleted)
+            assertEquals(listOf(WearPaths.watchRecord(RecordKind.NOTE, note.uid, "operation")), transport.deleted)
         }
 
     @Test
