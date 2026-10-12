@@ -17,6 +17,7 @@ import app.logdate.client.sync.datalayer.v2.WearPaths
 import app.logdate.client.sync.peer.state.StateDocumentCodec
 import app.logdate.wear.presentation.camera.WearRemoteCameraCaptureResultStore
 import app.logdate.wear.presentation.camera.WearRemoteCameraDeviceStore
+import app.logdate.wear.reminders.WearPresenceResponder
 import app.logdate.wear.sync.v2.WatchStateMirror
 import app.logdate.wear.sync.v2.link.WatchLinkCoordinator
 import app.logdate.wear.sync.v2.link.answerWearRequest
@@ -97,7 +98,7 @@ class WearDataLayerListenerService : WearableListenerService() {
         path: String,
         request: ByteArray,
     ): ByteArray? {
-        if (!WatchLinkCoordinator.handles(path)) {
+        if (!WatchLinkCoordinator.handles(path) && path != WearPaths.PRESENCE) {
             Napier.w("The phone sent a request this watch does not answer: $path")
             return null
         }
@@ -106,7 +107,11 @@ class WearDataLayerListenerService : WearableListenerService() {
             Napier.e("Koin unavailable after $MAX_KOIN_RETRIES retries; the phone's link request fails and is tried again")
             return null
         }
-        return koin.get<WatchLinkCoordinator>().answer(nodeId, path, request)
+        return if (path == WearPaths.PRESENCE) {
+            koin.get<WearPresenceResponder>().answer(nodeId, request)
+        } else {
+            koin.get<WatchLinkCoordinator>().answer(nodeId, path, request)
+        }
     }
 
     /** The watch now belongs to another phone, so the link with [nodeId] is stale. */

@@ -1,6 +1,7 @@
 package app.logdate.wear.di
 
 import android.content.Context
+import android.hardware.SensorManager
 import androidx.health.services.client.HealthServices
 import androidx.wear.phone.interactions.PhoneTypeHelper
 import androidx.wear.remote.interactions.RemoteActivityHelper
@@ -33,15 +34,19 @@ import app.logdate.wear.reminders.EveningReminderWork
 import app.logdate.wear.reminders.HealthServicesActivityRegistration
 import app.logdate.wear.reminders.NudgeNotifier
 import app.logdate.wear.reminders.ReminderPermissions
+import app.logdate.wear.reminders.SensorManagerOffBodyReadings
 import app.logdate.wear.reminders.SharedPreferencesActivityTransitionStore
 import app.logdate.wear.reminders.SharedPreferencesWatchReminderPreferences
 import app.logdate.wear.reminders.WatchNudgeNotifier
 import app.logdate.wear.reminders.WatchReminderDispatcher
 import app.logdate.wear.reminders.WatchReminderPreferences
 import app.logdate.wear.reminders.WatchReminders
+import app.logdate.wear.reminders.WearPresenceResponder
+import app.logdate.wear.reminders.WearPresenceSampler
 import app.logdate.wear.reminders.WorkManagerEveningReminderWork
 import app.logdate.wear.reminders.WorkoutWatcher
 import app.logdate.wear.sync.deleteLocalAudio
+import app.logdate.wear.sync.v2.delivery.WatchDeliveryPeer
 import app.logdate.wear.sync.v2.window.WindowProtocol
 import app.logdate.wear.v2.archive.ArchiveViewModel
 import app.logdate.wear.v2.capture.CaptureSheetViewModel
@@ -281,6 +286,16 @@ val wearV2Module =
             )
         }
         single<NudgeNotifier> { WatchNudgeNotifier(get()) }
+        single { WearPresenceSampler(SensorManagerOffBodyReadings(get<Context>().getSystemService(SensorManager::class.java))) }
+        single {
+            val flags = get<FeatureFlagStore>()
+            val peers = get<WatchDeliveryPeer>()
+            WearPresenceResponder(
+                sampler = get(),
+                currentPeer = { peers.current() },
+                enabled = { flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) },
+            )
+        }
         single { WatchReminderDispatcher(preferences = get(), notifier = get()) }
         single<ReminderPermissions> { AndroidReminderPermissions(get()) }
         single<ActivityRegistration> { HealthServicesActivityRegistration(get()) }
