@@ -10,6 +10,30 @@ import kotlin.test.assertTrue
 
 class DurableCloudApiClientTest {
     @Test
+    fun `authentication refusal is not masked by retained note work`() =
+        runTest {
+            val db = DownloadInboxTest.Database()
+            val inbox = DownloadInbox(db, db, { DownloadScope("owner", "server") }, { 1000 })
+            inbox.stage(
+                "NOTE",
+                7,
+                listOf(
+                    WireDownload(
+                        "note",
+                        7,
+                        false,
+                        """{"id":"note","type":"TEXT","content":"encrypted","createdAt":1,"lastUpdated":1,"serverVersion":7}""",
+                    ),
+                ),
+            )
+            val refusal =
+                app.logdate.client.sync.cloud
+                    .CloudApiException("DEVICE_REVOKED", "Access refused", 401)
+            val api = fakeCloudApiClient { getContentChangesResponse = Result.failure(refusal) }
+            assertEquals(refusal, DurableCloudApiClient(api, inbox).getContentChanges("token", 0).exceptionOrNull())
+        }
+
+    @Test
     fun `one corrupt retained wire payload cannot block unrelated records`() =
         runTest {
             val db = DownloadInboxTest.Database()

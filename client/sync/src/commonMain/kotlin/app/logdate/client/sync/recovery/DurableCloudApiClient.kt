@@ -13,6 +13,9 @@ import app.logdate.shared.model.sync.ContentDeletion
 import app.logdate.shared.model.sync.JournalChange
 import app.logdate.shared.model.sync.JournalChangesResponse
 import app.logdate.shared.model.sync.JournalDeletion
+import app.logdate.shared.model.sync.MomentChange
+import app.logdate.shared.model.sync.MomentChangesResponse
+import app.logdate.shared.model.sync.MomentDeletion
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -23,6 +26,36 @@ class DurableCloudApiClient(
     private val inbox: DownloadInbox,
 ) : CloudApiClient by delegate {
     private val json = Json { encodeDefaults = true }
+
+    override suspend fun getMomentChanges(
+        accessToken: String,
+        since: Long,
+        limit: Int?,
+    ): Result<MomentChangesResponse> =
+        safely {
+            val scope = inbox.currentScope()
+            val diagnosticSource = inbox.captureDiagnosticSource(scope)
+            val fetched = delegate.getMomentChanges(accessToken, inbox.cursor("MOMENT", scope), limit)
+            val page = fetched.getOrNull()
+            if (page != null) {
+                inbox.stage(
+                    "MOMENT",
+                    page.lastTimestamp,
+                    page.changes.map { WireDownload(it.id, it.serverVersion, false, json.encodeToString(it)) } +
+                        page.deletions.map { WireDownload(it.id, it.serverVersion, true, json.encodeToString(it)) },
+                    scope,
+                )
+            }
+            val pending = inbox.pending("MOMENT", scope)
+            handleFetchFailure(fetched, "MOMENT", scope, pending.isNotEmpty())
+            check(scope == inbox.currentScope()) { "Download scope changed" }
+            MomentChangesResponse(
+                changes = decodeRows<MomentChange>(pending.filterNot { it.deleted }, "MOMENT", scope, diagnosticSource),
+                deletions = decodeRows<MomentDeletion>(pending.filter { it.deleted }, "MOMENT", scope, diagnosticSource),
+                lastTimestamp = inbox.cursor("MOMENT", scope),
+                hasMore = page?.hasMore ?: false,
+            )
+        }
 
     override suspend fun getContentChanges(
         accessToken: String,
@@ -216,7 +249,8 @@ class DurableCloudApiClient(
                 else -> DiagnosticReason.SERVER_UNAVAILABLE
             }
         inbox.fetchFailed(type, reason, scope)
-        if (!canReplay) throw error
+        // Cached work must not hide a refusal from token refresh or device-revocation handling.
+        if (!canReplay || reason == DiagnosticReason.SIGN_IN_REQUIRED) throw error
     }
 
     private suspend fun <T> safely(block: suspend () -> T): Result<T> =
