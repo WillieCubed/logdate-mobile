@@ -409,9 +409,7 @@ class OfflineFirstJournalNotesRepository(
             is JournalNote.Text -> textNoteDao.addNote(storedNote.toEntity())
             is JournalNote.Image -> {
                 imageNoteDao.addNote(storedNote.toEntity())
-                if (storedNote.caption.isNotEmpty()) {
-                    mediaCaptionDao.upsertCaption(MediaCaptionEntity(storedNote.uid, storedNote.caption))
-                }
+                mediaCaptionDao.upsertCaption(MediaCaptionEntity(storedNote.uid, storedNote.caption))
             }
             is JournalNote.Audio -> {
                 audioNoteDao.addNote(storedNote.toEntity())
@@ -420,9 +418,7 @@ class OfflineFirstJournalNotesRepository(
             }
             is JournalNote.Video -> {
                 videoNoteDao.addNote(storedNote.toEntity())
-                if (storedNote.caption.isNotEmpty()) {
-                    mediaCaptionDao.upsertCaption(MediaCaptionEntity(storedNote.uid, storedNote.caption))
-                }
+                mediaCaptionDao.upsertCaption(MediaCaptionEntity(storedNote.uid, storedNote.caption))
             }
         }
     }
@@ -492,24 +488,4 @@ class OfflineFirstJournalNotesRepository(
         transcriptionRepository,
         queries,
     ).exportContentToFile(destination, overwrite, startTimestamp, endTimestamp)
-}
-
-private sealed interface PendingMediaIndex {
-    val uri: String
-    val timestamp: Instant
-
-    data class Image(
-        override val uri: String,
-        override val timestamp: Instant,
-    ) : PendingMediaIndex
-
-    data class Video(
-        override val uri: String,
-        override val timestamp: Instant,
-        val duration: kotlin.time.Duration,
-    ) : PendingMediaIndex
-}
-
-private object PassthroughSyncTransactionManager : SyncTransactionManager {
-    override suspend fun <T> withTransaction(block: suspend () -> T): T = block()
 }
