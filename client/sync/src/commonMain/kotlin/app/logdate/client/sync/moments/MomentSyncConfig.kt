@@ -22,3 +22,21 @@ internal fun DefaultSyncManager.createMomentDownloader(config: MomentSyncConfig)
         statusPublisher::handleCloudApiError,
         statusPublisher::handleSyncException,
     )
+
+internal fun DefaultSyncManager.createMomentUploader(config: MomentSyncConfig): MomentUploader =
+    MomentUploader(
+        config,
+        syncMetadataService,
+        transactionManager,
+        tokenRefresher,
+        retryCoordinator,
+        profile,
+        {
+            app.logdate.shared.model.sync.DeviceId(
+                requireNotNull(deviceIdProvider) {
+                    "Moment uploads require a device identity"
+                }.getDeviceId().value.toString(),
+            )
+        },
+        requireNotNull(downloadInbox) { "Moment uploads require a durable download inbox" },
+    )

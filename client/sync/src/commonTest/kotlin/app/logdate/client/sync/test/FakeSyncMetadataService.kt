@@ -17,6 +17,10 @@ import kotlin.uuid.Uuid
 class FakeSyncMetadataService(
     private val sessionStorage: SessionStorage = AlwaysAuthenticatedSessionStorage,
     private val trackOperationIdentity: Boolean = false,
+    private val currentScope: () -> app.logdate.client.sync.metadata.UploadScope = {
+        app.logdate.client.sync.metadata
+            .UploadScope("fixture-owner", "fixture-server")
+    },
 ) : SyncMetadataService {
     private val operationIds = mutableMapOf<Pair<EntityType, String>, String>()
     private val queuedFlow = MutableStateFlow<List<QueuedUpload>>(emptyList())
@@ -45,10 +49,7 @@ class FakeSyncMetadataService(
                     repairVersions[entityType to entityId],
                     scope =
                         if (trackOperationIdentity) {
-                            app.logdate.client.sync.metadata.UploadScope(
-                                "fixture-owner",
-                                "fixture-server",
-                            )
+                            currentScope()
                         } else {
                             null
                         },
@@ -216,10 +217,7 @@ class FakeSyncMetadataService(
                         retryCounts[type]?.get(id) ?: 0,
                         scope =
                             if (trackOperationIdentity) {
-                                app.logdate.client.sync.metadata.UploadScope(
-                                    "fixture-owner",
-                                    "fixture-server",
-                                )
+                                currentScope()
                             } else {
                                 null
                             },

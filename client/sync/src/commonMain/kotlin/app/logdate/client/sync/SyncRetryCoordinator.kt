@@ -345,6 +345,16 @@ internal class SyncRetryCoordinator(
         outcome: DiagnosticOutcome = DiagnosticOutcome.SUCCEEDED,
     ): Boolean {
         val settled = syncMetadataService.settleIfCurrent(entityType, pending, syncedAt, version)
+        return finishPersistedSettlement(entityType, pending, settled, outcome)
+    }
+
+    /** Publish and clean up only after a caller's atomic row/outbox transaction has committed. */
+    suspend fun finishPersistedSettlement(
+        entityType: EntityType,
+        pending: PendingUpload,
+        settled: Boolean,
+        outcome: DiagnosticOutcome = DiagnosticOutcome.SUCCEEDED,
+    ): Boolean {
         retryScheduleStore.clear(entityType, pending.retryKey())
         deadLetterStore.remove(pending.operationId ?: "${entityType.name}:${pending.entityId}")
         val attempt = attemptsInFlight.remove(PendingEntityKey(entityType, pending.retryKey()))

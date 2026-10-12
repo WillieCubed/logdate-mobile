@@ -234,6 +234,19 @@ class DownloadInbox(
         selected: DownloadScope = scope(),
     ): Long? = dao.get(selected.owner, selected.origin, type, id)?.takeUnless { it.deleted }?.version
 
+    /** Only a tombstone already applied to local storage can authorize settling missing-body work. */
+    suspend fun appliedDeletionVersion(
+        type: String,
+        id: String,
+        selected: DownloadScope = scope(),
+    ): Long? {
+        if (selected != scope()) return null
+        return dao
+            .get(selected.owner, selected.origin, type, id)
+            ?.takeIf { it.deleted && it.state == "APPLIED" && it.version > 0 }
+            ?.version
+    }
+
     suspend fun isCurrentVersion(
         type: String,
         id: String,

@@ -37,6 +37,7 @@ import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
 import app.logdate.client.sync.metadata.UnreadableCloudRecordStore
 import app.logdate.client.sync.moments.createMomentDownloader
+import app.logdate.client.sync.moments.createMomentUploader
 import app.logdate.client.util.platformIODispatcher
 import app.logdate.shared.model.CloudAccountRepository
 import app.logdate.shared.model.CloudQuotaManager
@@ -82,7 +83,7 @@ class DefaultSyncManager(
     internal val syncMetadataService: SyncMetadataService,
     internal val transactionManager: SyncTransactionManager,
     private val dataUsagePolicy: DataUsagePolicy,
-    private val deviceIdProvider: DeviceIdProvider? = null,
+    internal val deviceIdProvider: DeviceIdProvider? = null,
     /** Wired on every platform; optional only so tests that never encrypt can omit it. */
     internal val identityKeyManager: IdentityKeyManager? = null,
     /**
@@ -127,6 +128,7 @@ class DefaultSyncManager(
     internal var isEnabled = true
 
     internal val momentDownloader by lazy { momentSyncConfig?.let(::createMomentDownloader) }
+    internal val momentUploader by lazy { momentSyncConfig?.let(::createMomentUploader) }
 
     internal val historyEngine = locationHistorySyncEngine.takeIf { profile.syncsLocationHistory }
 
@@ -419,7 +421,7 @@ class DefaultSyncManager(
             mediaReferences = mediaReferences,
         )
 
-    private val retryCoordinator =
+    internal val retryCoordinator =
         SyncRetryCoordinator(
             retryScheduleStore = retryScheduleStore,
             syncMetadataService = syncMetadataService,

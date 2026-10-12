@@ -14,6 +14,7 @@ import app.logdate.client.device.crypto.DesktopCryptoManager
 import app.logdate.client.device.crypto.IdentityKeyManager
 import app.logdate.client.device.crypto.KeyDerivation
 import app.logdate.client.device.identity.CanonicalOwnerProvider
+import app.logdate.client.device.identity.DeviceIdProvider
 import app.logdate.client.networking.DefaultServerDiscoveryClient
 import app.logdate.client.networking.DeviceLinkApiClient
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -23,6 +24,7 @@ import app.logdate.client.repository.moments.MarkedMoment
 import app.logdate.client.repository.moments.atMillisecondPrecision
 import app.logdate.client.sync.DefaultSyncManager
 import app.logdate.client.sync.RoomSyncTransactionManager
+import app.logdate.client.sync.SyncTransactionManager
 import app.logdate.client.sync.cloud.CloudRequestLocation
 import app.logdate.client.sync.cloud.CloudRequestLocationProvider
 import app.logdate.client.sync.cloud.DefaultCloudAssociationDataSource
@@ -35,6 +37,7 @@ import app.logdate.client.sync.crypto.MarkedMomentPayloadCodec
 import app.logdate.client.sync.crypto.SyncPayloadCipher
 import app.logdate.client.sync.metadata.DatabaseSyncMetadataService
 import app.logdate.client.sync.metadata.EntityType
+import app.logdate.client.sync.metadata.PendingOperation
 import app.logdate.client.sync.moments.MomentSyncConfig
 import app.logdate.client.sync.recovery.DownloadInbox
 import app.logdate.client.sync.recovery.DownloadScope
@@ -47,15 +50,18 @@ import app.logdate.shared.model.sync.DeviceId
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
@@ -171,6 +177,20 @@ class MarkedMomentRoomDownloadE2ETest {
                         }
                     val journals = mockk<JournalRepository>(relaxed = true) { every { allJournalsObserved } returns flowOf(emptyList()) }
                     val notes = mockk<JournalNotesRepository>(relaxed = true) { every { allNotesObserved } returns flowOf(emptyList()) }
+                    var interruptReceipt = false
+                    val receiptTransactions =
+                        object : SyncTransactionManager {
+                            override suspend fun <T> withTransaction(block: suspend () -> T): T =
+                                transactions.withTransaction {
+                                    val result = block()
+                                    if (interruptReceipt) {
+                                        interruptReceipt = false
+                                        throw CancellationException("Interrupted receipt commit")
+                                    }
+                                    result
+                                }
+                        }
+                    val device = mockk<DeviceIdProvider> { every { getDeviceId() } returns MutableStateFlow(Uuid.random()) }
                     val manager =
                         DefaultSyncManager(
                             cloudContentDataSource = DefaultCloudContentDataSource(durable, phoneCipher),
@@ -191,7 +211,8 @@ class MarkedMomentRoomDownloadE2ETest {
                             deadLetterStore = mockk(relaxed = true),
                             retryScheduleStore = mockk(relaxed = true),
                             syncMetadataService = metadata,
-                            transactionManager = transactions,
+                            transactionManager = receiptTransactions,
+                            deviceIdProvider = device,
                             dataUsagePolicy = mockk(relaxed = true),
                             identityKeyManager = phoneIdentity,
                             cloudApiClient = api,
@@ -227,7 +248,31 @@ class MarkedMomentRoomDownloadE2ETest {
                     assertEquals(setOf(localNote, otherNote), repository.getMark(mark.id)!!.resolvedNoteIds)
                     assertEquals(MarkState.FILLED, repository.getMark(mark.id)!!.state)
                     assertEquals(pending, metadata.getPendingUploads(EntityType.MOMENT).single())
+                    val beforeReceipt = repository.getMark(mark.id)
+                    interruptReceipt = true
+                    assertFailsWith<CancellationException> { manager.uploadPendingChanges() }
+                    assertEquals(
+                        beforeReceipt,
+                        repository.getMark(mark.id),
+                        "Receipt interruption must roll back the stored server version",
+                    )
+                    assertEquals(
+                        pending,
+                        metadata.getPendingUploads(EntityType.MOMENT).single(),
+                        "Receipt interruption must retain the operation",
+                    )
+                    val uploaded = manager.uploadPendingChanges()
+                    assertTrue(uploaded.success, uploaded.errors.toString())
+                    assertEquals(1, uploaded.uploadedItems)
+                    assertTrue(metadata.getPendingUploads(EntityType.MOMENT).isEmpty())
+                    assertEquals(setOf(localNote, otherNote), phone.get(token, mark.id).getOrThrow().resolvedNoteIds)
+                    metadata.enqueuePending(mark.id.toString(), EntityType.MOMENT, PendingOperation.CREATE)
                     phone.delete(token, mark.id).getOrThrow()
+                    assertFalse(
+                        manager.uploadPendingChanges().success,
+                        "An unversioned deletion collision must stay queued until downloaded",
+                    )
+                    assertTrue(metadata.hasPending(EntityType.MOMENT, mark.id.toString()))
                     val deletion =
                         api
                             .getMomentChanges(token, 0)
@@ -239,8 +284,25 @@ class MarkedMomentRoomDownloadE2ETest {
                     assertEquals(1, deleted.downloadedItems)
                     assertEquals(null, repository.getMark(mark.id))
                     assertEquals(Instant.fromEpochMilliseconds(deletion.deletedAt), database.markedMomentDao().getById(mark.id)!!.deletedAt)
-                    assertEquals(pending, metadata.getPendingUploads(EntityType.MOMENT).single())
+                    assertTrue(metadata.hasPending(EntityType.MOMENT, mark.id.toString()))
                     assertTrue(retained.retained("MOMENT").isEmpty())
+                    val settledCollision = manager.uploadPendingChanges()
+                    assertTrue(settledCollision.success, settledCollision.errors.toString())
+                    assertEquals(0, settledCollision.uploadedItems)
+                    assertTrue(metadata.getPendingUploads(EntityType.MOMENT).isEmpty())
+                    val createdHere = mark.copy(id = Uuid.random(), syncVersion = 0)
+                    repository.applyFromSync(createdHere)
+                    metadata.enqueuePending(createdHere.id.toString(), EntityType.MOMENT, PendingOperation.CREATE)
+                    val createdUpload = manager.uploadPendingChanges()
+                    assertTrue(createdUpload.success, createdUpload.errors.toString())
+                    assertEquals(1, createdUpload.uploadedItems)
+                    assertTrue(repository.getMark(createdHere.id)!!.syncVersion > 0)
+                    repository.delete(createdHere.id, captured + 3.seconds)
+                    val deletedUpload = manager.uploadPendingChanges()
+                    assertTrue(deletedUpload.success, deletedUpload.errors.toString())
+                    assertEquals(1, deletedUpload.uploadedItems)
+                    assertTrue(metadata.getPendingUploads(EntityType.MOMENT).isEmpty())
+                    assertTrue(phone.get(token, createdHere.id).isFailure)
                 } finally {
                     job.cancelAndJoin()
                     database.close()

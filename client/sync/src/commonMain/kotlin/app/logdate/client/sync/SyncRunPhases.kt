@@ -85,13 +85,14 @@ internal suspend fun DefaultSyncManager.runPendingUploads(): SyncResult =
         val associationResult = uploader.uploadAssociations(accessToken)
         val draftResult = if (profile.syncsDrafts) uploader.uploadDrafts(accessToken) else SyncResult(success = true)
         val historyResult = historyEngine?.upload(accessToken) ?: SyncResult(success = true)
+        val momentResult = momentUploader?.upload() ?: SyncResult(success = true)
         val totalUploaded =
             journalResult.uploadedItems +
                 contentResult.uploadedItems +
                 mergeResult.uploadedItems +
                 associationResult.uploadedItems +
                 draftResult.uploadedItems +
-                historyResult.uploadedItems
+                historyResult.uploadedItems + momentResult.uploadedItems
         statusPublisher.setRunCompleted(totalUploaded)
         val errors =
             journalResult.errors +
@@ -99,7 +100,7 @@ internal suspend fun DefaultSyncManager.runPendingUploads(): SyncResult =
                 mergeResult.errors +
                 associationResult.errors +
                 draftResult.errors +
-                historyResult.errors
+                historyResult.errors + momentResult.errors
 
         val success = errors.isEmpty()
         if (success) {
