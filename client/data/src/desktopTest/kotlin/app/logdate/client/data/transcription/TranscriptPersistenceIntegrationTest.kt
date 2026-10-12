@@ -17,6 +17,8 @@ import app.logdate.client.repository.transcription.TranscriptSpeaker
 import app.logdate.client.repository.transcription.TranscriptWord
 import app.logdate.client.sync.RoomSyncTransactionManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
@@ -72,7 +74,7 @@ class TranscriptPersistenceIntegrationTest {
                 assertEquals("/local/audio.m4a", database.transcriptionDao().getTranscriptionByNoteId(note.uid)?.mediaUri)
                 assertEquals(0, manager.enqueueCount)
             } finally {
-                backgroundScope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+                backgroundScope.coroutineContext[Job]?.cancelAndJoin()
                 database.close()
                 Files.deleteIfExists(file)
                 Files.deleteIfExists(file.resolveSibling("${file.fileName}-wal"))
