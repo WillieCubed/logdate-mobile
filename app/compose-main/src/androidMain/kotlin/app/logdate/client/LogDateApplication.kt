@@ -13,6 +13,7 @@ import app.logdate.client.calendar.CalendarImportScheduler
 import app.logdate.client.data.notes.StoredMediaReferenceMigrationLauncher
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.domain.recommendation.AmbientPromptTriggerContext
+import app.logdate.client.domain.reminders.ReminderSignalObserver
 import app.logdate.client.events.EventInferenceScheduler
 import app.logdate.client.feature.widgets.publishWidgetPreviews
 import app.logdate.client.image.DataSaverImageInterceptor
@@ -120,6 +121,9 @@ class LogdateApplication :
         isolated("Failed to initialize ambient prompt scheduling") {
             get<AmbientPromptSchedulingObserver>().start()
             get<AmbientPromptScheduler>().enqueueImmediateEvaluation(AmbientPromptTriggerContext.PERIODIC)
+        }
+        isolated("Failed to observe reminder signals") {
+            get<ReminderSignalObserver>().start()
         }
         isolated("Failed to start location tracking manager on app startup") {
             get<LocationTrackingManager>().startTracking()

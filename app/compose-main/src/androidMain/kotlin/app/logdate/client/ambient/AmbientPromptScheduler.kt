@@ -19,6 +19,7 @@ import app.logdate.client.domain.recommendation.MemoriesSettings
 import app.logdate.client.domain.recommendation.MemoriesSettingsRepository
 import app.logdate.client.domain.watch.SharedPreferenceKey
 import app.logdate.client.domain.watch.WatchPreferencesRepository
+import app.logdate.client.reminders.MomentReminderWorker
 import io.github.aakira.napier.Napier
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -100,6 +101,14 @@ class AmbientPromptScheduler(
         )
     }
 
+    fun enqueueMomentEvaluation() {
+        workManager.enqueueUniqueWork(
+            SIGNAL_WORK_NAME,
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            OneTimeWorkRequestBuilder<MomentReminderWorker>().build(),
+        )
+    }
+
     private fun cancelFixedAlarms() {
         alarmManager.cancel(pendingIntent(REQUEST_MORNING, ACTION_MORNING_PROMPT))
         alarmManager.cancel(pendingIntent(REQUEST_EVENING, ACTION_EVENING_PROMPT))
@@ -108,6 +117,7 @@ class AmbientPromptScheduler(
     private fun cancelAll() {
         cancelFixedAlarms()
         workManager.cancelUniqueWork(PERIODIC_WORK_NAME)
+        workManager.cancelUniqueWork(SIGNAL_WORK_NAME)
         AmbientPromptTriggerContext.entries.forEach { trigger ->
             workManager.cancelUniqueWork("${IMMEDIATE_WORK_NAME}:${trigger.name.lowercase()}")
         }
@@ -158,6 +168,7 @@ class AmbientPromptScheduler(
         )
 
     companion object {
+        private const val SIGNAL_WORK_NAME = "logdate:moment-reminder:signal"
         private const val PERIODIC_WORK_NAME = "logdate:ambient:periodic"
         private const val IMMEDIATE_WORK_NAME = "logdate:ambient:immediate"
         const val ACTION_MORNING_PROMPT = "app.logdate.client.ambient.action.MORNING_PROMPT"

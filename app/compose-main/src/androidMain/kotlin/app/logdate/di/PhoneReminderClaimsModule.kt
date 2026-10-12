@@ -27,6 +27,7 @@ import org.koin.dsl.module
 val phoneReminderClaimsModule =
     module {
         includes(phoneReminderSignalsModule)
+        includes(phoneReminderSchedulingModule)
         single { ReminderPostedHistory(get()) }
         single { DeviceReminderBudget(get()) }
         single { PhoneMomentReminderNotifier(androidContext()) }

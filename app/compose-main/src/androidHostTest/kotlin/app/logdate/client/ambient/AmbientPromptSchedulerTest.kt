@@ -2,9 +2,13 @@ package app.logdate.client.ambient
 
 import android.app.AlarmManager
 import android.content.Context
+import androidx.concurrent.futures.CallbackToFutureAdapter
 import androidx.work.Configuration
+import androidx.work.ListenableWorker
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import androidx.work.WorkerFactory
+import androidx.work.WorkerParameters
 import androidx.work.testing.WorkManagerTestInitHelper
 import app.logdate.client.datastore.featureflags.FeatureFlag
 import app.logdate.client.datastore.featureflags.FeatureFlagStore
@@ -19,6 +23,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -85,9 +90,40 @@ class AmbientPromptSchedulerTest {
     private val alarms get() = shadowOf(context.getSystemService(AlarmManager::class.java)).scheduledAlarms
 
     @Before fun prepare() {
-        WorkManagerTestInitHelper.initializeTestWorkManager(context, Configuration.Builder().build())
+        WorkManagerTestInitHelper.initializeTestWorkManager(
+            context,
+            Configuration
+                .Builder()
+                .setWorkerFactory(
+                    object : WorkerFactory() {
+                        override fun createWorker(
+                            appContext: Context,
+                            workerClassName: String,
+                            workerParameters: WorkerParameters,
+                        ): ListenableWorker =
+                            object : ListenableWorker(appContext, workerParameters) {
+                                private var pending: CallbackToFutureAdapter.Completer<Result>? = null
+
+                                override fun startWork() =
+                                    CallbackToFutureAdapter.getFuture<Result> {
+                                        pending = it
+                                        "Held scheduling test work"
+                                    }
+
+                                override fun onStopped() {
+                                    pending?.setCancelled()
+                                }
+                            }
+                    },
+                ).build(),
+        )
         work = WorkManager.getInstance(context)
         scheduler = AmbientPromptScheduler(context, settings, flags, shared)
+    }
+
+    @After fun closeWork() {
+        work.cancelAllWork().result.get(10, TimeUnit.SECONDS)
+        WorkManagerTestInitHelper.closeWorkDatabase()
     }
 
     private fun scheduled() =
@@ -157,5 +193,26 @@ class AmbientPromptSchedulerTest {
             reminders.value = false
             runCurrent()
             assertTrue(scheduled().isEmpty())
+        }
+
+    @Test fun signalUpdatesQueueBehindActiveEvaluationWithoutCancellingIt() {
+        scheduler.enqueueMomentEvaluation()
+        val first = work.getWorkInfosForUniqueWork("logdate:moment-reminder:signal").get(10, TimeUnit.SECONDS).single()
+        scheduler.enqueueMomentEvaluation()
+        val queued = work.getWorkInfosForUniqueWork("logdate:moment-reminder:signal").get(10, TimeUnit.SECONDS)
+        assertEquals(2, queued.size)
+        assertEquals(WorkInfo.State.RUNNING, queued.single { it.id == first.id }.state)
+        assertEquals(WorkInfo.State.BLOCKED, queued.single { it.id != first.id }.state)
+    }
+
+    @Test fun optingOutCancelsPendingSignalEvaluationsAsWellAsPeriodicWork() =
+        runBlocking {
+            enabled.value = true
+            scheduler.enqueueMomentEvaluation()
+            scheduler.enqueueMomentEvaluation()
+            scheduler.refreshSchedules()
+            val cancelled = work.getWorkInfosForUniqueWork("logdate:moment-reminder:signal").get(10, TimeUnit.SECONDS)
+            assertEquals(2, cancelled.size)
+            assertTrue(cancelled.all { it.state == WorkInfo.State.CANCELLED })
         }
 }
