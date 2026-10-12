@@ -76,7 +76,8 @@ Files: create WatchMomentIngestor alongside app/compose-main/.../sync/v2/receipt
 - [x] Add watch-side MOMENT sending, scheduling and typed cloud release, with capability-held work, exact exchange, replay/relink guards and operation-CAS receipt settlement. Verified locally with 1,287 Wear host tests, installed graph and real Room receipt/sensor-race checks. Actual paired transport and full return journey remain open.
 - [ ] Reuse operation receipts and the shared merge; never clear local work on legacy or mismatched acknowledgments.
 - [x] Publish separate, capability-gated MOMENT window members on the phone, observing filled/dismissed Room marks and retaining typed manifests, shared count/byte budgets, revisions and tombstones. Transfer oversized bodies through kind-bound request/ticket guards; verify actual Room publication/streaming on phone and tablet emulators.
-- [ ] Merge returned MOMENT members on the watch with typed ownership, pending-operation preservation and complete-snapshot guards. Keep both peers from advertising MOMENTS until that consumer and the full return journey pass.
+- [x] Merge returned MOMENT members on the watch with typed ownership, pending-operation preservation and complete-snapshot guards. Verify real Room merge/outbox rollback, stale-receipt protection and installed graph. Window retirement retains durable capture rows and pending work.
+- [ ] Verify semantic phone deletion returning to pair-only watches separately from window eviction, plus the full paired return journey. Keep both peers from advertising MOMENTS until this passes.
 - [ ] Verify actual installed graphs, manifest routing, Room and paired emulator transport.
 
 ## Task 5: Acceptance and later rollout

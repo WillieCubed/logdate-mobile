@@ -8,8 +8,11 @@ import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.media.audio.transcription.AndroidTranscriptionManager
 import app.logdate.client.repository.journals.JournalNotesRepository
 import app.logdate.client.repository.journals.SyncableJournalNotesRepository
+import app.logdate.client.repository.moments.MarkedMomentRepository
+import app.logdate.client.repository.moments.SyncableMarkedMomentRepository
 import app.logdate.client.repository.transcription.TranscriptionRepository
 import app.logdate.client.sync.SyncTransactionManager
+import app.logdate.client.sync.datalayer.v2.RecordKind
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
@@ -17,9 +20,11 @@ import app.logdate.shared.config.LogDateConfigRepository
 import app.logdate.wear.sync.SyncedAudioCache
 import app.logdate.wear.sync.v2.delivery.LinkedDataLayerTransportV2
 import app.logdate.wear.sync.v2.delivery.WatchDeliveryPeer
+import app.logdate.wear.sync.v2.delivery.WatchMomentProtocol
 import app.logdate.wear.sync.v2.link.WatchLinkStore
 import app.logdate.wear.sync.v2.window.DataClientWindowItemSource
 import app.logdate.wear.sync.v2.window.GoogleWindowBodyRangeSource
+import app.logdate.wear.sync.v2.window.MomentWindowApplier
 import app.logdate.wear.sync.v2.window.WatchTranscriptRepository
 import app.logdate.wear.sync.v2.window.WindowApplier
 import app.logdate.wear.sync.v2.window.WindowBodyHydrator
@@ -72,6 +77,17 @@ val wearWatchWindowModule =
             }
         }
         single {
+            val protocol = get<WatchMomentProtocol>()
+            MomentWindowApplier(
+                get(),
+                get<MarkedMomentRepository>() as SyncableMarkedMomentRepository,
+                get(),
+                WindowMembershipStore(get(), RecordKind.MOMENT),
+                get<SyncTransactionManager>(WatchCloud),
+                protocol::accepts,
+            )
+        }
+        single {
             val cache = get<SyncedAudioCache>()
             WindowApplier(
                 peers = get(),
@@ -85,6 +101,7 @@ val wearWatchWindowModule =
                 },
                 media = get(),
                 prepareNote = get<WindowPlaces>()::ensure,
+                momentWindow = get(),
             )
         }
         single {

@@ -47,6 +47,7 @@ class WindowApplier(
     private val forgetMedia: suspend (Uuid) -> Unit,
     private val media: StoredMediaReferences = StoredMediaReferences.Unchanged,
     private val prepareNote: suspend (JournalNote) -> Unit = {},
+    private val momentWindow: MomentWindowApplier? = null,
 ) {
     private val applying = Mutex()
     private val mapper = NoteDataMapper()
@@ -61,6 +62,7 @@ class WindowApplier(
     suspend fun onItem(item: WindowItem): Boolean =
         applying.withLock {
             val peer = peers.current() ?: return@withLock false
+            if (WearPaths.parseWindowItem(item.path)?.kind == RecordKind.MOMENT) return@withLock momentWindow?.onItem(item) ?: false
             val copy = decode(peer, item) ?: return@withLock false
             val state = members.read(peer)
             val snapshot = state.snapshotRevision ?: return@withLock false
@@ -72,6 +74,7 @@ class WindowApplier(
         applying.withLock {
             val peer = peers.current() ?: return@withLock false
             val path = WearPaths.parseWindowTombstone(item.path) ?: return@withLock false
+            if (path.kind == RecordKind.MOMENT) return@withLock momentWindow?.onTombstone(item) ?: false
             if (item.sourceNodeId != peer.phoneNode || path.linkId != peer.linkId || path.kind != RecordKind.NOTE) return@withLock false
             val context = item.data[WindowTombstoneDataMap.KEY_CONTEXT] ?: return@withLock false
             if ((WearJson.decode(context, WearProtocol.WINDOW_SCHEMA, PeerDeliveryContext.serializer()) as? Decoded.Supported)?.value !=
@@ -94,35 +97,10 @@ class WindowApplier(
         items: List<WindowItem>,
     ): WindowApplied? =
         applying.withLock {
-            if (!peers.isCurrent(peer) ||
-                response.context != peer ||
-                response.schema != WearProtocol.WINDOW_SCHEMA ||
-                response.revision < 0
-            ) {
-                return@withLock null
-            }
-            val previous = members.read(peer)
-            if (response.revision < (previous.snapshotRevision ?: 0)) return@withLock null
-            if (response.members.size > 400 ||
-                response.members
-                    .map { it.kind to it.id }
-                    .toSet()
-                    .size != response.members.size
-            ) {
-                return@withLock null
-            }
-            if (response.members.any {
-                    Uuid.parseOrNull(it.id)?.toString() != it.id ||
-                        it.contentVersion < 0 ||
-                        it.revision <= 0 ||
-                        it.revision > response.revision ||
-                        it.kind !in setOf(RecordKind.NOTE, RecordKind.MOMENT)
-                }
-            ) {
-                return@withLock null
-            }
+            val previous = previousSnapshot(peer, response) ?: return@withLock null
             val expected = response.members.filter { it.kind == RecordKind.NOTE }.associateBy { it.id }
-            if (expected.size != response.members.size) Napier.w("Marked moments in the phone library need a newer watch consumer")
+            if (momentWindow == null && expected.size != response.members.size) return@withLock null
+            if (momentWindow != null && !momentWindow.complete(peer, response, items)) return@withLock null
             val copies = items.mapNotNull { decode(peer, it) }.associateBy { it.ref }
             // A response can reach the watch before its DataItems. Never prune on that partial view.
             for (ref in expected.values) {
@@ -137,13 +115,16 @@ class WindowApplier(
             }
             if (!peers.isCurrent(peer)) return@withLock null
             members.write(peer, previous.copy(snapshotRevision = response.revision, expected = expected))
-            var applied = 0
+            val momentResult = momentWindow?.reconcile(peer, response, items)
+            if (momentWindow != null && momentResult == null) return@withLock null
+            var applied = momentResult?.applied ?: 0
             for (ref in expected.values) {
                 val copy = copies[ref] ?: continue
                 if (apply(peer, copy)) applied++
                 if (!peers.isCurrent(peer)) return@withLock null
             }
-            var removed = 0
+            if (momentWindow != null && !momentWindow.complete(peer, response, items)) return@withLock null
+            var removed = momentResult?.removed ?: 0
             for (id in members.read(peer).entries.keys - expected.keys) {
                 if (remove(peer, id, response.revision)) removed++
                 if (!peers.isCurrent(peer)) return@withLock null
@@ -152,6 +133,40 @@ class WindowApplier(
             members.write(peer, settled.copy(retired = settled.retired.filterValues { it > response.revision }))
             WindowApplied(applied, removed)
         }
+
+    private suspend fun previousSnapshot(
+        peer: PeerDeliveryContext,
+        response: WindowResyncResponse,
+    ): WindowMembership? {
+        if (!peers.isCurrent(peer) ||
+            response.context != peer ||
+            response.schema != WearProtocol.WINDOW_SCHEMA ||
+            response.revision < 0
+        ) {
+            return null
+        }
+        val previous = members.read(peer)
+        if (response.revision < (previous.snapshotRevision ?: 0)) return null
+        if (response.members.size > 400 ||
+            response.members
+                .map { it.kind to it.id }
+                .toSet()
+                .size != response.members.size
+        ) {
+            return null
+        }
+        if (response.members.any {
+                Uuid.parseOrNull(it.id)?.toString() != it.id ||
+                    it.contentVersion < 0 ||
+                    it.revision <= 0 ||
+                    it.revision > response.revision ||
+                    it.kind !in setOf(RecordKind.NOTE, RecordKind.MOMENT)
+            }
+        ) {
+            return null
+        }
+        return previous
+    }
 
     private fun decode(
         peer: PeerDeliveryContext,

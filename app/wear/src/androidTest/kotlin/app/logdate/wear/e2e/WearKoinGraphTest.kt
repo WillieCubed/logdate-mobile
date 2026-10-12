@@ -68,6 +68,7 @@ class WearKoinGraphTest {
         koin.get<WatchNoteDelivery>()
         koin.get<WatchMomentDelivery>()
         koin.get<WatchMomentProtocol>()
+        koin.get<app.logdate.wear.sync.v2.window.MomentWindowApplier>()
         koin.get<WearDataLayerSyncManager>()
         koin.get<WatchSyncScheduler>()
         assertFalse(runBlocking { koin.get<WatchCaptureProtocol>().active() })

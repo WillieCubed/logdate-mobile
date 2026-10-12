@@ -29,6 +29,7 @@ data class WindowMembership(
 /** Unknown ownership never grants permission to delete local data. */
 class WindowMembershipStore(
     private val storage: KeyValueStorage,
+    private val kind: RecordKind = RecordKind.NOTE,
 ) {
     suspend fun read(peer: PeerDeliveryContext): WindowMembership {
         val saved = storage.getString(key(peer)) ?: return WindowMembership()
@@ -48,7 +49,11 @@ class WindowMembershipStore(
         storage.putString(key(peer), WearJson.encode(WindowMembership.serializer(), state))
     }
 
-    private fun key(peer: PeerDeliveryContext) = "watch.window.projections.v2." + WearJson.encode(PeerDeliveryContext.serializer(), peer)
+    private fun key(peer: PeerDeliveryContext): String {
+        require(kind == RecordKind.NOTE || kind == RecordKind.MOMENT)
+        val prefix = if (kind == RecordKind.NOTE) "watch.window.projections.v2." else "watch.window.moment_projections.v1."
+        return prefix + WearJson.encode(PeerDeliveryContext.serializer(), peer)
+    }
 
     private fun valid(state: WindowMembership): Boolean =
         (state.snapshotRevision == null || state.snapshotRevision >= 0) &&
@@ -65,7 +70,7 @@ class WindowMembershipStore(
             state.expected.all { (id, ref) ->
                 id == ref.id &&
                     Uuid.parseOrNull(id)?.toString() == id &&
-                    ref.kind == RecordKind.NOTE &&
+                    ref.kind == kind &&
                     ref.revision > 0 &&
                     ref.revision <= (state.snapshotRevision ?: -1) &&
                     ref.contentVersion >= 0
