@@ -4,6 +4,7 @@ import app.logdate.client.sync.SyncStatus
 import app.logdate.client.sync.metadata.EntityType
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
+import app.logdate.wear.sync.v2.delivery.NoteSchedule
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -28,8 +29,8 @@ fun interface WatchSyncWork {
  * when an item has never been attempted. It is set again each time the sync status settles outside a
  * run: at app start, when the phone comes into or goes out of reach, when the outbox changes, and
  * after every run. Changes during a run wait for it to finish, because setting a new run replaces the
- * waiting work and would stop a run in progress. With no phone in reach nothing is set: the phone's
- * return starts a sync by itself.
+ * waiting work and would stop a run in progress. Legacy uploads wait for the phone to return;
+ * operation-aware notes can wake independently to retry their own cloud backup.
  *
  * After a reboot WorkManager reschedules this work through the boot permission declared for reminders.
  */
@@ -40,6 +41,7 @@ class WatchSyncScheduler(
     private val retryScheduleStore: SyncRetryScheduleStore,
     private val dataLayerClient: WearDataLayerClient,
     private val clock: Clock = Clock.System,
+    private val noteSchedule: suspend () -> NoteSchedule = { NoteSchedule.Outbox },
 ) {
     /** Follows the sync status in [scope] for the life of the app. */
     @OptIn(FlowPreview::class)
@@ -53,15 +55,22 @@ class WatchSyncScheduler(
         }
     }
 
-    /** Sets the next run for when the earliest waiting item is due, if a phone is in reach. */
+    /** Sets the next run from note delivery deadlines and reachable legacy collections. */
     suspend fun scheduleNext() {
-        if (!dataLayerClient.isPhoneConnected()) return
-        val dueAt = earliestAttemptAt() ?: return
+        val connected = dataLayerClient.isPhoneConnected()
+        val dueAt =
+            when (val notes = noteSchedule()) {
+                NoteSchedule.Outbox -> if (connected) earliestAttemptAt(UPLOADED_TYPES) else null
+                is NoteSchedule.Ledger -> {
+                    val collections = if (connected) earliestAttemptAt(UPLOADED_TYPES.filterNot { it == EntityType.NOTE }) else null
+                    listOfNotNull(notes.dueAt, collections).minOrNull()
+                }
+            } ?: return
         work.runAfter((dueAt - clock.now().toEpochMilliseconds()).coerceAtLeast(0L))
     }
 
-    private suspend fun earliestAttemptAt(): Long? =
-        UPLOADED_TYPES
+    private suspend fun earliestAttemptAt(types: List<EntityType>): Long? =
+        types
             .flatMap { type -> syncMetadataService.getPendingUploads(type).map { pending -> type to pending.entityId } }
             .minOfOrNull { (type, entityId) -> retryScheduleStore.nextAttemptAt(type, entityId) ?: 0L }
 

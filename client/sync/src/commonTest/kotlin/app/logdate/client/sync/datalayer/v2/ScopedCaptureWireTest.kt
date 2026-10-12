@@ -15,6 +15,22 @@ class ScopedCaptureWireTest {
     private val context = PeerDeliveryContext(LinkWire.encodeKey(ByteArray(32) { -1 }), "phone", "watch", LinkMode.PAIR)
 
     @Test
+    fun `record items isolate the same operation across relinking`() {
+        val path = WearPaths.watchRecord(RecordKind.NOTE, id, context, "operation")
+        assertEquals("/logdate/v2/w2p/record/note/$id/${context.linkPathSegment}/op/operation", path)
+        assertEquals(RecordPath(RecordKind.NOTE, id, context.linkId, "operation"), WearPaths.parseWatchRecord(path))
+        assertNotEquals(
+            path,
+            WearPaths.watchRecord(
+                RecordKind.NOTE,
+                id,
+                context.copy(linkId = LinkWire.encodeKey(ByteArray(32) { 2 })),
+                "operation",
+            ),
+        )
+    }
+
+    @Test
     fun `operation record paths keep cleanup separate from a later mutation`() {
         val path = WearPaths.watchRecord(RecordKind.NOTE, id, "operation")
         assertEquals("/logdate/v2/w2p/record/note/$id/op/operation", path)

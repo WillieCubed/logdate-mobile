@@ -19,6 +19,7 @@ import app.logdate.client.sync.metadata.SyncDeadLetterRecord
 import app.logdate.client.sync.metadata.SyncDeadLetterStore
 import app.logdate.client.sync.metadata.SyncMetadataService
 import app.logdate.client.sync.metadata.SyncRetryScheduleStore
+import app.logdate.wear.sync.v2.delivery.WatchNotesV2
 import io.github.aakira.napier.Napier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -68,6 +69,7 @@ class WearDataLayerSyncManager(
     scope: CoroutineScope,
     private val audioDigester: AudioFileDigester = FileAudioDigester(),
     private val clock: Clock = Clock.System,
+    private val notesV2: WatchNotesV2? = null,
 ) : SyncManager,
     WearNoteAckHandler,
     WearNoteRemovalNotifier {
@@ -110,6 +112,7 @@ class WearDataLayerSyncManager(
     override suspend fun uploadPendingChanges(): SyncResult = runExclusively { uploadPendingChangesLocked() }
 
     private suspend fun uploadPendingChangesLocked(): SyncResult {
+        notesV2?.deliverIfActive()?.let { return it }
         if (!dataLayerClient.isPhoneConnected()) {
             return legacy.notConnectedResult()
         }

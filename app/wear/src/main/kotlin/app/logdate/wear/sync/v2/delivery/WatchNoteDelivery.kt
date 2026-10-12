@@ -87,6 +87,26 @@ class WatchNoteDelivery(
 
     private val router = WatchSyncRouter()
 
+    suspend fun schedule(): NoteSchedule {
+        if (!active()) return NoteSchedule.Outbox
+        val peer = peers.current() ?: return NoteSchedule.Ledger(null)
+        val deadlines = mutableListOf<Long>()
+        for (pending in outbox.getPendingUploads(EntityType.NOTE)) {
+            if (pending.scope == null) continue
+            val id = Uuid.parseOrNull(pending.entityId) ?: continue
+            if (pending.operation != PendingOperation.DELETE && notes.getNoteById(id) == null) continue
+            val identity = CaptureIdentity.of(pending.entityId, pending.operationId ?: continue) ?: continue
+            val key = if (pending.operation == PendingOperation.DELETE) identity.removalLedgerKey else identity.ledgerKey
+            val entry = ledger.get(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, key)
+            if (entry == null || entry.holdReason == null && entry.nextAttemptAt == null) {
+                deadlines += entry?.nextAttemptAt ?: now()
+            } else {
+                entry.nextAttemptAt?.let(deadlines::add)
+            }
+        }
+        return NoteSchedule.Ledger(if (isCurrent(peer)) deadlines.minOrNull() else null)
+    }
+
     override suspend fun deliverIfActive(): SyncResult? {
         if (!active()) return null
         val peer = peers.current() ?: return SyncResult(success = true)
@@ -213,7 +233,9 @@ class WatchNoteDelivery(
         ) {
             return Step()
         }
-        if (isCurrent(peer) && transport.deleteOwn(WearPaths.watchRecord(RecordKind.NOTE, capture.id, capture.identity.operationId))) {
+        if (isCurrent(peer) &&
+            transport.deleteOwn(WearPaths.watchRecord(RecordKind.NOTE, capture.id, peer, capture.identity.operationId))
+        ) {
             ledger.forget(entry.scope, entry.direction, entry.entityType, entry.entityId)
         }
         return Step(settled = 1)
@@ -245,7 +267,7 @@ class WatchNoteDelivery(
                     return Step()
                 }
             if (!transport.put(
-                    WearPaths.watchRecord(RecordKind.NOTE, capture.id, capture.identity.operationId),
+                    WearPaths.watchRecord(RecordKind.NOTE, capture.id, peer, capture.identity.operationId),
                     data,
                 )
             ) {

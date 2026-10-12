@@ -323,6 +323,28 @@ class OperationCaptureIngestionTest {
             assertFalse(removals.isRemoved(peer, text.uid))
         }
 
+    @Test
+    fun `a removal item on an earlier link path cannot delete a current capture`() =
+        runTest {
+            val removal =
+                RecordEnvelope(
+                    kind = RecordKind.NOTE,
+                    id = text.uid.toString(),
+                    contentVersion = 0,
+                    origin = RecordOrigin.WATCH,
+                    context = peer,
+                    operationId = "remove-operation",
+                    removed = true,
+                )
+            val old = peer.copy(linkId = LinkWire.encodeKey(ByteArray(32) { 2 }))
+            ingestion.onRecord(
+                "watch",
+                WearPaths.watchRecord(RecordKind.NOTE, text.uid, old, "remove-operation"),
+                EnvelopeDataMap.toDataMap(removal, 1),
+            )
+            assertEquals(text, stored[text.uid])
+        }
+
     private fun store(operation: String?) =
         FileWatchAudioStore.scoped(
             File(root, "audio"),
