@@ -12,7 +12,10 @@ import app.logdate.client.sync.peer.link.LinkWire
 import app.logdate.wear.sync.WatchSyncScheduler
 import app.logdate.wear.sync.WearDataLayerSyncManager
 import app.logdate.wear.sync.v2.delivery.ReleasedToCloud
+import app.logdate.wear.sync.v2.delivery.WatchCaptureDelivery
 import app.logdate.wear.sync.v2.delivery.WatchCaptureProtocol
+import app.logdate.wear.sync.v2.delivery.WatchMomentDelivery
+import app.logdate.wear.sync.v2.delivery.WatchMomentProtocol
 import app.logdate.wear.sync.v2.delivery.WatchNoteDelivery
 import app.logdate.wear.sync.v2.delivery.WatchNotesV2
 import app.logdate.wear.sync.v2.link.WatchLinkCoordinator
@@ -61,7 +64,10 @@ class WearKoinGraphTest {
 
     @Test
     fun captureDeliveryAndSchedulingResolveThroughTheInstalledGraph() {
-        assertSame(koin.get<WatchNoteDelivery>(), koin.get<WatchNotesV2>())
+        assertSame(koin.get<WatchCaptureDelivery>(), koin.get<WatchNotesV2>())
+        koin.get<WatchNoteDelivery>()
+        koin.get<WatchMomentDelivery>()
+        koin.get<WatchMomentProtocol>()
         koin.get<WearDataLayerSyncManager>()
         koin.get<WatchSyncScheduler>()
         assertFalse(runBlocking { koin.get<WatchCaptureProtocol>().active() })

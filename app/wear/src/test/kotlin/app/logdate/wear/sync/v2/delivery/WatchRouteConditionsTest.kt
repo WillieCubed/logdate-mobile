@@ -68,6 +68,30 @@ class WatchRouteConditionsTest {
         coEvery { battery.getCurrentBatteryState() } returns BatteryState(level = 50, isCharging = true, isPowerSaveMode = false)
     }
 
+    @Test fun momentRoutingRequiresMomentSupportInAdditionToDeviceLinkingAndConditionalCreate() =
+        runTest {
+            links.saveCloudLink("phone-node", "account", "https://logdate.test", linkId = linkId)
+            val moments =
+                WatchRouteConditions(
+                    transport,
+                    { CloudPresence.SIGNED_IN },
+                    config,
+                    network,
+                    battery,
+                    captured,
+                    peers,
+                    ServerProtocolFeature.MOMENTS_V1,
+                )
+            assertFalse(moments.current().serverReady)
+            coEvery { config.getCurrentServerDescriptor() } returns
+                descriptor(
+                    ServerProtocolFeature.DEVICE_LINKING_V1,
+                    ServerProtocolFeature.CONDITIONAL_CREATE_V1,
+                    ServerProtocolFeature.MOMENTS_V1,
+                )
+            assertEquals(true, moments.current().serverReady)
+        }
+
     @Test
     fun `a watch linked to the account on a ready server over wifi may upload`() =
         runTest {

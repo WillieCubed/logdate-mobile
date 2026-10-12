@@ -70,8 +70,8 @@ import app.logdate.wear.sync.WorkManagerWatchSyncWork
 import app.logdate.wear.sync.v2.WatchOwnState
 import app.logdate.wear.sync.v2.WatchPeerLink
 import app.logdate.wear.sync.v2.WatchStateMirror
+import app.logdate.wear.sync.v2.delivery.WatchCaptureDelivery
 import app.logdate.wear.sync.v2.delivery.WatchCaptureProtocol
-import app.logdate.wear.sync.v2.delivery.WatchNoteDelivery
 import app.logdate.wear.sync.v2.delivery.WatchNotesV2
 import app.logdate.wear.sync.v2.delivery.WatchReceiptApplier
 import app.logdate.wear.sync.v2.window.WindowReconciler
@@ -159,7 +159,7 @@ val wearDataModule =
                 syncMetadataService = get(),
                 retryScheduleStore = get(),
                 dataLayerClient = get(),
-                noteSchedule = get<WatchNoteDelivery>()::schedule,
+                noteSchedule = get<WatchCaptureDelivery>()::schedule,
             )
         }
         single { PeerStateStore() }

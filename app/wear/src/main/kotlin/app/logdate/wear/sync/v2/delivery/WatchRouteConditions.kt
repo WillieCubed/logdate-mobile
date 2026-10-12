@@ -24,6 +24,7 @@ class WatchRouteConditions(
     private val battery: BatteryInfoProvider,
     private val peer: PeerDeliveryContext,
     private val peers: WatchDeliveryPeer,
+    private val requiredFeature: String? = null,
 ) {
     suspend fun current(): RouteConditions {
         val descriptor = config.getCurrentServerDescriptor()
@@ -42,7 +43,8 @@ class WatchRouteConditions(
             phone = if (usable) reach else PhoneReach.UNREACHABLE,
             phoneCloud = if (usable) cloud else CloudPresence.UNKNOWN,
             linked = linked,
-            serverReady = linked && serverReady(descriptor),
+            serverReady =
+                linked && serverReady(descriptor) && (requiredFeature == null || descriptor?.hasProtocolFeature(requiredFeature) == true),
             network = network,
             charging = charging,
         )

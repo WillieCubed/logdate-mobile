@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicReference
 data class CloudCapture(
     val pending: PendingUpload,
     val contentVersion: Long,
+    val entityType: EntityType = EntityType.NOTE,
 )
 
 class ReleasedToCloud(
@@ -53,23 +54,23 @@ class ReleasedToCloud(
         entityType: EntityType,
         pending: PendingUpload,
     ): Boolean {
-        if (entityType != EntityType.NOTE || pending.operation == PendingOperation.UPDATE) return false
+        if (entityType !in setOf(EntityType.NOTE, EntityType.MOMENT) || pending.operation == PendingOperation.UPDATE) return false
         val run = activeRun.get() ?: return false
         val peer = run.peer
         if (peer.mode != LinkMode.CLOUD || !peer.isValid() || !peers.isCurrent(peer)) return false
         val scope = pending.scope ?: return false
         if (scope.ownerId != peer.accountId || scope.serverOrigin != peer.serverOrigin || pending.operationId.isNullOrBlank()) return false
-        val capture = run.captures.firstOrNull { sameOperation(it.pending, pending) } ?: return false
+        val capture = run.captures.firstOrNull { it.entityType == entityType && sameOperation(it.pending, pending) } ?: return false
         val identity = CaptureIdentity.of(pending.entityId, pending.operationId) ?: return false
         val key = if (pending.operation == PendingOperation.DELETE) identity.removalLedgerKey else identity.ledgerKey
-        val entry = ledger.get(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.NOTE, key) ?: return false
+        val entry = ledger.get(peer.ledgerScope, DeliveryDirection.TO_PHONE, entityType, key) ?: return false
         if (entry.state != DeliveryState.CLOUD_PENDING ||
             entry.holdReason != null ||
             entry.contentVersion != capture.contentVersion
         ) {
             return false
         }
-        if (!outbox.isCurrentOperation(EntityType.NOTE, pending)) return false
+        if (!outbox.isCurrentOperation(entityType, pending)) return false
         return peers.isCurrent(peer) && activeRun.get() === run
     }
 

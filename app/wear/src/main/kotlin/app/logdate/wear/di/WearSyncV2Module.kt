@@ -15,11 +15,15 @@ import app.logdate.client.sync.peer.link.LinkInstaller
 import app.logdate.client.sync.peer.link.PairKeyVault
 import app.logdate.client.sync.peer.link.SecureStoragePairKeyVault
 import app.logdate.client.sync.peer.link.WatchLinkExchange
+import app.logdate.shared.model.ServerProtocolFeature
 import app.logdate.wear.sync.v2.WatchOwnState
 import app.logdate.wear.sync.v2.delivery.CloudRelease
 import app.logdate.wear.sync.v2.delivery.LinkedDataLayerTransportV2
+import app.logdate.wear.sync.v2.delivery.WatchCaptureDelivery
 import app.logdate.wear.sync.v2.delivery.WatchCaptureProtocol
 import app.logdate.wear.sync.v2.delivery.WatchDeliveryPeer
+import app.logdate.wear.sync.v2.delivery.WatchMomentDelivery
+import app.logdate.wear.sync.v2.delivery.WatchMomentProtocol
 import app.logdate.wear.sync.v2.delivery.WatchNoteDelivery
 import app.logdate.wear.sync.v2.delivery.WatchNotesV2
 import app.logdate.wear.sync.v2.delivery.WatchReceiptApplier
@@ -112,7 +116,48 @@ val wearSyncV2Module =
                 cloud = CloudRelease { koin.get<DefaultSyncManager>(WatchCloud).uploadPendingChanges() },
                 mediaFilePath = get<MediaFileResolver>()::filePath,
             )
-        } bind WatchNotesV2::class
+        }
+        single {
+            val flags = get<FeatureFlagStore>()
+            WatchMomentProtocol(
+                enabled = { flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) },
+                peers = get(),
+                states = get(),
+                storage = get(),
+            )
+        }
+        single {
+            val flags = get<FeatureFlagStore>()
+            val peers = get<WatchDeliveryPeer>()
+            val receipts = get<WatchReceiptApplier>()
+            val protocol = get<WatchMomentProtocol>()
+            val koin = getKoin()
+            WatchMomentDelivery(
+                active = { flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) },
+                peers = peers,
+                outbox = get(),
+                moments = get(),
+                ledger = get(),
+                transportFor = { peer -> koin.get<LinkedDataLayerTransportV2> { parametersOf(peer) } },
+                conditions = { peer, transport ->
+                    WatchRouteConditions(
+                        transport,
+                        receipts::phoneCloud,
+                        get(),
+                        get(),
+                        get(),
+                        peer,
+                        peers,
+                        ServerProtocolFeature.MOMENTS_V1,
+                    ).current()
+                },
+                receipts = receipts,
+                released = get(),
+                cloud = CloudRelease { koin.get<DefaultSyncManager>(WatchCloud).uploadPendingChanges() },
+                accepts = protocol::accepts,
+            )
+        }
+        single { WatchCaptureDelivery(get(), get()) } bind WatchNotesV2::class
         single {
             WatchOwnState(
                 links = get<WatchLinkStore>().observe(),

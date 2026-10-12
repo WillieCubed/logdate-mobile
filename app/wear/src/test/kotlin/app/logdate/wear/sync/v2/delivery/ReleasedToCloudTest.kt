@@ -174,6 +174,40 @@ class ReleasedToCloudTest {
             assertFalse(released.isEligible(EntityType.NOTE, pending))
         }
 
+    @Test fun momentReleaseIsTypedAndCannotReleaseANoteWithTheSameOperation() =
+        runTest {
+            coEvery { outbox.isCurrentOperation(EntityType.MOMENT, pending) } returns true
+            val row = ledger.track(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.MOMENT, "note@operation", 5)
+            ledger.moveTo(row, DeliveryState.CLOUD_PENDING)
+            markReleased()
+            released.withCaptures(peer, listOf(CloudCapture(pending, 5, EntityType.MOMENT))) {
+                assertTrue(released.isEligible(EntityType.MOMENT, pending))
+                assertFalse(released.isEligible(EntityType.NOTE, pending))
+            }
+            released.withCaptures(peer, listOf(CloudCapture(pending, 5))) {
+                assertFalse(released.isEligible(EntityType.MOMENT, pending))
+            }
+        }
+
+    @Test fun momentDeletionCanBeReleasedButMomentEditsStayHeld() =
+        runTest {
+            for (operation in listOf(PendingOperation.DELETE, PendingOperation.UPDATE)) {
+                val work = pending.copy(operation = operation)
+                coEvery { outbox.isCurrentOperation(EntityType.MOMENT, work) } returns true
+                val key = if (operation == PendingOperation.DELETE) "note@operation:remove" else "note@operation"
+                val version = if (operation == PendingOperation.DELETE) 0L else 5L
+                val row = ledger.track(peer.ledgerScope, DeliveryDirection.TO_PHONE, EntityType.MOMENT, key, version)
+                ledger.moveTo(row, DeliveryState.CLOUD_PENDING)
+                released.withCaptures(peer, listOf(CloudCapture(work, version, EntityType.MOMENT))) {
+                    if (operation == PendingOperation.DELETE) {
+                        assertTrue(released.isEligible(EntityType.MOMENT, work))
+                    } else {
+                        assertFalse(released.isEligible(EntityType.MOMENT, work))
+                    }
+                }
+            }
+        }
+
     private suspend fun markReleased(
         key: String = "note@operation",
         version: Long = 5,
