@@ -50,6 +50,7 @@ data class MomentSyncResult(
     val unreadable: List<Uuid>,
     val unreadableVersions: Map<Uuid, Long>,
     val failures: List<RemoteRecordFailure>,
+    val deletionTimestamps: Map<Uuid, Instant> = emptyMap(),
 )
 
 class DefaultCloudMomentDataSource(
@@ -127,12 +128,13 @@ class DefaultCloudMomentDataSource(
             val removed =
                 page.deletions.readEach(idOf = { it.id }, versionOf = { it.serverVersion }) {
                     require(it.serverVersion > 0) { "Invalid moment deletion version" }
-                    Uuid.parse(it.id) to it.serverVersion
+                    Triple(Uuid.parse(it.id), it.serverVersion, Instant.fromEpochMilliseconds(it.deletedAt))
                 }
             MomentSyncResult(
                 changes = records.readable,
                 deletions = removed.readable.map { it.first },
-                deletionVersions = removed.readable.toMap(),
+                deletionVersions = removed.readable.associate { it.first to it.second },
+                deletionTimestamps = removed.readable.associate { it.first to it.third },
                 lastSyncTimestamp = Instant.fromEpochMilliseconds(page.lastTimestamp),
                 hasMore = page.hasMore,
                 unreadable = records.unreadable,

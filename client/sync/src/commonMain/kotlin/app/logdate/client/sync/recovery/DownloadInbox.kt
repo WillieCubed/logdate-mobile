@@ -239,6 +239,17 @@ class DownloadInbox(
         return row.version == version && !row.deleted
     }
 
+    suspend fun isCurrentDeletionVersion(
+        type: String,
+        id: String,
+        version: Long,
+        selected: DownloadScope = scope(),
+    ): Boolean {
+        if (selected != scope()) return false
+        val row = dao.get(selected.owner, selected.origin, type, id) ?: return false
+        return row.version == version && row.deleted
+    }
+
     suspend fun isAppliedVersion(
         type: String,
         id: String,

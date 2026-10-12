@@ -108,6 +108,7 @@ class CloudMomentDataSourceTest {
             assertEquals(listOf(mark.copy(syncVersion = 9)), result.changes)
             assertEquals(listOf(corruptId), result.deletions)
             assertEquals(mapOf(corruptId to 12L), result.deletionVersions)
+            assertEquals(mapOf(corruptId to Instant.fromEpochMilliseconds(10)), result.deletionTimestamps)
             assertEquals(listOf(wrongId), result.unreadable)
             assertEquals(mapOf(wrongId to 9L), result.unreadableVersions)
             assertEquals(
