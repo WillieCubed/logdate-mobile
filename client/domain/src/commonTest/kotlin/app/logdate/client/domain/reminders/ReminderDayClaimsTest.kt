@@ -23,6 +23,34 @@ class ReminderDayClaimsTest {
     private val watchClaim = phoneClaim.copy(id = "00000000-0000-4000-8000-000000000002", role = PeerRole.WATCH)
 
     @Test
+    fun delegatedReservationCanBeConsumedOnceAcrossRestart() =
+        runTest {
+            assertTrue(phone.grantPeer(watchClaim))
+            assertTrue(phone.consumePeer(watchClaim))
+            assertFalse(ReminderDayClaims(storage, PeerRole.PHONE).consumePeer(watchClaim))
+            assertFalse(phone.grantPeer(watchClaim))
+        }
+
+    @Test
+    fun unreservedOrDifferentClaimCannotConsumeTheDay() =
+        runTest {
+            assertFalse(phone.consumePeer(watchClaim))
+            assertTrue(phone.grantPeer(watchClaim))
+            assertFalse(phone.consumePeer(watchClaim.copy(id = "00000000-0000-4000-8000-000000000003")))
+            assertFalse(phone.consumePeer(watchClaim.copy(context = context.copy(linkId = "bad"))))
+            assertFalse(phone.consumePeer(phoneClaim))
+            assertTrue(phone.consumePeer(watchClaim))
+        }
+
+    @Test
+    fun concurrentDelegatedDeliveriesConsumeOnlyOnce() =
+        runTest {
+            assertTrue(phone.grantPeer(watchClaim))
+            val results = (1..20).map { async { phone.consumePeer(watchClaim) } }.awaitAll()
+            assertEquals(1, results.count { it })
+        }
+
+    @Test
     fun pendingLocalClaimCanCommitOnlyOnce() =
         runTest {
             assertTrue(phone.begin(phoneClaim))

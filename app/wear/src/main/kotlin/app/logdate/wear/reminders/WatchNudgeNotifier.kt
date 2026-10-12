@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import app.logdate.client.domain.reminders.ReminderTrigger
 import app.logdate.client.notifications.LogDateNotificationChannelKey
 import app.logdate.client.notifications.LogDateNotificationRegistrar
 import app.logdate.wear.R
@@ -25,27 +26,49 @@ fun interface NudgeNotifier {
 class WatchNudgeNotifier(
     private val context: Context,
 ) : NudgeNotifier {
-    override fun post(reminder: WatchReminder): Boolean {
+    fun post(
+        trigger: ReminderTrigger,
+        openMarks: Int,
+    ): Boolean = post(reminderForTrigger(trigger), openMarks)
+
+    override fun post(reminder: WatchReminder): Boolean = post(reminder, 0)
+
+    fun post(
+        reminder: WatchReminder,
+        openMarks: Int,
+    ): Boolean {
         val granted =
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         if (!granted) {
             Napier.w("Notifications are off for LogDate on this watch, so the ${reminder.name} reminder was not shown")
             return false
         }
-        return postGranted(reminder)
+        return postGranted(reminder, openMarks)
     }
 
-    private fun postGranted(reminder: WatchReminder): Boolean {
+    private fun postGranted(
+        reminder: WatchReminder,
+        openMarks: Int,
+    ): Boolean {
         LogDateNotificationRegistrar(context).registerChannel(CHANNEL)
         val manager = NotificationManagerCompat.from(context)
         val channel = manager.getNotificationChannel(CHANNEL.id)
         if (!manager.areNotificationsEnabled() || channel?.importance == NotificationManager.IMPORTANCE_NONE) return false
+        val body =
+            buildString {
+                append(context.getString(reminder.bodyRes))
+                if (openMarks > 0) {
+                    append("\n")
+                    append(context.resources.getQuantityString(R.plurals.wear_reminder_open_marks, openMarks, openMarks))
+                }
+            }
         val notification =
             NotificationCompat
                 .Builder(context, CHANNEL.id)
                 .setSmallIcon(R.drawable.ic_glyph_record)
                 .setContentTitle(context.getString(reminder.titleRes))
-                .setContentText(context.getString(reminder.bodyRes))
+                .setContentText(body)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                 .setCategory(NotificationCompat.CATEGORY_REMINDER)
                 .setAutoCancel(true)
                 .setContentIntent(WearLaunchIntents.home(context))

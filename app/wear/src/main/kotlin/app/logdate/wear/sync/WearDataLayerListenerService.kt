@@ -3,6 +3,7 @@ package app.logdate.wear.sync
 import app.logdate.client.database.dao.journals.JournalContentDao
 import app.logdate.client.database.entities.journals.JournalContentEntityLink
 import app.logdate.client.domain.reminders.ReminderClaimResponder
+import app.logdate.client.domain.reminders.ReminderDeliveryResponder
 import app.logdate.client.media.storage.androidMediaFileResolver
 import app.logdate.client.repository.journals.JournalNote
 import app.logdate.client.repository.journals.JournalNotesRepository
@@ -99,7 +100,11 @@ class WearDataLayerListenerService : WearableListenerService() {
         path: String,
         request: ByteArray,
     ): ByteArray? {
-        if (!WatchLinkCoordinator.handles(path) && path != WearPaths.PRESENCE && path != WearPaths.REMINDERS_CLAIM) {
+        if (!WatchLinkCoordinator.handles(path) &&
+            path != WearPaths.PRESENCE &&
+            path != WearPaths.REMINDERS_CLAIM &&
+            path != WearPaths.REMINDERS_DELIVER
+        ) {
             Napier.w("The phone sent a request this watch does not answer: $path")
             return null
         }
@@ -110,6 +115,8 @@ class WearDataLayerListenerService : WearableListenerService() {
         }
         return if (path == WearPaths.REMINDERS_CLAIM) {
             koin.get<ReminderClaimResponder>().answer(nodeId, request)
+        } else if (path == WearPaths.REMINDERS_DELIVER) {
+            koin.get<ReminderDeliveryResponder>().answer(nodeId, request)
         } else if (path == WearPaths.PRESENCE) {
             koin.get<WearPresenceResponder>().answer(nodeId, request)
         } else {

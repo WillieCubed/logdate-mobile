@@ -6,4 +6,13 @@
     <string name="wear_reminder_workout_body">Record how it went</string>
     <string name="wear_reminder_evening_title">Nothing recorded today</string>
     <string name="wear_reminder_evening_body">Record a moment before the day ends</string>
+    <string name="wear_reminder_arrival_title">Somewhere new</string>
+    <string name="wear_reminder_arrival_body">Record a moment here</string>
+    <string name="wear_reminder_campfire_title">Keep your campfire going</string>
+    <string name="wear_reminder_campfire_body">Record a moment from today</string>
+    <string name="wear_reminder_wind_down_title">Before the day ends</string>
+    <plurals name="wear_reminder_open_marks">
+        <item quantity="one">%d marked moment to finish</item>
+        <item quantity="other">%d marked moments to finish</item>
+    </plurals>
 </resources>

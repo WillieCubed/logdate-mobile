@@ -6,10 +6,13 @@ import app.logdate.client.datastore.featureflags.FeatureFlagStore
 import app.logdate.client.domain.reminders.CoordinatedReminderClaims
 import app.logdate.client.domain.reminders.ReminderClaimResponder
 import app.logdate.client.domain.reminders.ReminderDayClaims
+import app.logdate.client.domain.reminders.ReminderDeliveryResponder
 import app.logdate.client.domain.reminders.WireReminderClaimPeer
 import app.logdate.client.domain.streak.DEFAULT_STREAK_DAY_START_HOUR
 import app.logdate.client.sync.peer.state.PeerRole
 import app.logdate.client.sync.peer.state.PeerStateStore
+import app.logdate.wear.reminders.WatchNudgeNotifier
+import app.logdate.wear.reminders.WatchReminderPreferences
 import app.logdate.wear.sync.v2.delivery.WatchDeliveryPeer
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.flow.first
@@ -41,4 +44,15 @@ val wearReminderClaimsModule =
             )
         }
         single { ReminderClaimResponder(get(), PeerRole.WATCH) }
+        single {
+            val flags = get<FeatureFlagStore>()
+            val preferences = get<WatchReminderPreferences>()
+            val notifier = WatchNudgeNotifier(get())
+            ReminderDeliveryResponder(
+                claims = get(),
+                enabled = { flags.isEnabled(FeatureFlag.WATCH_EXPERIENCE_V2) && preferences.enabled.value },
+                post = { trigger, marks -> notifier.post(trigger, marks) },
+                recordPostedAt = { preferences.setLastReminderAt(it) },
+            )
+        }
     }

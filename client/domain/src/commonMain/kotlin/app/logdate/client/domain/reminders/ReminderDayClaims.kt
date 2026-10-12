@@ -61,6 +61,16 @@ class ReminderDayClaims(
             true
         }
 
+    /** A delegated post gets one durable authorization, including across retries and restart. */
+    suspend fun consumePeer(claim: ReminderDayClaim): Boolean =
+        mutex.withLock {
+            if (!claim.valid() || claim.role == role) return@withLock false
+            val current = read(claim.context) ?: return@withLock false
+            if (current.claim != claim || current.phase != Phase.RESERVED) return@withLock false
+            save(current.copy(phase = Phase.CONSUMED))
+            true
+        }
+
     private fun ReminderDayClaim.valid(): Boolean = context.isValid() && Uuid.parseOrNull(id) != null
 
     private suspend fun read(context: PeerDeliveryContext): Reservation? {
@@ -91,7 +101,7 @@ class ReminderDayClaims(
     )
 
     @Serializable
-    private enum class Phase { PENDING, RESERVED }
+    private enum class Phase { PENDING, RESERVED, CONSUMED }
 
     @Serializable
     private data class Reservation(

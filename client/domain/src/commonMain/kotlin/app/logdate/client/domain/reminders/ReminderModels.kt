@@ -4,6 +4,7 @@ import app.logdate.client.domain.streak.DEFAULT_STREAK_DAY_START_HOUR
 import app.logdate.client.domain.streak.FirePhase
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
+import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
 /**
@@ -64,6 +65,7 @@ data class ReminderSignals(
 )
 
 /** What a reminder rings for, in the order [ReminderOrchestrator] prefers them. */
+@Serializable
 enum class ReminderTrigger {
     WORKOUT_ENDED,
     ARRIVED_SOMEWHERE_NEW,

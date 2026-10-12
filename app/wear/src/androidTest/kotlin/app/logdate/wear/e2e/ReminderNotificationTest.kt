@@ -33,6 +33,7 @@ class ReminderNotificationTest {
 
     @Before
     fun grantNotifications() {
+        clear()
         InstrumentationRegistry
             .getInstrumentation()
             .uiAutomation
@@ -42,6 +43,30 @@ class ReminderNotificationTest {
     @After
     fun clear() {
         notificationManager.cancel(WatchNudgeNotifier.TAG, WatchNudgeNotifier.NOTIFICATION_ID)
+        val deadline = SystemClock.elapsedRealtime() + TIMEOUT_MS
+        while (SystemClock.elapsedRealtime() < deadline) {
+            if (notificationManager.activeNotifications.none {
+                    it.tag == WatchNudgeNotifier.TAG && it.id == WatchNudgeNotifier.NOTIFICATION_ID
+                }
+            ) {
+                return
+            }
+            SystemClock.sleep(25)
+        }
+        error("The previous watch reminder was not removed within $TIMEOUT_MS ms")
+    }
+
+    @Test
+    fun marked_moments_are_folded_into_the_single_reminder() {
+        assertTrue(WatchNudgeNotifier(context).post(WatchReminder.WORKOUT_ENDED, 3))
+        val notification = posted().notification
+        assertTrue(
+            notification.extras
+                .getCharSequence(Notification.EXTRA_TEXT)
+                .toString()
+                .contains("3 marked moments to finish"),
+        )
+        assertEquals(1, notificationManager.activeNotifications.count { it.tag == WatchNudgeNotifier.TAG })
     }
 
     @Test

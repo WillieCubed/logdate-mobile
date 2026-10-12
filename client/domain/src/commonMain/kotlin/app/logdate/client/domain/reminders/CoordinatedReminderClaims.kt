@@ -38,6 +38,11 @@ class CoordinatedReminderClaims(
         return canUse(claim)
     }
 
+    suspend fun acceptsDelegated(claim: ReminderDayClaim): Boolean = claim.role != role && canUse(claim)
+
+    suspend fun consumeDelegated(claim: ReminderDayClaim): Boolean =
+        acceptsDelegated(claim) && claims.consumePeer(claim) && acceptsDelegated(claim)
+
     private suspend fun canUse(claim: ReminderDayClaim): Boolean =
         claim.context.isValid() && claim.day == today() && enabled() && isCurrent(claim.context)
 
